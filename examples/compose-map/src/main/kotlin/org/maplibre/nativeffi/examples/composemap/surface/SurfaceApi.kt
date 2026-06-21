@@ -156,10 +156,16 @@ public sealed interface NativeSurfaceTarget {
 public data class MetalTextureTarget(
   public val texture: NativeHandle,
   public val pixelFormat: Long,
+  public val origin: TextureOrigin = TextureOrigin.TOP_LEFT,
   override val extent: SurfaceExtent,
   override val generation: Long,
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.METAL
+}
+
+public enum class TextureOrigin {
+  TOP_LEFT,
+  BOTTOM_LEFT,
 }
 
 public data class VulkanImageTarget(
@@ -190,7 +196,23 @@ public fun interface OpenGlContextProvider {
   public fun makeCurrent()
 }
 
+public sealed interface OpenGlContextHandles
+
+public data class EglContextHandles(
+  public val display: NativeHandle,
+  public val config: NativeHandle,
+  public val shareContext: NativeHandle,
+  public val getProcAddress: NativeHandle,
+) : OpenGlContextHandles
+
+public data class WglContextHandles(
+  public val deviceContext: NativeHandle,
+  public val shareContext: NativeHandle,
+  public val getProcAddress: NativeHandle,
+) : OpenGlContextHandles
+
 public data class OpenGlTextureTarget(
+  public val context: OpenGlContextHandles,
   public val textureName: Int,
   public val textureTarget: Int,
   public val format: Int,

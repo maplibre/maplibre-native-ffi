@@ -216,6 +216,7 @@ internal object SkikoHost {
   private class MetalTexturePresenter(private val texture: NativeHandle) : AutoCloseable {
     private var contextIdentity = 0
     private var extent = SurfaceExtent.Empty
+    private var origin = TextureOrigin.TOP_LEFT
     private var renderTarget: BackendRenderTarget? = null
     private var surface: Surface? = null
     private val retainedImages = ArrayDeque<Image>()
@@ -252,7 +253,8 @@ internal object SkikoHost {
         surface != null &&
           renderTarget != null &&
           contextIdentity == nextContextIdentity &&
-          extent == target.extent
+          extent == target.extent &&
+          origin == target.origin
       ) {
         return
       }
@@ -260,6 +262,7 @@ internal object SkikoHost {
       closeGpuResources()
       contextIdentity = nextContextIdentity
       extent = target.extent
+      origin = target.origin
       renderTarget =
         BackendRenderTarget.makeMetal(
           width = target.extent.physicalWidth,
@@ -270,7 +273,7 @@ internal object SkikoHost {
         Surface.makeFromBackendRenderTarget(
           context = context,
           rt = checkNotNull(renderTarget),
-          origin = SurfaceOrigin.TOP_LEFT,
+          origin = target.origin.toSkiaOrigin(),
           colorFormat = SurfaceColorFormat.BGRA_8888,
           colorSpace = null,
           surfaceProps = null,
@@ -291,6 +294,7 @@ internal object SkikoHost {
       closeGpuResources()
       contextIdentity = 0
       extent = SurfaceExtent.Empty
+      origin = TextureOrigin.TOP_LEFT
     }
 
     private fun closeGpuResources() {
@@ -309,3 +313,9 @@ internal data class SkikoMetalDevice(val ptr: Long)
 
 internal class NativeSurfaceBridgeException(message: String, cause: Throwable? = null) :
   RuntimeException(message, cause)
+
+private fun TextureOrigin.toSkiaOrigin(): SurfaceOrigin =
+  when (this) {
+    TextureOrigin.TOP_LEFT -> SurfaceOrigin.TOP_LEFT
+    TextureOrigin.BOTTOM_LEFT -> SurfaceOrigin.BOTTOM_LEFT
+  }

@@ -38,22 +38,6 @@ internal abstract class PlaceholderBridge(
   protected abstract fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget
 }
 
-internal class MacOpenGlMetalBridge :
-  PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.METAL) {
-  // TODO(surface): create an ANGLE EGL/GLES context backed by Metal, allocate the shared target as
-  // a Skiko-device Metal texture, import it into ANGLE with EGL_ANGLE_metal_texture_client_buffer,
-  // bind the EGLImage to a GLES texture, and expose that texture with an EglContextDescriptor.
-  override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
-    OpenGlTextureTarget(
-      textureName = 0,
-      textureTarget = 0,
-      format = 0,
-      contextProvider = OpenGlContextProvider {},
-      extent = extent,
-      generation = generation,
-    )
-}
-
 internal class LinuxVulkanOpenGlBridge :
   PlaceholderBridge(ProducerBackend.VULKAN, ConsumerBackend.OPENGL) {
   // TODO: Allocate a Vulkan image with Linux external-memory support, export it as dma-buf or an
@@ -75,11 +59,12 @@ internal class LinuxVulkanOpenGlBridge :
 
 internal class LinuxOpenGlBridge :
   PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.OPENGL) {
-  // TODO: Bind the target to the active Skiko OpenGL context, define context-current guarantees for
-  // producer callbacks, and add GL fence ownership so Skiko never samples while the producer
-  // writes.
+  // TODO: Create bridge-owned external-memory storage, import it into both MapLibre's EGL context
+  // and Skiko's OpenGL context, and add GL semaphore/fence ownership for producer-to-consumer
+  // handoff.
   override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
     OpenGlTextureTarget(
+      context = PlaceholderEglContextHandles,
       textureName = 0,
       textureTarget = 0,
       format = 0,
@@ -111,10 +96,11 @@ internal class WindowsVulkanD3d12Bridge :
 internal class WindowsOpenGlD3d12Bridge :
   PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.DIRECT3D12) {
   // TODO: Define the WGL-to-D3D12 sharing path, including keyed mutex or fence synchronization,
-  // lifetime for HANDLE ownership, and fallback behavior when the required WGL/D3D interop
+  // lifetime for HANDLE ownership, and fail-fast diagnostics when the required WGL/D3D interop
   // extensions are unavailable.
   override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
     OpenGlTextureTarget(
+      context = PlaceholderWglContextHandles,
       textureName = 0,
       textureTarget = 0,
       format = 0,
@@ -133,4 +119,19 @@ private val PlaceholderVulkanContextHandles =
     graphicsQueueFamilyIndex = 0,
     getInstanceProcAddr = NativeHandle(0),
     getDeviceProcAddr = NativeHandle(0),
+  )
+
+private val PlaceholderEglContextHandles =
+  EglContextHandles(
+    display = NativeHandle(0),
+    config = NativeHandle(0),
+    shareContext = NativeHandle(0),
+    getProcAddress = NativeHandle(0),
+  )
+
+private val PlaceholderWglContextHandles =
+  WglContextHandles(
+    deviceContext = NativeHandle(0),
+    shareContext = NativeHandle(0),
+    getProcAddress = NativeHandle(0),
   )

@@ -1,22 +1,29 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.examples.composemap.surface.EglContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
 import org.maplibre.nativeffi.examples.composemap.surface.NativeHandle
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceTarget
+import org.maplibre.nativeffi.examples.composemap.surface.OpenGlContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.OpenGlTextureTarget
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanContextHandles
 import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
+import org.maplibre.nativeffi.examples.composemap.surface.WglContextHandles
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLContextDescriptor
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderSessionHandle
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
+import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object MapLibreNativeSurfaceAdapter {
   val supportedBackends: Set<ProducerBackend> =
@@ -69,12 +76,14 @@ internal object MapLibreNativeSurfaceAdapter {
   ): BorrowedDescriptor =
     BorrowedDescriptor(
       key = targetKey(target.backend, target.generation, extent),
-      attach = {
-        // TODO(surface): OpenGlTextureTarget must expose a producer EGL/WGL context descriptor
-        // compatible with MapLibre's OpenGL borrowed texture API. Keep Skiko context discovery,
-        // external-memory import details, and synchronization in surface.
-        throw UnsupportedOperationException(
-          "OpenGL Compose surface targets do not yet expose a MapLibre OpenGL context descriptor"
+      attach = { map ->
+        map.attachOpenGLBorrowedTexture(
+          OpenGLBorrowedTextureDescriptor(
+            extent.toRenderTargetExtent(),
+            target.context.toDescriptor(),
+            target.textureName,
+            target.textureTarget,
+          )
         )
       },
     )
@@ -129,3 +138,20 @@ private fun VulkanContextHandles.toDescriptor(): VulkanContextDescriptor =
     getInstanceProcAddr.toPointer(),
     getDeviceProcAddr.toPointer(),
   )
+
+private fun OpenGlContextHandles.toDescriptor(): OpenGLContextDescriptor =
+  when (this) {
+    is EglContextHandles ->
+      EglContextDescriptor(
+        display.toPointer(),
+        config.toPointer(),
+        shareContext.toPointer(),
+        getProcAddress.toPointer(),
+      )
+    is WglContextHandles ->
+      WglContextDescriptor(
+        deviceContext.toPointer(),
+        shareContext.toPointer(),
+        getProcAddress.toPointer(),
+      )
+  }

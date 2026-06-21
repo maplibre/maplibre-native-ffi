@@ -161,10 +161,11 @@ diagnostics, or explicit disposal can pass a remembered controller.
 `NativeSurfaceTarget` is intentionally backend-specific at the edge. Targets are
 valid only during the `render(frame)` call.
 
-- `MetalTextureTarget`: `id<MTLTexture>` plus pixel format and extent.
+- `MetalTextureTarget`: `id<MTLTexture>` plus pixel format, origin, and extent.
 - `VulkanImageTarget`: `VkImage`, `VkImageView`, `VkFormat`, layouts, and queue
   family requirements.
-- `OpenGlTextureTarget`: texture name, target, context provider, and format.
+- `OpenGlTextureTarget`: texture name, target, context handles, context
+  provider, and format.
 
 Backend targets should use opaque native-handle wrappers instead of raw Kotlin
 `Long` values wherever possible:
@@ -272,20 +273,19 @@ producer handle to MapLibre.
 
 Per bridge row:
 
-| Bridge          | Shared storage direction                                                                                                                                                                                           |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `metal-metal`   | Create an `MTLTexture` on the Skiko Metal device, pass the same texture to MapLibre's Metal borrowed texture descriptor, and draw it from Skiko's Metal path.                                                      |
-| `vulkan-metal`  | Create an `MTLTexture` on the Skiko Metal device, import it into Vulkan with `VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLTEXTURE_BIT_EXT`, then pass the `VkImage` and `VkImageView` to MapLibre.                           |
-| `opengl-metal`  | Use IOSurface-backed storage as the expected common allocation, then create a Metal texture and an OpenGL texture view over that storage. The exact MapLibre OpenGL/EGL producer path remains a validation target. |
-| `vulkan-d3d12`  | Create a D3D12 committed resource or shared resource compatible with Skiko, export a shared handle, import it into Vulkan as a D3D12 resource-backed image, then pass the image and view to MapLibre.              |
-| `opengl-d3d12`  | Create a D3D12 shared resource compatible with Skiko, import it into OpenGL with Win32 external memory objects, then pass the OpenGL texture name to MapLibre.                                                     |
-| `vulkan-opengl` | Create Vulkan exportable image memory or Linux `dma_buf` storage, import it into OpenGL with external memory objects or EGL image import, then draw the OpenGL texture from Skiko.                                 |
-| `opengl-opengl` | Prefer bridge-owned external-memory storage imported into both the producer texture and the Skiko texture. Direct context sharing is only valid if Skiko exposes a compatible context/share group.                 |
+| Bridge          | Shared storage direction                                                                                                                                                                                                                                                           |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `metal-metal`   | Create an `MTLTexture` on the Skiko Metal device, pass the same texture to MapLibre's Metal borrowed texture descriptor, and draw it from Skiko's Metal path.                                                                                                                      |
+| `vulkan-metal`  | Create an `MTLTexture` on the Skiko Metal device, import it into Vulkan with `VK_EXTERNAL_MEMORY_HANDLE_TYPE_MTLTEXTURE_BIT_EXT`, then pass the `VkImage` and `VkImageView` to MapLibre.                                                                                           |
+| `opengl-metal`  | Create an `MTLTexture` on the Skiko Metal device, create an ANGLE Metal-backed EGL/GLES context, import the Metal texture with `EGL_ANGLE_metal_texture_client_buffer`, bind the `EGLImage` to `GL_TEXTURE_2D`, and pass the texture name plus `EglContextDescriptor` to MapLibre. |
+| `vulkan-d3d12`  | Create a D3D12 committed resource or shared resource compatible with Skiko, export a shared handle, import it into Vulkan as a D3D12 resource-backed image, then pass the image and view to MapLibre.                                                                              |
+| `opengl-d3d12`  | Create a D3D12 shared resource compatible with Skiko, import it into OpenGL with Win32 external memory objects, then pass the OpenGL texture name to MapLibre.                                                                                                                     |
+| `vulkan-opengl` | Create Vulkan exportable image memory or Linux `dma_buf` storage, import it into OpenGL with external memory objects or EGL image import, then draw the OpenGL texture from Skiko.                                                                                                 |
+| `opengl-opengl` | Create bridge-owned external-memory storage imported into both the producer EGL texture and the Skiko OpenGL texture, then synchronize producer-to-consumer access with GL semaphore/fence ownership.                                                                              |
 
 Vulkan external memory supports the needed producer imports for Metal textures,
 D3D12 resources, and Linux `dma_buf` file descriptors. OpenGL external memory
-objects cover the Windows and Linux GL import side, while Linux EGL image import
-is a second option for `dma_buf`-backed storage.
+objects cover the Windows and Linux GL import side.
 
 ## Ownership Model
 
@@ -355,9 +355,9 @@ it.
 
 Linux needs special care. Skiko's default Compose Desktop path is OpenGL, but it
 does not imply an EGL context that MapLibre can share directly. The current C
-API supports WGL and EGL context providers for OpenGL, not GLX. Therefore the
-portable Linux design should use external-memory texture aliasing rather than
-assuming direct context sharing with Skiko's OpenGL context.
+API supports WGL and EGL context providers for OpenGL, not GLX. The Linux OpenGL
+bridge should use external-memory texture aliasing instead of direct context
+sharing with Skiko's OpenGL context.
 
 ## Synchronization Strategy
 
@@ -414,10 +414,9 @@ needs the texture name, target, and a supported context provider once the bridge
 has imported or created the texture in the producer context.
 
 One C API gap is intentionally avoided by this architecture: direct Linux OpenGL
-sharing with Skiko would likely require a GLX context provider or deeper Skiko
-context ownership. The planned Linux OpenGL rows should use external-memory
-texture aliasing so the existing EGL provider remains enough for MapLibre's
-producer side.
+sharing with Skiko would require a GLX context provider or deeper Skiko context
+ownership. The Linux OpenGL rows use external-memory texture aliasing so the
+existing EGL provider remains enough for MapLibre's producer side.
 
 ## Build And Runtime Shape
 
@@ -466,9 +465,8 @@ renaming exported symbols.
 
 ## Remaining Validation Targets
 
-- Validate the exact IOSurface or CVPixelBuffer path for `opengl-metal`,
-  including whether the current MapLibre OpenGL backend can operate through the
-  needed EGL/CGL route on macOS.
+- Replace the first `opengl-metal` proof's `glFinish()` handoff with GPU-native
+  synchronization once a practical Skiko Metal wait path is identified.
 - Validate the best Metal-side synchronization path for `vulkan-metal` after the
   conservative proof, especially how to connect an `MTLSharedEvent` to Skiko
   command submission.
@@ -498,8 +496,7 @@ renaming exported symbols.
 - [GL_EXT_external_objects](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects.txt)
 - [GL_EXT_external_objects_fd](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects_fd.txt)
 - [GL_EXT_external_objects_win32](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects_win32.txt)
-- [Apple Metal and OpenGL interoperability](https://developer.apple.com/documentation/metal/mixing-metal-and-opengl-rendering-in-a-view)
-- [Apple Metal IOSurface textures](https://developer.apple.com/documentation/metal/mtldevice/maketexture%28descriptor%3Aiosurface%3Aplane%3A%29)
+- [ANGLE Metal texture client buffer extension](https://chromium.googlesource.com/angle/angle/+/refs/heads/main/extensions/EGL_ANGLE_metal_texture_client_buffer.txt)
 - [VK_EXT_metal_objects](https://docs.vulkan.org/features/latest/features/proposals/VK_EXT_metal_objects.html)
 - [VkExportMetalSharedEventInfoEXT](https://vulkan.lunarg.com/doc/view/1.4.341.0/mac/antora/refpages/latest/refpages/source/VkExportMetalSharedEventInfoEXT.html)
 - [Skiko AWT backend selection](https://raw.githubusercontent.com/JetBrains/skiko/master/skiko/src/awtMain/kotlin/org/jetbrains/skiko/Actuals.awt.kt)
