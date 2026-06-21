@@ -9,6 +9,10 @@ import (
 )
 
 func TestRenderSessionWrongThreadReturnsWrongThreadDarwin(t *testing.T) {
+	if !SupportedRenderBackends().Has(RenderBackendMetal) {
+		t.Skip("Metal texture sessions are not supported by this build")
+	}
+
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
 
