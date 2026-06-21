@@ -23,13 +23,13 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 
 ## Implementations
 
-| Example               | Profile | Binding  | Toolkit         | Platforms             | Backends              |
-| --------------------- | ------- | -------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`    | Desktop | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`   | Desktop | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/lwjgl-map`  | Desktop | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/dotnet-map` | Desktop | C#       | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/swift-map`  | Desktop | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+| Example               | Profile | Binding    | Toolkit         | Platforms             | Backends              |
+| --------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`    | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`   | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/lwjgl-map`  | Desktop | Kotlin/JVM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/dotnet-map` | Desktop | C#         | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/swift-map`  | Desktop | Swift      | AppKit, SwiftUI | macOS                 | Metal                 |
 
 For examples built by native render-backend variant, “Backends” is the union of
 supported configured variants. Each native library artifact includes one render

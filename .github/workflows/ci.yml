@@ -47,8 +47,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/rust-map:ci
@@ -68,8 +66,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/lwjgl-map:build
@@ -90,9 +86,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
+      - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/rust-map:ci
@@ -112,9 +106,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
+      - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/lwjgl-map:build
@@ -135,9 +127,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
+      - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:ci
@@ -159,9 +149,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
+      - run: mise run //bindings/kotlin:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:ci
@@ -279,8 +267,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/lwjgl-map:build
@@ -301,8 +287,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
       - run: mise run //bindings/rust:ci
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/rust-map:ci
