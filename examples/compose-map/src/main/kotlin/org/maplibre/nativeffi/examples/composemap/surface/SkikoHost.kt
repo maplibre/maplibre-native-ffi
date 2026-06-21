@@ -31,19 +31,24 @@ internal object SkikoHost {
         ?: throw NativeSurfaceBridgeException(
           "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
         )
-    val redrawer = requireMetalRedrawer(layer)
+    val contextHandler = requireMetalContextHandler(layer)
     val device =
-      redrawer.getField("_device")
+      contextHandler.getField("device")
         ?: throw NativeSurfaceBridgeException(
-          "$METAL_REDRAWER_CLASS._device was null; Skiko has not created the Metal device yet"
+          "${contextHandler.javaClass.name}.device was null; Skiko has not created the Metal device yet"
         )
     val ptr =
-      device.invokeNoArg("getPtr") as? Long
-        ?: throw NativeSurfaceBridgeException(
-          "${device.javaClass.name}.getPtr() did not return the Skiko MetalDevice pointer"
-        )
+      when (device) {
+        is Long -> device
+        else ->
+          device.getField("ptr") as? Long
+            ?: device.invokeNoArg("getPtr") as? Long
+            ?: throw NativeSurfaceBridgeException(
+              "${device.javaClass.name} did not expose the Skiko MetalDevice pointer"
+            )
+      }
     if (ptr == 0L) {
-      throw NativeSurfaceBridgeException("$METAL_REDRAWER_CLASS._device.ptr was zero")
+      throw NativeSurfaceBridgeException("${contextHandler.javaClass.name}.device.ptr was zero")
     }
     SkikoMetalDevice(ptr)
   }
@@ -74,15 +79,19 @@ internal object SkikoHost {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException("SkikoHost could not find a live $SKIA_LAYER_CLASS")
-    val redrawer = requireMetalRedrawer(layer)
-    val contextHandler =
-      redrawer.getField("contextHandler")
-        ?: throw NativeSurfaceBridgeException("$METAL_REDRAWER_CLASS.contextHandler was null")
-    (contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext)
+    val contextHandler = requireMetalContextHandler(layer)
+    (contextHandler.getField("context") as? DirectContext)
       ?: run {
         contextHandler.invokeDeclaredNoArg("initContext")
-        contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
+        (contextHandler.getField("context") as? DirectContext)
+          ?: contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
       }
+  }
+
+  private fun requireMetalContextHandler(layer: Any): Any {
+    val redrawer = requireMetalRedrawer(layer)
+    return redrawer.getField("contextHandler")
+      ?: throw NativeSurfaceBridgeException("$METAL_REDRAWER_CLASS.contextHandler was null")
   }
 
   private fun requireMetalRedrawer(layer: Any): Any {

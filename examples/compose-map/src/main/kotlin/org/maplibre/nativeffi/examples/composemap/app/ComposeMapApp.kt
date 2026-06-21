@@ -29,6 +29,7 @@ import androidx.compose.ui.input.pointer.isCtrlPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.onPointerEvent
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import kotlin.math.pow
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
@@ -41,6 +42,7 @@ import org.maplibre.nativeffi.examples.composemap.surface.rememberNativeSurfaceC
 internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
   val controller = rememberNativeSurfaceController()
   val focusRequester = remember { FocusRequester() }
+  val density = LocalDensity.current
   val state by controller.state.collectAsState()
 
   DisposableEffect(renderer) { onDispose { renderer.close() } }
@@ -60,7 +62,7 @@ internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
           .focusRequester(focusRequester)
           .focusable()
           .mapKeyboard(renderer)
-          .mapGestures(renderer),
+          .mapGestures(renderer, density.density.toDouble()),
       controller = controller,
     )
     val diagnostic =
@@ -78,10 +80,11 @@ internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
-private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer): Modifier =
-  pointerInput(renderer) {
+private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor: Double): Modifier =
+  pointerInput(renderer, scaleFactor) {
       awaitPointerEventScope {
         var previous: PointerInputChange? = null
+        val scale = scaleFactor.takeIf { it > 0.0 && it.isFinite() } ?: 1.0
         while (true) {
           val event = awaitPointerEvent()
           val change = event.changes.firstOrNull()
@@ -100,9 +103,9 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer): Modifier =
           val delta = current.position - last.position
           val rotate = event.buttons.isSecondaryPressed || event.keyboardModifiers.isCtrlPressed
           if (rotate) {
-            renderer.rotateAndPitchBy(delta.x.toDouble(), delta.y.toDouble())
+            renderer.rotateAndPitchBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
           } else {
-            renderer.moveBy(delta.x.toDouble(), delta.y.toDouble())
+            renderer.moveBy(delta.x.toDouble() / scale, delta.y.toDouble() / scale)
           }
           current.consume()
         }
@@ -116,8 +119,13 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer): Modifier =
       }
 
       change.consume()
+      val coordinateScale = scaleFactor.takeIf { it > 0.0 && it.isFinite() } ?: 1.0
       val scale = 2.0.pow(-scrollY.toDouble() * SCROLL_ZOOM_FACTOR)
-      renderer.scaleBy(scale, change.position.x.toDouble(), change.position.y.toDouble())
+      renderer.scaleBy(
+        scale,
+        change.position.x.toDouble() / coordinateScale,
+        change.position.y.toDouble() / coordinateScale,
+      )
     }
 
 private fun Modifier.mapKeyboard(renderer: MapLibreSurfaceRenderer): Modifier =

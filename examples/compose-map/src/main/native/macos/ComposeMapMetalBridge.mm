@@ -60,4 +60,23 @@ Java_org_maplibre_nativeffi_examples_composemap_surface_MacMetalBridgeNative_tex
   }
 }
 
+JNIEXPORT void JNICALL
+Java_org_maplibre_nativeffi_examples_composemap_surface_MacMetalBridgeNative_runInAutoreleasePool(
+  JNIEnv* env, jclass, jobject action
+) {
+  @autoreleasepool {
+    jclass runnableClass = env->FindClass("java/lang/Runnable");
+    if (runnableClass == nullptr) {
+      return;
+    }
+    jmethodID runMethod = env->GetMethodID(runnableClass, "run", "()V");
+    if (runMethod == nullptr) {
+      env->DeleteLocalRef(runnableClass);
+      return;
+    }
+    env->CallVoidMethod(action, runMethod);
+    env->DeleteLocalRef(runnableClass);
+  }
+}
+
 }  // extern C

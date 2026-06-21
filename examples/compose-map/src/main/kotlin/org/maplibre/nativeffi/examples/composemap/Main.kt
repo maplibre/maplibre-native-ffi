@@ -11,11 +11,7 @@ internal object Main {
   @JvmStatic
   fun main(args: Array<String>) {
     val renderer = MapLibreSurfaceRenderer()
-    val shutdownHook = Thread {
-      renderer.close()
-      SkikoHost.close()
-      Maplibre.clearLogCallback()
-    }
+    val shutdownHook = Thread { Maplibre.clearLogCallback() }
     Runtime.getRuntime().addShutdownHook(shutdownHook)
     Maplibre.setLogCallback { record ->
       System.err.printf(

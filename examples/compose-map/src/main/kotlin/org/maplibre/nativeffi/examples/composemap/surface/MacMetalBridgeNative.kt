@@ -23,4 +23,6 @@ internal object MacMetalBridgeNative {
   @JvmStatic external fun disposeMetalTexture(texture: Long)
 
   @JvmStatic external fun texturePixelFormat(texture: Long): Long
+
+  @JvmStatic external fun runInAutoreleasePool(action: Runnable)
 }

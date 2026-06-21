@@ -5,6 +5,7 @@ import kotlin.math.min
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.examples.composemap.surface.MacMetalBridgeNative
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
 import org.maplibre.nativeffi.examples.composemap.surface.NativeHandle
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
@@ -76,7 +77,11 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     }
 
     return try {
-      attached.session.renderUpdate()
+      if (frame.target is MetalTextureTarget) {
+        MacMetalBridgeNative.runInAutoreleasePool(Runnable { attached.session.renderUpdate() })
+      } else {
+        attached.session.renderUpdate()
+      }
       renderPending = false
       NativeSurfaceRenderResult.Rendered
     } catch (_: InvalidStateException) {
