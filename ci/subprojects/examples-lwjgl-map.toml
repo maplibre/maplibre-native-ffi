@@ -1,3 +1,2 @@
 [requires]
-backend = ["vulkan"]
 os = ["linux", "macos", "windows"]
