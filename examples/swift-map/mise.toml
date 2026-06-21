@@ -1,17 +1,34 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''
-if [[ "${MLN_FFI_RENDER_BACKEND:-metal}" != "metal" ]]; then
-  echo "swift-map currently supports Metal variants only" >&2
-  exit 1
+if [[ "$MISE_ENV" == ios-* ]]; then
+  swift build \
+    --product swift-map-ios \
+    --scratch-path ".build/$MISE_ENV" \
+    --sdk "$MLN_FFI_SYSTEM_ROOT" \
+    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE"
+else
+  swift build --product swift-map --scratch-path ".build/$MISE_ENV"
 fi
-swift build --scratch-path ".build/$MISE_ENV"
 '''
 
 [tasks.run]
-depends = ["build"]
-usage = 'arg "render-target"'
-run = '".build/$MISE_ENV/debug/swift-map" "{{ usage.render_target }}"'
+usage = 'arg "[render-target]"'
+run = '''
+if [[ "$MISE_ENV" == ios-simulator-* ]]; then
+  exec mise run run:ios-simulator
+fi
+if [[ "$MISE_ENV" == ios-* ]]; then
+  echo "swift-map run is only supported for iOS simulator environments, not $MISE_ENV" >&2
+  exit 1
+fi
+if [[ -z "{{ usage.render_target }}" ]]; then
+  echo "Usage: mise run //examples/swift-map:run -- <render-target>" >&2
+  exit 1
+fi
+mise run build
+exec ".build/$MISE_ENV/debug/swift-map" "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

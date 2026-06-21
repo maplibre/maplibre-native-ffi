@@ -30,15 +30,17 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
     commands = {variant.name: [] for variant in variants}
 
     for subproject in load_subprojects(variants):
-        is_native = subproject.name == "native"
         tasks = subproject.manifest.ci.model_dump(exclude_none=True)
 
         for variant in variants:
             if not subproject_matches_variant(subproject, variant):
                 continue
             for action_key, task in tasks.items():
-                build_only_native = variant.os in {"android", "ios", "ohos"}
-                if is_native and not build_only_native and action_key == "build":
+                if (
+                    action_key == "build"
+                    and tasks.get("test")
+                    and variant.supports_tests
+                ):
                     continue
                 if action_key == "test" and not variant.supports_tests:
                     continue

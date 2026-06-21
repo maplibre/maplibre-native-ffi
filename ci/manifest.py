@@ -156,7 +156,11 @@ def load_subprojects(variants: list[Variant]) -> list[Subproject]:
 
 def default_ci(name: str) -> CiConfig | None:
     if name.startswith("bindings-"):
-        return CiConfig(test=f"//bindings/{name.removeprefix('bindings-')}:test")
+        binding = name.removeprefix("bindings-")
+        return CiConfig(
+            build=f"//bindings/{binding}:build",
+            test=f"//bindings/{binding}:test",
+        )
     if name.startswith("examples-"):
         return CiConfig(build=f"//examples/{name.removeprefix('examples-')}:build")
     return None

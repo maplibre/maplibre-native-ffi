@@ -1,0 +1,19 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:kotlin:assemble"
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:kotlin:check"
+
+[tasks.jvmTest]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:kotlin:jvmTest"
+
+[tasks.nativeTest]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:kotlin:nativeTest"
+
+[tasks.androidBuild]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:kotlin:androidBuild"

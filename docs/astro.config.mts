@@ -52,16 +52,6 @@ export default defineConfig({
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
             {
-              label: "Java FFM API",
-              link: "/reference/java-ffm/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
-              label: "Java JNI API",
-              link: "/reference/java-jni/",
-              attrs: { target: "_blank", rel: "noopener noreferrer" },
-            },
-            {
               label: "Rust API",
               link: "/reference/rust/maplibre_native/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },

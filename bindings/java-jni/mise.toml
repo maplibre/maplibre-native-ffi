@@ -1,7 +1,0 @@
-[tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:java-jni:assemble"
-
-[tasks.test]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:java-jni:check"

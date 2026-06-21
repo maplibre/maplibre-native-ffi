@@ -49,9 +49,7 @@ BACKEND_LABELS = {
 
 SUBPROJECT_LABEL_OVERRIDES = {
     "bindings-dotnet": "C#",
-    "bindings-java-ffm": "Java FFM",
-    "bindings-java-jni": "Java JNI",
-    "bindings-kotlin-native": "Kotlin/Native",
+    "bindings-kotlin": "Kotlin",
 }
 
 BACKEND_ORDER = ["vulkan", "opengl", "metal"]

@@ -20,6 +20,7 @@ func nativeLinkerFlags() -> [String] {
 
 let isIOSSimulator = Context.environment["MISE_ENV"]?
   .hasPrefix("ios-simulator-") == true
+let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let testDependencies: [Target.Dependency] = [
   "MaplibreNative",
   "CMaplibreNativeC",
@@ -45,7 +46,9 @@ if isIOSSimulator {
   let testSourceFiles: [String]
   do {
     testSourceFiles = try FileManager.default
-      .contentsOfDirectory(atPath: testSourcesPath)
+      .contentsOfDirectory(atPath: packageRoot.appendingPathComponent(
+        testSourcesPath
+      ).path)
       .filter { $0.hasSuffix(".swift") }
       .sorted()
       .map { "MaplibreNativeTests/\($0)" }

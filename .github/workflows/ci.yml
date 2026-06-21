@@ -47,8 +47,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test
@@ -68,8 +66,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -90,9 +86,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
-      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/kotlin:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test
@@ -112,9 +106,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
-      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/kotlin:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -135,9 +127,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
-      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/kotlin:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -159,9 +149,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
-      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/kotlin:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -223,6 +211,9 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/swift:build
+      - run: mise run //bindings/zig:build
+      - run: mise run //examples/swift-map:build
   variant-ios-simulator-arm64-metal:
     name: variant / ios-simulator-arm64-metal
     runs-on: macos-26
@@ -235,10 +226,10 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
-      - run: mise run build
       - run: mise run test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/swift-map:build
   variant-ohos-arm64-egl:
     name: variant / ohos-arm64-egl
     runs-on: ubuntu-latest
@@ -279,8 +270,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -301,8 +290,6 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:test
-      - run: mise run //bindings/java-jni:test
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test
