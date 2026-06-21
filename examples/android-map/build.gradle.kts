@@ -1,13 +1,13 @@
-plugins { id("com.android.application") }
+plugins { alias(libs.plugins.android.application) }
 
 android {
   namespace = "org.maplibre.nativeffi.examples.androidmap"
-  compileSdk = 36
+  compileSdk = libs.versions.android.compileSdk.get().toInt()
 
   defaultConfig {
     applicationId = "org.maplibre.nativeffi.examples.androidmap"
-    minSdk = 24
-    targetSdk = 36
+    minSdk = libs.versions.android.minSdk.get().toInt()
+    targetSdk = libs.versions.android.targetSdk.get().toInt()
     versionCode = 1
     versionName = "0"
 

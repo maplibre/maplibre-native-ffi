@@ -1,44 +1,29 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
   application
-  kotlin("jvm")
+  alias(libs.plugins.kotlin.jvm)
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 repositories { mavenCentral() }
 
-val lwjglVersion = "3.4.1"
+val hostPlatform = HostPlatform.current()
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
-
-fun lwjglNativeClassifier(): String {
-  val os = System.getProperty("os.name").lowercase()
-  val arch = System.getProperty("os.arch").lowercase()
-  return when {
-    os.contains("mac") && (arch == "aarch64" || arch == "arm64") -> "natives-macos-arm64"
-    os.contains("mac") -> "natives-macos"
-    os.contains("linux") && (arch == "aarch64" || arch == "arm64") -> "natives-linux-arm64"
-    os.contains("linux") -> "natives-linux"
-    os.contains("windows") -> "natives-windows"
-    else -> throw GradleException("Unsupported LWJGL native platform: $os/$arch")
-  }
-}
-
-val lwjglNative = lwjglNativeClassifier()
-val hostOs = System.getProperty("os.name").lowercase()
-val hostIsMac = hostOs.contains("mac")
+val lwjglNative = hostPlatform.lwjglNativeClassifier
 val lwjglMapJvmArgs = buildList {
   add("--enable-native-access=ALL-UNNAMED")
-  if (hostIsMac) {
+  if (hostPlatform.isMac) {
     add("-XstartOnFirstThread")
   }
 }
 
-kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
 application {
   mainClass = "org.maplibre.nativeffi.examples.lwjglmap.Main"
@@ -47,22 +32,24 @@ application {
 
 dependencies {
   implementation(project(":bindings:kotlin"))
-  implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
-  implementation("org.lwjgl:lwjgl")
-  implementation("org.lwjgl:lwjgl-egl")
-  implementation("org.lwjgl:lwjgl-glfw")
-  implementation("org.lwjgl:lwjgl-opengl")
-  implementation("org.lwjgl:lwjgl-opengles")
-  implementation("org.lwjgl:lwjgl-vulkan")
-  implementation("org.lwjgl:lwjgl-shaderc")
-  runtimeOnly("org.lwjgl:lwjgl::$lwjglNative")
-  runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
-  runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
-  runtimeOnly("org.lwjgl:lwjgl-opengles::$lwjglNative")
-  runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
+  implementation(platform(libs.lwjgl.bom))
+  implementation(libs.lwjgl)
+  implementation(libs.lwjgl.egl)
+  implementation(libs.lwjgl.glfw)
+  implementation(libs.lwjgl.opengl)
+  implementation(libs.lwjgl.opengles)
+  implementation(libs.lwjgl.vulkan)
+  implementation(libs.lwjgl.shaderc)
+  runtimeOnly(variantOf(libs.lwjgl) { classifier(lwjglNative) })
+  runtimeOnly(variantOf(libs.lwjgl.glfw) { classifier(lwjglNative) })
+  runtimeOnly(variantOf(libs.lwjgl.opengl) { classifier(lwjglNative) })
+  runtimeOnly(variantOf(libs.lwjgl.opengles) { classifier(lwjglNative) })
+  runtimeOnly(variantOf(libs.lwjgl.shaderc) { classifier(lwjglNative) })
 }
 
-tasks.withType<JavaCompile>().configureEach { options.release = 24 }
+tasks.withType<JavaCompile>().configureEach {
+  options.release = libs.versions.java.release.get().toInt()
+}
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeLibraryPath = maplibreNativeC.libraryPath
