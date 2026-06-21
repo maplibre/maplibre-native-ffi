@@ -48,19 +48,19 @@ public fun ComposeNativeSurface(
       )
       onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
     } else {
+      val participant = DesktopNativeRenderingLifecycle.register {
+        renderer.onSurfaceLost()
+        bridge.close()
+      }
       controllerImpl?.connect(
         onRequestFrame = { frameRequest += 1 },
-        onDispose = {
-          renderer.onSurfaceLost()
-          bridge.close()
-        },
+        onDispose = participant::close,
       )
       controllerImpl?.setState(NativeSurfaceState.Ready(bridge.backend, bridge.capabilities))
       renderer.onSurfaceAvailable(session)
       session.requestFrame()
       onDispose {
-        renderer.onSurfaceLost()
-        bridge.close()
+        participant.close()
         controllerImpl?.disconnect()
         controllerImpl?.setState(NativeSurfaceState.Inactive)
       }

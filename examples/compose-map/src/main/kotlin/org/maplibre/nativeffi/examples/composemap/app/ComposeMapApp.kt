@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.pow
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.ComposeNativeSurface
+import org.maplibre.nativeffi.examples.composemap.surface.DesktopNativeRenderingLifecycle
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceState
 import org.maplibre.nativeffi.examples.composemap.surface.rememberNativeSurfaceController
 
@@ -45,7 +46,10 @@ internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
   val density = LocalDensity.current
   val state by controller.state.collectAsState()
 
-  DisposableEffect(renderer) { onDispose { renderer.close() } }
+  DisposableEffect(renderer) {
+    val participant = DesktopNativeRenderingLifecycle.register { renderer.close() }
+    onDispose { participant.close() }
+  }
   LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
   LaunchedEffect(controller) {
     while (true) {
