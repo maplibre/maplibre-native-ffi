@@ -18,6 +18,7 @@ OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
 sys.path.insert(0, str(REPO_ROOT))
 
 from ci.manifest import (  # noqa: E402
+    Subproject,
     Variant,
     load_subprojects,
     load_variants,
@@ -164,7 +165,11 @@ def subproject_source_directory(subproject_name: str) -> str:
 
 
 def source_directory(subproject_name: str, configured: str | None) -> str:
-    return configured if configured is not None else subproject_source_directory(subproject_name)
+    return (
+        configured
+        if configured is not None
+        else subproject_source_directory(subproject_name)
+    )
 
 
 def support_entry(variant: Variant, status: str) -> dict[str, str]:
@@ -218,11 +223,11 @@ def native_rows(variants: list[Variant]) -> list[dict[str, Any]]:
 
 
 def subproject_rows(
-    variants: list[Variant], *, prefix: str, kind: str
+    subprojects: list[Subproject], variants: list[Variant], *, prefix: str, kind: str
 ) -> list[dict[str, Any]]:
     rows = []
     for subproject in sorted(
-        load_subprojects(variants),
+        subprojects,
         key=lambda subproject: (
             subproject_label(subproject.name, subproject.manifest.label).casefold(),
             subproject.name,
@@ -243,6 +248,9 @@ def subproject_rows(
             environment = environment_key(variant)
             environment_entries[environment].append(support_entry(variant, status))
             environment_variants[environment] = variant
+
+        if not environment_entries:
+            continue
 
         rows.append(
             {
@@ -280,6 +288,7 @@ def subproject_rows(
 
 def support_matrix() -> dict[str, Any]:
     variants = load_variants()
+    subprojects = load_subprojects(variants)
     native = native_rows(variants)
     return {
         "statuses": status_rows(),
@@ -291,8 +300,12 @@ def support_matrix() -> dict[str, Any]:
             for row in native
         ],
         "native": native,
-        "bindings": subproject_rows(variants, prefix="bindings-", kind="binding"),
-        "examples": subproject_rows(variants, prefix="examples-", kind="example"),
+        "bindings": subproject_rows(
+            subprojects, variants, prefix="bindings-", kind="binding"
+        ),
+        "examples": subproject_rows(
+            subprojects, variants, prefix="examples-", kind="example"
+        ),
     }
 
 
