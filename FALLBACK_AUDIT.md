@@ -62,7 +62,10 @@ Headline: the anti-patterns concentrate in three places:
   confirmation that sccache isn't intentionally best-effort there.
 - `examples/{lwjgl-map,dotnet-map}` VulkanContext — Wayland warn-and-return
   contradicts the "targets Wayland" comment. Behavior change for examples.
-- Kotlin `closeQuietly` (see Java/Kotlin notes above).
+- Kotlin `closeQuietly` bulk-close paths (see Java/Kotlin notes above). The
+  failure-cleanup `addSuppressed` hazard is resolved; the bulk-close paths still
+  swallow silently, which is intentional (one bad child shouldn't abort sibling
+  teardown).
 
 ## Tier 1 — high-value, low-risk
 
