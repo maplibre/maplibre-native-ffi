@@ -119,26 +119,6 @@ function subprojectSupport(
     ];
   });
 }
-
-function bindingSupport(
-  environment: EnvironmentColumn & { backends: Backend[] },
-): { label: string; status: Status; url: string }[] {
-  return subprojectSupport(
-    supportMatrix.bindings,
-    environment,
-    (binding, support) => supportLabel(binding.label, environment, support),
-  );
-}
-
-function exampleSupport(
-  environment: EnvironmentColumn & { backends: Backend[] },
-): { label: string; status: Status; url: string }[] {
-  return subprojectSupport(
-    supportMatrix.examples,
-    environment,
-    (example) => example.label,
-  );
-}
 ---
 
 <p>
@@ -164,8 +144,16 @@ function exampleSupport(
   </thead>
   <tbody>
     {environmentRows.map((environment) => {
-      const bindings = bindingSupport(environment);
-      const examples = exampleSupport(environment);
+      const bindings = subprojectSupport(
+        supportMatrix.bindings,
+        environment,
+        (binding, support) => supportLabel(binding.label, environment, support),
+      );
+      const examples = subprojectSupport(
+        supportMatrix.examples,
+        environment,
+        (example) => example.label,
+      );
       return (
         <tr>
           <th scope="row">{environment.label}</th>
