@@ -7,6 +7,7 @@ import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -16,13 +17,13 @@ internal class MapState
 private constructor(
   private val runtime: RuntimeHandle,
   val map: MapHandle,
-  private var renderTarget: OpenGLSurfaceRenderTarget?,
+  private var renderTarget: SurfaceRenderTarget?,
 ) : AutoCloseable {
-  fun attachOrResize(graphics: EglGraphicsContext, viewport: Viewport) {
+  fun attachOrResize(graphics: GraphicsContext, viewport: Viewport) {
     if (viewport.isEmpty) return
     val target = renderTarget
     if (target == null) {
-      renderTarget = OpenGLSurfaceRenderTarget.attach(map, graphics, viewport)
+      renderTarget = SurfaceRenderTarget.attach(map, graphics, viewport)
     } else {
       target.resize(viewport)
     }
@@ -73,7 +74,7 @@ private constructor(
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
-    fun create(graphics: EglGraphicsContext, viewport: Viewport): MapState {
+    fun create(graphics: GraphicsContext, viewport: Viewport): MapState {
       val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
       val map =
         MapHandle.create(
@@ -85,7 +86,7 @@ private constructor(
             mapMode = MapMode.CONTINUOUS
           },
         )
-      var target: OpenGLSurfaceRenderTarget? = null
+      var target: SurfaceRenderTarget? = null
       try {
         map.setStyleUrl(STYLE_URL)
         map.jumpTo(
@@ -97,7 +98,7 @@ private constructor(
           }
         )
         map.requestRepaint()
-        target = OpenGLSurfaceRenderTarget.attach(map, graphics, viewport)
+        target = SurfaceRenderTarget.attach(map, graphics, viewport)
         return MapState(runtime, map, target)
       } catch (error: RuntimeException) {
         target?.close()
@@ -109,7 +110,7 @@ private constructor(
   }
 }
 
-private class OpenGLSurfaceRenderTarget(private val session: RenderSessionHandle) : AutoCloseable {
+private class SurfaceRenderTarget(private val session: RenderSessionHandle) : AutoCloseable {
   fun resize(viewport: Viewport) {
     session.resize(viewport.logicalWidth, viewport.logicalHeight, viewport.scaleFactor)
   }
@@ -123,14 +124,19 @@ private class OpenGLSurfaceRenderTarget(private val session: RenderSessionHandle
   }
 
   companion object {
-    fun attach(
-      map: MapHandle,
-      graphics: EglGraphicsContext,
-      viewport: Viewport,
-    ): OpenGLSurfaceRenderTarget {
-      val descriptor =
-        OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
-      return OpenGLSurfaceRenderTarget(map.attachOpenGLSurface(descriptor))
-    }
+    fun attach(map: MapHandle, graphics: GraphicsContext, viewport: Viewport): SurfaceRenderTarget =
+      when (graphics) {
+        is EglGraphicsContext -> {
+          val descriptor =
+            OpenGLSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+          SurfaceRenderTarget(map.attachOpenGLSurface(descriptor))
+        }
+        is VulkanGraphicsContext -> {
+          val descriptor =
+            VulkanSurfaceDescriptor(viewport.extent, graphics.descriptor, graphics.surfacePointer)
+          SurfaceRenderTarget(map.attachVulkanSurface(descriptor))
+        }
+        else -> error("Unsupported graphics context: ${graphics::class.java.name}")
+      }
   }
 }

@@ -16,7 +16,9 @@ private constructor(
   private val config: EGLConfig,
   private var shareContext: EGLContext,
   private var windowSurface: EGLSurface,
-) : AutoCloseable {
+) : GraphicsContext {
+  override val backendName: String = "opengl-egl"
+
   val descriptor: OpenGLContextDescriptor
     get() =
       EglContextDescriptor(

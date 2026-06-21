@@ -10,7 +10,7 @@ import android.view.SurfaceView
 internal class AndroidMapView(context: Context) :
   SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
   private val input = InputController(context, { mapState?.map }, ::requestRender)
-  private var graphics: EglGraphicsContext? = null
+  private var graphics: GraphicsContext? = null
   private var mapState: MapState? = null
   private var viewport: Viewport? = null
   private var viewVisible = false
@@ -118,7 +118,7 @@ internal class AndroidMapView(context: Context) :
       finishPendingDrawing()
       return
     }
-    val nextGraphics = EglGraphicsContext.create(holder.surface)
+    val nextGraphics = GraphicsContext.create(holder.surface)
     graphics = nextGraphics
     viewport = nextViewport
     val state = mapState
@@ -127,7 +127,7 @@ internal class AndroidMapView(context: Context) :
     } else {
       state.attachOrResize(nextGraphics, nextViewport)
     }
-    Log.i(TAG, "render-target=native-surface status=opengl-egl")
+    Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     requestRender()
   }
 

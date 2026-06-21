@@ -12,7 +12,19 @@ android {
     versionName = "0"
 
     ndk { abiFilters += "arm64-v8a" }
+
+    externalNativeBuild { cmake { arguments += "-DANDROID_STL=c++_shared" } }
+
+    buildConfigField(
+      "String",
+      "RENDER_BACKEND",
+      "\"${providers.environmentVariable("MLN_FFI_RENDER_BACKEND").getOrElse("opengl")}\"",
+    )
   }
+
+  buildFeatures { buildConfig = true }
+
+  externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt") } }
 }
 
 dependencies { implementation(project(":bindings:kotlin")) }
