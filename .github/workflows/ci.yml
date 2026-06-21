@@ -47,6 +47,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test
@@ -66,6 +67,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -86,7 +88,8 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test
@@ -106,7 +109,8 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -127,7 +131,8 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -149,7 +154,8 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -170,6 +176,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
+      - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/zig:test
       - run: mise run //examples/zig-readback:run
   variant-android-arm64-egl:
@@ -185,6 +192,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
   variant-android-arm64-vulkan:
     name: variant / android-arm64-vulkan
     runs-on: ubuntu-latest
@@ -198,6 +206,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
     runs-on: macos-26
@@ -270,6 +279,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
@@ -290,6 +300,7 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/rust-map:test

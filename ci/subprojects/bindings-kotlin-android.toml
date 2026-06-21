@@ -1,0 +1,8 @@
+label = "Kotlin/Android"
+source_directory = "bindings/kotlin"
+
+[requires]
+os = ["android"]
+
+[ci]
+build = "//bindings/kotlin:androidBuild"

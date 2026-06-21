@@ -49,7 +49,6 @@ BACKEND_LABELS = {
 
 SUBPROJECT_LABEL_OVERRIDES = {
     "bindings-dotnet": "C#",
-    "bindings-kotlin": "Kotlin",
 }
 
 BACKEND_ORDER = ["vulkan", "opengl", "metal"]
@@ -105,7 +104,9 @@ def subproject_short_name(subproject_name: str) -> str:
     return parts[1] if len(parts) == 2 else subproject_name
 
 
-def subproject_label(subproject_name: str) -> str:
+def subproject_label(subproject_name: str, label: str | None = None) -> str:
+    if label is not None:
+        return label
     if subproject_name in SUBPROJECT_LABEL_OVERRIDES:
         return SUBPROJECT_LABEL_OVERRIDES[subproject_name]
     short_name = subproject_short_name(subproject_name)
@@ -160,6 +161,10 @@ def status_rows() -> list[dict[str, str]]:
 def subproject_source_directory(subproject_name: str) -> str:
     category, name = subproject_name.split("-", maxsplit=1)
     return f"{category}/{name}"
+
+
+def source_directory(subproject_name: str, configured: str | None) -> str:
+    return configured if configured is not None else subproject_source_directory(subproject_name)
 
 
 def support_entry(variant: Variant, status: str) -> dict[str, str]:
@@ -219,7 +224,7 @@ def subproject_rows(
     for subproject in sorted(
         load_subprojects(variants),
         key=lambda subproject: (
-            subproject_label(subproject.name).casefold(),
+            subproject_label(subproject.name, subproject.manifest.label).casefold(),
             subproject.name,
         ),
     ):
@@ -243,9 +248,11 @@ def subproject_rows(
             {
                 "id": subproject.name,
                 "kind": kind,
-                "label": subproject_label(subproject.name),
+                "label": subproject_label(subproject.name, subproject.manifest.label),
                 "source": str(subproject.path.relative_to(REPO_ROOT)),
-                "sourceDirectory": subproject_source_directory(subproject.name),
+                "sourceDirectory": source_directory(
+                    subproject.name, subproject.manifest.source_directory
+                ),
                 "environments": [
                     {
                         "environment": environment,

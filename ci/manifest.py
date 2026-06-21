@@ -97,6 +97,8 @@ class CiConfig(StrictManifestModel):
 
 
 class SubprojectManifest(StrictManifestModel):
+    label: NonEmptyString | None = None
+    source_directory: NonEmptyString | None = None
     requires: RequiresConfig = Field(default_factory=RequiresConfig)
     ci: CiConfig | None = None
 
