@@ -623,8 +623,10 @@ surface is available.
 
 ### Input
 
-Translate platform touch input into distinct pan, scale-rotate, shove, and
-double-tap gesture states. Scale and rotation are one simultaneous two-finger
+Translate platform touch input into distinct one-finger pan, two-finger
+scale-rotate, two-finger shove, and double-tap gesture states. Platform gesture
+recognizers and custom touch trackers are both valid implementations when they
+produce the required camera operations. Scale and rotation share one two-finger
 state so a single gesture can zoom and rotate in the same update. Shove is an
 exclusive two-finger vertical state selected only when vertical centroid motion
 dominates before scale or rotation begins.
@@ -633,13 +635,13 @@ dominates before scale or rotation begins.
 
 Implementations MUST provide the following touch interactions:
 
-| Interaction                      | Behavior                                                                                                                                                 |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                     |
-| Pinch                            | Apply incremental `scale_by` deltas about the two-touch centroid, resetting the scale baseline after each applied delta.                                 |
-| Two-finger rotate                | Apply incremental `rotate_by(first, second)` commands from the previous and current screen-space rotation points since the last applied update.          |
-| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in two-touch centroid Y in logical coordinates since the last applied update. |
-| Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                          |
+| Interaction                      | Behavior                                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                   |
+| Pinch                            | Apply incremental scale deltas while preserving the geographic coordinate under the current two-touch centroid, resetting the scale baseline after each applied delta. |
+| Two-finger rotate                | Apply incremental bearing deltas from the change in the two-touch vector angle while preserving the geographic coordinate under the current two-touch centroid.        |
+| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in two-touch centroid Y in logical coordinates since the last applied update.               |
+| Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                                        |
 
 On any gesture begin, cancel in-flight camera transitions before applying
 deltas.

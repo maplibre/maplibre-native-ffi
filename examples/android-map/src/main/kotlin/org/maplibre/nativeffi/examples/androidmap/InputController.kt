@@ -22,10 +22,13 @@ internal class InputController(
   private val density = context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
   private val tapGestureDetector = GestureDetector(context, TapListener())
   private val pointerTracker = PointerTracker()
+  private var doubleTapActive = false
 
   fun onTouchEvent(event: MotionEvent): Boolean {
     val map = mapProvider() ?: return true
+    val wasDoubleTapActive = doubleTapActive
     tapGestureDetector.onTouchEvent(event)
+    if (doubleTapActive || wasDoubleTapActive) return true
     pointerTracker.onTouchEvent(map, event)
     return true
   }
@@ -34,6 +37,7 @@ internal class InputController(
     override fun onDown(event: MotionEvent): Boolean = true
 
     override fun onDoubleTap(event: MotionEvent): Boolean {
+      doubleTapActive = true
       val map = mapProvider() ?: return false
       map.cancelTransitions()
       val zoom = map.camera.zoom ?: 0.0
@@ -44,6 +48,16 @@ internal class InputController(
         AnimationOptions().apply { durationMs = 160.0 },
       )
       requestRender()
+      return true
+    }
+
+    override fun onDoubleTapEvent(event: MotionEvent): Boolean {
+      if (
+        event.actionMasked == MotionEvent.ACTION_UP ||
+          event.actionMasked == MotionEvent.ACTION_CANCEL
+      ) {
+        doubleTapActive = false
+      }
       return true
     }
   }
@@ -141,10 +155,7 @@ internal class InputController(
           changed = true
         }
         if (abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES) {
-          map.rotateBy(
-            screenPoint(baseline.firstX, baseline.firstY),
-            screenPoint(current.firstX, current.firstY),
-          )
+          rotateBy(map, deltaDegrees, current.centroidX, current.centroidY)
           changed = true
         }
       } else if (mode == Mode.SHOVE && deltaY != 0.0) {
@@ -161,6 +172,16 @@ internal class InputController(
         requestRender()
         twoFingerBaseline = current
       }
+    }
+
+    private fun rotateBy(map: MapHandle, deltaDegrees: Double, centroidX: Float, centroidY: Float) {
+      val camera = map.camera
+      map.jumpTo(
+        CameraOptions().apply {
+          bearing = (camera.bearing ?: 0.0) - deltaDegrees
+          anchor = screenPoint(centroidX, centroidY)
+        }
+      )
     }
 
     private fun classifyTwoFingerGesture(

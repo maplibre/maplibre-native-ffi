@@ -35,6 +35,8 @@ android {
 
     ndk { abiFilters += "arm64-v8a" }
   }
+
+  packaging { jniLibs { excludes += "lib/arm64-v8a/libjnijavacpp.so" } }
 }
 
 androidComponents {
