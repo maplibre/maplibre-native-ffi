@@ -50,7 +50,6 @@ internal object MacMetalBridgeNative {
       if (texture == 0L) 0L else MacObjectiveC.sendLong(texture, "pixelFormat")
     }
 
-  fun runInAutoreleasePool(action: Runnable) {
-    MacObjectiveC.autoreleasePool().use { action.run() }
-  }
+  fun <T> runInAutoreleasePool(action: () -> T): T =
+    MacObjectiveC.autoreleasePool().use { action() }
 }

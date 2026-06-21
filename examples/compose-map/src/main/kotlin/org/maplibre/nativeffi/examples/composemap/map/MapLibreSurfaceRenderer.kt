@@ -5,27 +5,18 @@ import kotlin.math.min
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.examples.composemap.surface.MacMetalBridgeNative
-import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
-import org.maplibre.nativeffi.examples.composemap.surface.NativeHandle
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
-import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceTarget
-import org.maplibre.nativeffi.examples.composemap.surface.OpenGlTextureTarget
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
-import org.maplibre.nativeffi.examples.composemap.surface.VulkanImageTarget
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.NativePointer
 import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -33,7 +24,7 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   override val supportedBackends: Set<ProducerBackend> =
-    setOf(ProducerBackend.METAL, ProducerBackend.VULKAN, ProducerBackend.OPENGL)
+    MapLibreNativeSurfaceAdapter.supportedBackends
 
   private var surfaceSession: NativeSurfaceSession? = null
   private var runtime: RuntimeHandle? = null
@@ -77,11 +68,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     }
 
     return try {
-      if (frame.target is MetalTextureTarget) {
-        MacMetalBridgeNative.runInAutoreleasePool(Runnable { attached.session.renderUpdate() })
-      } else {
-        attached.session.renderUpdate()
-      }
+      attached.session.renderUpdate()
       renderPending = false
       NativeSurfaceRenderResult.Rendered
     } catch (_: InvalidStateException) {
@@ -227,7 +214,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     map: MapHandle,
     frame: NativeSurfaceFrame,
   ): AttachedRenderSession {
-    val descriptor = borrowedDescriptor(frame.target, frame.extent)
+    val descriptor = MapLibreNativeSurfaceAdapter.descriptor(frame.target, frame.extent)
     renderSession?.let { existing ->
       if (existing.key == descriptor.key) {
         return existing
@@ -240,62 +227,6 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     renderPending = true
     return attached
   }
-
-  private fun borrowedDescriptor(
-    target: NativeSurfaceTarget,
-    extent: SurfaceExtent,
-  ): BorrowedDescriptor =
-    when (target) {
-      is MetalTextureTarget -> metalDescriptor(target, extent)
-      is VulkanImageTarget -> vulkanDescriptor(target, extent)
-      is OpenGlTextureTarget -> openGlDescriptor(target, extent)
-    }
-
-  private fun metalDescriptor(
-    target: MetalTextureTarget,
-    extent: SurfaceExtent,
-  ): BorrowedDescriptor =
-    BorrowedDescriptor(
-      key = targetKey(target.backend, target.generation, extent),
-      attach = { map ->
-        map.attachMetalBorrowedTexture(
-          MetalBorrowedTextureDescriptor(extent.toRenderTargetExtent(), target.texture.toPointer())
-        )
-      },
-    )
-
-  private fun vulkanDescriptor(
-    target: VulkanImageTarget,
-    extent: SurfaceExtent,
-  ): BorrowedDescriptor =
-    BorrowedDescriptor(
-      key = targetKey(target.backend, target.generation, extent),
-      attach = {
-        // TODO(surface): VulkanImageTarget must expose the producer Vulkan context handles
-        // required
-        // for VulkanContextDescriptor before MapLibre can attach this borrowed image. Keep
-        // external-memory handles, queue ownership transfers, and synchronization in surface.
-        throw UnsupportedOperationException(
-          "Vulkan Compose surface targets do not yet expose a MapLibre Vulkan context descriptor"
-        )
-      },
-    )
-
-  private fun openGlDescriptor(
-    target: OpenGlTextureTarget,
-    extent: SurfaceExtent,
-  ): BorrowedDescriptor =
-    BorrowedDescriptor(
-      key = targetKey(target.backend, target.generation, extent),
-      attach = {
-        // TODO(surface): OpenGlTextureTarget must expose a producer EGL/WGL context descriptor
-        // compatible with MapLibre's OpenGL borrowed texture API. Keep Skiko context discovery,
-        // external-memory import details, and synchronization in surface.
-        throw UnsupportedOperationException(
-          "OpenGL Compose surface targets do not yet expose a MapLibre OpenGL context descriptor"
-        )
-      },
-    )
 
   private fun drainEvents(runtime: RuntimeHandle, map: MapHandle) {
     while (true) {
@@ -323,36 +254,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   private fun viewportCenter(): ScreenPoint =
     ScreenPoint(currentExtent.width / 2.0, currentExtent.height / 2.0)
 
-  private fun targetKey(
-    backend: ProducerBackend,
-    generation: Long,
-    extent: SurfaceExtent,
-  ): TargetKey =
-    TargetKey(
-      backend = backend,
-      generation = generation,
-      width = extent.width,
-      height = extent.height,
-      scaleFactor = extent.scaleFactor,
-      physicalWidth = extent.physicalWidth,
-      physicalHeight = extent.physicalHeight,
-    )
-
-  private data class AttachedRenderSession(val key: TargetKey, val session: RenderSessionHandle)
-
-  private data class TargetKey(
-    val backend: ProducerBackend,
-    val generation: Long,
-    val width: Int,
-    val height: Int,
-    val scaleFactor: Double,
-    val physicalWidth: Int,
-    val physicalHeight: Int,
-  )
-
-  private class BorrowedDescriptor(
-    val key: TargetKey,
-    val attach: (MapHandle) -> RenderSessionHandle,
+  private data class AttachedRenderSession(
+    val key: MapLibreNativeSurfaceAdapter.TargetKey,
+    val session: RenderSessionHandle,
   )
 
   private companion object {
@@ -364,9 +268,4 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   }
 }
 
-private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
-  RenderTargetExtent(width, height, scaleFactor)
-
 private fun Double.clampPitch(): Double = max(0.0, min(60.0, this))
-
-private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)

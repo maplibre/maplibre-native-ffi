@@ -163,6 +163,7 @@ public data class MetalTextureTarget(
 }
 
 public data class VulkanImageTarget(
+  public val context: VulkanContextHandles,
   public val image: NativeHandle,
   public val imageView: NativeHandle,
   public val format: Int,
@@ -174,6 +175,16 @@ public data class VulkanImageTarget(
 ) : NativeSurfaceTarget {
   override val backend: ProducerBackend = ProducerBackend.VULKAN
 }
+
+public data class VulkanContextHandles(
+  public val instance: NativeHandle,
+  public val physicalDevice: NativeHandle,
+  public val device: NativeHandle,
+  public val graphicsQueue: NativeHandle,
+  public val graphicsQueueFamilyIndex: Int,
+  public val getInstanceProcAddr: NativeHandle,
+  public val getDeviceProcAddr: NativeHandle,
+)
 
 public fun interface OpenGlContextProvider {
   public fun makeCurrent()

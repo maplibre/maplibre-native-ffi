@@ -48,6 +48,7 @@ dependencies {
   implementation(compose.desktop.currentOs)
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
+  implementation("org.lwjgl:lwjgl-vulkan")
   runtimeOnly("org.lwjgl:lwjgl::${lwjglNativeClassifier()}")
 }
 

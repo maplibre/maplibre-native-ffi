@@ -113,7 +113,7 @@ public fun ComposeNativeSurface(
         }
       if (frame != null) {
         try {
-          when (renderer.render(frame)) {
+          when (bridge.withProducerAccess(frame) { renderer.render(frame) }) {
             NativeSurfaceRenderResult.Rendered -> {
               bridge.completeProducerAccess(frame)
               drawState.lastRenderedTarget = frame.target

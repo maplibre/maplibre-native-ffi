@@ -1,0 +1,119 @@
+package org.maplibre.nativeffi.examples.composemap.surface
+
+import androidx.compose.ui.graphics.drawscope.DrawScope
+
+internal class MacVulkanMetalBridge : NativeSurfaceBridge {
+  private val vulkan = MacVulkanContext.create()
+  private var metalTexture = NativeHandle(0)
+  private var pixelFormat = 0L
+  private var importedTexture: MacVulkanImportedTexture? = null
+  private var generation = 0L
+  private var currentExtent = SurfaceExtent.Empty
+
+  override val backend: ProducerBackend = ProducerBackend.VULKAN
+
+  override val consumerBackend: ConsumerBackend = ConsumerBackend.METAL
+
+  override val capabilities: NativeSurfaceCapabilities =
+    NativeSurfaceCapabilities(
+      producerBackend = backend,
+      consumerBackend = consumerBackend,
+      supportsExplicitSynchronization = false,
+      supportsResizeWithoutRecreate = false,
+      isPlaceholder = false,
+    )
+
+  override fun resize(extent: SurfaceExtent) {
+    if (extent == currentExtent && importedTexture != null) {
+      return
+    }
+    recreateTexture(extent)
+    currentExtent = extent
+    generation += 1
+  }
+
+  override fun acquireFrame(
+    frameId: Long,
+    extent: SurfaceExtent,
+    presentationTimeNanos: Long?,
+  ): NativeSurfaceFrame {
+    if (importedTexture == null || extent != currentExtent) {
+      resize(extent)
+    }
+    return NativeSurfaceFrameLease(
+      frameId = frameId,
+      extent = extent,
+      target = target(generation),
+      presentationTimeNanos = presentationTimeNanos,
+    )
+  }
+
+  override fun completeProducerAccess(frame: NativeSurfaceFrame) {
+    vulkan.waitIdle()
+  }
+
+  override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
+    if (target !is VulkanImageTarget || metalTexture.address == 0L) {
+      return false
+    }
+    return SkikoHost.drawMetalTexture(
+      scope,
+      MetalTextureTarget(
+        texture = metalTexture,
+        pixelFormat = pixelFormat,
+        extent = target.extent,
+        generation = target.generation,
+      ),
+    )
+  }
+
+  override fun close() {
+    disposeTexture()
+    vulkan.close()
+  }
+
+  private fun target(generation: Long): NativeSurfaceTarget =
+    checkNotNull(importedTexture) { "Vulkan texture is not initialized" }.target(generation)
+
+  private fun recreateTexture(extent: SurfaceExtent) {
+    if (extent.isEmpty) {
+      disposeTexture()
+      return
+    }
+
+    val oldTexture = metalTexture
+    val newTextureAddress =
+      MacMetalBridgeNative.createMetalTexture(
+        metalDevice = SkikoHost.requireMetalDevice().ptr,
+        oldTexture = oldTexture.address,
+        width = extent.physicalWidth,
+        height = extent.physicalHeight,
+      )
+    val newTexture = NativeHandle(newTextureAddress)
+    if (newTexture == oldTexture && importedTexture != null) {
+      return
+    }
+
+    importedTexture?.close()
+    importedTexture = null
+    metalTexture = newTexture
+    pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
+    try {
+      importedTexture = vulkan.createImportedTexture(newTexture, extent)
+    } catch (error: RuntimeException) {
+      disposeTexture()
+      throw error
+    }
+  }
+
+  private fun disposeTexture() {
+    importedTexture?.close()
+    importedTexture = null
+    if (metalTexture.address != 0L) {
+      SkikoHost.forgetMetalTexture(metalTexture)
+      MacMetalBridgeNative.disposeMetalTexture(metalTexture.address)
+      metalTexture = NativeHandle(0)
+      pixelFormat = 0
+    }
+  }
+}
