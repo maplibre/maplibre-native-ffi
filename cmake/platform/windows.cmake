@@ -1,27 +1,11 @@
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
-  find_package(ICU COMPONENTS i18n uc data REQUIRED)
   find_package(JPEG REQUIRED)
   find_package(libuv REQUIRED)
   find_package(PNG REQUIRED)
   find_package(WebP REQUIRED)
 
-  get_filename_component(MLN_FFI_ICU_ROOT "${ICU_INCLUDE_DIR}" DIRECTORY)
-  find_library(
-    MLN_FFI_ICU_I18N_LIBRARY
-    NAMES icuin
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
-  find_library(
-    MLN_FFI_ICU_UC_LIBRARY
-    NAMES icuuc
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
-  find_library(
-    MLN_FFI_ICU_DATA_LIBRARY
-    NAMES icudt
-    PATHS "${MLN_FFI_ICU_ROOT}/lib"
-    REQUIRED NO_DEFAULT_PATH)
+  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
@@ -43,6 +27,16 @@ function(mln_configure_windows_platform target)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
 
+  set_source_files_properties(
+    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
+
+  target_include_directories(
+    ${target}
+    SYSTEM
+    BEFORE
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+
   target_include_directories(
     ${target}
     BEFORE
@@ -57,17 +51,16 @@ function(mln_configure_windows_platform target)
 
   target_compile_definitions(
     ${target}
-    PRIVATE CURL_STATICLIB NOMINMAX USE_STD_FILESYSTEM _USE_MATH_DEFINES)
+    PRIVATE
+      CURL_STATICLIB NOMINMAX USE_STD_FILESYSTEM U_STATIC_IMPLEMENTATION
+      _USE_MATH_DEFINES)
+
+  target_compile_definitions(mbgl-vendor-icu PRIVATE U_STATIC_IMPLEMENTATION)
 
   target_link_libraries(
     ${target}
     PRIVATE
-      ${CURL_LIBRARIES}
-      ${JPEG_LIBRARIES}
-      WebP::webp
-      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-      ${MLN_FFI_ICU_I18N_LIBRARY}
-      ${MLN_FFI_ICU_UC_LIBRARY}
-      ${MLN_FFI_ICU_DATA_LIBRARY}
+      ${CURL_LIBRARIES} ${JPEG_LIBRARIES} WebP::webp
+      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv> mbgl-vendor-icu
       PNG::PNG)
 endfunction()

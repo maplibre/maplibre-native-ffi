@@ -54,7 +54,7 @@ submodule at `third_party/maplibre-native`.
 Run the Zig map example as a smoke test:
 
 ```bash
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 ```
 
 Mise selects the native build profile that matches your host when one is
@@ -75,7 +75,7 @@ mise run build
 mise run fix
 
 # Run examples
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 
 # Build the documentation site
 mise run //docs:build

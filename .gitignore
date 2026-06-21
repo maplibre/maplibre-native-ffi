@@ -3,6 +3,7 @@ build/
 target/
 bindings/*/bin/
 docs/doxygen/gen/
+docs/src/generated/
 docs/public/reference/
 .zig-cache/
 .ruff_cache/

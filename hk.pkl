@@ -17,6 +17,7 @@ local lintSteps = new Mapping<String, Step> {
   ["ci-workflow"] {
     glob = List(
       "ci/**/*.toml",
+      "ci/manifest.py",
       ".mise/tasks/ci/generate-workflow",
       ".github/workflows/ci.yml",
     )

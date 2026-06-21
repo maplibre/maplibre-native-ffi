@@ -1,5 +1,5 @@
 #!/usr/bin/env -S uv run --script
-#MISE description="Generate the GitHub Actions CI workflow from CI manifests."
+# MISE description="Generate the GitHub Actions CI workflow from CI manifests."
 # /// script
 # dependencies = ["pydantic==2.13.4", "pyyaml==6.0.3"]
 # ///
@@ -7,162 +7,40 @@
 import argparse
 import difflib
 import pathlib
-import re
 import sys
-import tomllib
-from typing import Annotated
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    ValidationError,
-    ValidationInfo,
-    field_validator,
-    model_validator,
-)
 import yaml
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-VARIANTS_PATH = REPO_ROOT / "ci" / "variants.toml"
-SUBPROJECTS_DIR = REPO_ROOT / "ci" / "subprojects"
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+sys.path.insert(0, str(REPO_ROOT))
+
+from ci.manifest import (  # noqa: E402
+    Variant,
+    load_subprojects,
+    load_variants,
+    subproject_matches_variant,
+)
 
 CHECKOUT_ACTION = "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10"
-TASK_PATTERN = re.compile(r"^(?:[A-Za-z0-9_-]+|//[A-Za-z0-9_./-]+:[A-Za-z0-9_-]+)$")
-
-NonEmptyString = Annotated[str, Field(min_length=1)]
-NonEmptyStringList = Annotated[list[NonEmptyString], Field(min_length=1)]
-
-
-class StrictManifestModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-
-class VariantConfig(StrictManifestModel):
-    runner: NonEmptyString
-    os: NonEmptyString
-    arch: NonEmptyString
-    backend: NonEmptyString
-    supports_tests: bool = True
-
-
-class Variant(VariantConfig):
-    name: NonEmptyString
-
-
-class VariantsManifest(StrictManifestModel):
-    variants: Annotated[dict[NonEmptyString, VariantConfig], Field(min_length=1)]
-
-
-class RequiresConfig(StrictManifestModel):
-    os: NonEmptyStringList | None = None
-    arch: NonEmptyStringList | None = None
-    backend: NonEmptyStringList | None = None
-    exclude: list[NonEmptyString] = Field(default_factory=list)
-
-    @field_validator("os", "arch", "backend")
-    @classmethod
-    def require_known_values(
-        cls, values: list[str] | None, info: ValidationInfo
-    ) -> list[str] | None:
-        if values is None:
-            return values
-        known_values = (info.context or {}).get("variant_values", {})
-        unknown = set(values) - known_values.get(info.field_name, set())
-        if unknown:
-            raise ValueError(f"unknown values: {sorted(unknown)}")
-        return values
-
-    @field_validator("exclude")
-    @classmethod
-    def require_known_variants(
-        cls, variants: list[str], info: ValidationInfo
-    ) -> list[str]:
-        known_variants = (info.context or {}).get("variants", set())
-        unknown = set(variants) - known_variants
-        if unknown:
-            raise ValueError(f"unknown variants: {sorted(unknown)}")
-        return variants
-
-
-class CiConfig(StrictManifestModel):
-    build: NonEmptyString | None = None
-    test: NonEmptyString | None = None
-    run: NonEmptyString | None = None
-
-    @model_validator(mode="after")
-    def require_action(self) -> "CiConfig":
-        if self.build is None and self.test is None and self.run is None:
-            raise ValueError("[ci] must contain at least one action")
-        return self
-
-    @field_validator("build", "test", "run")
-    @classmethod
-    def require_task_name(cls, task: str | None) -> str | None:
-        if task is not None and not TASK_PATTERN.fullmatch(task):
-            raise ValueError("must be a mise task name")
-        return task
-
-
-class SubprojectManifest(StrictManifestModel):
-    requires: RequiresConfig = Field(default_factory=RequiresConfig)
-    ci: CiConfig
-
-
-def parse_model[T: BaseModel](
-    path: pathlib.Path, model: type[T], context: dict | None = None
-) -> T:
-    try:
-        with path.open("rb") as file:
-            return model.model_validate(tomllib.load(file), context=context)
-    except ValidationError as error:
-        raise SystemExit(f"error: {path}: {error}") from None
-
-
-def load_variants() -> list[Variant]:
-    manifest = parse_model(VARIANTS_PATH, VariantsManifest)
-    return [
-        Variant(name=name, **config.model_dump())
-        for name, config in manifest.variants.items()
-    ]
-
-
-def matches(variant: Variant, requires: dict[str, list[str]]) -> bool:
-    return all(getattr(variant, key) in values for key, values in requires.items())
 
 
 def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
-    context = {
-        "variants": {variant.name for variant in variants},
-        "variant_values": {
-            "os": {variant.os for variant in variants},
-            "arch": {variant.arch for variant in variants},
-            "backend": {variant.backend for variant in variants},
-        },
-    }
     commands = {variant.name: [] for variant in variants}
 
-    paths = sorted(
-        SUBPROJECTS_DIR.glob("*.toml"),
-        key=lambda path: (path.name != "native.toml", path.name),
-    )
-    for path in paths:
-        manifest = parse_model(path, SubprojectManifest, context)
-        is_native = path.name == "native.toml"
-        requires = manifest.requires.model_dump(
-            include={"os", "arch", "backend"}, exclude_none=True
-        )
-        excluded_variants = set(manifest.requires.exclude)
-        tasks = manifest.ci.model_dump(exclude_none=True)
+    for subproject in load_subprojects(variants):
+        tasks = subproject.manifest.ci.model_dump(exclude_none=True)
 
         for variant in variants:
-            if not matches(variant, requires) or variant.name in excluded_variants:
+            if not subproject_matches_variant(subproject, variant):
                 continue
             for action_key, task in tasks.items():
-                build_only_native = variant.os in {"android", "ios", "ohos"}
-                if is_native and not build_only_native and action_key == "build":
+                if (
+                    action_key == "build"
+                    and tasks.get("test")
+                    and variant.supports_tests
+                ):
                     continue
                 if action_key == "test" and not variant.supports_tests:
                     continue

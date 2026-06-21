@@ -5,6 +5,3 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUI
 [tasks.test]
 depends = [":build"]
 run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
-
-[tasks.ci]
-depends = [":test"]

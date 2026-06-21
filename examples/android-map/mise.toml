@@ -9,13 +9,13 @@ fi
 '''
 
 [tasks.build]
-depends = ["ensure-environment", "ensure-native-library"]
+depends = ["ensure-environment", "//:ensure-native-library"]
 run = '''
 ../../gradlew :examples:android-map:assembleDebug
 '''
 
 [tasks.run]
-depends = ["ensure-environment", "ensure-native-library"]
+depends = ["ensure-environment", "//:ensure-native-library"]
 run = '''
 ../../gradlew :examples:android-map:installDebug
 adb shell am start -S -n org.maplibre.nativeffi.examples.androidmap/.MainActivity

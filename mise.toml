@@ -95,6 +95,8 @@ postinstall = [
   "pnpm install --frozen-lockfile --loglevel warn",
   "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
   "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet",
+  # Generated docs data is imported by Astro components and checked by vp.
+  { task = "docs:generate-support-matrix" },
   # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
   "pnpm --filter docs exec astro sync",
 ]

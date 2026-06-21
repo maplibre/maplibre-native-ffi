@@ -16,6 +16,16 @@ if [[ "$MISE_ENV" == ios-simulator-* ]]; then
     -Xswiftc -enable-testing \
     -Xlinker -rpath \
     -Xlinker "$testing_frameworks"
+elif [[ "$MISE_ENV" == ios-* ]]; then
+  sdk=${MLN_FFI_SYSTEM_ROOT:-}
+  if [[ -z "$sdk" ]]; then
+    sdk=$(xcrun --sdk iphoneos --show-sdk-path)
+  fi
+
+  swift build \
+    --scratch-path ".build/$MISE_ENV" \
+    --sdk "$sdk" \
+    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE"
 else
   swift build --scratch-path ".build/$MISE_ENV"
 fi
@@ -30,8 +40,5 @@ if [[ "$MISE_ENV" == ios-simulator-* ]]; then
 else
   swift test --scratch-path ".build/$MISE_ENV"
 fi
+swift package describe --type json >/dev/null
 '''
-
-[tasks.ci]
-depends = ["test"]
-run = 'swift package describe --type json >/dev/null'

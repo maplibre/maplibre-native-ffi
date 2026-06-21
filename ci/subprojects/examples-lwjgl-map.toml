@@ -1,6 +1,3 @@
 [requires]
-backend = ["vulkan"]
+exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]
-
-[ci]
-build = "//examples/lwjgl-map:build"

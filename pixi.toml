@@ -17,7 +17,6 @@ libvulkan-loader = ">=1.4,<2"
 zlib = ">=1.3,<2"
 
 [target.linux-64.dependencies]
-icu = ">=78,<79"
 libcurl = ">=8,<8.20"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
@@ -26,7 +25,6 @@ libwebp = ">=1.6,<2"
 libgles-devel = ">=1.7.0,<2"
 
 [target.linux-aarch64.dependencies]
-icu = ">=78,<79"
 libcurl = ">=8,<8.20"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
@@ -38,7 +36,6 @@ libgles-devel = ">=1.7.0,<2"
 moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
-icu = ">=78,<79"
 libcurl = ">=8,<8.20"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"

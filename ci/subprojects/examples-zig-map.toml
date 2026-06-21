@@ -1,6 +1,3 @@
 [requires]
 exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]
-
-[ci]
-build = "//examples/zig-map:build"

@@ -32,19 +32,19 @@ run = [
 ]
 
 [tasks.dev]
-depends = ["api"]
+depends = ["//:docs:generate-support-matrix", "api"]
 run = "pnpm exec astro dev"
 
 [tasks.start]
-depends = ["api"]
+depends = ["//:docs:generate-support-matrix", "api"]
 run = "pnpm exec astro dev"
 
 [tasks.build]
-depends = ["api"]
+depends = ["//:docs:generate-support-matrix", "api"]
 run = "pnpm exec astro build"
 
 [tasks.preview]
-depends = ["api"]
+depends = ["//:docs:generate-support-matrix", "api"]
 run = "pnpm exec astro preview"
 
 [tasks.astro]
