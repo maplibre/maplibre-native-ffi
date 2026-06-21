@@ -1,4 +1,6 @@
 [requires]
+# glutin disables its EGL backend on Apple platforms; adding macOS EGL would require a
+# separate EGL windowing path instead of the existing winit/glutin OpenGL pattern.
 exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]
 

@@ -2,7 +2,6 @@ label = "Kotlin/JVM"
 source_directory = "bindings/kotlin"
 
 [requires]
-exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]
 
 [ci]

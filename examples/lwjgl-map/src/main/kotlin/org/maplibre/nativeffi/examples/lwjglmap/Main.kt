@@ -68,7 +68,9 @@ internal object Main {
 
   private fun supportsUsableBackend(backends: Set<RenderBackend>): Boolean =
     if (GraphicsContext.isMac()) {
-      RenderBackend.METAL in backends || RenderBackend.VULKAN in backends
+      RenderBackend.METAL in backends ||
+        RenderBackend.OPENGL in backends ||
+        RenderBackend.VULKAN in backends
     } else {
       RenderBackend.OPENGL in backends || RenderBackend.VULKAN in backends
     }

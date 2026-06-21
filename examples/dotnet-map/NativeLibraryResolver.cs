@@ -61,6 +61,7 @@ internal static class NativeLibraryResolver
                 "vulkan",
             ],
             "vulkan" => ["libvulkan.so.1", "vulkan"],
+            "EGL" when OperatingSystem.IsMacOS() => ["libEGL.dylib", "EGL"],
             "EGL" when OperatingSystem.IsLinux() => ["libEGL.so.1", "libEGL.so", "EGL"],
             _ => [],
         };

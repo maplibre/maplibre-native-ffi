@@ -37,7 +37,7 @@ internal static class GraphicsContext
             return MetalContext.Create(title, width, height);
         }
 
-        if (!OperatingSystem.IsMacOS() && backends.HasFlag(RenderBackend.OpenGL))
+        if (backends.HasFlag(RenderBackend.OpenGL))
         {
             return OpenGLContext.Create(title, width, height);
         }

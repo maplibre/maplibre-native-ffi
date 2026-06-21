@@ -106,9 +106,9 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
   internal companion object {
     fun create(title: String, width: Int, height: Int): OpenGLContext =
       when {
-        isLinux() -> createEgl(title, width, height)
+        isLinux() || isMac() -> createEgl(title, width, height)
         isWindows() -> createWgl(title, width, height)
-        else -> error("LWJGL OpenGL context is only supported on Linux and Windows")
+        else -> error("LWJGL OpenGL context is only supported on Linux, macOS, and Windows")
       }
 
     private fun createEgl(title: String, width: Int, height: Int): OpenGLContext {
@@ -186,6 +186,9 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
 
     private fun isLinux(): Boolean =
       System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")
+
+    private fun isMac(): Boolean =
+      System.getProperty("os.name").lowercase(Locale.ROOT).contains("mac")
 
     private fun isWindows(): Boolean =
       System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")

@@ -37,7 +37,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public static OpenGLContext Create(string title, int width, int height)
     {
-        if (OperatingSystem.IsLinux())
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
         {
             return CreateEgl(title, width, height);
         }
@@ -48,7 +48,7 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         }
 
         throw new InvalidOperationException(
-            "dotnet-map OpenGL context creation is supported on Linux/EGL and Windows/WGL."
+            "dotnet-map OpenGL context creation is supported on Linux/EGL, macOS/EGL, and Windows/WGL."
         );
     }
 

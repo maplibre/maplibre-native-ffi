@@ -66,10 +66,16 @@ tasks.withType<JavaCompile>().configureEach { options.release = 24 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeLibraryPath = maplibreNativeC.libraryPath
+val nativeRuntimeLibraryPath =
+  maplibreNativeC.runtimeLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(lwjglMapJvmArgs)
+  systemProperty("org.lwjgl.librarypath", nativeRuntimeLibraryPath)
   systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)
   inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary")
+  inputs
+    .files(maplibreNativeC.runtimeLibraryDirs)
+    .withPropertyName("maplibreNativeCRuntimeLibraryDirs")
   inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
 }

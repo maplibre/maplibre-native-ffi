@@ -91,7 +91,9 @@ internal static class Program
     {
         if (OperatingSystem.IsMacOS())
         {
-            return backends.HasFlag(RenderBackend.Metal) || backends.HasFlag(RenderBackend.Vulkan);
+            return backends.HasFlag(RenderBackend.Metal)
+                || backends.HasFlag(RenderBackend.OpenGL)
+                || backends.HasFlag(RenderBackend.Vulkan);
         }
 
         return backends.HasFlag(RenderBackend.OpenGL) || backends.HasFlag(RenderBackend.Vulkan);
