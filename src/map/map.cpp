@@ -172,6 +172,7 @@ auto to_c_source_type(mbgl::style::SourceType type) -> uint32_t {
     case mbgl::style::SourceType::CustomVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
   }
+  assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
 }
 
@@ -2779,38 +2780,21 @@ auto map_request_still_image(mln_map* map) -> mln_status {
 }
 
 auto map_owner_thread(const mln_map* map) -> std::thread::id {
-  if (map == nullptr) {
-    return {};
-  }
   return map->owner_thread;
 }
 
-auto map_native(mln_map* map) -> mbgl::Map* {
-  if (map == nullptr) {
-    return nullptr;
-  }
-  return map->map.get();
-}
+auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
 
 auto map_latest_update(mln_map* map)
   -> std::shared_ptr<mbgl::UpdateParameters> {
-  if (map == nullptr || map->frontend == nullptr) {
-    return nullptr;
-  }
   return map->frontend->latest_update();
 }
 
 auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver* {
-  if (map == nullptr || map->frontend == nullptr) {
-    return nullptr;
-  }
   return map->frontend->renderer_observer();
 }
 
 auto map_run_render_jobs(mln_map* map) -> void {
-  if (map == nullptr || map->frontend == nullptr) {
-    return;
-  }
   map->frontend->run_render_jobs();
 }
 
