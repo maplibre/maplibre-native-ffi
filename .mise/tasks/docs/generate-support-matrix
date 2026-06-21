@@ -61,16 +61,17 @@ SUBPROJECT_LABELS = {
     "examples-zig-readback": "zig-readback",
 }
 
-PLATFORM_ORDER = ["linux", "macos", "windows", "android", "ios", "ohos"]
-ARCH_ORDER = ["x64", "arm64"]
 BACKEND_ORDER = ["vulkan", "opengl", "metal"]
-
-
-def platform_sort_key(os_name: str) -> tuple[int, str]:
-    try:
-        return (PLATFORM_ORDER.index(os_name), os_name)
-    except ValueError:
-        return (len(PLATFORM_ORDER), os_name)
+ENVIRONMENT_ORDER = [
+    "linux-x64",
+    "linux-arm64",
+    "macos-arm64",
+    "windows-x64",
+    "android-arm64",
+    "ios-arm64",
+    "ios-simulator-arm64",
+    "ohos-arm64",
+]
 
 
 def backend_sort_key(backend: str) -> tuple[int, str]:
@@ -80,11 +81,11 @@ def backend_sort_key(backend: str) -> tuple[int, str]:
         return (len(BACKEND_ORDER), backend)
 
 
-def arch_sort_key(arch: str) -> tuple[int, str]:
+def environment_sort_key(environment: str) -> tuple[int, str]:
     try:
-        return (ARCH_ORDER.index(arch), arch)
+        return (ENVIRONMENT_ORDER.index(environment), environment)
     except ValueError:
-        return (len(ARCH_ORDER), arch)
+        return (len(ENVIRONMENT_ORDER), environment)
 
 
 def platform_label(os_name: str) -> str:
@@ -97,6 +98,21 @@ def arch_label(arch: str) -> str:
 
 def backend_label(backend: str) -> str:
     return BACKEND_LABELS.get(backend, backend)
+
+
+def environment_key(variant: Variant) -> str:
+    if variant.os == "ios" and variant.name.startswith("ios-simulator-"):
+        return f"ios-simulator-{variant.arch}"
+    return f"{variant.os}-{variant.arch}"
+
+
+def environment_label(variant: Variant) -> str:
+    architecture = arch_label(variant.arch)
+    if variant.os == "ios" and variant.name.startswith("ios-simulator-"):
+        return f"iOS Simulator {architecture}"
+    if variant.os == "ios":
+        return f"iOS device {architecture}"
+    return f"{platform_label(variant.os)} {architecture}"
 
 
 def variant_status(variant: Variant) -> str:
@@ -116,7 +132,6 @@ def support_entry(variant: Variant, status: str) -> dict[str, str]:
         "backend": variant.backend,
         "backendLabel": backend_label(variant.backend),
         "status": status,
-        "variant": variant.name,
     }
 
 
@@ -141,10 +156,6 @@ def merge_backend_entries(entries: list[dict[str, str]]) -> list[dict[str, Any]]
                 "backend": backend,
                 "backendLabel": backend_label(backend),
                 "status": status,
-                "variants": [
-                    {"name": entry["variant"], "status": entry["status"]}
-                    for entry in backend_entries
-                ],
             }
         )
     return result
@@ -152,23 +163,23 @@ def merge_backend_entries(entries: list[dict[str, str]]) -> list[dict[str, Any]]
 
 def native_rows(variants: list[Variant]) -> list[dict[str, Any]]:
     rows: dict[str, list[dict[str, str]]] = defaultdict(list)
-    row_arches: dict[str, set[str]] = defaultdict(set)
+    row_variants: dict[str, Variant] = {}
     for variant in variants:
-        rows[variant.os].append(support_entry(variant, variant_status(variant)))
-        row_arches[variant.os].add(variant.arch)
+        environment = environment_key(variant)
+        rows[environment].append(support_entry(variant, variant_status(variant)))
+        row_variants[environment] = variant
 
     return [
         {
-            "platform": os_name,
-            "platformLabel": platform_label(os_name),
-            "architectures": sorted(row_arches[os_name], key=arch_sort_key),
-            "architectureLabels": [
-                arch_label(arch)
-                for arch in sorted(row_arches[os_name], key=arch_sort_key)
-            ],
-            "backends": merge_backend_entries(rows[os_name]),
+            "environment": environment,
+            "environmentLabel": environment_label(row_variants[environment]),
+            "platform": row_variants[environment].os,
+            "platformLabel": platform_label(row_variants[environment].os),
+            "arch": row_variants[environment].arch,
+            "archLabel": arch_label(row_variants[environment].arch),
+            "backends": merge_backend_entries(rows[environment]),
         }
-        for os_name in sorted(rows, key=platform_sort_key)
+        for environment in sorted(rows, key=environment_sort_key)
     ]
 
 
@@ -186,14 +197,17 @@ def subproject_rows(
         if not subproject.name.startswith(prefix):
             continue
 
-        platform_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
+        environment_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
+        environment_variants: dict[str, Variant] = {}
         actions = subproject.manifest.ci.model_dump(exclude_none=True)
         for variant in variants:
             if not subproject_matches_variant(subproject, variant):
                 continue
-            platform_entries[variant.os].append(
+            environment = environment_key(variant)
+            environment_entries[environment].append(
                 support_entry(variant, subproject_status(actions, variant))
             )
+            environment_variants[environment] = variant
 
         rows.append(
             {
@@ -201,13 +215,25 @@ def subproject_rows(
                 "kind": kind,
                 "label": SUBPROJECT_LABELS.get(subproject.name, subproject.name),
                 "source": str(subproject.path.relative_to(REPO_ROOT)),
-                "platforms": [
+                "environments": [
                     {
-                        "platform": os_name,
-                        "platformLabel": platform_label(os_name),
-                        "backends": merge_backend_entries(platform_entries[os_name]),
+                        "environment": environment,
+                        "environmentLabel": environment_label(
+                            environment_variants[environment]
+                        ),
+                        "platform": environment_variants[environment].os,
+                        "platformLabel": platform_label(
+                            environment_variants[environment].os
+                        ),
+                        "arch": environment_variants[environment].arch,
+                        "archLabel": arch_label(environment_variants[environment].arch),
+                        "backends": merge_backend_entries(
+                            environment_entries[environment]
+                        ),
                     }
-                    for os_name in sorted(platform_entries, key=platform_sort_key)
+                    for environment in sorted(
+                        environment_entries, key=environment_sort_key
+                    )
                 ],
             }
         )
@@ -218,13 +244,11 @@ def support_matrix() -> dict[str, Any]:
     variants = load_variants()
     native = native_rows(variants)
     return {
-        "legend": {
-            "tested": "Built and tested in CI.",
-            "run": "Built and run in CI.",
-            "build-only": "Built in CI without tests for that variant.",
-        },
-        "platforms": [
-            {"platform": row["platform"], "platformLabel": row["platformLabel"]}
+        "environments": [
+            {
+                "environment": row["environment"],
+                "environmentLabel": row["environmentLabel"],
+            }
             for row in native
         ],
         "native": native,
