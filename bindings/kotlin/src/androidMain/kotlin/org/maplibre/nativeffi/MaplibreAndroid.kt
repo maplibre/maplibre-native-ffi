@@ -9,8 +9,8 @@ public object MaplibreAndroid {
   /**
    * Initializes Android platform services that require an app [Context].
    *
-   * This forwards to `mln_android_init` through the Android JNI bridge. Call it before creating a
-   * runtime that may issue Android HTTP requests.
+   * This forwards to `mln_android_init`. Call it before creating a runtime that may issue Android
+   * HTTP requests.
    */
   public fun initialize(context: Context) {
     NativeAccess.ensureLoaded()

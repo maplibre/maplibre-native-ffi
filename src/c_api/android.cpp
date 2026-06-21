@@ -11,8 +11,10 @@ extern "C" auto mlnffi_rust_android_init_tls_verifier(
 extern "C" auto mlnffi_rust_android_error_free(char* error) -> void;
 #endif
 
-auto mln_android_init(void* jni_env, void* context) noexcept -> mln_status {
+auto mln_android_init(void* jni_env, void* jni_class, void* context) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
+    (void)jni_class;
     if (jni_env == nullptr || context == nullptr) {
       mln::core::set_thread_error("jni_env and context must not be null");
       return MLN_STATUS_INVALID_ARGUMENT;
