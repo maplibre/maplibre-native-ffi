@@ -1,8 +1,12 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
-plugins { application }
+plugins {
+  application
+  kotlin("jvm")
+}
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
@@ -34,13 +38,15 @@ val lwjglMapJvmArgs = buildList {
   }
 }
 
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_24) } }
+
 application {
   mainClass = "org.maplibre.nativeffi.examples.lwjglmap.Main"
   applicationDefaultJvmArgs = lwjglMapJvmArgs
 }
 
 dependencies {
-  implementation(project(":bindings:java-ffm"))
+  implementation(project(":bindings:kotlin"))
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
   implementation("org.lwjgl:lwjgl-egl")
@@ -56,7 +62,7 @@ dependencies {
   runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
 }
 
-tasks.withType<JavaCompile>().configureEach { options.release = 25 }
+tasks.withType<JavaCompile>().configureEach { options.release = 24 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeLibraryPath = maplibreNativeC.libraryPath
