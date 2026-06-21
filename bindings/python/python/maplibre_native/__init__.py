@@ -1,5 +1,6 @@
 """Low-level Python bindings for MapLibre Native FFI."""
 
+from . import _loader as _loader
 from ._global import (
     EXPECTED_C_ABI_VERSION,
     c_version,
