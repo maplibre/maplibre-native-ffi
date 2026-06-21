@@ -5,4 +5,4 @@ exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]
 
 [ci]
-lint = "//examples/rust-map:lint"
+check = "//examples/rust-map:check"

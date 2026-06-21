@@ -51,7 +51,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-arm64-vulkan:
@@ -72,7 +72,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-x64-egl:
@@ -94,7 +94,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-x64-vulkan:
@@ -116,7 +116,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-metal:
@@ -139,7 +139,7 @@ jobs:
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/swift-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
@@ -163,7 +163,7 @@ jobs:
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-egl:
@@ -292,7 +292,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-windows-x64-wgl:
@@ -313,7 +313,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:lint
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   required:
