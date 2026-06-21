@@ -51,6 +51,31 @@ public sealed class CustomGeometrySourceTests
         Assert.Equal("options", error.ParamName);
     }
 
+    [BindingSpecTest("BND-025")]
+    [Fact]
+    public void CustomGeometrySourceRejectsNegativeBuffer()
+    {
+        using var state = new CustomGeometrySourceState(
+            new CustomGeometrySourceOptions { FetchTile = _ => { }, Buffer = -1 }
+        );
+
+        var error = Assert.Throws<InvalidArgumentException>(() => state.Descriptor);
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
+    }
+
+    [Fact]
+    public void CustomGeometrySourceRejectsFractionalNegativeBuffer()
+    {
+        using var state = new CustomGeometrySourceState(
+            new CustomGeometrySourceOptions { FetchTile = _ => { }, Buffer = -0.5 }
+        );
+
+        // Cast-safety: -0.5 truncates to 0u and would silently pass the C-side
+        // unsigned-domain check. The binding rejects before the cast.
+        Assert.Throws<InvalidArgumentException>(() => state.Descriptor);
+    }
+
     [BindingSpecTest("BND-124")]
     [Fact]
     public async Task CustomGeometryDisposeKeepsHandleAliveUntilActiveCallbackExits()

@@ -217,6 +217,11 @@ public final class ResourceRequestHandle: @unchecked Sendable {
   }
 
   public func complete(_ response: ResourceResponse) throws {
+    if case let .unknown(raw) = response.errorReason {
+      throw NativeStatusFailure.swiftInvalidArgument(
+        "ResourceErrorReason.unknown(\(raw)) cannot be sent back to native"
+      )
+    }
     try mapNativeFailure {
       try state.complete(response.nativeInput)
     }

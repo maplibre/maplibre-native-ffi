@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Loader;
@@ -34,6 +35,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
     {
         get
         {
+            ValidateDescriptorShape();
             NativeLibraryLoader.EnsureLoaded();
             var descriptor = NativeMethods.mln_custom_geometry_source_options_default();
             descriptor.fetch_tile = &FetchTile;
@@ -82,6 +84,22 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
                 descriptor.wrap = wrap ? (byte)1 : (byte)0;
             }
             return descriptor;
+        }
+    }
+
+    // Binding-owned cast-safety: Buffer is `double?` in the public API but the
+    // C field is uint. Values in (-1, 0) would silently truncate to 0u and
+    // bypass the C-side unsigned-domain check. Reject them before the cast.
+    private void ValidateDescriptorShape()
+    {
+        if (options.Buffer is { } buffer && buffer < 0)
+        {
+            throw new InvalidArgumentException(
+                MaplibreStatus.InvalidArgument,
+                null,
+                "Custom geometry source buffer must be non-negative.",
+                null
+            );
         }
     }
 

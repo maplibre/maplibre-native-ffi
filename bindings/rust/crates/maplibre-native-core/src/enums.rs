@@ -310,12 +310,14 @@ impl MapMode {
         }
     }
 
-    pub fn as_raw(self) -> u32 {
+    pub fn raw_for_set(self) -> Result<u32> {
         match self {
-            Self::Continuous => sys::MLN_MAP_MODE_CONTINUOUS,
-            Self::Static => sys::MLN_MAP_MODE_STATIC,
-            Self::Tile => sys::MLN_MAP_MODE_TILE,
-            Self::Unknown(raw) => raw,
+            Self::Continuous => Ok(sys::MLN_MAP_MODE_CONTINUOUS),
+            Self::Static => Ok(sys::MLN_MAP_MODE_STATIC),
+            Self::Tile => Ok(sys::MLN_MAP_MODE_TILE),
+            Self::Unknown(raw) => Err(Error::invalid_argument(format!(
+                "unknown map mode cannot be set: {raw}"
+            ))),
         }
     }
 }
@@ -1013,9 +1015,9 @@ mod tests {
     #[test]
     fn map_option_enums_map_raw_values_and_preserve_unknowns() {
         assert_eq!(MapMode::from_raw(sys::MLN_MAP_MODE_TILE), MapMode::Tile);
-        assert_eq!(MapMode::Tile.as_raw(), sys::MLN_MAP_MODE_TILE);
+        assert_eq!(MapMode::Tile.raw_for_set().unwrap(), sys::MLN_MAP_MODE_TILE);
         assert_eq!(MapMode::from_raw(999_030), MapMode::Unknown(999_030));
-        assert_eq!(MapMode::Unknown(999_030).as_raw(), 999_030);
+        assert!(MapMode::Unknown(999_030).raw_for_set().is_err());
 
         assert_eq!(
             NorthOrientation::from_raw(sys::MLN_NORTH_ORIENTATION_LEFT),
