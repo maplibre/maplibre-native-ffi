@@ -4,7 +4,7 @@ class NativeHandleBox {
 
   init(typeName: String, pointer: OpaquePointer?) throws {
     do {
-      self.state = try NativeHandleState(typeName: typeName, pointer: pointer)
+      state = try NativeHandleState(typeName: typeName, pointer: pointer)
     } catch let failure as NativeStatusFailure {
       throw MaplibreError.invalidArgument(failure.diagnostic)
     }

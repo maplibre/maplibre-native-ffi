@@ -16,8 +16,9 @@ public enum NetworkStatus: Sendable, Equatable {
       switch self {
       case .online: 1
       case .offline: 2
-      case .unknown(let rawValue):
-        throw MaplibreError.invalidArgument("unknown network status \(rawValue) cannot be set")
+      case let .unknown(rawValue):
+        throw MaplibreError
+          .invalidArgument("unknown network status \(rawValue) cannot be set")
       }
     }
   }

@@ -1,14 +1,7 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = '''
-zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
-'''
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-run = '''
-zig build -Dtarget="$MLN_FFI_ZIG_TARGET" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
-'''
-
-[tasks.ci]
-depends = [":test"]
+depends = [":build"]
+run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"

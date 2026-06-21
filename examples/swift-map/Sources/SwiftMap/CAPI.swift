@@ -3,7 +3,9 @@ import MaplibreNative
 func installCAPILogging() {
   do {
     try Maplibre.setLogCallback { record in
-      print("[MapLibre] severity=\(record.severity) event=\(record.event) code=\(record.code): \(record.message)")
+      print(
+        "[MapLibre] severity=\(record.severity) event=\(record.event) code=\(record.code): \(record.message)"
+      )
       return true
     }
   } catch {
@@ -29,9 +31,15 @@ func logControls() {
       arrows or WASD: pan
       + / -: zoom at center
       Q / E: rotate
-      PageUp / PageDown or [ / ]: pitch
+      ] / [: pitch
       0: reset pitch and bearing
 
     """
   )
+}
+
+func logStartupStatus(mode: RenderTargetMode) {
+  print("render target: \(mode.rawValue)")
+  print("render target status: \(mode.statusLine)")
+  logControls()
 }

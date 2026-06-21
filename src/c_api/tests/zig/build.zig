@@ -5,9 +5,8 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath,
+    dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
 
@@ -18,10 +17,20 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
             .target = options.target,
             .optimize = options.optimize,
         }),
+        .use_lld = if (maplibre_build.isIosSimulator(options.target)) false else null,
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
-    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+    maplibre_build.addRenderBackendTranslateC(b, c_tests.root_module, .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+        .render_backend = options.render_backend,
+    });
+    if (maplibre_build.isIosSimulator(options.target)) {
+        c_tests.root_module.addCSourceFile(.{ .file = b.path("../../../zig_test_support/ios_simulator_dyld_stub.m") });
+    }
+    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux or options.target.result.os.tag == .macos) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });
@@ -38,10 +47,8 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     }
     maplibre_build.linkMaplibreNativeC(b, c_tests.root_module, .{
         .target = options.target,
-        .cmake_artifact_dir = options.cmake_artifact_dir,
-        .render_backend = options.render_backend,
+        .optimize = options.optimize,
         .include_dirs = options.include_dirs,
-        .dependency_library_dir = options.dependency_library_dir,
     });
     return c_tests;
 }
@@ -49,19 +56,22 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const render_backend = maplibre_build.renderBackend(b);
-    const cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,
-        .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir = cmake_artifact_dir,
+        .optimize = maplibre_build.testOptimize(target, b.standardOptimizeOption(.{})),
         .include_dirs = maplibre_build.includeDirs(b),
-        .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };
 
     const c_tests = addCTests(b, options);
 
-    const run_c_tests = b.addRunArtifact(c_tests);
+    const run_c_tests = maplibre_build.addTestRunStep(
+        b,
+        c_tests,
+        options.target,
+        b.path("../../../../scripts/run-ios-simulator-test.sh"),
+    );
     const test_step = b.step("test", "Run Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);
 }

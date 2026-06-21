@@ -1,6 +1,6 @@
 internal import CMaplibreNativeC
 
-struct NativeLatLng: Equatable, Sendable {
+struct NativeLatLng: Equatable {
   let latitude: Double
   let longitude: Double
 
@@ -19,7 +19,7 @@ struct NativeLatLng: Equatable, Sendable {
   }
 }
 
-struct NativeScreenPoint: Equatable, Sendable {
+struct NativeScreenPoint: Equatable {
   let x: Double
   let y: Double
 
@@ -38,7 +38,7 @@ struct NativeScreenPoint: Equatable, Sendable {
   }
 }
 
-struct NativeProjectedMeters: Equatable, Sendable {
+struct NativeProjectedMeters: Equatable {
   let northing: Double
   let easting: Double
 
@@ -57,7 +57,7 @@ struct NativeProjectedMeters: Equatable, Sendable {
   }
 }
 
-struct NativeEdgeInsets: Equatable, Sendable {
+struct NativeEdgeInsets: Equatable {
   let top: Double
   let left: Double
   let bottom: Double
@@ -82,18 +82,11 @@ struct NativeEdgeInsets: Equatable, Sendable {
   }
 }
 
-struct NativeMapOptionsInput: Equatable, Sendable {
+struct NativeMapOptionsInput: Equatable {
   let width: UInt32
   let height: UInt32
   let scaleFactor: Double
   let mapMode: UInt32
-
-  init(width: UInt32, height: UInt32, scaleFactor: Double, mapMode: UInt32) {
-    self.width = width
-    self.height = height
-    self.scaleFactor = scaleFactor
-    self.mapMode = mapMode
-  }
 
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_map_options>) throws -> Result
@@ -107,7 +100,7 @@ struct NativeMapOptionsInput: Equatable, Sendable {
   }
 }
 
-struct NativeCameraOptionsInput: Equatable, Sendable {
+struct NativeCameraOptionsInput: Equatable {
   var center: NativeLatLng?
   var zoom: Double?
   var bearing: Double?
@@ -141,15 +134,30 @@ struct NativeCameraOptionsInput: Equatable, Sendable {
   }
 
   init(_ raw: mln_camera_options) {
-    center = (raw.fields & MLN_CAMERA_OPTION_CENTER.rawValue) != 0 ? NativeLatLng(latitude: raw.latitude, longitude: raw.longitude) : nil
+    center = (raw.fields & MLN_CAMERA_OPTION_CENTER.rawValue) != 0 ?
+      NativeLatLng(
+        latitude: raw.latitude,
+        longitude: raw.longitude
+      ) : nil
     zoom = (raw.fields & MLN_CAMERA_OPTION_ZOOM.rawValue) != 0 ? raw.zoom : nil
-    bearing = (raw.fields & MLN_CAMERA_OPTION_BEARING.rawValue) != 0 ? raw.bearing : nil
-    pitch = (raw.fields & MLN_CAMERA_OPTION_PITCH.rawValue) != 0 ? raw.pitch : nil
-    centerAltitude = (raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue) != 0 ? raw.center_altitude : nil
-    padding = (raw.fields & MLN_CAMERA_OPTION_PADDING.rawValue) != 0 ? NativeEdgeInsets(raw.padding) : nil
-    anchor = (raw.fields & MLN_CAMERA_OPTION_ANCHOR.rawValue) != 0 ? NativeScreenPoint(x: raw.anchor.x, y: raw.anchor.y) : nil
+    bearing = (raw.fields & MLN_CAMERA_OPTION_BEARING.rawValue) != 0 ? raw
+      .bearing : nil
+    pitch = (raw.fields & MLN_CAMERA_OPTION_PITCH.rawValue) != 0 ? raw
+      .pitch : nil
+    centerAltitude = (
+      raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue
+    ) !=
+      0 ? raw.center_altitude : nil
+    padding = (raw.fields & MLN_CAMERA_OPTION_PADDING.rawValue) != 0 ?
+      NativeEdgeInsets(raw.padding) : nil
+    anchor = (raw.fields & MLN_CAMERA_OPTION_ANCHOR.rawValue) != 0 ?
+      NativeScreenPoint(
+        x: raw.anchor.x,
+        y: raw.anchor.y
+      ) : nil
     roll = (raw.fields & MLN_CAMERA_OPTION_ROLL.rawValue) != 0 ? raw.roll : nil
-    fieldOfView = (raw.fields & MLN_CAMERA_OPTION_FOV.rawValue) != 0 ? raw.field_of_view : nil
+    fieldOfView = (raw.fields & MLN_CAMERA_OPTION_FOV.rawValue) != 0 ? raw
+      .field_of_view : nil
   }
 
   func withNativeOptions<Result>(
@@ -197,25 +205,18 @@ struct NativeCameraOptionsInput: Equatable, Sendable {
   }
 }
 
-struct NativeUnitBezier: Equatable, Sendable {
+struct NativeUnitBezier: Equatable {
   let x1: Double
   let y1: Double
   let x2: Double
   let y2: Double
-
-  init(x1: Double, y1: Double, x2: Double, y2: Double) {
-    self.x1 = x1
-    self.y1 = y1
-    self.x2 = x2
-    self.y2 = y2
-  }
 
   var native: mln_unit_bezier {
     mln_unit_bezier(x1: x1, y1: y1, x2: x2, y2: y2)
   }
 }
 
-struct NativeAnimationOptionsInput: Equatable, Sendable {
+struct NativeAnimationOptionsInput: Equatable {
   var durationMilliseconds: Double?
   var velocity: Double?
   var minimumZoom: Double?
@@ -236,7 +237,9 @@ struct NativeAnimationOptionsInput: Equatable, Sendable {
   func withOptionalNativeOptions<Result>(
     _ body: (UnsafePointer<mln_animation_options>?) throws -> Result
   ) throws -> Result {
-    if durationMilliseconds == nil, velocity == nil, minimumZoom == nil, easing == nil {
+    if durationMilliseconds == nil, velocity == nil, minimumZoom == nil,
+       easing == nil
+    {
       return try body(nil)
     }
     var animation = mln_animation_options_default()
@@ -260,18 +263,26 @@ struct NativeAnimationOptionsInput: Equatable, Sendable {
   }
 }
 
-struct NativeCameraFitOptionsInput: Equatable, Sendable {
+struct NativeCameraFitOptionsInput: Equatable {
   var padding: NativeEdgeInsets?
   var bearing: Double?
   var pitch: Double?
 
-  init(padding: NativeEdgeInsets? = nil, bearing: Double? = nil, pitch: Double? = nil) {
+  init(
+    padding: NativeEdgeInsets? = nil,
+    bearing: Double? = nil,
+    pitch: Double? = nil
+  ) {
     self.padding = padding
     self.bearing = bearing
     self.pitch = pitch
   }
 
-  func withOptionalNativeOptions<Result>(_ body: (UnsafePointer<mln_camera_fit_options>?) throws -> Result) throws -> Result {
+  func withOptionalNativeOptions<Result>(_ body: (
+    UnsafePointer<mln_camera_fit_options>?
+  ) throws
+    -> Result) throws -> Result
+  {
     if padding == nil, bearing == nil, pitch == nil { return try body(nil) }
     var options = mln_camera_fit_options_default()
     if let padding {
@@ -290,14 +301,20 @@ struct NativeCameraFitOptionsInput: Equatable, Sendable {
   }
 }
 
-struct NativeBoundOptionsInput: Equatable, Sendable {
+struct NativeBoundOptionsInput: Equatable {
   var bounds: NativeLatLngBounds?
   var minZoom: Double?
   var maxZoom: Double?
   var minPitch: Double?
   var maxPitch: Double?
 
-  init(bounds: NativeLatLngBounds? = nil, minZoom: Double? = nil, maxZoom: Double? = nil, minPitch: Double? = nil, maxPitch: Double? = nil) {
+  init(
+    bounds: NativeLatLngBounds? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    minPitch: Double? = nil,
+    maxPitch: Double? = nil
+  ) {
     self.bounds = bounds
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -306,14 +323,23 @@ struct NativeBoundOptionsInput: Equatable, Sendable {
   }
 
   init(_ raw: mln_bound_options) {
-    bounds = (raw.fields & MLN_BOUND_OPTION_BOUNDS.rawValue) != 0 ? NativeLatLngBounds(raw.bounds) : nil
-    minZoom = (raw.fields & MLN_BOUND_OPTION_MIN_ZOOM.rawValue) != 0 ? raw.min_zoom : nil
-    maxZoom = (raw.fields & MLN_BOUND_OPTION_MAX_ZOOM.rawValue) != 0 ? raw.max_zoom : nil
-    minPitch = (raw.fields & MLN_BOUND_OPTION_MIN_PITCH.rawValue) != 0 ? raw.min_pitch : nil
-    maxPitch = (raw.fields & MLN_BOUND_OPTION_MAX_PITCH.rawValue) != 0 ? raw.max_pitch : nil
+    bounds = (raw.fields & MLN_BOUND_OPTION_BOUNDS.rawValue) != 0 ?
+      NativeLatLngBounds(raw.bounds) : nil
+    minZoom = (raw.fields & MLN_BOUND_OPTION_MIN_ZOOM.rawValue) != 0 ? raw
+      .min_zoom : nil
+    maxZoom = (raw.fields & MLN_BOUND_OPTION_MAX_ZOOM.rawValue) != 0 ? raw
+      .max_zoom : nil
+    minPitch = (raw.fields & MLN_BOUND_OPTION_MIN_PITCH.rawValue) != 0 ? raw
+      .min_pitch : nil
+    maxPitch = (raw.fields & MLN_BOUND_OPTION_MAX_PITCH.rawValue) != 0 ? raw
+      .max_pitch : nil
   }
 
-  func withNativeOptions<Result>(_ body: (UnsafePointer<mln_bound_options>) throws -> Result) throws -> Result {
+  func withNativeOptions<Result>(_ body: (
+    UnsafePointer<mln_bound_options>
+  ) throws
+    -> Result) throws -> Result
+  {
     var options = mln_bound_options_default()
     if let bounds {
       options.fields |= MLN_BOUND_OPTION_BOUNDS.rawValue
@@ -339,110 +365,229 @@ struct NativeBoundOptionsInput: Equatable, Sendable {
   }
 }
 
-struct NativeVec3: Equatable, Sendable {
+struct NativeVec3: Equatable {
   let x: Double
   let y: Double
   let z: Double
-  init(x: Double, y: Double, z: Double) { self.x = x; self.y = y; self.z = z }
-  init(_ raw: mln_vec3) { x = raw.x; y = raw.y; z = raw.z }
-  var native: mln_vec3 { mln_vec3(x: x, y: y, z: z) }
+  init(x: Double, y: Double, z: Double) {
+    self.x = x; self.y = y; self.z = z
+  }
+
+  init(_ raw: mln_vec3) {
+    x = raw.x; y = raw.y; z = raw.z
+  }
+
+  var native: mln_vec3 {
+    mln_vec3(x: x, y: y, z: z)
+  }
 }
 
-struct NativeQuaternion: Equatable, Sendable {
+struct NativeQuaternion: Equatable {
   let x: Double
   let y: Double
   let z: Double
   let w: Double
-  init(x: Double, y: Double, z: Double, w: Double) { self.x = x; self.y = y; self.z = z; self.w = w }
-  init(_ raw: mln_quaternion) { x = raw.x; y = raw.y; z = raw.z; w = raw.w }
-  var native: mln_quaternion { mln_quaternion(x: x, y: y, z: z, w: w) }
+  init(x: Double, y: Double, z: Double, w: Double) {
+    self.x = x; self.y = y; self.z = z; self.w = w
+  }
+
+  init(_ raw: mln_quaternion) {
+    x = raw.x; y = raw.y; z = raw.z; w = raw.w
+  }
+
+  var native: mln_quaternion {
+    mln_quaternion(x: x, y: y, z: z, w: w)
+  }
 }
 
-struct NativeFreeCameraOptionsInput: Equatable, Sendable {
+struct NativeFreeCameraOptionsInput: Equatable {
   var position: NativeVec3?
   var orientation: NativeQuaternion?
-  init(position: NativeVec3? = nil, orientation: NativeQuaternion? = nil) { self.position = position; self.orientation = orientation }
-  init(_ raw: mln_free_camera_options) {
-    position = (raw.fields & MLN_FREE_CAMERA_OPTION_POSITION.rawValue) != 0 ? NativeVec3(raw.position) : nil
-    orientation = (raw.fields & MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue) != 0 ? NativeQuaternion(raw.orientation) : nil
+  init(position: NativeVec3? = nil, orientation: NativeQuaternion? = nil) {
+    self.position = position; self.orientation = orientation
   }
-  func withNativeOptions<Result>(_ body: (UnsafePointer<mln_free_camera_options>) throws -> Result) throws -> Result {
+
+  init(_ raw: mln_free_camera_options) {
+    position = (raw.fields & MLN_FREE_CAMERA_OPTION_POSITION.rawValue) != 0 ?
+      NativeVec3(raw.position) : nil
+    orientation = (raw.fields & MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue) !=
+      0 ? NativeQuaternion(raw.orientation) : nil
+  }
+
+  func withNativeOptions<Result>(_ body: (
+    UnsafePointer<mln_free_camera_options>
+  ) throws
+    -> Result) throws -> Result
+  {
     var options = mln_free_camera_options_default()
-    if let position { options.fields |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; options.position = position.native }
-    if let orientation { options.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; options.orientation = orientation.native }
+    if let position {
+      options.fields |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; options
+        .position = position.native
+    }
+    if let orientation {
+      options.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; options
+        .orientation = orientation.native
+    }
     return try withUnsafePointer(to: &options, body)
   }
 }
 
-struct NativeProjectionModeInput: Equatable, Sendable {
+struct NativeProjectionModeInput: Equatable {
   var axonometric: Bool?
   var xSkew: Double?
   var ySkew: Double?
-  init(axonometric: Bool? = nil, xSkew: Double? = nil, ySkew: Double? = nil) { self.axonometric = axonometric; self.xSkew = xSkew; self.ySkew = ySkew }
-  init(_ raw: mln_projection_mode) {
-    axonometric = (raw.fields & MLN_PROJECTION_MODE_AXONOMETRIC.rawValue) != 0 ? raw.axonometric : nil
-    xSkew = (raw.fields & MLN_PROJECTION_MODE_X_SKEW.rawValue) != 0 ? raw.x_skew : nil
-    ySkew = (raw.fields & MLN_PROJECTION_MODE_Y_SKEW.rawValue) != 0 ? raw.y_skew : nil
+  init(axonometric: Bool? = nil, xSkew: Double? = nil, ySkew: Double? = nil) {
+    self.axonometric = axonometric; self.xSkew = xSkew; self.ySkew = ySkew
   }
-  func withNativeMode<Result>(_ body: (UnsafePointer<mln_projection_mode>) throws -> Result) throws -> Result {
+
+  init(_ raw: mln_projection_mode) {
+    axonometric = (raw.fields & MLN_PROJECTION_MODE_AXONOMETRIC.rawValue) != 0 ?
+      raw.axonometric : nil
+    xSkew = (raw.fields & MLN_PROJECTION_MODE_X_SKEW.rawValue) != 0 ? raw
+      .x_skew : nil
+    ySkew = (raw.fields & MLN_PROJECTION_MODE_Y_SKEW.rawValue) != 0 ? raw
+      .y_skew : nil
+  }
+
+  func withNativeMode<Result>(_ body: (
+    UnsafePointer<mln_projection_mode>
+  ) throws
+    -> Result) throws -> Result
+  {
     var mode = mln_projection_mode_default()
-    if let axonometric { mode.fields |= MLN_PROJECTION_MODE_AXONOMETRIC.rawValue; mode.axonometric = axonometric }
-    if let xSkew { mode.fields |= MLN_PROJECTION_MODE_X_SKEW.rawValue; mode.x_skew = xSkew }
-    if let ySkew { mode.fields |= MLN_PROJECTION_MODE_Y_SKEW.rawValue; mode.y_skew = ySkew }
+    if let axonometric {
+      mode.fields |= MLN_PROJECTION_MODE_AXONOMETRIC.rawValue; mode
+        .axonometric = axonometric
+    }
+    if let xSkew {
+      mode.fields |= MLN_PROJECTION_MODE_X_SKEW.rawValue; mode.x_skew = xSkew
+    }
+    if let ySkew {
+      mode.fields |= MLN_PROJECTION_MODE_Y_SKEW.rawValue; mode.y_skew = ySkew
+    }
     return try withUnsafePointer(to: &mode, body)
   }
 }
 
-struct NativeMapViewportOptionsInput: Equatable, Sendable {
+struct NativeMapViewportOptionsInput: Equatable {
   var northOrientation: UInt32?
   var constrainMode: UInt32?
   var viewportMode: UInt32?
   var frustumOffset: NativeEdgeInsets?
-  init(northOrientation: UInt32? = nil, constrainMode: UInt32? = nil, viewportMode: UInt32? = nil, frustumOffset: NativeEdgeInsets? = nil) {
-    self.northOrientation = northOrientation; self.constrainMode = constrainMode; self.viewportMode = viewportMode; self.frustumOffset = frustumOffset
+  init(
+    northOrientation: UInt32? = nil,
+    constrainMode: UInt32? = nil,
+    viewportMode: UInt32? = nil,
+    frustumOffset: NativeEdgeInsets? = nil
+  ) {
+    self.northOrientation = northOrientation; self
+      .constrainMode = constrainMode; self.viewportMode = viewportMode; self
+      .frustumOffset = frustumOffset
   }
+
   init(_ raw: mln_map_viewport_options) {
-    northOrientation = (raw.fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue) != 0 ? raw.north_orientation : nil
-    constrainMode = (raw.fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue) != 0 ? raw.constrain_mode : nil
-    viewportMode = (raw.fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue) != 0 ? raw.viewport_mode : nil
-    frustumOffset = (raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue) != 0 ? NativeEdgeInsets(raw.frustum_offset) : nil
+    northOrientation = (raw.fields & MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+      .rawValue) != 0 ? raw.north_orientation : nil
+    constrainMode = (raw.fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
+      .rawValue) != 0 ? raw.constrain_mode : nil
+    viewportMode = (raw.fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
+      .rawValue) != 0 ? raw.viewport_mode : nil
+    frustumOffset = (raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
+      .rawValue) != 0 ? NativeEdgeInsets(raw.frustum_offset) : nil
   }
-  func withNativeOptions<Result>(_ body: (UnsafePointer<mln_map_viewport_options>) throws -> Result) throws -> Result {
+
+  func withNativeOptions<Result>(_ body: (
+    UnsafePointer<mln_map_viewport_options>
+  ) throws
+    -> Result) throws -> Result
+  {
     var options = mln_map_viewport_options_default()
-    if let northOrientation { options.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; options.north_orientation = northOrientation }
-    if let constrainMode { options.fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; options.constrain_mode = constrainMode }
-    if let viewportMode { options.fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; options.viewport_mode = viewportMode }
-    if let frustumOffset { options.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; options.frustum_offset = frustumOffset.native }
+    if let northOrientation {
+      options.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+        .rawValue; options.north_orientation = northOrientation
+    }
+    if let constrainMode {
+      options.fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; options
+        .constrain_mode = constrainMode
+    }
+    if let viewportMode {
+      options.fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; options
+        .viewport_mode = viewportMode
+    }
+    if let frustumOffset {
+      options.fields |= MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue; options
+        .frustum_offset = frustumOffset.native
+    }
     return try withUnsafePointer(to: &options, body)
   }
 }
 
-struct NativeMapTileOptionsInput: Equatable, Sendable {
+struct NativeMapTileOptionsInput: Equatable {
   var prefetchZoomDelta: UInt32?
   var lodMinRadius: Double?
   var lodScale: Double?
   var lodPitchThreshold: Double?
   var lodZoomShift: Double?
   var lodMode: UInt32?
-  init(prefetchZoomDelta: UInt32? = nil, lodMinRadius: Double? = nil, lodScale: Double? = nil, lodPitchThreshold: Double? = nil, lodZoomShift: Double? = nil, lodMode: UInt32? = nil) {
-    self.prefetchZoomDelta = prefetchZoomDelta; self.lodMinRadius = lodMinRadius; self.lodScale = lodScale; self.lodPitchThreshold = lodPitchThreshold; self.lodZoomShift = lodZoomShift; self.lodMode = lodMode
+  init(
+    prefetchZoomDelta: UInt32? = nil,
+    lodMinRadius: Double? = nil,
+    lodScale: Double? = nil,
+    lodPitchThreshold: Double? = nil,
+    lodZoomShift: Double? = nil,
+    lodMode: UInt32? = nil
+  ) {
+    self.prefetchZoomDelta = prefetchZoomDelta; self
+      .lodMinRadius = lodMinRadius; self.lodScale = lodScale; self
+      .lodPitchThreshold = lodPitchThreshold; self
+      .lodZoomShift = lodZoomShift; self.lodMode = lodMode
   }
+
   init(_ raw: mln_map_tile_options) {
-    prefetchZoomDelta = (raw.fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue) != 0 ? raw.prefetch_zoom_delta : nil
-    lodMinRadius = (raw.fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue) != 0 ? raw.lod_min_radius : nil
-    lodScale = (raw.fields & MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue) != 0 ? raw.lod_scale : nil
-    lodPitchThreshold = (raw.fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD.rawValue) != 0 ? raw.lod_pitch_threshold : nil
-    lodZoomShift = (raw.fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue) != 0 ? raw.lod_zoom_shift : nil
-    lodMode = (raw.fields & MLN_MAP_TILE_OPTION_LOD_MODE.rawValue) != 0 ? raw.lod_mode : nil
+    prefetchZoomDelta = (raw.fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
+      .rawValue) != 0 ? raw.prefetch_zoom_delta : nil
+    lodMinRadius = (raw.fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue) !=
+      0 ? raw.lod_min_radius : nil
+    lodScale = (raw.fields & MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue) != 0 ? raw
+      .lod_scale : nil
+    lodPitchThreshold = (raw.fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
+      .rawValue) != 0 ? raw.lod_pitch_threshold : nil
+    lodZoomShift = (raw.fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue) !=
+      0 ? raw.lod_zoom_shift : nil
+    lodMode = (raw.fields & MLN_MAP_TILE_OPTION_LOD_MODE.rawValue) != 0 ? raw
+      .lod_mode : nil
   }
-  func withNativeOptions<Result>(_ body: (UnsafePointer<mln_map_tile_options>) throws -> Result) throws -> Result {
+
+  func withNativeOptions<Result>(_ body: (
+    UnsafePointer<mln_map_tile_options>
+  ) throws
+    -> Result) throws -> Result
+  {
     var options = mln_map_tile_options_default()
-    if let prefetchZoomDelta { options.fields |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue; options.prefetch_zoom_delta = prefetchZoomDelta }
-    if let lodMinRadius { options.fields |= MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue; options.lod_min_radius = lodMinRadius }
-    if let lodScale { options.fields |= MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue; options.lod_scale = lodScale }
-    if let lodPitchThreshold { options.fields |= MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD.rawValue; options.lod_pitch_threshold = lodPitchThreshold }
-    if let lodZoomShift { options.fields |= MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue; options.lod_zoom_shift = lodZoomShift }
-    if let lodMode { options.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; options.lod_mode = lodMode }
+    if let prefetchZoomDelta {
+      options.fields |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
+        .rawValue; options.prefetch_zoom_delta = prefetchZoomDelta
+    }
+    if let lodMinRadius {
+      options.fields |= MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue; options
+        .lod_min_radius = lodMinRadius
+    }
+    if let lodScale {
+      options.fields |= MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue; options
+        .lod_scale = lodScale
+    }
+    if let lodPitchThreshold {
+      options.fields |= MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
+        .rawValue; options.lod_pitch_threshold = lodPitchThreshold
+    }
+    if let lodZoomShift {
+      options.fields |= MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT.rawValue; options
+        .lod_zoom_shift = lodZoomShift
+    }
+    if let lodMode {
+      options.fields |= MLN_MAP_TILE_OPTION_LOD_MODE.rawValue; options
+        .lod_mode = lodMode
+    }
     return try withUnsafePointer(to: &options, body)
   }
 }

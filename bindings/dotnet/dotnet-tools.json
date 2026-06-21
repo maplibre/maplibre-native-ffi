@@ -2,11 +2,6 @@
   "version": 1,
   "isRoot": true,
   "tools": {
-    "csharpier": {
-      "version": "1.2.6",
-      "commands": ["csharpier"],
-      "rollForward": false
-    },
     "clangsharppinvokegenerator": {
       "version": "21.1.8.3",
       "commands": ["ClangSharpPInvokeGenerator"],

@@ -1,0 +1,23 @@
+[tasks.ensure-environment]
+hide = true
+run = '''
+if [[ "$MISE_ENV" != android-arm64-egl && "$MISE_ENV" != android-arm64-vulkan ]]; then
+  echo "Use an Android map mise environment:" >&2
+  echo "  mise -E android-arm64-egl run //examples/android-map:build" >&2
+  echo "  mise -E android-arm64-vulkan run //examples/android-map:build" >&2
+  exit 1
+fi
+'''
+
+[tasks.build]
+depends = ["ensure-environment", "//:ensure-native-library"]
+run = '''
+../../gradlew :examples:android-map:assembleDebug
+'''
+
+[tasks.run]
+depends = ["ensure-environment", "//:ensure-native-library"]
+run = '''
+../../gradlew :examples:android-map:installDebug
+adb shell am start -S -n org.maplibre.nativeffi.examples.androidmap/.MainActivity
+'''

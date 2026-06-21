@@ -411,6 +411,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // Spec coverage: BND-083.
     fn unknown_payload_preserves_raw_type_bytes_message_and_source() {
         let bytes = [1u8, 2, 3, 4];
         let message = b"future payload";
@@ -514,6 +515,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-087.
     fn payload_size_mismatch_is_rejected() {
         let payload = sys::mln_runtime_event_render_map {
             size: mem::size_of::<sys::mln_runtime_event_render_map>() as u32,

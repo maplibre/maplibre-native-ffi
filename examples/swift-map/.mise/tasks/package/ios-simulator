@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+#MISE description="Package the Swift map iOS simulator app bundle."
+set -euo pipefail
+
+if [[ "$MISE_ENV" != ios-simulator-* ]]; then
+  exec mise -E ios-simulator-arm64-metal run //examples/swift-map:package:ios-simulator
+fi
+
+mise run build
+
+app_dir=".build/$MISE_ENV/SwiftMapIOS.app"
+executable=".build/$MISE_ENV/$MLN_FFI_SWIFT_TARGET_BIN_DIR/debug/swift-map-ios"
+native_library="$MLN_FFI_BUILD_DIR/libmaplibre-native-c.dylib"
+info_plist="$app_dir/Info.plist"
+
+rm -rf "$app_dir"
+mkdir -p "$app_dir"
+cp "$executable" "$app_dir/swift-map-ios"
+cp "$native_library" "$app_dir/libmaplibre-native-c.dylib"
+install_name_tool -delete_rpath "$MLN_FFI_BUILD_DIR" "$app_dir/swift-map-ios"
+install_name_tool -add_rpath "@executable_path" "$app_dir/swift-map-ios"
+
+/usr/libexec/PlistBuddy -c 'Clear dict' "$info_plist" 2>/dev/null || true
+/usr/libexec/PlistBuddy -c 'Add :CFBundleDevelopmentRegion string en' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleDisplayName string Swift Map iOS' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string swift-map-ios' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string org.maplibre.nativeffi.examples.swift-map-ios' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleInfoDictionaryVersion string 6.0' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleName string SwiftMapIOS' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundlePackageType string APPL' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleShortVersionString string 0.1' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 1' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :LSRequiresIPhoneOS bool true' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :MinimumOSVersion string 14.3' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UILaunchScreen dict' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UIRequiredDeviceCapabilities array' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UIRequiredDeviceCapabilities:0 string metal' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations array' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:0 string UIInterfaceOrientationPortrait' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:1 string UIInterfaceOrientationLandscapeLeft' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:2 string UIInterfaceOrientationLandscapeRight' "$info_plist"
+/usr/libexec/PlistBuddy -c 'Add :UISupportedInterfaceOrientations:3 string UIInterfaceOrientationPortraitUpsideDown' "$info_plist"
+plutil -convert binary1 "$info_plist"
+
+codesign --force --sign - "$app_dir/libmaplibre-native-c.dylib"
+codesign --force --sign - "$app_dir/swift-map-ios"
+codesign --force --sign - "$app_dir"
+echo "$app_dir"

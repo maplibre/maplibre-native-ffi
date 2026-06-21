@@ -1,15 +1,9 @@
 internal import CMaplibreNativeC
 
-struct NativeRenderTargetExtent: Equatable, Sendable {
+struct NativeRenderTargetExtent: Equatable {
   let width: UInt32
   let height: UInt32
   let scaleFactor: Double
-
-  init(width: UInt32, height: UInt32, scaleFactor: Double) {
-    self.width = width
-    self.height = height
-    self.scaleFactor = scaleFactor
-  }
 
   var native: mln_render_target_extent {
     mln_render_target_extent(
@@ -21,7 +15,7 @@ struct NativeRenderTargetExtent: Equatable, Sendable {
   }
 }
 
-struct NativeMetalContextDescriptor: Equatable, Sendable {
+struct NativeMetalContextDescriptor: Equatable {
   let deviceAddress: UInt
 
   init(deviceAddress: UInt = 0) {
@@ -36,7 +30,7 @@ struct NativeMetalContextDescriptor: Equatable, Sendable {
   }
 }
 
-struct NativeVulkanContextDescriptor: Equatable, Sendable {
+struct NativeVulkanContextDescriptor: Equatable {
   let instanceAddress: UInt
   let physicalDeviceAddress: UInt
   let deviceAddress: UInt
@@ -67,22 +61,32 @@ struct NativeVulkanContextDescriptor: Equatable, Sendable {
     mln_vulkan_context_descriptor(
       size: UInt32(MemoryLayout<mln_vulkan_context_descriptor>.size),
       instance: UnsafeMutableRawPointer(bitPattern: instanceAddress),
-      physical_device: UnsafeMutableRawPointer(bitPattern: physicalDeviceAddress),
+      physical_device: UnsafeMutableRawPointer(
+        bitPattern: physicalDeviceAddress
+      ),
       device: UnsafeMutableRawPointer(bitPattern: deviceAddress),
       graphics_queue: UnsafeMutableRawPointer(bitPattern: graphicsQueueAddress),
       graphics_queue_family_index: graphicsQueueFamilyIndex,
-      get_instance_proc_addr: UnsafeMutableRawPointer(bitPattern: getInstanceProcAddrAddress),
-      get_device_proc_addr: UnsafeMutableRawPointer(bitPattern: getDeviceProcAddrAddress)
+      get_instance_proc_addr: UnsafeMutableRawPointer(
+        bitPattern: getInstanceProcAddrAddress
+      ),
+      get_device_proc_addr: UnsafeMutableRawPointer(
+        bitPattern: getDeviceProcAddrAddress
+      )
     )
   }
 }
 
-struct NativeWglContextDescriptor: Equatable, Sendable {
+struct NativeWglContextDescriptor: Equatable {
   let deviceContextAddress: UInt
   let shareContextAddress: UInt
   let getProcAddressAddress: UInt
 
-  init(deviceContextAddress: UInt, shareContextAddress: UInt, getProcAddressAddress: UInt = 0) {
+  init(
+    deviceContextAddress: UInt,
+    shareContextAddress: UInt,
+    getProcAddressAddress: UInt = 0
+  ) {
     self.deviceContextAddress = deviceContextAddress
     self.shareContextAddress = shareContextAddress
     self.getProcAddressAddress = getProcAddressAddress
@@ -93,18 +97,25 @@ struct NativeWglContextDescriptor: Equatable, Sendable {
       size: UInt32(MemoryLayout<mln_wgl_context_descriptor>.size),
       device_context: UnsafeMutableRawPointer(bitPattern: deviceContextAddress),
       share_context: UnsafeMutableRawPointer(bitPattern: shareContextAddress),
-      get_proc_address: UnsafeMutableRawPointer(bitPattern: getProcAddressAddress)
+      get_proc_address: UnsafeMutableRawPointer(
+        bitPattern: getProcAddressAddress
+      )
     )
   }
 }
 
-struct NativeEglContextDescriptor: Equatable, Sendable {
+struct NativeEglContextDescriptor: Equatable {
   let displayAddress: UInt
   let configAddress: UInt
   let shareContextAddress: UInt
   let getProcAddressAddress: UInt
 
-  init(displayAddress: UInt, configAddress: UInt, shareContextAddress: UInt, getProcAddressAddress: UInt = 0) {
+  init(
+    displayAddress: UInt,
+    configAddress: UInt,
+    shareContextAddress: UInt,
+    getProcAddressAddress: UInt = 0
+  ) {
     self.displayAddress = displayAddress
     self.configAddress = configAddress
     self.shareContextAddress = shareContextAddress
@@ -117,13 +128,15 @@ struct NativeEglContextDescriptor: Equatable, Sendable {
       display: UnsafeMutableRawPointer(bitPattern: displayAddress),
       config: UnsafeMutableRawPointer(bitPattern: configAddress),
       share_context: UnsafeMutableRawPointer(bitPattern: shareContextAddress),
-      get_proc_address: UnsafeMutableRawPointer(bitPattern: getProcAddressAddress)
+      get_proc_address: UnsafeMutableRawPointer(
+        bitPattern: getProcAddressAddress
+      )
     )
   }
 }
 
-struct NativeOpenGLContextDescriptor: Equatable, Sendable {
-  enum Platform: Equatable, Sendable {
+struct NativeOpenGLContextDescriptor: Equatable {
+  enum Platform: Equatable {
     case wgl(NativeWglContextDescriptor)
     case egl(NativeEglContextDescriptor)
   }
@@ -145,7 +158,7 @@ struct NativeOpenGLContextDescriptor: Equatable, Sendable {
   }
 }
 
-struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
+struct NativeMetalSurfaceDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeMetalContextDescriptor
   let layerAddress: UInt
@@ -161,7 +174,7 @@ struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
+struct NativeVulkanSurfaceDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
   let surfaceAddress: UInt
@@ -177,7 +190,7 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeOpenGLSurfaceDescriptorInput: Equatable, Sendable {
+struct NativeOpenGLSurfaceDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
   let surfaceAddress: UInt
@@ -193,7 +206,7 @@ struct NativeOpenGLSurfaceDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeTextureImageInfo: Equatable, Sendable {
+struct NativeTextureImageInfo: Equatable {
   let width: UInt32
   let height: UInt32
   let stride: UInt32
@@ -207,7 +220,7 @@ struct NativeTextureImageInfo: Equatable, Sendable {
   }
 }
 
-struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
+struct NativeMetalOwnedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeMetalContextDescriptor
 
@@ -221,12 +234,13 @@ struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
+struct NativeMetalBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let textureAddress: UInt
 
   func withNativeDescriptor<Result>(
-    _ body: (UnsafePointer<mln_metal_borrowed_texture_descriptor>) throws -> Result
+    _ body: (UnsafePointer<mln_metal_borrowed_texture_descriptor>) throws
+      -> Result
   ) throws -> Result {
     var descriptor = mln_metal_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
@@ -235,12 +249,13 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
+struct NativeVulkanOwnedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
 
   func withNativeDescriptor<Result>(
-    _ body: (UnsafePointer<mln_vulkan_owned_texture_descriptor>) throws -> Result
+    _ body: (UnsafePointer<mln_vulkan_owned_texture_descriptor>) throws
+      -> Result
   ) throws -> Result {
     var descriptor = mln_vulkan_owned_texture_descriptor_default()
     descriptor.extent = extent.native
@@ -249,7 +264,7 @@ struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
+struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
   let imageAddress: UInt
@@ -259,13 +274,15 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   let finalLayout: UInt32
 
   func withNativeDescriptor<Result>(
-    _ body: (UnsafePointer<mln_vulkan_borrowed_texture_descriptor>) throws -> Result
+    _ body: (UnsafePointer<mln_vulkan_borrowed_texture_descriptor>) throws
+      -> Result
   ) throws -> Result {
     var descriptor = mln_vulkan_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.image = UnsafeMutableRawPointer(bitPattern: imageAddress)
-    descriptor.image_view = UnsafeMutableRawPointer(bitPattern: imageViewAddress)
+    descriptor
+      .image_view = UnsafeMutableRawPointer(bitPattern: imageViewAddress)
     descriptor.format = format
     descriptor.initial_layout = initialLayout
     descriptor.final_layout = finalLayout
@@ -273,12 +290,13 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, Sendable {
+struct NativeOpenGLOwnedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
 
   func withNativeDescriptor<Result>(
-    _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws -> Result
+    _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws
+      -> Result
   ) throws -> Result {
     var descriptor = mln_opengl_owned_texture_descriptor_default()
     descriptor.extent = extent.native
@@ -287,14 +305,15 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable, Sendable {
+struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
   let texture: UInt32
   let target: UInt32
 
   func withNativeDescriptor<Result>(
-    _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws -> Result
+    _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws
+      -> Result
   ) throws -> Result {
     var descriptor = mln_opengl_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native

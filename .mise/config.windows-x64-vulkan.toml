@@ -1,7 +1,16 @@
 [env]
-_.path = ["{{config_root}}/build/windows-x64-vulkan"]
-MLN_FFI_VARIANT = "windows-x64-vulkan"
-MLN_FFI_TARGET_TRIPLE = "windows-x64"
+_.path = [
+  "{{config_root}}/.pixi/envs/default/Library/bin",
+  "{{config_root}}/build/windows-x64-vulkan",
+]
 MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/windows-x64-vulkan"
-MLN_FFI_ZIG_TARGET = "x86_64-windows-msvc"
+MLN_FFI_SYSTEM_ROOT = false
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/Library/include"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/Library/lib"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=x86_64-windows-msvc"
+CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default/Library"
+CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
+PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}};{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}/pkgconfig"
+PKG_CONFIG = { value = "{{ tools[\"pkg-config\"].path }}/Library/bin/pkg-config.exe", tools = true }
+LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/Library/bin"

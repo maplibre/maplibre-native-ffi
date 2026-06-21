@@ -77,7 +77,7 @@ typedef struct mln_wgl_context_descriptor {
   void* get_proc_address;
 } mln_wgl_context_descriptor;
 
-/** EGL context fields shared by OpenGL render targets on Linux. */
+/** EGL context fields shared by OpenGL render targets. */
 typedef struct mln_egl_context_descriptor {
   uint32_t size;
   /** Borrowed EGLDisplay. Required. */

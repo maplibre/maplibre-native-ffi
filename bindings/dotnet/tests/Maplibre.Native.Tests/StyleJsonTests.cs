@@ -12,6 +12,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class StyleJsonTests
 {
+    [BindingSpecTest("BND-064")]
     [Fact]
     public void NativeJsonValueMaterializesNestedObjectsAndArrays()
     {
@@ -35,6 +36,7 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal((uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING, first.value->type);
     }
 
+    [BindingSpecTest("BND-025")]
     [Fact]
     public void NativeJsonValueRejectsNonFiniteNumbersBeforeNativeCall()
     {
@@ -44,6 +46,8 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     }
 
+    // Support invariant for BND-064: malformed native JSON containers fail
+    // deterministically instead of fabricating public JSON values.
     [Fact]
     public void JsonReaderRejectsNonZeroCountsWithNullBackingPointers()
     {
@@ -74,6 +78,8 @@ public sealed unsafe class StyleJsonTests
         Assert.Contains("mln_json_object", objectError.Message, StringComparison.Ordinal);
     }
 
+    // Support invariant for BND-064: unknown native JSON tags fail
+    // deterministically instead of fabricating public JSON values.
     [Fact]
     public void JsonReaderRejectsUnknownNativeValueTypes()
     {
@@ -84,11 +90,11 @@ public sealed unsafe class StyleJsonTests
         Assert.Contains("Unknown native JSON value type", error.Message, StringComparison.Ordinal);
     }
 
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void UrlAndTileSourceApisAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
 
@@ -124,11 +130,34 @@ public sealed unsafe class StyleJsonTests
         Assert.Equal("Vector attribution", map.StyleSourceInfo("vector-tiles")?.Attribution);
     }
 
+    [BindingSpecTest("BND-081", "BND-101")]
+    [Fact]
+    public void SetStyleJsonReturnsCopiedStyleLoadedEventWithMapIdentity()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
+            runtime,
+            map,
+            RuntimeEventType.MapStyleLoaded
+        );
+
+        Assert.Equal(RuntimeEventType.MapStyleLoaded, runtimeEvent.Type);
+        Assert.Equal((uint)RuntimeEventType.MapStyleLoaded, runtimeEvent.RawType);
+        Assert.Equal(RuntimeEventSourceType.Map, runtimeEvent.SourceType);
+        Assert.Same(map, runtimeEvent.MapSource);
+        Assert.Null(runtimeEvent.RuntimeSource);
+        Assert.Same(RuntimeEventPayload.None.Instance, runtimeEvent.Payload);
+        Assert.Same(map, runtimeEvent.MapSource);
+    }
+
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         map.AddStyleSourceJson("geo", GeoJsonSource());
@@ -137,7 +166,8 @@ public sealed unsafe class StyleJsonTests
                 new JsonMember("id", new JsonValue.String("fill")),
                 new JsonMember("type", new JsonValue.String("fill")),
                 new JsonMember("source", new JsonValue.String("geo")),
-            ])
+            ]),
+            ""
         );
 
         map.SetLayerProperty("fill", "fill-opacity", new JsonValue.Double(0.5));
@@ -158,11 +188,11 @@ public sealed unsafe class StyleJsonTests
         Assert.Null(map.GetLayerFilter("fill"));
     }
 
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void StyleSourceAndLayerJsonAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
 
@@ -180,7 +210,8 @@ public sealed unsafe class StyleJsonTests
             new JsonValue.Object([
                 new JsonMember("id", new JsonValue.String("background")),
                 new JsonMember("type", new JsonValue.String("background")),
-            ])
+            ]),
+            ""
         );
         Assert.True(map.StyleLayerExists("background"));
         Assert.Equal("background", map.StyleLayerType("background"));

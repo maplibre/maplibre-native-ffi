@@ -20,20 +20,20 @@
 #include <mbgl/util/image.hpp>
 #include <mbgl/util/size.hpp>
 
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
 #include <Windows.h>
-#elif defined(__linux__)
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <EGL/egl.h>
 #endif
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
-#if defined(__linux__)
-#include "render/opengl/egl_common.hpp"
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+#include "render/opengl/egl_context.hpp"
 #endif
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
@@ -391,10 +391,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       resource.reset();
       context.reset();
     };
-    if (render_context_ != nullptr) {
-      auto guard = mbgl::gfx::BackendScope{
-        *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-      };
+    if (has_native_context()) {
+      auto guard = mbgl::gfx::BackendScope{*this};
       cleanup();
     } else {
       cleanup();
@@ -437,9 +435,19 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
  private:
+  [[nodiscard]] auto has_native_context() const -> bool {
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+    return render_context_ != nullptr;
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    return egl_context_.has_value();
+#else
+    return false;
+#endif
+  }
+
   auto getExtensionFunctionPointer(const char* name)
     -> mbgl::gl::ProcAddress override {
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
       context_.data.wgl.get_proc_address
@@ -457,22 +465,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     return reinterpret_cast<mbgl::gl::ProcAddress>(
       mln::core::opengl::get_opengl32_proc_address(name)
     );
-#elif defined(__linux__)
-    using GetProcAddressFunction = void* (*)(const char*);
-    auto* loader = reinterpret_cast<GetProcAddressFunction>(
-      context_.data.egl.get_proc_address
-    );
-    if (loader != nullptr) {
-      auto* proc = loader(name);
-      if (proc != nullptr) {
-        return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
-      }
-    }
-    if (auto* proc = eglGetProcAddress(name); proc != nullptr) {
-      return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
-    }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
     return reinterpret_cast<mbgl::gl::ProcAddress>(
-      mln::core::opengl::get_egl_client_library_proc_address(name, active_api_)
+      mln::core::opengl::get_egl_proc_address(
+        context_.data.egl, name,
+        egl_context_ ? egl_context_->active_api() : EGL_NONE
+      )
     );
 #else
     (void)name;
@@ -481,7 +479,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   void activate() override {
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
     try {
@@ -506,59 +504,30 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       previous_render_context_ = nullptr;
       throw;
     }
-#elif defined(__linux__)
-    previous_display_ = eglGetCurrentDisplay();
-    previous_draw_surface_ = eglGetCurrentSurface(EGL_DRAW);
-    previous_read_surface_ = eglGetCurrentSurface(EGL_READ);
-    previous_context_ = eglGetCurrentContext();
-    previous_api_ = eglQueryAPI();
-    try {
-      const auto requested_api = share_context_api();
-      if (eglBindAPI(requested_api) == EGL_FALSE) {
-        throw std::runtime_error("Binding EGL OpenGL API failed");
-      }
-      active_api_ = requested_api;
-      if (render_context_ == nullptr) {
-        create_egl_context();
-      }
-      if (
-        eglMakeCurrent(
-          static_cast<EGLDisplay>(context_.data.egl.display),
-          static_cast<EGLSurface>(surface_), static_cast<EGLSurface>(surface_),
-          static_cast<EGLContext>(render_context_)
-        ) == EGL_FALSE
-      ) {
-        throw std::runtime_error("Switching OpenGL EGL context failed");
-      }
-    } catch (...) {
-      if (active_api_ != EGL_NONE) {
-        release_current_egl_context();
-      }
-      restore_previous_egl_api();
-      restore_previous_egl_context();
-      throw;
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    if (!egl_context_) {
+      egl_context_.emplace(context_.data.egl);
     }
+    egl_context_->activate_pbuffer();
 #else
     throw std::runtime_error("OpenGL context provider is unsupported");
 #endif
   }
 
   void deactivate() override {
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
     wglMakeCurrent(
       static_cast<HDC>(previous_device_context_),
       static_cast<HGLRC>(previous_render_context_)
     );
     previous_device_context_ = nullptr;
     previous_render_context_ = nullptr;
-#elif defined(__linux__)
-    release_current_egl_context();
-    restore_previous_egl_api();
-    restore_previous_egl_context();
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+    egl_context_->deactivate();
 #endif
   }
 
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void create_wgl_context() {
     auto* const device_context =
       static_cast<HDC>(context_.data.wgl.device_context);
@@ -586,124 +555,22 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       render_context_ = nullptr;
     }
   }
-#elif defined(__linux__)
-  void create_egl_context() {
-    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
-    auto* const config = static_cast<EGLConfig>(context_.data.egl.config);
-    auto* const share_context =
-      static_cast<EGLContext>(context_.data.egl.share_context);
-
-    const EGLint es_context_attributes[] = {
-      EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
-    };
-    const EGLint opengl_context_attributes[] = {EGL_NONE};
-    auto* const context_attributes = active_api_ == EGL_OPENGL_ES_API
-                                       ? es_context_attributes
-                                       : opengl_context_attributes;
-    render_context_ =
-      eglCreateContext(display, config, share_context, context_attributes);
-    if (render_context_ == EGL_NO_CONTEXT) {
-      render_context_ = nullptr;
-      throw std::runtime_error("Creating OpenGL EGL context failed");
-    }
-
-    const EGLint surface_attributes[] = {
-      EGL_WIDTH, 8, EGL_HEIGHT, 8, EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE
-    };
-    surface_ = eglCreatePbufferSurface(display, config, surface_attributes);
-    if (surface_ == EGL_NO_SURFACE) {
-      eglDestroyContext(display, static_cast<EGLContext>(render_context_));
-      render_context_ = nullptr;
-      surface_ = nullptr;
-      throw std::runtime_error("Creating OpenGL EGL pbuffer failed");
-    }
-  }
-
-  auto share_context_api() -> EGLenum {
-    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
-    auto* const share_context =
-      static_cast<EGLContext>(context_.data.egl.share_context);
-    auto client_type = EGLint{};
-    if (
-      eglQueryContext(
-        display, share_context, EGL_CONTEXT_CLIENT_TYPE, &client_type
-      ) == EGL_FALSE
-    ) {
-      throw std::runtime_error("Querying OpenGL EGL context API failed");
-    }
-    if (client_type == EGL_OPENGL_API || client_type == EGL_OPENGL_ES_API) {
-      return static_cast<EGLenum>(client_type);
-    }
-    throw std::runtime_error("OpenGL EGL context API is unsupported");
-  }
-
-  void release_current_egl_context() {
-    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
-    (void)eglMakeCurrent(
-      display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT
-    );
-  }
-
-  void restore_previous_egl_api() {
-    if (previous_api_ != EGL_NONE) {
-      eglBindAPI(previous_api_);
-      previous_api_ = EGL_NONE;
-    }
-    active_api_ = EGL_NONE;
-  }
-
-  void restore_previous_egl_context() {
-    const auto had_previous_display = previous_display_ != nullptr;
-    auto* const display =
-      had_previous_display ? static_cast<EGLDisplay>(previous_display_)
-                           : static_cast<EGLDisplay>(context_.data.egl.display);
-    auto* const draw_surface =
-      had_previous_display ? static_cast<EGLSurface>(previous_draw_surface_)
-                           : EGL_NO_SURFACE;
-    auto* const read_surface =
-      had_previous_display ? static_cast<EGLSurface>(previous_read_surface_)
-                           : EGL_NO_SURFACE;
-    auto* const context = had_previous_display
-                            ? static_cast<EGLContext>(previous_context_)
-                            : EGL_NO_CONTEXT;
-    (void)eglMakeCurrent(display, draw_surface, read_surface, context);
-    previous_display_ = nullptr;
-    previous_draw_surface_ = nullptr;
-    previous_read_surface_ = nullptr;
-    previous_context_ = nullptr;
-  }
-
-  void destroy_native_context() {
-    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
-    if (surface_ != nullptr) {
-      eglDestroySurface(display, static_cast<EGLSurface>(surface_));
-      surface_ = nullptr;
-    }
-    if (render_context_ != nullptr) {
-      eglDestroyContext(display, static_cast<EGLContext>(render_context_));
-      render_context_ = nullptr;
-    }
-  }
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  void destroy_native_context() { egl_context_.reset(); }
 #else
   void destroy_native_context() {}
 #endif
 
   mln_opengl_context_descriptor context_{};
   uint32_t borrowed_texture_ = 0;
-  void* render_context_ = nullptr;
   mbgl::Size resource_size_{};
 
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
+  void* render_context_ = nullptr;
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
-#elif defined(__linux__)
-  void* surface_ = nullptr;
-  void* previous_display_ = nullptr;
-  void* previous_draw_surface_ = nullptr;
-  void* previous_read_surface_ = nullptr;
-  void* previous_context_ = nullptr;
-  EGLenum previous_api_ = EGL_NONE;
-  EGLenum active_api_ = EGL_NONE;
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
+  std::optional<mln::core::opengl::EglSharedContext> egl_context_;
 #endif
 };
 

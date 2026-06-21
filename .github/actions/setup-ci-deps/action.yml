@@ -20,19 +20,70 @@ runs:
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
-    - name: Use software OpenGL on Linux
+    - name: Use Linux software graphics drivers
       if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes \
+          libegl-mesa0 \
+          libgl1-mesa-dri \
+          libvulkan1 \
+          mesa-utils \
+          mesa-utils-extra \
+          mesa-vulkan-drivers
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
 
-    - name: Use software OpenGL on Windows
+    - name: Use Windows software graphics drivers
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
-      run: '"GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV'
+      run: |
+        $mesaVersion = "26.0.8"
+        $mesaArchive = Join-Path $env:RUNNER_TEMP "mesa3d.7z"
+        $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d"
+        $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/mesa3d-$mesaVersion-release-msvc.7z"
+
+        Invoke-WebRequest -Uri $mesaUrl -OutFile $mesaArchive
+        $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
+        $actualHash = (Get-FileHash $mesaArchive -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) {
+          throw "Mesa archive hash mismatch: expected $expectedHash, got $actualHash"
+        }
+        7z x $mesaArchive "-o$mesaRoot" -y | Out-Null
+
+        $mesaWglDriver = Get-ChildItem $mesaRoot -Recurse -Filter "libgallium_wgl.dll" |
+          Where-Object { $_.FullName -match "x64" } |
+          Select-Object -First 1
+        if (-not $mesaWglDriver) {
+          throw "Missing Mesa WGL driver in $mesaArchive"
+        }
+
+        $driverManifest = Get-ChildItem $mesaRoot -Recurse -Filter "lvp_icd.x86_64.json" |
+          Select-Object -First 1
+        if (-not $driverManifest) {
+          throw "Missing lavapipe Vulkan ICD manifest in $mesaArchive"
+        }
+
+        $mesaBin = $mesaWglDriver.Directory.FullName
+        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32\mesadrv.dll"
+        Copy-Item $mesaWglDriver.FullName $mesaWglSystemDriver -Force
+
+        $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
+        New-Item -Path $openglDriverKey -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DLL -PropertyType String -Value "mesadrv.dll" -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DriverVersion -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
+
+        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+        New-Item -Path $driverKey -Force | Out-Null
+        New-ItemProperty -Path $driverKey -Name $driverManifest.FullName -PropertyType DWord -Value 0 -Force | Out-Null
+
+        "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
+        "Path=$mesaBin;$env:Path" >> $env:GITHUB_ENV
 
     - name: Cache Cargo packages
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -42,6 +93,42 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache OpenHarmony SDK
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/setup-ohos-sdk
+        key: ohos-sdk-v1-v6.1-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Setup OpenHarmony SDK
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        sdk_root="$HOME/setup-ohos-sdk"
+        archive="ohos-sdk-windows_linux-public.tar.gz"
+
+        mkdir -p "$sdk_root"
+        cd "$sdk_root"
+        if [[ ! -f "$sdk_root/linux/native/build/cmake/ohos.toolchain.cmake" ]]; then
+          gh release download v6.1 \
+            --repo openharmony-rs/ohos-sdk \
+            --pattern "${archive}*"
+
+          cat "${archive}".a* > "$archive"
+          expected_sha="$(tr -d '[:space:]' < "${archive}.sha256")"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          if [[ "$actual_sha" != "$expected_sha" ]]; then
+            echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
+            exit 1
+          fi
+          tar -xf "$archive"
+          unzip -q linux/native-*.zip -d linux
+        fi
+
+        echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
 
     - name: Cache Gradle
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -53,15 +140,17 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-gradle-
 
-    - name: Trim Windows PATH before Pixi activation
+    - name: Trim Windows PATH before mise activation
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        # Pixi's Windows activation uses cmd.exe and emits a single PATH update
-        # line; the default GitHub Actions Path can make that line exceed cmd's
-        # limit. See https://github.com/prefix-dev/pixi/issues/1108.
+        $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
+        # Git Bash maps /tmp to the checkout drive; create it before mise hooks run.
+        New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
+
         $paths = @(
-          $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
+          if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
+          if ($env:Path) { $env:Path -split ';' }
           "C:\Program Files\Git\bin",
           "C:\Program Files\Git\usr\bin",
           "$env:SystemRoot\System32",
@@ -74,6 +163,13 @@ runs:
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
 
+        $gradleTemp = $env:RUNNER_TEMP -replace '\\', '/'
+        $gradleOptions = "-Djava.io.tmpdir=$gradleTemp"
+        if ($env:GRADLE_OPTS) {
+          $gradleOptions = "$gradleOptions $env:GRADLE_OPTS"
+        }
+        "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
+
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
@@ -84,62 +180,14 @@ runs:
     - name: Wire sccache into CMake
       shell: bash
       run: |
+        mise_env="${MISE_ENV:-$(mise exec -- printenv MISE_ENV)}"
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=${MLN_FFI_TARGET_TRIPLE}"
+          echo "SCCACHE_GHA_VERSION=${mise_env%-*}"
           echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
-
-    - name: Register Windows CI software graphics drivers
-      if: ${{ runner.os == 'Windows' }}
-      shell: pwsh
-      run: |
-        $pixiLibrary = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library"
-
-        # Register Pixi's Mesa WGL driver so system opengl32.dll can load llvmpipe.
-        $mesaWglDriver = Join-Path $pixiLibrary "bin\libgallium_wgl.dll"
-        if (-not (Test-Path $mesaWglDriver)) {
-          throw "Missing Mesa WGL driver: $mesaWglDriver"
-        }
-
-        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32\mesadrv.dll"
-        Copy-Item $mesaWglDriver $mesaWglSystemDriver -Force
-
-        $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
-        New-Item -Path $openglDriverKey -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name DLL -PropertyType String -Value "mesadrv.dll" -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name DriverVersion -PropertyType DWord -Value 1 -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
-
-        # Register Pixi's lavapipe ICD so the Vulkan loader finds software Vulkan.
-        $driverManifest = Join-Path $pixiLibrary "share\vulkan\icd.d\lvp_icd.x86_64.json"
-        if (-not (Test-Path $driverManifest)) {
-          throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
-        }
-
-        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
-        New-Item -Path $driverKey -Force | Out-Null
-        New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
-
-    - name: Diagnose EGL setup
-      if: ${{ runner.os == 'Linux' }}
-      shell: bash
-      run: |
-        sudo apt-get update
-        sudo apt-get install --no-install-recommends --yes libegl-mesa0 libgl1-mesa-dri mesa-utils
-        mise exec -- pixi run --locked bash -euo pipefail -c '
-          env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|CONDA|PIXI)" || true
-          command -v eglinfo
-          EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
-        '
-
-    - name: Diagnose Vulkan setup
-      if: ${{ contains(env.MISE_ENV, 'vulkan') }}
-      shell: bash
-      run: mise run ci:vulkan-info
 
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the
@@ -157,3 +205,8 @@ runs:
           mise install --force rust
           ensure_rust_components
         fi
+
+    - name: Ensure Android Rust target
+      if: ${{ startsWith(env.MISE_ENV, 'android-') }}
+      shell: bash
+      run: mise exec -- rustup target add aarch64-linux-android

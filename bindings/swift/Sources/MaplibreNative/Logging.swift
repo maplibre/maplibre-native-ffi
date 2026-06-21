@@ -81,7 +81,12 @@ public struct LogRecord: Sendable, Equatable {
   public let code: Int64
   public let message: String
 
-  public init(severity: LogSeverity, event: LogEvent, code: Int64, message: String) {
+  public init(
+    severity: LogSeverity,
+    event: LogEvent,
+    code: Int64,
+    message: String
+  ) {
     self.severity = severity
     self.event = event
     self.code = code
@@ -100,8 +105,8 @@ public struct LogRecord: Sendable, Equatable {
 
 public typealias LogCallback = @Sendable (LogRecord) -> Bool
 
-extension Maplibre {
-  public static func setLogCallback(_ callback: @escaping LogCallback) throws {
+public extension Maplibre {
+  static func setLogCallback(_ callback: @escaping LogCallback) throws {
     try mapNativeFailure {
       try LoggingCallbackState.set { nativeRecord in
         callback(LogRecord(native: nativeRecord))
@@ -109,13 +114,13 @@ extension Maplibre {
     }
   }
 
-  public static func clearLogCallback() throws {
+  static func clearLogCallback() throws {
     try mapNativeFailure {
       try LoggingCallbackState.clear()
     }
   }
 
-  public static func setAsyncLogSeverityMask(_ mask: LogSeverityMask) throws {
+  static func setAsyncLogSeverityMask(_ mask: LogSeverityMask) throws {
     let unknownBits = mask.rawValue & ~LogSeverityMask.all.rawValue
     if unknownBits != 0 {
       throw MaplibreError.invalidArgument(
@@ -127,7 +132,7 @@ extension Maplibre {
     }
   }
 
-  public static func restoreDefaultAsyncLogSeverityMask() throws {
+  static func restoreDefaultAsyncLogSeverityMask() throws {
     try setAsyncLogSeverityMask(.default)
   }
 }

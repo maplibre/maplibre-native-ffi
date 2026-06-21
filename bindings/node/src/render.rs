@@ -760,12 +760,12 @@ impl RenderedQueryGeometryInput {
 
 impl RenderedFeatureQueryOptionsInput {
     fn into_core(self) -> Result<core::query::RenderedFeatureQueryOptions> {
-        let mut options = core::query::RenderedFeatureQueryOptions::new();
+        let mut options = core::query::RenderedFeatureQueryOptions::default();
         if let Some(layer_ids) = self.layer_ids {
-            options = options.with_layer_ids(layer_ids);
+            options.layer_ids = Some(layer_ids);
         }
         if let Some(filter) = self.filter {
-            options = options.with_filter(parse_json_value(filter)?);
+            options.filter = Some(parse_json_value(filter)?);
         }
         Ok(options)
     }
@@ -773,12 +773,12 @@ impl RenderedFeatureQueryOptionsInput {
 
 impl SourceFeatureQueryOptionsInput {
     fn into_core(self) -> Result<core::query::SourceFeatureQueryOptions> {
-        let mut options = core::query::SourceFeatureQueryOptions::new();
+        let mut options = core::query::SourceFeatureQueryOptions::default();
         if let Some(source_layer_ids) = self.source_layer_ids {
-            options = options.with_source_layer_ids(source_layer_ids);
+            options.source_layer_ids = Some(source_layer_ids);
         }
         if let Some(filter) = self.filter {
-            options = options.with_filter(parse_json_value(filter)?);
+            options.filter = Some(parse_json_value(filter)?);
         }
         Ok(options)
     }

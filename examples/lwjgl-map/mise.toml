@@ -4,12 +4,14 @@ run = "../../gradlew :examples:lwjgl-map:build"
 
 [tasks.run]
 depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:lwjgl-map:run --args='--render-target=owned-texture'"
+usage = 'arg "render-target"'
+run = '../../gradlew :examples:lwjgl-map:run --args="{{ usage.render_target }}"'
 
 [tasks."run:owned-texture"]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:lwjgl-map:run --args='--render-target=owned-texture'"
+run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:lwjgl-map:run --args='--render-target=native-surface'"
+run = [{ task = "run", args = ["native-surface"] }]

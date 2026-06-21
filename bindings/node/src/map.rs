@@ -1731,18 +1731,18 @@ impl EdgeInsets {
 
 impl MapViewportOptions {
     fn into_core(self) -> Result<core::MapViewportOptions> {
-        let mut options = core::MapViewportOptions::new();
+        let mut options = core::MapViewportOptions::default();
         if let Some(value) = self.north_orientation {
-            options = options.with_north_orientation(north_orientation_from_string(&value)?);
+            options.north_orientation = Some(north_orientation_from_string(&value)?);
         }
         if let Some(value) = self.constrain_mode {
-            options = options.with_constrain_mode(constrain_mode_from_string(&value)?);
+            options.constrain_mode = Some(constrain_mode_from_string(&value)?);
         }
         if let Some(value) = self.viewport_mode {
-            options = options.with_viewport_mode(viewport_mode_from_string(&value)?);
+            options.viewport_mode = Some(viewport_mode_from_string(&value)?);
         }
         if let Some(value) = self.frustum_offset {
-            options = options.with_frustum_offset(value.into_core());
+            options.frustum_offset = Some(value.into_core());
         }
         Ok(options)
     }
@@ -1759,24 +1759,24 @@ impl MapViewportOptions {
 
 impl MapTileOptions {
     fn into_core(self) -> Result<core::MapTileOptions> {
-        let mut options = core::MapTileOptions::new();
+        let mut options = core::MapTileOptions::default();
         if let Some(value) = self.prefetch_zoom_delta {
-            options = options.with_prefetch_zoom_delta(value);
+            options.prefetch_zoom_delta = Some(value);
         }
         if let Some(value) = self.lod_min_radius {
-            options = options.with_lod_min_radius(value);
+            options.lod_min_radius = Some(value);
         }
         if let Some(value) = self.lod_scale {
-            options = options.with_lod_scale(value);
+            options.lod_scale = Some(value);
         }
         if let Some(value) = self.lod_pitch_threshold {
-            options = options.with_lod_pitch_threshold(value);
+            options.lod_pitch_threshold = Some(value);
         }
         if let Some(value) = self.lod_zoom_shift {
-            options = options.with_lod_zoom_shift(value);
+            options.lod_zoom_shift = Some(value);
         }
         if let Some(value) = self.lod_mode {
-            options = options.with_lod_mode(tile_lod_mode_from_string(&value)?);
+            options.lod_mode = Some(tile_lod_mode_from_string(&value)?);
         }
         Ok(options)
     }
@@ -1795,21 +1795,21 @@ impl MapTileOptions {
 
 impl BoundOptions {
     fn into_core(self) -> core::BoundOptions {
-        let mut options = core::BoundOptions::new();
+        let mut options = core::BoundOptions::default();
         if let Some(value) = self.bounds {
-            options = options.with_bounds(value.into_core());
+            options.bounds = Some(value.into_core());
         }
         if let Some(value) = self.min_zoom {
-            options = options.with_min_zoom(value);
+            options.min_zoom = Some(value);
         }
         if let Some(value) = self.max_zoom {
-            options = options.with_max_zoom(value);
+            options.max_zoom = Some(value);
         }
         if let Some(value) = self.min_pitch {
-            options = options.with_min_pitch(value);
+            options.min_pitch = Some(value);
         }
         if let Some(value) = self.max_pitch {
-            options = options.with_max_pitch(value);
+            options.max_pitch = Some(value);
         }
         options
     }
@@ -1827,15 +1827,15 @@ impl BoundOptions {
 
 impl ProjectionMode {
     fn into_core(self) -> core::ProjectionMode {
-        let mut mode = core::ProjectionMode::new();
+        let mut mode = core::ProjectionMode::default();
         if let Some(value) = self.axonometric {
-            mode = mode.with_axonometric(value);
+            mode.axonometric = Some(value);
         }
         if let Some(value) = self.x_skew {
-            mode = mode.with_x_skew(value);
+            mode.x_skew = Some(value);
         }
         if let Some(value) = self.y_skew {
-            mode = mode.with_y_skew(value);
+            mode.y_skew = Some(value);
         }
         mode
     }
@@ -1851,33 +1851,33 @@ impl ProjectionMode {
 
 impl CameraOptions {
     pub(crate) fn into_core(self) -> core::CameraOptions {
-        let mut camera = core::CameraOptions::new();
+        let mut camera = core::CameraOptions::default();
         if let Some(center) = self.center {
-            camera = camera.with_center(center.into_core());
+            camera.center = Some(center.into_core());
         }
         if let Some(zoom) = self.zoom {
-            camera = camera.with_zoom(zoom);
+            camera.zoom = Some(zoom);
         }
         if let Some(bearing) = self.bearing {
-            camera = camera.with_bearing(bearing);
+            camera.bearing = Some(bearing);
         }
         if let Some(pitch) = self.pitch {
-            camera = camera.with_pitch(pitch);
+            camera.pitch = Some(pitch);
         }
         if let Some(center_altitude) = self.center_altitude {
-            camera = camera.with_center_altitude(center_altitude);
+            camera.center_altitude = Some(center_altitude);
         }
         if let Some(padding) = self.padding {
-            camera = camera.with_padding(padding.into_core());
+            camera.padding = Some(padding.into_core());
         }
         if let Some(anchor) = self.anchor {
-            camera = camera.with_anchor(anchor.into_core());
+            camera.anchor = Some(anchor.into_core());
         }
         if let Some(roll) = self.roll {
-            camera = camera.with_roll(roll);
+            camera.roll = Some(roll);
         }
         if let Some(field_of_view) = self.field_of_view {
-            camera = camera.with_field_of_view(field_of_view);
+            camera.field_of_view = Some(field_of_view);
         }
         camera
     }
@@ -1905,18 +1905,18 @@ impl UnitBezier {
 
 impl AnimationOptions {
     fn into_core(self) -> core::AnimationOptions {
-        let mut animation = core::AnimationOptions::new();
+        let mut animation = core::AnimationOptions::default();
         if let Some(duration_ms) = self.duration_ms {
-            animation = animation.with_duration_ms(duration_ms);
+            animation.duration_ms = Some(duration_ms);
         }
         if let Some(velocity) = self.velocity {
-            animation = animation.with_velocity(velocity);
+            animation.velocity = Some(velocity);
         }
         if let Some(min_zoom) = self.min_zoom {
-            animation = animation.with_min_zoom(min_zoom);
+            animation.min_zoom = Some(min_zoom);
         }
         if let Some(easing) = self.easing {
-            animation = animation.with_easing(easing.into_core());
+            animation.easing = Some(easing.into_core());
         }
         animation
     }
@@ -1971,12 +1971,12 @@ impl CanonicalTileId {
 
 impl FreeCameraOptions {
     fn into_core(self) -> core::FreeCameraOptions {
-        let mut options = core::FreeCameraOptions::new();
+        let mut options = core::FreeCameraOptions::default();
         if let Some(position) = self.position {
-            options = options.with_position(position.into_core());
+            options.position = Some(position.into_core());
         }
         if let Some(orientation) = self.orientation {
-            options = options.with_orientation(orientation.into_core());
+            options.orientation = Some(orientation.into_core());
         }
         options
     }
@@ -1998,7 +1998,7 @@ impl MapOptions {
             self.scale_factor.unwrap_or(defaults.scale_factor),
         );
         if let Some(map_mode) = self.map_mode {
-            options = options.with_mode(map_mode_from_string(&map_mode)?);
+            options.mode = map_mode_from_string(&map_mode)?;
         }
         Ok(options)
     }
@@ -2548,7 +2548,7 @@ fn feature_from_serde(value: &serde_json::Value) -> Result<core::Feature> {
     };
     let mut feature = core::Feature::new(geometry, properties);
     if let Some(identifier) = value.get("id") {
-        feature = feature.with_identifier(feature_identifier_from_serde(identifier)?);
+        feature.identifier = feature_identifier_from_serde(identifier)?;
     }
     Ok(feature)
 }

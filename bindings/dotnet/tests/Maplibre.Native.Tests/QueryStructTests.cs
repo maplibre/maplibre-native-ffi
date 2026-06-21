@@ -9,6 +9,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class QueryStructTests
 {
+    [BindingSpecTest("BND-060")]
     [Fact]
     public void RenderedQueryGeometryMaterializesPublicShapes()
     {
@@ -45,6 +46,7 @@ public sealed unsafe class QueryStructTests
         Assert.Equal(9, line.Value.data.line_string.points[1].x);
     }
 
+    [BindingSpecTest("BND-060", "BND-061")]
     [Fact]
     public void QueryOptionsMaterializeOptionalFieldsAndFilters()
     {
@@ -99,6 +101,7 @@ public sealed unsafe class QueryStructTests
         );
     }
 
+    [BindingSpecTest("BND-106")]
     [Fact]
     public void QueriedFeatureCopiesNestedFeatureAndOptionalFields()
     {
@@ -172,6 +175,41 @@ public sealed unsafe class QueryStructTests
         Assert.Equal("feature-1", id.Value);
     }
 
+    [BindingSpecTest("BND-066")]
+    [Fact]
+    public void FeatureQueryResultIsDestroyedWhenCopyingFeatureFails()
+    {
+        var destroyCalls = 0;
+        using var methods = QueryStructs.UseFeatureQueryResultMethodsForTest(
+            (_, count) =>
+            {
+                *count = 1;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, _, feature) =>
+            {
+                *feature = new mln_queried_feature
+                {
+                    size = (uint)sizeof(mln_queried_feature),
+                    feature = new mln_feature
+                    {
+                        size = (uint)sizeof(mln_feature),
+                        identifier_type = 999,
+                    },
+                };
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => destroyCalls++
+        );
+
+        Assert.Throws<InvalidOperationException>(() =>
+            QueryStructs.ReadFeatureQueryResult((mln_feature_query_result*)1234)
+        );
+
+        Assert.Equal(1, destroyCalls);
+    }
+
+    [BindingSpecTest("BND-106")]
     [Fact]
     public void NativeFeatureNullIdentifierMaterializesNullIdentifier()
     {
@@ -187,6 +225,8 @@ public sealed unsafe class QueryStructTests
         Assert.Same(FeatureIdentifier.Null.Instance, feature.Identifier);
     }
 
+    // Support invariant for copied query output: malformed native discriminants
+    // fail deterministically instead of fabricating public feature values.
     [Fact]
     public void UnknownNativeFeatureDiscriminantsThrow()
     {

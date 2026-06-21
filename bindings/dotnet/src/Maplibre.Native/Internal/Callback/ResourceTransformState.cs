@@ -25,6 +25,8 @@ internal sealed unsafe class ResourceTransformState : IDisposable
             user_data = (void*)handle,
         };
 
+    internal bool IsHandleAllocatedForTest => handle != 0;
+
     internal mln_status TransformForTest(ResourceKind kind, string? url, out string? replacementUrl)
     {
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));

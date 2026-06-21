@@ -24,6 +24,8 @@ internal sealed unsafe class ResourceProviderState : IDisposable
             user_data = (void*)handle,
         };
 
+    internal bool IsHandleAllocatedForTest => handle != 0;
+
     internal uint HandleForTest(mln_resource_request* request)
     {
         return Invoke(this, request, (mln_resource_request_handle*)1);

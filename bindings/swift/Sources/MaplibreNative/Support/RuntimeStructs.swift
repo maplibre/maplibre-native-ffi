@@ -1,11 +1,15 @@
 internal import CMaplibreNativeC
 
-struct NativeRuntimeOptionsInput: Sendable, Equatable {
+struct NativeRuntimeOptionsInput: Equatable {
   var assetPath: String?
   var cachePath: String?
   var maximumCacheSize: UInt64?
 
-  init(assetPath: String? = nil, cachePath: String? = nil, maximumCacheSize: UInt64? = nil) {
+  init(
+    assetPath: String? = nil,
+    cachePath: String? = nil,
+    maximumCacheSize: UInt64? = nil
+  ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.maximumCacheSize = maximumCacheSize
@@ -29,7 +33,7 @@ struct NativeRuntimeOptionsInput: Sendable, Equatable {
   }
 }
 
-struct NativeRenderingStats: Equatable, Sendable {
+struct NativeRenderingStats: Equatable {
   let encodingTime: Double
   let renderingTime: Double
   let frameCount: Int64
@@ -45,7 +49,7 @@ struct NativeRenderingStats: Equatable, Sendable {
   }
 }
 
-struct NativeRenderFrameEvent: Equatable, Sendable {
+struct NativeRenderFrameEvent: Equatable {
   let mode: UInt32
   let needsRepaint: Bool
   let placementChanged: Bool
@@ -59,7 +63,7 @@ struct NativeRenderFrameEvent: Equatable, Sendable {
   }
 }
 
-struct NativeRenderMapEvent: Equatable, Sendable {
+struct NativeRenderMapEvent: Equatable {
   let mode: UInt32
 
   init(_ raw: mln_runtime_event_render_map) {
@@ -67,7 +71,7 @@ struct NativeRenderMapEvent: Equatable, Sendable {
   }
 }
 
-struct NativeTileId: Equatable, Sendable {
+struct NativeTileId: Equatable {
   let overscaledZ: UInt32
   let wrap: Int32
   let canonicalZ: UInt32
@@ -83,7 +87,7 @@ struct NativeTileId: Equatable, Sendable {
   }
 }
 
-struct NativeTileActionEvent: Equatable, Sendable {
+struct NativeTileActionEvent: Equatable {
   let operation: UInt32
   let tileId: NativeTileId
   let sourceId: String
@@ -91,11 +95,14 @@ struct NativeTileActionEvent: Equatable, Sendable {
   init(_ raw: mln_runtime_event_tile_action) throws {
     operation = raw.operation
     tileId = NativeTileId(raw.tile_id)
-    sourceId = try NativeString.copyUTF8(data: raw.source_id, size: raw.source_id_size)
+    sourceId = try NativeString.copyUTF8(
+      data: raw.source_id,
+      size: raw.source_id_size
+    )
   }
 }
 
-struct NativeOfflineRegionStatus: Equatable, Sendable {
+struct NativeOfflineRegionStatus: Equatable {
   let downloadState: UInt32
   let completedResourceCount: UInt64
   let completedResourceSize: UInt64
@@ -119,7 +126,7 @@ struct NativeOfflineRegionStatus: Equatable, Sendable {
   }
 }
 
-struct NativeOfflineRegionStatusEvent: Equatable, Sendable {
+struct NativeOfflineRegionStatusEvent: Equatable {
   let regionId: Int64
   let status: NativeOfflineRegionStatus
 
@@ -129,7 +136,7 @@ struct NativeOfflineRegionStatusEvent: Equatable, Sendable {
   }
 }
 
-struct NativeOfflineRegionResponseErrorEvent: Equatable, Sendable {
+struct NativeOfflineRegionResponseErrorEvent: Equatable {
   let regionId: Int64
   let reason: UInt32
 
@@ -139,7 +146,7 @@ struct NativeOfflineRegionResponseErrorEvent: Equatable, Sendable {
   }
 }
 
-struct NativeOfflineRegionTileCountLimitEvent: Equatable, Sendable {
+struct NativeOfflineRegionTileCountLimitEvent: Equatable {
   let regionId: Int64
   let limit: UInt64
 
@@ -149,7 +156,7 @@ struct NativeOfflineRegionTileCountLimitEvent: Equatable, Sendable {
   }
 }
 
-struct NativeOfflineOperationCompletedEvent: Equatable, Sendable {
+struct NativeOfflineOperationCompletedEvent: Equatable {
   let operationId: UInt64
   let operationKind: UInt32
   let resultKind: UInt32
@@ -165,7 +172,7 @@ struct NativeOfflineOperationCompletedEvent: Equatable, Sendable {
   }
 }
 
-enum NativeRuntimeEventPayload: Equatable, Sendable {
+enum NativeRuntimeEventPayload: Equatable {
   case none
   case renderFrame(NativeRenderFrameEvent)
   case renderMap(NativeRenderMapEvent)
@@ -178,7 +185,7 @@ enum NativeRuntimeEventPayload: Equatable, Sendable {
   case unknown(type: UInt32, byteCount: Int)
 }
 
-struct NativeRuntimeEvent: Equatable, Sendable {
+struct NativeRuntimeEvent: Equatable {
   let type: UInt32
   let sourceType: UInt32
   let sourceAddress: UInt
@@ -191,38 +198,67 @@ struct NativeRuntimeEvent: Equatable, Sendable {
     sourceType = raw.source_type
     sourceAddress = UInt(bitPattern: raw.source)
     code = raw.code
-    message = try NativeString.copyUTF8(data: raw.message, size: raw.message_size)
+    message = try NativeString.copyUTF8(
+      data: raw.message,
+      size: raw.message_size
+    )
     payload = try Self.copyPayload(raw)
   }
 
-  private static func copyPayload(_ raw: mln_runtime_event) throws -> NativeRuntimeEventPayload {
+  private static func copyPayload(_ raw: mln_runtime_event) throws
+    -> NativeRuntimeEventPayload
+  {
     switch raw.payload_type {
     case MLN_RUNTIME_EVENT_PAYLOAD_NONE.rawValue:
       return .none
     case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_render_frame.self) { .renderFrame(NativeRenderFrameEvent($0)) }
+      return try withPayload(raw, as: mln_runtime_event_render_frame.self) {
+        .renderFrame(NativeRenderFrameEvent($0))
+      }
     case MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_render_map.self) { .renderMap(NativeRenderMapEvent($0)) }
+      return try withPayload(raw, as: mln_runtime_event_render_map.self) {
+        .renderMap(NativeRenderMapEvent($0))
+      }
     case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_style_image_missing.self) {
-        .styleImageMissing(try NativeString.copyUTF8(data: $0.image_id, size: $0.image_id_size))
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_style_image_missing.self
+      ) {
+        try .styleImageMissing(NativeString.copyUTF8(
+          data: $0.image_id,
+          size: $0.image_id_size
+        ))
       }
     case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_tile_action.self) { .tileAction(try NativeTileActionEvent($0)) }
+      return try withPayload(raw, as: mln_runtime_event_tile_action.self) {
+        try .tileAction(NativeTileActionEvent($0))
+      }
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_offline_region_status.self) {
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_offline_region_status.self
+      ) {
         .offlineRegionStatus(NativeOfflineRegionStatusEvent($0))
       }
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_offline_region_response_error.self) {
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_offline_region_response_error.self
+      ) {
         .offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent($0))
       }
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_offline_region_tile_count_limit.self) {
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_offline_region_tile_count_limit.self
+      ) {
         .offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent($0))
       }
     case MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED.rawValue:
-      return try withPayload(raw, as: mln_runtime_event_offline_operation_completed.self) {
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_offline_operation_completed.self
+      ) {
         .offlineOperationCompleted(NativeOfflineOperationCompletedEvent($0))
       }
     default:
@@ -232,11 +268,16 @@ struct NativeRuntimeEvent: Equatable, Sendable {
 
   private static func withPayload<Payload, Result>(
     _ raw: mln_runtime_event,
-    as type: Payload.Type,
+    as _: Payload.Type,
     _ body: (Payload) throws -> Result
   ) throws -> Result {
-    guard raw.payload_size >= MemoryLayout<Payload>.size, let payload = raw.payload else {
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "runtime event payload is missing or too small")
+    guard raw.payload_size >= MemoryLayout<Payload>.size,
+          let payload = raw.payload
+    else {
+      throw NativeStatusFailure(
+        rawStatus: 0,
+        diagnostic: "runtime event payload is missing or too small"
+      )
     }
     return try body(payload.assumingMemoryBound(to: Payload.self).pointee)
   }

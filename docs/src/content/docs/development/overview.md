@@ -21,7 +21,8 @@ diagnostics, borrowed data, threading, and event draining. They preserve the C
 API's concepts. Higher-level adapters may provide full SDKs, async models, view
 lifecycle integrations, convenience workflows, or new abstractions.
 
-Read the [Binding Conventions](/maplibre-native-ffi/development/bindings/)
+Read the
+[Binding specification](/maplibre-native-ffi/development/binding-specification/)
 before implementing or reviewing a binding.
 
 ## Getting Set Up
@@ -32,6 +33,10 @@ Install the platform toolchain:
   compatible Xcode. Run the pinned
   [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
   switch to the repository version.
+- On Fedora, install the `C Development Tools and Libraries` package group with
+  `sudo dnf group install c-development`.
+- On Debian or Ubuntu, install the C and C++ compiler packages with
+  `sudo apt install build-essential`.
 - On Windows, install a recent version of Visual Studio Community (or Build
   Tools) 2022 with the `Desktop development with C++` workload and
   `Git for Windows`. We rely on Git Bash to run project scripts.
@@ -49,7 +54,7 @@ submodule at `third_party/maplibre-native`.
 Run the Zig map example as a smoke test:
 
 ```bash
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 ```
 
 Mise selects the native build profile that matches your host when one is
@@ -60,7 +65,7 @@ platform and render backend.
 ## Common Commands
 
 ```bash
-# Build and test the C API (via Zig bindings)
+# Build and test the C API
 mise run test
 
 # Build only
@@ -70,7 +75,7 @@ mise run build
 mise run fix
 
 # Run examples
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 
 # Build the documentation site
 mise run //docs:build
@@ -82,27 +87,23 @@ This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
 
-Project-managed dependency state keeps builds reproducible. Pixi supplies native
-build dependencies instead of Homebrew, apt, or other machine-global package
-managers. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
-pragmatic external exceptions.
+Project-managed dependency state keeps builds reproducible. Mise supplies
+repository tools, owns task execution, and exports the environment consumed by
+build systems, bindings, and examples. Pixi currently supplies desktop native
+libraries from [`conda-forge`](https://conda-forge.org/). Platform SDKs such as
+Xcode, Visual Studio, Linux compiler packages, and the Android SDK remain host
+toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
-tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
-common workflows: build, test, check, fix, and examples. Mise also provides
-ecosystem entrypoints such as Pixi, Zig, Python, uv, Node, and pnpm.
+tools, installs Git hooks, selects backend variants, and runs repository tasks.
+Use `mise run ...` for common workflows: build, test, check, fix, and examples.
+Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
+and pnpm.
 
-[`pixi`](https://pixi.sh/) owns the C and C++ native build environment. It
-supplies native packages from [`conda-forge`](https://conda-forge.org/):
-libraries, C/C++ tooling, and build tools that participate in CMake
-configuration or native package discovery. CMake, Ninja, pkg-config, shader
-tools, and clang tooling live in Pixi for that reason. Pixi runs
-[CMake](https://cmake.org/), and CMake builds the native C/C++ library.
-
-Mise profiles select dependency environments and backend variants. Inner build
-files such as CMake, Cargo, Gradle, and Zig build scripts consume the resulting
-environment values and paths; keep Pixi and mise policy at the repository task
-layer.
+[`pixi`](https://pixi.sh/) installs the desktop native libraries used by local
+builds. CMake, Ninja, pkg-config, shader tools, Doxygen, and clang-tidy are
+pinned by mise. Host platform toolchains provide C and C++ compilers, and CMake
+builds the native C/C++ library.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
@@ -121,8 +122,8 @@ build the documentation site. Generated API reference HTML is installed into
 ## Tests And Examples
 
 Every feature needs automated CI coverage when practical. The root
-`mise run test` command builds the native library, runs the direct Zig C API
-suite, and runs the public Zig binding suite for supported host variants.
+`mise run test` command builds the native library and runs the direct Zig C API
+suite. Language binding suites run through their binding-specific CI tasks.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.

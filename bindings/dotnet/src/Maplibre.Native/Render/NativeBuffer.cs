@@ -7,15 +7,15 @@ public sealed unsafe class NativeBuffer : IDisposable
 {
     private nint address;
 
-    public NativeBuffer(nuint byteLength)
+    public NativeBuffer(int byteLength)
     {
+        ArgumentOutOfRangeException.ThrowIfNegative(byteLength);
         ByteLength = byteLength;
-        address = (nint)NativeMemory.Alloc(byteLength == 0 ? 1 : byteLength);
+        address = (nint)NativeMemory.Alloc((nuint)(byteLength == 0 ? 1 : byteLength));
     }
 
-    public nuint ByteLength { get; }
-    public NativePointer Pointer => new(AddressOrThrow());
-    public Span<byte> Span => new((void*)AddressOrThrow(), checked((int)ByteLength));
+    public int ByteLength { get; }
+    public Span<byte> Span => new((void*)AddressOrThrow(), ByteLength);
 
     public void Dispose()
     {

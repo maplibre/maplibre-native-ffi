@@ -56,6 +56,13 @@ pub fn validateAbiVersionValue(
     return error.AbiVersionMismatch;
 }
 
+pub fn setBindingDiagnostic(
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    message: []const u8,
+) std.mem.Allocator.Error!void {
+    if (diagnostic_store) |store| try store.set(null, message);
+}
+
 fn copyThreadLastErrorMessage(
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     raw_status: i32,

@@ -1,0 +1,347 @@
+#!/usr/bin/env -S uv run --script
+# MISE description="Generate docs support matrix data from CI manifests."
+# /// script
+# dependencies = ["pydantic==2.13.4"]
+# ///
+
+import argparse
+import difflib
+import json
+import pathlib
+import sys
+from collections import defaultdict
+from typing import Any
+
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
+sys.path.insert(0, str(REPO_ROOT))
+
+from ci.manifest import (  # noqa: E402
+    Subproject,
+    Variant,
+    load_subprojects,
+    load_variants,
+    subproject_matches_variant,
+)
+
+Status = str
+
+
+PLATFORM_LABELS = {
+    "android": "Android",
+    "ios": "iOS",
+    "linux": "Linux",
+    "macos": "macOS",
+    "ohos": "OpenHarmony",
+    "windows": "Windows",
+}
+
+ARCH_LABELS = {
+    "arm64": "arm64",
+    "x64": "x64",
+}
+
+BACKEND_LABELS = {
+    "metal": "Metal",
+    "opengl": "OpenGL",
+    "vulkan": "Vulkan",
+}
+
+SUBPROJECT_LABEL_OVERRIDES = {
+    "bindings-dotnet": "C#",
+}
+
+BACKEND_ORDER = ["vulkan", "opengl", "metal"]
+ENVIRONMENT_ORDER = [
+    "linux-x64",
+    "linux-arm64",
+    "macos-arm64",
+    "windows-x64",
+    "android-arm64",
+    "ios-arm64",
+    "ios-simulator-arm64",
+    "ohos-arm64",
+]
+STATUS_LABELS = {
+    "tested": "Tested in CI",
+    "build-only": "Built only",
+}
+STATUS_ORDER = ["build-only", "tested"]
+
+
+def backend_sort_key(backend: str) -> tuple[int, str]:
+    try:
+        return (BACKEND_ORDER.index(backend), backend)
+    except ValueError:
+        return (len(BACKEND_ORDER), backend)
+
+
+def environment_sort_key(environment: str) -> tuple[int, str]:
+    try:
+        return (ENVIRONMENT_ORDER.index(environment), environment)
+    except ValueError:
+        return (len(ENVIRONMENT_ORDER), environment)
+
+
+def platform_label(os_name: str) -> str:
+    return PLATFORM_LABELS.get(os_name, os_name)
+
+
+def arch_label(arch: str) -> str:
+    return ARCH_LABELS.get(arch, arch)
+
+
+def backend_label(backend: str) -> str:
+    return BACKEND_LABELS.get(backend, backend)
+
+
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
+
+def subproject_short_name(subproject_name: str) -> str:
+    parts = subproject_name.split("-", maxsplit=1)
+    return parts[1] if len(parts) == 2 else subproject_name
+
+
+def subproject_label(subproject_name: str, label: str | None = None) -> str:
+    if label is not None:
+        return label
+    if subproject_name in SUBPROJECT_LABEL_OVERRIDES:
+        return SUBPROJECT_LABEL_OVERRIDES[subproject_name]
+    short_name = subproject_short_name(subproject_name)
+    if subproject_name.startswith("examples-"):
+        return short_name
+    return short_name.capitalize()
+
+
+def environment_key(variant: Variant) -> str:
+    if variant.os == "ios" and variant.name.startswith("ios-simulator-"):
+        return f"ios-simulator-{variant.arch}"
+    return f"{variant.os}-{variant.arch}"
+
+
+def environment_label(variant: Variant) -> str:
+    architecture = arch_label(variant.arch)
+    if variant.os == "ios" and variant.name.startswith("ios-simulator-"):
+        return f"iOS Simulator {architecture}"
+    if variant.os == "ios":
+        return f"iOS device {architecture}"
+    return f"{platform_label(variant.os)} {architecture}"
+
+
+def variant_status(variant: Variant) -> str:
+    return "tested" if variant.supports_tests else "build-only"
+
+
+def subproject_status(actions: dict[str, str], variant: Variant) -> Status | None:
+    if actions.get("run"):
+        return "tested"
+    if actions.get("test") and variant.supports_tests:
+        return "tested"
+    if actions.get("build"):
+        return "build-only"
+    return None
+
+
+def merged_status(statuses: set[str]) -> str:
+    for status in STATUS_ORDER:
+        if status in statuses:
+            return status
+    return sorted(statuses)[0]
+
+
+def status_rows() -> list[dict[str, str]]:
+    return [
+        {"status": status, "statusLabel": status_label(status)}
+        for status in ["tested", "build-only"]
+    ]
+
+
+def subproject_source_directory(subproject_name: str) -> str:
+    category, name = subproject_name.split("-", maxsplit=1)
+    return f"{category}/{name}"
+
+
+def source_directory(subproject_name: str, configured: str | None) -> str:
+    return (
+        configured
+        if configured is not None
+        else subproject_source_directory(subproject_name)
+    )
+
+
+def support_entry(variant: Variant, status: str) -> dict[str, str]:
+    return {
+        "backend": variant.backend,
+        "backendLabel": backend_label(variant.backend),
+        "status": status,
+    }
+
+
+def merge_backend_entries(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry["backend"]].append(entry)
+
+    result = []
+    for backend in sorted(grouped, key=backend_sort_key):
+        backend_entries = grouped[backend]
+        statuses = {entry["status"] for entry in backend_entries}
+        status = merged_status(statuses)
+        result.append(
+            {
+                "backend": backend,
+                "backendLabel": backend_label(backend),
+                "status": status,
+            }
+        )
+    return result
+
+
+def native_rows(variants: list[Variant]) -> list[dict[str, Any]]:
+    rows: dict[str, list[dict[str, str]]] = defaultdict(list)
+    row_variants: dict[str, Variant] = {}
+    for variant in variants:
+        environment = environment_key(variant)
+        rows[environment].append(support_entry(variant, variant_status(variant)))
+        row_variants[environment] = variant
+
+    return [
+        {
+            "environment": environment,
+            "environmentLabel": environment_label(row_variants[environment]),
+            "platform": row_variants[environment].os,
+            "platformLabel": platform_label(row_variants[environment].os),
+            "arch": row_variants[environment].arch,
+            "archLabel": arch_label(row_variants[environment].arch),
+            "backends": merge_backend_entries(rows[environment]),
+        }
+        for environment in sorted(rows, key=environment_sort_key)
+    ]
+
+
+def subproject_rows(
+    subprojects: list[Subproject], variants: list[Variant], *, prefix: str, kind: str
+) -> list[dict[str, Any]]:
+    rows = []
+    for subproject in sorted(
+        subprojects,
+        key=lambda subproject: (
+            subproject_label(subproject.name, subproject.manifest.label).casefold(),
+            subproject.name,
+        ),
+    ):
+        if not subproject.name.startswith(prefix):
+            continue
+
+        environment_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
+        environment_variants: dict[str, Variant] = {}
+        actions = subproject.manifest.ci.model_dump(exclude_none=True)
+        for variant in variants:
+            if not subproject_matches_variant(subproject, variant):
+                continue
+            status = subproject_status(actions, variant)
+            if status is None:
+                continue
+            environment = environment_key(variant)
+            environment_entries[environment].append(support_entry(variant, status))
+            environment_variants[environment] = variant
+
+        if not environment_entries:
+            continue
+
+        rows.append(
+            {
+                "id": subproject.name,
+                "kind": kind,
+                "label": subproject_label(subproject.name, subproject.manifest.label),
+                "source": str(subproject.path.relative_to(REPO_ROOT)),
+                "sourceDirectory": source_directory(
+                    subproject.name, subproject.manifest.source_directory
+                ),
+                "environments": [
+                    {
+                        "environment": environment,
+                        "environmentLabel": environment_label(
+                            environment_variants[environment]
+                        ),
+                        "platform": environment_variants[environment].os,
+                        "platformLabel": platform_label(
+                            environment_variants[environment].os
+                        ),
+                        "arch": environment_variants[environment].arch,
+                        "archLabel": arch_label(environment_variants[environment].arch),
+                        "backends": merge_backend_entries(
+                            environment_entries[environment]
+                        ),
+                    }
+                    for environment in sorted(
+                        environment_entries, key=environment_sort_key
+                    )
+                ],
+            }
+        )
+    return rows
+
+
+def support_matrix() -> dict[str, Any]:
+    variants = load_variants()
+    subprojects = load_subprojects(variants)
+    native = native_rows(variants)
+    return {
+        "statuses": status_rows(),
+        "environments": [
+            {
+                "environment": row["environment"],
+                "environmentLabel": row["environmentLabel"],
+            }
+            for row in native
+        ],
+        "native": native,
+        "bindings": subproject_rows(
+            subprojects, variants, prefix="bindings-", kind="binding"
+        ),
+        "examples": subproject_rows(
+            subprojects, variants, prefix="examples-", kind="example"
+        ),
+    }
+
+
+def render_json() -> str:
+    return json.dumps(support_matrix(), indent=2, sort_keys=False) + "\n"
+
+
+def check_output(expected: str) -> int:
+    actual = OUTPUT_PATH.read_text() if OUTPUT_PATH.exists() else ""
+    if actual == expected:
+        return 0
+    diff = difflib.unified_diff(
+        actual.splitlines(keepends=True),
+        expected.splitlines(keepends=True),
+        fromfile=str(OUTPUT_PATH),
+        tofile=f"{OUTPUT_PATH} (generated)",
+    )
+    sys.stderr.writelines(diff)
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check", action="store_true", help="fail if support matrix data is stale"
+    )
+    args = parser.parse_args()
+
+    rendered = render_json()
+    if args.check:
+        return check_output(rendered)
+
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

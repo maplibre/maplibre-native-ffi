@@ -1,0 +1,14 @@
+[env]
+MLN_FFI_RENDER_BACKEND = "vulkan"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/ohos-arm64-vulkan"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-linux-ohos"
+OHOS_SDK_NATIVE = { required = true }
+MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_TOOLCHAIN_FILE={{env.OHOS_SDK_NATIVE}}/build/cmake/ohos.toolchain.cmake
+-DOHOS_ARCH=arm64-v8a
+-DOHOS_STL=c++_shared
+-DMLN_FFI_ENABLE_CLANG_TIDY=OFF
+"""
+CMAKE_PREFIX_PATH = ""
+PKG_CONFIG_PATH = ""
+LIBCLANG_PATH = ""

@@ -21,7 +21,12 @@ public struct MapOptions: Equatable, Sendable {
   public var scaleFactor: Double
   public var mode: MapMode
 
-  public init(width: UInt32, height: UInt32, scaleFactor: Double = 1.0, mode: MapMode = .continuous) {
+  public init(
+    width: UInt32,
+    height: UInt32,
+    scaleFactor: Double = 1.0,
+    mode: MapMode = .continuous
+  ) {
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
@@ -46,12 +51,18 @@ public final class MapHandle {
   private let handle: NativeHandleBox
   private let nativeAddress: UInt
   private var styleURLReplacementPending = false
-  private var customGeometrySourceCallbacks: [String: NativeCustomGeometrySourceCallbacks] = [:]
+  private var customGeometrySourceCallbacks: [
+    String: NativeCustomGeometrySourceCallbacks
+  ] =
+    [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
     let pointer = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
-        try NativeMap.create(runtime: try runtime.requireLivePointer(), options: nativeOptions)
+        try NativeMap.create(
+          runtime: runtime.requireLivePointer(),
+          options: nativeOptions
+        )
       }
     }
     self.runtime = runtime
@@ -69,6 +80,13 @@ public final class MapHandle {
 
   public var isClosed: Bool {
     handle.isClosed
+  }
+
+  public func isSource(of event: RuntimeEvent) -> Bool {
+    guard case let .map(source) = event.source else {
+      return false
+    }
+    return source.addressBitPattern == nativeAddress
   }
 
   func requireLivePointer() throws -> OpaquePointer {
@@ -89,10 +107,11 @@ public final class MapHandle {
 
   static func handleRuntimeEvent(_ event: RuntimeEvent) {
     guard event.type == .mapStyleLoaded,
-      case .map(let source) = event.source
+          case let .map(source) = event.source
     else { return }
 
-    let map = registryLock.withLock { registry[source.addressBitPattern]?.value }
+    let map = registryLock
+      .withLock { registry[source.addressBitPattern]?.value }
     map?.releaseCallbacksForLoadedStyleURLIfNeeded()
   }
 
@@ -113,7 +132,10 @@ public final class MapHandle {
     }
   }
 
-  func storeCustomGeometrySourceCallbacks(_ callbacks: NativeCustomGeometrySourceCallbacks, sourceId: String) {
+  func storeCustomGeometrySourceCallbacks(
+    _ callbacks: NativeCustomGeometrySourceCallbacks,
+    sourceId: String
+  ) {
     customGeometrySourceCallbacks[sourceId] = callbacks
   }
 
@@ -147,7 +169,7 @@ public final class MapHandle {
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(url) { url in
-        try checkStatus(mln_map_set_style_url(try handle.requireLive(), url))
+        try checkStatus(mln_map_set_style_url(handle.requireLive(), url))
       }
       retainCallbacksUntilPendingStyleURLLoads()
     }
@@ -156,7 +178,7 @@ public final class MapHandle {
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(json) { json in
-        try checkStatus(mln_map_set_style_json(try handle.requireLive(), json))
+        try checkStatus(mln_map_set_style_json(handle.requireLive(), json))
       }
       resetCallbackRetentionState()
     }
@@ -164,50 +186,68 @@ public final class MapHandle {
 
   public func requestRepaint() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_request_repaint(try handle.requireLive()))
+      try checkStatus(mln_map_request_repaint(handle.requireLive()))
     }
   }
 
   public func requestStillImage() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_request_still_image(try handle.requireLive()))
+      try checkStatus(mln_map_request_still_image(handle.requireLive()))
     }
   }
 
   public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      CameraOptions(native: NativeCameraOptionsInput(try NativeMap.camera(try handle.requireLive())))
+      try CameraOptions(native: NativeCameraOptionsInput(NativeMap
+          .camera(handle.requireLive())))
     }
   }
 
   public func jump(to camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try checkStatus(mln_map_jump_to(try handle.requireLive(), nativeCamera))
+        try checkStatus(mln_map_jump_to(handle.requireLive(), nativeCamera))
       }
     }
   }
 
-  public func ease(to camera: CameraOptions, animation: AnimationOptions? = nil) throws {
+  public func ease(
+    to camera: CameraOptions,
+    animation: AnimationOptions? = nil
+  ) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try (animation?.nativeInput ?? NativeAnimationOptionsInput()).withOptionalNativeOptions { nativeAnimation in
-          try checkStatus(mln_map_ease_to(try handle.requireLive(), nativeCamera, nativeAnimation))
-        }
+        try (animation?.nativeInput ?? NativeAnimationOptionsInput())
+          .withOptionalNativeOptions { nativeAnimation in
+            try checkStatus(mln_map_ease_to(
+              handle.requireLive(),
+              nativeCamera,
+              nativeAnimation
+            ))
+          }
       }
     }
   }
 
   public func moveBy(deltaX: Double, deltaY: Double) throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_move_by(try handle.requireLive(), deltaX, deltaY))
+      try checkStatus(mln_map_move_by(handle.requireLive(), deltaX, deltaY))
     }
   }
 
-  public func moveBy(deltaX: Double, deltaY: Double, animation: AnimationOptions) throws {
+  public func moveBy(
+    deltaX: Double,
+    deltaY: Double,
+    animation: AnimationOptions
+  ) throws {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
-        try checkStatus(mln_map_move_by_animated(try handle.requireLive(), deltaX, deltaY, nativeAnimation))
+        try checkStatus(mln_map_move_by_animated(
+          handle.requireLive(),
+          deltaX,
+          deltaY,
+          nativeAnimation
+        ))
       }
     }
   }
@@ -216,23 +256,41 @@ public final class MapHandle {
     try mapNativeFailure {
       if var nativeAnchor = anchor?.nativeInput.native {
         try withUnsafePointer(to: &nativeAnchor) { anchor in
-          try checkStatus(mln_map_scale_by(try handle.requireLive(), scale, anchor))
+          try checkStatus(mln_map_scale_by(
+            handle.requireLive(),
+            scale,
+            anchor
+          ))
         }
       } else {
-        try checkStatus(mln_map_scale_by(try handle.requireLive(), scale, nil))
+        try checkStatus(mln_map_scale_by(handle.requireLive(), scale, nil))
       }
     }
   }
 
-  public func scaleBy(_ scale: Double, anchor: ScreenPoint? = nil, animation: AnimationOptions) throws {
+  public func scaleBy(
+    _ scale: Double,
+    anchor: ScreenPoint? = nil,
+    animation: AnimationOptions
+  ) throws {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
         if var nativeAnchor = anchor?.nativeInput.native {
           try withUnsafePointer(to: &nativeAnchor) { anchor in
-            try checkStatus(mln_map_scale_by_animated(try handle.requireLive(), scale, anchor, nativeAnimation))
+            try checkStatus(mln_map_scale_by_animated(
+              handle.requireLive(),
+              scale,
+              anchor,
+              nativeAnimation
+            ))
           }
         } else {
-          try checkStatus(mln_map_scale_by_animated(try handle.requireLive(), scale, nil, nativeAnimation))
+          try checkStatus(mln_map_scale_by_animated(
+            handle.requireLive(),
+            scale,
+            nil,
+            nativeAnimation
+          ))
         }
       }
     }
@@ -240,7 +298,7 @@ public final class MapHandle {
 
   public func cancelTransitions() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_cancel_transitions(try handle.requireLive()))
+      try checkStatus(mln_map_cancel_transitions(handle.requireLive()))
     }
   }
 }

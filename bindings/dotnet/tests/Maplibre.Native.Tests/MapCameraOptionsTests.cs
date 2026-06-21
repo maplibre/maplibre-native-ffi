@@ -1,4 +1,5 @@
 using Maplibre.Native.Camera;
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
 using Maplibre.Native.Runtime;
@@ -16,11 +17,11 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(expected.Longitude, actual.Longitude, CoordinatePrecision);
     }
 
+    [BindingSpecTest("BND-100")]
     [Fact]
     public void ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         map.SetViewportOptions(
@@ -59,11 +60,11 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(TileLodMode.Distance, tile.LodMode);
     }
 
+    [BindingSpecTest("BND-102")]
     [Fact]
     public void CameraFitHelpersCopyDescriptorsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
         var fit = new CameraFitOptions
@@ -88,11 +89,11 @@ public sealed class MapCameraOptionsTests
         Assert.NotNull(geometryCamera.Zoom);
     }
 
+    [BindingSpecTest("BND-102", "BND-103")]
     [Fact]
     public void BoundsAndProjectionOptionsRoundTripThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
@@ -143,11 +144,33 @@ public sealed class MapCameraOptionsTests
         Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
     }
 
+    [BindingSpecTest("BND-104")]
+    [Fact]
+    public void InvalidMapAndProjectionInputsPropagateNativeDiagnostics()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        var mapError = Assert.Throws<InvalidArgumentException>(() =>
+            map.JumpTo(new CameraOptions { Zoom = double.NaN })
+        );
+        var projectionError = Assert.Throws<InvalidArgumentException>(() =>
+            map.SetProjectionMode(new ProjectionModeOptions { XSkew = double.NaN })
+        );
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, mapError.Status);
+        Assert.NotNull(mapError.RawStatus);
+        Assert.NotEmpty(mapError.Diagnostic);
+        Assert.Equal(MaplibreStatus.InvalidArgument, projectionError.Status);
+        Assert.NotNull(projectionError.RawStatus);
+        Assert.NotEmpty(projectionError.Diagnostic);
+    }
+
+    [BindingSpecTest("BND-103")]
     [Fact]
     public void CoordinateProjectionRoundTripsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var coordinate = new LatLng(12.5, 34.25);
 
@@ -165,11 +188,11 @@ public sealed class MapCameraOptionsTests
         Assert.Empty(map.LatLngsForPixels([]));
     }
 
+    [BindingSpecTest("BND-103")]
     [Fact]
     public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         using var projection = map.CreateProjection();
         var coordinate = new LatLng(12.5, 34.25);
@@ -193,22 +216,42 @@ public sealed class MapCameraOptionsTests
         Assert.True(projection.IsClosed);
     }
 
+    [BindingSpecTest("BND-043")]
+    [Fact]
+    public void ProjectionSnapshotRemainsUsableAfterSourceMapCloses()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var projection = map.CreateProjection();
+        var coordinate = new LatLng(12.5, 34.25);
+
+        map.Close();
+
+        var camera = projection.GetCamera();
+        Assert.NotNull(camera);
+        var point = projection.PixelForLatLng(coordinate);
+        AssertClose(coordinate, projection.LatLngForPixel(point));
+
+        projection.Close();
+        runtime.Close();
+    }
+
+    [BindingSpecTest("BND-102")]
     [Fact]
     public void FreeCameraOptionsCanBeCopiedThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         var freeCamera = map.GetFreeCameraOptions();
         map.SetFreeCameraOptions(freeCamera);
     }
 
+    [BindingSpecTest("BND-102")]
     [Fact]
     public void CameraTransitionCommandsAcceptOptionalAnimationDescriptors()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
         var animation = new AnimationOptions
@@ -218,33 +261,33 @@ public sealed class MapCameraOptionsTests
             Easing = new UnitBezier(0, 0, 1, 1),
         };
 
-        map.EaseTo(camera);
+        map.EaseTo(camera, null);
         map.EaseTo(camera, animation);
-        map.FlyTo(camera);
+        map.FlyTo(camera, null);
         map.FlyTo(camera, animation);
         map.MoveBy(0, 0);
-        map.MoveByAnimated(0, 0);
+        map.MoveByAnimated(0, 0, null);
         map.MoveByAnimated(0, 0, animation);
-        map.ScaleBy(1);
+        map.ScaleBy(1, null);
         map.ScaleBy(1, new ScreenPoint(256, 256));
-        map.ScaleByAnimated(1);
-        map.ScaleByAnimated(1, new ScreenPoint(256, 256));
-        map.ScaleByAnimated(1, animation);
+        map.ScaleByAnimated(1, null, null);
+        map.ScaleByAnimated(1, new ScreenPoint(256, 256), null);
+        map.ScaleByAnimated(1, null, animation);
         map.ScaleByAnimated(1, new ScreenPoint(256, 256), animation);
         map.RotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
-        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), null);
         map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), animation);
         map.PitchBy(0);
-        map.PitchByAnimated(0);
+        map.PitchByAnimated(0, null);
         map.PitchByAnimated(0, animation);
         map.CancelTransitions();
     }
 
+    [BindingSpecTest("BND-102")]
     [Fact]
     public void JumpToAppliesCameraFieldsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         map.JumpTo(

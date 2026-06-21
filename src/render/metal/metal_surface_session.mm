@@ -229,9 +229,7 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
   auto operator=(MetalSurfaceBackend&&) -> MetalSurfaceBackend& = delete;
 
   ~MetalSurfaceBackend() override {
-    auto guard = mbgl::gfx::BackendScope{
-      *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-    };
+    auto guard = mbgl::gfx::BackendScope{*this};
     resource.reset();
     context.reset();
   }

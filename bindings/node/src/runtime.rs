@@ -1525,16 +1525,15 @@ impl Drop for NativeRuntimeHandle {
 
 impl RuntimeOptions {
     fn into_core(self) -> Result<core::RuntimeOptions> {
-        let mut options = core::RuntimeOptions::new();
+        let mut options = core::RuntimeOptions::default();
         if let Some(asset_path) = self.asset_path {
-            options = options.with_asset_path(asset_path);
+            options.asset_path = Some(asset_path);
         }
         if let Some(cache_path) = self.cache_path {
-            options = options.with_cache_path(cache_path);
+            options.cache_path = Some(cache_path);
         }
         if let Some(maximum_cache_size) = self.maximum_cache_size {
-            options =
-                options.with_maximum_cache_size(maximum_cache_size_to_u64(maximum_cache_size)?);
+            options.maximum_cache_size = Some(maximum_cache_size_to_u64(maximum_cache_size)?);
         }
         Ok(options)
     }

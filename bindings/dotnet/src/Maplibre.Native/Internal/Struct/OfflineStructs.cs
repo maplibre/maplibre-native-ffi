@@ -7,6 +7,26 @@ using Maplibre.Native.Offline;
 
 namespace Maplibre.Native.Internal.Struct;
 
+internal unsafe delegate mln_status OfflineRegionSnapshotGet(
+    mln_offline_region_snapshot* snapshot,
+    mln_offline_region_info* outInfo
+);
+
+internal unsafe delegate void OfflineRegionSnapshotDestroy(mln_offline_region_snapshot* snapshot);
+
+internal unsafe delegate mln_status OfflineRegionListCount(
+    mln_offline_region_list* list,
+    nuint* outCount
+);
+
+internal unsafe delegate mln_status OfflineRegionListGet(
+    mln_offline_region_list* list,
+    nuint index,
+    mln_offline_region_info* outInfo
+);
+
+internal unsafe delegate void OfflineRegionListDestroy(mln_offline_region_list* list);
+
 internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
 {
     private readonly NativeUtf8String styleUrl;
@@ -117,6 +137,34 @@ internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
 
 internal static unsafe class OfflineStructs
 {
+    private static readonly OfflineRegionSnapshotGet DefaultSnapshotGet = static (
+        snapshot,
+        outInfo
+    ) => NativeMethods.mln_offline_region_snapshot_get(snapshot, outInfo);
+    private static readonly OfflineRegionSnapshotDestroy DefaultSnapshotDestroy = static snapshot =>
+        NativeMethods.mln_offline_region_snapshot_destroy(snapshot);
+    private static readonly OfflineRegionListCount DefaultListCount = static (list, outCount) =>
+        NativeMethods.mln_offline_region_list_count(list, outCount);
+    private static readonly OfflineRegionListGet DefaultListGet = static (list, index, outInfo) =>
+        NativeMethods.mln_offline_region_list_get(list, index, outInfo);
+    private static readonly OfflineRegionListDestroy DefaultListDestroy = static list =>
+        NativeMethods.mln_offline_region_list_destroy(list);
+
+    [ThreadStatic]
+    private static OfflineRegionSnapshotGet? snapshotGetForTest;
+
+    [ThreadStatic]
+    private static OfflineRegionSnapshotDestroy? snapshotDestroyForTest;
+
+    [ThreadStatic]
+    private static OfflineRegionListCount? listCountForTest;
+
+    [ThreadStatic]
+    private static OfflineRegionListGet? listGetForTest;
+
+    [ThreadStatic]
+    private static OfflineRegionListDestroy? listDestroyForTest;
+
     internal static OfflineRegionInfo ReadSnapshot(mln_offline_region_snapshot* snapshot)
     {
         if (snapshot is null)
@@ -127,12 +175,12 @@ internal static unsafe class OfflineStructs
         try
         {
             var info = new mln_offline_region_info { size = (uint)sizeof(mln_offline_region_info) };
-            NativeStatus.Check(NativeMethods.mln_offline_region_snapshot_get(snapshot, &info));
+            NativeStatus.Check(SnapshotGet(snapshot, &info));
             return ReadInfo(info);
         }
         finally
         {
-            NativeMethods.mln_offline_region_snapshot_destroy(snapshot);
+            SnapshotDestroy(snapshot);
         }
     }
 
@@ -146,7 +194,7 @@ internal static unsafe class OfflineStructs
         try
         {
             nuint count = 0;
-            NativeStatus.Check(NativeMethods.mln_offline_region_list_count(list, &count));
+            NativeStatus.Check(ListCount(list, &count));
             var regions = new OfflineRegionInfo[checked((int)count)];
             for (nuint index = 0; index < count; index++)
             {
@@ -154,14 +202,78 @@ internal static unsafe class OfflineStructs
                 {
                     size = (uint)sizeof(mln_offline_region_info),
                 };
-                NativeStatus.Check(NativeMethods.mln_offline_region_list_get(list, index, &info));
+                NativeStatus.Check(ListGet(list, index, &info));
                 regions[(int)index] = ReadInfo(info);
             }
             return regions;
         }
         finally
         {
-            NativeMethods.mln_offline_region_list_destroy(list);
+            ListDestroy(list);
+        }
+    }
+
+    internal static IDisposable UseOfflineSnapshotMethodsForTest(
+        OfflineRegionSnapshotGet get,
+        OfflineRegionSnapshotDestroy destroy
+    )
+    {
+        var previousGet = snapshotGetForTest;
+        var previousDestroy = snapshotDestroyForTest;
+        snapshotGetForTest = get;
+        snapshotDestroyForTest = destroy;
+        return new RestoreOfflineSnapshotMethods(previousGet, previousDestroy);
+    }
+
+    internal static IDisposable UseOfflineListMethodsForTest(
+        OfflineRegionListCount count,
+        OfflineRegionListGet get,
+        OfflineRegionListDestroy destroy
+    )
+    {
+        var previousCount = listCountForTest;
+        var previousGet = listGetForTest;
+        var previousDestroy = listDestroyForTest;
+        listCountForTest = count;
+        listGetForTest = get;
+        listDestroyForTest = destroy;
+        return new RestoreOfflineListMethods(previousCount, previousGet, previousDestroy);
+    }
+
+    private static OfflineRegionSnapshotGet SnapshotGet => snapshotGetForTest ?? DefaultSnapshotGet;
+
+    private static OfflineRegionSnapshotDestroy SnapshotDestroy =>
+        snapshotDestroyForTest ?? DefaultSnapshotDestroy;
+
+    private static OfflineRegionListCount ListCount => listCountForTest ?? DefaultListCount;
+
+    private static OfflineRegionListGet ListGet => listGetForTest ?? DefaultListGet;
+
+    private static OfflineRegionListDestroy ListDestroy => listDestroyForTest ?? DefaultListDestroy;
+
+    private sealed class RestoreOfflineSnapshotMethods(
+        OfflineRegionSnapshotGet? previousGet,
+        OfflineRegionSnapshotDestroy? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            snapshotGetForTest = previousGet;
+            snapshotDestroyForTest = previousDestroy;
+        }
+    }
+
+    private sealed class RestoreOfflineListMethods(
+        OfflineRegionListCount? previousCount,
+        OfflineRegionListGet? previousGet,
+        OfflineRegionListDestroy? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            listCountForTest = previousCount;
+            listGetForTest = previousGet;
+            listDestroyForTest = previousDestroy;
         }
     }
 
