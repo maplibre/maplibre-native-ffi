@@ -1,11 +1,13 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.compile.JavaCompile
+import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.catalogVersionInt
 
 val hostPlatform = HostPlatform.current()
+val androidTarget = AndroidTarget.current()
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val javaCppToolClasspath = configurations.getByName("javaCppTool")
 
@@ -82,8 +84,8 @@ val generateJavaCppNativeLibrary =
       "-classpath",
       classpath.asPath,
       "-properties",
-      "android-arm64",
-      "-Dplatform.compiler=${androidNdkHome.get()}/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}/bin/aarch64-linux-android24-clang++",
+      androidTarget.javaCppPlatform,
+      "-Dplatform.compiler=${androidNdkHome.get()}/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}/bin/${androidTarget.ndkCompilerTriple}-clang++",
       "-Dplatform.includepath=${(maplibreNativeC.includeDirs + javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
       "-Dplatform.linkpath=${maplibreNativeC.linkDirs.joinToString(File.pathSeparator)}",
       "-clean",
@@ -110,5 +112,5 @@ tasks.register<Sync>("packageAndroidNativeLibraries") {
   dependsOn(generateJavaCppNativeLibrary)
   from(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
   from(maplibreNativeC.libraryPath)
-  into(packagedAndroidNativeLibs.map { it.dir("arm64-v8a") })
+  into(packagedAndroidNativeLibs.map { it.dir(androidTarget.ndkAbi) })
 }

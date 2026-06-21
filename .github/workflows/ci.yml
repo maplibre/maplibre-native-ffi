@@ -217,6 +217,35 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
+  variant-android-x64-egl:
+    name: variant / android-x64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-x64-egl
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
+      - run: mise run //examples/android-map:build
+  variant-android-x64-vulkan:
+    name: variant / android-x64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-x64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
     runs-on: macos-26
@@ -333,6 +362,8 @@ jobs:
       - variant-macos-arm64-egl
       - variant-android-arm64-egl
       - variant-android-arm64-vulkan
+      - variant-android-x64-egl
+      - variant-android-x64-vulkan
       - variant-ios-arm64-metal
       - variant-ios-simulator-arm64-metal
       - variant-ohos-arm64-egl
