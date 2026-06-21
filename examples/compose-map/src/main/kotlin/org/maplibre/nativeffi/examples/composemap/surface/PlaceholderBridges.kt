@@ -40,9 +40,9 @@ internal abstract class PlaceholderBridge(
 
 internal class MacOpenGlMetalBridge :
   PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.METAL) {
-  // TODO(surface): build this from IOSurface-backed storage after the same-API Metal path proves
-  // the SkikoHost reflection and draw path; define the producer CGL/EGL context contract before
-  // exposing an OpenGlTextureTarget to MapLibre.
+  // TODO(surface): create an ANGLE EGL/GLES context backed by Metal, allocate the shared target as
+  // a Skiko-device Metal texture, import it into ANGLE with EGL_ANGLE_metal_texture_client_buffer,
+  // bind the EGLImage to a GLES texture, and expose that texture with an EglContextDescriptor.
   override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
     OpenGlTextureTarget(
       textureName = 0,
