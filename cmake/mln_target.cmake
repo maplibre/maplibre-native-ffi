@@ -1,5 +1,4 @@
 include(mln_artifact_metadata)
-include(mln_bundled_deps)
 include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
@@ -25,6 +24,10 @@ function(mln_configure_shared_exports target)
     target_link_options(
       ${target}
       PRIVATE "LINKER:--version-script,${export_file}")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
+       AND MLN_FFI_ARTIFACT_SHAPE STREQUAL "shared-private")
+      target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
+    endif()
   endif()
 endfunction()
 
@@ -73,8 +76,6 @@ function(mln_add_c_api_library target)
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
       mbgl-vendor-sqlite)
-
-  mln_configure_zlib_linking(${target})
 
   target_compile_options(
     ${target}

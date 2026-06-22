@@ -1,7 +1,10 @@
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
+  find_package(libuv REQUIRED)
+  find_package(PNG REQUIRED)
   find_package(WebP REQUIRED)
+  find_package(ZLIB REQUIRED)
 
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
@@ -44,8 +47,13 @@ function(mln_configure_windows_platform target)
     ${target}
     SYSTEM
     PRIVATE
-      ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
-      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS})
+      ${MLN_SOURCE_DIR}/platform/windows/include
+      ${CURL_INCLUDE_DIRS}
+      ${JPEG_INCLUDE_DIRS}
+      ${PNG_INCLUDE_DIRS}
+      ${WEBP_INCLUDE_DIRS}
+      ${ZLIB_INCLUDE_DIR}
+      "$ENV{MLN_FFI_DEPENDENCY_INCLUDE_DIR}")
 
   target_compile_definitions(
     ${target}
@@ -57,8 +65,12 @@ function(mln_configure_windows_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE ${CURL_LIBRARIES} ${JPEG_LIBRARIES} WebP::webp mbgl-vendor-icu)
-
-  mln_link_bundled_png(${target})
-  mln_link_bundled_libuv(${target})
+    PRIVATE
+      ${CURL_LIBRARIES}
+      ${JPEG_LIBRARIES}
+      WebP::webp
+      mbgl-vendor-icu
+      libuv::uv_a
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/zlibstatic.lib"
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libpng16_static.lib")
 endfunction()
