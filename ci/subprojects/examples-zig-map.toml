@@ -1,5 +1,5 @@
 [requires]
-# Zig translate-c currently fails on Windows ARM64 SDK headers while translating
-# the SDL-backed example entry points.
-exclude = ["windows-arm64-vulkan", "windows-arm64-wgl"]
+# The Vulkan example precompiles shaders with glslangValidator, which is not provided
+# by the Windows ARM64 mise toolchain yet.
+exclude = ["windows-arm64-vulkan"]
 os = ["linux", "macos", "windows"]

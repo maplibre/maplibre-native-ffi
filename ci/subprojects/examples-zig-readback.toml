@@ -1,6 +1,4 @@
 [requires]
-# The WGL path currently fails in Zig translate-c on Windows ARM64 SDK headers.
-exclude = ["windows-arm64-wgl"]
 os = ["linux", "macos", "windows"]
 
 [ci]

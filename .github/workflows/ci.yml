@@ -354,6 +354,8 @@ jobs:
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
+      - run: mise run //examples/zig-readback:run
   required:
     name: ci-required
     runs-on: ubuntu-latest

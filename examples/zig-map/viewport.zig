@@ -42,6 +42,8 @@ pub fn get(window: *c.SDL_Window) types.Viewport {
     return .{
         .logical_width = scaled_logical_width,
         .logical_height = scaled_logical_height,
+        .window_width = @intCast(safe_logical_width),
+        .window_height = @intCast(safe_logical_height),
         .physical_width = @intCast(safe_physical_width),
         .physical_height = @intCast(safe_physical_height),
         .scale_factor = content_scale,
