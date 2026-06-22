@@ -417,6 +417,75 @@ The `dma_buf` / EGLImage path remains the Linux fallback and portability probe:
   as `GL_EXT_EGL_image_storage` or an equivalent EGL-image texture target that
   works with Skiko's desktop GL context.
 
+### Windows D3D12 Handoff Notes
+
+The Windows rows should follow the Linux lesson: MapLibre receives only the
+producer-native target, while the bridge owns Skiko reflection, shared-resource
+handles, texture origin, synchronization, and owner-thread routing.
+
+For Compose 1.11.1 / Skiko 0.144.6, the expected Direct3D consumer path is
+`org.jetbrains.skiko.redrawer.Direct3DRedrawer`. The cached class shape shows
+private `contextHandler` and `device` fields, public `makeContext()`,
+`makeSurface(...)`, `changeSize(...)`, `getBufferIndex()`, and native swap-chain
+helpers. `Direct3DContextHandler` owns Skiko's Direct3D `DirectContext` and
+surfaces. The Windows bridge should keep those reflection details inside
+`SkikoHost`, analogous to the Metal and Linux OpenGL reflection paths, and
+return only a small Direct3D capability object to bridge code.
+
+`vulkan-d3d12` should be the primary Windows implementation:
+
+1. Discover Skiko's live Direct3D device/context through `SkikoHost`; fail fast
+   when the active redrawer is not `Direct3DRedrawer`.
+2. Allocate a D3D12 `ID3D12Resource` on Skiko's device with color-attachment and
+   shader-resource usage that Skia can wrap. Prefer a shareable committed
+   resource and use shared heaps only if the committed resource cannot be
+   imported by Vulkan on target drivers.
+3. Export a Win32 handle with `ID3D12Device::CreateSharedHandle`; duplicate or
+   transfer handle ownership deliberately, and close each `HANDLE` exactly once.
+4. Import the handle into Vulkan with `VK_KHR_external_memory_win32` and
+   `VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT`, create a `VkImageView`,
+   and pass only the resulting `VulkanImageTarget` to MapLibre.
+5. Present the D3D12 resource through Skiko's Direct3D path. First try Skiko's
+   `BackendRenderTarget.makeDirect3D(...)` wrapper; if the Kotlin wrapper cannot
+   express the imported resource shape, isolate the missing Skia/D3D12 wrapping
+   in a bridge-local native helper.
+6. Start with `vkDeviceWaitIdle()` plus an explicit Direct3D queue/fence wait
+   for proof-level ordering. Replace that with a shared D3D12 fence imported
+   into Vulkan as `VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT` once the
+   texture path is stable.
+
+`opengl-d3d12` should reuse the same Skiko Direct3D presenter, but its producer
+side is WGL:
+
+1. Create a WGL share context for MapLibre using the existing
+   `WglContextDescriptor` contract. Use `src/zig_test_support/wgl_context.zig`
+   as the bootstrap reference for selecting a pixel format, creating a dummy
+   window/device context, and creating a shareable WGL context.
+2. Allocate the consumer-compatible D3D12 resource first, then expose that
+   storage to WGL/OpenGL. Preferred path: `GL_EXT_memory_object` plus
+   `GL_EXT_external_objects_win32` / `GL_EXT_memory_object_win32` from a D3D12
+   resource handle. Fallback candidates are `WGL_NV_DX_interop2` or an
+   ANGLE-backed D3D path if driver support makes the GL external-memory path
+   impractical.
+3. Pass only `OpenGlTextureTarget` and `WglContextHandles` to MapLibre. Keep
+   D3D12 resources, GL memory objects, duplicated handles, keyed mutexes, and
+   Skiko Direct3D reflection inside the bridge.
+4. Carry `TextureOrigin` explicitly and validate visual orientation before
+   validating gestures or resize. Linux showed that a correct texture-sharing
+   path can still be vertically flipped.
+5. Route all MapLibre-owned calls through the context owner thread if WGL is
+   made current away from the EDT. The Linux EGL bridge's `withRendererAccess`
+   hook is the template for gestures, resize, render-session calls, and cleanup.
+6. Use `glFinish()` plus a D3D12 fence wait for the first proof, then graduate
+   to `GL_EXT_semaphore_win32`, keyed mutex, or shared-fence synchronization
+   after import and presentation are stable.
+
+Before implementing either Windows row, add the missing runtime dependencies or
+native helpers for Win32/D3D12 calls. LWJGL covers Vulkan, OpenGL, and WGL-style
+OpenGL APIs here, but this example currently has no D3D12/COM helper layer. Keep
+that helper narrow: device/resource/handle/fence operations only, with
+MapLibre-facing descriptors still built in Kotlin.
+
 ## Synchronization Strategy
 
 External memory and synchronization are separate capabilities. Each bridge owns
