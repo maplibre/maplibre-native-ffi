@@ -219,7 +219,7 @@ def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
     write_lines(out_dir / f"{LIBRARY_NAME}.cargo-rustflags", lines)
 
 
-def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
+def write_zig_config(metadata: dict, artifact: Artifact, out_dir: Path) -> None:
     values = {
         "render_backend": artifact.render_backend,
         "library_path": artifact.library_path,
@@ -228,7 +228,7 @@ def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
         "library_dirs": path_list(artifact.library_dirs),
         "link_dirs": path_list(artifact.link_dirs),
         "runtime_library_dirs": path_list(artifact.runtime_library_dirs),
-        "link_libraries": path_list(artifact.link_libraries),
+        "link_libraries": path_list(unique(metadata.get("link_libraries", []))),
         "frameworks": path_list(artifact.frameworks),
     }
     write_lines(
@@ -261,6 +261,8 @@ def write_zig_libc_config(out_dir: Path) -> None:
 def generate(metadata_path: Path) -> None:
     out_dir = metadata_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
+    with metadata_path.open(encoding="utf-8") as metadata_file:
+        metadata = json.load(metadata_file)
     artifact = load_artifact(metadata_path)
     write_pkg_config(artifact, out_dir)
     write_gradle_properties(artifact, out_dir)
@@ -268,7 +270,7 @@ def generate(metadata_path: Path) -> None:
     (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)
     write_swift_linker_flags(artifact, out_dir)
     write_cargo_rustflags(artifact, out_dir)
-    write_zig_config(artifact, out_dir)
+    write_zig_config(metadata, artifact, out_dir)
     write_zig_libc_config(out_dir)
 
 

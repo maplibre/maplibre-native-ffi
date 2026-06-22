@@ -51,7 +51,7 @@ fn parseRenderBackend(value: []const u8) RenderBackend {
 }
 
 fn usesStaticMonolithicLink(config: NativeArtifactConfig) bool {
-    return config.link_libraries.len > 0;
+    return std.ascii.endsWithIgnoreCase(config.library_path, ".a");
 }
 
 fn maybeNativeArtifactConfigPath(b: *std.Build) ?std.Build.LazyPath {
