@@ -72,5 +72,5 @@ function(mln_configure_windows_platform target)
       mbgl-vendor-icu
       libuv::uv_a
       "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/zlibstatic.lib"
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libpng16_static.lib")
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libpng_static.lib")
 endfunction()
