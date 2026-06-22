@@ -40,7 +40,7 @@ function(mln_write_artifact_metadata target)
   endif()
 
   if(UNIX AND MLN_FFI_ARTIFACT_SHAPE STREQUAL "shared-private")
-    set(rpaths ${library_dirs})
+    set(rpaths "$<TARGET_FILE_DIR:${target}>" ${library_dirs})
     set(supports_linker_rpath true)
   endif()
 
