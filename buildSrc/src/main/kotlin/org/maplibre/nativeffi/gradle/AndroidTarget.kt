@@ -28,6 +28,12 @@ enum class AndroidTarget(
     fun cargoTargetForRustlsMetadata(): String =
       System.getenv("CARGO_BUILD_TARGET") ?: ARM64.cargoTarget
 
+    /**
+     * Resolves ndk ABI filters during Gradle configuration when [CARGO_BUILD_TARGET] may be unset.
+     */
+    fun ndkAbiForGradleConfiguration(): String =
+      fromCargoTarget(cargoTargetForRustlsMetadata()).ndkAbi
+
     fun fromCargoTarget(cargoTarget: String): AndroidTarget =
       entries.firstOrNull { it.cargoTarget == cargoTarget }
         ?: error(

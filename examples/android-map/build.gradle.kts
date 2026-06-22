@@ -1,6 +1,6 @@
 plugins { alias(libs.plugins.android.application) }
 
-val androidNdkAbi = org.maplibre.nativeffi.gradle.AndroidTarget.current().ndkAbi
+val androidNdkAbi = org.maplibre.nativeffi.gradle.AndroidTarget.ndkAbiForGradleConfiguration()
 
 android {
   namespace = "org.maplibre.nativeffi.examples.androidmap"

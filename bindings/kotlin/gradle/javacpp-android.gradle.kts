@@ -120,6 +120,7 @@ if (System.getenv("CARGO_BUILD_TARGET") != null) {
 
   tasks.register<Sync>("packageAndroidNativeLibraries") {
     dependsOn(generateJavaCppNativeLibrary)
+    doFirst { delete(packagedAndroidNativeLibs) }
     from(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
     from(maplibreNativeC.libraryPath)
     into(packagedAndroidNativeLibs.map { it.dir(androidTarget.ndkAbi) })
