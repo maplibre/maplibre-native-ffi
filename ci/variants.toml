@@ -92,3 +92,17 @@ runner = "windows-2022"
 os = "windows"
 arch = "x64"
 backend = "opengl"
+
+[variants.windows-arm64-vulkan]
+runner = "windows-11-arm"
+os = "windows"
+arch = "arm64"
+backend = "vulkan"
+supports_tests = false
+
+[variants.windows-arm64-wgl]
+runner = "windows-11-arm"
+os = "windows"
+arch = "arm64"
+backend = "opengl"
+supports_tests = false

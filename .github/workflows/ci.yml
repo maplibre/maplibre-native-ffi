@@ -316,6 +316,32 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+  variant-windows-arm64-vulkan:
+    name: variant / windows-arm64-vulkan
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      MISE_ENV: windows-arm64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+  variant-windows-arm64-wgl:
+    name: variant / windows-arm64-wgl
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      MISE_ENV: windows-arm64-wgl
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
   required:
     name: ci-required
     runs-on: ubuntu-latest
@@ -339,6 +365,8 @@ jobs:
       - variant-ohos-arm64-vulkan
       - variant-windows-x64-vulkan
       - variant-windows-x64-wgl
+      - variant-windows-arm64-vulkan
+      - variant-windows-arm64-wgl
     steps:
       - name: Fail if required jobs failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}

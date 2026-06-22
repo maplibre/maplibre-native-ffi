@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#MISE description="Download and adapt the temporary curl-for-win ARM64 artifact for Windows ARM64 builds."
+set -euo pipefail
+
+if [[ "${MISE_ENV%-*}" != "windows-arm64" ]]; then
+  echo "curl-for-win ARM64 artifact is only configured for windows-arm64" >&2
+  exit 1
+fi
+
+# shellcheck source=.mise/bin/windows-msvc-path.sh
+source "$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh" >/dev/null
+
+# Temporary bridge until conda-forge publishes libcurl for win-arm64:
+# https://github.com/conda-forge/curl-feedstock/pull/166
+version="8.19.0_5"
+archive_name="curl-${version}-win64a-mingw.zip"
+url="https://curl.se/windows/dl-${version}/${archive_name}"
+sha256="41b24afe97e5e0325382a778b18243c92fa09711d24bc9c4460513c7d0ce47a8"
+
+curl_root="${MLN_FFI_REPO_ROOT}/build/deps/curl/${version}/win64a-msvc"
+archive="${MLN_FFI_REPO_ROOT}/build/deps/curl/${version}/${archive_name}"
+marker="${curl_root}/.complete"
+marker_value="${sha256} msvc-import-lib-v2"
+
+if [[ -f "$marker" ]] && [[ "$(cat "$marker")" == "$marker_value" ]]; then
+  exit 0
+fi
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+mkdir -p "$(dirname "$archive")"
+curl --fail --location --silent --show-error --output "$tmp_dir/$archive_name" "$url"
+
+if command -v sha256sum >/dev/null; then
+  actual_sha256="$(sha256sum "$tmp_dir/$archive_name" | awk '{print $1}')"
+elif command -v shasum >/dev/null; then
+  actual_sha256="$(shasum -a 256 "$tmp_dir/$archive_name" | awk '{print $1}')"
+else
+  archive_win="$(cygpath -w "$tmp_dir/$archive_name")"
+  actual_sha256="$(
+    powershell.exe -NoProfile -Command \
+      "\$hash = Get-FileHash -Algorithm SHA256 -LiteralPath '$archive_win'; \$hash.Hash.ToLowerInvariant()"
+  )"
+fi
+
+if [[ "$actual_sha256" != "$sha256" ]]; then
+  echo "curl-for-win archive SHA-256 mismatch for $archive_name" >&2
+  echo "expected: $sha256" >&2
+  echo "actual:   $actual_sha256" >&2
+  exit 1
+fi
+
+extract_dir="$tmp_dir/extract"
+mkdir -p "$extract_dir"
+archive_win="$(cygpath -w "$tmp_dir/$archive_name")"
+extract_win="$(cygpath -w "$extract_dir")"
+powershell.exe -NoProfile -Command \
+  "Expand-Archive -LiteralPath '$archive_win' -DestinationPath '$extract_win' -Force"
+
+extracted_root="$(find "$extract_dir" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+if [[ -z "$extracted_root" ]]; then
+  echo "curl-for-win archive did not contain an extracted root directory" >&2
+  exit 1
+fi
+
+rm -rf "$curl_root"
+mkdir -p "$curl_root/bin" "$curl_root/include" "$curl_root/lib"
+cp -R "$extracted_root/include/curl" "$curl_root/include/"
+cp "$extracted_root/bin/libcurl-arm64.def" "$curl_root/bin/"
+cp "$extracted_root/bin/libcurl-arm64.dll" "$curl_root/bin/"
+cp "$extracted_root/bin/curl-ca-bundle.crt" "$curl_root/bin/"
+cp "$tmp_dir/$archive_name" "$archive"
+
+export MSYS2_ARG_CONV_EXCL="*"
+lib.exe \
+  /nologo \
+  /machine:arm64 \
+  /def:"$(cygpath -w "$curl_root/bin/libcurl-arm64.def")" \
+  /out:"$(cygpath -w "$curl_root/lib/libcurl.lib")"
+
+printf '%s' "$marker_value" > "$marker"

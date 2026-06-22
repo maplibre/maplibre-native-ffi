@@ -38,7 +38,7 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Use Windows software graphics drivers
-      if: ${{ runner.os == 'Windows' }}
+      if: ${{ runner.os == 'Windows' && runner.arch != 'ARM64' }}
       shell: pwsh
       run: |
         $mesaVersion = "26.0.8"

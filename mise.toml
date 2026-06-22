@@ -156,6 +156,9 @@ run = '''
 if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
   mise run deps:angle
 fi
+if [[ "${MISE_ENV%-*}" == "windows-arm64" ]]; then
+  mise run deps:curl-win-arm64
+fi
 '''
 
 [tasks.test]

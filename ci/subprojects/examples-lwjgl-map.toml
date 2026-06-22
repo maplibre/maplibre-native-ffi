@@ -1,2 +1,3 @@
 [requires]
+exclude = ["windows-arm64-vulkan", "windows-arm64-wgl"]
 os = ["linux", "macos", "windows"]

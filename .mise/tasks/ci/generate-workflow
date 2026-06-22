@@ -42,7 +42,7 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
                     and variant.supports_tests
                 ):
                     continue
-                if action_key == "test" and not variant.supports_tests:
+                if action_key in {"run", "test"} and not variant.supports_tests:
                     continue
                 commands[variant.name].append(f"mise run {task}")
 
