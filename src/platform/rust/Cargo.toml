@@ -9,9 +9,10 @@ repository.workspace = true
 crate-type = ["staticlib"]
 
 [dependencies]
+http = "1.4"
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
-minreq = { version = "3.0.0", default-features = false, features = ["https-rustls-probe"] }
 threadpool = "1.8.1"
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "platform-verifier"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21.1", default-features = false }

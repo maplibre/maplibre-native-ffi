@@ -1,10 +1,7 @@
 function(mln_configure_linux_platform target)
-  find_package(CURL REQUIRED)
-  find_package(JPEG REQUIRED)
-  find_package(PNG REQUIRED)
+  include(mln_rust)
   find_package(PkgConfig REQUIRED)
   find_package(Threads REQUIRED)
-  pkg_search_module(WEBP libwebp REQUIRED)
   pkg_search_module(LIBUV libuv REQUIRED)
 
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
@@ -12,21 +9,21 @@ function(mln_configure_linux_platform target)
   set(MLN_FFI_VENDOR_LINUX_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/image.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/jpeg_reader.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_reader.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/webp_reader.cpp)
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+
+  set(MLN_FFI_LINUX_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
+  mln_target_project_sources(${target} ${MLN_FFI_LINUX_SOURCES})
 
   set_source_files_properties(
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
@@ -38,21 +35,11 @@ function(mln_configure_linux_platform target)
     BEFORE
     PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
 
-  target_include_directories(
-    ${target}
-    SYSTEM
-    PRIVATE
-      ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS}
-      ${WEBP_INCLUDE_DIRS})
+  target_include_directories(${target} SYSTEM PRIVATE ${LIBUV_INCLUDE_DIRS})
 
   target_link_libraries(
     ${target}
-    PRIVATE
-      ${CURL_LIBRARIES}
-      ${JPEG_LIBRARIES}
-      ${LIBUV_LIBRARIES}
-      ${WEBP_LIBRARIES}
-      mbgl-vendor-icu
-      PNG::PNG
-      Threads::Threads)
+    PRIVATE ${LIBUV_LIBRARIES} mbgl-vendor-icu Threads::Threads)
+
+  mln_link_rust_platform(${target})
 endfunction()
