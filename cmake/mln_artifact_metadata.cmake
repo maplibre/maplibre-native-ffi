@@ -81,14 +81,7 @@ function(mln_write_artifact_metadata target)
     endif()
   endif()
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-    set(artifact_shape "static-monolithic")
-  else()
-    set(artifact_shape "shared-private")
-  endif()
-
   mln_json_escape(render_backend "${MLN_FFI_RENDER_BACKEND}")
-  mln_json_escape(artifact_shape "${artifact_shape}")
   mln_json_array(include_dirs_json ${include_dirs})
   mln_json_array(library_dirs_json ${library_dirs})
   mln_json_array(rpaths_json ${rpaths})
@@ -101,7 +94,6 @@ function(mln_write_artifact_metadata target)
     CONTENT
       "{
   \"render_backend\": \"${render_backend}\",
-  \"artifact_shape\": \"${artifact_shape}\",
   \"library_path\": \"$<TARGET_FILE:${target}>\",
   \"import_library_path\": \"$<TARGET_LINKER_FILE:${target}>\",
   \"supports_linker_rpath\": ${supports_linker_rpath},

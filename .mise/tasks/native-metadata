@@ -15,7 +15,6 @@ LIBRARY_NAME = "maplibre-native-c"
 @dataclass(frozen=True)
 class Artifact:
     render_backend: str
-    artifact_shape: str
     library_path: str
     import_library_path: str
     include_dirs: list[str]
@@ -62,7 +61,6 @@ def load_artifact(metadata_path: Path) -> Artifact:
 
     return Artifact(
         render_backend=metadata.get("render_backend", ""),
-        artifact_shape=metadata.get("artifact_shape", ""),
         library_path=library_path,
         import_library_path=import_library_path,
         include_dirs=unique(metadata.get("include_dirs", [])),
@@ -224,7 +222,6 @@ def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
 def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
     values = {
         "render_backend": artifact.render_backend,
-        "artifact_shape": artifact.artifact_shape,
         "library_path": artifact.library_path,
         "import_library_path": artifact.import_library_path,
         "include_dirs": path_list(artifact.include_dirs),
