@@ -331,6 +331,7 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/dotnet:build
       - run: mise run //bindings/rust:build
+      - run: mise run //bindings/zig:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
   variant-windows-arm64-wgl:
@@ -348,6 +349,7 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/dotnet:build
       - run: mise run //bindings/rust:build
+      - run: mise run //bindings/zig:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
   required:
