@@ -28,12 +28,6 @@ function(mln_configure_options)
     set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
   endif()
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-    set(MLN_FFI_ARTIFACT_SHAPE "static-monolithic")
-  else()
-    set(MLN_FFI_ARTIFACT_SHAPE "shared-private")
-  endif()
-
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
@@ -102,16 +96,15 @@ function(mln_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     message(
       STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER} as ${MLN_FFI_ARTIFACT_SHAPE}")
+        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
   else()
     message(
-      STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend as ${MLN_FFI_ARTIFACT_SHAPE}")
+      STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")
   endif()
 
   set(MLN_FFI_RENDER_BACKEND "${MLN_FFI_RENDER_BACKEND}" PARENT_SCOPE)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
       PARENT_SCOPE)
   set(MLN_FFI_EGL_ROOT "${MLN_FFI_EGL_ROOT}" PARENT_SCOPE)
-  set(MLN_FFI_ARTIFACT_SHAPE "${MLN_FFI_ARTIFACT_SHAPE}" PARENT_SCOPE)
+  set(MLN_FFI_IS_IOS_SIMULATOR "${MLN_FFI_IS_IOS_SIMULATOR}" PARENT_SCOPE)
 endfunction()
