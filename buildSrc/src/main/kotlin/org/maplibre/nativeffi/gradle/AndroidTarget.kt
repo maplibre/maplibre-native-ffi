@@ -24,9 +24,16 @@ enum class AndroidTarget(
 
     /**
      * Resolves the Android rustls Maven layout when Android repos are configured off-Android envs.
+     * [CARGO_BUILD_TARGET] may point at the host desktop triple during Linux native builds; only
+     * honor it when it matches a supported Android cargo target.
      */
-    fun cargoTargetForRustlsMetadata(): String =
-      System.getenv("CARGO_BUILD_TARGET") ?: ARM64.cargoTarget
+    fun cargoTargetForRustlsMetadata(): String {
+      val cargoTarget = System.getenv("CARGO_BUILD_TARGET")
+      if (cargoTarget != null) {
+        entries.firstOrNull { it.cargoTarget == cargoTarget }?.let { return cargoTarget }
+      }
+      return ARM64.cargoTarget
+    }
 
     /**
      * Resolves ndk ABI filters during Gradle configuration when [CARGO_BUILD_TARGET] may be unset.
