@@ -13,7 +13,9 @@ include(":bindings:kotlin")
 if (androidSdkDir() != null) {
   include(":examples:android-map")
 }
+
 include(":examples:compose-map")
+
 include(":examples:lwjgl-map")
 
 fun androidSdkDir(): File? {
