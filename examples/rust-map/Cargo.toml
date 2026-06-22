@@ -7,7 +7,6 @@ publish = false
 repository.workspace = true
 
 [features]
-default = ["vulkan"]
 metal = [
   "dep:objc2",
   "dep:objc2-app-kit",

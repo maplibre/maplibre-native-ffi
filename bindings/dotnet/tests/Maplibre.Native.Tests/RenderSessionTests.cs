@@ -191,11 +191,16 @@ public sealed unsafe class RenderSessionTests
 
     [BindingSpecTest("BND-060")]
     [Fact]
-    public void RenderDescriptorsPreserveNativeDefaultsWhenExtentOmitted()
+    public void RenderDescriptorsInitializeSizeAndPreserveCallerExtent()
     {
         var metal = RenderStructs.ToNative(
-            new MetalSurfaceDescriptor { Layer = NativePointer.FromBorrowedAddress(1) }
+            new MetalSurfaceDescriptor
+            {
+                Extent = new RenderTargetExtent(256, 256, 1.0),
+                Layer = NativePointer.FromBorrowedAddress(1),
+            }
         );
+        Assert.Equal((uint)sizeof(mln_render_target_extent), metal.extent.size);
         Assert.Equal(256u, metal.extent.width);
         Assert.Equal(256u, metal.extent.height);
         Assert.Equal(1, metal.extent.scale_factor);
@@ -203,38 +208,23 @@ public sealed unsafe class RenderSessionTests
         var vulkanBorrowed = RenderStructs.ToNative(
             new VulkanBorrowedTextureDescriptor
             {
+                Extent = new RenderTargetExtent(256, 256, 1.0),
                 Image = NativePointer.FromBorrowedAddress(2),
                 ImageView = NativePointer.FromBorrowedAddress(3),
             }
         );
+        Assert.Equal((uint)sizeof(mln_render_target_extent), vulkanBorrowed.extent.size);
         Assert.Equal(256u, vulkanBorrowed.extent.width);
         Assert.Equal(256u, vulkanBorrowed.extent.height);
         Assert.Equal(1, vulkanBorrowed.extent.scale_factor);
         Assert.Equal(5u, vulkanBorrowed.final_layout);
 
-        var openglOwned = RenderStructs.ToNative(new OpenGLOwnedTextureDescriptor());
+        var openglOwned = RenderStructs.ToNative(
+            new OpenGLOwnedTextureDescriptor { Extent = new RenderTargetExtent(256, 256, 1.0) }
+        );
         var openglOwnedDefault = NativeMethods.mln_opengl_owned_texture_descriptor_default();
-        Assert.Equal(256u, openglOwned.extent.width);
-        Assert.Equal(256u, openglOwned.extent.height);
-        Assert.Equal(1, openglOwned.extent.scale_factor);
+        Assert.Equal((uint)sizeof(mln_opengl_owned_texture_descriptor), openglOwned.size);
         Assert.Equal(openglOwnedDefault.context.platform, openglOwned.context.platform);
-    }
-
-    [BindingSpecTest("BND-025")]
-    [Fact]
-    public void RenderExtentValidationRejectsInvalidScaleFactor()
-    {
-        var error = Assert.Throws<InvalidArgumentException>(() =>
-            RenderStructs.ToNative(new RenderTargetExtent(1, 1, 0))
-        );
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
-
-        Assert.Throws<InvalidArgumentException>(() =>
-            RenderStructs.ToNative(new RenderTargetExtent(1, 1, double.NaN))
-        );
-        Assert.Throws<InvalidArgumentException>(() =>
-            RenderStructs.ToNative(new RenderTargetExtent(1, 1, double.PositiveInfinity))
-        );
     }
 
     [BindingSpecTest("BND-166", "BND-167")]

@@ -2,7 +2,7 @@
 #MISE description="Init only MapLibre Native submodules required for maplibre-native-ffi builds"
 set -euo pipefail
 
-repo_root="${MLN_FFI_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
+repo_root="$MLN_FFI_REPO_ROOT"
 mln_path="third_party/maplibre-native"
 
 cd "$repo_root"

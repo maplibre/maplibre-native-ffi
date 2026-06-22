@@ -898,9 +898,7 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    if (auto* native_map = map_native(map); native_map != nullptr) {
-      native_map->setSize(mbgl::Size{session->width, session->height});
-    }
+    map_native(map)->setSize(mbgl::Size{session->width, session->height});
     session->kind = kind;
     register_render_session(handle, std::move(session));
   } catch (...) {
@@ -966,9 +964,7 @@ auto render_session_resize(
     session->texture.acquired_native_texture = nullptr;
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->setSize(mbgl::Size{width, height});
-  }
+  map_native(session->map)->setSize(mbgl::Size{width, height});
   session->renderer.reset();
   session->rendered_generation = 0;
   session->width = width;
@@ -1163,9 +1159,7 @@ auto render_session_set_feature_state(
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id), *state_object
   );
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->triggerRepaint();
-  }
+  map_native(session->map)->triggerRepaint();
   return MLN_STATUS_OK;
 }
 
@@ -1223,9 +1217,7 @@ auto render_session_remove_feature_state(
       *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
     )
   );
-  if (auto* native_map = map_native(session->map); native_map != nullptr) {
-    native_map->triggerRepaint();
-  }
+  map_native(session->map)->triggerRepaint();
   return MLN_STATUS_OK;
 }
 

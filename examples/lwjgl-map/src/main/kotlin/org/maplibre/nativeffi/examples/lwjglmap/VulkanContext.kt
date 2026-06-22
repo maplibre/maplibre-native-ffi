@@ -356,9 +356,6 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
         return
       }
       if (System.getenv("WAYLAND_DISPLAY").isNullOrBlank()) {
-        System.err.println(
-          "WAYLAND_DISPLAY is not set; Linux runtime support for this example targets Wayland."
-        )
         return
       }
       if (glfwGetPlatform() != GLFW_PLATFORM_WAYLAND) {

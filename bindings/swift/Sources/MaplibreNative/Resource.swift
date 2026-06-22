@@ -89,13 +89,38 @@ public enum ResourceResponseStatus: UInt32, Sendable, Hashable {
   case notModified = 3
 }
 
-public enum ResourceErrorReason: UInt32, Sendable, Hashable {
-  case none = 0
-  case notFound = 1
-  case server = 2
-  case connection = 3
-  case rateLimit = 4
-  case other = 5
+public enum ResourceErrorReason: Sendable, Hashable {
+  case none
+  case notFound
+  case server
+  case connection
+  case rateLimit
+  case other
+  case unknown(UInt32)
+
+  public static func fromNative(_ rawValue: UInt32) -> Self {
+    switch rawValue {
+    case 0: .none
+    case 1: .notFound
+    case 2: .server
+    case 3: .connection
+    case 4: .rateLimit
+    case 5: .other
+    default: .unknown(rawValue)
+    }
+  }
+
+  public var rawValue: UInt32 {
+    switch self {
+    case .none: 0
+    case .notFound: 1
+    case .server: 2
+    case .connection: 3
+    case .rateLimit: 4
+    case .other: 5
+    case let .unknown(raw): raw
+    }
+  }
 }
 
 public struct ByteRange: Equatable, Sendable {
@@ -192,6 +217,11 @@ public final class ResourceRequestHandle: @unchecked Sendable {
   }
 
   public func complete(_ response: ResourceResponse) throws {
+    if case let .unknown(raw) = response.errorReason {
+      throw NativeStatusFailure.swiftInvalidArgument(
+        "ResourceErrorReason.unknown(\(raw)) cannot be sent back to native"
+      )
+    }
     try mapNativeFailure {
       try state.complete(response.nativeInput)
     }

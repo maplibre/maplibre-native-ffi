@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <Import Project="$(MLN_FFI_BUILD_DIR)/Maplibre.Native.C.props" Condition="Exists('$(MLN_FFI_BUILD_DIR)/Maplibre.Native.C.props')" />
+  <Import Project="$(MLN_FFI_BUILD_DIR)/Maplibre.Native.C.props" />
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>

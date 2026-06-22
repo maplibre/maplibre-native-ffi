@@ -54,6 +54,20 @@ arch = "arm64"
 backend = "vulkan"
 supports_tests = false
 
+[variants.android-x64-egl]
+runner = "ubuntu-latest"
+os = "android"
+arch = "x64"
+backend = "opengl"
+supports_tests = false
+
+[variants.android-x64-vulkan]
+runner = "ubuntu-latest"
+os = "android"
+arch = "x64"
+backend = "vulkan"
+supports_tests = false
+
 [variants.ios-arm64-metal]
 runner = "macos-26"
 os = "ios"

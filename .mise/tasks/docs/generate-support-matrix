@@ -60,6 +60,7 @@ ENVIRONMENT_ORDER = [
     "windows-x64",
     "windows-arm64",
     "android-arm64",
+    "android-x64",
     "ios-arm64",
     "ios-simulator-arm64",
     "ohos-arm64",

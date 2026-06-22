@@ -1,10 +1,8 @@
 function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-  if(DEFINED ENV{CARGO_BUILD_TARGET}
-     AND NOT "$ENV{CARGO_BUILD_TARGET}" STREQUAL "")
-    set(rust_target "$ENV{CARGO_BUILD_TARGET}")
-  else()
+  set(rust_target "$ENV{CARGO_BUILD_TARGET}")
+  if(rust_target STREQUAL "")
     message(
       FATAL_ERROR "CARGO_BUILD_TARGET must be set for Rust platform builds")
   endif()
@@ -23,15 +21,17 @@ function(mln_link_rust_platform target)
   set(rust_cxx "${CMAKE_CXX_COMPILER}")
   set(rust_linker "${CMAKE_CXX_COMPILER}")
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-    if(NOT rust_target STREQUAL "aarch64-linux-android")
-      message(
-        FATAL_ERROR
-          "Android Rust platform builds currently support only aarch64-linux-android; got ${rust_target}")
-    endif()
-
     get_filename_component(rust_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
     string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
-    set(android_tool_prefix "aarch64-linux-android${android_api_level}")
+    if(rust_target STREQUAL "aarch64-linux-android")
+      set(android_tool_prefix "aarch64-linux-android${android_api_level}")
+    elseif(rust_target STREQUAL "x86_64-linux-android")
+      set(android_tool_prefix "x86_64-linux-android${android_api_level}")
+    else()
+      message(
+        FATAL_ERROR
+          "Android Rust platform builds support aarch64-linux-android and x86_64-linux-android; got ${rust_target}")
+    endif()
     set(android_cc "${rust_compiler_dir}/${android_tool_prefix}-clang")
     set(android_cxx "${rust_compiler_dir}/${android_tool_prefix}-clang++")
     if(EXISTS "${android_cc}" AND EXISTS "${android_cxx}")

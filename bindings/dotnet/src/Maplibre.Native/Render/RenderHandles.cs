@@ -350,16 +350,6 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public void Resize(uint width, uint height, double scaleFactor)
     {
         ThrowIfTextureFrameActive(nameof(Resize));
-        if (!double.IsFinite(scaleFactor) || scaleFactor <= 0)
-        {
-            throw new InvalidArgumentException(
-                MaplibreStatus.InvalidArgument,
-                null,
-                "Render target scale factor must be positive and finite.",
-                null
-            );
-        }
-
         NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
     }
 

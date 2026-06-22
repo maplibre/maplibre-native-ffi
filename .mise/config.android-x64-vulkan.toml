@@ -1,0 +1,14 @@
+[env]
+MLN_FFI_RENDER_BACKEND = "vulkan"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-x64-vulkan"
+PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/lib/pkgconfig"
+PKG_CONFIG_ALLOW_CROSS = "1"
+ANDROID_HOME = { required = true }
+ANDROID_NDK_HOME = { required = true }
+MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_TOOLCHAIN_FILE={{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake
+-DANDROID_ABI=x86_64
+-DANDROID_PLATFORM=android-24
+"""
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=x86_64-linux-android"
+CARGO_BUILD_TARGET = "x86_64-linux-android"
