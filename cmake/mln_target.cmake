@@ -1,4 +1,5 @@
 include(mln_artifact_metadata)
+include(mln_bundled_deps)
 include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
@@ -28,8 +29,6 @@ function(mln_configure_shared_exports target)
 endfunction()
 
 function(mln_add_c_api_library target)
-  find_package(ZLIB REQUIRED)
-
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
@@ -73,7 +72,9 @@ function(mln_add_c_api_library target)
     ${target}
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
-      mbgl-vendor-sqlite ZLIB::ZLIB)
+      mbgl-vendor-sqlite)
+
+  mln_configure_zlib_linking(${target})
 
   target_compile_options(
     ${target}

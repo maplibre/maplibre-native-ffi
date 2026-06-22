@@ -1,8 +1,6 @@
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
-  find_package(libuv REQUIRED)
-  find_package(PNG REQUIRED)
   find_package(WebP REQUIRED)
 
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
@@ -59,8 +57,8 @@ function(mln_configure_windows_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE
-      ${CURL_LIBRARIES} ${JPEG_LIBRARIES} WebP::webp
-      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv> mbgl-vendor-icu
-      PNG::PNG)
+    PRIVATE ${CURL_LIBRARIES} ${JPEG_LIBRARIES} WebP::webp mbgl-vendor-icu)
+
+  mln_link_bundled_png(${target})
+  mln_link_bundled_libuv(${target})
 endfunction()
