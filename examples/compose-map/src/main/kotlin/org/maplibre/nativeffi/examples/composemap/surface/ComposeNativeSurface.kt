@@ -50,7 +50,7 @@ public fun ComposeNativeSurface(
       onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
     } else {
       val participant = DesktopNativeRenderingLifecycle.register {
-        renderer.onSurfaceLost()
+        renderer.close()
         bridge.close()
       }
       controllerImpl?.connect(

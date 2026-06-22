@@ -17,7 +17,7 @@ public interface NativeSurfaceController {
   public fun dispose()
 }
 
-public interface NativeSurfaceRenderer {
+public interface NativeSurfaceRenderer : AutoCloseable {
   public val supportedBackends: Set<ProducerBackend>
 
   public fun onSurfaceAvailable(session: NativeSurfaceSession) {}
@@ -27,6 +27,10 @@ public interface NativeSurfaceRenderer {
   public fun render(frame: NativeSurfaceFrame): NativeSurfaceRenderResult
 
   public fun onSurfaceLost() {}
+
+  override fun close() {
+    onSurfaceLost()
+  }
 }
 
 public interface NativeSurfaceSession {

@@ -22,7 +22,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
-internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
+internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   override val supportedBackends: Set<ProducerBackend> =
     MapLibreNativeSurfaceAdapter.supportedBackends
 

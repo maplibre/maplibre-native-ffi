@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -34,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.pow
 import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.ComposeNativeSurface
-import org.maplibre.nativeffi.examples.composemap.surface.DesktopNativeRenderingLifecycle
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceState
 import org.maplibre.nativeffi.examples.composemap.surface.rememberNativeSurfaceController
 
@@ -46,10 +44,6 @@ internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
   val density = LocalDensity.current
   val state by controller.state.collectAsState()
 
-  DisposableEffect(renderer) {
-    val participant = DesktopNativeRenderingLifecycle.register { renderer.close() }
-    onDispose { participant.close() }
-  }
   LaunchedEffect(focusRequester) { focusRequester.requestFocus() }
   LaunchedEffect(controller) {
     while (true) {
