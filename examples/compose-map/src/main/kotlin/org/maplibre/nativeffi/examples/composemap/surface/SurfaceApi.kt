@@ -35,6 +35,8 @@ public interface NativeSurfaceSession {
   public val capabilities: NativeSurfaceCapabilities
 
   public fun requestFrame()
+
+  public fun <T> withRendererAccess(action: () -> T): T
 }
 
 public interface NativeSurfaceFrame {
@@ -216,6 +218,7 @@ public data class OpenGlTextureTarget(
   public val textureName: Int,
   public val textureTarget: Int,
   public val format: Int,
+  public val origin: TextureOrigin = TextureOrigin.TOP_LEFT,
   public val contextProvider: OpenGlContextProvider,
   override val extent: SurfaceExtent,
   override val generation: Long,

@@ -49,9 +49,11 @@ dependencies {
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
   implementation("org.lwjgl:lwjgl-egl")
+  implementation("org.lwjgl:lwjgl-opengl")
   implementation("org.lwjgl:lwjgl-opengles")
   implementation("org.lwjgl:lwjgl-vulkan")
   runtimeOnly("org.lwjgl:lwjgl::${lwjglNativeClassifier()}")
+  runtimeOnly("org.lwjgl:lwjgl-opengl::${lwjglNativeClassifier()}")
   runtimeOnly("org.lwjgl:lwjgl-opengles::${lwjglNativeClassifier()}")
 }
 

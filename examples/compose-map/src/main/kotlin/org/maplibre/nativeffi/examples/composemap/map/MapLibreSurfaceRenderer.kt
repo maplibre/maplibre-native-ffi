@@ -27,6 +27,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     MapLibreNativeSurfaceAdapter.supportedBackends
 
   private var surfaceSession: NativeSurfaceSession? = null
+  private var ownerSession: NativeSurfaceSession? = null
   private var runtime: RuntimeHandle? = null
   private var map: MapHandle? = null
   private var renderSession: AttachedRenderSession? = null
@@ -35,19 +36,24 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   private var closed = false
 
   override fun onSurfaceAvailable(session: NativeSurfaceSession) {
-    check(!closed) { "renderer is closed" }
-    surfaceSession = session
-    renderPending = true
-    session.requestFrame()
+    session.withRendererAccess {
+      check(!closed) { "renderer is closed" }
+      surfaceSession = session
+      ownerSession = session
+      renderPending = true
+      session.requestFrame()
+    }
   }
 
   override fun onSurfaceChanged(extent: SurfaceExtent) {
-    if (closed || extent.isEmpty) {
-      return
+    withRendererAccess {
+      if (closed || extent.isEmpty) {
+        return@withRendererAccess
+      }
+      currentExtent = extent
+      renderPending = true
+      surfaceSession?.requestFrame()
     }
-    currentExtent = extent
-    renderPending = true
-    surfaceSession?.requestFrame()
   }
 
   override fun render(frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
@@ -79,86 +85,110 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   }
 
   override fun onSurfaceLost() {
-    surfaceSession = null
-    closeRenderSession()
+    withRendererAccess {
+      surfaceSession = null
+      closeRenderSession()
+    }
   }
 
   fun requestRender() {
-    if (closed) {
-      return
+    withRendererAccess {
+      if (closed) {
+        return@withRendererAccess
+      }
+      renderPending = true
+      surfaceSession?.requestFrame()
     }
-    renderPending = true
-    surfaceSession?.requestFrame()
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    map?.moveBy(deltaX, deltaY)
-    requestRender()
+    withRendererAccess {
+      map?.moveBy(deltaX, deltaY)
+      requestRender()
+    }
   }
 
   fun scaleBy(scale: Double, anchorX: Double, anchorY: Double) {
-    map?.scaleBy(scale, ScreenPoint(anchorX, anchorY))
-    requestRender()
+    withRendererAccess {
+      map?.scaleBy(scale, ScreenPoint(anchorX, anchorY))
+      requestRender()
+    }
   }
 
   fun moveByAnimated(deltaX: Double, deltaY: Double) {
-    map?.moveByAnimated(deltaX, deltaY, KEYBOARD_ANIMATION)
-    requestRender()
+    withRendererAccess {
+      map?.moveByAnimated(deltaX, deltaY, KEYBOARD_ANIMATION)
+      requestRender()
+    }
   }
 
   fun scaleByAnimated(scale: Double) {
-    map?.scaleByAnimated(scale, viewportCenter(), KEYBOARD_ANIMATION)
-    requestRender()
+    withRendererAccess {
+      map?.scaleByAnimated(scale, viewportCenter(), KEYBOARD_ANIMATION)
+      requestRender()
+    }
   }
 
   fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
-    val currentMap = map ?: return
-    val camera = currentMap.camera
-    currentMap.jumpTo(
-      CameraOptions().apply {
-        bearing = (camera.bearing ?: 0.0) + deltaX * DRAG_ROTATE_FACTOR
-        pitch = ((camera.pitch ?: 0.0) - deltaY * DRAG_PITCH_FACTOR).clampPitch()
-      }
-    )
-    requestRender()
+    withRendererAccess {
+      val currentMap = map ?: return@withRendererAccess
+      val camera = currentMap.camera
+      currentMap.jumpTo(
+        CameraOptions().apply {
+          bearing = (camera.bearing ?: 0.0) + deltaX * DRAG_ROTATE_FACTOR
+          pitch = ((camera.pitch ?: 0.0) - deltaY * DRAG_PITCH_FACTOR).clampPitch()
+        }
+      )
+      requestRender()
+    }
   }
 
   fun rotateBy(deltaDegrees: Double) {
-    val currentMap = map ?: return
-    currentMap.easeTo(
-      CameraOptions().apply { bearing = (currentMap.camera.bearing ?: 0.0) + deltaDegrees },
-      KEYBOARD_ANIMATION,
-    )
-    requestRender()
+    withRendererAccess {
+      val currentMap = map ?: return@withRendererAccess
+      currentMap.easeTo(
+        CameraOptions().apply { bearing = (currentMap.camera.bearing ?: 0.0) + deltaDegrees },
+        KEYBOARD_ANIMATION,
+      )
+      requestRender()
+    }
   }
 
   fun pitchBy(deltaDegrees: Double) {
-    val currentMap = map ?: return
-    currentMap.easeTo(
-      CameraOptions().apply {
-        pitch = ((currentMap.camera.pitch ?: 0.0) + deltaDegrees).clampPitch()
-      },
-      KEYBOARD_ANIMATION,
-    )
-    requestRender()
+    withRendererAccess {
+      val currentMap = map ?: return@withRendererAccess
+      currentMap.easeTo(
+        CameraOptions().apply {
+          pitch = ((currentMap.camera.pitch ?: 0.0) + deltaDegrees).clampPitch()
+        },
+        KEYBOARD_ANIMATION,
+      )
+      requestRender()
+    }
   }
 
   fun resetPitchAndBearing() {
-    map?.easeTo(
-      CameraOptions().apply {
-        bearing = 0.0
-        pitch = 0.0
-      },
-      RESET_ANIMATION,
-    )
-    requestRender()
+    withRendererAccess {
+      map?.easeTo(
+        CameraOptions().apply {
+          bearing = 0.0
+          pitch = 0.0
+        },
+        RESET_ANIMATION,
+      )
+      requestRender()
+    }
   }
 
   fun cancelTransitions() {
-    map?.cancelTransitions()
+    withRendererAccess { map?.cancelTransitions() }
   }
 
   override fun close() {
+    withRendererAccess { closeOwnedResources() }
+  }
+
+  private fun closeOwnedResources() {
     if (closed) {
       return
     }
@@ -171,8 +201,12 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
       map = null
       runtime?.close()
       runtime = null
+      ownerSession = null
     }
   }
+
+  private fun <T> withRendererAccess(action: () -> T): T =
+    ownerSession?.withRendererAccess(action) ?: action()
 
   private fun ensureMap(extent: SurfaceExtent): MapHandle {
     map?.let {

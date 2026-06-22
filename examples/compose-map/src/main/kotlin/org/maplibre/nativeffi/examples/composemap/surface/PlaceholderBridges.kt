@@ -38,42 +38,6 @@ internal abstract class PlaceholderBridge(
   protected abstract fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget
 }
 
-internal class LinuxVulkanOpenGlBridge :
-  PlaceholderBridge(ProducerBackend.VULKAN, ConsumerBackend.OPENGL) {
-  // TODO: Allocate a Vulkan image with Linux external-memory support, export it as dma-buf or an
-  // opaque FD, import it into Skiko's OpenGL context with the matching EGL/GL memory extension, and
-  // add explicit sync FD ownership for producer-to-consumer and consumer-to-producer handoff.
-  override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
-    VulkanImageTarget(
-      context = PlaceholderVulkanContextHandles,
-      image = NativeHandle(0),
-      imageView = NativeHandle(0),
-      format = 0,
-      initialLayout = 0,
-      finalLayout = 0,
-      queueFamilyIndex = 0,
-      extent = extent,
-      generation = generation,
-    )
-}
-
-internal class LinuxOpenGlBridge :
-  PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.OPENGL) {
-  // TODO: Create bridge-owned external-memory storage, import it into both MapLibre's EGL context
-  // and Skiko's OpenGL context, and add GL semaphore/fence ownership for producer-to-consumer
-  // handoff.
-  override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
-    OpenGlTextureTarget(
-      context = PlaceholderEglContextHandles,
-      textureName = 0,
-      textureTarget = 0,
-      format = 0,
-      contextProvider = OpenGlContextProvider {},
-      extent = extent,
-      generation = generation,
-    )
-}
-
 internal class WindowsVulkanD3d12Bridge :
   PlaceholderBridge(ProducerBackend.VULKAN, ConsumerBackend.DIRECT3D12) {
   // TODO: Create a D3D12 shared resource handle, import it into Vulkan with

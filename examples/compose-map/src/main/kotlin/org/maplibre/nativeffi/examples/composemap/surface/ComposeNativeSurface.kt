@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import javax.swing.SwingUtilities
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -202,6 +203,12 @@ private class NativeSurfaceSessionImpl(
   override val capabilities: NativeSurfaceCapabilities = bridge.capabilities
 
   override fun requestFrame() {
-    controller.requestFrame()
+    if (SwingUtilities.isEventDispatchThread()) {
+      controller.requestFrame()
+    } else {
+      SwingUtilities.invokeLater { controller.requestFrame() }
+    }
   }
+
+  override fun <T> withRendererAccess(action: () -> T): T = bridge.withRendererAccess(action)
 }

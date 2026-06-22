@@ -23,6 +23,8 @@ internal interface NativeSurfaceBridge : AutoCloseable {
 
   fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T = action()
 
+  fun <T> withRendererAccess(action: () -> T): T = action()
+
   fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean = false
 
   override fun close() {}
