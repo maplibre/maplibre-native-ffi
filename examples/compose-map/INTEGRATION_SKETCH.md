@@ -280,12 +280,15 @@ Per bridge row:
 | `opengl-metal`  | Create an `MTLTexture` on the Skiko Metal device, create an ANGLE Metal-backed EGL/GLES context, import the Metal texture with `EGL_ANGLE_metal_texture_client_buffer`, bind the `EGLImage` to `GL_TEXTURE_2D`, and pass the texture name plus `EglContextDescriptor` to MapLibre. |
 | `vulkan-d3d12`  | Create a D3D12 committed resource or shared resource compatible with Skiko, export a shared handle, import it into Vulkan as a D3D12 resource-backed image, then pass the image and view to MapLibre.                                                                              |
 | `opengl-d3d12`  | Create a D3D12 shared resource compatible with Skiko, import it into OpenGL with Win32 external memory objects, then pass the OpenGL texture name to MapLibre.                                                                                                                     |
-| `vulkan-opengl` | Create Vulkan exportable image memory or Linux `dma_buf` storage, import it into OpenGL with external memory objects or EGL image import, then draw the OpenGL texture from Skiko.                                                                                                 |
+| `vulkan-opengl` | Create Vulkan exportable image memory, import it into OpenGL with `GL_EXT_memory_object_fd`, then draw the OpenGL texture from Skiko; use Linux `dma_buf`/EGLImage import as a fallback when opaque-FD memory objects are unavailable.                                             |
 | `opengl-opengl` | Create bridge-owned external-memory storage imported into both the producer EGL texture and the Skiko OpenGL texture, then synchronize producer-to-consumer access with GL semaphore/fence ownership.                                                                              |
 
 Vulkan external memory supports the needed producer imports for Metal textures,
-D3D12 resources, and Linux `dma_buf` file descriptors. OpenGL external memory
-objects cover the Windows and Linux GL import side.
+D3D12 resources, and Linux file-descriptor handles. OpenGL external memory
+objects cover the Windows and Linux GL import side when the GL context and
+Vulkan device report compatible driver/device UUIDs. Linux `dma_buf` import is
+available through EGLImage, but it requires carrying DRM fourcc, offset, pitch,
+and often modifier metadata across the bridge.
 
 ## Ownership Model
 
@@ -359,6 +362,61 @@ API supports WGL and EGL context providers for OpenGL, not GLX. The Linux OpenGL
 bridge should use external-memory texture aliasing instead of direct context
 sharing with Skiko's OpenGL context.
 
+For Compose 1.11.1 / Skiko 0.144.6 on Linux, `LinuxOpenGLRedrawer` owns a
+private native GL context handle and a private `OpenGLContextHandler`. Rendering
+happens while Skiko holds the Linux drawing surface lock, makes that context
+current, asks `OpenGLContextHandler` to draw, swaps buffers, and flushes GL.
+`OpenGLContextHandler` wraps the current draw framebuffer with
+`BackendRenderTarget.makeGL(...)`; it does not expose a public native context,
+display, or framebuffer handle. The Linux bridge therefore needs a contained
+`SkikoHost` reflection path that runs during the Compose draw callback, verifies
+that the active redrawer is `LinuxOpenGLRedrawer`, and performs GL texture
+creation/import/wrapping while Skiko's GL context is current.
+
+Skiko's public wrappers are still useful once that context is current:
+`BackendTexture.makeGL(...)` wraps a GL texture name, and
+`Image.adoptTextureFrom` creates a GPU-backed `Image` from a `BackendTexture`
+and a `DirectContext`. The missing public piece is access to the live
+`DirectContext` used by `OpenGLContextHandler`. The Linux proof should retrieve
+that context from the private handler and use Skia/Compose to composite the
+imported texture as a normal GPU-backed UI element.
+
+The first Linux spike should target the opaque-FD path:
+
+1. Create the producer Vulkan image with `VK_KHR_external_memory_fd` /
+   `VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT`.
+2. Export the memory with `vkGetMemoryFdKHR`; close the FD in application code
+   unless a successful GL import transfers ownership.
+3. In Skiko's current GL context, require `GL_EXT_memory_object`,
+   `GL_EXT_memory_object_fd`, and texture-storage support.
+4. Import the FD with `ImportMemoryFdEXT(..., HANDLE_TYPE_OPAQUE_FD_EXT, fd)`,
+   set `DEDICATED_MEMORY_OBJECT_EXT` when the Vulkan allocation is dedicated,
+   and bind it to a `GL_TEXTURE_2D` with `TexStorageMem2DEXT` or
+   `TextureStorageMem2DEXT`.
+5. Wrap that texture with `BackendTexture.makeGL(...)` and
+   `Image.adoptTextureFrom(...)`, then draw the resulting Skia image from the
+   Compose draw callback.
+
+This path avoids DRM modifier negotiation and is the most direct same-driver
+Vulkan-to-OpenGL proof. It must fail fast when the GL context and Vulkan device
+do not expose matching `DEVICE_UUID_EXT` / driver UUID data or when the chosen
+Vulkan physical device cannot export an opaque FD image with the needed format,
+usage, and tiling.
+
+The `dma_buf` / EGLImage path remains the Linux fallback and portability probe:
+
+- Vulkan must support `VK_EXT_external_memory_dma_buf` and, for images with DRM
+  modifiers, `VK_EXT_image_drm_format_modifier`.
+- EGL import requires `EGL_EXT_image_dma_buf_import`; modifier-aware imports and
+  capability probes require `EGL_EXT_image_dma_buf_import_modifiers`.
+- The bridge must pass logical width/height, DRM fourcc, per-plane FD, offset,
+  pitch, and modifier metadata to `eglCreateImageKHR`.
+- EGL does not take ownership of the dma-buf FDs; the bridge closes them after
+  import succeeds or fails.
+- Binding the imported `EGLImage` to a GL texture requires a GL extension such
+  as `GL_EXT_EGL_image_storage` or an equivalent EGL-image texture target that
+  works with Skiko's desktop GL context.
+
 ## Synchronization Strategy
 
 External memory and synchronization are separate capabilities. Each bridge owns
@@ -389,6 +447,16 @@ Per bridge family:
 Bridge implementations should keep memory import/export, semaphore/fence
 creation, and resize teardown in one place so the frame loop does not learn
 backend-specific rules.
+
+Linux synchronization should be treated as separate from memory import. Vulkan
+`VK_KHR_external_semaphore_fd` exports and imports semaphore payloads through
+POSIX FDs; GL `GL_EXT_semaphore_fd` imports semaphore FDs and `WaitSemaphoreEXT`
+makes texture memory visible to GL after the external producer signals. The
+initial Linux proof may use `vkQueueWaitIdle` plus GL flush/finish while the
+interop path is validated, but the bridge design should keep room for a
+producer-to-consumer semaphore per frame. FD ownership rules match external
+memory: successful Vulkan export transfers the FD to application code, and
+successful GL import transfers ownership to the GL implementation.
 
 The public surface should expose synchronization as a lifecycle contract, not as
 raw primitives by default. A renderer receives a frame whose target is ready for
@@ -479,6 +547,13 @@ renaming exported symbols.
   renderer or decoded video frame source.
 - Probe real driver support for GL external memory and semaphore extensions on
   the Linux and Windows machines we expect developers or CI to use.
+- Prototype Linux `vulkan-opengl` with opaque-FD GL memory objects first, then
+  evaluate `dma_buf`/EGLImage import only if opaque-FD support is missing or
+  proves less portable across target drivers.
+- Verify Skiko 0.144.6 Linux reflection points against the exact source before
+  replacing the placeholder bridge: `LinuxOpenGLRedrawer.context`,
+  `LinuxOpenGLRedrawer.contextHandler`, and
+  `OpenGLContextHandler.context`/surface lifecycle.
 - Treat `vulkan-metal` as the first bridge candidate because it exercises
   cross-API sharing against the current macOS development host while keeping the
   Windows D3D12 bridge in the design from the start.
@@ -490,15 +565,22 @@ renaming exported symbols.
 - [VkExternalMemoryHandleTypeFlagBits](https://docs.vulkan.org/refpages/latest/refpages/source/VkExternalMemoryHandleTypeFlagBits.html)
 - [VK_KHR_external_memory_win32](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_external_memory_win32.html)
 - [VK_EXT_external_memory_dma_buf](https://docs.vulkan.org/refpages/latest/refpages/source/VK_EXT_external_memory_dma_buf.html)
+- [VK_KHR_external_memory_fd](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_external_memory_fd.html)
+- [VK_KHR_external_semaphore_fd](https://docs.vulkan.org/refpages/latest/refpages/source/VK_KHR_external_semaphore_fd.html)
+- [VK_EXT_image_drm_format_modifier](https://docs.vulkan.org/refpages/latest/refpages/source/VK_EXT_image_drm_format_modifier.html)
 - [D3D12 CreateSharedHandle](https://learn.microsoft.com/en-us/windows/win32/api/d3d12/nf-d3d12-id3d12device-createsharedhandle)
 - [D3D12 Shared Heaps](https://learn.microsoft.com/en-us/windows/win32/direct3d12/shared-heaps)
 - [EGL_EXT_image_dma_buf_import](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_image_dma_buf_import.txt)
+- [EGL_EXT_image_dma_buf_import_modifiers](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_image_dma_buf_import_modifiers.txt)
 - [GL_EXT_external_objects](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects.txt)
 - [GL_EXT_external_objects_fd](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects_fd.txt)
+- [GL_EXT_EGL_image_storage](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_EGL_image_storage.txt)
 - [GL_EXT_external_objects_win32](https://registry.khronos.org/OpenGL/extensions/EXT/EXT_external_objects_win32.txt)
 - [ANGLE Metal texture client buffer extension](https://chromium.googlesource.com/angle/angle/+/refs/heads/main/extensions/EGL_ANGLE_metal_texture_client_buffer.txt)
 - [VK_EXT_metal_objects](https://docs.vulkan.org/features/latest/features/proposals/VK_EXT_metal_objects.html)
 - [VkExportMetalSharedEventInfoEXT](https://vulkan.lunarg.com/doc/view/1.4.341.0/mac/antora/refpages/latest/refpages/source/VkExportMetalSharedEventInfoEXT.html)
-- [Skiko AWT backend selection](https://raw.githubusercontent.com/JetBrains/skiko/master/skiko/src/awtMain/kotlin/org/jetbrains/skiko/Actuals.awt.kt)
-- [Skiko DirectContext wrappers](https://raw.githubusercontent.com/JetBrains/skiko/master/skiko/src/commonMain/kotlin/org/jetbrains/skia/DirectContext.kt)
-- [Skiko BackendRenderTarget wrappers](https://raw.githubusercontent.com/JetBrains/skiko/master/skiko/src/commonMain/kotlin/org/jetbrains/skia/BackendRenderTarget.kt)
+- [Skiko 0.144.6 LinuxOpenGLRedrawer](https://raw.githubusercontent.com/JetBrains/skiko/v0.144.6/skiko/src/awtMain/kotlin/org/jetbrains/skiko/redrawer/LinuxOpenGLRedrawer.kt)
+- [Skiko 0.144.6 OpenGLContextHandler](https://raw.githubusercontent.com/JetBrains/skiko/v0.144.6/skiko/src/awtMain/kotlin/org/jetbrains/skiko/context/OpenGLContextHandler.kt)
+- [Skiko 0.144.6 DirectContext wrappers](https://raw.githubusercontent.com/JetBrains/skiko/v0.144.6/skiko/src/commonMain/kotlin/org/jetbrains/skia/DirectContext.kt)
+- [Skiko 0.144.6 BackendTexture wrappers](https://raw.githubusercontent.com/JetBrains/skiko/v0.144.6/skiko/src/commonMain/kotlin/org/jetbrains/skia/BackendTexture.kt)
+- [Skiko 0.144.6 BackendRenderTarget wrappers](https://raw.githubusercontent.com/JetBrains/skiko/v0.144.6/skiko/src/commonMain/kotlin/org/jetbrains/skia/BackendRenderTarget.kt)
