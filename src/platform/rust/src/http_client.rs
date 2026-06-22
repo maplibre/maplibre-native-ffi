@@ -15,9 +15,9 @@ const HTTP_WORKER_THREADS: usize = 20;
 // Upstream default `http_file_source.cpp` does not set `CURLOPT_TIMEOUT`; this
 // bounds hung requests for the blocking Rust worker model.
 const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
-// Upstream uses `CURLOPT_FOLLOWLOCATION` without `CURLOPT_MAXREDIRS`; libcurl 8
-// defaults to 30. We allow a few more hops before failing.
-const HTTP_MAX_REDIRECTS: u32 = 50;
+// Upstream uses `CURLOPT_FOLLOWLOCATION` without `CURLOPT_MAXREDIRS`; match
+// libcurl 8's default redirect limit.
+const HTTP_MAX_REDIRECTS: u32 = 30;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
