@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
+import shlex
 import sys
 import xml.etree.ElementTree as ET
 
@@ -201,6 +202,25 @@ def write_swift_linker_flags(artifact: Artifact, out_dir: Path) -> None:
     write_lines(out_dir / f"{LIBRARY_NAME}.swift-linker-flags", linker_flags(artifact))
 
 
+def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
+    flags = [
+        f"-Clink-arg=-Wl,-rpath,{runtime_dir}"
+        for runtime_dir in artifact.runtime_library_dirs
+    ]
+    encoded_flags = "\x1f".join(flags)
+    lines = []
+    if encoded_flags:
+        quoted_flags = shlex.quote(encoded_flags)
+        lines = [
+            'if [[ -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]]; then',
+            f"  export CARGO_ENCODED_RUSTFLAGS={quoted_flags}$'\\x1f'$CARGO_ENCODED_RUSTFLAGS",
+            "else",
+            f"  export CARGO_ENCODED_RUSTFLAGS={quoted_flags}",
+            "fi",
+        ]
+    write_lines(out_dir / f"{LIBRARY_NAME}.cargo-rustflags", lines)
+
+
 def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
     values = {
         "render_backend": artifact.render_backend,
@@ -250,6 +270,7 @@ def generate(metadata_path: Path) -> None:
     write_msbuild_props(artifact, out_dir)
     (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)
     write_swift_linker_flags(artifact, out_dir)
+    write_cargo_rustflags(artifact, out_dir)
     write_zig_config(artifact, out_dir)
     write_zig_libc_config(out_dir)
 

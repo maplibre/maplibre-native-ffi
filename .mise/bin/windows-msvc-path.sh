@@ -128,4 +128,14 @@ normalize_windows_msvc_path() {
   export PATH="${dependency_path:+$dependency_path:}$msvc_bin${rest_path:+:$rest_path}"
 }
 
-load_windows_msvc_environment && normalize_windows_msvc_path
+setup_windows_msvc_path() {
+  if [[ -z "${MLN_FFI_MSVC_HOST_ARCH:-}" && -z "${MLN_FFI_MSVC_TARGET_ARCH:-}" ]]; then
+    return 0
+  fi
+
+  : "${MLN_FFI_MSVC_HOST_ARCH:?MLN_FFI_MSVC_HOST_ARCH is required for Windows MSVC setup}"
+  : "${MLN_FFI_MSVC_TARGET_ARCH:?MLN_FFI_MSVC_TARGET_ARCH is required for Windows MSVC setup}"
+  load_windows_msvc_environment && normalize_windows_msvc_path
+}
+
+setup_windows_msvc_path
