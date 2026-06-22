@@ -202,10 +202,26 @@ def write_swift_linker_flags(artifact: Artifact, out_dir: Path) -> None:
     write_lines(out_dir / f"{LIBRARY_NAME}.swift-linker-flags", linker_flags(artifact))
 
 
+def ohos_cargo_link_rustflags() -> list[str]:
+    ohos_sdk = os.environ.get("OHOS_SDK_NATIVE", "")
+    if not ohos_sdk:
+        return []
+
+    sysroot = Path(ohos_sdk) / "sysroot"
+    return [
+        "-Clink-arg=--target=aarch64-linux-ohos",
+        f"-Clink-arg=--sysroot={sysroot}",
+        "-Clink-arg=-fuse-ld=lld",
+    ]
+
+
 def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
     flags = [
-        f"-Clink-arg=-Wl,-rpath,{runtime_dir}"
-        for runtime_dir in artifact.runtime_library_dirs
+        *ohos_cargo_link_rustflags(),
+        *(
+            f"-Clink-arg=-Wl,-rpath,{runtime_dir}"
+            for runtime_dir in artifact.runtime_library_dirs
+        ),
     ]
     encoded_flags = "\x1f".join(flags)
     lines = []
@@ -242,6 +258,23 @@ def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
 
 def write_zig_libc_config(out_dir: Path) -> None:
     path = out_dir / f"{LIBRARY_NAME}.zig-libc"
+    ohos_sdk = os.environ.get("OHOS_SDK_NATIVE", "")
+    if ohos_sdk:
+        sysroot = Path(ohos_sdk) / "sysroot"
+        ohos_arch = "aarch64-linux-ohos"
+        write_lines(
+            path,
+            [
+                f"include_dir={sysroot / 'usr' / 'include' / ohos_arch}",
+                f"sys_include_dir={sysroot / 'usr' / 'include'}",
+                f"crt_dir={sysroot / 'usr' / 'lib' / ohos_arch}",
+                "msvc_lib_dir=",
+                "kernel32_lib_dir=",
+                "gcc_dir=",
+            ],
+        )
+        return
+
     system_root = os.environ.get("MLN_FFI_SYSTEM_ROOT", "")
     if not system_root:
         path.unlink(missing_ok=True)

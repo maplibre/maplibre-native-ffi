@@ -65,7 +65,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android" }
+"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos" }
 "core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
 # Zig's native Windows ARM64 0.16.0 build crashes while loading build.zig, so
 # Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.

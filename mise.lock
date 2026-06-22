@@ -884,7 +884,7 @@ backend = "core:rust"
 [tools.rust.options]
 components = "clippy,rustfmt"
 profile = "minimal"
-targets = "aarch64-linux-android,x86_64-linux-android"
+targets = "aarch64-linux-android,aarch64-unknown-linux-ohos,x86_64-linux-android"
 
 [[tools.swift]]
 version = "6.3.1"

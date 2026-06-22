@@ -294,6 +294,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/rust:build
   variant-ohos-arm64-vulkan:
     name: variant / ohos-arm64-vulkan
     runs-on: ubuntu-latest
@@ -307,6 +308,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/rust:build
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
