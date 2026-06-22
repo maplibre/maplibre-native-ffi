@@ -2,9 +2,6 @@ label = "Kotlin/JVM"
 source_directory = "bindings/kotlin"
 
 [requires]
-# The Kotlin/JVM binding still needs a Windows ARM64 native-library packaging path
-# before its JVM tests can load maplibre-native-c on the runner.
-exclude = ["windows-arm64-vulkan", "windows-arm64-wgl"]
 os = ["linux", "macos", "windows"]
 
 [ci]

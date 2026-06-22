@@ -98,11 +98,9 @@ runner = "windows-11-arm"
 os = "windows"
 arch = "arm64"
 backend = "vulkan"
-supports_tests = false
 
 [variants.windows-arm64-wgl]
 runner = "windows-11-arm"
 os = "windows"
 arch = "arm64"
 backend = "opengl"
-supports_tests = false
