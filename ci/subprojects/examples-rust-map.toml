@@ -1,7 +1,9 @@
 [requires]
 # glutin disables its EGL backend on Apple platforms; adding macOS EGL would require a
 # separate EGL windowing path instead of the existing winit/glutin OpenGL pattern.
-exclude = ["macos-arm64-egl"]
+# The Vulkan example precompiles shaders with glslangValidator, which is not provided
+# by the Windows ARM64 mise toolchain yet.
+exclude = ["macos-arm64-egl", "windows-arm64-vulkan"]
 os = ["linux", "macos", "windows"]
 
 [ci]

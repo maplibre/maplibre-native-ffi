@@ -1,3 +1,5 @@
 [requires]
+# Zig translate-c currently fails on Windows ARM64 SDK headers while translating
+# the SDL-backed example entry points.
 exclude = ["windows-arm64-vulkan", "windows-arm64-wgl"]
 os = ["linux", "macos", "windows"]

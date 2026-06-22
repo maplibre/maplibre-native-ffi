@@ -11,6 +11,8 @@ const LIBRARY_NAME: &str = "maplibre-native-c";
 struct Artifact {
     include_dirs: Vec<PathBuf>,
     import_library_path: PathBuf,
+    rpaths: Vec<PathBuf>,
+    supports_linker_rpath: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -34,6 +36,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         import_library_dir.display()
     );
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
+    if artifact.supports_linker_rpath {
+        for rpath in &artifact.rpaths {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
+        }
+    }
 
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");

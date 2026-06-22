@@ -333,7 +333,6 @@ jobs:
       - run: mise run //bindings/rust:build
       - run: mise run //bindings/zig:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:check
   variant-windows-arm64-wgl:
     name: variant / windows-arm64-wgl
     runs-on: windows-11-arm
