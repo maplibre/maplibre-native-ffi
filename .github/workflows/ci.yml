@@ -334,6 +334,8 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
+      - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-windows-arm64-wgl:
     name: variant / windows-arm64-wgl

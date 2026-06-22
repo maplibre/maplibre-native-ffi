@@ -170,6 +170,16 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
+    # Windows ARM64 gets Vulkan libraries through mise/pixi, but glslangValidator
+    # is not available there yet; the Vulkan examples need it to precompile shaders.
+    - name: Install Windows ARM64 Vulkan SDK
+      if: ${{ env.MISE_ENV == 'windows-arm64-vulkan' }}
+      uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
+      with:
+        vulkan_version: 1.4.341.0
+        cache: true
+        stripdown: true
+
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:

@@ -1,5 +1,2 @@
 [requires]
-# The Vulkan example precompiles shaders with glslangValidator, which is not provided
-# by the Windows ARM64 mise toolchain yet.
-exclude = ["windows-arm64-vulkan"]
 os = ["linux", "macos", "windows"]
