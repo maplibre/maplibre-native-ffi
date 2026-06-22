@@ -8,3 +8,4 @@ BINDGEN_EXTRA_CLANG_ARGS = "--target=aarch64-conda-linux-gnu --sysroot={{config_
 PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
+CARGO_BUILD_TARGET = "aarch64-unknown-linux-gnu"

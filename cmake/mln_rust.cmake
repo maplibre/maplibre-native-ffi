@@ -3,15 +3,9 @@ function(mln_link_rust_platform target)
 
   set(rust_target "$ENV{CARGO_BUILD_TARGET}")
   if(rust_target STREQUAL "")
-    find_program(RUSTC_EXECUTABLE rustc REQUIRED)
-    execute_process(
-      COMMAND ${RUSTC_EXECUTABLE} -vV
-      OUTPUT_VARIABLE rustc_version_output OUTPUT_STRIP_TRAILING_WHITESPACE)
-    string(REGEX MATCH "host: ([^ \n]+)" _ "${rustc_version_output}")
-    if(NOT CMAKE_MATCH_1)
-      message(FATAL_ERROR "Could not determine Rust host triple from rustc -vV")
-    endif()
-    set(rust_target "${CMAKE_MATCH_1}")
+    message(
+      FATAL_ERROR
+        "CARGO_BUILD_TARGET must be set for Rust platform builds (see .mise/config.*.toml)")
   endif()
 
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
