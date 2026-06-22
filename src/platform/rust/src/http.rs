@@ -195,12 +195,12 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     }
 
     match builder.call() {
-        Ok(mut response) => http_response_from_ureq(&mut response),
+        Ok(mut response) => http_response(&mut response),
         Err(error) => http_error(map_transport_error(&error), &error.to_string()),
     }
 }
 
-fn http_response_from_ureq(response: &mut http::Response<ureq::Body>) -> MlnRustHttpResponse {
+fn http_response(response: &mut http::Response<ureq::Body>) -> MlnRustHttpResponse {
     let status_code = response.status().as_u16();
     let etag = response_header(response, "etag");
     let modified = response_header(response, "last-modified");
@@ -285,7 +285,7 @@ fn http_error(reason: u8, message: &str) -> MlnRustHttpResponse {
 
 fn free_http_response(response: MlnRustHttpResponse) {
     if !response.data.is_null() && response.data_len > 0 {
-        // SAFETY: `http_response_from_ureq` returns `data` from `Box<[u8]>`, and the
+        // SAFETY: `http_response` returns `data` from `Box<[u8]>`, and the
         // caller returns ownership here with the original length.
         unsafe {
             drop(Box::from_raw(from_raw_parts_mut(
