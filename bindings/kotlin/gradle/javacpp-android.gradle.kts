@@ -37,7 +37,7 @@ fun registerDisabledAndroidJavaCppTask(name: String) {
   }
 }
 
-if (System.getenv("CARGO_BUILD_TARGET") != null) {
+if (AndroidTarget.hasAndroidCargoTarget()) {
   val androidTarget = AndroidTarget.current()
 
   val compileJavaCppConfig =

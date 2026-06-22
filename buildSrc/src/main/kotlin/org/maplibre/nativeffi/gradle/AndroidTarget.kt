@@ -22,6 +22,15 @@ enum class AndroidTarget(
   companion object {
     fun current(): AndroidTarget = fromCargoTarget(requiredCargoTarget())
 
+    fun isAndroidCargoTarget(cargoTarget: String): Boolean =
+      entries.any { it.cargoTarget == cargoTarget }
+
+    /** True when [CARGO_BUILD_TARGET] is set to a supported Android triple. */
+    fun hasAndroidCargoTarget(): Boolean {
+      val cargoTarget = System.getenv("CARGO_BUILD_TARGET") ?: return false
+      return isAndroidCargoTarget(cargoTarget)
+    }
+
     /**
      * Resolves the Android rustls Maven layout when Android repos are configured off-Android envs.
      * [CARGO_BUILD_TARGET] may point at the host desktop triple during Linux native builds; only
