@@ -10,7 +10,7 @@ object RustlsPlatformVerifier {
     project.providers
       .exec {
         workingDir = project.rootProject.projectDir
-        val androidTarget = AndroidTarget.current().cargoTarget
+        val androidTarget = AndroidTarget.cargoTargetForRustlsMetadata()
         commandLine(
           "cargo",
           "metadata",

@@ -22,6 +22,12 @@ enum class AndroidTarget(
   companion object {
     fun current(): AndroidTarget = fromCargoTarget(requiredCargoTarget())
 
+    /**
+     * Resolves the Android rustls Maven layout when Android repos are configured off-Android envs.
+     */
+    fun cargoTargetForRustlsMetadata(): String =
+      System.getenv("CARGO_BUILD_TARGET") ?: ARM64.cargoTarget
+
     fun fromCargoTarget(cargoTarget: String): AndroidTarget =
       entries.firstOrNull { it.cargoTarget == cargoTarget }
         ?: error(

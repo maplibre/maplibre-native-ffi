@@ -32,8 +32,7 @@ function(mln_link_rust_platform target)
     else()
       message(
         FATAL_ERROR
-          "Android Rust platform builds support aarch64-linux-android and x86_64-linux-android; got ${rust_target}"
-      )
+          "Android Rust platform builds support aarch64-linux-android and x86_64-linux-android; got ${rust_target}")
     endif()
     set(android_cc "${rust_compiler_dir}/${android_tool_prefix}-clang")
     set(android_cxx "${rust_compiler_dir}/${android_tool_prefix}-clang++")
