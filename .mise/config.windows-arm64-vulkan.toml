@@ -14,5 +14,4 @@ MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/Library/lib
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-windows-msvc"
 CMAKE_PREFIX_PATH = "{{config_root}}/build/deps/curl/8.19.0_5/win64a-msvc;{{config_root}}/.pixi/envs/default/Library"
 CMAKE_LIBRARY_PATH = "{{config_root}}/build/deps/curl/8.19.0_5/win64a-msvc/lib;{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
-PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}};{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}/pkgconfig"
 LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/Library/bin"

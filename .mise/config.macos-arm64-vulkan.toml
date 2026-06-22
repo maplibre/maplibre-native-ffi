@@ -2,7 +2,6 @@
 MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/macos-arm64-vulkan"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-macos"
-PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 MLN_FFI_SYSTEM_ROOT = "{% if os() == \"macos\" %}{% if env.SDKROOT is defined and env.SDKROOT != \"\" %}{{ env.SDKROOT }}{% else %}{{ exec(command='xcrun --sdk macosx --show-sdk-path', cache_key='macosx-sdk-path', cache_duration='1d') | trim }}{% endif %}{% endif %}"
 JDK_JAVA_OPTIONS = "-Djava.library.path={{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}} -Dorg.lwjgl.vulkan.libname=libvulkan.1.dylib"
 VK_ICD_FILENAMES = "{{config_root}}/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
