@@ -1,8 +1,3 @@
-#if canImport(Darwin)
-  import Darwin
-#elseif canImport(Glibc)
-  import Glibc
-#endif
 import Foundation
 
 struct NativeHandleLeak: Equatable {
@@ -11,12 +6,8 @@ struct NativeHandleLeak: Equatable {
 }
 
 private func writeStandardError(_ message: String) {
-  message.withCString { message in
-    #if canImport(Darwin)
-      _ = Darwin.write(STDERR_FILENO, message, strlen(message))
-    #elseif canImport(Glibc)
-      _ = Glibc.write(STDERR_FILENO, message, strlen(message))
-    #endif
+  if let data = message.data(using: .utf8) {
+    FileHandle.standardError.write(data)
   }
 }
 

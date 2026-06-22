@@ -952,6 +952,9 @@ targets = "aarch64-linux-android,x86_64-linux-android"
 version = "6.3.1"
 backend = "core:swift"
 
+[tools.swift."platforms.linux-arm64"]
+checksum = "blake3:5757beba33d3dff25fb750a239936827ab0350e65b28ea37a3924449883c6429"
+
 [tools.swift."platforms.linux-x64"]
 checksum = "blake3:8a95707e406fa824266e95319f9f906415871df8f8dce47304a90302ec9977e8"
 
