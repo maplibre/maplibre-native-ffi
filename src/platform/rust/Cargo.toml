@@ -9,13 +9,9 @@ repository.workspace = true
 crate-type = ["staticlib"]
 
 [dependencies]
-# `http` is a direct dependency because this crate's module is named `http`.
 http = "1.4"
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
 threadpool = "1.8.1"
-# `platform-verifier` uses the OS trust store. On Android, HTTPS still requires
-# `mln_android_init` / `MaplibreAndroid.initialize` before requests so
-# `rustls_platform_verifier::android::init_with_env` runs (see `android.rs`).
 ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "platform-verifier"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
