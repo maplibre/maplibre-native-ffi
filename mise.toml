@@ -61,7 +61,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:astral-sh/uv" = "0.11.11"
 
 # Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["macos"] }
+"core:swift" = { version = "6.3.1", os = ["linux", "macos"] }
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems

@@ -1,4 +1,8 @@
-import Darwin
+#if canImport(Darwin)
+  import Darwin
+#elseif canImport(Glibc)
+  import Glibc
+#endif
 import Foundation
 
 struct NativeHandleLeak: Equatable {
@@ -6,14 +10,22 @@ struct NativeHandleLeak: Equatable {
   let address: UInt
 }
 
+private func writeStandardError(_ message: String) {
+  message.withCString { message in
+    #if canImport(Darwin)
+      _ = Darwin.write(STDERR_FILENO, message, strlen(message))
+    #elseif canImport(Glibc)
+      _ = Glibc.write(STDERR_FILENO, message, strlen(message))
+    #endif
+  }
+}
+
 enum NativeHandleLeakReporter {
   private static let lock = NSLock()
   private static let defaultHandler: @Sendable (NativeHandleLeak)
     -> Void = { leak in
       let message = "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n"
-      message.withCString { message in
-        _ = Darwin.write(STDERR_FILENO, message, strlen(message))
-      }
+      writeStandardError(message)
     }
 
   private nonisolated(unsafe) static var handler = defaultHandler
