@@ -40,7 +40,7 @@ case "${MLN_FFI_RENDER_BACKEND:-}" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
 esac
-cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
+env LD_LIBRARY_PATH="$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]
