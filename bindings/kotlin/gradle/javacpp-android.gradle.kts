@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.Delete
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.compile.JavaCompile
@@ -118,9 +119,13 @@ if (System.getenv("CARGO_BUILD_TARGET") != null) {
       outputs.file(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
     }
 
+  val cleanPackagedAndroidNativeLibs =
+    tasks.register<Delete>("cleanPackagedAndroidNativeLibs") {
+      delete(packagedAndroidNativeLibs)
+    }
+
   tasks.register<Sync>("packageAndroidNativeLibraries") {
-    dependsOn(generateJavaCppNativeLibrary)
-    doFirst { delete(packagedAndroidNativeLibs) }
+    dependsOn(generateJavaCppNativeLibrary, cleanPackagedAndroidNativeLibs)
     from(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
     from(maplibreNativeC.libraryPath)
     into(packagedAndroidNativeLibs.map { it.dir(androidTarget.ndkAbi) })
