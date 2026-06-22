@@ -120,9 +120,7 @@ if (System.getenv("CARGO_BUILD_TARGET") != null) {
     }
 
   val cleanPackagedAndroidNativeLibs =
-    tasks.register<Delete>("cleanPackagedAndroidNativeLibs") {
-      delete(packagedAndroidNativeLibs)
-    }
+    tasks.register<Delete>("cleanPackagedAndroidNativeLibs") { delete(packagedAndroidNativeLibs) }
 
   tasks.register<Sync>("packageAndroidNativeLibraries") {
     dependsOn(generateJavaCppNativeLibrary, cleanPackagedAndroidNativeLibs)
