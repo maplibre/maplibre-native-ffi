@@ -1,3 +1,4 @@
+using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Internal.Handle;
@@ -603,6 +604,38 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
     }
 
+    private void EnsureNoLiveMaps()
+    {
+        lock (mapGate)
+        {
+            PruneDeadLiveMapsLocked();
+            if (liveMaps.Count == 0)
+            {
+                return;
+            }
+
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                (int)MaplibreStatus.InvalidState,
+                liveMaps.Count == 1
+                    ? "RuntimeHandle has live maps."
+                    : $"RuntimeHandle has {liveMaps.Count} live maps.",
+                null
+            );
+        }
+    }
+
+    private void PruneDeadLiveMapsLocked()
+    {
+        foreach (var entry in liveMaps.ToArray())
+        {
+            if (!entry.Value.TryGetTarget(out _))
+            {
+                liveMaps.Remove(entry.Key);
+            }
+        }
+    }
+
     /// <summary>Runs one pending owner-thread task for this runtime.</summary>
     public void RunOnce()
     {
@@ -631,6 +664,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// <summary>Destroys the runtime on its owner thread.</summary>
     public void Close()
     {
+        EnsureNoLiveMaps();
         state.Close();
         DisposeCallbackState();
     }
