@@ -443,6 +443,8 @@ internal object SkikoHost {
   private class Direct3DTexturePresenter(private val texture: NativeHandle) : AutoCloseable {
     private var contextIdentity = 0
     private var extent = SurfaceExtent.Empty
+    private var colorFormat = SurfaceColorFormat.BGRA_8888
+    private var origin = TextureOrigin.TOP_LEFT
     private var renderTarget: BackendRenderTarget? = null
     private var surface: Surface? = null
     private val retainedImages = ArrayDeque<Image>()
@@ -479,7 +481,9 @@ internal object SkikoHost {
         surface != null &&
           renderTarget != null &&
           contextIdentity == nextContextIdentity &&
-          extent == target.extent
+          extent == target.extent &&
+          colorFormat == target.colorFormat &&
+          origin == target.origin
       ) {
         return
       }
@@ -487,6 +491,8 @@ internal object SkikoHost {
       closeGpuResources()
       contextIdentity = nextContextIdentity
       extent = target.extent
+      colorFormat = target.colorFormat
+      origin = target.origin
       renderTarget =
         BackendRenderTarget.makeDirect3D(
           width = target.extent.physicalWidth,
@@ -500,8 +506,8 @@ internal object SkikoHost {
         Surface.makeFromBackendRenderTarget(
           context = context,
           rt = checkNotNull(renderTarget),
-          origin = SurfaceOrigin.TOP_LEFT,
-          colorFormat = SurfaceColorFormat.BGRA_8888,
+          origin = target.origin.toSkiaOrigin(),
+          colorFormat = target.colorFormat,
           colorSpace = null,
           surfaceProps = null,
         )
@@ -514,6 +520,8 @@ internal object SkikoHost {
       closeGpuResources()
       contextIdentity = 0
       extent = SurfaceExtent.Empty
+      colorFormat = SurfaceColorFormat.BGRA_8888
+      origin = TextureOrigin.TOP_LEFT
     }
 
     private fun retainImageForRecordedFrame(image: Image) {
@@ -672,6 +680,8 @@ internal data class SkikoDirect3DDevice(val ptr: Long)
 internal data class Direct3DTextureTarget(
   val texture: NativeHandle,
   val format: Int = 87,
+  val colorFormat: SurfaceColorFormat = SurfaceColorFormat.BGRA_8888,
+  val origin: TextureOrigin = TextureOrigin.TOP_LEFT,
   val extent: SurfaceExtent,
   val generation: Long,
 )

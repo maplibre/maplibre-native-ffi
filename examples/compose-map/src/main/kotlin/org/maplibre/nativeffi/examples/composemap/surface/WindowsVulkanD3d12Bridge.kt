@@ -585,7 +585,7 @@ private constructor(
   }
 }
 
-private object WindowsD3D12Interop {
+internal object WindowsD3D12Interop {
   private const val IID_ID3D12_DEVICE_DATA1 = 0x189819F1
   private const val IID_ID3D12_DEVICE_DATA2 = 0x1DB6
   private const val IID_ID3D12_DEVICE_DATA3 = 0x4B57
@@ -600,7 +600,8 @@ private object WindowsD3D12Interop {
   private const val D3D12_RESOURCE_STATE_COMMON = 0
   private const val D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET = 0x1
   private const val D3D12_TEXTURE_LAYOUT_UNKNOWN = 0
-  private const val DXGI_FORMAT_B8G8R8A8_UNORM = 87
+  const val DXGI_FORMAT_R8G8B8A8_UNORM = 28
+  const val DXGI_FORMAT_B8G8R8A8_UNORM = 87
   private const val ID3D12_DEVICE_CHILD_GET_DEVICE_INDEX = 7
   private const val ID3D12_DEVICE_CREATE_COMMITTED_RESOURCE_INDEX = 27
   private const val ID3D12_DEVICE_CREATE_SHARED_HANDLE_INDEX = 31
@@ -613,7 +614,11 @@ private object WindowsD3D12Interop {
       FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
     )
 
-  fun createSharedTexture(device: SkikoDirect3DDevice, extent: SurfaceExtent): NativeHandle {
+  fun createSharedTexture(
+    device: SkikoDirect3DDevice,
+    extent: SurfaceExtent,
+    dxgiFormat: Int = DXGI_FORMAT_B8G8R8A8_UNORM,
+  ): NativeHandle {
     check(!extent.isEmpty) { "Cannot create a D3D12 texture for an empty extent" }
     Arena.ofConfined().use { arena ->
       val rawDevice = rawD3D12Device(device)
@@ -624,7 +629,7 @@ private object WindowsD3D12Interop {
           address(rawDevice),
           heapProperties(arena),
           D3D12_HEAP_FLAG_SHARED,
-          textureDesc(arena, extent),
+          textureDesc(arena, extent, dxgiFormat),
           D3D12_RESOURCE_STATE_COMMON,
           MemorySegment.NULL,
           iidId3D12Resource(arena),
@@ -705,7 +710,7 @@ private object WindowsD3D12Interop {
     return props
   }
 
-  private fun textureDesc(arena: Arena, extent: SurfaceExtent): MemorySegment {
+  private fun textureDesc(arena: Arena, extent: SurfaceExtent, dxgiFormat: Int): MemorySegment {
     val desc = arena.allocate(56)
     desc.set(ValueLayout.JAVA_INT, 0, D3D12_RESOURCE_DIMENSION_TEXTURE2D)
     desc.set(ValueLayout.JAVA_LONG, 8, 0)
@@ -713,7 +718,7 @@ private object WindowsD3D12Interop {
     desc.set(ValueLayout.JAVA_INT, 24, extent.physicalHeight)
     desc.set(ValueLayout.JAVA_SHORT, 28, 1.toShort())
     desc.set(ValueLayout.JAVA_SHORT, 30, 1.toShort())
-    desc.set(ValueLayout.JAVA_INT, 32, DXGI_FORMAT_B8G8R8A8_UNORM)
+    desc.set(ValueLayout.JAVA_INT, 32, dxgiFormat)
     desc.set(ValueLayout.JAVA_INT, 36, 1)
     desc.set(ValueLayout.JAVA_INT, 40, 0)
     desc.set(ValueLayout.JAVA_INT, 44, D3D12_TEXTURE_LAYOUT_UNKNOWN)
