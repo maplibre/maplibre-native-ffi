@@ -9,4 +9,3 @@ PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/
 CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 CARGO_BUILD_TARGET = "aarch64-unknown-linux-gnu"
-SSL_CERT_FILE = "{{config_root}}/.pixi/envs/default/ssl/cacert.pem"
