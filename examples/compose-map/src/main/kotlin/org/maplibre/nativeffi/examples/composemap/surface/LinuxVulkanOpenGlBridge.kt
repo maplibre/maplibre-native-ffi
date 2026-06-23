@@ -96,6 +96,8 @@ import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 
 internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
+  private val rendererDispatcher =
+    NativeSurfaceRendererDispatcher("compose-map-linux-vulkan-renderer")
   private val vulkan = LinuxVulkanContext.create()
   private var exportedTexture: LinuxExportedVulkanTexture? = null
   private var importedTexture: LinuxOpenGlImportedTexture? = null
@@ -136,8 +138,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    vulkan.waitIdle()
+    rendererDispatcher.run { vulkan.waitIdle() }
   }
+
+  override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
+    rendererDispatcher.run(action)
+
+  override fun <T> withRendererAccess(action: () -> T): T = rendererDispatcher.run(action)
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
     if (target !is VulkanImageTarget) {
@@ -150,6 +157,7 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   override fun close() {
     disposeTexture()
     vulkan.close()
+    rendererDispatcher.close()
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =

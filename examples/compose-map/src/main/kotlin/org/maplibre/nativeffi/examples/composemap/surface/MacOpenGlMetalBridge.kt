@@ -164,6 +164,9 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
 
     importedTexture?.close()
     importedTexture = null
+    if (newTexture != oldTexture) {
+      releaseMetalTexture(oldTexture)
+    }
     metalTexture = newTexture
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
     try {
@@ -177,12 +180,17 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   private fun disposeTexture() {
     importedTexture?.close()
     importedTexture = null
-    if (metalTexture.address != 0L) {
-      SkikoHost.forgetMetalTexture(metalTexture)
-      MacMetalBridgeNative.disposeMetalTexture(metalTexture.address)
-      metalTexture = NativeHandle(0)
-      pixelFormat = 0
+    releaseMetalTexture(metalTexture)
+    metalTexture = NativeHandle(0)
+    pixelFormat = 0
+  }
+
+  private fun releaseMetalTexture(texture: NativeHandle) {
+    if (texture.address == 0L) {
+      return
     }
+    SkikoHost.forgetMetalTexture(texture)
+    MacMetalBridgeNative.disposeMetalTexture(texture.address)
   }
 }
 

@@ -34,9 +34,6 @@ internal object MacMetalBridgeNative {
         if (texture == 0L) {
           throw NativeSurfaceBridgeException("Skiko Metal texture allocation returned null")
         }
-        if (oldTexture != 0L) {
-          MacObjectiveC.release(oldTexture)
-        }
         texture
       } finally {
         MacObjectiveC.release(descriptor)

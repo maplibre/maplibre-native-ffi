@@ -1,6 +1,9 @@
 package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicReference
 
 internal interface NativeSurfaceBridge : AutoCloseable {
   val backend: ProducerBackend
@@ -66,6 +69,31 @@ internal interface NativeSurfaceBridge : AutoCloseable {
           )
         NativeSurfaceOperatingSystem.UNSUPPORTED -> emptyList()
       }
+  }
+}
+
+internal class NativeSurfaceRendererDispatcher(threadName: String) : AutoCloseable {
+  private val threadRef = AtomicReference<Thread?>()
+  private val executor = Executors.newSingleThreadExecutor { task ->
+    Thread(task, threadName).also {
+      it.isDaemon = true
+      threadRef.set(it)
+    }
+  }
+
+  fun <T> run(action: () -> T): T {
+    if (Thread.currentThread() == threadRef.get()) {
+      return action()
+    }
+    return try {
+      executor.submit<T> { action() }.get()
+    } catch (error: ExecutionException) {
+      throw error.cause ?: error
+    }
+  }
+
+  override fun close() {
+    executor.shutdown()
   }
 }
 

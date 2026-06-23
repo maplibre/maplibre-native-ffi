@@ -75,6 +75,8 @@ import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 
 internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
+  private val rendererDispatcher =
+    NativeSurfaceRendererDispatcher("compose-map-windows-vulkan-renderer")
   private val vulkan = WindowsVulkanContext.create()
   private var direct3DTexture = NativeHandle(0)
   private var importedTexture: WindowsVulkanImportedD3D12Texture? = null
@@ -119,8 +121,13 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    vulkan.waitIdle()
+    rendererDispatcher.run { vulkan.waitIdle() }
   }
+
+  override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
+    rendererDispatcher.run(action)
+
+  override fun <T> withRendererAccess(action: () -> T): T = rendererDispatcher.run(action)
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
     if (target !is VulkanImageTarget || direct3DTexture.address == 0L) {
@@ -139,6 +146,7 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   override fun close() {
     disposeTexture()
     vulkan.close()
+    rendererDispatcher.close()
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =

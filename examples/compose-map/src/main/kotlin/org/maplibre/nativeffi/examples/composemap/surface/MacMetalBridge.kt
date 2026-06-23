@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.examples.composemap.surface
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
 internal class MacMetalBridge : NativeSurfaceBridge {
+  private val rendererDispatcher = NativeSurfaceRendererDispatcher("compose-map-mac-metal-renderer")
   private var texture = NativeHandle(0)
   private var pixelFormat = 0L
   private var generation = 0L
@@ -63,10 +64,15 @@ internal class MacMetalBridge : NativeSurfaceBridge {
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
-    MacMetalBridgeNative.runInAutoreleasePool(action)
+    rendererDispatcher.run {
+      MacMetalBridgeNative.runInAutoreleasePool(action)
+    }
+
+  override fun <T> withRendererAccess(action: () -> T): T = rendererDispatcher.run(action)
 
   override fun close() {
     disposeTexture()
+    rendererDispatcher.close()
   }
 
   private fun recreateTexture(extent: SurfaceExtent) {
@@ -74,24 +80,33 @@ internal class MacMetalBridge : NativeSurfaceBridge {
       disposeTexture()
       return
     }
+    val oldTexture = texture
     val metalDevice = SkikoHost.requireMetalDevice()
     val textureAddress =
       MacMetalBridgeNative.createMetalTexture(
         metalDevice = metalDevice.ptr,
-        oldTexture = texture.address,
+        oldTexture = oldTexture.address,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
       )
+    if (textureAddress != oldTexture.address) {
+      releaseMetalTexture(oldTexture)
+    }
     texture = NativeHandle(textureAddress)
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(textureAddress)
   }
 
   private fun disposeTexture() {
-    if (texture.address != 0L) {
-      SkikoHost.forgetMetalTexture(texture)
-      MacMetalBridgeNative.disposeMetalTexture(texture.address)
-      texture = NativeHandle(0)
-      pixelFormat = 0
+    releaseMetalTexture(texture)
+    texture = NativeHandle(0)
+    pixelFormat = 0
+  }
+
+  private fun releaseMetalTexture(texture: NativeHandle) {
+    if (texture.address == 0L) {
+      return
     }
+    SkikoHost.forgetMetalTexture(texture)
+    MacMetalBridgeNative.disposeMetalTexture(texture.address)
   }
 }

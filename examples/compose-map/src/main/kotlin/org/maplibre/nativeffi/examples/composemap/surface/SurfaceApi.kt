@@ -144,12 +144,16 @@ public data class SurfaceExtent(
         if (safePhysicalWidth == 0) 0 else max(1, ceil(safePhysicalWidth / scale).toInt())
       val logicalHeight =
         if (safePhysicalHeight == 0) 0 else max(1, ceil(safePhysicalHeight / scale).toInt())
+      val normalizedPhysicalWidth =
+        if (logicalWidth == 0) 0 else physicalDimension(logicalWidth, scale)
+      val normalizedPhysicalHeight =
+        if (logicalHeight == 0) 0 else physicalDimension(logicalHeight, scale)
       return SurfaceExtent(
         logicalWidth,
         logicalHeight,
         scale,
-        safePhysicalWidth,
-        safePhysicalHeight,
+        normalizedPhysicalWidth,
+        normalizedPhysicalHeight,
       )
     }
   }
