@@ -28,19 +28,26 @@ public sealed class RuntimeOfflineOperationTests
         Assert.True(operation.IsClosed);
     }
 
-    // Support invariant for runtime-owned offline cleanup: closing the parent
-    // runtime leaves stale no-result operation tokens closed and idempotent.
+    [BindingSpecTest("BND-042")]
     [Fact]
-    public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
+    public void RuntimeCloseFailsWhileOfflineOperationIsLiveAndCanRetryAfterDiscard()
     {
-        var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-        runtime.Close();
+        var error = Assert.Throws<InvalidStateException>(runtime.Close);
+
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.Null(error.RawStatus);
+        Assert.False(runtime.IsClosed);
+        Assert.False(operation.IsClosed);
+        Assert.Contains("live child handle", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
 
         operation.Close();
+        runtime.Close();
+
+        Assert.True(runtime.IsClosed);
         Assert.True(operation.IsClosed);
-        operation.Close();
     }
 
     [BindingSpecTest("BND-084")]

@@ -57,6 +57,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     private readonly Lock callbackGate = new();
     private readonly Lock mapGate = new();
     private readonly Dictionary<nint, WeakReference<Map.MapHandle>> liveMaps = [];
+    private int liveChildren;
     private readonly NativeHandleState<mln_runtime> state;
     private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
@@ -628,9 +629,34 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return runtimeEvent;
     }
 
+    internal void RetainChild()
+    {
+        Interlocked.Increment(ref liveChildren);
+    }
+
+    internal void ReleaseChild()
+    {
+        Interlocked.Decrement(ref liveChildren);
+    }
+
+    private void EnsureNoLiveChildren()
+    {
+        var childCount = Volatile.Read(ref liveChildren);
+        if (childCount > 0)
+        {
+            throw new Error.InvalidStateException(
+                Error.MaplibreStatus.InvalidState,
+                null,
+                $"RuntimeHandle has {childCount} live child handle(s)",
+                null
+            );
+        }
+    }
+
     /// <summary>Destroys the runtime on its owner thread.</summary>
     public void Close()
     {
+        EnsureNoLiveChildren();
         state.Close();
         DisposeCallbackState();
     }
@@ -638,6 +664,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
+        if (Volatile.Read(ref liveChildren) > 0)
+        {
+            return;
+        }
+
         if (state.TryClose())
         {
             DisposeCallbackState();

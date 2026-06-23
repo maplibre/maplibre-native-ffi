@@ -9,6 +9,7 @@ public sealed class OfflineOperationHandle : IDisposable
     private readonly object gate = new();
     private readonly RuntimeHandle runtime;
     private bool closed;
+    private bool retainsParent;
 
     internal OfflineOperationHandle(
         RuntimeHandle runtime,
@@ -31,6 +32,8 @@ public sealed class OfflineOperationHandle : IDisposable
         Id = id;
         Kind = kind;
         ResultKind = resultKind;
+        runtime.RetainChild();
+        retainsParent = true;
     }
 
     /// <summary>Native offline operation identifier.</summary>
@@ -109,7 +112,17 @@ public sealed class OfflineOperationHandle : IDisposable
     {
         lock (gate)
         {
+            if (closed)
+            {
+                return;
+            }
+
             closed = true;
+            if (retainsParent)
+            {
+                runtime.ReleaseChild();
+                retainsParent = false;
+            }
         }
     }
 
