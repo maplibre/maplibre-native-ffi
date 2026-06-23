@@ -35,10 +35,12 @@ internal object SkikoHost {
   private const val SKIA_LAYER_CLASS = "org.jetbrains.skiko.SkiaLayer"
   private const val COMPOSE_WINDOW_CLASS = "androidx.compose.ui.awt.ComposeWindow"
   private const val METAL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.MetalRedrawer"
+  private const val DIRECT3D_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.Direct3DRedrawer"
   private const val LINUX_OPENGL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.LinuxOpenGLRedrawer"
   private const val RETAINED_IMAGE_COUNT = 8
 
   private val metalPresenters = mutableMapOf<Long, MetalTexturePresenter>()
+  private val direct3DPresenters = mutableMapOf<Long, Direct3DTexturePresenter>()
   private val openGlPresenters = mutableMapOf<Int, OpenGlTexturePresenter>()
 
   fun requireMetalDevice(): SkikoMetalDevice = onEdt {
@@ -69,6 +71,22 @@ internal object SkikoHost {
     SkikoMetalDevice(ptr)
   }
 
+  fun requireDirect3DDevice(): SkikoDirect3DDevice = onEdt {
+    val layer =
+      findSkiaLayer()
+        ?: throw NativeSurfaceBridgeException(
+          "SkikoHost could not find a live $SKIA_LAYER_CLASS. ${describeWindows()}"
+        )
+    val redrawer = requireDirect3DRedrawer(layer)
+    val ptr =
+      redrawer.getField("device") as? Long
+        ?: throw NativeSurfaceBridgeException("$DIRECT3D_REDRAWER_CLASS.device was null")
+    if (ptr == 0L) {
+      throw NativeSurfaceBridgeException("$DIRECT3D_REDRAWER_CLASS.device was zero")
+    }
+    SkikoDirect3DDevice(ptr)
+  }
+
   fun drawMetalTexture(scope: DrawScope, target: MetalTextureTarget): Boolean {
     var drew = false
     scope.drawIntoCanvas { composeCanvas ->
@@ -81,8 +99,26 @@ internal object SkikoHost {
     return drew
   }
 
+  fun drawDirect3DTexture(scope: DrawScope, target: Direct3DTextureTarget): Boolean {
+    var drew = false
+    scope.drawIntoCanvas { composeCanvas ->
+      val context = findDirect3DContext() ?: return@drawIntoCanvas
+      val presenter =
+        direct3DPresenters.getOrPut(target.texture.address) {
+          Direct3DTexturePresenter(target.texture)
+        }
+      presenter.draw(composeCanvas.skiaCanvas, context, target, scope.size.width, scope.size.height)
+      drew = true
+    }
+    return drew
+  }
+
   fun forgetMetalTexture(texture: NativeHandle) {
     metalPresenters.remove(texture.address)?.close()
+  }
+
+  fun forgetDirect3DTexture(texture: NativeHandle) {
+    direct3DPresenters.remove(texture.address)?.close()
   }
 
   fun drawOpenGlTexture(scope: DrawScope, target: OpenGlTextureTarget): Boolean {
@@ -106,6 +142,9 @@ internal object SkikoHost {
     val presenters = metalPresenters.values.toList()
     metalPresenters.clear()
     presenters.forEach { it.close() }
+    val d3dPresenters = direct3DPresenters.values.toList()
+    direct3DPresenters.clear()
+    d3dPresenters.forEach { it.close() }
     val glPresenters = openGlPresenters.values.toList()
     openGlPresenters.clear()
     glPresenters.forEach { it.close() }
@@ -135,6 +174,33 @@ internal object SkikoHost {
       layer.invokeNoArg("getRedrawer\$skiko")
         ?: throw NativeSurfaceBridgeException("SkikoLayer.getRedrawer\$skiko returned null")
     requireClass(redrawer, METAL_REDRAWER_CLASS, "Skiko redrawer")
+    return redrawer
+  }
+
+  private fun findDirect3DContext(): DirectContext? = onEdt {
+    val layer =
+      findSkiaLayer()
+        ?: throw NativeSurfaceBridgeException("SkikoHost could not find a live $SKIA_LAYER_CLASS")
+    val contextHandler = requireDirect3DContextHandler(layer)
+    (contextHandler.getField("context") as? DirectContext)
+      ?: run {
+        contextHandler.invokeDeclaredNoArg("initContext")
+        (contextHandler.getField("context") as? DirectContext)
+          ?: contextHandler.invokeDeclaredNoArg("makeContext") as? DirectContext
+      }
+  }
+
+  private fun requireDirect3DContextHandler(layer: Any): Any {
+    val redrawer = requireDirect3DRedrawer(layer)
+    return redrawer.getField("contextHandler")
+      ?: throw NativeSurfaceBridgeException("$DIRECT3D_REDRAWER_CLASS.contextHandler was null")
+  }
+
+  private fun requireDirect3DRedrawer(layer: Any): Any {
+    val redrawer =
+      layer.invokeNoArg("getRedrawer\$skiko")
+        ?: throw NativeSurfaceBridgeException("SkikoLayer.getRedrawer\$skiko returned null")
+    requireClass(redrawer, DIRECT3D_REDRAWER_CLASS, "Skiko redrawer")
     return redrawer
   }
 
@@ -255,16 +321,19 @@ internal object SkikoHost {
     throw NoSuchFieldException("${this.name}.$name")
   }
 
-  private fun Class<*>.findMethod(name: String): java.lang.reflect.Method {
+  private fun Class<*>.findMethod(
+    name: String,
+    vararg parameterTypes: Class<*>,
+  ): java.lang.reflect.Method {
     var current: Class<*>? = this
     while (current != null) {
       try {
-        return current.getDeclaredMethod(name)
+        return current.getDeclaredMethod(name, *parameterTypes)
       } catch (_: NoSuchMethodException) {
         current = current.superclass
       }
     }
-    throw NoSuchMethodException("${this.name}.$name()")
+    throw NoSuchMethodException("${this.name}.$name(${parameterTypes.joinToString { it.name }})")
   }
 
   private fun <T> onEdt(block: () -> T): T {
@@ -358,6 +427,100 @@ internal object SkikoHost {
       contextIdentity = 0
       extent = SurfaceExtent.Empty
       origin = TextureOrigin.TOP_LEFT
+    }
+
+    private fun closeGpuResources() {
+      while (retainedImages.isNotEmpty()) {
+        retainedImages.removeFirst().close()
+      }
+      surface?.close()
+      surface = null
+      renderTarget?.close()
+      renderTarget = null
+    }
+  }
+
+  private class Direct3DTexturePresenter(private val texture: NativeHandle) : AutoCloseable {
+    private var contextIdentity = 0
+    private var extent = SurfaceExtent.Empty
+    private var renderTarget: BackendRenderTarget? = null
+    private var surface: Surface? = null
+    private val retainedImages = ArrayDeque<Image>()
+
+    fun draw(
+      canvas: org.jetbrains.skia.Canvas,
+      context: DirectContext,
+      target: Direct3DTextureTarget,
+      destinationWidth: Float,
+      destinationHeight: Float,
+    ) {
+      ensureSurface(context, target)
+      val currentSurface =
+        surface
+          ?: throw NativeSurfaceBridgeException(
+            "Skia could not wrap Direct3D texture ${target.texture.address}"
+          )
+      currentSurface.notifyContentWillChange(ContentChangeMode.DISCARD)
+      val image = currentSurface.makeImageSnapshot()
+      retainImageForRecordedFrame(image)
+      canvas.drawImageRect(
+        image = image,
+        src = Rect.makeWH(image.width.toFloat(), image.height.toFloat()),
+        dst = Rect.makeWH(destinationWidth, destinationHeight),
+        samplingMode = SamplingMode.LINEAR,
+        paint = null,
+        strict = true,
+      )
+    }
+
+    private fun ensureSurface(context: DirectContext, target: Direct3DTextureTarget) {
+      val nextContextIdentity = System.identityHashCode(context)
+      if (
+        surface != null &&
+          renderTarget != null &&
+          contextIdentity == nextContextIdentity &&
+          extent == target.extent
+      ) {
+        return
+      }
+
+      closeGpuResources()
+      contextIdentity = nextContextIdentity
+      extent = target.extent
+      renderTarget =
+        BackendRenderTarget.makeDirect3D(
+          width = target.extent.physicalWidth,
+          height = target.extent.physicalHeight,
+          texturePtr = texture.address,
+          format = target.format,
+          sampleCnt = 1,
+          levelCnt = 0,
+        )
+      surface =
+        Surface.makeFromBackendRenderTarget(
+          context = context,
+          rt = checkNotNull(renderTarget),
+          origin = SurfaceOrigin.TOP_LEFT,
+          colorFormat = SurfaceColorFormat.BGRA_8888,
+          colorSpace = null,
+          surfaceProps = null,
+        )
+          ?: throw NativeSurfaceBridgeException(
+            "Skia could not wrap Direct3D texture ${target.texture.address} as a render target"
+          )
+    }
+
+    override fun close() {
+      closeGpuResources()
+      contextIdentity = 0
+      extent = SurfaceExtent.Empty
+    }
+
+    private fun retainImageForRecordedFrame(image: Image) {
+      retainedImages.addLast(image)
+      while (retainedImages.size > RETAINED_IMAGE_COUNT) {
+        retainedImages.removeFirst().close()
+      }
     }
 
     private fun closeGpuResources() {
@@ -503,6 +666,15 @@ internal object SkikoHost {
 }
 
 internal data class SkikoMetalDevice(val ptr: Long)
+
+internal data class SkikoDirect3DDevice(val ptr: Long)
+
+internal data class Direct3DTextureTarget(
+  val texture: NativeHandle,
+  val format: Int = 87,
+  val extent: SurfaceExtent,
+  val generation: Long,
+)
 
 internal class NativeSurfaceBridgeException(message: String, cause: Throwable? = null) :
   RuntimeException(message, cause)

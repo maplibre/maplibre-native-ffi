@@ -27,6 +27,7 @@ fun lwjglNativeClassifier(): String {
     os.contains("mac") -> "natives-macos"
     os.contains("linux") && (arch == "aarch64" || arch == "arm64") -> "natives-linux-arm64"
     os.contains("linux") -> "natives-linux"
+    os.contains("windows") && (arch == "aarch64" || arch == "arm64") -> "natives-windows-arm64"
     os.contains("windows") -> "natives-windows"
     else -> throw GradleException("Unsupported LWJGL native platform: $os/$arch")
   }

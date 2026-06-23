@@ -38,43 +38,6 @@ internal abstract class PlaceholderBridge(
   protected abstract fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget
 }
 
-internal class WindowsVulkanD3d12Bridge :
-  PlaceholderBridge(ProducerBackend.VULKAN, ConsumerBackend.DIRECT3D12) {
-  // TODO: Mirror the Linux bridge shape with Direct3D as the consumer:
-  // 1. Add a SkikoHost Direct3D reflection path for Compose 1.11.1 / Skiko 0.144.6. The expected
-  //    redrawer is org.jetbrains.skiko.redrawer.Direct3DRedrawer; useful private fields/methods are
-  //    contextHandler, device, makeContext(), makeSurface(...), and getBufferIndex(). Keep every
-  //    Skiko field name isolated in SkikoHost, then expose only a small Direct3D device/context
-  //    capability to this bridge.
-  // 2. Allocate the consumer texture on the same ID3D12Device Skiko uses. Prefer a committed
-  //    ID3D12Resource with a shareable handle from ID3D12Device::CreateSharedHandle; use shared
-  //    heaps only if the committed-resource path cannot satisfy Vulkan import requirements.
-  // 3. Import the D3D12 resource handle into Vulkan with VK_KHR_external_memory_win32 using
-  //    VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT. Keep MapLibre's view as a normal
-  //    VulkanImageTarget while the bridge owns the D3D12-backed storage.
-  // 4. Present through Skiko's Direct3D path, ideally via BackendRenderTarget.makeDirect3D(...).
-  //    If that wrapper cannot express the resource shape, add a contained native helper that wraps
-  //    the consumer ID3D12Resource for Skia. Keep the D3D12 resource alive until every Skia
-  //    Surface/Image snapshot that references it has been released.
-  // 5. Start with the same conservative synchronization model as the Linux/macOS proofs
-  //    (vkDeviceWaitIdle plus a D3D queue/fence wait), then replace it with a shared D3D12 fence
-  //    imported into Vulkan as VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT.
-  // 6. Give this bridge an owner-thread path if the first MapLibre call happens away from the EDT;
-  //    all map, render-session, resize, gesture, and cleanup calls must stay on the owner thread.
-  override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
-    VulkanImageTarget(
-      context = PlaceholderVulkanContextHandles,
-      image = NativeHandle(0),
-      imageView = NativeHandle(0),
-      format = 0,
-      initialLayout = 0,
-      finalLayout = 0,
-      queueFamilyIndex = 0,
-      extent = extent,
-      generation = generation,
-    )
-}
-
 internal class WindowsOpenGlD3d12Bridge :
   PlaceholderBridge(ProducerBackend.OPENGL, ConsumerBackend.DIRECT3D12) {
   // TODO: Build this after the Vulkan-D3D12 bridge unless OpenGL parity becomes the priority:
