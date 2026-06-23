@@ -640,7 +640,6 @@ internal object SkikoHost {
           0,
         )
         val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-        glBindFramebuffer(GL_FRAMEBUFFER, previous)
         checkGl("glFramebufferTexture2D")
         check(status == GL_FRAMEBUFFER_COMPLETE) {
           "OpenGL framebuffer for texture ${target.textureName} is incomplete: 0x${status.toString(16)}"

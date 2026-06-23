@@ -25,10 +25,15 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
+    val metalDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, metalDevice) }
+  }
+
+  private fun resizeOnRendererThread(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
-    recreateTexture(extent)
+    recreateTexture(extent, metalDevice)
     currentExtent = extent
     generation += 1
   }
@@ -83,17 +88,17 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(importedTexture) { "Vulkan texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
     val oldTexture = metalTexture
-    val metalDevice = SkikoHost.requireMetalDevice()
+    val requiredMetalDevice = metalDevice ?: SkikoHost.requireMetalDevice()
     val newTextureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = metalDevice.ptr,
+        metalDevice = requiredMetalDevice.ptr,
         oldTexture = oldTexture.address,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
@@ -111,7 +116,7 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     metalTexture = newTexture
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
     try {
-      val context = vulkan ?: MacVulkanContext.create(metalDevice.ptr).also { vulkan = it }
+      val context = vulkan ?: MacVulkanContext.create(requiredMetalDevice.ptr).also { vulkan = it }
       importedTexture = context.createImportedTexture(newTexture, extent)
     } catch (error: RuntimeException) {
       disposeTexture()

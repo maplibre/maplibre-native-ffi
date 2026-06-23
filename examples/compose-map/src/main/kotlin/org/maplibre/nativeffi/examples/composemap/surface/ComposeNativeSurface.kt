@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,6 +40,8 @@ public fun ComposeNativeSurface(
     remember(bridge, activeController) {
       bridge?.let { NativeSurfaceSessionImpl(it, activeController) }
     }
+  val nativeSurfaceState by activeController.state.collectAsState()
+  val surfaceFailed = nativeSurfaceState is NativeSurfaceState.Failed
 
   DisposableEffect(renderer, bridgeSelection, bridge, session, controllerImpl) {
     when (bridgeSelection) {
@@ -82,8 +85,8 @@ public fun ComposeNativeSurface(
     }
   }
 
-  LaunchedEffect(extent, bridge, renderer) {
-    if (!extent.isEmpty && bridge != null) {
+  LaunchedEffect(extent, bridge, renderer, surfaceFailed) {
+    if (!surfaceFailed && !extent.isEmpty && bridge != null) {
       try {
         extent.log("compose viewport")
         bridge.resize(extent)
@@ -111,7 +114,7 @@ public fun ComposeNativeSurface(
   ) {
     frameSignal
     var drew = false
-    if (!extent.isEmpty && bridge != null && session != null) {
+    if (!surfaceFailed && !extent.isEmpty && bridge != null && session != null) {
       val frameId = drawState.nextFrameId()
       val frame =
         try {

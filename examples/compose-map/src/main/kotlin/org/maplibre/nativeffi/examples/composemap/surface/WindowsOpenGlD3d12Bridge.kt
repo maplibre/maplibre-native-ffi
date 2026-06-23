@@ -86,10 +86,15 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
+    val device = if (extent.isEmpty) null else SkikoHost.requireDirect3DDevice()
+    runOnProducerThread { resizeOnProducerThread(extent, device) }
+  }
+
+  private fun resizeOnProducerThread(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
     if (extent == currentExtent && producerTexture != null) {
       return
     }
-    recreateTexture(extent)
+    recreateTexture(extent, device)
     currentExtent = extent
     generation += 1
   }
@@ -145,31 +150,30 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(producerTexture) { "Windows WGL texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
-    val device = SkikoHost.requireDirect3DDevice()
+    val direct3DDevice = device ?: SkikoHost.requireDirect3DDevice()
     disposeTexture()
     direct3DTexture =
       WindowsD3D12Interop.createSharedTexture(
-        device,
+        direct3DDevice,
+        extent,
+        dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
+      )
+    val memorySize =
+      WindowsD3D12Interop.textureMemorySize(
+        direct3DTexture,
         extent,
         dxgiFormat = WindowsD3D12Interop.DXGI_FORMAT_R8G8B8A8_UNORM,
       )
     var sharedHandle = NULL
     try {
       sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
-      producerTexture = runOnProducerThread {
-        WindowsWglImportedD3D12Texture.create(
-          wgl,
-          sharedHandle,
-          WindowsD3D12Interop.textureMemorySize(extent),
-          extent,
-        )
-      }
+      producerTexture = WindowsWglImportedD3D12Texture.create(wgl, sharedHandle, memorySize, extent)
     } catch (error: RuntimeException) {
       disposeTexture()
       throw error

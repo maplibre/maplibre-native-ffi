@@ -97,10 +97,15 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
+    val device = if (extent.isEmpty) null else SkikoHost.requireDirect3DDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, device) }
+  }
+
+  private fun resizeOnRendererThread(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
-    recreateTexture(extent)
+    recreateTexture(extent, device)
     currentExtent = extent
     generation += 1
   }
@@ -154,16 +159,16 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(importedTexture) { "Windows Vulkan texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTexture(extent: SurfaceExtent, device: SkikoDirect3DDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
 
-    val device = SkikoHost.requireDirect3DDevice()
+    val direct3DDevice = device ?: SkikoHost.requireDirect3DDevice()
     val storageExtent = extent
     disposeTexture()
-    direct3DTexture = WindowsD3D12Interop.createSharedTexture(device, storageExtent)
+    direct3DTexture = WindowsD3D12Interop.createSharedTexture(direct3DDevice, storageExtent)
     var sharedHandle = NULL
     try {
       sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
@@ -568,11 +573,10 @@ internal object WindowsD3D12Interop {
   private const val D3D12_RESOURCE_STATE_COMMON = 0
   private const val D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET = 0x1
   private const val D3D12_TEXTURE_LAYOUT_UNKNOWN = 0
-  private const val D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT = 65536L
-  private const val RGBA8_BYTES_PER_PIXEL = 4L
   const val DXGI_FORMAT_R8G8B8A8_UNORM = 28
   const val DXGI_FORMAT_B8G8R8A8_UNORM = 87
   private const val ID3D12_DEVICE_CHILD_GET_DEVICE_INDEX = 7
+  private const val ID3D12_DEVICE_GET_RESOURCE_ALLOCATION_INFO_INDEX = 25
   private const val ID3D12_DEVICE_CREATE_COMMITTED_RESOURCE_INDEX = 27
   private const val ID3D12_DEVICE_CREATE_SHARED_HANDLE_INDEX = 31
   private const val IUNKNOWN_RELEASE_INDEX = 2
@@ -650,10 +654,39 @@ internal object WindowsD3D12Interop {
     }
   }
 
-  fun textureMemorySize(extent: SurfaceExtent): Long {
-    val bytes =
-      extent.physicalWidth.toLong() * extent.physicalHeight.toLong() * RGBA8_BYTES_PER_PIXEL
-    return alignUp(bytes, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT)
+  fun textureMemorySize(
+    resource: NativeHandle,
+    extent: SurfaceExtent,
+    dxgiFormat: Int = DXGI_FORMAT_B8G8R8A8_UNORM,
+  ): Long {
+    check(resource.address != 0L) { "Cannot query a null D3D12 resource" }
+    Arena.ofConfined().use { arena ->
+      val device = resourceDevice(resource.address, arena)
+      try {
+        val allocationInfo = arena.allocate(16)
+        invokeAddress(
+          comMethod(device, ID3D12_DEVICE_GET_RESOURCE_ALLOCATION_INFO_INDEX),
+          FunctionDescriptor.of(
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.ADDRESS,
+            ValueLayout.JAVA_INT,
+            ValueLayout.JAVA_INT,
+            ValueLayout.ADDRESS,
+          ),
+          address(device),
+          allocationInfo,
+          0,
+          1,
+          textureDesc(arena, extent, dxgiFormat),
+        )
+        val size = allocationInfo.get(ValueLayout.JAVA_LONG, 0)
+        check(size > 0L) { "ID3D12Device::GetResourceAllocationInfo returned zero size" }
+        return size
+      } finally {
+        release(device)
+      }
+    }
   }
 
   fun release(resource: NativeHandle) {
@@ -675,9 +708,6 @@ internal object WindowsD3D12Interop {
     check(rawDevice != NULL) { "Skiko Direct3D device wrapper did not expose ID3D12Device" }
     return rawDevice
   }
-
-  private fun alignUp(value: Long, alignment: Long): Long =
-    ((value + alignment - 1) / alignment) * alignment
 
   private fun heapProperties(arena: Arena): MemorySegment {
     val props = arena.allocate(20)
@@ -776,6 +806,13 @@ internal object WindowsD3D12Interop {
   private fun invokeHResult(function: MemorySegment, vararg args: Any): Int =
     invokeInt(function, hresultDescriptor(args.size), *args)
 
+  private fun invokeAddress(
+    function: MemorySegment,
+    descriptor: FunctionDescriptor,
+    vararg args: Any,
+  ): MemorySegment =
+    linker.downcallHandle(function, descriptor).invokeWithArguments(*args) as MemorySegment
+
   private fun invokeInt(
     function: MemorySegment,
     descriptor: FunctionDescriptor,
@@ -817,6 +854,22 @@ internal object WindowsD3D12Interop {
     }
 
   private fun address(value: Long): MemorySegment = MemorySegment.ofAddress(value)
+
+  private fun resourceDevice(resource: Long, arena: Arena): Long {
+    val deviceOut = arena.allocate(ValueLayout.ADDRESS)
+    checkHResult(
+      invokeHResult(
+        comMethod(resource, ID3D12_DEVICE_CHILD_GET_DEVICE_INDEX),
+        address(resource),
+        iidId3D12Device(arena),
+        deviceOut,
+      ),
+      "ID3D12Resource::GetDevice",
+    )
+    val device = deviceOut.get(ValueLayout.ADDRESS, 0).address()
+    check(device != NULL) { "ID3D12Resource::GetDevice returned null" }
+    return device
+  }
 
   private fun checkHResult(hr: Int, operation: String) {
     check(hr >= 0) { "$operation failed with HRESULT 0x${hr.toUInt().toString(16)}" }

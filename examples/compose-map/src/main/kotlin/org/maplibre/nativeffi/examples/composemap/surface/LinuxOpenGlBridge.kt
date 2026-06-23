@@ -414,8 +414,8 @@ private constructor(
         GL_HANDLE_TYPE_OPAQUE_FD_EXT,
         fd,
       )
-      imported = true
       checkGl("glImportMemoryFdEXT")
+      imported = true
 
       textureName = glGenTextures()
       glBindTexture(GL_TEXTURE_2D, textureName)

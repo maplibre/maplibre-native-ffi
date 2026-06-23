@@ -22,10 +22,15 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
+    val metalDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, metalDevice) }
+  }
+
+  private fun resizeOnRendererThread(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent == currentExtent && texture.address != 0L) {
       return
     }
-    recreateTexture(extent)
+    recreateTexture(extent, metalDevice)
     currentExtent = extent
     generation += 1
   }
@@ -75,16 +80,15 @@ internal class MacMetalBridge : NativeSurfaceBridge {
     rendererDispatcher.close()
   }
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
     }
     val oldTexture = texture
-    val metalDevice = SkikoHost.requireMetalDevice()
     val textureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = metalDevice.ptr,
+        metalDevice = (metalDevice ?: SkikoHost.requireMetalDevice()).ptr,
         oldTexture = oldTexture.address,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
