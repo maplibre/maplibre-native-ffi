@@ -36,6 +36,7 @@ import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
+import org.lwjgl.vulkan.VK10.VK_SUCCESS
 import org.lwjgl.vulkan.VK10.vkAllocateMemory
 import org.lwjgl.vulkan.VK10.vkBindImageMemory
 import org.lwjgl.vulkan.VK10.vkCreateDevice
@@ -77,7 +78,7 @@ import org.lwjgl.vulkan.VkQueue
 internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-windows-vulkan-renderer")
-  private val vulkan = WindowsVulkanContext.create()
+  private var vulkan: WindowsVulkanContext? = null
   private var direct3DTexture = NativeHandle(0)
   private var importedTexture: WindowsVulkanImportedD3D12Texture? = null
   private var generation = 0L
@@ -121,7 +122,7 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    rendererDispatcher.run { vulkan.waitIdle() }
+    rendererDispatcher.run { vulkan?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -145,7 +146,8 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
 
   override fun close() {
     disposeTexture()
-    vulkan.close()
+    vulkan?.close()
+    vulkan = null
     rendererDispatcher.close()
   }
 
@@ -165,7 +167,8 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
     var sharedHandle = NULL
     try {
       sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
-      importedTexture = vulkan.importD3D12Texture(sharedHandle, storageExtent, extent)
+      val context = vulkan ?: WindowsVulkanContext.create(sharedHandle).also { vulkan = it }
+      importedTexture = context.importD3D12Texture(sharedHandle, storageExtent, extent)
     } catch (error: RuntimeException) {
       disposeTexture()
       throw error
@@ -185,7 +188,8 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   }
 }
 
-private class WindowsVulkanContext private constructor() : AutoCloseable {
+private class WindowsVulkanContext private constructor(private val sharedHandle: Long) :
+  AutoCloseable {
   private var instance: VkInstance? = null
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
@@ -287,13 +291,53 @@ private class WindowsVulkanContext private constructor() : AutoCloseable {
           continue
         }
         val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
-        if (queueFamily >= 0) {
+        if (queueFamily >= 0 && canImportD3D12Handle(candidate, queueFamily)) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
           return
         }
       }
       error("No Vulkan device supports graphics and $VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME")
+    }
+  }
+
+  private fun canImportD3D12Handle(candidate: VkPhysicalDevice, queueFamily: Int): Boolean {
+    MemoryStack.stackPush().use { stack ->
+      val deviceExtensions = stack.vulkanDeviceExtensions(candidate)
+      val extensions = LinkedHashSet<String>()
+      extensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)
+      if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
+        extensions.add(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
+      }
+      val priorities = stack.floats(1.0f)
+      val queueInfo =
+        VkDeviceQueueCreateInfo.calloc(1, stack)
+          .sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
+          .queueFamilyIndex(queueFamily)
+          .pQueuePriorities(priorities)
+      val createInfo =
+        VkDeviceCreateInfo.calloc(stack)
+          .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
+          .pQueueCreateInfos(queueInfo)
+          .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
+      val out = stack.mallocPointer(1)
+      if (vkCreateDevice(candidate, createInfo, null, out) != VK_SUCCESS) {
+        return false
+      }
+      val probeDevice = VkDevice(out[0], candidate, createInfo)
+      return try {
+        val handleProperties =
+          VkMemoryWin32HandlePropertiesKHR.calloc(stack)
+            .sType(VK_STRUCTURE_TYPE_MEMORY_WIN32_HANDLE_PROPERTIES_KHR)
+        vkGetMemoryWin32HandlePropertiesKHR(
+          probeDevice,
+          VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT,
+          sharedHandle,
+          handleProperties,
+        ) == VK_SUCCESS && handleProperties.memoryTypeBits() != 0
+      } finally {
+        vkDestroyDevice(probeDevice, null)
+      }
     }
   }
 
@@ -341,8 +385,8 @@ private class WindowsVulkanContext private constructor() : AutoCloseable {
   }
 
   companion object {
-    fun create(): WindowsVulkanContext {
-      val context = WindowsVulkanContext()
+    fun create(sharedHandle: Long): WindowsVulkanContext {
+      val context = WindowsVulkanContext(sharedHandle)
       try {
         context.createInstance()
         context.pickPhysicalDeviceAndQueue()
@@ -524,6 +568,8 @@ internal object WindowsD3D12Interop {
   private const val D3D12_RESOURCE_STATE_COMMON = 0
   private const val D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET = 0x1
   private const val D3D12_TEXTURE_LAYOUT_UNKNOWN = 0
+  private const val D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT = 65536L
+  private const val RGBA8_BYTES_PER_PIXEL = 4L
   const val DXGI_FORMAT_R8G8B8A8_UNORM = 28
   const val DXGI_FORMAT_B8G8R8A8_UNORM = 87
   private const val ID3D12_DEVICE_CHILD_GET_DEVICE_INDEX = 7
@@ -604,6 +650,12 @@ internal object WindowsD3D12Interop {
     }
   }
 
+  fun textureMemorySize(extent: SurfaceExtent): Long {
+    val bytes =
+      extent.physicalWidth.toLong() * extent.physicalHeight.toLong() * RGBA8_BYTES_PER_PIXEL
+    return alignUp(bytes, D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT)
+  }
+
   fun release(resource: NativeHandle) {
     release(resource.address)
   }
@@ -623,6 +675,9 @@ internal object WindowsD3D12Interop {
     check(rawDevice != NULL) { "Skiko Direct3D device wrapper did not expose ID3D12Device" }
     return rawDevice
   }
+
+  private fun alignUp(value: Long, alignment: Long): Long =
+    ((value + alignment - 1) / alignment) * alignment
 
   private fun heapProperties(arena: Arena): MemorySegment {
     val props = arena.allocate(20)

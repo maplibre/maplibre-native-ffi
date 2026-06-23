@@ -163,7 +163,12 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
     try {
       sharedHandle = WindowsD3D12Interop.createSharedHandle(direct3DTexture)
       producerTexture = runOnProducerThread {
-        WindowsWglImportedD3D12Texture.create(wgl, sharedHandle, extent)
+        WindowsWglImportedD3D12Texture.create(
+          wgl,
+          sharedHandle,
+          WindowsD3D12Interop.textureMemorySize(extent),
+          extent,
+        )
       }
     } catch (error: RuntimeException) {
       disposeTexture()
@@ -289,6 +294,7 @@ private class WindowsWglImportedD3D12Texture
 private constructor(
   private val context: WindowsWglContext,
   private val sharedHandle: Long,
+  private val memorySize: Long,
   private val extent: SurfaceExtent,
 ) : AutoCloseable {
   private var memoryObject = 0
@@ -318,7 +324,12 @@ private constructor(
 
     memoryObject = glCreateMemoryObjectsEXT()
     glMemoryObjectParameteriEXT(memoryObject, GL_DEDICATED_MEMORY_OBJECT_EXT, GL_TRUE)
-    glImportMemoryWin32HandleEXT(memoryObject, 0L, GL_HANDLE_TYPE_D3D12_RESOURCE_EXT, sharedHandle)
+    glImportMemoryWin32HandleEXT(
+      memoryObject,
+      memorySize,
+      GL_HANDLE_TYPE_D3D12_RESOURCE_EXT,
+      sharedHandle,
+    )
     checkGl("glImportMemoryWin32HandleEXT")
 
     textureName = glGenTextures()
@@ -358,9 +369,10 @@ private constructor(
     fun create(
       context: WindowsWglContext,
       sharedHandle: Long,
+      memorySize: Long,
       extent: SurfaceExtent,
     ): WindowsWglImportedD3D12Texture {
-      val texture = WindowsWglImportedD3D12Texture(context, sharedHandle, extent)
+      val texture = WindowsWglImportedD3D12Texture(context, sharedHandle, memorySize, extent)
       try {
         texture.create()
         return texture

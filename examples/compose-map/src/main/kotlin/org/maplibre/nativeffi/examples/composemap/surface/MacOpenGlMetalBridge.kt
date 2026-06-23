@@ -95,15 +95,16 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       supportsResizeWithoutRecreate = false,
     )
 
-  override fun resize(extent: SurfaceExtent) = rendererDispatcher.run {
-    resizeOnRendererThread(extent)
+  override fun resize(extent: SurfaceExtent) {
+    val metalDevice = if (extent.isEmpty) null else SkikoHost.requireMetalDevice()
+    rendererDispatcher.run { resizeOnRendererThread(extent, metalDevice) }
   }
 
-  private fun resizeOnRendererThread(extent: SurfaceExtent) {
+  private fun resizeOnRendererThread(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
-    recreateTexture(extent)
+    recreateTexture(extent, metalDevice)
     currentExtent = extent
     generation += 1
   }
@@ -165,7 +166,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   private fun target(generation: Long): NativeSurfaceTarget =
     checkNotNull(importedTexture) { "ANGLE texture is not initialized" }.target(generation)
 
-  private fun recreateTexture(extent: SurfaceExtent) {
+  private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {
     if (extent.isEmpty) {
       disposeTexture()
       return
@@ -174,7 +175,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     val oldTexture = metalTexture
     val newTextureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = SkikoHost.requireMetalDevice().ptr,
+        metalDevice = (metalDevice ?: SkikoHost.requireMetalDevice()).ptr,
         oldTexture = oldTexture.address,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
@@ -288,7 +289,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
   }
 
   override fun close() {
-    waitIdle()
+    runCatching { waitIdle() }
     GLES.setCapabilities(null)
     if (display != EGL_NO_DISPLAY) {
       eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)

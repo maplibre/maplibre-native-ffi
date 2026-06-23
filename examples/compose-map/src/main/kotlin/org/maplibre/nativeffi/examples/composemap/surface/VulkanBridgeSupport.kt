@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.surface
 
+import java.nio.ByteBuffer
 import org.lwjgl.PointerBuffer
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.vulkan.VK
@@ -100,3 +101,8 @@ internal fun findVulkanDeviceLocalMemoryType(
   }
   error(errorMessage)
 }
+
+internal fun ByteBuffer.toUuidHex(length: Int): String =
+  (0..<length).joinToString(separator = "") { index ->
+    (get(index).toInt() and 0xff).toString(16).padStart(2, '0')
+  }

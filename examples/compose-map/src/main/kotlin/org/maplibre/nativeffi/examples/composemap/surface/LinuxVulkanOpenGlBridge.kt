@@ -3,10 +3,14 @@ package org.maplibre.nativeffi.examples.composemap.surface
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import java.util.LinkedHashSet
 import org.lwjgl.opengl.EXTMemoryObject.GL_DEDICATED_MEMORY_OBJECT_EXT
+import org.lwjgl.opengl.EXTMemoryObject.GL_DEVICE_UUID_EXT
+import org.lwjgl.opengl.EXTMemoryObject.GL_NUM_DEVICE_UUIDS_EXT
 import org.lwjgl.opengl.EXTMemoryObject.GL_OPTIMAL_TILING_EXT
 import org.lwjgl.opengl.EXTMemoryObject.GL_TEXTURE_TILING_EXT
+import org.lwjgl.opengl.EXTMemoryObject.GL_UUID_SIZE_EXT
 import org.lwjgl.opengl.EXTMemoryObject.glCreateMemoryObjectsEXT
 import org.lwjgl.opengl.EXTMemoryObject.glDeleteMemoryObjectsEXT
+import org.lwjgl.opengl.EXTMemoryObject.glGetUnsignedBytei_vEXT
 import org.lwjgl.opengl.EXTMemoryObject.glMemoryObjectParameteriEXT
 import org.lwjgl.opengl.EXTMemoryObject.glTexStorageMem2DEXT
 import org.lwjgl.opengl.EXTMemoryObjectFD.GL_HANDLE_TYPE_OPAQUE_FD_EXT
@@ -26,6 +30,7 @@ import org.lwjgl.opengl.GL11.glDeleteTextures
 import org.lwjgl.opengl.GL11.glFinish
 import org.lwjgl.opengl.GL11.glGenTextures
 import org.lwjgl.opengl.GL11.glGetError
+import org.lwjgl.opengl.GL11.glGetInteger
 import org.lwjgl.opengl.GL11.glTexParameteri
 import org.lwjgl.opengl.GL12.GL_CLAMP_TO_EDGE
 import org.lwjgl.system.MemoryStack
@@ -76,6 +81,9 @@ import org.lwjgl.vulkan.VK11.VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT
 import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO
 import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO
 import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO
+import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES
+import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2
+import org.lwjgl.vulkan.VK11.vkGetPhysicalDeviceProperties2
 import org.lwjgl.vulkan.VkApplicationInfo
 import org.lwjgl.vulkan.VkDevice
 import org.lwjgl.vulkan.VkDeviceCreateInfo
@@ -93,12 +101,14 @@ import org.lwjgl.vulkan.VkMemoryDedicatedAllocateInfo
 import org.lwjgl.vulkan.VkMemoryGetFdInfoKHR
 import org.lwjgl.vulkan.VkMemoryRequirements
 import org.lwjgl.vulkan.VkPhysicalDevice
+import org.lwjgl.vulkan.VkPhysicalDeviceIDProperties
+import org.lwjgl.vulkan.VkPhysicalDeviceProperties2
 import org.lwjgl.vulkan.VkQueue
 
 internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-linux-vulkan-renderer")
-  private val vulkan = LinuxVulkanContext.create()
+  private var vulkan: LinuxVulkanContext? = null
   private var exportedTexture: LinuxExportedVulkanTexture? = null
   private var importedTexture: LinuxOpenGlImportedTexture? = null
   private var generation = 0L
@@ -138,7 +148,7 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    rendererDispatcher.run { vulkan.waitIdle() }
+    rendererDispatcher.run { vulkan?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -156,7 +166,8 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
 
   override fun close() {
     disposeTexture()
-    vulkan.close()
+    vulkan?.close()
+    vulkan = null
     rendererDispatcher.close()
   }
 
@@ -172,7 +183,9 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     }
 
     disposeTexture()
-    val exported = vulkan.createExportedTexture(extent)
+    val context =
+      vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
+    val exported = context.createExportedTexture(extent)
     try {
       val imported =
         LinuxOpenGlImportedTexture.create(exported.exportFd(), exported.memorySize(), extent)
@@ -192,9 +205,28 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     exportedTexture?.close()
     exportedTexture = null
   }
+
+  private fun currentOpenGlDeviceUuids(): Set<String> {
+    val capabilities = ensureLwjglOpenGlCapabilities()
+    if (!capabilities.GL_EXT_memory_object) {
+      return emptySet()
+    }
+    val count = glGetInteger(GL_NUM_DEVICE_UUIDS_EXT)
+    if (count <= 0) {
+      return emptySet()
+    }
+    MemoryStack.stackPush().use { stack ->
+      return (0..<count).mapTo(linkedSetOf()) { index ->
+        val uuid = stack.malloc(GL_UUID_SIZE_EXT)
+        glGetUnsignedBytei_vEXT(GL_DEVICE_UUID_EXT, index, uuid)
+        uuid.toUuidHex(GL_UUID_SIZE_EXT)
+      }
+    }
+  }
 }
 
-internal class LinuxVulkanContext private constructor() : AutoCloseable {
+internal class LinuxVulkanContext
+private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseable {
   private var instance: VkInstance? = null
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
@@ -289,6 +321,9 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
         if (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME !in stack.vulkanDeviceExtensions(candidate)) {
           continue
         }
+        if (requiredDeviceUuids.isNotEmpty() && deviceUuid(candidate) !in requiredDeviceUuids) {
+          continue
+        }
         val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
         if (queueFamily >= 0) {
           physicalDevice = candidate
@@ -296,7 +331,25 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
           return
         }
       }
-      error("No Vulkan device supports graphics and $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME")
+      val deviceRequirement =
+        if (requiredDeviceUuids.isEmpty()) "" else " and matches the Skiko OpenGL device UUID"
+      error(
+        "No Vulkan device supports graphics, $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME$deviceRequirement"
+      )
+    }
+  }
+
+  private fun deviceUuid(candidate: VkPhysicalDevice): String {
+    MemoryStack.stackPush().use { stack ->
+      val id =
+        VkPhysicalDeviceIDProperties.calloc(stack)
+          .sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES)
+      val properties =
+        VkPhysicalDeviceProperties2.calloc(stack)
+          .sType(VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2)
+          .pNext(id.address())
+      vkGetPhysicalDeviceProperties2(candidate, properties)
+      return id.deviceUUID().toUuidHex(GL_UUID_SIZE_EXT)
     }
   }
 
@@ -344,8 +397,8 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
   }
 
   companion object {
-    fun create(): LinuxVulkanContext {
-      val context = LinuxVulkanContext()
+    fun create(requiredDeviceUuids: Set<String> = emptySet()): LinuxVulkanContext {
+      val context = LinuxVulkanContext(requiredDeviceUuids)
       try {
         context.createInstance()
         context.pickPhysicalDeviceAndQueue()
