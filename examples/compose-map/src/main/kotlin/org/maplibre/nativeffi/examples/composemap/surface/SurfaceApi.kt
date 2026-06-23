@@ -138,9 +138,19 @@ public data class SurfaceExtent(
       scaleFactor: Double,
     ): SurfaceExtent {
       val scale = if (scaleFactor > 0.0 && scaleFactor.isFinite()) scaleFactor else 1.0
-      val logicalWidth = max(1, ceil(physicalWidth.coerceAtLeast(1) / scale).toInt())
-      val logicalHeight = max(1, ceil(physicalHeight.coerceAtLeast(1) / scale).toInt())
-      return SurfaceExtent(logicalWidth, logicalHeight, scale)
+      val safePhysicalWidth = physicalWidth.coerceAtLeast(0)
+      val safePhysicalHeight = physicalHeight.coerceAtLeast(0)
+      val logicalWidth =
+        if (safePhysicalWidth == 0) 0 else max(1, ceil(safePhysicalWidth / scale).toInt())
+      val logicalHeight =
+        if (safePhysicalHeight == 0) 0 else max(1, ceil(safePhysicalHeight / scale).toInt())
+      return SurfaceExtent(
+        logicalWidth,
+        logicalHeight,
+        scale,
+        safePhysicalWidth,
+        safePhysicalHeight,
+      )
     }
   }
 }

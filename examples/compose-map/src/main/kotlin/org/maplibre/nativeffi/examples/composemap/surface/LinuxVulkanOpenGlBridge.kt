@@ -158,6 +158,8 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   private fun recreateTexture(extent: SurfaceExtent) {
     if (extent.isEmpty) {
       disposeTexture()
+      currentExtent = SurfaceExtent.Empty
+      generation += 1
       return
     }
 

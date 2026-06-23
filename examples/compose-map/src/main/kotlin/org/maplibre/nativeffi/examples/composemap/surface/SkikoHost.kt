@@ -290,7 +290,7 @@ internal object SkikoHost {
   }
 
   private fun requireClass(value: Any, expected: String, label: String) {
-    if (value.javaClass.name != expected) {
+    if (!Class.forName(expected).isAssignableFrom(value.javaClass)) {
       throw NativeSurfaceBridgeException("$label was ${value.javaClass.name}, expected $expected")
     }
   }

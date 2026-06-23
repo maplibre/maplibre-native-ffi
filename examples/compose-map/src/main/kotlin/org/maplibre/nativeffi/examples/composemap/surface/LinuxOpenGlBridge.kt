@@ -105,10 +105,8 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     )
 
   override fun resize(extent: SurfaceExtent) {
-    if (extent == currentExtent && producerTexture != null && consumerTexture != null) {
-      return
-    }
-    recreateTexture(extent)
+    // The consumer import issues OpenGL calls against Skiko's context, so texture creation is
+    // applied lazily by acquireFrame inside the Compose draw callback.
   }
 
   override fun acquireFrame(
@@ -183,7 +181,9 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       currentExtent = extent
       generation += 1
     } catch (error: RuntimeException) {
-      producer?.close()
+      if (producer != null) {
+        runOnProducerThread { producer.close() }
+      }
       consumer?.close()
       exported.close()
       throw error

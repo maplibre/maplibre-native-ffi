@@ -25,23 +25,23 @@ internal object DesktopNativeRenderingLifecycle {
       if (quitHandlerInstalled) {
         return
       }
-      quitHandlerInstalled = true
-    }
-    if (!Desktop.isDesktopSupported()) {
-      return
-    }
-    val desktop = Desktop.getDesktop()
-    if (!desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
-      return
-    }
-    desktop.setQuitHandler { _, response ->
-      try {
-        closeAll()
-        response.performQuit()
-      } catch (error: Throwable) {
-        error.printStackTrace()
-        response.cancelQuit()
+      if (!Desktop.isDesktopSupported()) {
+        return
       }
+      val desktop = Desktop.getDesktop()
+      if (!desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
+        return
+      }
+      desktop.setQuitHandler { _, response ->
+        try {
+          closeAll()
+          response.performQuit()
+        } catch (error: Throwable) {
+          error.printStackTrace()
+          response.cancelQuit()
+        }
+      }
+      quitHandlerInstalled = true
     }
   }
 

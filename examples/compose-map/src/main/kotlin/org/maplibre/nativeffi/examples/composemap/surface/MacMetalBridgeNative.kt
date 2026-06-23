@@ -15,7 +15,6 @@ internal object MacMetalBridgeNative {
         if (oldWidth == width.toLong() && oldHeight == height.toLong()) {
           return oldTexture
         }
-        MacObjectiveC.release(oldTexture)
       }
 
       val adapter = MacObjectiveC.sendPointer(metalDevice, "adapter")
@@ -34,6 +33,9 @@ internal object MacMetalBridgeNative {
         val texture = MacObjectiveC.sendPointer(adapter, "newTextureWithDescriptor:", descriptor)
         if (texture == 0L) {
           throw NativeSurfaceBridgeException("Skiko Metal texture allocation returned null")
+        }
+        if (oldTexture != 0L) {
+          MacObjectiveC.release(oldTexture)
         }
         texture
       } finally {
