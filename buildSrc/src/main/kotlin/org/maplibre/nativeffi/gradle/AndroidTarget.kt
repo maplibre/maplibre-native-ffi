@@ -34,13 +34,15 @@ enum class AndroidTarget(
         )
 
     /**
-     * Cargo `--filter-platform` for rustls-platform-verifier-android Maven metadata.
-     * The published artifact is ABI-agnostic; [ARM64] is the fallback when the env
-     * names a host desktop triple during Linux native builds.
+     * Cargo `--filter-platform` for rustls-platform-verifier-android Maven metadata. The published
+     * artifact is ABI-agnostic; [ARM64] is the fallback when the env names a host desktop triple
+     * during Linux native builds.
      */
     fun rustlsMetadataCargoTarget(): String = fromEnv()?.cargoTarget ?: ARM64.cargoTarget
 
-    /** NDK ABI filter for Android Gradle when [CARGO_BUILD_TARGET] is unset or names a host triple. */
+    /**
+     * NDK ABI filter for Android Gradle when [CARGO_BUILD_TARGET] is unset or names a host triple.
+     */
     fun ndkAbiForGradleConfiguration(): String = fromEnv()?.ndkAbi ?: ARM64.ndkAbi
   }
 }
