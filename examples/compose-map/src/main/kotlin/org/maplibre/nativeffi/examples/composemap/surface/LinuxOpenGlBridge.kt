@@ -115,7 +115,7 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     presentationTimeNanos: Long?,
   ): NativeSurfaceFrame {
     if (producerTexture == null || consumerTexture == null || extent != currentExtent) {
-      resize(extent)
+      recreateTexture(extent)
     }
     return NativeSurfaceFrameLease(
       frameId = frameId,
