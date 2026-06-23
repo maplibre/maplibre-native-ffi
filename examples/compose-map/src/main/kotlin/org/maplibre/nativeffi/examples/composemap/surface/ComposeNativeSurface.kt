@@ -32,38 +32,52 @@ public fun ComposeNativeSurface(
   var extent by remember { mutableStateOf(SurfaceExtent.Empty) }
   var frameRequest by remember { mutableLongStateOf(0L) }
   val frameSignal = frameRequest
-  val bridge =
+  val bridgeSelection =
     remember(renderer.supportedBackends) { NativeSurfaceBridge.select(renderer.supportedBackends) }
+  val bridge = (bridgeSelection as? NativeSurfaceBridgeSelection.Selected)?.bridge
   val session =
     remember(bridge, activeController) {
       bridge?.let { NativeSurfaceSessionImpl(it, activeController) }
     }
 
-  DisposableEffect(renderer, bridge, session, controllerImpl) {
-    if (bridge == null || session == null) {
-      controllerImpl?.setState(
-        NativeSurfaceState.Unsupported(
-          requestedBackends = renderer.supportedBackends,
-          host = NativeSurfaceBridge.host,
+  DisposableEffect(renderer, bridgeSelection, bridge, session, controllerImpl) {
+    when (bridgeSelection) {
+      is NativeSurfaceBridgeSelection.Failed -> {
+        controllerImpl?.setState(
+          NativeSurfaceState.Failed(
+            message = "Native surface bridge initialization failed: ${bridgeSelection.message}",
+            cause = bridgeSelection.error,
+          )
         )
-      )
-      onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
-    } else {
-      val participant = DesktopNativeRenderingLifecycle.register {
-        renderer.close()
-        bridge.close()
+        onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
       }
-      controllerImpl?.connect(
-        onRequestFrame = { frameRequest += 1 },
-        onDispose = participant::close,
-      )
-      controllerImpl?.setState(NativeSurfaceState.Ready(bridge.backend, bridge.capabilities))
-      renderer.onSurfaceAvailable(session)
-      session.requestFrame()
-      onDispose {
-        participant.close()
-        controllerImpl?.disconnect()
-        controllerImpl?.setState(NativeSurfaceState.Inactive)
+      NativeSurfaceBridgeSelection.Unsupported -> {
+        controllerImpl?.setState(
+          NativeSurfaceState.Unsupported(
+            requestedBackends = renderer.supportedBackends,
+            host = NativeSurfaceBridge.host,
+          )
+        )
+        onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
+      }
+      is NativeSurfaceBridgeSelection.Selected -> {
+        check(bridge != null && session != null) { "Selected native surface bridge is not ready" }
+        val participant = DesktopNativeRenderingLifecycle.register {
+          renderer.close()
+          bridge.close()
+        }
+        controllerImpl?.connect(
+          onRequestFrame = { frameRequest += 1 },
+          onDispose = participant::close,
+        )
+        controllerImpl?.setState(NativeSurfaceState.Ready(bridge.backend, bridge.capabilities))
+        renderer.onSurfaceAvailable(session)
+        session.requestFrame()
+        onDispose {
+          participant.close()
+          controllerImpl?.disconnect()
+          controllerImpl?.setState(NativeSurfaceState.Inactive)
+        }
       }
     }
   }

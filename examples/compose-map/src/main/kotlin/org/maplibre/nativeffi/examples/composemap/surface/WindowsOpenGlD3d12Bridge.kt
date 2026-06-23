@@ -58,7 +58,7 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
       producerThreadRef.set(it)
     }
   }
-  private val wgl = runOnProducerThread { WindowsWglContext.create() }
+  private val wgl: WindowsWglContext
   private var direct3DTexture = NativeHandle(0)
   private var producerTexture: WindowsWglImportedD3D12Texture? = null
   private var generation = 0L
@@ -67,6 +67,15 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
   override val consumerBackend: ConsumerBackend = ConsumerBackend.DIRECT3D12
+
+  init {
+    try {
+      wgl = runOnProducerThread { WindowsWglContext.create() }
+    } catch (error: Throwable) {
+      producerExecutor.shutdown()
+      throw error
+    }
+  }
 
   override val capabilities: NativeSurfaceCapabilities =
     NativeSurfaceCapabilities(

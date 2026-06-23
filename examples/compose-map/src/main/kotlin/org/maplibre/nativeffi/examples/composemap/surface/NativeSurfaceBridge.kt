@@ -32,8 +32,19 @@ internal interface NativeSurfaceBridge : AutoCloseable {
   companion object {
     val host: NativeSurfaceHost = detectHost()
 
-    fun select(supportedBackends: Set<ProducerBackend>): NativeSurfaceBridge? =
-      bridgeCandidates(host).firstOrNull { it.backend in supportedBackends }?.create()
+    fun select(supportedBackends: Set<ProducerBackend>): NativeSurfaceBridgeSelection {
+      val candidate =
+        bridgeCandidates(host).firstOrNull { it.backend in supportedBackends }
+          ?: return NativeSurfaceBridgeSelection.Unsupported
+      return try {
+        NativeSurfaceBridgeSelection.Selected(candidate.create())
+      } catch (error: Throwable) {
+        if (error is VirtualMachineError || error is ThreadDeath) {
+          throw error
+        }
+        NativeSurfaceBridgeSelection.Failed(candidate.backend, error)
+      }
+    }
 
     private fun bridgeCandidates(host: NativeSurfaceHost): List<NativeSurfaceBridgeCandidate> =
       when (host.operatingSystem) {
@@ -62,6 +73,18 @@ private data class NativeSurfaceBridgeCandidate(
   val backend: ProducerBackend,
   val create: () -> NativeSurfaceBridge,
 )
+
+internal sealed interface NativeSurfaceBridgeSelection {
+  data class Selected(val bridge: NativeSurfaceBridge) : NativeSurfaceBridgeSelection
+
+  data class Failed(val backend: ProducerBackend, val error: Throwable) :
+    NativeSurfaceBridgeSelection {
+    val message: String
+      get() = "$backend bridge failed: ${error.message ?: error.javaClass.name}"
+  }
+
+  data object Unsupported : NativeSurfaceBridgeSelection
+}
 
 private fun detectHost(): NativeSurfaceHost {
   val os = System.getProperty("os.name").lowercase()

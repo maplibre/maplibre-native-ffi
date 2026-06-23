@@ -75,7 +75,7 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       producerThreadRef.set(it)
     }
   }
-  private val egl = runOnProducerThread { LinuxEglContext.create() }
+  private val egl: LinuxEglContext
   private var exportedTexture: LinuxExportedVulkanTexture? = null
   private var producerTexture: LinuxEglImportedTexture? = null
   private var consumerTexture: LinuxOpenGlImportedTexture? = null
@@ -85,6 +85,16 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
   override val backend: ProducerBackend = ProducerBackend.OPENGL
 
   override val consumerBackend: ConsumerBackend = ConsumerBackend.OPENGL
+
+  init {
+    try {
+      egl = runOnProducerThread { LinuxEglContext.create() }
+    } catch (error: Throwable) {
+      producerExecutor.shutdown()
+      vulkan.close()
+      throw error
+    }
+  }
 
   override val capabilities: NativeSurfaceCapabilities =
     NativeSurfaceCapabilities(
