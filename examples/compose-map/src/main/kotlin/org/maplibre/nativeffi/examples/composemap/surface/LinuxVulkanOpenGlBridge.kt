@@ -165,10 +165,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   }
 
   override fun close() {
-    disposeTexture()
-    vulkan?.close()
-    vulkan = null
-    rendererDispatcher.close()
+    try {
+      disposeTexture(consumerContextCurrent = false)
+    } finally {
+      vulkan?.close()
+      vulkan = null
+      rendererDispatcher.close()
+    }
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =
@@ -176,13 +179,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
 
   private fun recreateTexture(extent: SurfaceExtent) {
     if (extent.isEmpty) {
-      disposeTexture()
+      disposeTexture(consumerContextCurrent = true)
       currentExtent = SurfaceExtent.Empty
       generation += 1
       return
     }
 
-    disposeTexture()
+    disposeTexture(consumerContextCurrent = true)
     val context =
       vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
     val exported = context.createExportedTexture(extent)
@@ -199,8 +202,14 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     }
   }
 
-  private fun disposeTexture() {
-    importedTexture?.close()
+  private fun disposeTexture(consumerContextCurrent: Boolean = true) {
+    importedTexture?.let { texture ->
+      if (consumerContextCurrent) {
+        texture.close()
+      } else {
+        SkikoHost.withLinuxOpenGlContext { texture.close() }
+      }
+    }
     importedTexture = null
     exportedTexture?.close()
     exportedTexture = null

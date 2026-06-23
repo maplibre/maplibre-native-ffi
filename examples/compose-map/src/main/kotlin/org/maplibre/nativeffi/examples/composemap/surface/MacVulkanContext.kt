@@ -121,6 +121,14 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       if (VK_EXT_DEBUG_UTILS_EXTENSION_NAME in available) {
         extensions.add(VK_EXT_DEBUG_UTILS_EXTENSION_NAME)
       }
+      val exportCreate =
+        if (requiredMetalDevice == 0L) {
+          null
+        } else {
+          VkExportMetalObjectCreateInfoEXT.calloc(stack)
+            .sType(VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT)
+            .exportObjectType(VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT)
+        }
       val app =
         VkApplicationInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_APPLICATION_INFO)
@@ -130,6 +138,7 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       val createInfo =
         VkInstanceCreateInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
+          .pNext(exportCreate?.address() ?: NULL)
           .pApplicationInfo(app)
           .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
       if (enablePortability) {
@@ -185,10 +194,6 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
         extensions.add(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
       }
-      val exportCreate =
-        VkExportMetalObjectCreateInfoEXT.calloc(stack)
-          .sType(VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT)
-          .exportObjectType(VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT)
       val priorities = stack.floats(1.0f)
       val queueInfo =
         VkDeviceQueueCreateInfo.calloc(1, stack)
@@ -198,7 +203,6 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       val createInfo =
         VkDeviceCreateInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
-          .pNext(exportCreate.address())
           .pQueueCreateInfos(queueInfo)
           .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
       val out = stack.mallocPointer(1)

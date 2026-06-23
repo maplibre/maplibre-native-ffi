@@ -41,7 +41,7 @@ public fun ComposeNativeSurface(
       bridge?.let { NativeSurfaceSessionImpl(it, activeController) }
     }
   val nativeSurfaceState by activeController.state.collectAsState()
-  val surfaceFailed = nativeSurfaceState is NativeSurfaceState.Failed
+  val surfaceReady = nativeSurfaceState is NativeSurfaceState.Ready
 
   DisposableEffect(renderer, bridgeSelection, bridge, session, controllerImpl) {
     when (bridgeSelection) {
@@ -85,8 +85,8 @@ public fun ComposeNativeSurface(
     }
   }
 
-  LaunchedEffect(extent, bridge, renderer, surfaceFailed) {
-    if (!surfaceFailed && !extent.isEmpty && bridge != null) {
+  LaunchedEffect(extent, bridge, renderer, surfaceReady) {
+    if (surfaceReady && !extent.isEmpty && bridge != null) {
       try {
         extent.log("compose viewport")
         bridge.resize(extent)
@@ -114,7 +114,7 @@ public fun ComposeNativeSurface(
   ) {
     frameSignal
     var drew = false
-    if (!surfaceFailed && !extent.isEmpty && bridge != null && session != null) {
+    if (surfaceReady && !extent.isEmpty && bridge != null && session != null) {
       val frameId = drawState.nextFrameId()
       val frame =
         try {

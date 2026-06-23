@@ -9,6 +9,7 @@ internal object DesktopNativeRenderingLifecycle {
   private val participants = LinkedHashMap<Long, Participant>()
   private var nextId = 1L
   private var quitHandlerInstalled = false
+  private var quitHandlerUnavailable = false
 
   fun register(closeAction: () -> Unit): NativeRenderingParticipant {
     installQuitHandler()
@@ -22,14 +23,16 @@ internal object DesktopNativeRenderingLifecycle {
 
   private fun installQuitHandler() {
     synchronized(lock) {
-      if (quitHandlerInstalled) {
+      if (quitHandlerInstalled || quitHandlerUnavailable) {
         return
       }
       if (!Desktop.isDesktopSupported()) {
+        quitHandlerUnavailable = true
         return
       }
       val desktop = Desktop.getDesktop()
       if (!desktop.isSupported(Desktop.Action.APP_QUIT_HANDLER)) {
+        quitHandlerUnavailable = true
         return
       }
       desktop.setQuitHandler { _, response ->

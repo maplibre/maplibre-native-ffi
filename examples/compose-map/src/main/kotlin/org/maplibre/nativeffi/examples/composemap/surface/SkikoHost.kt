@@ -37,6 +37,10 @@ internal object SkikoHost {
   private const val METAL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.MetalRedrawer"
   private const val DIRECT3D_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.Direct3DRedrawer"
   private const val LINUX_OPENGL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.LinuxOpenGLRedrawer"
+  private const val LINUX_OPENGL_REDRAWER_HELPERS_CLASS =
+    "org.jetbrains.skiko.redrawer.LinuxOpenGLRedrawerKt"
+  private const val AWT_LINUX_DRAWING_SURFACE_HELPERS_CLASS =
+    "org.jetbrains.skiko.AWTLinuxDrawingSurfaceKt"
   private const val RETAINED_IMAGE_COUNT = 8
 
   private val metalPresenters = mutableMapOf<Long, MetalTexturePresenter>()
@@ -136,6 +140,30 @@ internal object SkikoHost {
 
   fun forgetOpenGlTexture(textureName: Int) {
     openGlPresenters.remove(textureName)?.close()
+  }
+
+  fun <T> withLinuxOpenGlContext(action: () -> T): T = onEdt {
+    val layer =
+      findSkiaLayer()
+        ?: throw NativeSurfaceBridgeException("SkikoHost could not find a live $SKIA_LAYER_CLASS")
+    val redrawer = requireLinuxOpenGlRedrawer(layer)
+    val backedLayer =
+      layer.getField("backedLayer")
+        ?: throw NativeSurfaceBridgeException("$SKIA_LAYER_CLASS.backedLayer was null")
+    val context =
+      redrawer.getField("context") as? Long
+        ?: throw NativeSurfaceBridgeException("$LINUX_OPENGL_REDRAWER_CLASS.context was null")
+    check(context != 0L) { "$LINUX_OPENGL_REDRAWER_CLASS.context was zero" }
+    val surfaceHelpers = Class.forName(AWT_LINUX_DRAWING_SURFACE_HELPERS_CLASS)
+    val drawingSurface = surfaceHelpers.staticInvoke("lockLinuxDrawingSurface", backedLayer)
+    try {
+      Class.forName(LINUX_OPENGL_REDRAWER_HELPERS_CLASS)
+        .staticInvoke("access\$makeCurrent", drawingSurface, context)
+      ensureOpenGlCapabilities()
+      action()
+    } finally {
+      surfaceHelpers.staticInvoke("unlockLinuxDrawingSurface", drawingSurface)
+    }
   }
 
   fun close() {
@@ -308,6 +336,11 @@ internal object SkikoHost {
       it.isAccessible = true
       it.get(this)
     }
+
+  private fun Class<*>.staticInvoke(name: String, vararg args: Any?): Any? =
+    methods
+      .firstOrNull { method -> method.name == name && method.parameterCount == args.size }
+      ?.invoke(null, *args) ?: throw NoSuchMethodException("${this.name}.$name/${args.size}")
 
   private fun Class<*>.findField(name: String): java.lang.reflect.Field {
     var current: Class<*>? = this
