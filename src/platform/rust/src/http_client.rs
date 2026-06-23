@@ -94,16 +94,23 @@ fn http_thread_pool() -> &'static threadpool::ThreadPool {
 fn http_agent() -> &'static ureq::Agent {
     static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
     AGENT.get_or_init(|| {
+        let mut tls_builder =
+            ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier);
+        #[cfg(target_os = "windows")]
+        {
+            tls_builder = tls_builder.provider(ureq::tls::TlsProvider::NativeTls);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            tls_builder = tls_builder.provider(ureq::tls::TlsProvider::Rustls);
+        }
+
         let mut config_builder = ureq::config::Config::builder()
             .http_status_as_error(false)
             // Redirects are handled manually so each hop can be checked on Android.
             .max_redirects(0)
             .timeout_connect(Some(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECONDS)))
-            .tls_config(
-                ureq::tls::TlsConfig::builder()
-                    .root_certs(ureq::tls::RootCerts::PlatformVerifier)
-                    .build(),
-            );
+            .tls_config(tls_builder.build());
         if let Some(proxy) = ureq::Proxy::try_from_env() {
             config_builder = config_builder.proxy(Some(proxy));
         }

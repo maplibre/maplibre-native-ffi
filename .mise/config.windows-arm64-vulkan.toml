@@ -1,6 +1,5 @@
 [env]
 _.path = [
-  "{{config_root}}/build/deps/curl/8.19.0_5/win64a-msvc/bin",
   "{{config_root}}/.pixi/envs/default/Library/bin",
   "{{config_root}}/build/windows-arm64-vulkan",
 ]
@@ -12,6 +11,7 @@ MLN_FFI_MSVC_TARGET_ARCH = "arm64"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/Library/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/Library/lib"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-windows-msvc"
-CMAKE_PREFIX_PATH = "{{config_root}}/build/deps/curl/8.19.0_5/win64a-msvc;{{config_root}}/.pixi/envs/default/Library"
-CMAKE_LIBRARY_PATH = "{{config_root}}/build/deps/curl/8.19.0_5/win64a-msvc/lib;{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
+CARGO_BUILD_TARGET = "aarch64-pc-windows-msvc"
+CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default/Library"
+CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/Library/bin"

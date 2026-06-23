@@ -9,8 +9,13 @@ function(mln_link_rust_platform target)
   endif()
 
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
-  set(rust_library
-      "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/libmaplibre_native_platform.a")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(rust_library
+        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/maplibre_native_platform.lib")
+  else()
+    set(rust_library
+        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/libmaplibre_native_platform.a")
+  endif()
   file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
        "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
 
@@ -21,6 +26,9 @@ function(mln_link_rust_platform target)
   set(rust_cc "${CMAKE_C_COMPILER}")
   set(rust_cxx "${CMAKE_CXX_COMPILER}")
   set(rust_linker "${CMAKE_CXX_COMPILER}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(rust_linker "${CMAKE_LINKER}")
+  endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     get_filename_component(rust_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
     string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")

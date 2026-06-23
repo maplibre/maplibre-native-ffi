@@ -44,7 +44,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:pkg-config" = { version = "0.29.2", os = ["linux"] } # Linux CMake uses pkg-config for libwebp/libuv
+"conda:pkg-config" = { version = "0.29.2", os = ["linux"] } # Linux CMake uses pkg-config for libuv
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
 # Node.js ecosystem
@@ -65,7 +65,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos" }
+"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
 "core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
 # Zig's native Windows ARM64 0.16.0 build crashes while loading build.zig, so
 # Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
@@ -157,9 +157,6 @@ description = "Install variant-specific managed dependencies."
 run = '''
 if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
   mise run deps:angle
-fi
-if [[ "${MISE_ENV%-*}" == "windows-arm64" ]]; then
-  mise run deps:curl-win-arm64
 fi
 '''
 

@@ -12,8 +12,13 @@ crate-type = ["staticlib"]
 http = "1.4"
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
 threadpool = "1.8.1"
-ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "platform-verifier", "socks-proxy"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "0.21.1", default-features = false }
 rustls-platform-verifier = "0.6.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+ureq = { version = "3", default-features = false, features = ["native-tls", "gzip", "socks-proxy"] }
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+ureq = { version = "3", default-features = false, features = ["rustls", "gzip", "platform-verifier", "socks-proxy"] }

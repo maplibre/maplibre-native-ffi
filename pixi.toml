@@ -41,15 +41,7 @@ ca-certificates = ">=2024,<2027"
 moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
-libcurl = ">=8,<8.20"
-libjpeg-turbo = ">=3.1,<4"
-libpng = ">=1.6,<2"
 libuv = ">=1,<2"
-libwebp = ">=1.6,<2"
 
 [target.win-arm64.dependencies]
-# libcurl is not currently available on conda-forge win-arm64.
-libjpeg-turbo = ">=3.1,<4"
-libpng = ">=1.6,<2"
 libuv = ">=1,<2"
-libwebp = ">=1.6,<2"

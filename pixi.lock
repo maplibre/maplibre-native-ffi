@@ -153,25 +153,16 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
       win-64:
-      - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.4.22-h4c7d964_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/icu-78.3-h637d24d_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/krb5-1.22.2-h0ea6238_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libclang-22.1.8-default_hac490eb_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libclang13-22.1.8-default_ha2db4b5_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libcurl-8.19.0-h8206538_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libiconv-1.18-hc1393d2_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libjpeg-turbo-3.1.4.1-hfd05255_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libpng-1.6.58-h7351971_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libssh2-1.11.1-h9aa295b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libuv-1.51.0-hfd05255_1.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libvulkan-loader-1.4.341.0-h477610d_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libwebp-1.6.0-h4d5522a_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/libwebp-base-1.6.0-h4d5522a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libxml2-16-2.15.3-h3cfd58e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libxml2-2.15.3-h8ef44ab_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/libzlib-1.3.2-hfd05255_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/openssl-3.6.2-hf411b9b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/ucrt-10.0.26100.0-h57928b3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc-14.3-h41ae7f8_34.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/vc14_runtime-14.44.35208-h818238b_34.conda
@@ -182,13 +173,9 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libclang-22.1.8-default_h95c9228_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libclang13-22.1.8-default_heb97caa_2.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libiconv-1.18-hef2380a_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-arm64/libjpeg-turbo-3.1.4.1-hfbbf558_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/liblzma-5.8.3-hfbbf558_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-arm64/libpng-1.6.58-h6cb7253_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libuv-1.52.1-hb7845dc_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libvulkan-loader-1.4.341.0-h11ae69d_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-arm64/libwebp-1.6.0-h7784224_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-arm64/libwebp-base-1.6.0-h7784224_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libxml2-16-2.15.3-hf3ace14_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libxml2-2.15.3-h255fea3_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-arm64/libzlib-1.3.2-hfbbf558_2.conda
@@ -1312,14 +1299,6 @@ packages:
   license_family: BSD
   size: 614429
   timestamp: 1764777145593
-- conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.4.22-h4c7d964_0.conda
-  sha256: 6f4ff81534c19e76acf52fcabf4a258088a932b8f1ac56e9a59e98f6051f8e46
-  md5: 56fb2c6c73efc627b40c77d14caecfba
-  depends:
-  - __win
-  license: ISC
-  size: 131388
-  timestamp: 1776865633471
 - conda: https://conda.anaconda.org/conda-forge/noarch/ca-certificates-2026.6.17-hbd8a1cb_0.conda
   sha256: f8e3c730fa14ee3f170493779f06522c4acf89169f43db4f039727709b6419cf
   md5: a9965dd99f683c5f444428f896635716
@@ -1755,18 +1734,6 @@ packages:
   license_family: MIT
   size: 14954024
   timestamp: 1773822508646
-- conda: https://conda.anaconda.org/conda-forge/win-64/krb5-1.22.2-h0ea6238_0.conda
-  sha256: eb60f1ad8b597bcf95dee11bc11fe71a8325bc1204cf51d2bb1f2120ffd77761
-  md5: 4432f52dc0c8eb6a7a6abc00a037d93c
-  depends:
-  - openssl >=3.5.5,<4.0a0
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  license: MIT
-  license_family: MIT
-  size: 751055
-  timestamp: 1769769688841
 - conda: https://conda.anaconda.org/conda-forge/win-64/libclang-22.1.8-default_hac490eb_2.conda
   sha256: 911d2eab79fcdbb73618e2207752377372ae530fd93697d2b5388a7ba2be2f36
   md5: d91a6cf59bd0b72884cc826c13aac6ee
@@ -1802,20 +1769,6 @@ packages:
     - libclang13 >=22.1.8
   size: 30487117
   timestamp: 1781848941933
-- conda: https://conda.anaconda.org/conda-forge/win-64/libcurl-8.19.0-h8206538_0.conda
-  sha256: 6b2143ba5454b399dab4471e9e1d07352a2f33b569975e6b8aedc2d9bf51cbb0
-  md5: ed181e29a7ebf0f60b84b98d6140a340
-  depends:
-  - krb5 >=1.22.2,<1.23.0a0
-  - libssh2 >=1.11.1,<2.0a0
-  - libzlib >=1.3.1,<2.0a0
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  license: curl
-  license_family: MIT
-  size: 392543
-  timestamp: 1773218585056
 - conda: https://conda.anaconda.org/conda-forge/win-64/libiconv-1.18-hc1393d2_2.conda
   sha256: 0dcdb1a5f01863ac4e8ba006a8b0dc1a02d2221ec3319b5915a1863254d7efa7
   md5: 64571d1dd6cdcfa25d0664a5950fdaa2
@@ -1826,18 +1779,6 @@ packages:
   license: LGPL-2.1-only
   size: 696926
   timestamp: 1754909290005
-- conda: https://conda.anaconda.org/conda-forge/win-64/libjpeg-turbo-3.1.4.1-hfd05255_0.conda
-  sha256: 698d57b5b90120270eaa401298319fcb25ea186ae95b340c2f4813ed9171083d
-  md5: 25a127bad5470852b30b239f030ec95b
-  depends:
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  constrains:
-  - jpeg <0.0.0a
-  license: IJG AND BSD-3-Clause AND Zlib
-  size: 842806
-  timestamp: 1775962811457
 - conda: https://conda.anaconda.org/conda-forge/win-64/liblzma-5.8.3-hfd05255_0.conda
   sha256: d636d1a25234063642f9c531a7bb58d84c1c496411280a36ea000bd122f078f1
   md5: 8f83619ab1588b98dd99c90b0bfc5c6d
@@ -1850,30 +1791,6 @@ packages:
   license: 0BSD
   size: 106486
   timestamp: 1775825663227
-- conda: https://conda.anaconda.org/conda-forge/win-64/libpng-1.6.58-h7351971_0.conda
-  sha256: 218913aeee391460bd0e341b834dbd9c6fa6ae0a4276c0c300266cc99a816a28
-  md5: 52f1280563f3b48b5f75414cd2d15dd1
-  depends:
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  - ucrt >=10.0.20348.0
-  - libzlib >=1.3.2,<2.0a0
-  license: zlib-acknowledgement
-  size: 385227
-  timestamp: 1776315248638
-- conda: https://conda.anaconda.org/conda-forge/win-64/libssh2-1.11.1-h9aa295b_0.conda
-  sha256: cbdf93898f2e27cefca5f3fe46519335d1fab25c4ea2a11b11502ff63e602c09
-  md5: 9dce2f112bfd3400f4f432b3d0ac07b2
-  depends:
-  - libzlib >=1.3.1,<2.0a0
-  - openssl >=3.5.0,<4.0a0
-  - ucrt >=10.0.20348.0
-  - vc >=14.2,<15
-  - vc14_runtime >=14.29.30139
-  license: BSD-3-Clause
-  license_family: BSD
-  size: 292785
-  timestamp: 1745608759342
 - conda: https://conda.anaconda.org/conda-forge/win-64/libuv-1.51.0-hfd05255_1.conda
   sha256: f03dc82e6fb1725788e73ae97f0cd3d820d5af0d351a274104a0767035444c59
   md5: 31e1545994c48efc3e6ea32ca02a8724
@@ -1898,32 +1815,6 @@ packages:
   license_family: APACHE
   size: 282251
   timestamp: 1770077165680
-- conda: https://conda.anaconda.org/conda-forge/win-64/libwebp-1.6.0-h4d5522a_0.conda
-  sha256: 9442e93a6e51bdfdeb1e3f90889f7ddea4e1127ceda5b19e97c0ad7c0aede5ca
-  md5: 151aee0a97a0234a289c781e2e48ce9a
-  depends:
-  - libwebp-base 1.6.0.*
-  - libwebp-base >=1.6.0,<2.0a0
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  license: BSD-3-Clause
-  license_family: BSD
-  size: 72249
-  timestamp: 1752167597373
-- conda: https://conda.anaconda.org/conda-forge/win-64/libwebp-base-1.6.0-h4d5522a_0.conda
-  sha256: 7b6316abfea1007e100922760e9b8c820d6fc19df3f42fb5aca684cfacb31843
-  md5: f9bbae5e2537e3b06e0f7310ba76c893
-  depends:
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  constrains:
-  - libwebp 1.6.0
-  license: BSD-3-Clause
-  license_family: BSD
-  size: 279176
-  timestamp: 1752159543911
 - conda: https://conda.anaconda.org/conda-forge/win-64/libxml2-16-2.15.3-h3cfd58e_0.conda
   sha256: 3b61ee3caba702d2ff432fa3920835db963026e5c99c4e6fdca0c6114f59e7ce
   md5: 9e8dd0d90ed830107b2c36801035b7db
@@ -1970,18 +1861,6 @@ packages:
   license_family: Other
   size: 58347
   timestamp: 1774072851498
-- conda: https://conda.anaconda.org/conda-forge/win-64/openssl-3.6.2-hf411b9b_0.conda
-  sha256: feb5815125c60f2be4a411e532db1ed1cd2d7261a6a43c54cb6ae90724e2e154
-  md5: 05c7d624cff49dbd8db1ad5ba537a8a3
-  depends:
-  - ca-certificates
-  - ucrt >=10.0.20348.0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  license: Apache-2.0
-  license_family: Apache
-  size: 9410183
-  timestamp: 1775589779763
 - conda: https://conda.anaconda.org/conda-forge/win-64/ucrt-10.0.26100.0-h57928b3_0.conda
   sha256: 3005729dce6f3d3f5ec91dfc49fc75a0095f9cd23bab49efb899657297ac91a5
   md5: 71b24316859acd00bdb8b38f5e2ce328
@@ -2094,20 +1973,6 @@ packages:
     - libiconv >=1.18,<2.0a0
   size: 690354
   timestamp: 1754908935023
-- conda: https://conda.anaconda.org/conda-forge/win-arm64/libjpeg-turbo-3.1.4.1-hfbbf558_0.conda
-  sha256: 1168b8bcfd46dd81883d318f3daabda4383f4086a9c9ca909383b6dc542082da
-  md5: 4f08501ffff36b29801347c8a3cf30e8
-  depends:
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  constrains:
-  - jpeg <0.0.0a
-  license: IJG AND BSD-3-Clause AND Zlib
-  run_exports:
-    weak:
-    - libjpeg-turbo >=3.1.4.1,<4.0a0
-  size: 741114
-  timestamp: 1775962822673
 - conda: https://conda.anaconda.org/conda-forge/win-arm64/liblzma-5.8.3-hfbbf558_0.conda
   sha256: 14992b717ce63ed7acbaea73d5cd1ab956864804a14d95489eb5c7661394a206
   md5: 05d76088c9e8d7f8d3986c4044d7d928
@@ -2122,19 +1987,6 @@ packages:
     - liblzma >=5.8.3,<6.0a0
   size: 98360
   timestamp: 1775825578466
-- conda: https://conda.anaconda.org/conda-forge/win-arm64/libpng-1.6.58-h6cb7253_0.conda
-  sha256: 67c934760764e7e473ed5cec1d49464975bce1893e2514d427dea7882d07d2ce
-  md5: 862b344904d78620cbe06fd31484d486
-  depends:
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  - libzlib >=1.3.2,<2.0a0
-  license: zlib-acknowledgement
-  run_exports:
-    weak:
-    - libpng >=1.6.58,<1.7.0a0
-  size: 368261
-  timestamp: 1776315252746
 - conda: https://conda.anaconda.org/conda-forge/win-arm64/libuv-1.52.1-hb7845dc_0.conda
   sha256: 9e0bfaf3f0aa2b52fd2c5fbc93b9626850554099f51eec64c0e7bb48ff703fa5
   md5: 589bb44681c8af6112615cd721bff2a1
@@ -2161,34 +2013,6 @@ packages:
     - libvulkan-loader >=1.4.341.0,<2.0a0
   size: 250243
   timestamp: 1770077166916
-- conda: https://conda.anaconda.org/conda-forge/win-arm64/libwebp-1.6.0-h7784224_0.conda
-  sha256: 1f5f8d38f075759f15787fb5a9c8b06f4ab13573d8a84d419ce6af25c59ca379
-  md5: b4eeb35125e3de113fa4eab21f59382f
-  depends:
-  - libwebp-base 1.6.0.*
-  - libwebp-base >=1.6.0,<2.0a0
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  license: BSD-3-Clause
-  run_exports:
-    weak:
-    - libwebp-base >=1.6.0,<2.0a0
-  size: 67260
-  timestamp: 1752167254026
-- conda: https://conda.anaconda.org/conda-forge/win-arm64/libwebp-base-1.6.0-h7784224_0.conda
-  sha256: 1e8ba2b28b806b792ba7197e671af95ba72574414b6166cd3c5dd1bb1447db18
-  md5: c63760895f5555186720ce0c6d0f2634
-  depends:
-  - vc >=14.3,<15
-  - vc14_runtime >=14.44.35208
-  constrains:
-  - libwebp 1.6.0
-  license: BSD-3-Clause
-  run_exports:
-    weak:
-    - libwebp-base >=1.6.0,<2.0a0
-  size: 249753
-  timestamp: 1752159653523
 - conda: https://conda.anaconda.org/conda-forge/win-arm64/libxml2-16-2.15.3-hf3ace14_0.conda
   sha256: 427d46db0a679df45855a0cf0ced994f7deb3474dcbcec7f1426f05fd14cc517
   md5: f8bc36e2ba7e7ebc6b54d66fc6e25713
