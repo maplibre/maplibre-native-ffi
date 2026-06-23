@@ -225,7 +225,7 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
                     };
                     continue;
                 }
-                return http_response(&mut response);
+                return http_response(&mut response, has_range);
             }
             Err(error) => return http_error(map_transport_error(&error), &error.to_string()),
         }
@@ -234,8 +234,22 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     http_error(HTTP_ERROR_OTHER, "too many HTTP redirects")
 }
 
-fn http_response(response: &mut http::Response<ureq::Body>) -> MlnRustHttpResponse {
+fn http_response(
+    response: &mut http::Response<ureq::Body>,
+    ranged_request: bool,
+) -> MlnRustHttpResponse {
     let status_code = response.status().as_u16();
+    if ranged_request && (status_code == 200 || status_code == 206) {
+        if let Some(encoding) = response_header(response, "content-encoding")
+            && !encoding.eq_ignore_ascii_case("identity")
+        {
+            return http_error(
+                HTTP_ERROR_OTHER,
+                &format!("unsupported HTTP content encoding: {encoding}"),
+            );
+        }
+    }
+
     let etag = response_header(response, "etag");
     let modified = response_header(response, "last-modified");
     let cache_control = response_header(response, "cache-control");
