@@ -37,53 +37,13 @@ runs:
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
 
-    - name: Use Windows software graphics drivers
-      if: ${{ runner.os == 'Windows' }}
-      shell: pwsh
-      run: |
-        $mesaVersion = "26.0.8"
-        $mesaArchive = Join-Path $env:RUNNER_TEMP "mesa3d.7z"
-        $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d"
-        $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/mesa3d-$mesaVersion-release-msvc.7z"
+    - name: Use Windows Vulkan software driver
+      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-vulkan') }}
+      uses: ./.github/actions/setup-windows-vulkan-software
 
-        Invoke-WebRequest -Uri $mesaUrl -OutFile $mesaArchive
-        $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
-        $actualHash = (Get-FileHash $mesaArchive -Algorithm SHA256).Hash
-        if ($actualHash -ne $expectedHash) {
-          throw "Mesa archive hash mismatch: expected $expectedHash, got $actualHash"
-        }
-        7z x $mesaArchive "-o$mesaRoot" -y | Out-Null
-
-        $mesaWglDriver = Get-ChildItem $mesaRoot -Recurse -Filter "libgallium_wgl.dll" |
-          Where-Object { $_.FullName -match "x64" } |
-          Select-Object -First 1
-        if (-not $mesaWglDriver) {
-          throw "Missing Mesa WGL driver in $mesaArchive"
-        }
-
-        $driverManifest = Get-ChildItem $mesaRoot -Recurse -Filter "lvp_icd.x86_64.json" |
-          Select-Object -First 1
-        if (-not $driverManifest) {
-          throw "Missing lavapipe Vulkan ICD manifest in $mesaArchive"
-        }
-
-        $mesaBin = $mesaWglDriver.Directory.FullName
-        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32\mesadrv.dll"
-        Copy-Item $mesaWglDriver.FullName $mesaWglSystemDriver -Force
-
-        $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
-        New-Item -Path $openglDriverKey -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name DLL -PropertyType String -Value "mesadrv.dll" -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name DriverVersion -PropertyType DWord -Value 1 -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
-        New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
-
-        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
-        New-Item -Path $driverKey -Force | Out-Null
-        New-ItemProperty -Path $driverKey -Name $driverManifest.FullName -PropertyType DWord -Value 0 -Force | Out-Null
-
-        "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
-        "Path=$mesaBin;$env:Path" >> $env:GITHUB_ENV
+    - name: Use Windows OpenGL software driver
+      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-wgl') }}
+      uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -169,6 +129,16 @@ runs:
           $gradleOptions = "$gradleOptions $env:GRADLE_OPTS"
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
+
+    # Windows ARM64 gets Vulkan libraries through mise/pixi, but glslangValidator
+    # is not available there yet; the Vulkan examples need it to precompile shaders.
+    - name: Install Windows ARM64 Vulkan SDK
+      if: ${{ env.MISE_ENV == 'windows-arm64-vulkan' }}
+      uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
+      with:
+        vulkan_version: 1.4.341.0
+        cache: true
+        stripdown: true
 
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1

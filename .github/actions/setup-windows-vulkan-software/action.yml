@@ -1,0 +1,59 @@
+name: Setup Windows Vulkan software driver
+description: Install a Lavapipe Vulkan ICD for Windows CI
+
+runs:
+  using: composite
+  steps:
+    - name: Install Lavapipe
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        $ProgressPreference = "SilentlyContinue"
+
+        function Save-CheckedArchive($Url, $Path, $ExpectedHash) {
+          Invoke-WebRequest -Uri $Url -OutFile $Path
+          $actualHash = (Get-FileHash $Path -Algorithm SHA256).Hash
+          if ($actualHash -ne $ExpectedHash) {
+            throw "Archive hash mismatch for $Url`: expected $ExpectedHash, got $actualHash"
+          }
+        }
+
+        function Register-VulkanDriver($Manifest) {
+          $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+          New-Item -Path $driverKey -Force | Out-Null
+          New-ItemProperty -Path $driverKey -Name $Manifest -PropertyType DWord -Value 0 -Force | Out-Null
+        }
+
+        if ($env:RUNNER_ARCH -eq "ARM64") {
+          $mesaVersion = "26.1.3"
+          $archiveName = "mesa-lavapipe-arm64-$mesaVersion.7z"
+          $expectedHash = "371EF5E595A0A3D7FF1965E336F98314EB2C7787FCB7953BC700DFCCC72DB457"
+          $mesaUrl = "https://github.com/mmozeiko/build-mesa/releases/download/$mesaVersion/$archiveName"
+          $manifestName = "lvp_icd.aarch64.json"
+        } else {
+          $mesaVersion = "26.0.8"
+          $archiveName = "mesa3d-$mesaVersion-release-msvc.7z"
+          $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
+          $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/$archiveName"
+          $manifestName = "lvp_icd.x86_64.json"
+        }
+
+        $mesaArchive = Join-Path $env:RUNNER_TEMP $archiveName
+        $mesaRoot = Join-Path $env:RUNNER_TEMP "lavapipe-$mesaVersion-$env:RUNNER_ARCH"
+        Save-CheckedArchive $mesaUrl $mesaArchive $expectedHash
+        7z x $mesaArchive "-o$mesaRoot" -y | Out-Null
+
+        $driverManifest = Get-ChildItem $mesaRoot -Recurse -Filter $manifestName |
+          Select-Object -First 1
+        if (-not $driverManifest) {
+          throw "Missing Lavapipe Vulkan ICD manifest $manifestName in $mesaArchive"
+        }
+
+        $driver = Get-ChildItem $mesaRoot -Recurse -Filter "vulkan_lvp.dll" |
+          Select-Object -First 1
+        if (-not $driver) {
+          throw "Missing Lavapipe Vulkan driver in $mesaArchive"
+        }
+
+        Register-VulkanDriver $driverManifest.FullName
+        "Path=$($driver.Directory.FullName);$env:Path" >> $env:GITHUB_ENV

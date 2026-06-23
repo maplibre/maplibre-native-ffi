@@ -25,6 +25,7 @@ class HostPlatform private constructor(osName: String, arch: String) {
         isMac -> "natives-macos"
         isLinux && isArm64 -> "natives-linux-arm64"
         isLinux -> "natives-linux"
+        isWindows && isArm64 -> "natives-windows-arm64"
         isWindows -> "natives-windows"
         else -> throw IllegalStateException("Unsupported LWJGL native platform: $osName/$arch")
       }

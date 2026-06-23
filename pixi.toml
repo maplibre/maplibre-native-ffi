@@ -3,7 +3,14 @@
 
 [workspace]
 channels = ["conda-forge"]
-platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
+platforms = [
+  "linux-64",
+  "linux-aarch64",
+  "osx-64",
+  "osx-arm64",
+  "win-64",
+  "win-arm64",
+]
 
 [system-requirements]
 macos = "14.0"
@@ -41,6 +48,13 @@ moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
 libcurl = ">=8,<8.20"
+libjpeg-turbo = ">=3.1,<4"
+libpng = ">=1.6,<2"
+libuv = ">=1,<2"
+libwebp = ">=1.6,<2"
+
+[target.win-arm64.dependencies]
+# libcurl is not currently available on conda-forge win-arm64.
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
 libuv = ">=1,<2"

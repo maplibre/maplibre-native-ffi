@@ -58,6 +58,7 @@ ENVIRONMENT_ORDER = [
     "linux-arm64",
     "macos-arm64",
     "windows-x64",
+    "windows-arm64",
     "android-arm64",
     "android-x64",
     "ios-arm64",
@@ -137,7 +138,7 @@ def variant_status(variant: Variant) -> str:
 
 
 def subproject_status(actions: dict[str, str], variant: Variant) -> Status | None:
-    if actions.get("run"):
+    if actions.get("run") and variant.supports_tests:
         return "tested"
     if actions.get("test") and variant.supports_tests:
         return "tested"

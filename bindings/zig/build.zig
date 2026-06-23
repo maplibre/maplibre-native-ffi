@@ -217,6 +217,17 @@ pub const CMacro = struct {
 
 pub fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const CMacro {
     if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
+    if (target.result.cpu.arch == .aarch64) {
+        return &.{
+            .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+            // Zig translate-c does not define __clang__, so Windows ARM64 UCRT
+            // wchar.h selects NEON intrinsics without importing arm_neon.h.
+            .{ .name = "_M_CEE", .value = "1" },
+            .{ .name = "__clrcall", .value = "__cdecl" },
+            .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+            .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+        };
+    }
     return &.{
         .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
         .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },

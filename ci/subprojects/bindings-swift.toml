@@ -1,2 +1,2 @@
 [requires]
-os = ["macos", "ios"]
+os = ["linux", "macos", "ios"]

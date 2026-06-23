@@ -14,6 +14,7 @@ depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
 set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
 case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
@@ -26,6 +27,7 @@ depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
 set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
 case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
@@ -39,6 +41,7 @@ dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
 run = '''
 set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
 case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
