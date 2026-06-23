@@ -5,7 +5,13 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-mac-vulkan-renderer")
-  private val vulkan = MacVulkanContext.create()
+  private val vulkan: MacVulkanContext =
+    try {
+      MacVulkanContext.create()
+    } catch (error: Throwable) {
+      rendererDispatcher.close()
+      throw error
+    }
   private var metalTexture = NativeHandle(0)
   private var pixelFormat = 0L
   private var importedTexture: MacVulkanImportedTexture? = null
