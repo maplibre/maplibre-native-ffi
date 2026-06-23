@@ -4,7 +4,7 @@ include(mln_platform)
 include(mln_render_backend)
 
 function(mln_configure_shared_exports target)
-  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     return()
   endif()
 
@@ -24,12 +24,13 @@ function(mln_configure_shared_exports target)
     target_link_options(
       ${target}
       PRIVATE "LINKER:--version-script,${export_file}")
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
+    endif()
   endif()
 endfunction()
 
 function(mln_add_c_api_library target)
-  find_package(ZLIB REQUIRED)
-
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
@@ -55,7 +56,7 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     add_library(${target} STATIC)
   else()
     add_library(${target} SHARED)
@@ -73,7 +74,7 @@ function(mln_add_c_api_library target)
     ${target}
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
-      mbgl-vendor-sqlite ZLIB::ZLIB)
+      mbgl-vendor-sqlite)
 
   target_compile_options(
     ${target}

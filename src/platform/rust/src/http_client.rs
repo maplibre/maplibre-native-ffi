@@ -185,8 +185,18 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
 
         let agent = http_agent();
         let mut builder = agent.get(&url);
+        let has_accept_encoding = request.headers.iter().any(|(name, _)| {
+            name.eq_ignore_ascii_case("accept-encoding")
+        });
+        let has_range = request
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("range"));
         for (name, value) in &request.headers {
             builder = builder.header(name, value);
+        }
+        if !has_accept_encoding && has_range {
+            builder = builder.header("Accept-Encoding", "identity");
         }
 
         match builder.call() {

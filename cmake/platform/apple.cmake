@@ -50,9 +50,13 @@ function(mln_configure_apple_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      mbgl-vendor-metal-cpp "-framework CoreFoundation"
-      "-framework CoreGraphics" "-framework CoreText" "-framework Foundation"
-      "-framework ImageIO")
+      mbgl-vendor-metal-cpp
+      "-framework CoreFoundation"
+      "-framework CoreGraphics"
+      "-framework CoreText"
+      "-framework Foundation"
+      "-framework ImageIO"
+      z)
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(

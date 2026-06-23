@@ -2,7 +2,7 @@ function(mln_configure_linux_platform target)
   include(mln_rust)
   find_package(PkgConfig REQUIRED)
   find_package(Threads REQUIRED)
-  pkg_search_module(LIBUV libuv REQUIRED)
+  find_package(ZLIB REQUIRED)
 
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
@@ -35,11 +35,20 @@ function(mln_configure_linux_platform target)
     BEFORE
     PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
 
-  target_include_directories(${target} SYSTEM PRIVATE ${LIBUV_INCLUDE_DIRS})
+  target_include_directories(
+    ${target}
+    SYSTEM
+    PRIVATE ${ZLIB_INCLUDE_DIR} "$ENV{MLN_FFI_DEPENDENCY_INCLUDE_DIR}")
 
   target_link_libraries(
     ${target}
-    PRIVATE ${LIBUV_LIBRARIES} mbgl-vendor-icu Threads::Threads)
+    PRIVATE
+      mbgl-vendor-icu
+      Threads::Threads
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libpng.a"
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a"
+      dl)
 
   mln_link_rust_platform(${target})
 endfunction()

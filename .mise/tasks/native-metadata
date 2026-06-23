@@ -15,7 +15,6 @@ LIBRARY_NAME = "maplibre-native-c"
 @dataclass(frozen=True)
 class Artifact:
     render_backend: str
-    artifact_shape: str
     library_path: str
     import_library_path: str
     include_dirs: list[str]
@@ -62,7 +61,6 @@ def load_artifact(metadata_path: Path) -> Artifact:
 
     return Artifact(
         render_backend=metadata.get("render_backend", ""),
-        artifact_shape=metadata.get("artifact_shape", ""),
         library_path=library_path,
         import_library_path=import_library_path,
         include_dirs=unique(metadata.get("include_dirs", [])),
@@ -221,17 +219,16 @@ def write_cargo_rustflags(artifact: Artifact, out_dir: Path) -> None:
     write_lines(out_dir / f"{LIBRARY_NAME}.cargo-rustflags", lines)
 
 
-def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
+def write_zig_config(metadata: dict, artifact: Artifact, out_dir: Path) -> None:
     values = {
         "render_backend": artifact.render_backend,
-        "artifact_shape": artifact.artifact_shape,
         "library_path": artifact.library_path,
         "import_library_path": artifact.import_library_path,
         "include_dirs": path_list(artifact.include_dirs),
         "library_dirs": path_list(artifact.library_dirs),
         "link_dirs": path_list(artifact.link_dirs),
         "runtime_library_dirs": path_list(artifact.runtime_library_dirs),
-        "link_libraries": path_list(artifact.link_libraries),
+        "link_libraries": path_list(unique(metadata.get("link_libraries", []))),
         "frameworks": path_list(artifact.frameworks),
     }
     write_lines(
@@ -264,6 +261,8 @@ def write_zig_libc_config(out_dir: Path) -> None:
 def generate(metadata_path: Path) -> None:
     out_dir = metadata_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
+    with metadata_path.open(encoding="utf-8") as metadata_file:
+        metadata = json.load(metadata_file)
     artifact = load_artifact(metadata_path)
     write_pkg_config(artifact, out_dir)
     write_gradle_properties(artifact, out_dir)
@@ -271,7 +270,7 @@ def generate(metadata_path: Path) -> None:
     (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)
     write_swift_linker_flags(artifact, out_dir)
     write_cargo_rustflags(artifact, out_dir)
-    write_zig_config(artifact, out_dir)
+    write_zig_config(metadata, artifact, out_dir)
     write_zig_libc_config(out_dir)
 
 
