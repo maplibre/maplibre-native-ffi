@@ -620,7 +620,7 @@ renaming exported symbols.
   evaluate `dma_buf`/EGLImage import only if opaque-FD support is missing or
   proves less portable across target drivers.
 - Verify Skiko 0.144.6 Linux reflection points against the exact source before
-  replacing the placeholder bridge: `LinuxOpenGLRedrawer.context`,
+  replacing the prototype bridge: `LinuxOpenGLRedrawer.context`,
   `LinuxOpenGLRedrawer.contextHandler`, and
   `OpenGLContextHandler.context`/surface lifecycle.
 - Treat `vulkan-metal` as the first bridge candidate because it exercises

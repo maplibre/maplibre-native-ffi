@@ -2,11 +2,15 @@ package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
 
-internal class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, ConsumerBackend.METAL) {
+internal class MacMetalBridge : NativeSurfaceBridge {
   private var texture = NativeHandle(0)
   private var pixelFormat = 0L
   private var generation = 0L
   private var currentExtent = SurfaceExtent.Empty
+
+  override val backend: ProducerBackend = ProducerBackend.METAL
+
+  override val consumerBackend: ConsumerBackend = ConsumerBackend.METAL
 
   override val capabilities: NativeSurfaceCapabilities =
     NativeSurfaceCapabilities(
@@ -14,7 +18,6 @@ internal class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, Consume
       consumerBackend = consumerBackend,
       supportsExplicitSynchronization = false,
       supportsResizeWithoutRecreate = false,
-      isPlaceholder = false,
     )
 
   override fun resize(extent: SurfaceExtent) {
@@ -42,7 +45,7 @@ internal class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, Consume
     )
   }
 
-  override fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
+  private fun target(extent: SurfaceExtent, generation: Long): NativeSurfaceTarget =
     MetalTextureTarget(
       texture =
         texture.takeIf { it.address != 0L }

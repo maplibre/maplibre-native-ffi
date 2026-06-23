@@ -93,7 +93,6 @@ public data class NativeSurfaceCapabilities(
   public val consumerBackend: ConsumerBackend,
   public val supportsExplicitSynchronization: Boolean,
   public val supportsResizeWithoutRecreate: Boolean,
-  public val isPlaceholder: Boolean,
 )
 
 public data class NativeSurfaceHost(

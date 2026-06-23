@@ -85,7 +85,6 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       consumerBackend = consumerBackend,
       supportsExplicitSynchronization = false,
       supportsResizeWithoutRecreate = false,
-      isPlaceholder = false,
     )
 
   override fun resize(extent: SurfaceExtent) {
