@@ -630,21 +630,28 @@ internal object SkikoHost {
       ensureOpenGlCapabilities()
       val previous = glGetInteger(GL_FRAMEBUFFER_BINDING)
       val next = glGenFramebuffers()
-      glBindFramebuffer(GL_FRAMEBUFFER, next)
-      glFramebufferTexture2D(
-        GL_FRAMEBUFFER,
-        GL_COLOR_ATTACHMENT0,
-        target.textureTarget,
-        target.textureName,
-        0,
-      )
-      val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
-      glBindFramebuffer(GL_FRAMEBUFFER, previous)
-      checkGl("glFramebufferTexture2D")
-      check(status == GL_FRAMEBUFFER_COMPLETE) {
-        "OpenGL framebuffer for texture ${target.textureName} is incomplete: 0x${status.toString(16)}"
+      try {
+        glBindFramebuffer(GL_FRAMEBUFFER, next)
+        glFramebufferTexture2D(
+          GL_FRAMEBUFFER,
+          GL_COLOR_ATTACHMENT0,
+          target.textureTarget,
+          target.textureName,
+          0,
+        )
+        val status = glCheckFramebufferStatus(GL_FRAMEBUFFER)
+        glBindFramebuffer(GL_FRAMEBUFFER, previous)
+        checkGl("glFramebufferTexture2D")
+        check(status == GL_FRAMEBUFFER_COMPLETE) {
+          "OpenGL framebuffer for texture ${target.textureName} is incomplete: 0x${status.toString(16)}"
+        }
+        return next
+      } catch (error: RuntimeException) {
+        runCatching { glDeleteFramebuffers(next) }
+        throw error
+      } finally {
+        glBindFramebuffer(GL_FRAMEBUFFER, previous)
       }
-      return next
     }
 
     private fun retainImageForRecordedFrame(image: Image) {

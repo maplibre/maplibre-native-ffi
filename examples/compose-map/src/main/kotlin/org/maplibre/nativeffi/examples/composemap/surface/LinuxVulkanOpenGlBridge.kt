@@ -205,22 +205,22 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     exportedTexture?.close()
     exportedTexture = null
   }
+}
 
-  private fun currentOpenGlDeviceUuids(): Set<String> {
-    val capabilities = ensureLwjglOpenGlCapabilities()
-    if (!capabilities.GL_EXT_memory_object) {
-      return emptySet()
-    }
-    val count = glGetInteger(GL_NUM_DEVICE_UUIDS_EXT)
-    if (count <= 0) {
-      return emptySet()
-    }
-    MemoryStack.stackPush().use { stack ->
-      return (0..<count).mapTo(linkedSetOf()) { index ->
-        val uuid = stack.malloc(GL_UUID_SIZE_EXT)
-        glGetUnsignedBytei_vEXT(GL_DEVICE_UUID_EXT, index, uuid)
-        uuid.toUuidHex(GL_UUID_SIZE_EXT)
-      }
+internal fun currentOpenGlDeviceUuids(): Set<String> {
+  val capabilities = ensureLwjglOpenGlCapabilities()
+  if (!capabilities.GL_EXT_memory_object) {
+    return emptySet()
+  }
+  val count = glGetInteger(GL_NUM_DEVICE_UUIDS_EXT)
+  if (count <= 0) {
+    return emptySet()
+  }
+  MemoryStack.stackPush().use { stack ->
+    return (0..<count).mapTo(linkedSetOf()) { index ->
+      val uuid = stack.malloc(GL_UUID_SIZE_EXT)
+      glGetUnsignedBytei_vEXT(GL_DEVICE_UUID_EXT, index, uuid)
+      uuid.toUuidHex(GL_UUID_SIZE_EXT)
     }
   }
 }
@@ -596,8 +596,8 @@ private constructor(
       memoryObject = glCreateMemoryObjectsEXT()
       glMemoryObjectParameteriEXT(memoryObject, GL_DEDICATED_MEMORY_OBJECT_EXT, GL_TRUE)
       glImportMemoryFdEXT(memoryObject, memorySize, GL_HANDLE_TYPE_OPAQUE_FD_EXT, fd)
-      imported = true
       checkGl("glImportMemoryFdEXT")
+      imported = true
 
       textureName = glGenTextures()
       glBindTexture(GL_TEXTURE_2D, textureName)

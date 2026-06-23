@@ -5,13 +5,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   private val rendererDispatcher =
     NativeSurfaceRendererDispatcher("compose-map-mac-vulkan-renderer")
-  private val vulkan: MacVulkanContext =
-    try {
-      MacVulkanContext.create()
-    } catch (error: Throwable) {
-      rendererDispatcher.close()
-      throw error
-    }
+  private var vulkan: MacVulkanContext? = null
   private var metalTexture = NativeHandle(0)
   private var pixelFormat = 0L
   private var importedTexture: MacVulkanImportedTexture? = null
@@ -56,7 +50,7 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    rendererDispatcher.run { vulkan.waitIdle() }
+    rendererDispatcher.run { vulkan?.waitIdle() }
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
@@ -81,7 +75,8 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
 
   override fun close() {
     disposeTexture()
-    vulkan.close()
+    vulkan?.close()
+    vulkan = null
     rendererDispatcher.close()
   }
 
@@ -95,9 +90,10 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     }
 
     val oldTexture = metalTexture
+    val metalDevice = SkikoHost.requireMetalDevice()
     val newTextureAddress =
       MacMetalBridgeNative.createMetalTexture(
-        metalDevice = SkikoHost.requireMetalDevice().ptr,
+        metalDevice = metalDevice.ptr,
         oldTexture = oldTexture.address,
         width = extent.physicalWidth,
         height = extent.physicalHeight,
@@ -115,7 +111,8 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     metalTexture = newTexture
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
     try {
-      importedTexture = vulkan.createImportedTexture(newTexture, extent)
+      val context = vulkan ?: MacVulkanContext.create(metalDevice.ptr).also { vulkan = it }
+      importedTexture = context.createImportedTexture(newTexture, extent)
     } catch (error: RuntimeException) {
       disposeTexture()
       throw error

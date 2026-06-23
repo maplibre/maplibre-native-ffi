@@ -45,6 +45,7 @@ internal object MacObjectiveC {
     JNI.invokePPPV(receiver, selector, argument, implementation(receiver, selector))
   }
 
+  @Synchronized
   private fun cls(name: String): Long =
     classes.getOrPut(name) {
       loadFrameworkForClass(name)
@@ -60,6 +61,7 @@ internal object MacObjectiveC {
     }
   }
 
+  @Synchronized
   private fun selector(name: String): Long =
     selectors.getOrPut(name) { ObjCRuntime.sel_registerName(name) }
 
@@ -73,6 +75,7 @@ internal object MacObjectiveC {
     return implementation
   }
 
+  @Synchronized
   private fun loadFramework(framework: String): Long =
     frameworks.getOrPut(framework) {
       val path = "/System/Library/Frameworks/$framework.framework/$framework"

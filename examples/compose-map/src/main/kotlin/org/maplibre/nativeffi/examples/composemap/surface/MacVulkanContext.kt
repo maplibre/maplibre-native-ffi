@@ -4,8 +4,13 @@ import java.util.LinkedHashSet
 import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.vulkan.EXTDebugUtils.VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+import org.lwjgl.vulkan.EXTMetalObjects.VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT
 import org.lwjgl.vulkan.EXTMetalObjects.VK_EXT_METAL_OBJECTS_EXTENSION_NAME
+import org.lwjgl.vulkan.EXTMetalObjects.VK_STRUCTURE_TYPE_EXPORT_METAL_DEVICE_INFO_EXT
+import org.lwjgl.vulkan.EXTMetalObjects.VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECTS_INFO_EXT
+import org.lwjgl.vulkan.EXTMetalObjects.VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT
 import org.lwjgl.vulkan.EXTMetalObjects.VK_STRUCTURE_TYPE_IMPORT_METAL_TEXTURE_INFO_EXT
+import org.lwjgl.vulkan.EXTMetalObjects.vkExportMetalObjectsEXT
 import org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
 import org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
 import org.lwjgl.vulkan.KHRPortabilitySubset.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
@@ -27,6 +32,7 @@ import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
+import org.lwjgl.vulkan.VK10.VK_SUCCESS
 import org.lwjgl.vulkan.VK10.vkCreateDevice
 import org.lwjgl.vulkan.VK10.vkCreateImage
 import org.lwjgl.vulkan.VK10.vkCreateImageView
@@ -42,6 +48,9 @@ import org.lwjgl.vulkan.VkApplicationInfo
 import org.lwjgl.vulkan.VkDevice
 import org.lwjgl.vulkan.VkDeviceCreateInfo
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo
+import org.lwjgl.vulkan.VkExportMetalDeviceInfoEXT
+import org.lwjgl.vulkan.VkExportMetalObjectCreateInfoEXT
+import org.lwjgl.vulkan.VkExportMetalObjectsInfoEXT
 import org.lwjgl.vulkan.VkExtent3D
 import org.lwjgl.vulkan.VkImageCreateInfo
 import org.lwjgl.vulkan.VkImageSubresourceRange
@@ -52,7 +61,8 @@ import org.lwjgl.vulkan.VkInstanceCreateInfo
 import org.lwjgl.vulkan.VkPhysicalDevice
 import org.lwjgl.vulkan.VkQueue
 
-internal class MacVulkanContext : AutoCloseable {
+internal class MacVulkanContext private constructor(private val requiredMetalDevice: Long) :
+  AutoCloseable {
   private var instance: VkInstance? = null
   private var physicalDevice: VkPhysicalDevice? = null
   private var device: VkDevice? = null
@@ -150,13 +160,65 @@ internal class MacVulkanContext : AutoCloseable {
           continue
         }
         val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
-        if (queueFamily >= 0) {
+        if (queueFamily >= 0 && exportsRequiredMetalDevice(candidate, queueFamily)) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
           return
         }
       }
-      error("No Vulkan device supports graphics and $VK_EXT_METAL_OBJECTS_EXTENSION_NAME")
+      val metalRequirement =
+        if (requiredMetalDevice == 0L) "" else " and matches the Skiko Metal device"
+      error(
+        "No Vulkan device supports graphics, $VK_EXT_METAL_OBJECTS_EXTENSION_NAME$metalRequirement"
+      )
+    }
+  }
+
+  private fun exportsRequiredMetalDevice(candidate: VkPhysicalDevice, queueFamily: Int): Boolean {
+    if (requiredMetalDevice == 0L) {
+      return true
+    }
+    MemoryStack.stackPush().use { stack ->
+      val deviceExtensions = stack.vulkanDeviceExtensions(candidate)
+      val extensions = LinkedHashSet<String>()
+      extensions.add(VK_EXT_METAL_OBJECTS_EXTENSION_NAME)
+      if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
+        extensions.add(VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME)
+      }
+      val exportCreate =
+        VkExportMetalObjectCreateInfoEXT.calloc(stack)
+          .sType(VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECT_CREATE_INFO_EXT)
+          .exportObjectType(VK_EXPORT_METAL_OBJECT_TYPE_METAL_DEVICE_BIT_EXT)
+      val priorities = stack.floats(1.0f)
+      val queueInfo =
+        VkDeviceQueueCreateInfo.calloc(1, stack)
+          .sType(VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO)
+          .queueFamilyIndex(queueFamily)
+          .pQueuePriorities(priorities)
+      val createInfo =
+        VkDeviceCreateInfo.calloc(stack)
+          .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
+          .pNext(exportCreate.address())
+          .pQueueCreateInfos(queueInfo)
+          .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
+      val out = stack.mallocPointer(1)
+      if (vkCreateDevice(candidate, createInfo, null, out) != VK_SUCCESS) {
+        return false
+      }
+      val probeDevice = VkDevice(out[0], candidate, createInfo)
+      return try {
+        val deviceInfo =
+          VkExportMetalDeviceInfoEXT.calloc(stack)
+            .sType(VK_STRUCTURE_TYPE_EXPORT_METAL_DEVICE_INFO_EXT)
+        val objectsInfo =
+          VkExportMetalObjectsInfoEXT.calloc(stack)
+            .sType(VK_STRUCTURE_TYPE_EXPORT_METAL_OBJECTS_INFO_EXT)
+            .pNext(deviceInfo.address())
+        vkExportMetalObjectsEXT(probeDevice, objectsInfo)
+        deviceInfo.mtlDevice() == requiredMetalDevice
+      } finally {
+        vkDestroyDevice(probeDevice, null)
+      }
     }
   }
 
@@ -204,8 +266,8 @@ internal class MacVulkanContext : AutoCloseable {
   }
 
   companion object {
-    fun create(): MacVulkanContext {
-      val context = MacVulkanContext()
+    fun create(requiredMetalDevice: Long = 0L): MacVulkanContext {
+      val context = MacVulkanContext(requiredMetalDevice)
       try {
         context.createInstance()
         context.pickPhysicalDeviceAndQueue()

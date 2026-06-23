@@ -67,7 +67,7 @@ import org.lwjgl.system.MemoryStack
 import org.lwjgl.system.MemoryUtil.NULL
 
 internal class LinuxOpenGlBridge : NativeSurfaceBridge {
-  private val vulkan = LinuxVulkanContext.create()
+  private var vulkan: LinuxVulkanContext? = null
   private val producerThreadRef = AtomicReference<Thread?>()
   private val producerExecutor = Executors.newSingleThreadExecutor { task ->
     Thread(task, "compose-map-linux-egl-producer").also {
@@ -91,7 +91,6 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
       egl = runOnProducerThread { LinuxEglContext.create() }
     } catch (error: Throwable) {
       producerExecutor.shutdown()
-      vulkan.close()
       throw error
     }
   }
@@ -146,7 +145,8 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     disposeTexture()
     runOnProducerThread { egl.close() }
     producerExecutor.shutdown()
-    vulkan.close()
+    vulkan?.close()
+    vulkan = null
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =
@@ -161,7 +161,9 @@ internal class LinuxOpenGlBridge : NativeSurfaceBridge {
     }
 
     disposeTexture()
-    val exported = vulkan.createExportedTexture(extent)
+    val context =
+      vulkan ?: LinuxVulkanContext.create(currentOpenGlDeviceUuids()).also { vulkan = it }
+    val exported = context.createExportedTexture(extent)
     var producer: LinuxEglImportedTexture? = null
     var consumer: LinuxOpenGlImportedTexture? = null
     try {
