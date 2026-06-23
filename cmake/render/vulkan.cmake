@@ -1,5 +1,16 @@
 function(mln_configure_vulkan_backend target)
-  find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan vulkan-1 REQUIRED)
+  set(_mln_vulkan_loader_names vulkan vulkan-1 vulkan.1)
+  set(_mln_vulkan_loader_hints)
+  if(DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR} AND NOT
+                                       "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" STREQUAL "")
+    list(APPEND _mln_vulkan_loader_hints "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
+  endif()
+
+  find_library(
+    MLN_VULKAN_LOADER_LIBRARY
+    NAMES ${_mln_vulkan_loader_names}
+    HINTS ${_mln_vulkan_loader_hints}
+    REQUIRED)
 
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
