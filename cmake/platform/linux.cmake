@@ -1,6 +1,5 @@
 function(mln_configure_linux_platform target)
   include(mln_rust)
-  find_package(PkgConfig REQUIRED)
   find_package(Threads REQUIRED)
   find_package(ZLIB REQUIRED)
 
@@ -43,11 +42,9 @@ function(mln_configure_linux_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      mbgl-vendor-icu
-      Threads::Threads
+      mbgl-vendor-icu Threads::Threads
       "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a"
-      dl)
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a" dl)
 
   mln_link_rust_platform(${target})
 endfunction()

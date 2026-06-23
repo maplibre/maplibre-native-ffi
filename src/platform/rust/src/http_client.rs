@@ -12,9 +12,10 @@ use std::time::Duration;
 // Matches `mbgl::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
 // `OnlineFileSource` in maplibre-native's default platform layer.
 const HTTP_WORKER_THREADS: usize = 20;
-// Upstream default `http_file_source.cpp` does not set `CURLOPT_TIMEOUT`; this
-// bounds hung requests for the blocking Rust worker model.
-const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
+// Upstream default `http_file_source.cpp` does not set `CURLOPT_TIMEOUT`; cap
+// connection establishment so hung TCP/TLS handshakes do not occupy a worker
+// thread indefinitely, without bounding slow but progressing body downloads.
+const HTTP_CONNECT_TIMEOUT_SECONDS: u64 = 30;
 // Upstream uses `CURLOPT_FOLLOWLOCATION` without `CURLOPT_MAXREDIRS`; match
 // libcurl 8's default redirect limit.
 const HTTP_MAX_REDIRECTS: u32 = 30;
@@ -97,7 +98,7 @@ fn http_agent() -> &'static ureq::Agent {
             .http_status_as_error(false)
             // Redirects are handled manually so each hop can be checked on Android.
             .max_redirects(0)
-            .timeout_global(Some(Duration::from_secs(HTTP_REQUEST_TIMEOUT_SECONDS)))
+            .timeout_connect(Some(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECONDS)))
             .tls_config(
                 ureq::tls::TlsConfig::builder()
                     .root_certs(ureq::tls::RootCerts::PlatformVerifier)
@@ -185,9 +186,10 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
 
         let agent = http_agent();
         let mut builder = agent.get(&url);
-        let has_accept_encoding = request.headers.iter().any(|(name, _)| {
-            name.eq_ignore_ascii_case("accept-encoding")
-        });
+        let has_accept_encoding = request
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
         let has_range = request
             .headers
             .iter()
@@ -204,7 +206,10 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
                 let status_code = response.status().as_u16();
                 if is_redirect_status(status_code) {
                     let Some(location) = response_header(&response, "location") else {
-                        return http_error(HTTP_ERROR_OTHER, "HTTP redirect missing Location header");
+                        return http_error(
+                            HTTP_ERROR_OTHER,
+                            "HTTP redirect missing Location header",
+                        );
                     };
                     if location.is_empty() {
                         return http_error(
