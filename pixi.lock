@@ -135,7 +135,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/libxml2-16-2.15.3-h7a90416_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/libxml2-2.15.3-h953d39d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/libzlib-1.3.2-hbb4bfdb_2.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-64/zlib-1.3.2-hbb4bfdb_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
       osx-arm64:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/icu-78.3-hef89b57_0.conda
@@ -150,7 +149,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libxml2-2.15.3-h5654f7c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/libzlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/moltenvk-1.4.1-h407b865_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
       win-64:
       - conda: https://conda.anaconda.org/conda-forge/win-64/icu-78.3-h637d24d_0.conda
@@ -1538,16 +1536,6 @@ packages:
   license_family: Other
   size: 59000
   timestamp: 1774073052242
-- conda: https://conda.anaconda.org/conda-forge/osx-64/zlib-1.3.2-hbb4bfdb_2.conda
-  sha256: 5dd728cebca2e96fa48d41661f1a35ed0ee3cb722669eee4e2d854c6745655eb
-  md5: 6276aa61ffc361cbf130d78cfb88a237
-  depends:
-  - __osx >=11.0
-  - libzlib 1.3.2 hbb4bfdb_2
-  license: Zlib
-  license_family: Other
-  size: 92411
-  timestamp: 1774073075482
 - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
   sha256: 47101a4055a70a4876ffc87b750ab2287b67eca793f21c8224be5e1ee6394d3f
   md5: 727109b184d680772e3122f40136d5ca
@@ -1703,16 +1691,6 @@ packages:
   license_family: APACHE
   size: 1380005
   timestamp: 1777643484676
-- conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-1.3.2-h8088a28_2.conda
-  sha256: 8dd2ac25f0ba714263aac5832d46985648f4bfb9b305b5021d702079badc08d2
-  md5: f1c0bce276210bed45a04949cfe8dc20
-  depends:
-  - __osx >=11.0
-  - libzlib 1.3.2 h8088a28_2
-  license: Zlib
-  license_family: Other
-  size: 81123
-  timestamp: 1774072974535
 - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
   sha256: 9485ba49e8f47d2b597dd399e88f4802e100851b27c21d7525625b0b4025a5d9
   md5: ab136e4c34e97f34fb621d2592a393d8
