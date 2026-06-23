@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import java.util.LinkedHashSet
-import org.lwjgl.PointerBuffer
 import org.lwjgl.opengl.EXTMemoryObject.GL_DEDICATED_MEMORY_OBJECT_EXT
 import org.lwjgl.opengl.EXTMemoryObject.GL_OPTIMAL_TILING_EXT
 import org.lwjgl.opengl.EXTMemoryObject.GL_TEXTURE_TILING_EXT
@@ -39,7 +38,6 @@ import org.lwjgl.vulkan.KHRExternalMemoryFd.vkGetMemoryFdKHR
 import org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
 import org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
 import org.lwjgl.vulkan.KHRPortabilitySubset.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME
-import org.lwjgl.vulkan.VK
 import org.lwjgl.vulkan.VK10.VK_FORMAT_R8G8B8A8_UNORM
 import org.lwjgl.vulkan.VK10.VK_IMAGE_ASPECT_COLOR_BIT
 import org.lwjgl.vulkan.VK10.VK_IMAGE_LAYOUT_GENERAL
@@ -49,8 +47,6 @@ import org.lwjgl.vulkan.VK10.VK_IMAGE_TYPE_2D
 import org.lwjgl.vulkan.VK10.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
 import org.lwjgl.vulkan.VK10.VK_IMAGE_USAGE_SAMPLED_BIT
 import org.lwjgl.vulkan.VK10.VK_IMAGE_VIEW_TYPE_2D
-import org.lwjgl.vulkan.VK10.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-import org.lwjgl.vulkan.VK10.VK_QUEUE_GRAPHICS_BIT
 import org.lwjgl.vulkan.VK10.VK_SAMPLE_COUNT_1_BIT
 import org.lwjgl.vulkan.VK10.VK_SHARING_MODE_EXCLUSIVE
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_APPLICATION_INFO
@@ -60,7 +56,6 @@ import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO
 import org.lwjgl.vulkan.VK10.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO
-import org.lwjgl.vulkan.VK10.VK_SUCCESS
 import org.lwjgl.vulkan.VK10.vkAllocateMemory
 import org.lwjgl.vulkan.VK10.vkBindImageMemory
 import org.lwjgl.vulkan.VK10.vkCreateDevice
@@ -72,14 +67,10 @@ import org.lwjgl.vulkan.VK10.vkDestroyImage
 import org.lwjgl.vulkan.VK10.vkDestroyImageView
 import org.lwjgl.vulkan.VK10.vkDestroyInstance
 import org.lwjgl.vulkan.VK10.vkDeviceWaitIdle
-import org.lwjgl.vulkan.VK10.vkEnumerateDeviceExtensionProperties
-import org.lwjgl.vulkan.VK10.vkEnumerateInstanceExtensionProperties
 import org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices
 import org.lwjgl.vulkan.VK10.vkFreeMemory
 import org.lwjgl.vulkan.VK10.vkGetDeviceQueue
 import org.lwjgl.vulkan.VK10.vkGetImageMemoryRequirements
-import org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceMemoryProperties
-import org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceQueueFamilyProperties
 import org.lwjgl.vulkan.VK11.VK_API_VERSION_1_1
 import org.lwjgl.vulkan.VK11.VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT
 import org.lwjgl.vulkan.VK11.VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO
@@ -90,7 +81,6 @@ import org.lwjgl.vulkan.VkDevice
 import org.lwjgl.vulkan.VkDeviceCreateInfo
 import org.lwjgl.vulkan.VkDeviceQueueCreateInfo
 import org.lwjgl.vulkan.VkExportMemoryAllocateInfo
-import org.lwjgl.vulkan.VkExtensionProperties
 import org.lwjgl.vulkan.VkExtent3D
 import org.lwjgl.vulkan.VkExternalMemoryImageCreateInfo
 import org.lwjgl.vulkan.VkImageCreateInfo
@@ -103,9 +93,7 @@ import org.lwjgl.vulkan.VkMemoryDedicatedAllocateInfo
 import org.lwjgl.vulkan.VkMemoryGetFdInfoKHR
 import org.lwjgl.vulkan.VkMemoryRequirements
 import org.lwjgl.vulkan.VkPhysicalDevice
-import org.lwjgl.vulkan.VkPhysicalDeviceMemoryProperties
 import org.lwjgl.vulkan.VkQueue
-import org.lwjgl.vulkan.VkQueueFamilyProperties
 
 internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
   private val vulkan = LinuxVulkanContext.create()
@@ -219,7 +207,7 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
     LinuxExportedVulkanTexture.create(this, extent)
 
   fun waitIdle() {
-    device?.let { check(vkDeviceWaitIdle(it), "vkDeviceWaitIdle") }
+    device?.let { checkVulkan(vkDeviceWaitIdle(it), "vkDeviceWaitIdle") }
   }
 
   internal fun physicalDevice(): VkPhysicalDevice =
@@ -234,19 +222,17 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
     checkNotNull(graphicsQueue) { "Vulkan graphics queue is not initialized" }
 
   private fun getInstanceProcAddrAddress(): Long {
-    ensureVulkanFunctionProvider()
-    return VK.getFunctionProvider().getFunctionAddress("vkGetInstanceProcAddr")
+    return vulkanFunctionAddress("vkGetInstanceProcAddr")
   }
 
   private fun getDeviceProcAddrAddress(): Long {
-    ensureVulkanFunctionProvider()
-    return VK.getFunctionProvider().getFunctionAddress("vkGetDeviceProcAddr")
+    return vulkanFunctionAddress("vkGetDeviceProcAddr")
   }
 
   private fun createInstance() {
     ensureVulkanFunctionProvider()
     MemoryStack.stackPush().use { stack ->
-      val available = instanceExtensions(stack)
+      val available = stack.vulkanInstanceExtensions()
       val extensions = LinkedHashSet<String>()
       val enablePortability = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME in available
       if (enablePortability) {
@@ -265,12 +251,12 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
         VkInstanceCreateInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO)
           .pApplicationInfo(app)
-          .ppEnabledExtensionNames(stringBuffer(stack, extensions))
+          .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
       if (enablePortability) {
         createInfo.flags(VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR)
       }
       val out = stack.mallocPointer(1)
-      check(vkCreateInstance(createInfo, null, out), "vkCreateInstance")
+      checkVulkan(vkCreateInstance(createInfo, null, out), "vkCreateInstance")
       instance = VkInstance(out[0], createInfo)
     }
   }
@@ -278,19 +264,22 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
   private fun pickPhysicalDeviceAndQueue() {
     MemoryStack.stackPush().use { stack ->
       val count = stack.mallocInt(1)
-      check(
+      checkVulkan(
         vkEnumeratePhysicalDevices(instance(), count, null),
         "vkEnumeratePhysicalDevices(count)",
       )
       check(count[0] != 0) { "No Vulkan physical devices found" }
       val devices = stack.mallocPointer(count[0])
-      check(vkEnumeratePhysicalDevices(instance(), count, devices), "vkEnumeratePhysicalDevices")
+      checkVulkan(
+        vkEnumeratePhysicalDevices(instance(), count, devices),
+        "vkEnumeratePhysicalDevices",
+      )
       for (index in 0..<devices.capacity()) {
         val candidate = VkPhysicalDevice(devices[index], instance())
-        if (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME !in deviceExtensions(stack, candidate)) {
+        if (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME !in stack.vulkanDeviceExtensions(candidate)) {
           continue
         }
-        val queueFamily = findGraphicsQueueFamily(stack, candidate)
+        val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
         if (queueFamily >= 0) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
@@ -301,22 +290,9 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
     }
   }
 
-  private fun findGraphicsQueueFamily(stack: MemoryStack, candidate: VkPhysicalDevice): Int {
-    val count = stack.mallocInt(1)
-    vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, null)
-    val families = VkQueueFamilyProperties.calloc(count[0], stack)
-    vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, families)
-    for (index in 0..<families.capacity()) {
-      if ((families[index].queueFlags() and VK_QUEUE_GRAPHICS_BIT) != 0) {
-        return index
-      }
-    }
-    return -1
-  }
-
   private fun createDevice() {
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = deviceExtensions(stack, physicalDevice())
+      val deviceExtensions = stack.vulkanDeviceExtensions(physicalDevice())
       check(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME in deviceExtensions) {
         "Selected Vulkan device does not support $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME"
       }
@@ -335,9 +311,9 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
         VkDeviceCreateInfo.calloc(stack)
           .sType(VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO)
           .pQueueCreateInfos(queueInfo)
-          .ppEnabledExtensionNames(stringBuffer(stack, extensions))
+          .ppEnabledExtensionNames(stack.vulkanStringBuffer(extensions))
       val out = stack.mallocPointer(1)
-      check(vkCreateDevice(physicalDevice(), createInfo, null, out), "vkCreateDevice")
+      checkVulkan(vkCreateDevice(physicalDevice(), createInfo, null, out), "vkCreateDevice")
       device = VkDevice(out[0], physicalDevice(), createInfo)
       val queueOut = stack.mallocPointer(1)
       vkGetDeviceQueue(device(), graphicsQueueFamilyIndex, 0, queueOut)
@@ -370,53 +346,6 @@ internal class LinuxVulkanContext private constructor() : AutoCloseable {
         throw error
       }
     }
-
-    private fun instanceExtensions(stack: MemoryStack): Set<String> {
-      val count = stack.mallocInt(1)
-      check(
-        vkEnumerateInstanceExtensionProperties(null as String?, count, null),
-        "vkEnumerateInstanceExtensionProperties(count)",
-      )
-      val props = VkExtensionProperties.calloc(count[0], stack)
-      check(
-        vkEnumerateInstanceExtensionProperties(null as String?, count, props),
-        "vkEnumerateInstanceExtensionProperties",
-      )
-      return buildSet { props.forEach { add(it.extensionNameString()) } }
-    }
-
-    private fun deviceExtensions(stack: MemoryStack, device: VkPhysicalDevice): Set<String> {
-      val count = stack.mallocInt(1)
-      check(
-        vkEnumerateDeviceExtensionProperties(device, null as String?, count, null),
-        "vkEnumerateDeviceExtensionProperties(count)",
-      )
-      val props = VkExtensionProperties.calloc(count[0], stack)
-      check(
-        vkEnumerateDeviceExtensionProperties(device, null as String?, count, props),
-        "vkEnumerateDeviceExtensionProperties",
-      )
-      return buildSet { props.forEach { add(it.extensionNameString()) } }
-    }
-
-    private fun stringBuffer(stack: MemoryStack, values: Set<String>): PointerBuffer {
-      val buffer = stack.mallocPointer(values.size)
-      for (value in values) {
-        buffer.put(stack.UTF8(value))
-      }
-      return buffer.flip()
-    }
-
-    @Suppress("SENSELESS_COMPARISON")
-    private fun ensureVulkanFunctionProvider() {
-      if (VK.getFunctionProvider() == null) {
-        VK.create()
-      }
-    }
-
-    private fun check(status: Int, operation: String) {
-      check(status == VK_SUCCESS) { "$operation failed with Vulkan status $status" }
-    }
   }
 }
 
@@ -438,7 +367,7 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
           .memory(memory)
           .handleType(VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
       val fdOut = stack.mallocInt(1)
-      check(vkGetMemoryFdKHR(context.device(), fdInfo, fdOut), "vkGetMemoryFdKHR")
+      checkVulkan(vkGetMemoryFdKHR(context.device(), fdInfo, fdOut), "vkGetMemoryFdKHR")
       return fdOut[0]
     }
   }
@@ -482,7 +411,7 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
           .sharingMode(VK_SHARING_MODE_EXCLUSIVE)
           .initialLayout(VK_IMAGE_LAYOUT_UNDEFINED)
       val imageOut = stack.mallocLong(1)
-      check(vkCreateImage(context.device(), imageInfo, null, imageOut), "vkCreateImage")
+      checkVulkan(vkCreateImage(context.device(), imageInfo, null, imageOut), "vkCreateImage")
       image = imageOut[0]
 
       val requirements = VkMemoryRequirements.calloc(stack)
@@ -502,11 +431,20 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
           .sType(VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO)
           .pNext(exportMemory.address())
           .allocationSize(requirements.size())
-          .memoryTypeIndex(findMemoryType(requirements.memoryTypeBits()))
+          .memoryTypeIndex(
+            findVulkanDeviceLocalMemoryType(
+              context.physicalDevice(),
+              requirements.memoryTypeBits(),
+              "No compatible Vulkan memory type found",
+            )
+          )
       val memoryOut = stack.mallocLong(1)
-      check(vkAllocateMemory(context.device(), allocateInfo, null, memoryOut), "vkAllocateMemory")
+      checkVulkan(
+        vkAllocateMemory(context.device(), allocateInfo, null, memoryOut),
+        "vkAllocateMemory",
+      )
       memory = memoryOut[0]
-      check(vkBindImageMemory(context.device(), image, memory, 0), "vkBindImageMemory")
+      checkVulkan(vkBindImageMemory(context.device(), image, memory, 0), "vkBindImageMemory")
 
       val viewInfo =
         VkImageViewCreateInfo.calloc(stack)
@@ -523,26 +461,9 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
               .layerCount(1)
           )
       val viewOut = stack.mallocLong(1)
-      check(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")
+      checkVulkan(vkCreateImageView(context.device(), viewInfo, null, viewOut), "vkCreateImageView")
       view = viewOut[0]
     }
-  }
-
-  private fun findMemoryType(typeBits: Int): Int {
-    MemoryStack.stackPush().use { stack ->
-      val properties = VkPhysicalDeviceMemoryProperties.calloc(stack)
-      vkGetPhysicalDeviceMemoryProperties(context.physicalDevice(), properties)
-      for (index in 0..<properties.memoryTypeCount()) {
-        val supported = (typeBits and (1 shl index)) != 0
-        val hasProperties =
-          (properties.memoryTypes(index).propertyFlags() and VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) ==
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
-        if (supported && hasProperties) {
-          return index
-        }
-      }
-    }
-    error("No compatible Vulkan memory type found")
   }
 
   override fun close() {
@@ -571,10 +492,6 @@ private constructor(private val context: LinuxVulkanContext, private val extent:
         texture.close()
         throw error
       }
-    }
-
-    private fun check(status: Int, operation: String) {
-      check(status == VK_SUCCESS) { "$operation failed with Vulkan status $status" }
     }
   }
 }
