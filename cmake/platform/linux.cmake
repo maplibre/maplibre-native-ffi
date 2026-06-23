@@ -46,7 +46,6 @@ function(mln_configure_linux_platform target)
       mbgl-vendor-icu
       Threads::Threads
       "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libpng.a"
       "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a"
       dl)
 
