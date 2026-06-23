@@ -68,7 +68,15 @@ import org.lwjgl.system.MemoryUtil.NULL
 import org.lwjgl.system.MemoryUtil.memAddress
 
 internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
-  private val egl = MacAngleEglContext.create()
+  private val rendererDispatcher =
+    NativeSurfaceRendererDispatcher("compose-map-mac-opengl-renderer")
+  private val egl: MacAngleEglContext =
+    try {
+      rendererDispatcher.run { MacAngleEglContext.create() }
+    } catch (error: Throwable) {
+      rendererDispatcher.close()
+      throw error
+    }
   private var metalTexture = NativeHandle(0)
   private var pixelFormat = 0L
   private var importedTexture: MacAngleImportedTexture? = null
@@ -87,7 +95,11 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
       supportsResizeWithoutRecreate = false,
     )
 
-  override fun resize(extent: SurfaceExtent) {
+  override fun resize(extent: SurfaceExtent) = rendererDispatcher.run {
+    resizeOnRendererThread(extent)
+  }
+
+  private fun resizeOnRendererThread(extent: SurfaceExtent) {
     if (extent == currentExtent && importedTexture != null) {
       return
     }
@@ -100,11 +112,11 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
     frameId: Long,
     extent: SurfaceExtent,
     presentationTimeNanos: Long?,
-  ): NativeSurfaceFrame {
+  ): NativeSurfaceFrame = rendererDispatcher.run {
     if (importedTexture == null || extent != currentExtent) {
-      resize(extent)
+      resizeOnRendererThread(extent)
     }
-    return NativeSurfaceFrameLease(
+    NativeSurfaceFrameLease(
       frameId = frameId,
       extent = extent,
       target = target(generation),
@@ -113,7 +125,7 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   }
 
   override fun completeProducerAccess(frame: NativeSurfaceFrame) {
-    egl.waitIdle()
+    rendererDispatcher.run { egl.waitIdle() }
   }
 
   override fun draw(scope: DrawScope, target: NativeSurfaceTarget): Boolean {
@@ -133,11 +145,21 @@ internal class MacOpenGlMetalBridge : NativeSurfaceBridge {
   }
 
   override fun <T> withProducerAccess(frame: NativeSurfaceFrame, action: () -> T): T =
-    MacMetalBridgeNative.runInAutoreleasePool(action)
+    rendererDispatcher.run {
+      MacMetalBridgeNative.runInAutoreleasePool(action)
+    }
+
+  override fun <T> withRendererAccess(action: () -> T): T = rendererDispatcher.run(action)
 
   override fun close() {
-    disposeTexture()
-    egl.close()
+    try {
+      rendererDispatcher.run {
+        disposeTexture()
+        egl.close()
+      }
+    } finally {
+      rendererDispatcher.close()
+    }
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =
