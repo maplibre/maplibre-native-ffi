@@ -1,13 +1,8 @@
 function(mln_configure_vulkan_backend target)
-  if(APPLE)
-    find_library(
-      MLN_VULKAN_LOADER_LIBRARY
-      NAMES vulkan.1
-      PATHS "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" NO_DEFAULT_PATH
-      REQUIRED)
-  else()
-    find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan vulkan-1 REQUIRED)
-  endif()
+  find_library(
+    MLN_VULKAN_LOADER_LIBRARY
+    NAMES vulkan vulkan-1 vulkan.1
+    REQUIRED)
 
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
