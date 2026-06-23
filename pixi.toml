@@ -28,12 +28,14 @@ c-compiler = ">=1,<2"
 cxx-compiler = ">=1,<2"
 libuv = ">=1,<2"
 libgles-devel = ">=1.7.0,<2"
+ca-certificates = ">=2024,<2027"
 
 [target.linux-aarch64.dependencies]
 c-compiler = ">=1,<2"
 cxx-compiler = ">=1,<2"
 libuv = ">=1,<2"
 libgles-devel = ">=1.7.0,<2"
+ca-certificates = ">=2024,<2027"
 
 [target.osx-arm64.dependencies]
 moltenvk = ">=1.4.1,<2"

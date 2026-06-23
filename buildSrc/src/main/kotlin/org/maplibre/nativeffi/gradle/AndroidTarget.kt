@@ -20,45 +20,27 @@ enum class AndroidTarget(
   );
 
   companion object {
-    fun current(): AndroidTarget = fromCargoTarget(requiredCargoTarget())
-
-    fun isAndroidCargoTarget(cargoTarget: String): Boolean =
-      entries.any { it.cargoTarget == cargoTarget }
-
-    /** True when [CARGO_BUILD_TARGET] is set to a supported Android triple. */
-    fun hasAndroidCargoTarget(): Boolean {
-      val cargoTarget = System.getenv("CARGO_BUILD_TARGET") ?: return false
-      return isAndroidCargoTarget(cargoTarget)
+    /** Resolves when [CARGO_BUILD_TARGET] names a supported Android triple. */
+    fun fromEnv(): AndroidTarget? {
+      val cargoTarget = System.getenv("CARGO_BUILD_TARGET") ?: return null
+      return entries.firstOrNull { it.cargoTarget == cargoTarget }
     }
 
-    /**
-     * Resolves the Android rustls Maven layout when Android repos are configured off-Android envs.
-     * [CARGO_BUILD_TARGET] may point at the host desktop triple during Linux native builds; only
-     * honor it when it matches a supported Android cargo target.
-     */
-    fun cargoTargetForRustlsMetadata(): String {
-      val cargoTarget = System.getenv("CARGO_BUILD_TARGET")
-      if (cargoTarget != null) {
-        entries.firstOrNull { it.cargoTarget == cargoTarget }?.let { return cargoTarget }
-      }
-      return ARM64.cargoTarget
-    }
-
-    /**
-     * Resolves ndk ABI filters during Gradle configuration when [CARGO_BUILD_TARGET] may be unset.
-     */
-    fun ndkAbiForGradleConfiguration(): String =
-      fromCargoTarget(cargoTargetForRustlsMetadata()).ndkAbi
-
-    fun fromCargoTarget(cargoTarget: String): AndroidTarget =
-      entries.firstOrNull { it.cargoTarget == cargoTarget }
+    fun current(): AndroidTarget =
+      fromEnv()
         ?: error(
-          "Unsupported Android cargo target: $cargoTarget " +
+          "CARGO_BUILD_TARGET must be set to a supported Android triple " +
             "(expected ${entries.joinToString(" or ") { it.cargoTarget }})"
         )
 
-    private fun requiredCargoTarget(): String =
-      System.getenv("CARGO_BUILD_TARGET")
-        ?: error("CARGO_BUILD_TARGET must be set for Android Gradle builds")
+    /**
+     * Cargo `--filter-platform` for rustls-platform-verifier-android Maven metadata.
+     * The published artifact is ABI-agnostic; [ARM64] is the fallback when the env
+     * names a host desktop triple during Linux native builds.
+     */
+    fun rustlsMetadataCargoTarget(): String = fromEnv()?.cargoTarget ?: ARM64.cargoTarget
+
+    /** NDK ABI filter for Android Gradle when [CARGO_BUILD_TARGET] is unset or names a host triple. */
+    fun ndkAbiForGradleConfiguration(): String = fromEnv()?.ndkAbi ?: ARM64.ndkAbi
   }
 }
