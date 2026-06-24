@@ -159,19 +159,9 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
 
-    # The mise action may restore Rust metadata without all rustup-managed
-    # component files. Repair the toolchain only when rustup cannot add the
-    # configured components or the component binaries still cannot run.
-    - name: Ensure Rust components
+    # The mise action may restore Rust install metadata without the rustup
+    # toolchain, components, or cross targets from mise.toml. Reinstall rust
+    # from mise config instead of redeclaring components/targets here.
+    - name: Ensure Rust toolchain
       shell: bash
-      run: |
-        ensure_rust_components() {
-          mise exec -- rustup component add rustfmt clippy &&
-            mise exec -- cargo fmt --version &&
-            mise exec -- cargo clippy --version
-        }
-
-        if ! ensure_rust_components; then
-          mise install --force rust
-          ensure_rust_components
-        fi
+      run: MISE_NO_HOOKS=1 mise install --force rust
