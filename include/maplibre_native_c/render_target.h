@@ -107,6 +107,24 @@ typedef struct mln_opengl_context_descriptor {
   } data;
 } mln_opengl_context_descriptor;
 
+/** WebGPU backend context fields shared by WebGPU render targets. */
+typedef struct mln_webgpu_context_descriptor {
+  uint32_t size;
+  /**
+   * Borrowed WGPUInstance. When null on Emscripten builds, the session creates
+   * one from the browser WebGPU API.
+   */
+  void* instance;
+  /**
+   * Borrowed WGPUDevice. When null on Emscripten builds, the session requests
+   * one from the browser WebGPU API.
+   */
+  void* device;
+  /** Borrowed WGPUQueue. When null, the session uses the device default queue.
+   */
+  void* queue;
+} mln_webgpu_context_descriptor;
+
 /**
  * Returns OpenGL context providers supported by this build.
  */

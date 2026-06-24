@@ -1,0 +1,33 @@
+[env]
+MLN_FFI_RENDER_BACKEND = "webgpu"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/browser-wasm64-webgpu"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=wasm32-emscripten"
+CARGO_BUILD_TARGET = "wasm32-unknown-emscripten"
+RUSTFLAGS = "-C target-feature=+atomics,+bulk-memory -C panic=abort"
+
+[tools]
+"github:emscripten-core/emsdk" = "4.0.10"
+
+[tasks.configure]
+depends = ["//:deps"]
+run = '''
+source "$EMSDK/emsdk_env.sh"
+emcmake cmake \
+  -S . \
+  -B "$MLN_FFI_BUILD_DIR" \
+  -G Ninja \
+  -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE" \
+  -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND" \
+  -DMLN_FFI_OPENGL_CONTEXT_PROVIDER=""
+'''
+
+[tasks.build]
+depends = ["configure"]
+run = '''
+source "$EMSDK/emsdk_env.sh"
+emmake cmake --build "$MLN_FFI_BUILD_DIR" --target browser_map
+'''
+
+[tasks.run]
+depends = ["build"]
+run = 'cd "$MLN_FFI_BUILD_DIR/examples/browser-map" && python3 "$MISE_PROJECT_ROOT/examples/browser-map/serve.py"'

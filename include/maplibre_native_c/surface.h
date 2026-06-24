@@ -55,6 +55,21 @@ typedef struct mln_opengl_surface_descriptor {
   void* surface;
 } mln_opengl_surface_descriptor;
 
+/** WebGPU native surface session attachment options. */
+typedef struct mln_webgpu_surface_descriptor {
+  uint32_t size;
+  /** Logical surface extent. */
+  mln_render_target_extent extent;
+  /** Borrowed WebGPU context handles. */
+  mln_webgpu_context_descriptor context;
+  /**
+   * HTML canvas selector for Emscripten builds, for example "#canvas".
+   *
+   * Required for browser WebGPU surface sessions.
+   */
+  const char* canvas_selector;
+} mln_webgpu_surface_descriptor;
+
 /**
  * Returns Metal surface descriptor defaults for this C API version.
  */
@@ -152,6 +167,24 @@ MLN_API mln_status mln_vulkan_surface_attach(
  */
 MLN_API mln_status mln_opengl_surface_attach(
   mln_map* map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session** out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Returns WebGPU surface descriptor defaults for this C API version.
+ */
+MLN_API mln_webgpu_surface_descriptor
+mln_webgpu_surface_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Attaches a WebGPU native surface render target to a map.
+ *
+ * On Emscripten builds, descriptor->canvas_selector must name an HTML canvas
+ * element. The session creates or adopts the WebGPU instance, device, queue,
+ * and surface needed to render into that canvas.
+ */
+MLN_API mln_status mln_webgpu_surface_attach(
+  mln_map* map, const mln_webgpu_surface_descriptor* descriptor,
   mln_render_session** out_session
 ) MLN_NOEXCEPT;
 

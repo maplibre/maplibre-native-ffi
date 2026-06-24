@@ -13,6 +13,14 @@ function(mln_add_maplibre_native)
 
   add_subdirectory("${MLN_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/maplibre-native")
 
+  if(EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+    include(render/emdawnwebgpu)
+    mln_configure_emdawnwebgpu(mbgl-core)
+    if(TARGET mbgl-vendor-dawn)
+      mln_configure_emdawnwebgpu(mbgl-vendor-dawn)
+    endif()
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
     target_include_directories(
       mbgl-core

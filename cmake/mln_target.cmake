@@ -58,6 +58,8 @@ function(mln_add_c_api_library target)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     add_library(${target} STATIC)
+  elseif(EMSCRIPTEN)
+    add_library(${target} STATIC)
   else()
     add_library(${target} SHARED)
   endif()

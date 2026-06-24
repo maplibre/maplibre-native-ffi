@@ -1,0 +1,1 @@
+globalThis.createMapLibreModule = createMapLibreModule;

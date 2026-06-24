@@ -29,6 +29,7 @@ function(mln_link_rust_platform target)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(rust_linker "${CMAKE_LINKER}")
   endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     get_filename_component(rust_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
     string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
@@ -54,12 +55,27 @@ function(mln_link_rust_platform target)
     endif()
   endif()
 
-  add_custom_command(
-    OUTPUT "${rust_library}"
-    COMMAND
-      ${CMAKE_COMMAND}
-      -E
-      env
+  set(rust_cargo_extra_args "")
+  if(rust_target STREQUAL "wasm32-unknown-emscripten")
+    # Pthread WASM links with --shared-memory; the prebuilt std for this target
+    # lacks atomics, so rebuild std via build-std. panic=abort avoids pulling
+    # non-atomic panic_unwind objects into the staticlib.
+    if(DEFINED ENV{RUSTFLAGS}
+       AND NOT "$ENV{RUSTFLAGS}" STREQUAL "")
+      set(rust_rustflags "$ENV{RUSTFLAGS}")
+    else()
+      set(rust_rustflags
+          "-C target-feature=+atomics,+bulk-memory -C panic=abort")
+    endif()
+    list(APPEND rust_cargo_extra_args -Z build-std=std,panic_abort)
+    set(rust_bootstrap "1")
+  elseif(DEFINED ENV{RUSTFLAGS})
+    set(rust_rustflags "$ENV{RUSTFLAGS}")
+  else()
+    set(rust_rustflags "")
+  endif()
+
+  set(rust_env
       "CC_${rust_target_env}=${rust_cc}"
       "CXX_${rust_target_env}=${rust_cxx}"
       "AR_${rust_target_env}=${CMAKE_AR}"
@@ -67,7 +83,21 @@ function(mln_link_rust_platform target)
       "CXX_${rust_target_env_lower}=${rust_cxx}"
       "AR_${rust_target_env_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
-      "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
+      "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}")
+  if(NOT rust_rustflags STREQUAL "")
+    list(APPEND rust_env "RUSTFLAGS=${rust_rustflags}")
+  endif()
+  if(DEFINED rust_bootstrap)
+    list(PREPEND rust_env "RUSTC_BOOTSTRAP=${rust_bootstrap}")
+  endif()
+
+  add_custom_command(
+    OUTPUT "${rust_library}"
+    COMMAND
+      ${CMAKE_COMMAND}
+      -E
+      env
+      ${rust_env}
       "${CARGO_EXECUTABLE}"
       build
       --manifest-path
@@ -77,6 +107,7 @@ function(mln_link_rust_platform target)
       --target
       "${rust_target}"
       --release
+      ${rust_cargo_extra_args}
     DEPENDS
       "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
       "${PROJECT_SOURCE_DIR}/Cargo.lock"

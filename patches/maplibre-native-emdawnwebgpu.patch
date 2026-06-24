@@ -1,0 +1,85 @@
+diff --git a/cmake/webgpu.cmake b/cmake/webgpu.cmake
+index 0b6bd0b..c4b5d60 100644
+--- a/cmake/webgpu.cmake
++++ b/cmake/webgpu.cmake
+@@ -14,7 +14,6 @@ list(APPEND
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/buffer_resource.cpp
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/context.cpp
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/command_encoder.cpp
+-        ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/headless_backend.cpp
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/renderer_backend.cpp
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/drawable.cpp
+         ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/drawable_builder.cpp
+@@ -124,3 +123,8 @@ elseif(MLN_WEBGPU_IMPL_WGPU)
+         list(APPEND SRC_FILES ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/webgpu_cpp_impl.cpp)
+     endif()
+ endif()
++
++# Headless backend uses Dawn native / wgpu-native bootstrap; skip for emdawnwebgpu.
++if(NOT MLN_WEBGPU_EMDAWN)
++    list(APPEND SRC_FILES ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/headless_backend.cpp)
++endif()
+diff --git a/src/mbgl/webgpu/offscreen_texture.cpp b/src/mbgl/webgpu/offscreen_texture.cpp
+index 1a4642c..79de183 100644
+--- a/src/mbgl/webgpu/offscreen_texture.cpp
++++ b/src/mbgl/webgpu/offscreen_texture.cpp
+@@ -149,7 +149,7 @@ public:
+         }
+ 
+         // Process all pending device operations to ensure rendering is complete
+-#if MLN_WEBGPU_IMPL_DAWN
++#if MLN_WEBGPU_IMPL_DAWN && !MLN_WEBGPU_EMDAWN
+         wgpuDeviceTick(device);
+ #endif
+ 
+diff --git a/vendor/dawn.cmake b/vendor/dawn.cmake
+index 48c05e1..ec3153d 100644
+--- a/vendor/dawn.cmake
++++ b/vendor/dawn.cmake
+@@ -8,6 +8,20 @@ if(NOT MLN_WITH_WEBGPU)
+     return()
+ endif()
+ 
++if(MLN_WEBGPU_EMDAWN)
++    message(STATUS "Configuring emdawnwebgpu (host supplies --use-port=emdawnwebgpu)")
++    add_library(mbgl-vendor-dawn INTERFACE)
++    set_target_properties(
++        mbgl-vendor-dawn
++        PROPERTIES
++            INTERFACE_MAPLIBRE_NAME "emdawnwebgpu"
++            INTERFACE_MAPLIBRE_URL "https://dawn.googlesource.com/dawn"
++            INTERFACE_MAPLIBRE_AUTHOR "Chromium Dawn Team"
++            INTERFACE_MAPLIBRE_LICENSE "${PROJECT_SOURCE_DIR}/vendor/dawn/LICENSE"
++    )
++    return()
++endif()
++
+ if(POLICY CMP0169)
+     cmake_policy(SET CMP0169 OLD)
+ endif()
+diff --git a/vendor/webgpu.cmake b/vendor/webgpu.cmake
+index dad2a52..a268992 100644
+--- a/vendor/webgpu.cmake
++++ b/vendor/webgpu.cmake
+@@ -3,11 +3,21 @@
+ 
+ set(MLN_WEBGPU_IMPL_DAWN OFF CACHE STRING "WebGPU with Dawn implementation")
+ set(MLN_WEBGPU_IMPL_WGPU OFF CACHE STRING "WebGPU with wgpu implementation")
++set(MLN_WEBGPU_EMDAWN OFF
++    CACHE BOOL "Use Emscripten emdawnwebgpu with Dawn headers (requires MLN_WEBGPU_IMPL_DAWN)")
+ 
+ if(MLN_WITH_WEBGPU)
++    if(MLN_WEBGPU_EMDAWN AND NOT MLN_WEBGPU_IMPL_DAWN)
++        message(FATAL_ERROR "MLN_WEBGPU_EMDAWN requires MLN_WEBGPU_IMPL_DAWN")
++    endif()
++
+     if(MLN_WEBGPU_IMPL_DAWN)
+         message(STATUS "Using Dawn as WebGPU backend")
+         add_compile_definitions(MLN_WEBGPU_IMPL_DAWN)
++        if(MLN_WEBGPU_EMDAWN)
++            message(STATUS "Using emdawnwebgpu port for browser WebGPU")
++            add_compile_definitions(MLN_WEBGPU_EMDAWN)
++        endif()
+ 
+     elseif(MLN_WEBGPU_IMPL_WGPU)
+         message(STATUS "Using wgpu as WebGPU backend")
