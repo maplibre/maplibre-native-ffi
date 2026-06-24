@@ -142,9 +142,15 @@ internal class WindowsOpenGlD3d12Bridge : NativeSurfaceBridge {
   }
 
   override fun close() {
-    disposeTexture()
-    runOnProducerThread { wgl.close() }
-    producerExecutor.shutdown()
+    try {
+      disposeTexture()
+    } finally {
+      try {
+        runOnProducerThread { wgl.close() }
+      } finally {
+        producerExecutor.shutdown()
+      }
+    }
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =

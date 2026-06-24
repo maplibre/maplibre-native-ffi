@@ -29,6 +29,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   private var ownerSession: NativeSurfaceSession? = null
   private var runtime: RuntimeHandle? = null
   private var map: MapHandle? = null
+  private var mapScaleFactor: Double? = null
   private var renderSession: AttachedRenderSession? = null
   private var currentExtent = SurfaceExtent.Empty
   private var renderPending = true
@@ -197,6 +198,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val closingRuntime = runtime
     map = null
     runtime = null
+    mapScaleFactor = null
     ownerSession = null
     try {
       closeRenderSession()
@@ -213,21 +215,29 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     ownerSession?.withRendererAccess(action) ?: action()
 
   private fun ensureMap(extent: SurfaceExtent): MapHandle {
-    map?.let {
-      return it
+    map?.let { existing ->
+      if (mapScaleFactor == extent.scaleFactor) {
+        return existing
+      }
+      closeMapForScaleFactorChange()
     }
 
     val createdRuntime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
     val createdMap =
-      MapHandle.create(
-        createdRuntime,
-        MapOptions().apply {
-          width = extent.width
-          height = extent.height
-          scaleFactor = extent.scaleFactor
-          mapMode = MapMode.CONTINUOUS
-        },
-      )
+      try {
+        MapHandle.create(
+          createdRuntime,
+          MapOptions().apply {
+            width = extent.width
+            height = extent.height
+            scaleFactor = extent.scaleFactor
+            mapMode = MapMode.CONTINUOUS
+          },
+        )
+      } catch (error: RuntimeException) {
+        createdRuntime.close()
+        throw error
+      }
     try {
       createdMap.setStyleUrl(STYLE_URL)
       createdMap.jumpTo(
@@ -240,11 +250,33 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       )
       runtime = createdRuntime
       map = createdMap
+      mapScaleFactor = extent.scaleFactor
       return createdMap
     } catch (error: RuntimeException) {
-      createdMap.close()
-      createdRuntime.close()
+      try {
+        createdMap.close()
+      } finally {
+        createdRuntime.close()
+      }
       throw error
+    }
+  }
+
+  private fun closeMapForScaleFactorChange() {
+    val closingMap = map
+    val closingRuntime = runtime
+    map = null
+    runtime = null
+    mapScaleFactor = null
+    renderPending = true
+    try {
+      closeRenderSession()
+    } finally {
+      try {
+        closingMap?.close()
+      } finally {
+        closingRuntime?.close()
+      }
     }
   }
 

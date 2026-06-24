@@ -150,10 +150,17 @@ internal class WindowsVulkanD3d12Bridge : NativeSurfaceBridge {
   }
 
   override fun close() {
-    disposeTexture()
-    vulkan?.close()
-    vulkan = null
-    rendererDispatcher.close()
+    try {
+      disposeTexture()
+    } finally {
+      val closingVulkan = vulkan
+      vulkan = null
+      try {
+        closingVulkan?.close()
+      } finally {
+        rendererDispatcher.close()
+      }
+    }
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =

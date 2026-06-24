@@ -168,9 +168,13 @@ internal class LinuxVulkanOpenGlBridge : NativeSurfaceBridge {
     try {
       disposeTexture(consumerContextCurrent = false)
     } finally {
-      vulkan?.close()
+      val closingVulkan = vulkan
       vulkan = null
-      rendererDispatcher.close()
+      try {
+        closingVulkan?.close()
+      } finally {
+        rendererDispatcher.close()
+      }
     }
   }
 

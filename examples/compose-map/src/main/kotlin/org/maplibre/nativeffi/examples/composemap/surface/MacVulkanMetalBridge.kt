@@ -79,10 +79,17 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
   }
 
   override fun close() {
-    disposeTexture()
-    vulkan?.close()
-    vulkan = null
-    rendererDispatcher.close()
+    try {
+      disposeTexture()
+    } finally {
+      val closingVulkan = vulkan
+      vulkan = null
+      try {
+        closingVulkan?.close()
+      } finally {
+        rendererDispatcher.close()
+      }
+    }
   }
 
   private fun target(generation: Long): NativeSurfaceTarget =
@@ -96,6 +103,7 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
 
     val oldTexture = metalTexture
     val requiredMetalDevice = metalDevice ?: SkikoHost.requireMetalDevice()
+    val requiredMetalAdapter = MacMetalBridgeNative.metalAdapter(requiredMetalDevice.ptr)
     val newTextureAddress =
       MacMetalBridgeNative.createMetalTexture(
         metalDevice = requiredMetalDevice.ptr,
@@ -116,7 +124,7 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
     metalTexture = newTexture
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(newTexture.address)
     try {
-      val context = vulkan ?: MacVulkanContext.create(requiredMetalDevice.ptr).also { vulkan = it }
+      val context = vulkan ?: MacVulkanContext.create(requiredMetalAdapter).also { vulkan = it }
       importedTexture = context.createImportedTexture(newTexture, extent)
     } catch (error: RuntimeException) {
       disposeTexture()

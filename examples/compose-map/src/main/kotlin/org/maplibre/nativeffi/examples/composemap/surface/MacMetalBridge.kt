@@ -76,8 +76,11 @@ internal class MacMetalBridge : NativeSurfaceBridge {
   override fun <T> withRendererAccess(action: () -> T): T = rendererDispatcher.run(action)
 
   override fun close() {
-    disposeTexture()
-    rendererDispatcher.close()
+    try {
+      disposeTexture()
+    } finally {
+      rendererDispatcher.close()
+    }
   }
 
   private fun recreateTexture(extent: SurfaceExtent, metalDevice: SkikoMetalDevice? = null) {

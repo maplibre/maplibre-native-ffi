@@ -7,6 +7,9 @@ internal object MacMetalBridgeNative {
   private const val MTL_TEXTURE_USAGE_RENDER_TARGET = 4L
   private const val MTL_STORAGE_MODE_PRIVATE = 2L
 
+  fun metalAdapter(metalDevice: Long): Long =
+    MacObjectiveC.autoreleasePool().use { MacObjectiveC.sendPointer(metalDevice, "adapter") }
+
   fun createMetalTexture(metalDevice: Long, oldTexture: Long, width: Int, height: Int): Long =
     MacObjectiveC.autoreleasePool().use {
       if (oldTexture != 0L) {
