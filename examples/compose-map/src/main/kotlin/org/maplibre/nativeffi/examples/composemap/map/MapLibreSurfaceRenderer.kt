@@ -23,8 +23,7 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
-  override val supportedBackends: Set<ProducerBackend> =
-    MapLibreNativeSurfaceAdapter.supportedBackends
+  override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
 
   private var surfaceSession: NativeSurfaceSession? = null
   private var ownerSession: NativeSurfaceSession? = null
@@ -194,14 +193,19 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     }
     closed = true
     surfaceSession = null
-    closeRenderSession()
+    val closingMap = map
+    val closingRuntime = runtime
+    map = null
+    runtime = null
+    ownerSession = null
     try {
-      map?.close()
+      closeRenderSession()
     } finally {
-      map = null
-      runtime?.close()
-      runtime = null
-      ownerSession = null
+      try {
+        closingMap?.close()
+      } finally {
+        closingRuntime?.close()
+      }
     }
   }
 

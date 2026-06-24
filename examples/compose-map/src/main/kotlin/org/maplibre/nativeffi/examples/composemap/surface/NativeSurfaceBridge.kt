@@ -35,39 +35,31 @@ internal interface NativeSurfaceBridge : AutoCloseable {
   companion object {
     val host: NativeSurfaceHost = detectHost()
 
-    fun select(supportedBackends: Set<ProducerBackend>): NativeSurfaceBridgeSelection {
-      val candidate =
-        bridgeCandidates(host).firstOrNull { it.backend in supportedBackends }
-          ?: return NativeSurfaceBridgeSelection.Unsupported
+    fun select(backend: ProducerBackend): NativeSurfaceBridgeSelection {
+      val create = bridgeFactory(host, backend) ?: return NativeSurfaceBridgeSelection.Unsupported
       return try {
-        NativeSurfaceBridgeSelection.Selected(candidate.create())
+        NativeSurfaceBridgeSelection.Selected(create())
       } catch (error: Throwable) {
         if (error is VirtualMachineError || error is ThreadDeath) {
           throw error
         }
-        NativeSurfaceBridgeSelection.Failed(candidate.backend, error)
+        NativeSurfaceBridgeSelection.Failed(backend, error)
       }
     }
 
-    private fun bridgeCandidates(host: NativeSurfaceHost): List<NativeSurfaceBridgeCandidate> =
-      when (host.operatingSystem) {
-        NativeSurfaceOperatingSystem.MACOS ->
-          listOf(
-            NativeSurfaceBridgeCandidate(ProducerBackend.METAL, ::MacMetalBridge),
-            NativeSurfaceBridgeCandidate(ProducerBackend.VULKAN, ::MacVulkanMetalBridge),
-            NativeSurfaceBridgeCandidate(ProducerBackend.OPENGL, ::MacOpenGlMetalBridge),
-          )
-        NativeSurfaceOperatingSystem.LINUX ->
-          listOf(
-            NativeSurfaceBridgeCandidate(ProducerBackend.VULKAN, ::LinuxVulkanOpenGlBridge),
-            NativeSurfaceBridgeCandidate(ProducerBackend.OPENGL, ::LinuxOpenGlBridge),
-          )
-        NativeSurfaceOperatingSystem.WINDOWS ->
-          listOf(
-            NativeSurfaceBridgeCandidate(ProducerBackend.VULKAN, ::WindowsVulkanD3d12Bridge),
-            NativeSurfaceBridgeCandidate(ProducerBackend.OPENGL, ::WindowsOpenGlD3d12Bridge),
-          )
-        NativeSurfaceOperatingSystem.UNSUPPORTED -> emptyList()
+    private fun bridgeFactory(
+      host: NativeSurfaceHost,
+      backend: ProducerBackend,
+    ): (() -> NativeSurfaceBridge)? =
+      when (host.operatingSystem to backend) {
+        NativeSurfaceOperatingSystem.MACOS to ProducerBackend.METAL -> ::MacMetalBridge
+        NativeSurfaceOperatingSystem.MACOS to ProducerBackend.VULKAN -> ::MacVulkanMetalBridge
+        NativeSurfaceOperatingSystem.MACOS to ProducerBackend.OPENGL -> ::MacOpenGlMetalBridge
+        NativeSurfaceOperatingSystem.LINUX to ProducerBackend.VULKAN -> ::LinuxVulkanOpenGlBridge
+        NativeSurfaceOperatingSystem.LINUX to ProducerBackend.OPENGL -> ::LinuxOpenGlBridge
+        NativeSurfaceOperatingSystem.WINDOWS to ProducerBackend.VULKAN -> ::WindowsVulkanD3d12Bridge
+        NativeSurfaceOperatingSystem.WINDOWS to ProducerBackend.OPENGL -> ::WindowsOpenGlD3d12Bridge
+        else -> null
       }
   }
 }
@@ -96,11 +88,6 @@ internal class NativeSurfaceRendererDispatcher(threadName: String) : AutoCloseab
     executor.shutdown()
   }
 }
-
-private data class NativeSurfaceBridgeCandidate(
-  val backend: ProducerBackend,
-  val create: () -> NativeSurfaceBridge,
-)
 
 internal sealed interface NativeSurfaceBridgeSelection {
   data class Selected(val bridge: NativeSurfaceBridge) : NativeSurfaceBridgeSelection

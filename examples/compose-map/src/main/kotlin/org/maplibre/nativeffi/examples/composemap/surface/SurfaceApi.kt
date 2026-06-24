@@ -1,24 +1,54 @@
 package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import kotlin.math.ceil
 import kotlin.math.max
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
-public fun rememberNativeSurfaceController(): NativeSurfaceController =
-  rememberNativeSurfaceControllerImpl()
+public fun rememberNativeSurfaceController(): NativeSurfaceController = remember {
+  NativeSurfaceController()
+}
 
-public interface NativeSurfaceController {
-  public val state: StateFlow<NativeSurfaceState>
+public class NativeSurfaceController internal constructor() {
+  private val mutableState = MutableStateFlow<NativeSurfaceState>(NativeSurfaceState.Inactive)
+  private var requestFrameCallback: (() -> Unit)? = null
+  private var disposeCallback: (() -> Unit)? = null
 
-  public fun requestFrame()
+  public val state: StateFlow<NativeSurfaceState> = mutableState
 
-  public fun dispose()
+  public fun requestFrame() {
+    requestFrameCallback?.invoke()
+  }
+
+  public fun dispose() {
+    try {
+      disposeCallback?.invoke()
+    } finally {
+      disconnect()
+      setState(NativeSurfaceState.Inactive)
+    }
+  }
+
+  internal fun connect(onRequestFrame: () -> Unit, onDispose: () -> Unit) {
+    requestFrameCallback = onRequestFrame
+    disposeCallback = onDispose
+  }
+
+  internal fun disconnect() {
+    requestFrameCallback = null
+    disposeCallback = null
+  }
+
+  internal fun setState(state: NativeSurfaceState) {
+    mutableState.value = state
+  }
 }
 
 public interface NativeSurfaceRenderer : AutoCloseable {
-  public val supportedBackends: Set<ProducerBackend>
+  public val backend: ProducerBackend
 
   public fun onSurfaceAvailable(session: NativeSurfaceSession) {}
 
@@ -68,7 +98,7 @@ public sealed interface NativeSurfaceState {
   ) : NativeSurfaceState
 
   public data class Unsupported(
-    public val requestedBackends: Set<ProducerBackend>,
+    public val requestedBackend: ProducerBackend,
     public val host: NativeSurfaceHost,
   ) : NativeSurfaceState
 

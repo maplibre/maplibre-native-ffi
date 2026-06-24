@@ -67,7 +67,7 @@ internal fun ComposeMapApp(renderer: MapLibreSurfaceRenderer) {
       when (val current = state) {
         is NativeSurfaceState.Failed -> current.message
         is NativeSurfaceState.Unsupported ->
-          "Native surface unsupported for ${current.requestedBackends} on ${current.host.operatingSystem}/${current.host.consumerBackend}"
+          "Native surface unsupported for ${current.requestedBackend} on ${current.host.operatingSystem}/${current.host.consumerBackend}"
         NativeSurfaceState.Inactive,
         is NativeSurfaceState.Ready -> null
       }

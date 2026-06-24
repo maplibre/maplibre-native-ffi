@@ -101,7 +101,7 @@ fun ComposeNativeSurface(
 )
 
 interface NativeSurfaceRenderer {
-  val supportedBackends: Set<ProducerBackend>
+  val backend: ProducerBackend
 
   fun onSurfaceAvailable(session: NativeSurfaceSession) {}
   fun onSurfaceChanged(extent: SurfaceExtent) {}
@@ -280,7 +280,7 @@ Per bridge row:
 | `opengl-metal`  | Create an `MTLTexture` on the Skiko Metal device, create an ANGLE Metal-backed EGL/GLES context, import the Metal texture with `EGL_ANGLE_metal_texture_client_buffer`, bind the `EGLImage` to `GL_TEXTURE_2D`, and pass the texture name plus `EglContextDescriptor` to MapLibre. |
 | `vulkan-d3d12`  | Create a D3D12 committed resource or shared resource compatible with Skiko, export a shared handle, import it into Vulkan as a D3D12 resource-backed image, then pass the image and view to MapLibre.                                                                              |
 | `opengl-d3d12`  | Create a D3D12 shared resource compatible with Skiko, import it into OpenGL with Win32 external memory objects, then pass the OpenGL texture name to MapLibre.                                                                                                                     |
-| `vulkan-opengl` | Create Vulkan exportable image memory, import it into OpenGL with `GL_EXT_memory_object_fd`, then draw the OpenGL texture from Skiko; use Linux `dma_buf`/EGLImage import as a fallback when opaque-FD memory objects are unavailable.                                             |
+| `vulkan-opengl` | Create Vulkan exportable image memory, import it into OpenGL with `GL_EXT_memory_object_fd`, then draw the OpenGL texture from Skiko.                                                                                                                                              |
 | `opengl-opengl` | Create bridge-owned external-memory storage imported into both the producer EGL texture and the Skiko OpenGL texture, then synchronize producer-to-consumer access with GL semaphore/fence ownership.                                                                              |
 
 Vulkan external memory supports the needed producer imports for Metal textures,
@@ -403,7 +403,7 @@ do not expose matching `DEVICE_UUID_EXT` / driver UUID data or when the chosen
 Vulkan physical device cannot export an opaque FD image with the needed format,
 usage, and tiling.
 
-The `dma_buf` / EGLImage path remains the Linux fallback and portability probe:
+The `dma_buf` / EGLImage path remains a Linux portability probe:
 
 - Vulkan must support `VK_EXT_external_memory_dma_buf` and, for images with DRM
   modifiers, `VK_EXT_image_drm_format_modifier`.
@@ -464,9 +464,9 @@ side is WGL:
 2. Allocate the consumer-compatible D3D12 resource first, then expose that
    storage to WGL/OpenGL. Preferred path: `GL_EXT_memory_object` plus
    `GL_EXT_external_objects_win32` / `GL_EXT_memory_object_win32` from a D3D12
-   resource handle. Fallback candidates are `WGL_NV_DX_interop2` or an
-   ANGLE-backed D3D path if driver support makes the GL external-memory path
-   impractical.
+   resource handle. If driver support makes the GL external-memory path
+   impractical, evaluate `WGL_NV_DX_interop2` or an ANGLE-backed D3D path as a
+   separate bridge design.
 3. Pass only `OpenGlTextureTarget` and `WglContextHandles` to MapLibre. Keep
    D3D12 resources, GL memory objects, duplicated handles, keyed mutexes, and
    Skiko Direct3D reflection inside the bridge.
@@ -576,7 +576,7 @@ The build should keep the Kotlin/Compose app separate from per-OS bridge code:
   requires it.
 - LWJGL supplies the Objective-C runtime bridge used by the macOS same-API Metal
   implementation.
-- Runtime selection chooses one bridge row based on the default Skiko renderer,
+- Bridge construction uses the one row determined by the default Skiko renderer,
   the selected MapLibre backend artifact, and extension/capability probes.
 
 The code should be laid out so extraction is mechanical:
@@ -623,9 +623,9 @@ renaming exported symbols.
   replacing the prototype bridge: `LinuxOpenGLRedrawer.context`,
   `LinuxOpenGLRedrawer.contextHandler`, and
   `OpenGLContextHandler.context`/surface lifecycle.
-- Treat `vulkan-metal` as the first bridge candidate because it exercises
-  cross-API sharing against the current macOS development host while keeping the
-  Windows D3D12 bridge in the design from the start.
+- Prioritize validating `vulkan-metal` because it exercises cross-API sharing
+  against the current macOS development host while keeping the Windows D3D12
+  bridge in the design from the start.
 
 ## Research Pointers
 

@@ -16,8 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import javax.swing.SwingUtilities
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 public fun ComposeNativeSurface(
@@ -25,16 +23,15 @@ public fun ComposeNativeSurface(
   modifier: Modifier = Modifier,
   controller: NativeSurfaceController? = null,
 ) {
-  val internalController = rememberNativeSurfaceControllerImpl()
+  val internalController = rememberNativeSurfaceController()
   val activeController = controller ?: internalController
-  val controllerImpl = activeController as? NativeSurfaceControllerImpl
   val density = LocalDensity.current
   val drawState = remember { NativeSurfaceDrawState() }
   var extent by remember { mutableStateOf(SurfaceExtent.Empty) }
   var frameRequest by remember { mutableLongStateOf(0L) }
   val frameSignal = frameRequest
   val bridgeSelection =
-    remember(renderer.supportedBackends) { NativeSurfaceBridge.select(renderer.supportedBackends) }
+    remember(renderer, activeController) { NativeSurfaceBridge.select(renderer.backend) }
   val bridge = (bridgeSelection as? NativeSurfaceBridgeSelection.Selected)?.bridge
   val session =
     remember(bridge, activeController) {
@@ -43,43 +40,49 @@ public fun ComposeNativeSurface(
   val nativeSurfaceState by activeController.state.collectAsState()
   val surfaceReady = nativeSurfaceState is NativeSurfaceState.Ready
 
-  DisposableEffect(renderer, bridgeSelection, bridge, session, controllerImpl) {
+  DisposableEffect(renderer, bridgeSelection, bridge, session, activeController) {
     when (bridgeSelection) {
       is NativeSurfaceBridgeSelection.Failed -> {
-        controllerImpl?.setState(
+        activeController.setState(
           NativeSurfaceState.Failed(
             message = "Native surface bridge initialization failed: ${bridgeSelection.message}",
             cause = bridgeSelection.error,
           )
         )
-        onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
+        onDispose { activeController.setState(NativeSurfaceState.Inactive) }
       }
       NativeSurfaceBridgeSelection.Unsupported -> {
-        controllerImpl?.setState(
+        activeController.setState(
           NativeSurfaceState.Unsupported(
-            requestedBackends = renderer.supportedBackends,
+            requestedBackend = renderer.backend,
             host = NativeSurfaceBridge.host,
           )
         )
-        onDispose { controllerImpl?.setState(NativeSurfaceState.Inactive) }
+        onDispose { activeController.setState(NativeSurfaceState.Inactive) }
       }
       is NativeSurfaceBridgeSelection.Selected -> {
         check(bridge != null && session != null) { "Selected native surface bridge is not ready" }
         val participant = DesktopNativeRenderingLifecycle.register {
-          renderer.close()
-          bridge.close()
+          try {
+            renderer.close()
+          } finally {
+            bridge.close()
+          }
         }
-        controllerImpl?.connect(
+        activeController.connect(
           onRequestFrame = { frameRequest += 1 },
           onDispose = participant::close,
         )
-        controllerImpl?.setState(NativeSurfaceState.Ready(bridge.backend, bridge.capabilities))
+        activeController.setState(NativeSurfaceState.Ready(bridge.backend, bridge.capabilities))
         renderer.onSurfaceAvailable(session)
         session.requestFrame()
         onDispose {
-          participant.close()
-          controllerImpl?.disconnect()
-          controllerImpl?.setState(NativeSurfaceState.Inactive)
+          try {
+            participant.close()
+          } finally {
+            activeController.disconnect()
+            activeController.setState(NativeSurfaceState.Inactive)
+          }
         }
       }
     }
@@ -95,7 +98,7 @@ public fun ComposeNativeSurface(
         session?.requestFrame()
       } catch (error: Throwable) {
         error.printStackTrace()
-        controllerImpl?.setState(
+        activeController.setState(
           NativeSurfaceState.Failed(
             message =
               "Native surface bridge failed to resize to ${extent.width}x${extent.height}: ${error.message}",
@@ -121,7 +124,7 @@ public fun ComposeNativeSurface(
           bridge.acquireFrame(frameId, extent, System.nanoTime())
         } catch (error: Throwable) {
           error.printStackTrace()
-          controllerImpl?.setState(
+          activeController.setState(
             NativeSurfaceState.Failed(
               message = "Native surface bridge failed to acquire frame $frameId: ${error.message}",
               cause = error,
@@ -141,7 +144,7 @@ public fun ComposeNativeSurface(
           drawState.lastRenderedTarget?.let { target -> drew = bridge.draw(this, target) }
         } catch (error: Throwable) {
           error.printStackTrace()
-          controllerImpl?.setState(
+          activeController.setState(
             NativeSurfaceState.Failed(
               message = "Native surface renderer failed for frame $frameId: ${error.message}",
               cause = error,
@@ -172,43 +175,6 @@ private class NativeSurfaceDrawState {
   }
 
   fun nextFrameId(): Long = nextFrameId++
-}
-
-@Composable
-internal fun rememberNativeSurfaceControllerImpl(): NativeSurfaceController = remember {
-  NativeSurfaceControllerImpl()
-}
-
-internal class NativeSurfaceControllerImpl : NativeSurfaceController {
-  private val mutableState = MutableStateFlow<NativeSurfaceState>(NativeSurfaceState.Inactive)
-  private var requestFrameCallback: (() -> Unit)? = null
-  private var disposeCallback: (() -> Unit)? = null
-
-  override val state: StateFlow<NativeSurfaceState> = mutableState
-
-  override fun requestFrame() {
-    requestFrameCallback?.invoke()
-  }
-
-  override fun dispose() {
-    disposeCallback?.invoke()
-    disconnect()
-    setState(NativeSurfaceState.Inactive)
-  }
-
-  fun connect(onRequestFrame: () -> Unit, onDispose: () -> Unit) {
-    requestFrameCallback = onRequestFrame
-    disposeCallback = onDispose
-  }
-
-  fun disconnect() {
-    requestFrameCallback = null
-    disposeCallback = null
-  }
-
-  fun setState(state: NativeSurfaceState) {
-    mutableState.value = state
-  }
 }
 
 private class NativeSurfaceSessionImpl(

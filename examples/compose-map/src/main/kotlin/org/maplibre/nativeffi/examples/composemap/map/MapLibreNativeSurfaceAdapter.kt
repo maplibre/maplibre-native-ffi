@@ -26,8 +26,11 @@ import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object MapLibreNativeSurfaceAdapter {
-  val supportedBackends: Set<ProducerBackend> =
-    Maplibre.supportedRenderBackends().mapNotNullTo(mutableSetOf()) { it.toProducerBackend() }
+  val backend: ProducerBackend =
+    Maplibre.supportedRenderBackends().mapNotNull { it.toProducerBackend() }.singleOrNull()
+      ?: error(
+        "Expected exactly one MapLibre render backend, found ${Maplibre.supportedRenderBackends()}"
+      )
 
   fun descriptor(target: NativeSurfaceTarget, extent: SurfaceExtent): BorrowedDescriptor =
     when (target) {

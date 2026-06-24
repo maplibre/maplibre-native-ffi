@@ -219,7 +219,7 @@ private class WindowsWglContext private constructor() : AutoCloseable {
       WglContextHandles(
         deviceContext = NativeHandle(deviceContext),
         shareContext = NativeHandle(shareContext),
-        // Null makes the native WGL loader use its built-in wglGetProcAddress fallback.
+        // Null makes the native WGL descriptor resolve entry points from the current context.
         getProcAddress = NativeHandle(0),
       )
 
