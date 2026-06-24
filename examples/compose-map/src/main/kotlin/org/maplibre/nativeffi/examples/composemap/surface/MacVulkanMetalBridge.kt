@@ -80,15 +80,14 @@ internal class MacVulkanMetalBridge : NativeSurfaceBridge {
 
   override fun close() {
     try {
-      disposeTexture()
-    } finally {
-      val closingVulkan = vulkan
-      vulkan = null
-      try {
+      rendererDispatcher.run {
+        disposeTexture()
+        val closingVulkan = vulkan
+        vulkan = null
         closingVulkan?.close()
-      } finally {
-        rendererDispatcher.close()
       }
+    } finally {
+      rendererDispatcher.close()
     }
   }
 

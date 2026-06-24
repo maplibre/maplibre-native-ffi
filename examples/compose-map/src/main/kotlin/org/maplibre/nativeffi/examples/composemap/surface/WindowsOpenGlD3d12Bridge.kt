@@ -237,6 +237,7 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
   private var shareContext = NULL
   private var initialized = false
   private var capabilitiesInitialized = false
+  private var glfwRuntimeAcquired = false
 
   val handles: WglContextHandles
     get() =
@@ -306,7 +307,10 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
         if (window != NULL) {
           glfwDestroyWindow(window)
         }
-        glfwTerminate()
+        if (glfwRuntimeAcquired) {
+          WindowsGlfwRuntime.release()
+          glfwRuntimeAcquired = false
+        }
       }
       Kind.NV_AFFINITY -> {
         if (shareContext != NULL) {
@@ -325,7 +329,8 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
   }
 
   private fun createDefault() {
-    check(glfwInit()) { "GLFW initialization failed for Windows WGL bridge" }
+    WindowsGlfwRuntime.acquire()
+    glfwRuntimeAcquired = true
     glfwDefaultWindowHints()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API)
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3)
@@ -449,6 +454,27 @@ private constructor(private val kind: Kind, private val label: String) : AutoClo
   private enum class Kind {
     GLFW,
     NV_AFFINITY,
+  }
+}
+
+private object WindowsGlfwRuntime {
+  private var references = 0
+
+  @Synchronized
+  fun acquire() {
+    if (references == 0) {
+      check(glfwInit()) { "GLFW initialization failed for Windows WGL bridge" }
+    }
+    references += 1
+  }
+
+  @Synchronized
+  fun release() {
+    check(references > 0) { "Windows GLFW runtime was released without a matching acquire" }
+    references -= 1
+    if (references == 0) {
+      glfwTerminate()
+    }
   }
 }
 
