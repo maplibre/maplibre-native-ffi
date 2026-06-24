@@ -40,6 +40,11 @@ public fun ComposeNativeSurface(
   val nativeSurfaceState by activeController.state.collectAsState()
   val surfaceReady = nativeSurfaceState is NativeSurfaceState.Ready
 
+  DisposableEffect(renderer) {
+    val participant = DesktopNativeRenderingLifecycle.register { renderer.close() }
+    onDispose { participant.close() }
+  }
+
   DisposableEffect(renderer, bridgeSelection, bridge, session, activeController) {
     when (bridgeSelection) {
       is NativeSurfaceBridgeSelection.Failed -> {
@@ -64,7 +69,7 @@ public fun ComposeNativeSurface(
         check(bridge != null && session != null) { "Selected native surface bridge is not ready" }
         val participant = DesktopNativeRenderingLifecycle.register {
           try {
-            renderer.close()
+            renderer.onSurfaceLost()
           } finally {
             bridge.close()
           }
