@@ -51,6 +51,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -73,6 +74,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -96,6 +98,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -119,6 +122,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -142,6 +146,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/swift-map:build
@@ -166,6 +171,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -189,6 +195,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
@@ -326,6 +333,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -347,6 +355,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -368,6 +377,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
@@ -389,6 +399,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
