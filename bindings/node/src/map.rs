@@ -199,7 +199,8 @@ pub fn create_native_map_handle(
     options: Option<MapOptions>,
 ) -> Result<NativeMapHandle> {
     let options = options.unwrap_or_default().into_core()?;
-    let native_options = core::options::map_options_to_native(&options);
+    let native_options =
+        core::options::map_options_to_native(&options).map_err(error::from_core)?;
     let mut map = std::ptr::null_mut();
 
     core::check(unsafe { sys::mln_map_create(runtime.as_ptr(), &native_options, &mut map) })

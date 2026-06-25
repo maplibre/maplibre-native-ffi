@@ -12,8 +12,10 @@
   "include": [
     "*.cjs",
     "*.d.cts",
+    "*.d.mts",
     "index.d.ts",
     "test/**/*.cjs",
-    "test/**/*.cts"
+    "test/**/*.cts",
+    "test/**/*.mts"
   ]
 }

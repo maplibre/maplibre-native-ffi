@@ -98,7 +98,7 @@ export interface RuntimeEvent {
   rawEventType: number;
   sourceType: string;
   rawSourceType: number;
-  sourceAddress: bigint;
+  sourceMap: MapHandle | null;
   code: number;
   message?: string | null;
   payloadKind: RuntimeEventPayload["kind"];
@@ -614,15 +614,7 @@ export type OfflineOperationRef = OfflineOperationHandle;
 export type OfflineRegionDownloadState = "inactive" | "active";
 
 export declare class OfflineOperationHandle {
-  private constructor(
-    runtime: RuntimeHandle,
-    operationId: bigint,
-    operationKind: OfflineOperationKind,
-    resultKind: OfflineOperationResultKind,
-  );
-  readonly operationId: bigint;
-  readonly operationKind: OfflineOperationKind;
-  readonly resultKind: OfflineOperationResultKind;
+  private constructor(nativeHandle: unknown);
   readonly closed: boolean;
   close(): void;
   [Symbol.dispose](): void;
@@ -729,11 +721,6 @@ export interface TextureImageInfo {
   byteLength: number;
 }
 
-export interface TextureReadback {
-  info: TextureImageInfo;
-  pixels: Uint8Array;
-}
-
 export type TextureReadbackBuffer =
   | NativeBuffer
   | ArrayBuffer
@@ -741,6 +728,7 @@ export type TextureReadbackBuffer =
 
 export declare class MetalOwnedTextureFrame {
   private constructor(nativeFrame: unknown);
+  readonly closed: boolean;
   readonly generation: bigint;
   readonly width: number;
   readonly height: number;
@@ -749,10 +737,13 @@ export declare class MetalOwnedTextureFrame {
   readonly texture: NativePointer;
   readonly device: NativePointer;
   readonly pixelFormat: bigint;
+  close(): void;
+  [Symbol.dispose](): void;
 }
 
 export declare class VulkanOwnedTextureFrame {
   private constructor(nativeFrame: unknown);
+  readonly closed: boolean;
   readonly generation: bigint;
   readonly width: number;
   readonly height: number;
@@ -763,10 +754,13 @@ export declare class VulkanOwnedTextureFrame {
   readonly device: NativePointer;
   readonly format: number;
   readonly layout: number;
+  close(): void;
+  [Symbol.dispose](): void;
 }
 
 export declare class OpenGLOwnedTextureFrame {
   private constructor(nativeFrame: unknown);
+  readonly closed: boolean;
   readonly generation: bigint;
   readonly width: number;
   readonly height: number;
@@ -777,6 +771,8 @@ export declare class OpenGLOwnedTextureFrame {
   readonly internalFormat: number;
   readonly format: number;
   readonly type: number;
+  close(): void;
+  [Symbol.dispose](): void;
 }
 
 export interface FeatureStateSelector {
@@ -813,47 +809,9 @@ export interface QueriedFeature {
   state?: JsonValue | null;
 }
 
-type TextureFrameCallbackResult<T> = T extends PromiseLike<unknown> ? never : T;
-
 export declare class RenderSessionHandle {
   private constructor(nativeHandle: unknown, map: MapHandle);
   readonly map: MapHandle;
-  static attachMetalOwnedTexture(
-    map: MapHandle,
-    descriptor: MetalOwnedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachMetalBorrowedTexture(
-    map: MapHandle,
-    descriptor: MetalBorrowedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachMetalSurface(
-    map: MapHandle,
-    descriptor: MetalSurfaceDescriptor,
-  ): RenderSessionHandle;
-  static attachVulkanOwnedTexture(
-    map: MapHandle,
-    descriptor: VulkanOwnedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachVulkanBorrowedTexture(
-    map: MapHandle,
-    descriptor: VulkanBorrowedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachVulkanSurface(
-    map: MapHandle,
-    descriptor: VulkanSurfaceDescriptor,
-  ): RenderSessionHandle;
-  static attachOpenGLOwnedTexture(
-    map: MapHandle,
-    descriptor: OpenGLOwnedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachOpenGLBorrowedTexture(
-    map: MapHandle,
-    descriptor: OpenGLBorrowedTextureDescriptor,
-  ): RenderSessionHandle;
-  static attachOpenGLSurface(
-    map: MapHandle,
-    descriptor: OpenGLSurfaceDescriptor,
-  ): RenderSessionHandle;
   readonly closed: boolean;
   close(): void;
   resize(width: number, height: number, scaleFactor: number): void;
@@ -880,16 +838,9 @@ export declare class RenderSessionHandle {
     extensionField: string,
     args?: JsonValue | null,
   ): JsonValue;
-  withMetalOwnedTextureFrame<T>(
-    callback: (frame: MetalOwnedTextureFrame) => TextureFrameCallbackResult<T>,
-  ): TextureFrameCallbackResult<T>;
-  withVulkanOwnedTextureFrame<T>(
-    callback: (frame: VulkanOwnedTextureFrame) => TextureFrameCallbackResult<T>,
-  ): TextureFrameCallbackResult<T>;
-  withOpenGLOwnedTextureFrame<T>(
-    callback: (frame: OpenGLOwnedTextureFrame) => TextureFrameCallbackResult<T>,
-  ): TextureFrameCallbackResult<T>;
-  readPremultipliedRgba8(): TextureReadback;
+  acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrame;
+  acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrame;
+  acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrame;
   readPremultipliedRgba8Into(data: TextureReadbackBuffer): TextureImageInfo;
   [Symbol.dispose](): void;
 }

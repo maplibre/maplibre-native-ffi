@@ -1,18 +1,21 @@
-import { type CameraOptions } from "@maplibre/native-ffi-node/camera";
+import {
+  type JsonValue,
+  type RenderedQueryGeometry,
+  type StyleImageInput,
+} from "@maplibre/native-ffi-node";
 import { InvalidArgumentError } from "@maplibre/native-ffi-node/error";
 import {
   projectedMetersForLatLng,
   type LatLng,
 } from "@maplibre/native-ffi-node/geo";
-import { type JsonValue } from "@maplibre/native-ffi-node/json";
 import { setLogCallback, type LogRecord } from "@maplibre/native-ffi-node/log";
 import {
   MapHandle,
+  type CameraOptions,
   type MapTileOptionsInput,
   type MapViewportOptionsInput,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
-import { type RenderedQueryGeometry } from "@maplibre/native-ffi-node/query";
 import {
   NativeBuffer,
   NativePointer,
@@ -33,7 +36,6 @@ import {
   takeNativeLeakReports,
   type NativeLeakReport,
 } from "@maplibre/native-ffi-node/runtime";
-import { type StyleImageInput } from "@maplibre/native-ffi-node/style";
 
 const camera: CameraOptions = { center: { latitude: 1, longitude: 2 } };
 const coordinate: LatLng = { latitude: 1, longitude: 2 };

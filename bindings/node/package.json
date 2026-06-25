@@ -7,27 +7,58 @@
   "main": "index.cjs",
   "types": "index.d.cts",
   "exports": {
-    ".": { "types": "./index.d.cts", "default": "./index.cjs" },
-    "./camera": { "types": "./camera.d.cts", "default": "./camera.cjs" },
-    "./error": { "types": "./error.d.cts", "default": "./error.cjs" },
-    "./geo": { "types": "./geo.d.cts", "default": "./geo.cjs" },
-    "./json": { "types": "./json.d.cts", "default": "./json.cjs" },
-    "./log": { "types": "./log.d.cts", "default": "./log.cjs" },
-    "./map": { "types": "./map.d.cts", "default": "./map.cjs" },
-    "./offline": { "types": "./offline.d.cts", "default": "./offline.cjs" },
-    "./query": { "types": "./query.d.cts", "default": "./query.cjs" },
-    "./render": { "types": "./render.d.cts", "default": "./render.cjs" },
-    "./resource": { "types": "./resource.d.cts", "default": "./resource.cjs" },
-    "./runtime": { "types": "./runtime.d.cts", "default": "./runtime.cjs" },
-    "./style": { "types": "./style.d.cts", "default": "./style.cjs" }
+    ".": {
+      "import": { "types": "./index.d.mts", "default": "./index.mjs" },
+      "require": { "types": "./index.d.cts", "default": "./index.cjs" }
+    },
+    "./error": {
+      "import": { "types": "./error.d.mts", "default": "./error.mjs" },
+      "require": { "types": "./error.d.cts", "default": "./error.cjs" }
+    },
+    "./geo": {
+      "import": { "types": "./geo.d.mts", "default": "./geo.mjs" },
+      "require": { "types": "./geo.d.cts", "default": "./geo.cjs" }
+    },
+    "./log": {
+      "import": { "types": "./log.d.mts", "default": "./log.mjs" },
+      "require": { "types": "./log.d.cts", "default": "./log.cjs" }
+    },
+    "./map": {
+      "import": { "types": "./map.d.mts", "default": "./map.mjs" },
+      "require": { "types": "./map.d.cts", "default": "./map.cjs" }
+    },
+    "./offline": {
+      "import": { "types": "./offline.d.mts", "default": "./offline.mjs" },
+      "require": { "types": "./offline.d.cts", "default": "./offline.cjs" }
+    },
+    "./render": {
+      "import": { "types": "./render.d.mts", "default": "./render.mjs" },
+      "require": { "types": "./render.d.cts", "default": "./render.cjs" }
+    },
+    "./resource": {
+      "import": { "types": "./resource.d.mts", "default": "./resource.mjs" },
+      "require": { "types": "./resource.d.cts", "default": "./resource.cjs" }
+    },
+    "./runtime": {
+      "import": { "types": "./runtime.d.mts", "default": "./runtime.mjs" },
+      "require": { "types": "./runtime.d.cts", "default": "./runtime.cjs" }
+    }
   },
-  "files": ["*.cjs", "*.d.cts", "index.js", "index.d.ts", "*.node"],
+  "files": [
+    "*.cjs",
+    "*.mjs",
+    "*.d.cts",
+    "*.d.mts",
+    "index.js",
+    "index.d.ts",
+    "*.node"
+  ],
   "engines": { "node": ">=22.14" },
   "napi": { "binaryName": "maplibre-native-node" },
   "scripts": {
     "build": "napi build --release --platform --manifest-path Cargo.toml",
     "build:debug": "napi build --platform --manifest-path Cargo.toml",
-    "test": "node --test test/*.test.cjs && node test/esm-smoke.mjs",
+    "test": "node --test test/*.test.cjs && node test/esm-smoke.mjs && pnpm typecheck",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

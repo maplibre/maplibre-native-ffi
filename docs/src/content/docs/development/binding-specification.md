@@ -260,17 +260,26 @@ strings and string views are copied before their native borrow window ends.
 
 ### JSON and GeoJSON
 
-Structured JSON and GeoJSON models MUST preserve MapLibre value semantics:
-object member order, repeated member names, signed and unsigned integer width,
-floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
-JSON or GeoJSON text inputs MUST pass through as text without reparsing or
-reformatting unless the public API is explicitly a structured-value API.
+Structured JSON and GeoJSON APIs use one of these public representations:
 
-Bindings MUST preserve the full unsigned 64-bit domain for unsigned JSON and
-GeoJSON integer values. Languages without a native unsigned 64-bit integer type
-MUST expose those values through a documented representation that preserves the
-raw value. The binding documentation MUST state how callers compare and format
-representations that are not naturally unsigned.
+- A lossless structured model that preserves MapLibre value semantics: object
+  member order, repeated member names, signed and unsigned integer width,
+  floating-point values, booleans, nulls, strings, arrays, and nested objects.
+- The target language's native JSON value model, when that model is the
+  idiomatic low-level representation for JSON and GeoJSON in the language.
+
+Bindings that expose native JSON values use precise public types for values the
+model can represent and document any JSON distinctions the model does not
+preserve, such as repeated object member names or integer width. Raw JSON or
+GeoJSON text inputs MUST pass through as text without reparsing or reformatting
+unless the public API is explicitly a structured-value API.
+
+Lossless structured representations MUST preserve the full unsigned 64-bit
+domain for unsigned JSON and GeoJSON integer values. Languages without a native
+unsigned 64-bit integer type MUST expose those values through a documented
+representation that preserves the raw value. The binding documentation MUST
+state how callers compare and format representations that are not naturally
+unsigned.
 
 ### Native pointers
 
@@ -385,6 +394,12 @@ Resource transform invocation follows this operation:
 Resource providers decide whether a request passes through to the native
 provider or is handled by the binding.
 
+Bindings may expose declarative transform or provider routing when that shape
+matches the host's execution constraints. The routing API still produces the
+same C decisions: pass-through, synchronous transform replacement, or handled
+provider ownership. Handled routes follow the same request lifetime, completion,
+and release rules as direct callback APIs.
+
 Resource provider invocation follows this operation:
 
 1. For pass-through requests, return pass-through without retaining the native
@@ -417,7 +432,9 @@ Provide an owner-thread execution helper when the host language can move a
 logical task across native threads or cannot otherwise give safe callers a
 stable native owner thread for a runtime/map lifecycle. Bindings with stable
 native caller identity expose ordinary methods and wrong-thread errors without
-this helper.
+this helper. Single-threaded event-loop bindings with stable native caller
+identity can use the event loop as the public execution context for ordinary
+low-level methods.
 
 The helper follows this design:
 
@@ -466,6 +483,14 @@ bound native owner thread. Copied immutable values can be transferable when
 their contents are independent of native owner-thread state. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
+
+Resource request handles can be environment-local when the host language
+separates execution environments and native callback handles are valid only in
+the environment that received the callback. The binding's public provider model
+then completes handled requests in that same environment while still allowing
+deferred asynchronous completion there. A binding that exposes cross-worker or
+cross-thread request completion provides a transferable completion token or
+helper that preserves the one-shot completion and stale-handle rules.
 
 ---
 

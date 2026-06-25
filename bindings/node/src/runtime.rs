@@ -222,7 +222,7 @@ pub struct ResourceProviderRequest {
     pub prior_expires_unix_ms: Option<BigInt>,
     pub prior_etag: Option<String>,
     pub prior_data: Uint8Array,
-    pub handle_id: String,
+    pub completion_token: String,
 }
 
 #[napi(object)]
@@ -238,8 +238,8 @@ pub struct ResourceResponseInput {
     pub retry_after_unix_ms: Option<BigInt>,
 }
 
-static RESOURCE_REQUEST_HANDLE_IDS: AtomicU64 = AtomicU64::new(1);
-static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<u64, ResourceRequestRegistration>>> =
+static RESOURCE_REQUEST_TOKEN_IDS: AtomicU64 = AtomicU64::new(1);
+static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<String, ResourceRequestRegistration>>> =
     OnceLock::new();
 
 #[derive(Clone)]
@@ -267,7 +267,7 @@ struct ResourceTransformState {
 struct ResourceProviderState {
     routes: Vec<ResourceMatcher>,
     callback: ThreadsafeFunction<ResourceProviderRequest>,
-    pending_handle_ids: Mutex<HashSet<u64>>,
+    pending_completion_tokens: Mutex<HashSet<String>>,
 }
 
 #[napi(js_name = "NativeRuntimeHandle")]
@@ -301,41 +301,40 @@ pub fn create_native_runtime_handle(
 
 #[napi(js_name = "nativeResourceRequestComplete")]
 pub fn native_resource_request_complete(
-    handle_id: String,
+    completion_token: String,
     response: ResourceResponseInput,
 ) -> Result<()> {
-    let handle_id = parse_resource_request_handle_id(&handle_id)?;
+    validate_resource_request_completion_token(&completion_token)?;
     let response = resource_response_from_input(response)?;
     let registration = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
-        .get(&handle_id)
+        .get(&completion_token)
         .cloned()
         .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
+    unregister_resource_request_handle(&completion_token);
     registration
         .handle
         .complete(&response)
-        .map_err(error::from_core)?;
-    unregister_resource_request_handle(handle_id);
-    Ok(())
+        .map_err(error::from_core)
 }
 
 #[napi(js_name = "nativeResourceRequestCancelled")]
-pub fn native_resource_request_cancelled(handle_id: String) -> Result<bool> {
-    let handle_id = parse_resource_request_handle_id(&handle_id)?;
+pub fn native_resource_request_cancelled(completion_token: String) -> Result<bool> {
+    validate_resource_request_completion_token(&completion_token)?;
     let registration = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
-        .get(&handle_id)
+        .get(&completion_token)
         .cloned()
         .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
     registration.handle.is_cancelled().map_err(error::from_core)
 }
 
 #[napi(js_name = "nativeResourceRequestClose")]
-pub fn native_resource_request_close(handle_id: String) -> Result<()> {
-    let handle_id = parse_resource_request_handle_id(&handle_id)?;
-    if let Some(registration) = unregister_resource_request_handle(handle_id) {
+pub fn native_resource_request_close(completion_token: String) -> Result<()> {
+    validate_resource_request_completion_token(&completion_token)?;
+    if let Some(registration) = unregister_resource_request_handle(&completion_token) {
         registration.handle.close();
     }
     Ok(())
@@ -378,7 +377,7 @@ impl NativeRuntimeHandle {
                 .map(resource_matcher_from_input)
                 .collect::<Result<Vec<_>>>()?,
             callback,
-            pending_handle_ids: Mutex::new(HashSet::new()),
+            pending_completion_tokens: Mutex::new(HashSet::new()),
         });
         let descriptor = core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
@@ -808,14 +807,14 @@ unsafe fn resource_provider_trampoline_inner(
         Ok(handle_state) => handle_state,
         Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
     };
-    let handle_id = register_resource_request_handle(handle_state.clone(), &provider);
-    let provider_request = resource_provider_request_from_core(request, handle_id);
+    let completion_token = register_resource_request_handle(handle_state.clone(), &provider);
+    let provider_request = resource_provider_request_from_core(request, completion_token.clone());
     let status = provider.callback.call(
         Ok(provider_request),
         ThreadsafeFunctionCallMode::NonBlocking,
     );
     if !matches!(status, napi::Status::Ok) {
-        unregister_resource_request_handle(handle_id);
+        unregister_resource_request_handle(&completion_token);
         return handle_state.finish_provider_exception();
     }
     handle_state.finish_provider_decision(core::resource::ResourceProviderDecision::Handle)
@@ -902,39 +901,42 @@ impl RuntimeEvent {
     }
 }
 
-fn resource_request_handles() -> &'static Mutex<HashMap<u64, ResourceRequestRegistration>> {
+fn resource_request_handles() -> &'static Mutex<HashMap<String, ResourceRequestRegistration>> {
     RESOURCE_REQUEST_HANDLES.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 fn register_resource_request_handle(
     handle: Arc<core::resource::ResourceRequestHandleState>,
     provider: &Arc<ResourceProviderState>,
-) -> u64 {
-    let handle_id = RESOURCE_REQUEST_HANDLE_IDS.fetch_add(1, Ordering::Relaxed);
+) -> String {
+    let token_id = RESOURCE_REQUEST_TOKEN_IDS.fetch_add(1, Ordering::Relaxed);
+    let completion_token = format!("resource-request:{token_id}");
     if let Ok(mut handles) = resource_request_handles().lock() {
         handles.insert(
-            handle_id,
+            completion_token.clone(),
             ResourceRequestRegistration {
                 handle,
                 provider: Arc::clone(provider),
             },
         );
     }
-    if let Ok(mut pending) = provider.pending_handle_ids.lock() {
-        pending.insert(handle_id);
+    if let Ok(mut pending) = provider.pending_completion_tokens.lock() {
+        pending.insert(completion_token.clone());
     }
-    handle_id
+    completion_token
 }
 
-fn unregister_resource_request_handle(handle_id: u64) -> Option<ResourceRequestRegistration> {
+fn unregister_resource_request_handle(
+    completion_token: &str,
+) -> Option<ResourceRequestRegistration> {
     let registration = resource_request_handles()
         .lock()
         .ok()
-        .and_then(|mut handles| handles.remove(&handle_id));
+        .and_then(|mut handles| handles.remove(completion_token));
     if let Some(registration) = &registration
-        && let Ok(mut pending) = registration.provider.pending_handle_ids.lock()
+        && let Ok(mut pending) = registration.provider.pending_completion_tokens.lock()
     {
-        pending.remove(&handle_id);
+        pending.remove(completion_token);
     }
     registration
 }
@@ -1019,15 +1021,21 @@ impl ResourceMatcher {
     }
 }
 
-fn parse_resource_request_handle_id(handle_id: &str) -> Result<u64> {
-    handle_id
-        .parse::<u64>()
-        .map_err(|_| error::invalid_argument("ResourceRequestHandle id is invalid"))
+fn validate_resource_request_completion_token(completion_token: &str) -> Result<()> {
+    let token_id = completion_token
+        .strip_prefix("resource-request:")
+        .ok_or_else(|| error::invalid_argument("ResourceRequestHandle token is invalid"))?;
+    if token_id.is_empty() || token_id.parse::<u64>().is_err() {
+        return Err(error::invalid_argument(
+            "ResourceRequestHandle token is invalid",
+        ));
+    }
+    Ok(())
 }
 
 fn resource_provider_request_from_core(
     request: core::resource::ResourceRequest,
-    handle_id: u64,
+    completion_token: String,
 ) -> ResourceProviderRequest {
     ResourceProviderRequest {
         url: request.url,
@@ -1049,7 +1057,7 @@ fn resource_provider_request_from_core(
         prior_expires_unix_ms: request.prior_expires_unix_ms.map(BigInt::from),
         prior_etag: request.prior_etag,
         prior_data: Uint8Array::from(request.prior_data),
-        handle_id: handle_id.to_string(),
+        completion_token,
     }
 }
 
@@ -1489,15 +1497,15 @@ impl NativeRuntimeHandle {
 impl Drop for ResourceProviderState {
     fn drop(&mut self) {
         let pending = self
-            .pending_handle_ids
+            .pending_completion_tokens
             .lock()
             .map(|mut pending| pending.drain().collect::<Vec<_>>())
             .unwrap_or_default();
-        for handle_id in pending {
+        for completion_token in pending {
             if let Some(registration) = resource_request_handles()
                 .lock()
                 .ok()
-                .and_then(|mut handles| handles.remove(&handle_id))
+                .and_then(|mut handles| handles.remove(&completion_token))
             {
                 registration.handle.close();
             }

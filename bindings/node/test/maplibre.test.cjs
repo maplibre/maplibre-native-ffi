@@ -3,6 +3,8 @@ const path = require("node:path");
 const test = require("node:test");
 const { Worker } = require("node:worker_threads");
 
+process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
+
 const {
   clearLogCallback,
   cVersion,
@@ -36,11 +38,11 @@ const {
 const nativeAddon = require("../index.js");
 
 /**
- * @param {string} handleId
+ * @param {string} completionToken
  * @param {string} url
  * @returns {any}
  */
-function fakeResourceProviderRequest(handleId, url) {
+function fakeResourceProviderRequest(completionToken, url) {
   return {
     url,
     kind: "source",
@@ -58,20 +60,8 @@ function fakeResourceProviderRequest(handleId, url) {
     priorExpiresUnixMs: null,
     priorEtag: null,
     priorData: new Uint8Array(),
-    handleId,
+    completionToken,
   };
-}
-
-if (false) {
-  const session = /** @type {import("..").RenderSessionHandle} */ (
-    /** @type {unknown} */ (null)
-  );
-  // @ts-expect-error texture frame callbacks release native frames synchronously.
-  session.withMetalOwnedTextureFrame(async (frame) => frame.width);
-  // @ts-expect-error texture frame callbacks release native frames synchronously.
-  session.withVulkanOwnedTextureFrame(async (frame) => frame.width);
-  // @ts-expect-error texture frame callbacks release native frames synchronously.
-  session.withOpenGLOwnedTextureFrame(async (frame) => frame.width);
 }
 
 test("concept subpath modules expose curated public API groups", () => {
@@ -92,10 +82,6 @@ test("concept subpath modules expose curated public API groups", () => {
   const mapModule = require("@maplibre/native-ffi-node/map");
   const offlineModule = require("@maplibre/native-ffi-node/offline");
   const resourceModule = require("@maplibre/native-ffi-node/resource");
-  const cameraModule = require("@maplibre/native-ffi-node/camera");
-  const jsonModule = require("@maplibre/native-ffi-node/json");
-  const queryModule = require("@maplibre/native-ffi-node/query");
-  const styleModule = require("@maplibre/native-ffi-node/style");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
   assert.equal(runtimeModule.networkStatus, networkStatus);
@@ -107,10 +93,6 @@ test("concept subpath modules expose curated public API groups", () => {
   assert.equal(mapModule.MapHandle, MapHandle);
   assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
   assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
-  assert.deepEqual(cameraModule, {});
-  assert.deepEqual(jsonModule, {});
-  assert.deepEqual(queryModule, {});
-  assert.deepEqual(styleModule, {});
 });
 
 test("process-global APIs cross the native add-on", () => {
@@ -265,48 +247,42 @@ test("native pointer is a borrowed opaque address value", () => {
 test("texture frame scopes expose borrowed pointers only while active", () => {
   let released = false;
   /** @type {import("..").MetalOwnedTextureFrame | undefined} */
-  let scopedFrame;
+  let frame;
   /** @type {import("..").NativePointer | undefined} */
   let scopedTexture;
-  const result = RenderSessionHandle.prototype.withMetalOwnedTextureFrame.call(
-    {
-      native: {
-        acquireMetalOwnedTextureFrame() {
-          return {
-            generation: 1n,
-            width: 2,
-            height: 3,
-            scaleFactor: 4,
-            frameId: 5n,
-            textureAddress: 0x10n,
-            deviceAddress: 0x20n,
-            pixelFormat: 80n,
-          };
-        },
-        /** @param {any} raw */
-        releaseMetalOwnedTextureFrame(raw) {
-          assert.equal(raw.frameId, 5n);
-          released = true;
-        },
+  frame = RenderSessionHandle.prototype.acquireMetalOwnedTextureFrame.call({
+    native: {
+      acquireMetalOwnedTextureFrame() {
+        return {
+          generation: 1n,
+          width: 2,
+          height: 3,
+          scaleFactor: 4,
+          frameId: 5n,
+          textureAddress: 0x10n,
+          deviceAddress: 0x20n,
+          pixelFormat: 80n,
+        };
+      },
+      /** @param {any} raw */
+      releaseMetalOwnedTextureFrame(raw) {
+        assert.equal(raw.frameId, 5n);
+        released = true;
       },
     },
-    (frame) => {
-      scopedFrame = frame;
-      assert.equal(frame instanceof MetalOwnedTextureFrame, true);
-      assert.equal(frame.width, 2);
-      scopedTexture = frame.texture;
-      assert.equal(scopedTexture.address, 0x10n);
-      assert.equal(frame.device.address, 0x20n);
-      assert.equal(frame.pixelFormat, 80n);
-      return "ok";
-    },
-  );
+  });
 
-  assert.equal(result, "ok");
+  assert.equal(frame instanceof MetalOwnedTextureFrame, true);
+  assert.equal(frame.width, 2);
+  scopedTexture = frame.texture;
+  assert.equal(scopedTexture.address, 0x10n);
+  assert.equal(frame.device.address, 0x20n);
+  assert.equal(frame.pixelFormat, 80n);
+  assert.equal(frame.closed, false);
+  frame.close();
   assert.equal(released, true);
-  const frameAfterScope = scopedFrame;
-  assert.ok(frameAfterScope);
-  assert.throws(() => frameAfterScope.width, InvalidStateError);
+  assert.equal(frame.closed, true);
+  assert.throws(() => frame.width, InvalidStateError);
   const textureAfterScope = scopedTexture;
   assert.ok(textureAfterScope);
   assert.throws(() => textureAfterScope.address, InvalidStateError);
@@ -315,20 +291,55 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
   assert.equal(typeof OpenGLOwnedTextureFrame, "function");
   assert.throws(
     () =>
-      RenderSessionHandle.prototype.withVulkanOwnedTextureFrame.call(
-        { native: {} },
-        /** @type {any} */ (null),
-      ),
-    InvalidArgumentError,
+      RenderSessionHandle.prototype.acquireVulkanOwnedTextureFrame.call({
+        native: {
+          closed: false,
+          acquireVulkanOwnedTextureFrame() {
+            throw new InvalidStateError(null, "active frame");
+          },
+        },
+      }),
+    InvalidStateError,
   );
   assert.throws(
     () =>
-      RenderSessionHandle.prototype.withOpenGLOwnedTextureFrame.call(
-        { native: {} },
-        /** @type {any} */ (null),
-      ),
+      new /** @type {any} */ (OpenGLOwnedTextureFrame)({}, { generation: 1n }),
     InvalidArgumentError,
   );
+});
+
+test("texture frame release failures leave frames retryable", () => {
+  let attempts = 0;
+  const frame =
+    RenderSessionHandle.prototype.acquireMetalOwnedTextureFrame.call({
+      native: {
+        closed: false,
+        acquireMetalOwnedTextureFrame() {
+          return {
+            generation: 1n,
+            width: 2,
+            height: 3,
+            scaleFactor: 1,
+            frameId: 5n,
+            textureAddress: 0x10n,
+            deviceAddress: 0x20n,
+            pixelFormat: 80n,
+          };
+        },
+        releaseMetalOwnedTextureFrame() {
+          attempts += 1;
+          if (attempts === 1) {
+            throw new InvalidStateError(null, "release failed");
+          }
+        },
+      },
+    });
+
+  assert.throws(() => frame.close(), InvalidStateError);
+  assert.equal(frame.closed, false);
+  assert.equal(frame.width, 2);
+  frame.close();
+  assert.equal(frame.closed, true);
 });
 
 test("native buffer owns byte storage for render interop", () => {
@@ -430,7 +441,7 @@ test("handles stay local while workers create their own runtime", async () => {
     assert.throws(
       () =>
         ResourceRequestHandle.prototype.complete.call(
-          { handleId: "detached", closed: false },
+          { completionToken: "detached", closed: false },
           {},
         ),
       InvalidStateError,
@@ -457,8 +468,8 @@ test("offline operations expose discardable handles", () => {
   try {
     const operation = runtime.runAmbientCacheOperation("clear");
     assert.equal(operation instanceof OfflineOperationHandle, true);
-    assert.equal(typeof operation.operationId, "bigint");
     assert.equal(operation.closed, false);
+    assert.throws(() => runtime.close(), InvalidStateError);
     operation.close();
     assert.equal(operation.closed, true);
     operation.close();
@@ -511,77 +522,35 @@ test("offline operations expose discardable handles", () => {
 });
 
 test("offline operation handles validate runtime, kind, and consumption", () => {
-  const fakeRuntime = Object.create(RuntimeHandle.prototype);
-  fakeRuntime.native = {
-    closed: false,
-    /** @param {bigint} operationId */
-    offlineRegionsListTakeResult(operationId) {
-      assert.equal(operationId, 10n);
-      return [];
-    },
-    discardOfflineOperation() {
-      throw new Error("consumed operations must not discard");
-    },
-  };
-  const OfflineOperationHandleForTest =
-    /** @type {new (runtime: object, operationId: bigint, operationKind?: string, resultKind?: string) => OfflineOperationHandle} */ (
-      /** @type {unknown} */ (OfflineOperationHandle)
+  const runtime = new RuntimeHandle();
+
+  try {
+    assert.throws(
+      () => new /** @type {any} */ (OfflineOperationHandle)(runtime, 10n),
+      InvalidArgumentError,
     );
 
-  const operation = new OfflineOperationHandleForTest(
-    fakeRuntime,
-    10n,
-    "regionsList",
-    "regionList",
-  );
-  assert.deepEqual(
-    RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
-      fakeRuntime,
-      operation,
-    ),
-    [],
-  );
-  assert.equal(operation.closed, true);
-  operation.close();
+    const closedOperation = runtime.offlineRegionsList();
+    closedOperation.close();
+    assert.throws(
+      () => runtime.offlineRegionsListTakeResult(closedOperation),
+      InvalidStateError,
+    );
 
-  const wrongKind = new OfflineOperationHandleForTest(
-    fakeRuntime,
-    11n,
-    "regionGet",
-    "optionalRegion",
-  );
-  assert.throws(
-    () =>
-      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
-        fakeRuntime,
-        wrongKind,
-      ),
-    InvalidStateError,
-  );
+    const wrongKind = runtime.offlineRegionGet(1n);
+    assert.throws(
+      () => runtime.offlineRegionsListTakeResult(wrongKind),
+      InvalidStateError,
+    );
+    wrongKind.close();
 
-  const otherRuntime = Object.create(RuntimeHandle.prototype);
-  const wrongRuntime = new OfflineOperationHandleForTest(
-    otherRuntime,
-    12n,
-    "regionsList",
-    "regionList",
-  );
-  assert.throws(
-    () =>
-      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
-        fakeRuntime,
-        wrongRuntime,
-      ),
-    InvalidStateError,
-  );
-  assert.throws(
-    () =>
-      RuntimeHandle.prototype.offlineRegionsListTakeResult.call(
-        fakeRuntime,
-        /** @type {any} */ (13n),
-      ),
-    InvalidArgumentError,
-  );
+    assert.throws(
+      () => runtime.offlineRegionsListTakeResult(/** @type {any} */ (13n)),
+      InvalidArgumentError,
+    );
+  } finally {
+    runtime.close();
+  }
 });
 
 test("resource providers must be configured before map creation", () => {
@@ -602,14 +571,13 @@ test("resource providers must be configured before map creation", () => {
 
 test("offline operation events expose copied typed payloads", async () => {
   const runtime = new RuntimeHandle();
+  let operation;
   try {
-    const operation = runtime.runAmbientCacheOperation("clear");
+    operation = runtime.runAmbientCacheOperation("clear");
     const event = await eventually(() => {
       runtime.runOnce();
       const event = runtime.pollEvent();
-      return event?.payload.kind === "offline-operation-completed" &&
-        event.payload.offlineOperationCompleted.operationId ===
-          operation.operationId
+      return event?.payload.kind === "offline-operation-completed"
         ? event
         : null;
     });
@@ -617,10 +585,10 @@ test("offline operation events expose copied typed payloads", async () => {
     assert.equal(event.payloadKind, "offline-operation-completed");
     assert.equal(event.payload.rawType > 0, true);
     assert.equal(event.sourceType, "runtime");
-    assert.equal(typeof event.sourceAddress, "bigint");
+    assert.equal(event.sourceMap, null);
     const completed = /** @type {any} */ (event.payload)
       .offlineOperationCompleted;
-    assert.equal(completed.operationId, operation.operationId);
+    assert.equal(typeof completed.operationId, "bigint");
     assert.equal(completed.operationKind, "ambientCache");
     assert.equal(completed.resultKind, "none");
     assert.equal(typeof completed.rawOperationKind, "number");
@@ -628,39 +596,29 @@ test("offline operation events expose copied typed payloads", async () => {
     assert.equal(typeof completed.resultStatus, "number");
     assert.equal(typeof completed.found, "boolean");
   } finally {
+    operation?.close();
     runtime.close();
   }
 });
 
-test("style-loaded events release detached custom geometry sources", () => {
-  const fakeRuntime = Object.create(RuntimeHandle.prototype);
-  let releases = 0;
-  fakeRuntime.mapsByAddress = new Map([
-    [
-      0x1234n,
-      {
-        _releaseDetachedCustomGeometrySources() {
-          releases += 1;
-        },
-      },
-    ],
-  ]);
-  fakeRuntime.native = {
-    closed: false,
-    pollEvent() {
-      return {
-        eventType: "map-style-loaded",
-        sourceType: "map",
-        sourceAddress: 0x1234n,
-        payload: { kind: "none" },
-      };
-    },
-  };
+test("map events expose proven public map identity without native addresses", async () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
 
-  const event = RuntimeHandle.prototype.pollEvent.call(fakeRuntime);
-  assert.ok(event);
-  assert.equal(event.eventType, "map-style-loaded");
-  assert.equal(releases, 1);
+  try {
+    map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
+    const event = await eventually(() => {
+      runtime.runOnce();
+      const event = runtime.pollEvent();
+      return event?.eventType === "map-style-loaded" ? event : null;
+    });
+    assert.equal(event.sourceType, "map");
+    assert.equal(event.sourceMap, map);
+    assert.equal("sourceAddress" in event, false);
+  } finally {
+    map.close();
+    runtime.close();
+  }
 });
 
 test("resource provider routes validate Node handoff shape", async () => {
@@ -690,20 +648,20 @@ test("resource provider routes validate Node handoff shape", async () => {
 
   const originalComplete = nativeAddon.nativeResourceRequestComplete;
   const originalClose = nativeAddon.nativeResourceRequestClose;
-  /** @type {Array<{ handleId: string, response: any }>} */
+  /** @type {Array<{ completionToken: string, response: any }>} */
   const completions = [];
   /** @type {string[]} */
   const closes = [];
   nativeAddon.nativeResourceRequestComplete =
-    /** @type {(handleId: string, response: any) => void} */ (
-      (handleId, response) => {
-        completions.push({ handleId, response });
+    /** @type {(completionToken: string, response: any) => void} */ (
+      (completionToken, response) => {
+        completions.push({ completionToken, response });
       }
     );
   nativeAddon.nativeResourceRequestClose =
-    /** @type {(handleId: string) => void} */ (
-      (handleId) => {
-        closes.push(handleId);
+    /** @type {(completionToken: string) => void} */ (
+      (completionToken) => {
+        closes.push(completionToken);
       }
     );
   try {
@@ -715,7 +673,13 @@ test("resource provider routes validate Node handoff shape", async () => {
           /** @param {any} routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(routes, callback) {
             assert.deepEqual(routes, [{ urlPrefix: "custom://" }]);
-            callback(null, fakeResourceProviderRequest("1", "custom://tile"));
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:1",
+                "custom://tile",
+              ),
+            );
           },
         },
       },
@@ -726,11 +690,12 @@ test("resource provider routes validate Node handoff shape", async () => {
       },
     );
     assert.ok(received);
-    assert.equal(received.handleId, undefined);
+    assert.equal(received.completionToken, undefined);
     assert.equal(received.handle instanceof ResourceRequestHandle, true);
     assert.equal(received.handle.closed, false);
     received.handle.close();
-    assert.deepEqual(closes, ["1"]);
+    assert.deepEqual(closes, ["resource-request:1"]);
+    assert.throws(() => received.handle.cancelled(), InvalidStateError);
 
     /** @type {any} */
     let thrownHandle;
@@ -739,7 +704,13 @@ test("resource provider routes validate Node handoff shape", async () => {
         native: {
           /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(null, fakeResourceProviderRequest("2", "custom://throw"));
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:2",
+                "custom://throw",
+              ),
+            );
           },
         },
       },
@@ -752,7 +723,7 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.ok(thrownHandle);
     assert.equal(thrownHandle.closed, true);
     assert.deepEqual(completions[0], {
-      handleId: "2",
+      completionToken: "resource-request:2",
       response: {
         status: "error",
         errorReason: "other",
@@ -767,7 +738,13 @@ test("resource provider routes validate Node handoff shape", async () => {
         native: {
           /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(null, fakeResourceProviderRequest("3", "custom://reject"));
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:3",
+                "custom://reject",
+              ),
+            );
           },
         },
       },
@@ -781,7 +758,7 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.ok(rejectedHandle);
     assert.equal(rejectedHandle.closed, true);
     assert.deepEqual(completions[1], {
-      handleId: "3",
+      completionToken: "resource-request:3",
       response: {
         status: "error",
         errorReason: "other",
@@ -798,7 +775,10 @@ test("resource provider routes validate Node handoff shape", async () => {
           setResourceProviderRoutes(_routes, callback) {
             callback(
               null,
-              fakeResourceProviderRequest("4", "custom://thenable"),
+              fakeResourceProviderRequest(
+                "resource-request:4",
+                "custom://thenable",
+              ),
             );
           },
         },
@@ -819,7 +799,7 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.ok(thenableHandle);
     assert.equal(thenableHandle.closed, true);
     assert.deepEqual(completions[2], {
-      handleId: "4",
+      completionToken: "resource-request:4",
       response: {
         status: "error",
         errorReason: "other",
@@ -834,7 +814,13 @@ test("resource provider routes validate Node handoff shape", async () => {
         native: {
           /** @param {any} _routes @param {(error: any, request: any) => void} callback */
           setResourceProviderRoutes(_routes, callback) {
-            callback(null, fakeResourceProviderRequest("5", "custom://mutate"));
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:5",
+                "custom://mutate",
+              ),
+            );
           },
         },
       },
@@ -842,21 +828,107 @@ test("resource provider routes validate Node handoff shape", async () => {
       (request) => {
         mutatedHandle = request.handle;
         /** @type {any} */ (request.handle).closed = true;
-        /** @type {any} */ (request.handle).handleId = "wrong";
+        /** @type {any} */ (request.handle).completionToken = "wrong";
         throw new Error("mutated provider boom");
       },
     );
     assert.ok(mutatedHandle);
     assert.equal(mutatedHandle.closed, true);
-    assert.equal(mutatedHandle.handleId, undefined);
+    assert.equal(mutatedHandle.completionToken, undefined);
     assert.deepEqual(completions[3], {
-      handleId: "5",
+      completionToken: "resource-request:5",
       response: {
         status: "error",
         errorReason: "other",
         errorMessage: "mutated provider boom",
       },
     });
+
+    /** @type {any} */
+    let invalidResponseHandle;
+    let invalidResponseAttempts = 0;
+    nativeAddon.nativeResourceRequestComplete =
+      /** @type {(completionToken: string, response: any) => void} */ (
+        (completionToken, response) => {
+          invalidResponseAttempts += 1;
+          if (invalidResponseAttempts === 1) {
+            throw new InvalidArgumentError(1, "invalid response");
+          }
+          completions.push({ completionToken, response });
+        }
+      );
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:6",
+                "custom://invalid",
+              ),
+            );
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        invalidResponseHandle = request.handle;
+      },
+    );
+    assert.ok(invalidResponseHandle);
+    assert.throws(
+      () => invalidResponseHandle.complete({ status: "not-valid" }),
+      InvalidArgumentError,
+    );
+    assert.equal(invalidResponseHandle.closed, false);
+    invalidResponseHandle.complete({ bytes: new Uint8Array([1]) });
+    assert.equal(invalidResponseHandle.closed, true);
+    assert.deepEqual(completions[4], {
+      completionToken: "resource-request:6",
+      response: { bytes: new Uint8Array([1]) },
+    });
+
+    /** @type {any} */
+    let failedCompletionHandle;
+    nativeAddon.nativeResourceRequestComplete =
+      /** @type {(completionToken: string, response: any) => void} */ (
+        () => {
+          throw new InvalidStateError(2, "native completion failed");
+        }
+      );
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:7",
+                "custom://fail",
+              ),
+            );
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        failedCompletionHandle = request.handle;
+      },
+    );
+    assert.ok(failedCompletionHandle);
+    assert.throws(
+      () => failedCompletionHandle.complete({ bytes: new Uint8Array([1]) }),
+      InvalidStateError,
+    );
+    assert.equal(failedCompletionHandle.closed, true);
+    assert.throws(
+      () => failedCompletionHandle.complete({ bytes: new Uint8Array([2]) }),
+      InvalidStateError,
+    );
+    assert.throws(() => failedCompletionHandle.cancelled(), InvalidStateError);
   } finally {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;
@@ -958,12 +1030,8 @@ test("render session attach descriptors translate native failures", () => {
       InvalidArgumentError,
     );
     assert.equal(
-      typeof RenderSessionHandle.attachMetalOwnedTexture,
-      "function",
-    );
-    assert.equal(
-      typeof RenderSessionHandle.attachVulkanOwnedTexture,
-      "function",
+      Object.hasOwn(RenderSessionHandle, "attachMetalOwnedTexture"),
+      false,
     );
     assert.equal(
       typeof RenderSessionHandle.prototype.setFeatureState,

@@ -236,9 +236,8 @@ class NativePointer {
 
 const HANDLE_ENVIRONMENT = Symbol("handleEnvironment");
 const ENVIRONMENT_TOKEN = Object.freeze({});
-const TEXTURE_FRAME_RAW = Symbol("textureFrameRaw");
-const TEXTURE_FRAME_DEACTIVATE = Symbol("textureFrameDeactivate");
 const NATIVE_HANDLES = new WeakMap();
+const MAP_NATIVE_ADDRESSES = new WeakMap();
 
 function recordHandleEnvironment(handle) {
   Object.defineProperty(handle, HANDLE_ENVIRONMENT, {
@@ -265,7 +264,11 @@ function nativeOf(owner) {
     assertHandleEnvironment(owner);
     return NATIVE_HANDLES.get(owner);
   }
-  if (owner != null && Object.prototype.hasOwnProperty.call(owner, "native")) {
+  if (
+    process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS === "1" &&
+    owner != null &&
+    Object.prototype.hasOwnProperty.call(owner, "native")
+  ) {
     return owner.native;
   }
   assertHandleEnvironment(owner);
@@ -338,15 +341,17 @@ class NativeBuffer {
 class MetalOwnedTextureFrame {
   #active = true;
   #raw;
+  #session;
 
-  constructor(token, raw) {
+  constructor(token, raw, session) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
-        "texture frames are only available inside render-session frame scopes",
+        "texture frames are created by RenderSessionHandle frame acquisition",
       );
     }
     this.#raw = raw;
+    this.#session = session;
     Object.freeze(this);
   }
 
@@ -397,27 +402,39 @@ class MetalOwnedTextureFrame {
     return this.#raw[field];
   }
 
-  [TEXTURE_FRAME_RAW]() {
-    return this.#raw;
+  close() {
+    if (!this.#active) {
+      return;
+    }
+    translateNativeErrors(() =>
+      liveNativeOf(this.#session).releaseMetalOwnedTextureFrame(this.#raw),
+    );
+    this.#active = false;
   }
 
-  [TEXTURE_FRAME_DEACTIVATE]() {
-    this.#active = false;
+  get closed() {
+    return !this.#active;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
   }
 }
 
 class OpenGLOwnedTextureFrame {
   #active = true;
   #raw;
+  #session;
 
-  constructor(token, raw) {
+  constructor(token, raw, session) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
-        "texture frames are only available inside render-session frame scopes",
+        "texture frames are created by RenderSessionHandle frame acquisition",
       );
     }
     this.#raw = raw;
+    this.#session = session;
     Object.freeze(this);
   }
 
@@ -459,26 +476,39 @@ class OpenGLOwnedTextureFrame {
     return this.#raw[field];
   }
 
-  [TEXTURE_FRAME_RAW]() {
-    return this.#raw;
-  }
-  [TEXTURE_FRAME_DEACTIVATE]() {
+  close() {
+    if (!this.#active) {
+      return;
+    }
+    translateNativeErrors(() =>
+      liveNativeOf(this.#session).releaseOpenGLOwnedTextureFrame(this.#raw),
+    );
     this.#active = false;
+  }
+
+  get closed() {
+    return !this.#active;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
   }
 }
 
 class VulkanOwnedTextureFrame {
   #active = true;
   #raw;
+  #session;
 
-  constructor(token, raw) {
+  constructor(token, raw, session) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
-        "texture frames are only available inside render-session frame scopes",
+        "texture frames are created by RenderSessionHandle frame acquisition",
       );
     }
     this.#raw = raw;
+    this.#session = session;
     Object.freeze(this);
   }
 
@@ -541,12 +571,22 @@ class VulkanOwnedTextureFrame {
     return this.#raw[field];
   }
 
-  [TEXTURE_FRAME_RAW]() {
-    return this.#raw;
+  close() {
+    if (!this.#active) {
+      return;
+    }
+    translateNativeErrors(() =>
+      liveNativeOf(this.#session).releaseVulkanOwnedTextureFrame(this.#raw),
+    );
+    this.#active = false;
   }
 
-  [TEXTURE_FRAME_DEACTIVATE]() {
-    this.#active = false;
+  get closed() {
+    return !this.#active;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
   }
 }
 
@@ -615,9 +655,9 @@ function mutableUint8Array(data, fieldName) {
 
 const resourceRequestFinalizer =
   typeof FinalizationRegistry === "function"
-    ? new FinalizationRegistry((handleId) => {
+    ? new FinalizationRegistry((completionToken) => {
         try {
-          native.nativeResourceRequestClose(handleId);
+          native.nativeResourceRequestClose(completionToken);
         } catch {
           // Finalizers are best-effort cleanup only.
         }
@@ -668,10 +708,10 @@ function customGeometryCallback(callback) {
 }
 
 class ResourceRequestHandle {
-  #handleId;
+  #completionToken;
   #closed = false;
 
-  constructor(token, handleId) {
+  constructor(token, completionToken) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
@@ -679,8 +719,8 @@ class ResourceRequestHandle {
       );
     }
     recordHandleEnvironment(this);
-    this.#handleId = handleId;
-    resourceRequestFinalizer?.register(this, handleId, this);
+    this.#completionToken = completionToken;
+    resourceRequestFinalizer?.register(this, completionToken, this);
     Object.preventExtensions(this);
   }
 
@@ -694,17 +734,33 @@ class ResourceRequestHandle {
     if (this.#closed) {
       throw new InvalidStateError(null, "ResourceRequestHandle is closed");
     }
-    translateNativeErrors(() =>
-      native.nativeResourceRequestComplete(this.#handleId, response),
-    );
-    this.#closed = true;
-    resourceRequestFinalizer?.unregister(this);
+    let consumed = false;
+    try {
+      const result = translateNativeErrors(() =>
+        native.nativeResourceRequestComplete(this.#completionToken, response),
+      );
+      consumed = true;
+      return result;
+    } catch (error) {
+      if (!(error instanceof InvalidArgumentError)) {
+        consumed = true;
+      }
+      throw error;
+    } finally {
+      if (consumed) {
+        this.#closed = true;
+        resourceRequestFinalizer?.unregister(this);
+      }
+    }
   }
 
   cancelled() {
     assertHandleEnvironment(this);
+    if (this.#closed) {
+      throw new InvalidStateError(null, "ResourceRequestHandle is closed");
+    }
     return translateNativeErrors(() =>
-      native.nativeResourceRequestCancelled(this.#handleId),
+      native.nativeResourceRequestCancelled(this.#completionToken),
     );
   }
 
@@ -714,7 +770,7 @@ class ResourceRequestHandle {
       return;
     }
     translateNativeErrors(() =>
-      native.nativeResourceRequestClose(this.#handleId),
+      native.nativeResourceRequestClose(this.#completionToken),
     );
     this.#closed = true;
     resourceRequestFinalizer?.unregister(this);
@@ -726,12 +782,25 @@ class ResourceRequestHandle {
 }
 
 class OfflineOperationHandle {
+  #runtime;
+  #operationId;
+  #operationKind;
+  #resultKind;
+  #closed = false;
+
   constructor(
+    token,
     runtime,
     operationId,
     operationKind = "unknown",
     resultKind = "unknown",
   ) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "offline operation handles are created by RuntimeHandle operations",
+      );
+    }
     recordHandleEnvironment(this);
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
@@ -742,55 +811,63 @@ class OfflineOperationHandle {
         "offline operation id must be a positive bigint",
       );
     }
-    this.runtime = runtime;
-    this.operationId = operationId;
-    this.operationKind = operationKind;
-    this.resultKind = resultKind;
-    this.discarded = false;
+    this.#runtime = runtime;
+    this.#operationId = operationId;
+    this.#operationKind = operationKind;
+    this.#resultKind = resultKind;
+    runtime._registerOfflineOperation(this);
+    Object.preventExtensions(this);
   }
 
   close() {
     assertHandleEnvironment(this);
-    if (this.discarded) {
+    if (this.#closed) {
       return;
     }
     translateNativeErrors(() =>
-      liveNativeOf(this.runtime).discardOfflineOperation(this.operationId),
+      liveNativeOf(this.#runtime).discardOfflineOperation(this.#operationId),
     );
-    this.discarded = true;
+    this.#markClosed();
   }
 
   get closed() {
     assertHandleEnvironment(this);
-    return this.discarded;
+    return this.#closed;
   }
 
   _requireLive(expectedRuntime, expectedOperationKind, expectedResultKind) {
     assertHandleEnvironment(this);
-    if (this.discarded) {
+    if (this.#closed) {
       throw new InvalidStateError(null, "offline operation handle is closed");
     }
-    if (this.runtime !== expectedRuntime) {
+    if (this.#runtime !== expectedRuntime) {
       throw new InvalidStateError(
         null,
         "OfflineOperationHandle belongs to a different RuntimeHandle",
       );
     }
     if (
-      this.operationKind !== expectedOperationKind ||
-      this.resultKind !== expectedResultKind
+      this.#operationKind !== expectedOperationKind ||
+      this.#resultKind !== expectedResultKind
     ) {
       throw new InvalidStateError(
         null,
-        `OfflineOperationHandle has kind ${this.operationKind} and result kind ${this.resultKind}, expected ${expectedOperationKind} and ${expectedResultKind}`,
+        `OfflineOperationHandle has kind ${this.#operationKind} and result kind ${this.#resultKind}, expected ${expectedOperationKind} and ${expectedResultKind}`,
       );
     }
-    return this.operationId;
+    return this.#operationId;
   }
 
   _markConsumed() {
     assertHandleEnvironment(this);
-    this.discarded = true;
+    this.#markClosed();
+  }
+
+  #markClosed() {
+    if (!this.#closed) {
+      this.#closed = true;
+      this.#runtime._unregisterOfflineOperation(this);
+    }
   }
 
   [Symbol.dispose]() {
@@ -799,9 +876,11 @@ class OfflineOperationHandle {
 }
 
 class RuntimeHandle {
+  #mapsByAddress = new Map();
+  #offlineOperations = new Set();
+
   constructor(options) {
     recordHandleEnvironment(this);
-    this.mapsByAddress = new Map();
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
@@ -815,8 +894,14 @@ class RuntimeHandle {
   }
 
   close() {
+    if (this.#offlineOperations.size > 0) {
+      throw new InvalidStateError(
+        null,
+        "runtime has live offline operation handles",
+      );
+    }
     const result = translateNativeErrors(() => nativeOf(this).close());
-    this.mapsByAddress.clear();
+    this.#mapsByAddress.clear();
     return result;
   }
 
@@ -860,13 +945,13 @@ class RuntimeHandle {
         }
         const handle = new ResourceRequestHandle(
           CONSTRUCTION_TOKEN,
-          request.handleId,
+          request.completionToken,
         );
         const wrapped = {
           ...request,
           handle,
         };
-        delete wrapped.handleId;
+        delete wrapped.completionToken;
         try {
           const result = callback(wrapped);
           if (result && typeof result.then === "function") {
@@ -892,6 +977,7 @@ class RuntimeHandle {
       liveNativeOf(this).runAmbientCacheOperation(operation),
     );
     return new OfflineOperationHandle(
+      CONSTRUCTION_TOKEN,
       this,
       BigInt(start.operationId),
       "ambientCache",
@@ -1054,6 +1140,7 @@ class RuntimeHandle {
   #offlineOperation(startOperation, operationKind, resultKind) {
     const start = translateNativeErrors(startOperation);
     return new OfflineOperationHandle(
+      CONSTRUCTION_TOKEN,
       this,
       BigInt(start.operationId),
       operationKind,
@@ -1063,26 +1150,46 @@ class RuntimeHandle {
 
   pollEvent() {
     const event = translateNativeErrors(() => liveNativeOf(this).pollEvent());
+    if (event == null) {
+      return null;
+    }
     if (event?.eventType === "map-style-loaded" && event.sourceType === "map") {
-      this.mapsByAddress
+      this.#mapsByAddress
         .get(event.sourceAddress)
         ?._releaseDetachedCustomGeometrySources();
     }
+    event.sourceMap =
+      event.sourceType === "map"
+        ? (this.#mapsByAddress.get(event.sourceAddress) ?? null)
+        : null;
+    delete event.sourceAddress;
     return event;
   }
 
   _registerMap(map) {
     assertHandleEnvironment(this);
-    if (map.nativeAddress != null) {
-      this.mapsByAddress.set(map.nativeAddress, map);
+    const nativeAddress = MAP_NATIVE_ADDRESSES.get(map);
+    if (nativeAddress != null) {
+      this.#mapsByAddress.set(nativeAddress, map);
     }
   }
 
   _unregisterMap(map) {
     assertHandleEnvironment(this);
-    if (map.nativeAddress != null) {
-      this.mapsByAddress.delete(map.nativeAddress);
+    const nativeAddress = MAP_NATIVE_ADDRESSES.get(map);
+    if (nativeAddress != null) {
+      this.#mapsByAddress.delete(nativeAddress);
     }
+  }
+
+  _registerOfflineOperation(operation) {
+    assertHandleEnvironment(this);
+    this.#offlineOperations.add(operation);
+  }
+
+  _unregisterOfflineOperation(operation) {
+    assertHandleEnvironment(this);
+    this.#offlineOperations.delete(operation);
   }
 
   [Symbol.dispose]() {
@@ -1325,87 +1432,6 @@ class RenderSessionHandle {
     this.map = map;
   }
 
-  static attachMetalOwnedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createMetalOwnedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeMetalOwnedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachMetalBorrowedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createMetalBorrowedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeMetalBorrowedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachMetalSurface(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createMetalSurfaceRenderSession(
-        liveNativeOf(map),
-        normalizeMetalSurfaceDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachVulkanOwnedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createVulkanOwnedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeVulkanOwnedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachVulkanBorrowedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createVulkanBorrowedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeVulkanBorrowedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachVulkanSurface(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createVulkanSurfaceRenderSession(
-        liveNativeOf(map),
-        normalizeVulkanSurfaceDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachOpenGLOwnedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createOpenGLOwnedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeOpenGLOwnedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachOpenGLBorrowedTexture(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createOpenGLBorrowedTextureRenderSession(
-        liveNativeOf(map),
-        normalizeOpenGLBorrowedTextureDescriptor(descriptor),
-      ),
-    );
-  }
-
-  static attachOpenGLSurface(map, descriptor) {
-    return attachRenderSession(map, () =>
-      native.createOpenGLSurfaceRenderSession(
-        liveNativeOf(map),
-        normalizeOpenGLSurfaceDescriptor(descriptor),
-      ),
-    );
-  }
-
   close() {
     return translateNativeErrors(() => nativeOf(this).close());
   }
@@ -1510,93 +1536,33 @@ class RenderSessionHandle {
     );
   }
 
-  withMetalOwnedTextureFrame(callback) {
-    if (typeof callback !== "function") {
-      throw new InvalidArgumentError(
-        null,
-        "metal texture frame callback must be a function",
-      );
-    }
-    const frame = new MetalOwnedTextureFrame(
+  acquireMetalOwnedTextureFrame() {
+    return new MetalOwnedTextureFrame(
       CONSTRUCTION_TOKEN,
       translateNativeErrors(() =>
         liveNativeOf(this).acquireMetalOwnedTextureFrame(),
       ),
+      this,
     );
-    try {
-      return callback(frame);
-    } finally {
-      try {
-        translateNativeErrors(() =>
-          liveNativeOf(this).releaseMetalOwnedTextureFrame(
-            frame[TEXTURE_FRAME_RAW](),
-          ),
-        );
-      } finally {
-        frame[TEXTURE_FRAME_DEACTIVATE]();
-      }
-    }
   }
 
-  withVulkanOwnedTextureFrame(callback) {
-    if (typeof callback !== "function") {
-      throw new InvalidArgumentError(
-        null,
-        "vulkan texture frame callback must be a function",
-      );
-    }
-    const frame = new VulkanOwnedTextureFrame(
+  acquireVulkanOwnedTextureFrame() {
+    return new VulkanOwnedTextureFrame(
       CONSTRUCTION_TOKEN,
       translateNativeErrors(() =>
         liveNativeOf(this).acquireVulkanOwnedTextureFrame(),
       ),
+      this,
     );
-    try {
-      return callback(frame);
-    } finally {
-      try {
-        translateNativeErrors(() =>
-          liveNativeOf(this).releaseVulkanOwnedTextureFrame(
-            frame[TEXTURE_FRAME_RAW](),
-          ),
-        );
-      } finally {
-        frame[TEXTURE_FRAME_DEACTIVATE]();
-      }
-    }
   }
 
-  withOpenGLOwnedTextureFrame(callback) {
-    if (typeof callback !== "function") {
-      throw new InvalidArgumentError(
-        null,
-        "OpenGL texture frame callback must be a function",
-      );
-    }
-    const frame = new OpenGLOwnedTextureFrame(
+  acquireOpenGLOwnedTextureFrame() {
+    return new OpenGLOwnedTextureFrame(
       CONSTRUCTION_TOKEN,
       translateNativeErrors(() =>
         liveNativeOf(this).acquireOpenGLOwnedTextureFrame(),
       ),
-    );
-    try {
-      return callback(frame);
-    } finally {
-      try {
-        translateNativeErrors(() =>
-          liveNativeOf(this).releaseOpenGLOwnedTextureFrame(
-            frame[TEXTURE_FRAME_RAW](),
-          ),
-        );
-      } finally {
-        frame[TEXTURE_FRAME_DEACTIVATE]();
-      }
-    }
-  }
-
-  readPremultipliedRgba8() {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).readPremultipliedRgba8(),
+      this,
     );
   }
 
@@ -1625,25 +1591,27 @@ function attachRenderSession(map, attach) {
 }
 
 class MapHandle {
+  #runtime;
+
   constructor(runtime, options) {
     recordHandleEnvironment(this);
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
-    this.runtime = runtime;
+    this.#runtime = runtime;
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
         native.createNativeMapHandle(liveNativeOf(runtime), options ?? {}),
       ),
     );
-    this.nativeAddress = nativeOf(this).nativeAddress;
+    MAP_NATIVE_ADDRESSES.set(this, nativeOf(this).nativeAddress);
     runtime._registerMap(this);
   }
 
   close() {
     const result = translateNativeErrors(() => nativeOf(this).close());
-    this.runtime._unregisterMap(this);
+    this.#runtime._unregisterMap(this);
     return result;
   }
 
@@ -1656,39 +1624,84 @@ class MapHandle {
   }
 
   attachMetalOwnedTexture(descriptor) {
-    return RenderSessionHandle.attachMetalOwnedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createMetalOwnedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeMetalOwnedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachMetalBorrowedTexture(descriptor) {
-    return RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createMetalBorrowedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeMetalBorrowedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachMetalSurface(descriptor) {
-    return RenderSessionHandle.attachMetalSurface(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createMetalSurfaceRenderSession(
+        liveNativeOf(this),
+        normalizeMetalSurfaceDescriptor(descriptor),
+      ),
+    );
   }
 
   attachVulkanOwnedTexture(descriptor) {
-    return RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createVulkanOwnedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeVulkanOwnedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachVulkanBorrowedTexture(descriptor) {
-    return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createVulkanBorrowedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeVulkanBorrowedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachVulkanSurface(descriptor) {
-    return RenderSessionHandle.attachVulkanSurface(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createVulkanSurfaceRenderSession(
+        liveNativeOf(this),
+        normalizeVulkanSurfaceDescriptor(descriptor),
+      ),
+    );
   }
 
   attachOpenGLOwnedTexture(descriptor) {
-    return RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createOpenGLOwnedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeOpenGLOwnedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachOpenGLBorrowedTexture(descriptor) {
-    return RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createOpenGLBorrowedTextureRenderSession(
+        liveNativeOf(this),
+        normalizeOpenGLBorrowedTextureDescriptor(descriptor),
+      ),
+    );
   }
 
   attachOpenGLSurface(descriptor) {
-    return RenderSessionHandle.attachOpenGLSurface(this, descriptor);
+    return attachRenderSession(this, () =>
+      native.createOpenGLSurfaceRenderSession(
+        liveNativeOf(this),
+        normalizeOpenGLSurfaceDescriptor(descriptor),
+      ),
+    );
   }
 
   requestRepaint() {
