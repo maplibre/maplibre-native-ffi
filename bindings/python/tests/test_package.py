@@ -292,11 +292,21 @@ def test_runtime_close_from_wrong_thread_reports_wrong_thread() -> None:
 
     try:
         assert len(raised_error) == 1
-        assert isinstance(raised_error[0], mln.WrongThreadError)
-        assert raised_error[0].status == mln.MaplibreStatus.WRONG_THREAD
-        assert raised_error[0].diagnostic
+        assert_wrong_thread_error(raised_error[0])
     finally:
         runtime.close()
+
+
+def assert_wrong_thread_error(
+    error: BaseException, diagnostic: str | None = None
+) -> None:
+    assert isinstance(error, mln.WrongThreadError)
+    assert error.status == mln.MaplibreStatus.WRONG_THREAD
+    assert error.native_status_code == mln.MaplibreStatus.WRONG_THREAD.native_code
+    if diagnostic is None:
+        assert error.diagnostic
+    else:
+        assert error.diagnostic == diagnostic
 
 
 def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
@@ -318,12 +328,232 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     try:
         assert len(raised_errors) == 3
         for error in raised_errors:
-            assert isinstance(error, mln.WrongThreadError)
-            assert error.status == mln.MaplibreStatus.WRONG_THREAD
-            assert error.diagnostic
+            assert_wrong_thread_error(error)
     finally:
         map_handle.close()
         runtime.close()
+
+
+def test_resource_transform_registration_reports_wrong_thread_diagnostics() -> None:
+    runtime = mln.RuntimeHandle()
+    raised_errors: list[BaseException] = []
+
+    def transform(request: resource.ResourceTransformRequest) -> str | None:
+        return request.url
+
+    def call_resource_transform_methods() -> None:
+        for call in (
+            lambda: runtime.set_resource_transform(transform, max_pending_callbacks=1),
+            runtime.clear_resource_transform,
+        ):
+            try:
+                call()
+            except BaseException as error:
+                raised_errors.append(error)
+
+    thread = threading.Thread(target=call_resource_transform_methods)
+    thread.start()
+    thread.join()
+
+    try:
+        assert len(raised_errors) == 2
+        for error in raised_errors:
+            assert_wrong_thread_error(error)
+    finally:
+        runtime.close()
+
+
+def test_render_session_methods_propagate_wrong_thread_errors() -> None:
+    diagnostics = {
+        "close": "wrong thread while closing render session",
+        "resize": "wrong thread while resizing render session",
+        "render_update": "wrong thread while rendering update",
+        "detach": "wrong thread while detaching render session",
+        "reduce_memory_use": "wrong thread while reducing memory use",
+        "clear_data": "wrong thread while clearing data",
+        "dump_debug_logs": "wrong thread while dumping debug logs",
+        "texture_image_info": "wrong thread while reading texture info",
+        "read_premultiplied_rgba8_into": "wrong thread while reading into buffer",
+        "read_premultiplied_rgba8": "wrong thread while reading image",
+        "acquire_metal_owned_texture_frame": "wrong thread while acquiring Metal frame",
+        "acquire_vulkan_owned_texture_frame": (
+            "wrong thread while acquiring Vulkan frame"
+        ),
+        "acquire_opengl_owned_texture_frame": (
+            "wrong thread while acquiring OpenGL frame"
+        ),
+        "query_rendered_features": "wrong thread while querying rendered features",
+        "query_source_features": "wrong thread while querying source features",
+        "query_feature_extensions": "wrong thread while querying feature extensions",
+        "set_feature_state": "wrong thread while setting feature state",
+        "get_feature_state": "wrong thread while getting feature state",
+        "remove_feature_state": "wrong thread while removing feature state",
+    }
+
+    class FakeNativeRenderSession:
+        closed = False
+        detached = False
+
+        def _wrong_thread(self, method: str) -> None:
+            raise mln.WrongThreadError(
+                mln.MaplibreStatus.WRONG_THREAD.native_code,
+                diagnostics[method],
+            )
+
+        def close(self) -> None:
+            self._wrong_thread("close")
+
+        def resize(self, width: int, height: int, scale_factor: float) -> None:
+            self._wrong_thread("resize")
+
+        def render_update(self) -> None:
+            self._wrong_thread("render_update")
+
+        def detach(self) -> None:
+            self._wrong_thread("detach")
+
+        def reduce_memory_use(self) -> None:
+            self._wrong_thread("reduce_memory_use")
+
+        def clear_data(self) -> None:
+            self._wrong_thread("clear_data")
+
+        def dump_debug_logs(self) -> None:
+            self._wrong_thread("dump_debug_logs")
+
+        def texture_image_info(self) -> None:
+            self._wrong_thread("texture_image_info")
+
+        def read_premultiplied_rgba8_into(self, buffer: object) -> None:
+            self._wrong_thread("read_premultiplied_rgba8_into")
+
+        def read_premultiplied_rgba8(self) -> None:
+            self._wrong_thread("read_premultiplied_rgba8")
+
+        def acquire_metal_owned_texture_frame(self) -> None:
+            self._wrong_thread("acquire_metal_owned_texture_frame")
+
+        def acquire_vulkan_owned_texture_frame(self) -> None:
+            self._wrong_thread("acquire_vulkan_owned_texture_frame")
+
+        def acquire_opengl_owned_texture_frame(self) -> None:
+            self._wrong_thread("acquire_opengl_owned_texture_frame")
+
+        def query_rendered_features(
+            self,
+            geometry: object,
+            layer_ids: tuple[str, ...] | None,
+            filter_: object,
+        ) -> None:
+            self._wrong_thread("query_rendered_features")
+
+        def query_source_features(
+            self,
+            source_id: str,
+            source_layer_ids: tuple[str, ...] | None,
+            filter_: object,
+        ) -> None:
+            self._wrong_thread("query_source_features")
+
+        def query_feature_extensions(
+            self,
+            source_id: str,
+            feature: object,
+            extension: str,
+            extension_field: str,
+            arguments: object,
+        ) -> None:
+            self._wrong_thread("query_feature_extensions")
+
+        def set_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+            state: object,
+        ) -> None:
+            self._wrong_thread("set_feature_state")
+
+        def get_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+        ) -> None:
+            self._wrong_thread("get_feature_state")
+
+        def remove_feature_state(
+            self,
+            source_id: str,
+            source_layer_id: str | None,
+            feature_id: str | None,
+            state_key: str | None,
+        ) -> None:
+            self._wrong_thread("remove_feature_state")
+
+    session = render.RenderSessionHandle._from_native(
+        FakeNativeRenderSession(), object()
+    )
+    point_query = query.RenderedQueryGeometry.point_geometry(
+        camera.ScreenPoint(1.0, 2.0)
+    )
+    feature = geo.Feature(geometry=geo.point(1.0, 2.0))
+    selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
+    calls = {
+        "close": session.close,
+        "resize": lambda: session.resize(128, 64, 1.0),
+        "render_update": session.render_update,
+        "detach": session.detach,
+        "reduce_memory_use": session.reduce_memory_use,
+        "clear_data": session.clear_data,
+        "dump_debug_logs": session.dump_debug_logs,
+        "texture_image_info": session.texture_image_info,
+        "read_premultiplied_rgba8_into": (
+            lambda: session.read_premultiplied_rgba8_into(bytearray(4))
+        ),
+        "read_premultiplied_rgba8": session.read_premultiplied_rgba8,
+        "acquire_metal_owned_texture_frame": session.acquire_metal_owned_texture_frame,
+        "acquire_vulkan_owned_texture_frame": (
+            session.acquire_vulkan_owned_texture_frame
+        ),
+        "acquire_opengl_owned_texture_frame": (
+            session.acquire_opengl_owned_texture_frame
+        ),
+        "query_rendered_features": lambda: session.query_rendered_features(point_query),
+        "query_source_features": lambda: session.query_source_features("points"),
+        "query_feature_extensions": (
+            lambda: session.query_feature_extensions(
+                "points",
+                feature,
+                "supercluster",
+                "leaves",
+                {"limit": 10},
+            )
+        ),
+        "set_feature_state": (
+            lambda: session.set_feature_state(selector, {"hover": True})
+        ),
+        "get_feature_state": lambda: session.get_feature_state(selector),
+        "remove_feature_state": lambda: session.remove_feature_state(selector),
+    }
+    raised_errors: dict[str, BaseException] = {}
+
+    def call_render_session_methods() -> None:
+        for name, call in calls.items():
+            try:
+                call()
+            except BaseException as error:
+                raised_errors[name] = error
+
+    thread = threading.Thread(target=call_render_session_methods)
+    thread.start()
+    thread.join()
+
+    assert set(raised_errors) == set(calls)
+    for name, error in raised_errors.items():
+        assert_wrong_thread_error(error, diagnostics[name])
 
 
 def test_map_handle_context_manager_closes_once() -> None:

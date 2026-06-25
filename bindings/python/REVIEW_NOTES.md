@@ -81,8 +81,9 @@ input before implementation.
   - complexity: high
   - area: BND-162 through BND-173
   - outcome: Cover successful attach, readback, frame acquire/release,
-    active-frame rejection, stale-frame behavior, and caller-owned resource
-    preservation for configured backends.
+    active-frame rejection, stale-frame behavior, caller-owned resource
+    preservation, and native render-session wrong-thread behavior for configured
+    backends.
   - rationale: Current tests rely heavily on descriptors, fake natives, and
     invalid attach paths. The spec requires successful backend-specific native
     workflows.
@@ -102,18 +103,6 @@ input before implementation.
     binding/C boundary.
   - implementation notes: Mirror the dedicated C/Zig resource scenarios through
     public Python APIs.
-
-- [ ] `py-wrong-thread-coverage`: Add the remaining wrong-thread tests.
-  - severity: low
-  - complexity: medium
-  - area: BND-190 and BND-191
-  - outcome: Cover wrong-thread errors and diagnostics for resource transform
-    set/clear and render-session methods.
-  - rationale: Python already covers runtime close, `run_once`, `poll_event`,
-    and one map method from the wrong thread. Render-session and resource
-    registration coverage remains.
-  - implementation notes: Use public owner-thread handles and assert
-    `WrongThreadError` with copied diagnostics where native supplies them.
 
 - [ ] `py-frame-acquire-construction-failure`: Add post-acquire cleanup guards
       for owned texture frames.
@@ -147,3 +136,8 @@ input before implementation.
 - `py-native-stub`: `_native.pyi` now declares the wrapper-facing native handle
   classes, methods, and module functions instead of exporting a catch-all
   `__getattr__`.
+- `py-wrong-thread-coverage`: Resource transform set/clear now have real
+  wrong-thread tests, and render-session public methods now have wrapper-level
+  wrong-thread propagation coverage. Native render-session wrong-thread coverage
+  remains part of `py-render-integration-tests`, where backend render fixtures
+  can exercise real session handles.
