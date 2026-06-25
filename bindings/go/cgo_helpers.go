@@ -32,37 +32,44 @@ func (view cStringView) free() {
 }
 
 type cStringViewArray struct {
-	views []cStringView
-	raw   []C.mln_string_view
+	views      []cStringView
+	raw        unsafe.Pointer
+	valueCount int
 }
 
 func newCStringViewArray(values []string) cStringViewArray {
 	out := cStringViewArray{
-		views: make([]cStringView, len(values)),
-		raw:   make([]C.mln_string_view, len(values)),
+		views:      make([]cStringView, len(values)),
+		valueCount: len(values),
+	}
+	if len(values) > 0 {
+		out.raw = C.malloc(C.size_t(len(values)) * C.size_t(unsafe.Sizeof(C.mln_string_view{})))
 	}
 	for i, value := range values {
 		view := newCStringView(value)
 		out.views[i] = view
-		out.raw[i] = view.raw()
+		*(*C.mln_string_view)(unsafe.Add(out.raw, uintptr(i)*unsafe.Sizeof(C.mln_string_view{}))) = view.raw()
 	}
 	return out
 }
 
 func (array cStringViewArray) ptr() *C.mln_string_view {
-	if len(array.raw) == 0 {
+	if array.raw == nil {
 		return nil
 	}
-	return &array.raw[0]
+	return (*C.mln_string_view)(array.raw)
 }
 
 func (array cStringViewArray) count() C.size_t {
-	return C.size_t(len(array.raw))
+	return C.size_t(array.valueCount)
 }
 
 func (array cStringViewArray) free() {
 	for i := range array.views {
 		array.views[i].free()
+	}
+	if array.raw != nil {
+		C.free(array.raw)
 	}
 }
 

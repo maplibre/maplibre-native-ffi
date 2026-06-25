@@ -1,6 +1,8 @@
 package maplibre
 
 /*
+#include <stdlib.h>
+
 #include "internal/cgo_geometry_shim.h"
 #include "internal/cgo_json_shim.h"
 */
@@ -132,41 +134,65 @@ type FeatureExtensionResult struct {
 }
 
 type cRenderedQueryGeometry struct {
-	raw    C.mln_rendered_query_geometry
-	points []C.mln_screen_point
+	raw    *C.mln_rendered_query_geometry
+	points unsafe.Pointer
 }
 
 func newCRenderedQueryGeometry(geometry RenderedQueryGeometry) cRenderedQueryGeometry {
+	raw := (*C.mln_rendered_query_geometry)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_rendered_query_geometry{}))))
 	switch geometry.Type {
 	case RenderedQueryGeometryTypePoint:
-		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_point(cScreenPoint(geometry.Point))}
+		*raw = C.mln_rendered_query_geometry_point(cScreenPoint(geometry.Point))
+		return cRenderedQueryGeometry{raw: raw}
 	case RenderedQueryGeometryTypeBox:
 		box := C.mln_screen_box{min: cScreenPoint(geometry.Box.Min), max: cScreenPoint(geometry.Box.Max)}
-		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_box(box)}
+		*raw = C.mln_rendered_query_geometry_box(box)
+		return cRenderedQueryGeometry{raw: raw}
 	case RenderedQueryGeometryTypeLineString:
-		points := cScreenPointSlice(geometry.Points)
 		var pointsPtr *C.mln_screen_point
-		if len(points) > 0 {
-			pointsPtr = &points[0]
+		var points unsafe.Pointer
+		if len(geometry.Points) > 0 {
+			points = C.malloc(C.size_t(len(geometry.Points)) * C.size_t(unsafe.Sizeof(C.mln_screen_point{})))
+			pointsPtr = (*C.mln_screen_point)(points)
+			for i, point := range geometry.Points {
+				*(*C.mln_screen_point)(unsafe.Add(points, uintptr(i)*unsafe.Sizeof(C.mln_screen_point{}))) = cScreenPoint(point)
+			}
 		}
-		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_line_string(pointsPtr, C.size_t(len(points))), points: points}
+		*raw = C.mln_rendered_query_geometry_line_string(pointsPtr, C.size_t(len(geometry.Points)))
+		return cRenderedQueryGeometry{raw: raw, points: points}
 	default:
-		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry{size: C.uint32_t(unsafe.Sizeof(C.mln_rendered_query_geometry{})), _type: C.uint32_t(geometry.Type)}}
+		*raw = C.mln_rendered_query_geometry{size: C.uint32_t(unsafe.Sizeof(C.mln_rendered_query_geometry{})), _type: C.uint32_t(geometry.Type)}
+		return cRenderedQueryGeometry{raw: raw}
+	}
+}
+
+func (geometry cRenderedQueryGeometry) ptr() *C.mln_rendered_query_geometry {
+	return geometry.raw
+}
+
+func (geometry cRenderedQueryGeometry) free() {
+	if geometry.points != nil {
+		C.free(geometry.points)
+	}
+	if geometry.raw != nil {
+		C.free(unsafe.Pointer(geometry.raw))
 	}
 }
 
 type cRenderedFeatureQueryOptions struct {
-	raw          C.mln_rendered_feature_query_options
+	raw          *C.mln_rendered_feature_query_options
 	layerIDs     cStringViewArray
 	materializer *cJSONMaterializer
-	filter       C.mln_json_value
 }
 
 func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRenderedFeatureQueryOptions, error) {
 	if options == nil {
 		return nil, nil
 	}
-	raw := &cRenderedFeatureQueryOptions{raw: C.mln_rendered_feature_query_options_default()}
+	raw := &cRenderedFeatureQueryOptions{
+		raw: (*C.mln_rendered_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_rendered_feature_query_options{})))),
+	}
+	*raw.raw = C.mln_rendered_feature_query_options_default()
 	if options.LayerIDs != nil {
 		raw.raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 		raw.layerIDs = newCStringViewArray(options.LayerIDs)
@@ -175,13 +201,12 @@ func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRe
 	}
 	if options.Filter != nil {
 		raw.materializer = newCJSONMaterializer()
-		filter, err := raw.materializer.value(*options.Filter)
+		filter, err := raw.materializer.valuePtr(*options.Filter)
 		if err != nil {
 			raw.free()
 			return nil, err
 		}
-		raw.filter = filter
-		raw.raw.filter = &raw.filter
+		raw.raw.filter = filter
 	}
 	return raw, nil
 }
@@ -190,7 +215,7 @@ func (options *cRenderedFeatureQueryOptions) ptr() *C.mln_rendered_feature_query
 	if options == nil {
 		return nil
 	}
-	return &options.raw
+	return options.raw
 }
 
 func (options *cRenderedFeatureQueryOptions) free() {
@@ -201,20 +226,25 @@ func (options *cRenderedFeatureQueryOptions) free() {
 	if options.materializer != nil {
 		options.materializer.free()
 	}
+	if options.raw != nil {
+		C.free(unsafe.Pointer(options.raw))
+	}
 }
 
 type cSourceFeatureQueryOptions struct {
-	raw          C.mln_source_feature_query_options
+	raw          *C.mln_source_feature_query_options
 	layerIDs     cStringViewArray
 	materializer *cJSONMaterializer
-	filter       C.mln_json_value
 }
 
 func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSourceFeatureQueryOptions, error) {
 	if options == nil {
 		return nil, nil
 	}
-	raw := &cSourceFeatureQueryOptions{raw: C.mln_source_feature_query_options_default()}
+	raw := &cSourceFeatureQueryOptions{
+		raw: (*C.mln_source_feature_query_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_source_feature_query_options{})))),
+	}
+	*raw.raw = C.mln_source_feature_query_options_default()
 	if options.SourceLayerIDs != nil {
 		raw.raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 		raw.layerIDs = newCStringViewArray(options.SourceLayerIDs)
@@ -223,13 +253,12 @@ func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSource
 	}
 	if options.Filter != nil {
 		raw.materializer = newCJSONMaterializer()
-		filter, err := raw.materializer.value(*options.Filter)
+		filter, err := raw.materializer.valuePtr(*options.Filter)
 		if err != nil {
 			raw.free()
 			return nil, err
 		}
-		raw.filter = filter
-		raw.raw.filter = &raw.filter
+		raw.raw.filter = filter
 	}
 	return raw, nil
 }
@@ -238,7 +267,7 @@ func (options *cSourceFeatureQueryOptions) ptr() *C.mln_source_feature_query_opt
 	if options == nil {
 		return nil
 	}
-	return &options.raw
+	return options.raw
 }
 
 func (options *cSourceFeatureQueryOptions) free() {
@@ -248,6 +277,9 @@ func (options *cSourceFeatureQueryOptions) free() {
 	options.layerIDs.free()
 	if options.materializer != nil {
 		options.materializer.free()
+	}
+	if options.raw != nil {
+		C.free(unsafe.Pointer(options.raw))
 	}
 }
 
@@ -487,6 +519,7 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 	defer release()
 	defer session.state.KeepAlive()
 	rawGeometry := newCRenderedQueryGeometry(geometry)
+	defer rawGeometry.free()
 	rawOptions, err := newCRenderedFeatureQueryOptions(options)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
@@ -495,7 +528,7 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 	var result *C.mln_feature_query_result
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawGeometry.raw, rawOptions.ptr(), &result))
+			return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), rawGeometry.ptr(), rawOptions.ptr(), &result))
 		})
 	}); err != nil {
 		return nil, err

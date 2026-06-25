@@ -50,6 +50,19 @@ func TestQueryDescriptorsAndHandleErrors(t *testing.T) {
 	}
 }
 
+func TestQueryMaterializersPassCgoPointerChecks(t *testing.T) {
+	filter := JSONArray(JSONString("=="), JSONString("kind"), JSONString("park"))
+
+	renderedQueryGeometryPassesCgoPointerCheckForTest(RenderedQueryLineString([]ScreenPoint{{X: 1, Y: 2}, {X: 3, Y: 4}}))
+
+	if err := renderedFeatureQueryOptionsPassesCgoPointerCheckForTest(&RenderedFeatureQueryOptions{LayerIDs: []string{"layer"}, Filter: &filter}); err != nil {
+		t.Fatalf("rendered feature query options: %v", err)
+	}
+	if err := sourceFeatureQueryOptionsPassesCgoPointerCheckForTest(&SourceFeatureQueryOptions{SourceLayerIDs: []string{"layer"}, Filter: &filter}); err != nil {
+		t.Fatalf("source feature query options: %v", err)
+	}
+}
+
 func TestFeatureExtensionUnknownResultTypePreserved(t *testing.T) {
 	result := featureExtensionResultForTest(0x7fff_0002)
 	if result.Type != FeatureExtensionResultType(0x7fff_0002) {

@@ -65,6 +65,16 @@ func (materializer *cJSONMaterializer) value(value JSONValue) (C.mln_json_value,
 	}
 }
 
+func (materializer *cJSONMaterializer) valuePtr(value JSONValue) (*C.mln_json_value, error) {
+	raw, err := materializer.value(value)
+	if err != nil {
+		return nil, err
+	}
+	ptr := (*C.mln_json_value)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+	*ptr = raw
+	return ptr, nil
+}
+
 func (materializer *cJSONMaterializer) float(value float64) (C.mln_json_value, error) {
 	if math.IsNaN(value) || math.IsInf(value, 0) {
 		return C.mln_json_value{}, fmt.Errorf("JSON double value must be finite")
@@ -231,6 +241,9 @@ func (materializer *cGeoJSONMaterializer) features(features []Feature) (*C.mln_f
 }
 
 func cJSONSnapshotValue(snapshot *C.mln_json_snapshot) (JSONValue, error) {
+	if snapshot == nil {
+		return JSONNull(), nil
+	}
 	defer C.mln_json_snapshot_destroy(snapshot)
 	var rawValue *C.mln_json_value
 	if err := checkNative(func() int32 {

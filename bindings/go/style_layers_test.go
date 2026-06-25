@@ -218,6 +218,13 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	)); err != nil {
 		t.Fatalf("SetStyleLightJSON(): %v", err)
 	}
+	undefined, err := m.StyleLightProperty("does-not-exist")
+	if err != nil {
+		t.Fatalf("StyleLightProperty(does-not-exist): %v", err)
+	}
+	if undefined.Type != JSONValueTypeNull {
+		t.Fatalf("StyleLightProperty(does-not-exist) = %#v, want JSON null", undefined)
+	}
 	if err := m.SetStyleLightProperty("intensity", JSONDouble(0.75)); err != nil {
 		t.Fatalf("SetStyleLightProperty(intensity): %v", err)
 	}
