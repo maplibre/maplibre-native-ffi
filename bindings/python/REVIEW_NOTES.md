@@ -65,17 +65,6 @@ input before implementation.
   - implementation notes: Add an internal loader or version seam that forces
     mismatch before public handle creation.
 
-- [ ] `py-status-diagnostics-tests`: Expand status and diagnostic coverage.
-  - severity: medium
-  - complexity: medium
-  - area: BND-020 through BND-026
-  - outcome: Cover every public status category, unknown future status, stale
-    diagnostic copying, and cleanup-preserved diagnostics.
-  - rationale: Current tests cover representative invalid-argument diagnostics,
-    but not the full status and diagnostic matrix required by the spec.
-  - implementation notes: Add internal conversion and diagnostic seams for
-    status categories that are hard to produce with real native calls.
-
 - [ ] `py-render-integration-tests`: Add render workflow integration coverage.
   - severity: high
   - complexity: high
@@ -130,3 +119,7 @@ input before implementation.
 - `py-frame-acquire-construction-failure`: Owned texture frame acquisition now
   uses a cleanup guard that releases the native frame and clears active-frame
   state if Python frame-handle construction fails.
+- `py-status-diagnostics-tests`: Python tests now cover every public native
+  status category, OK status, unknown future status, stale diagnostic copying,
+  binding-owned diagnostics without stale native leakage, embedded NUL
+  validation, and cleanup/support-work diagnostic preservation.

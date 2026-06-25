@@ -110,24 +110,87 @@ def test_network_status_preserves_unknown_raw_values() -> None:
 
 
 def test_unknown_network_status_setter_raises_invalid_argument() -> None:
+    stale = _native_invalid_network_status_error().diagnostic
+
     with pytest.raises(mln.InvalidArgumentError) as raised:
         mln.set_network_status(mln.NetworkStatus(999_001))
 
     assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
     assert raised.value.native_status_code is None
     assert "cannot be set" in raised.value.diagnostic
+    assert raised.value.diagnostic != stale
 
 
 def test_native_status_conversion_preserves_status_and_diagnostic() -> None:
     with pytest.raises(mln.InvalidArgumentError) as raised:
         _native.set_network_status_raw_unchecked_for_test(999_001)
 
-    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
-    assert (
-        raised.value.native_status_code
-        == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
-    )
-    assert "network status" in raised.value.diagnostic
+    error = raised.value
+    copied = error.diagnostic
+
+    with pytest.raises(mln.InvalidArgumentError) as later:
+        _native.projected_meters_for_lat_lng(1000.0, 0.0)
+
+    assert error.status == mln.MaplibreStatus.INVALID_ARGUMENT
+    assert error.native_status_code == mln.MaplibreStatus.INVALID_ARGUMENT.native_code
+    assert "network status" in error.diagnostic
+    assert error.diagnostic == copied
+    assert later.value.diagnostic != copied
+
+
+@pytest.mark.parametrize(
+    ("status", "error_type"),
+    (
+        (mln.MaplibreStatus.INVALID_ARGUMENT, mln.InvalidArgumentError),
+        (mln.MaplibreStatus.INVALID_STATE, mln.InvalidStateError),
+        (mln.MaplibreStatus.WRONG_THREAD, mln.WrongThreadError),
+        (mln.MaplibreStatus.UNSUPPORTED, mln.UnsupportedFeatureError),
+        (mln.MaplibreStatus.NATIVE_ERROR, mln.NativeError),
+    ),
+)
+def test_native_status_categories_map_to_public_errors(
+    status: mln.MaplibreStatus,
+    error_type: type[mln.MaplibreError],
+) -> None:
+    diagnostic = f"synthetic native diagnostic for {status.name}"
+
+    with pytest.raises(error_type) as raised:
+        _native.status_error_for_test(status.native_code, diagnostic)
+
+    assert raised.value.status == status
+    assert raised.value.native_status_code == status.native_code
+    assert raised.value.diagnostic == diagnostic
+
+
+def test_ok_native_status_does_not_raise() -> None:
+    _native.status_error_for_test(mln.MaplibreStatus.OK.native_code, "unused")
+
+
+def test_unknown_native_status_preserves_raw_status() -> None:
+    with pytest.raises(mln.UnknownStatusError) as raised:
+        _native.status_error_for_test(-123_456, "future native status")
+
+    assert raised.value.status == mln.MaplibreStatus.UNKNOWN
+    assert raised.value.native_status_code == -123_456
+    assert raised.value.diagnostic == "future native status"
+
+
+def test_support_work_preserves_original_native_diagnostic() -> None:
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        _native.status_error_after_support_call_for_test(
+            mln.MaplibreStatus.UNSUPPORTED.native_code,
+            "original native diagnostic",
+        )
+
+    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+    assert raised.value.native_status_code == mln.MaplibreStatus.UNSUPPORTED.native_code
+    assert raised.value.diagnostic == "original native diagnostic"
+
+
+def _native_invalid_network_status_error() -> mln.InvalidArgumentError:
+    with pytest.raises(mln.InvalidArgumentError) as raised:
+        _native.set_network_status_raw_unchecked_for_test(999_001)
+    return raised.value
 
 
 def test_public_type_hints_are_resolvable() -> None:
@@ -605,12 +668,14 @@ def test_still_image_request_uses_map_mode_validation() -> None:
 def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
     runtime = mln.RuntimeHandle()
     runtime.close()
+    stale = _native_invalid_network_status_error().diagnostic
 
     with pytest.raises(mln.InvalidStateError) as raised:
         runtime.create_map()
 
     assert raised.value.native_status_code is None
     assert raised.value.diagnostic == "runtime handle is closed"
+    assert raised.value.diagnostic != stale
 
 
 def test_map_debug_and_status_options_round_trip_public_values() -> None:
@@ -633,11 +698,18 @@ def test_map_debug_and_status_options_round_trip_public_values() -> None:
             assert map_handle.get_rendering_stats_view_enabled() is False
 
 
-def test_style_url_reports_native_status_for_invalid_url() -> None:
+def test_style_url_rejects_embedded_nul_before_native_call() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
-            with pytest.raises(mln.InvalidArgumentError):
+            stale = _native_invalid_network_status_error().diagnostic
+
+            with pytest.raises(mln.InvalidArgumentError) as raised:
                 map_handle.set_style_url("bad\0url")
+
+    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
+    assert raised.value.native_status_code is None
+    assert "embedded NUL" in raised.value.diagnostic
+    assert raised.value.diagnostic != stale
 
 
 def test_style_source_url_metadata_and_removal_public_api() -> None:

@@ -6655,6 +6655,31 @@ fn set_network_status_raw_unchecked_for_test(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status_raw(raw_status).map_err(map_error)
 }
 
+/// Test helper that maps synthetic native statuses through the public error shape.
+#[pyfunction]
+fn status_error_for_test(raw_status: i32, diagnostic: String) -> PyResult<()> {
+    if raw_status == sys::MLN_STATUS_OK {
+        Ok(())
+    } else {
+        Err(map_error(Error::from_status_and_diagnostic(
+            raw_status, diagnostic,
+        )))
+    }
+}
+
+/// Test helper that verifies later support work does not replace a copied error.
+#[pyfunction]
+fn status_error_after_support_call_for_test(raw_status: i32, diagnostic: String) -> PyResult<()> {
+    if raw_status == sys::MLN_STATUS_OK {
+        return Ok(());
+    }
+    let error = Error::from_status_and_diagnostic(raw_status, diagnostic);
+    // SAFETY: The raw value is passed by value. The intentionally invalid value
+    // forces a later diagnostic-writing native call for cleanup/support tests.
+    let _ = unsafe { sys::mln_network_status_set(u32::MAX) };
+    Err(map_error(error))
+}
+
 /// Test helper that exercises private runtime event payload wire conversion.
 #[pyfunction]
 fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -7253,6 +7278,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(set_async_log_severity_mask, module)?)?;
     module.add_function(wrap_pyfunction!(
         set_network_status_raw_unchecked_for_test,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(status_error_for_test, module)?)?;
+    module.add_function(wrap_pyfunction!(
+        status_error_after_support_call_for_test,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(
