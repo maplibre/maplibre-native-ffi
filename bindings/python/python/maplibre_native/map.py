@@ -127,7 +127,7 @@ class MapViewportOptions:
     frustum_offset: EdgeInsets | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "MapViewportOptions":
+    def _from_native(cls, raw: dict[str, object]) -> "MapViewportOptions":
         """Build viewport options from private native bridge values."""
         frustum_offset = raw["frustum_offset"]
         return cls(
@@ -158,7 +158,7 @@ class MapTileOptions:
     lod_mode: TileLodMode | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "MapTileOptions":
+    def _from_native(cls, raw: dict[str, object]) -> "MapTileOptions":
         """Build tile options from private native bridge values."""
         return cls(
             prefetch_zoom_delta=raw["prefetch_zoom_delta"],
@@ -369,7 +369,7 @@ class MapProjectionHandle(NativeHandleMixin):
         """Return the helper's current camera snapshot."""
         from .camera import CameraOptions
 
-        return CameraOptions.from_native(self._native.get_camera())
+        return CameraOptions._from_native(self._native.get_camera())
 
     def set_camera(self, camera: CameraOptions) -> None:
         """Apply camera fields to this projection helper."""
@@ -489,7 +489,7 @@ class MapHandle(NativeHandleMixin):
 
     def get_viewport_options(self) -> MapViewportOptions:
         """Return live map viewport and render-transform controls."""
-        return MapViewportOptions.from_native(self._native.get_viewport_options())
+        return MapViewportOptions._from_native(self._native.get_viewport_options())
 
     def set_viewport_options(self, options: MapViewportOptions) -> None:
         """Apply selected live map viewport and render-transform controls."""
@@ -514,7 +514,7 @@ class MapHandle(NativeHandleMixin):
 
     def get_tile_options(self) -> MapTileOptions:
         """Return tile prefetch and LOD tuning controls."""
-        return MapTileOptions.from_native(self._native.get_tile_options())
+        return MapTileOptions._from_native(self._native.get_tile_options())
 
     def set_tile_options(self, options: MapTileOptions) -> None:
         """Apply selected tile prefetch and LOD tuning controls."""
@@ -661,7 +661,7 @@ class MapHandle(NativeHandleMixin):
         from .style import StyleSourceInfo
 
         raw = self._native.get_style_source_info(source_id)
-        return StyleSourceInfo.from_native(raw) if raw is not None else None
+        return StyleSourceInfo._from_native(raw) if raw is not None else None
 
     def list_style_source_ids(self) -> tuple[str, ...]:
         """Return style source IDs in style order."""
@@ -838,14 +838,14 @@ class MapHandle(NativeHandleMixin):
         from .style import StyleImageInfo
 
         raw = self._native.get_style_image_info(image_id)
-        return StyleImageInfo.from_native(raw) if raw is not None else None
+        return StyleImageInfo._from_native(raw) if raw is not None else None
 
     def copy_style_image_premultiplied_rgba8(self, image_id: str) -> StyleImage | None:
         """Copy one runtime style image as premultiplied RGBA8 pixels."""
         from .style import StyleImage
 
         raw = self._native.copy_style_image_premultiplied_rgba8(image_id)
-        return StyleImage.from_native(raw) if raw is not None else None
+        return StyleImage._from_native(raw) if raw is not None else None
 
     def add_image_source_url(
         self,
@@ -910,7 +910,7 @@ class MapHandle(NativeHandleMixin):
         """Return the current camera snapshot."""
         from .camera import CameraOptions
 
-        return CameraOptions.from_native(self._native.get_camera())
+        return CameraOptions._from_native(self._native.get_camera())
 
     def jump_to(self, camera: CameraOptions) -> None:
         """Apply a camera jump command."""
@@ -945,7 +945,7 @@ class MapHandle(NativeHandleMixin):
             (bounds.northeast.latitude, bounds.northeast.longitude),
             *_fit_parts(fit),
         )
-        return CameraOptions.from_native(raw)
+        return CameraOptions._from_native(raw)
 
     def camera_for_lat_lngs(
         self,
@@ -959,7 +959,7 @@ class MapHandle(NativeHandleMixin):
             _coordinate_parts(coordinates),
             *_fit_parts(fit),
         )
-        return CameraOptions.from_native(raw)
+        return CameraOptions._from_native(raw)
 
     def camera_for_geometry(
         self,
@@ -973,7 +973,7 @@ class MapHandle(NativeHandleMixin):
             geometry,
             *_fit_parts(fit),
         )
-        return CameraOptions.from_native(raw)
+        return CameraOptions._from_native(raw)
 
     def lat_lng_bounds_for_camera(
         self,
@@ -994,7 +994,7 @@ class MapHandle(NativeHandleMixin):
         """Return map camera constraint options."""
         from .camera import BoundOptions
 
-        return BoundOptions.from_native(self._native.get_bounds())
+        return BoundOptions._from_native(self._native.get_bounds())
 
     def set_bounds(self, bounds: BoundOptions) -> None:
         """Apply selected map camera constraint options."""
@@ -1065,7 +1065,7 @@ class MapHandle(NativeHandleMixin):
         """Return the current free camera position and orientation."""
         from .camera import FreeCameraOptions
 
-        return FreeCameraOptions.from_native(self._native.get_free_camera_options())
+        return FreeCameraOptions._from_native(self._native.get_free_camera_options())
 
     def set_free_camera_options(self, options: FreeCameraOptions) -> None:
         """Apply selected free camera position and orientation fields."""
@@ -1090,7 +1090,7 @@ class MapHandle(NativeHandleMixin):
         """Return the current axonometric rendering options."""
         from .camera import ProjectionMode
 
-        return ProjectionMode.from_native(self._native.get_projection_mode())
+        return ProjectionMode._from_native(self._native.get_projection_mode())
 
     def set_projection_mode(self, mode: ProjectionMode) -> None:
         """Apply axonometric rendering option fields to the map."""

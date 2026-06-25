@@ -372,12 +372,15 @@ def test_still_image_request_uses_map_mode_validation() -> None:
     assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
 
 
-def test_map_create_from_closed_runtime_reports_invalid_argument() -> None:
+def test_map_create_from_closed_runtime_reports_invalid_state() -> None:
     runtime = mln.RuntimeHandle()
     runtime.close()
 
-    with pytest.raises(mln.InvalidArgumentError):
+    with pytest.raises(mln.InvalidStateError) as raised:
         runtime.create_map()
+
+    assert raised.value.native_status_code is None
+    assert raised.value.diagnostic == "runtime handle is closed"
 
 
 def test_map_debug_and_status_options_round_trip_public_values() -> None:
@@ -953,12 +956,12 @@ def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
 def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     events = _native.runtime_event_payload_wire_shapes_for_test()
 
-    render_frame_event = mln.RuntimeEvent.from_native(events["render_frame"])
+    render_frame_event = mln.RuntimeEvent._from_native(events["render_frame"])
     assert isinstance(render_frame_event.payload, mln.RenderFramePayload)
     assert render_frame_event.payload.mode == mln.RenderMode.FULL
 
     render_frame_payload = events["render_frame"]["payload"]
-    render_frame = mln.RenderFramePayload.from_runtime_payload(render_frame_payload)
+    render_frame = mln.RenderFramePayload._from_runtime_payload(render_frame_payload)
     assert render_frame.mode == mln.RenderMode.FULL
     assert render_frame.needs_repaint is True
     assert render_frame.placement_changed is False
@@ -969,9 +972,9 @@ def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     assert render_frame.stats.total_draw_call_count == 5
 
     tile_action_payload = events["tile_action"]["payload"]
-    tile_action_event = mln.RuntimeEvent.from_native(events["tile_action"])
+    tile_action_event = mln.RuntimeEvent._from_native(events["tile_action"])
     assert isinstance(tile_action_event.payload, mln.TileActionPayload)
-    tile_action = mln.TileActionPayload.from_runtime_payload(tile_action_payload)
+    tile_action = mln.TileActionPayload._from_runtime_payload(tile_action_payload)
     assert tile_action.operation == mln.TileOperation.LOAD_FROM_NETWORK
     assert tile_action.tile_id.overscaled_z == 6
     assert tile_action.tile_id.wrap == -1
@@ -981,7 +984,7 @@ def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     assert tile_action.source_id == "source-a"
 
     offline_status_payload = events["offline_region_status"]["payload"]
-    status_changed = offline.OfflineRegionStatusChanged.from_runtime_payload(
+    status_changed = offline.OfflineRegionStatusChanged._from_runtime_payload(
         offline_status_payload
     )
     assert status_changed.region_id == 42
@@ -1678,7 +1681,7 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
         required_resource_count_is_precise=True,
         complete=False,
     )
-    completed = offline.OfflineOperationCompleted.from_runtime_payload(
+    completed = offline.OfflineOperationCompleted._from_runtime_payload(
         {
             "operation_id": 7,
             "operation_kind": offline.OfflineOperationKind.REGION_CREATE.native_code,
@@ -1687,13 +1690,13 @@ def test_offline_values_wrap_runtime_event_payload_shape() -> None:
             "found": True,
         }
     )
-    response_error = offline.OfflineRegionResponseError.from_runtime_payload(
+    response_error = offline.OfflineRegionResponseError._from_runtime_payload(
         {
             "region_id": 8,
             "reason": resource.ResourceErrorReason.NOT_FOUND.native_code,
         }
     )
-    tile_limit = offline.OfflineRegionTileCountLimitExceeded.from_runtime_payload(
+    tile_limit = offline.OfflineRegionTileCountLimitExceeded._from_runtime_payload(
         {
             "region_id": 9,
             "limit": 10,
@@ -1759,7 +1762,7 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
 
 
 def test_feature_extension_result_preserves_unknown_native_type() -> None:
-    extension = query.FeatureExtensionResult.from_native({"type": 999_001})
+    extension = query.FeatureExtensionResult._from_native({"type": 999_001})
 
     assert extension.type is query.FeatureExtensionResultType.UNKNOWN
     assert extension.raw_type == 999_001
@@ -1848,7 +1851,7 @@ def test_geojson_values_preserve_geometry_and_properties() -> None:
 
 
 def test_resource_values_preserve_native_shape() -> None:
-    request = resource.ResourceRequest.from_native(
+    request = resource.ResourceRequest._from_native(
         {
             "url": "https://example.test/tile.pbf",
             "kind": resource.ResourceKind.TILE.native_code,
@@ -1871,9 +1874,9 @@ def test_resource_values_preserve_native_shape() -> None:
     assert request.kind == resource.ResourceKind.TILE
     assert request.range == resource.ByteRange(5, 10)
     assert request.prior_data == b"old"
-    assert response.to_native()["status"] == resource.ResourceResponseStatus.ERROR
+    assert response._to_native()["status"] == resource.ResourceResponseStatus.ERROR
     assert (
-        response.to_native()["error_reason"] == resource.ResourceErrorReason.NOT_FOUND
+        response._to_native()["error_reason"] == resource.ResourceErrorReason.NOT_FOUND
     )
 
 
@@ -1999,7 +2002,7 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     retry = resource.ResourceRequestHandle._from_native(retry_native)
 
     class InvalidResponse:
-        def to_native(self) -> dict[str, object]:
+        def _to_native(self) -> dict[str, object]:
             msg = "cannot materialize response"
             raise ValueError(msg)
 

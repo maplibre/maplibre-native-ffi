@@ -116,7 +116,7 @@ class QueriedFeature:
     state: JsonValue | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
+    def _from_native(cls, raw: dict[str, Any]) -> "QueriedFeature":
         """Build a queried feature from private native values."""
         return cls(
             feature=raw["feature"],
@@ -165,7 +165,7 @@ class FeatureExtensionResult:
         return cls(FeatureExtensionResultType.UNKNOWN, raw_type=raw_type)
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
+    def _from_native(cls, raw: dict[str, Any]) -> "FeatureExtensionResult":
         """Build a feature-extension result from private native values."""
         raw_type = int(raw["type"])
         if raw_type == FeatureExtensionResultType.VALUE:

@@ -278,7 +278,7 @@ class TextureImageInfo:
     byte_length: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "TextureImageInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> "TextureImageInfo":
         """Build metadata from private native values."""
         return cls(
             width=raw["width"],
@@ -296,9 +296,9 @@ class PremultipliedRgba8Image:
     data: bytes
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "PremultipliedRgba8Image":
+    def _from_native(cls, raw: dict[str, Any]) -> "PremultipliedRgba8Image":
         """Build an image from private native values."""
-        return cls(info=TextureImageInfo.from_native(raw["info"]), data=raw["data"])
+        return cls(info=TextureImageInfo._from_native(raw["info"]), data=raw["data"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -313,7 +313,7 @@ class MetalOwnedTextureFrame:
     pixel_format: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "MetalOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> "MetalOwnedTextureFrame":
         """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
@@ -338,7 +338,7 @@ class VulkanOwnedTextureFrame:
     layout: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "VulkanOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> "VulkanOwnedTextureFrame":
         """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
@@ -366,7 +366,7 @@ class OpenGLOwnedTextureFrame:
     type: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "OpenGLOwnedTextureFrame":
+    def _from_native(cls, raw: dict[str, Any]) -> "OpenGLOwnedTextureFrame":
         """Build frame metadata from private native values."""
         return cls(
             generation=raw["generation"],
@@ -450,17 +450,17 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def texture_image_info(self) -> TextureImageInfo:
         """Return readback metadata for the latest texture frame."""
-        return TextureImageInfo.from_native(self._native.texture_image_info())
+        return TextureImageInfo._from_native(self._native.texture_image_info())
 
     def read_premultiplied_rgba8_into(self, buffer: object) -> TextureImageInfo:
         """Read the latest texture frame into caller-owned writable storage."""
-        return TextureImageInfo.from_native(
+        return TextureImageInfo._from_native(
             self._native.read_premultiplied_rgba8_into(buffer)
         )
 
     def read_premultiplied_rgba8(self) -> PremultipliedRgba8Image:
         """Read the latest texture frame into copied bytes."""
-        return PremultipliedRgba8Image.from_native(
+        return PremultipliedRgba8Image._from_native(
             self._native.read_premultiplied_rgba8()
         )
 
@@ -500,7 +500,7 @@ class RenderSessionHandle(NativeHandleMixin):
             layer_ids,
             filter_,
         )
-        return tuple(QueriedFeature.from_native(feature) for feature in raw)
+        return tuple(QueriedFeature._from_native(feature) for feature in raw)
 
     def query_source_features(
         self,
@@ -515,7 +515,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
         source_layer_ids, filter_ = _source_options_to_native_wire(options)
         raw = self._native.query_source_features(source_id, source_layer_ids, filter_)
-        return tuple(QueriedFeature.from_native(feature) for feature in raw)
+        return tuple(QueriedFeature._from_native(feature) for feature in raw)
 
     def query_feature_extensions(
         self,
@@ -535,7 +535,7 @@ class RenderSessionHandle(NativeHandleMixin):
             extension_field,
             arguments,
         )
-        return FeatureExtensionResult.from_native(raw)
+        return FeatureExtensionResult._from_native(raw)
 
     def set_feature_state(
         self,
@@ -588,7 +588,7 @@ class MetalOwnedTextureFrameHandle(NativeHandleMixin):
     @property
     def frame(self) -> MetalOwnedTextureFrame:
         """Return copied frame metadata."""
-        return MetalOwnedTextureFrame.from_native(self._native.frame())
+        return MetalOwnedTextureFrame._from_native(self._native.frame())
 
     @property
     def texture(self) -> NativePointer:
@@ -627,7 +627,7 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
     @property
     def frame(self) -> VulkanOwnedTextureFrame:
         """Return copied frame metadata."""
-        return VulkanOwnedTextureFrame.from_native(self._native.frame())
+        return VulkanOwnedTextureFrame._from_native(self._native.frame())
 
     @property
     def image(self) -> NativePointer:
@@ -675,7 +675,7 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
     @property
     def frame(self) -> OpenGLOwnedTextureFrame:
         """Return copied frame metadata."""
-        return OpenGLOwnedTextureFrame.from_native(self._native.frame())
+        return OpenGLOwnedTextureFrame._from_native(self._native.frame())
 
     @property
     def texture(self) -> FrameOpenGLTextureName:

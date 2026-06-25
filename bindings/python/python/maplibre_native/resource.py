@@ -87,7 +87,7 @@ class ByteRange:
     end: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "ByteRange":
+    def _from_native(cls, raw: dict[str, Any]) -> "ByteRange":
         """Build a byte range from private native values."""
         return cls(start=raw["start"], end=raw["end"])
 
@@ -109,7 +109,7 @@ class ResourceRequest:
     prior_data: bytes
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "ResourceRequest":
+    def _from_native(cls, raw: dict[str, Any]) -> "ResourceRequest":
         """Build a copied request from private native values."""
         raw_range = raw["range"]
         return cls(
@@ -119,7 +119,7 @@ class ResourceRequest:
             priority=ResourcePriority(raw["priority"]),
             usage=ResourceUsage(raw["usage"]),
             storage_policy=ResourceStoragePolicy(raw["storage_policy"]),
-            range=ByteRange.from_native(raw_range) if raw_range is not None else None,
+            range=ByteRange._from_native(raw_range) if raw_range is not None else None,
             prior_modified_unix_ms=raw["prior_modified_unix_ms"],
             prior_expires_unix_ms=raw["prior_expires_unix_ms"],
             prior_etag=raw["prior_etag"],
@@ -135,7 +135,7 @@ class ResourceTransformRequest:
     url: str
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "ResourceTransformRequest":
+    def _from_native(cls, raw: dict[str, Any]) -> "ResourceTransformRequest":
         """Build a copied transform request from private native values."""
         return cls(kind=ResourceKind(raw["kind"]), url=raw["url"])
 
@@ -178,7 +178,7 @@ class ResourceResponse:
             error_message=message,
         )
 
-    def to_native(self) -> dict[str, Any]:
+    def _to_native(self) -> dict[str, Any]:
         """Return private native bridge values for this response."""
         return {
             "status": self.status.native_code,
@@ -223,7 +223,7 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
                 None,
                 "resource request handle is already closed",
             )
-        native_response = response.to_native()
+        native_response = response._to_native()
         self._native.validate_completion_response(native_response)
         try:
             self._native.complete(native_response)
@@ -263,7 +263,7 @@ def _adapt_resource_transform_callback(
     """Adapt a public resource transform callback for the native bridge."""
 
     def adapted(raw_request: dict[str, Any]) -> str | None:
-        return callback(ResourceTransformRequest.from_native(raw_request))
+        return callback(ResourceTransformRequest._from_native(raw_request))
 
     return adapted
 
@@ -276,7 +276,7 @@ def _adapt_resource_provider_callback(
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
         handle = ResourceRequestHandle._from_native(native_handle)  # noqa: SLF001
         decision = ResourceProviderDecision(
-            callback(ResourceRequest.from_native(raw_request), handle)
+            callback(ResourceRequest._from_native(raw_request), handle)
         )
         if decision is not ResourceProviderDecision.HANDLE and not handle.closed:
             handle.close()

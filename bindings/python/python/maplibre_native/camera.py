@@ -69,7 +69,7 @@ class CameraOptions:
     field_of_view: float | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "CameraOptions":
+    def _from_native(cls, raw: dict[str, object]) -> "CameraOptions":
         """Build camera options from private native bridge values."""
         center = raw["center"]
         padding = raw["padding"]
@@ -117,7 +117,7 @@ class BoundOptions:
     max_pitch: float | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "BoundOptions":
+    def _from_native(cls, raw: dict[str, object]) -> "BoundOptions":
         """Build bound options from private native bridge values."""
         bounds = raw["bounds"]
         if isinstance(bounds, dict):
@@ -144,7 +144,7 @@ class FreeCameraOptions:
     orientation: Quaternion | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "FreeCameraOptions":
+    def _from_native(cls, raw: dict[str, object]) -> "FreeCameraOptions":
         """Build free camera options from private native bridge values."""
         position = raw["position"]
         orientation = raw["orientation"]
@@ -165,7 +165,7 @@ class ProjectionMode:
     y_skew: float | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "ProjectionMode":
+    def _from_native(cls, raw: dict[str, object]) -> "ProjectionMode":
         """Build projection mode options from private native bridge values."""
         return cls(
             axonometric=raw["axonometric"],

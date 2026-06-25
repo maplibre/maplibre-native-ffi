@@ -54,20 +54,6 @@ keep a small amount of Python-native ergonomics.
 These findings have a clear desired outcome and do not need further maintainer
 input before implementation.
 
-- [ ] `py-api-wire-methods`: Make raw bridge conversion methods private.
-  - severity: medium
-  - complexity: medium
-  - area: public value types in `python/maplibre_native`
-  - outcome: Rename public-looking native-wire conversion methods such as
-    `from_native()` and `to_native()` to private helpers such as
-    `_from_native()` and `_to_native()`.
-  - rationale: Exported value classes currently expose methods that accept or
-    return private bridge dictionaries. The binding spec keeps raw C and host
-    FFI carrier shapes outside the safe public API.
-  - implementation notes: Migrate domain by domain, starting with
-    runtime/resource/render/query values, and update tests to use private seams
-    where raw wire values are intentional.
-
 - [ ] `py-native-stub`: Replace the `Any` catch-all native extension stub.
   - severity: low
   - complexity: medium
@@ -140,19 +126,6 @@ input before implementation.
   - implementation notes: Use public owner-thread handles and assert
     `WrongThreadError` with copied diagnostics where native supplies them.
 
-- [ ] `py-runtime-close-race`: Add an explicit runtime releasing state.
-  - severity: medium
-  - complexity: medium
-  - area: `src/lib.rs` runtime handle state
-  - outcome: Runtime operations fail with a binding-owned releasing or closed
-    error before crossing into C while `close()` is in progress.
-  - rationale: The PyO3 runtime close path marks the native handle closed,
-    releases the GIL, and then runs `mln_runtime_destroy()`. Concurrent runtime
-    methods can observe a null native pointer and surface native
-    invalid-argument behavior.
-  - implementation notes: Extend the runtime operation gate or handle state and
-    check it from every runtime method before C calls.
-
 - [ ] `py-frame-acquire-construction-failure`: Add post-acquire cleanup guards
       for owned texture frames.
   - severity: medium
@@ -173,3 +146,12 @@ input before implementation.
   constructors.
   - rationale: The current tests use private factories for internal seams and
     assert direct public construction fails.
+
+## Completed In This Branch
+
+- `py-api-wire-methods`: Raw native-wire value conversions now use underscored
+  helpers such as `_from_native()`, `_to_native()`, and
+  `_from_runtime_payload()`.
+- `py-runtime-close-race`: Runtime operations now pass through a binding-owned
+  close gate before calling C, and closed-runtime map creation reports a copied
+  binding diagnostic.

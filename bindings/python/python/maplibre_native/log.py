@@ -62,7 +62,7 @@ class LogRecord:
     message: str
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "LogRecord":
+    def _from_native(cls, raw: dict[str, Any]) -> "LogRecord":
         """Build a copied log record from private native values."""
         return cls(
             severity=LogSeverity(raw["severity"]),
@@ -95,7 +95,7 @@ class LogReceiver:
         record = self._native.poll_record()
         if record is None:
             return None
-        return LogRecord.from_native(record)
+        return LogRecord._from_native(record)
 
 
 def set_log_callback(

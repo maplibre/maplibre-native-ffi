@@ -20,7 +20,7 @@ class MaplibreStatus(Enum):
         return self.value
 
     @classmethod
-    def from_native(cls, native_code: int) -> "MaplibreStatus":
+    def _from_native(cls, native_code: int) -> "MaplibreStatus":
         """Return the Python status category for a C ABI status value."""
         for status in cls:
             if status.value == native_code:

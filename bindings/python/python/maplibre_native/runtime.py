@@ -86,7 +86,7 @@ class RenderingStats:
     total_draw_call_count: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "RenderingStats":
+    def _from_native(cls, raw: dict[str, object]) -> "RenderingStats":
         """Build rendering statistics from private native bridge values."""
         return cls(
             encoding_time=raw["encoding_time"],
@@ -107,13 +107,13 @@ class RenderFramePayload:
     stats: RenderingStats
 
     @classmethod
-    def from_runtime_payload(cls, payload: dict[str, object]) -> "RenderFramePayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderFramePayload":
         """Build a render-frame payload from RuntimeEvent.payload."""
         return cls(
             mode=RenderMode(payload["mode"]),
             needs_repaint=payload["needs_repaint"],
             placement_changed=payload["placement_changed"],
-            stats=RenderingStats.from_native(payload["stats"]),
+            stats=RenderingStats._from_native(payload["stats"]),
         )
 
 
@@ -124,7 +124,7 @@ class RenderMapPayload:
     mode: RenderMode
 
     @classmethod
-    def from_runtime_payload(cls, payload: dict[str, object]) -> "RenderMapPayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> "RenderMapPayload":
         """Build a render-map payload from RuntimeEvent.payload."""
         return cls(mode=RenderMode(payload["mode"]))
 
@@ -136,7 +136,7 @@ class StyleImageMissingPayload:
     image_id: str
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "StyleImageMissingPayload":
         """Build a style-image-missing payload from RuntimeEvent.payload."""
@@ -154,7 +154,7 @@ class TileId:
     canonical_y: int
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "TileId":
+    def _from_native(cls, raw: dict[str, object]) -> "TileId":
         """Build a tile identity from private native bridge values."""
         return cls(
             overscaled_z=raw["overscaled_z"],
@@ -174,11 +174,11 @@ class TileActionPayload:
     source_id: str
 
     @classmethod
-    def from_runtime_payload(cls, payload: dict[str, object]) -> "TileActionPayload":
+    def _from_runtime_payload(cls, payload: dict[str, object]) -> "TileActionPayload":
         """Build a tile-action payload from RuntimeEvent.payload."""
         return cls(
             operation=TileOperation(payload["operation"]),
-            tile_id=TileId.from_native(payload["tile_id"]),
+            tile_id=TileId._from_native(payload["tile_id"]),
             source_id=payload["source_id"],
         )
 
@@ -191,7 +191,7 @@ class UnknownRuntimeEventPayload:
     data: bytes
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "UnknownRuntimeEventPayload":
         """Build an unknown payload from RuntimeEvent.payload."""
@@ -217,7 +217,7 @@ class RuntimeEvent:
     payload: RuntimeEventPayload
 
     @classmethod
-    def from_native(
+    def _from_native(
         cls,
         raw: dict[str, Any],
         runtime: RuntimeHandle | None = None,
@@ -437,7 +437,7 @@ class RuntimeHandle(NativeHandleMixin):
         event = self._native.poll_event()
         if event is None:
             return None
-        return RuntimeEvent.from_native(event, runtime=self)
+        return RuntimeEvent._from_native(event, runtime=self)
 
     def create_map(self, options: MapOptions | None = None) -> MapHandle:
         """Create a map owned by this runtime."""
@@ -451,22 +451,22 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
     if kind == "none":
         return None
     if kind == "render_frame":
-        return RenderFramePayload.from_runtime_payload(payload)
+        return RenderFramePayload._from_runtime_payload(payload)
     if kind == "render_map":
-        return RenderMapPayload.from_runtime_payload(payload)
+        return RenderMapPayload._from_runtime_payload(payload)
     if kind == "style_image_missing":
-        return StyleImageMissingPayload.from_runtime_payload(payload)
+        return StyleImageMissingPayload._from_runtime_payload(payload)
     if kind == "tile_action":
-        return TileActionPayload.from_runtime_payload(payload)
+        return TileActionPayload._from_runtime_payload(payload)
     if kind == "offline_region_status":
-        return OfflineRegionStatusChanged.from_runtime_payload(payload)
+        return OfflineRegionStatusChanged._from_runtime_payload(payload)
     if kind == "offline_region_response_error":
-        return OfflineRegionResponseError.from_runtime_payload(payload)
+        return OfflineRegionResponseError._from_runtime_payload(payload)
     if kind == "offline_region_tile_count_limit":
-        return OfflineRegionTileCountLimitExceeded.from_runtime_payload(payload)
+        return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
     if kind == "offline_operation_completed":
-        return OfflineOperationCompleted.from_runtime_payload(payload)
-    return UnknownRuntimeEventPayload.from_runtime_payload(payload)
+        return OfflineOperationCompleted._from_runtime_payload(payload)
+    return UnknownRuntimeEventPayload._from_runtime_payload(payload)
 
 
 __all__ = [

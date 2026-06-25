@@ -245,6 +245,13 @@ impl RuntimeHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
+
+    fn state_for_operation(
+        &self,
+    ) -> PyResult<MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_runtime>>> {
+        self.operation_gate.ensure_open()?;
+        Ok(self.state())
+    }
 }
 
 impl RuntimeOperationGate {
@@ -272,6 +279,20 @@ impl RuntimeOperationGate {
         }
         state.active_detached_operation = true;
         Ok(RuntimeDetachedOperationGuard { gate: self })
+    }
+
+    fn ensure_open(&self) -> PyResult<()> {
+        let state = self
+            .state
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if state.closed {
+            return Err(invalid_state_error("runtime handle is closed"));
+        }
+        if state.closing {
+            return Err(invalid_state_error("runtime is closing"));
+        }
+        Ok(())
     }
 
     fn begin_close(&self) -> PyResult<bool> {
@@ -332,7 +353,7 @@ fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64
 where
     F: FnOnce(*mut sys::mln_runtime, *mut u64) -> i32,
 {
-    let state = runtime.state();
+    let state = runtime.state_for_operation()?;
     let mut operation_id = 0;
     maplibre_core::check(start(state.as_ptr(), &mut operation_id)).map_err(map_error)?;
     Ok(operation_id)
@@ -816,7 +837,7 @@ impl RuntimeHandle {
     }
 
     fn run_once(&self) -> PyResult<()> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         // SAFETY: The C API validates that the pointer is a live runtime handle
         // and that the call occurs on the runtime owner thread.
         maplibre_core::check(unsafe { sys::mln_runtime_run_once(state.as_ptr()) })
@@ -824,7 +845,7 @@ impl RuntimeHandle {
     }
 
     fn run_ambient_cache_operation_start(&self, operation: u32) -> PyResult<u64> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut operation_id = 0;
         // SAFETY: The C API validates the runtime handle, operation enum value,
         // owner-thread affinity, and writable operation_id pointer.
@@ -844,7 +865,7 @@ impl RuntimeHandle {
         definition: &Bound<'_, PyAny>,
         metadata: Vec<u8>,
     ) -> PyResult<u64> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let definition = offline_region_definition_from_wire(definition)?;
         let definition = maplibre_core::runtime::offline_region_definition_to_native(&definition)
             .map_err(map_error)?;
@@ -934,7 +955,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
@@ -959,7 +980,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Option<Py<PyAny>>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
         // SAFETY: The C API validates the runtime handle, operation ID, output pointer, and found pointer.
@@ -989,7 +1010,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
@@ -1014,7 +1035,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
@@ -1039,7 +1060,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
@@ -1064,7 +1085,7 @@ impl RuntimeHandle {
         py: Python<'_>,
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut status = empty_offline_region_status();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
@@ -1079,7 +1100,7 @@ impl RuntimeHandle {
     }
 
     fn offline_operation_discard(&self, operation_id: u64) -> PyResult<()> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         // SAFETY: The C API validates the runtime handle, owner-thread affinity,
         // and operation ID.
         maplibre_core::check(unsafe {
@@ -1103,10 +1124,11 @@ impl RuntimeHandle {
             max_pending_callbacks,
         ));
         let descriptor = replacement.descriptor();
-        let state = self.state();
-        // SAFETY: state owns or has released the runtime pointer. The C API
-        // validates that it is live. descriptor points to replacement state,
-        // which is retained after a successful native registration.
+        let state = self.state_for_operation()?;
+        // SAFETY: state owns a runtime pointer that passed the binding
+        // lifecycle gate. The C API validates that it is live. descriptor
+        // points to replacement state, which is retained after a successful
+        // native registration.
         maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_provider(state.as_ptr(), &descriptor)
         })
@@ -1136,7 +1158,7 @@ impl RuntimeHandle {
         let descriptor = replacement.descriptor();
         let _operation = self.operation_gate.begin_detached_operation()?;
         let runtime_address = {
-            let state = self.state();
+            let state = self.state_for_operation()?;
             let Some(runtime_address) = state.address() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
@@ -1145,11 +1167,12 @@ impl RuntimeHandle {
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
-        // SAFETY: state owns or has released the runtime pointer. The C API
-        // validates that it is live. descriptor points to replacement state,
-        // which is retained after a successful native registration. Replacement
-        // can wait for in-flight callbacks, so release the GIL while it runs
-        // without holding the Rust handle-state mutex.
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live.
+        // descriptor points to replacement state, which is retained after a
+        // successful native registration. Replacement can wait for in-flight
+        // callbacks, so release the GIL while it runs without holding the Rust
+        // handle-state mutex.
         let status = py.detach(move || {
             let descriptor = sys::mln_resource_transform {
                 size,
@@ -1174,16 +1197,16 @@ impl RuntimeHandle {
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
         let runtime_address = {
-            let state = self.state();
+            let state = self.state_for_operation()?;
             let Some(runtime_address) = state.address() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
             runtime_address
         };
-        // SAFETY: state owns or has released the runtime pointer. The C API
-        // validates that it is live and waits for in-flight callbacks before
-        // returning success, so release the GIL while it runs without holding
-        // the Rust handle-state mutex.
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live and waits
+        // for in-flight callbacks before returning success, so release the GIL
+        // while it runs without holding the Rust handle-state mutex.
         let status = py.detach(move || unsafe {
             sys::mln_runtime_clear_resource_transform(runtime_address as *mut sys::mln_runtime)
         });
@@ -1196,7 +1219,7 @@ impl RuntimeHandle {
     }
 
     fn poll_event(&self, py: Python<'_>) -> PyResult<Option<Py<PyAny>>> {
-        let state = self.state();
+        let state = self.state_for_operation()?;
         let mut event = maplibre_core::events::empty_runtime_event();
         let mut has_event = false;
         // SAFETY: The C API validates that the pointer is a live runtime handle.
@@ -6673,11 +6696,12 @@ fn create_map(
     let mut options = maplibre_core::MapOptions::new(width, height, scale_factor);
     options.mode = mode;
     let raw_options = maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
-    let runtime_state = runtime.state();
+    let runtime_state = runtime.state_for_operation()?;
     let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();
-    // SAFETY: runtime_state owns or has released the runtime pointer. The C API
-    // validates that it is live. raw_options is a fully initialized value, and
-    // out is a valid null-initialized out-pointer owned by this call.
+    // SAFETY: runtime_state owns a runtime pointer that passed the binding
+    // lifecycle gate. The C API validates that it is live. raw_options is a
+    // fully initialized value, and out is a valid null-initialized out-pointer
+    // owned by this call.
     maplibre_core::check(unsafe {
         sys::mln_map_create(runtime_state.as_ptr(), &raw_options, out.as_mut_ptr())
     })

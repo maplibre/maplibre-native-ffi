@@ -71,7 +71,7 @@ class StyleSourceInfo:
     attribution: str | None = None
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> "StyleSourceInfo":
         """Build source metadata from private native bridge values."""
         return cls(
             source_type=StyleSourceType(raw["source_type"]),
@@ -100,7 +100,7 @@ class StyleImageInfo:
     sdf: bool
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
+    def _from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
         """Build style image metadata from private native bridge values."""
         return cls(
             width=raw["width"],
@@ -121,9 +121,9 @@ class StyleImage:
     sdf: bool
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "StyleImage":
+    def _from_native(cls, raw: dict[str, Any]) -> "StyleImage":
         """Build a copied style image from private native bridge values."""
-        info = StyleImageInfo.from_native(raw["info"])
+        info = StyleImageInfo._from_native(raw["info"])
         return cls(
             image=PremultipliedRgba8Image(
                 TextureImageInfo(
@@ -171,7 +171,7 @@ class CustomGeometrySourceEvent:
     tile_id: CanonicalTileId
 
     @classmethod
-    def from_native(cls, raw: dict[str, Any]) -> "CustomGeometrySourceEvent":
+    def _from_native(cls, raw: dict[str, Any]) -> "CustomGeometrySourceEvent":
         """Build an event from private native values."""
         return cls(
             event_type=CustomGeometrySourceEventType(raw["kind"]),
@@ -219,7 +219,7 @@ class CustomGeometrySourceHandle(NativeHandleMixin):
         event = self._native.poll_event()
         if event is None:
             return None
-        return CustomGeometrySourceEvent.from_native(event)
+        return CustomGeometrySourceEvent._from_native(event)
 
 
 __all__ = [

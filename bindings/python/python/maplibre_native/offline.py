@@ -131,14 +131,14 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     def take_region(self) -> "OfflineRegionInfo":
         """Take a completed region snapshot result."""
-        return OfflineRegionInfo.from_native(
+        return OfflineRegionInfo._from_native(
             self._take(self._runtime._native.offline_region_create_take_result)  # noqa: SLF001
         )
 
     def take_optional_region(self) -> "OfflineRegionInfo | None":
         """Take a completed optional region snapshot result."""
         raw = self._take(self._runtime._native.offline_region_get_take_result)  # noqa: SLF001
-        return OfflineRegionInfo.from_native(raw) if raw is not None else None
+        return OfflineRegionInfo._from_native(raw) if raw is not None else None
 
     def take_region_list(
         self,
@@ -152,12 +152,12 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
             else self._runtime._native.offline_regions_list_take_result  # noqa: SLF001
         )
         return tuple(
-            OfflineRegionInfo.from_native(region) for region in self._take(take)
+            OfflineRegionInfo._from_native(region) for region in self._take(take)
         )
 
     def take_updated_region(self) -> "OfflineRegionInfo":
         """Take a completed updated region snapshot result."""
-        return OfflineRegionInfo.from_native(
+        return OfflineRegionInfo._from_native(
             self._take(
                 self._runtime._native.offline_region_update_metadata_take_result  # noqa: SLF001
             )
@@ -165,7 +165,7 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     def take_status(self) -> "OfflineRegionStatus":
         """Take a completed offline region status result."""
-        return OfflineRegionStatus.from_native(
+        return OfflineRegionStatus._from_native(
             self._take(self._runtime._native.offline_region_get_status_take_result)  # noqa: SLF001
         )
 
@@ -185,7 +185,7 @@ class OfflineRegionStatus:
     complete: bool
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "OfflineRegionStatus":
+    def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionStatus":
         """Build a status snapshot from private native bridge values."""
         return cls(
             download_state=OfflineRegionDownloadState(raw["download_state"]),
@@ -250,7 +250,7 @@ class OfflineRegionInfo:
     metadata: bytes
 
     @classmethod
-    def from_native(cls, raw: dict[str, object]) -> "OfflineRegionInfo":
+    def _from_native(cls, raw: dict[str, object]) -> "OfflineRegionInfo":
         """Build region metadata from private native bridge values."""
         return cls(
             id=raw["id"],
@@ -267,13 +267,13 @@ class OfflineRegionStatusChanged:
     status: OfflineRegionStatus
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionStatusChanged":
         """Build a status-change payload from RuntimeEvent.payload."""
         return cls(
             region_id=_payload_int(payload, "region_id"),
-            status=OfflineRegionStatus.from_native(payload["status"]),
+            status=OfflineRegionStatus._from_native(payload["status"]),
         )
 
 
@@ -285,7 +285,7 @@ class OfflineRegionResponseError:
     reason: ResourceErrorReason
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionResponseError":
         """Build a response-error payload from RuntimeEvent.payload."""
@@ -305,7 +305,7 @@ class OfflineRegionTileCountLimitExceeded:
     limit: int
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineRegionTileCountLimitExceeded":
         """Build a tile-count-limit payload from RuntimeEvent.payload."""
@@ -326,7 +326,7 @@ class OfflineOperationCompleted:
     found: bool
 
     @classmethod
-    def from_runtime_payload(
+    def _from_runtime_payload(
         cls, payload: dict[str, object]
     ) -> "OfflineOperationCompleted":
         """Build a completion payload from RuntimeEvent.payload."""
