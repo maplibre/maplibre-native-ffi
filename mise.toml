@@ -44,7 +44,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:pkg-config" = { version = "0.29.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
+"conda:pkg-config" = { version = "0.29.2", os = ["linux"] } # Linux CMake uses pkg-config for libuv
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
 # Node.js ecosystem
@@ -61,12 +61,15 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:astral-sh/uv" = "0.11.11"
 
 # Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["macos"] }
+"core:swift" = { version = "6.3.1", os = ["linux", "macos"] }
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy" }
-"core:zig" = "0.16.0"
+"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
+"core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
+# Zig's native Windows ARM64 0.16.0 build crashes while loading build.zig, so
+# Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
+"http:zig" = { version = "0.16.0", os = ["windows/arm64"], url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip", checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e", bin_path = "zig-x86_64-windows-0.16.0" }
 "core:go" = "1.26.3"
 "core:dotnet" = "10.0.203"
 
@@ -83,7 +86,6 @@ MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
-PKG_CONFIG_PATH = "{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
 
 [hooks]

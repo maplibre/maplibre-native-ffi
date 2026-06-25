@@ -16,14 +16,8 @@ pub const RenderBackend = enum {
     vulkan,
 };
 
-const ArtifactShape = enum {
-    shared_private,
-    static_monolithic,
-};
-
 const NativeArtifactConfig = struct {
     render_backend: []const u8 = "",
-    artifact_shape: []const u8 = "",
     library_path: []const u8 = "",
     import_library_path: []const u8 = "",
     include_dirs: []const []const u8 = &.{},
@@ -56,10 +50,8 @@ fn parseRenderBackend(value: []const u8) RenderBackend {
         std.debug.panic("unsupported render backend in native artifact config: {s}", .{value});
 }
 
-fn parseArtifactShape(value: []const u8) ArtifactShape {
-    if (std.mem.eql(u8, value, "shared-private")) return .shared_private;
-    if (std.mem.eql(u8, value, "static-monolithic")) return .static_monolithic;
-    std.debug.panic("unsupported artifact shape in native artifact config: {s}", .{value});
+fn usesStaticMonolithicLink(config: NativeArtifactConfig) bool {
+    return std.ascii.endsWithIgnoreCase(config.library_path, ".a");
 }
 
 fn maybeNativeArtifactConfigPath(b: *std.Build) ?std.Build.LazyPath {
@@ -120,8 +112,6 @@ fn parseNativeArtifactConfig(b: *std.Build, config_path: std.Build.LazyPath) Nat
 
         if (std.mem.eql(u8, key, "render_backend")) {
             config.render_backend = value;
-        } else if (std.mem.eql(u8, key, "artifact_shape")) {
-            config.artifact_shape = value;
         } else if (std.mem.eql(u8, key, "library_path")) {
             config.library_path = value;
         } else if (std.mem.eql(u8, key, "import_library_path")) {
@@ -141,10 +131,9 @@ fn parseNativeArtifactConfig(b: *std.Build, config_path: std.Build.LazyPath) Nat
         }
     }
 
-    if (config.render_backend.len == 0 or config.artifact_shape.len == 0 or config.library_path.len == 0) {
+    if (config.render_backend.len == 0 or config.library_path.len == 0) {
         std.debug.panic("native artifact config is incomplete: {s}", .{config_path.getPath(b)});
     }
-    if (config.import_library_path.len == 0) config.import_library_path = config.library_path;
     return config;
 }
 
@@ -218,6 +207,17 @@ pub const CMacro = struct {
 
 pub fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const CMacro {
     if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
+    if (target.result.cpu.arch == .aarch64) {
+        return &.{
+            .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+            // Zig translate-c does not define __clang__, so Windows ARM64 UCRT
+            // wchar.h selects NEON intrinsics without importing arm_neon.h.
+            .{ .name = "_M_CEE", .value = "1" },
+            .{ .name = "__clrcall", .value = "__cdecl" },
+            .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+            .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+        };
+    }
     return &.{
         .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
         .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
@@ -473,28 +473,20 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     const dependency_library_dirs = lazyPathsFromStrings(b, config.library_dirs);
     const link_dirs = lazyPathsFromStrings(b, config.link_dirs);
     const runtime_library_dirs = lazyPathsFromStrings(b, config.runtime_library_dirs);
-    switch (parseArtifactShape(config.artifact_shape)) {
-        .shared_private => {
-            if (options.target.result.os.tag == .windows) {
-                module_.addObjectFile(lazyPath(config.import_library_path));
-            } else {
-                addLibraryPaths(module_, link_dirs);
-                addRPaths(module_, runtime_library_dirs);
-                module_.linkSystemLibrary("maplibre-native-c", .{});
-            }
-        },
-        .static_monolithic => {
-            addLibraryPaths(module_, link_dirs);
-            linkSystemLibraries(module_, config.link_libraries);
-            if (options.target.result.os.tag == .ios) {
-                if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
-                    if (system_root.len != 0) {
-                        module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
-                    }
-                }
-            }
-            linkFrameworks(module_, config.frameworks);
-        },
+    if (usesStaticMonolithicLink(config)) {
+        addLibraryPaths(module_, link_dirs);
+        linkSystemLibraries(module_, config.link_libraries);
+        if (options.target.result.os.tag == .ios) {
+            const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT").?;
+            module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+        }
+        linkFrameworks(module_, config.frameworks);
+    } else if (options.target.result.os.tag == .windows) {
+        module_.addObjectFile(lazyPath(config.import_library_path));
+    } else {
+        addLibraryPaths(module_, link_dirs);
+        addRPaths(module_, runtime_library_dirs);
+        module_.linkSystemLibrary("maplibre-native-c", .{});
     }
     linkRenderBackend(b, module_, .{
         .target = options.target,

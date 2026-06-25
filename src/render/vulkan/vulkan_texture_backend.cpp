@@ -357,7 +357,7 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
 
   auto buffer_allocation = mbgl::vulkan::BufferAllocation{allocator};
   if (!buffer_allocation.create(allocation_info, buffer_info)) {
-    return {};
+    throw std::runtime_error("Vulkan readback buffer allocation failed");
   }
 
   // VulkanTextureBackend always constructs a Vulkan renderer context.
@@ -423,7 +423,7 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
         allocator, buffer_allocation.allocation, &buffer_allocation.mappedBuffer
       ) != VK_SUCCESS
     ) {
-      return {};
+      throw std::runtime_error("Vulkan readback host memory map failed");
     }
     std::memcpy(image.data.get(), buffer_allocation.mappedBuffer, image_size);
     vmaUnmapMemory(allocator, buffer_allocation.allocation);

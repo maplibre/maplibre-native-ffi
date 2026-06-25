@@ -2,6 +2,7 @@
 MLN_FFI_RENDER_BACKEND = "opengl"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/ohos-arm64-egl"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-linux-ohos"
+MLN_FFI_SYSTEM_ROOT = "{{env.OHOS_SDK_NATIVE}}/sysroot"
 OHOS_SDK_NATIVE = { required = true }
 MLN_FFI_CMAKE_ARGS = """
 -DCMAKE_TOOLCHAIN_FILE={{env.OHOS_SDK_NATIVE}}/build/cmake/ohos.toolchain.cmake
@@ -10,5 +11,9 @@ MLN_FFI_CMAKE_ARGS = """
 -DMLN_FFI_ENABLE_CLANG_TIDY=OFF
 """
 CMAKE_PREFIX_PATH = ""
-PKG_CONFIG_PATH = ""
-LIBCLANG_PATH = ""
+CARGO_BUILD_TARGET = "aarch64-unknown-linux-ohos"
+LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
+BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos = "--target=aarch64-linux-ohos --sysroot={{env.OHOS_SDK_NATIVE}}/sysroot -I{{env.OHOS_SDK_NATIVE}}/sysroot/usr/include/aarch64-linux-ohos"
+CC_aarch64_unknown_linux_ohos = "{{env.OHOS_SDK_NATIVE}}/llvm/bin/clang --target=aarch64-linux-ohos --sysroot={{env.OHOS_SDK_NATIVE}}/sysroot"
+CXX_aarch64_unknown_linux_ohos = "{{env.OHOS_SDK_NATIVE}}/llvm/bin/clang++ --target=aarch64-linux-ohos --sysroot={{env.OHOS_SDK_NATIVE}}/sysroot"
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER = "{{env.OHOS_SDK_NATIVE}}/llvm/bin/clang"

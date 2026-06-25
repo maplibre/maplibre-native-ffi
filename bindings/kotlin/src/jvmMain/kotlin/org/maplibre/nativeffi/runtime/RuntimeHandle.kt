@@ -247,7 +247,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       previous = resourceProviderState
       resourceProviderState = replacement
     } catch (error: Throwable) {
-      replacement.close()
+      closeAndSuppress(error, replacement)
       throw error
     }
     closeQuietly(previous)
@@ -263,7 +263,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       previous = resourceTransformState
       resourceTransformState = replacement
     } catch (error: Throwable) {
-      replacement.close()
+      closeAndSuppress(error, replacement)
       throw error
     }
     closeQuietly(previous)
@@ -378,4 +378,12 @@ private fun closeQuietly(closeable: AutoCloseable?) {
   try {
     closeable?.close()
   } catch (_: RuntimeException) {}
+}
+
+private fun closeAndSuppress(error: Throwable, closeable: AutoCloseable?) {
+  try {
+    closeable?.close()
+  } catch (cleanup: Throwable) {
+    error.addSuppressed(cleanup)
+  }
 }

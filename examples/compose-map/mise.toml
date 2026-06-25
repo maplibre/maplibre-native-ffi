@@ -1,0 +1,7 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :examples:compose-map:build"
+
+[tasks.run]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :examples:compose-map:run"

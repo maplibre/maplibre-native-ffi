@@ -3,21 +3,44 @@ use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
+
 const LIBRARY_NAME: &str = "maplibre-native-c";
+
+#[derive(Deserialize)]
+struct Artifact {
+    include_dirs: Vec<PathBuf>,
+    import_library_path: PathBuf,
+    rpaths: Vec<PathBuf>,
+    supports_linker_rpath: bool,
+}
 
 fn main() -> Result<(), Box<dyn Error>> {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let repo_root = repo_root_from_manifest_dir(&manifest_dir)?;
     let header = repo_root.join("include/maplibre_native_c.h");
 
-    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
-    print_rerun_if_pkg_config_file_changed();
-
-    let library = pkg_config::Config::new().probe(LIBRARY_NAME).map_err(|error| {
-        io::Error::other(format!(
-            "could not find {LIBRARY_NAME} with pkg-config; run through mise or add the generated maplibre-native-c.pc directory to PKG_CONFIG_PATH: {error}"
-        ))
+    println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
+    let artifact = load_artifact()?;
+    let import_library_dir = artifact.import_library_path.parent().ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "native metadata import_library_path has no parent directory: {}",
+                artifact.import_library_path.display()
+            ),
+        )
     })?;
+    println!(
+        "cargo:rustc-link-search=native={}",
+        import_library_dir.display()
+    );
+    println!("cargo:rustc-link-lib={LIBRARY_NAME}");
+    if artifact.supports_linker_rpath {
+        for rpath in &artifact.rpaths {
+            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
+        }
+    }
 
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
@@ -27,7 +50,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .header(header.display().to_string())
         .clang_arg("-xc")
         .clang_arg("-std=c23");
-    for include_path in &library.include_paths {
+    for include_path in &artifact.include_dirs {
         bindings = bindings.clang_arg(format!("-I{}", include_path.display()));
     }
     let bindings = bindings
@@ -43,6 +66,38 @@ fn main() -> Result<(), Box<dyn Error>> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+fn load_artifact() -> Result<Artifact, Box<dyn Error>> {
+    let build_dir = env::var_os("MLN_FFI_BUILD_DIR").ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "MLN_FFI_BUILD_DIR is required; run Rust binding builds through mise",
+        )
+    })?;
+    let metadata_path = PathBuf::from(build_dir).join(format!("{LIBRARY_NAME}.dev.json"));
+    println!("cargo:rerun-if-changed={}", metadata_path.display());
+
+    let metadata = std::fs::read_to_string(&metadata_path).map_err(|error| {
+        io::Error::new(
+            error.kind(),
+            format!(
+                "failed to read native artifact metadata at {}; run `mise run build` first: {error}",
+                metadata_path.display()
+            ),
+        )
+    })?;
+    let artifact = serde_json::from_str::<Artifact>(&metadata).map_err(|error| {
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "invalid native artifact metadata at {}: {error}",
+                metadata_path.display()
+            ),
+        )
+    })?;
+
+    Ok(artifact)
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
@@ -70,18 +125,5 @@ fn print_rerun_if_changed(path: &Path) {
     };
     for entry in entries.flatten() {
         print_rerun_if_changed(&entry.path());
-    }
-}
-
-fn print_rerun_if_pkg_config_file_changed() {
-    let Some(paths) = env::var_os("PKG_CONFIG_PATH") else {
-        return;
-    };
-
-    for path in env::split_paths(&paths) {
-        let pc_file = path.join(format!("{LIBRARY_NAME}.pc"));
-        if pc_file.is_file() {
-            println!("cargo:rerun-if-changed={}", pc_file.display());
-        }
     }
 }

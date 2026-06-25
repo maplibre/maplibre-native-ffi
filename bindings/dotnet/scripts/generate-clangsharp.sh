@@ -28,14 +28,9 @@ if [[ -n "$rid" ]]; then
 fi
 
 clang_include=""
-if command -v clang >/dev/null 2>&1; then
-  resource_dir="$(clang -print-resource-dir 2>/dev/null || true)"
-  if [[ -n "$resource_dir" && -d "$resource_dir/include" ]]; then
-    clang_include="$resource_dir/include"
-  fi
-fi
-if [[ -z "$clang_include" && -d /Library/Developer/CommandLineTools/usr/lib/clang/21/include ]]; then
-  clang_include=/Library/Developer/CommandLineTools/usr/lib/clang/21/include
+resource_dir="$(clang -print-resource-dir)"
+if [[ -d "$resource_dir/include" ]]; then
+  clang_include="$resource_dir/include"
 fi
 
 headers=(

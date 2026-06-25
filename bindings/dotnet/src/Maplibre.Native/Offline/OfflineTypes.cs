@@ -37,9 +37,10 @@ public sealed record OfflineRegionInfo
 
     public OfflineRegionInfo(long Id, OfflineRegionDefinition Definition, byte[] Metadata)
     {
+        ArgumentNullException.ThrowIfNull(Metadata);
         this.Id = Id;
         this.Definition = Definition;
-        metadata = Metadata is null ? [] : (byte[])Metadata.Clone();
+        metadata = (byte[])Metadata.Clone();
     }
 
     public long Id { get; }

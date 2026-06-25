@@ -1,6 +1,7 @@
 use maplibre_native_sys as sys;
 
 use crate::enums::{ConstrainMode, MapMode, NorthOrientation, TileLodMode, ViewportMode};
+use crate::error::Result;
 use crate::values::{EdgeInsets, edge_insets_from_native, edge_insets_to_native};
 
 /// Options used when creating a map.
@@ -23,15 +24,15 @@ impl MapOptions {
         }
     }
 
-    fn to_native(&self) -> sys::mln_map_options {
+    fn to_native(&self) -> Result<sys::mln_map_options> {
         // SAFETY: Default constructor takes no arguments and initializes size
         // and default values for this C ABI version.
         let mut raw = unsafe { sys::mln_map_options_default() };
         raw.width = self.width;
         raw.height = self.height;
         raw.scale_factor = self.scale_factor;
-        raw.map_mode = self.mode.as_raw();
-        raw
+        raw.map_mode = self.mode.raw_for_set()?;
+        Ok(raw)
     }
 }
 
@@ -44,7 +45,7 @@ impl Default for MapOptions {
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            mode: MapMode::from_raw(raw.map_mode).unwrap_or(MapMode::Continuous),
+            mode: MapMode::from_raw(raw.map_mode),
         }
     }
 }
@@ -180,7 +181,7 @@ fn maybe_enum<T>(fields: u32, flag: u32, raw: u32, convert: impl FnOnce(u32) -> 
     has(fields, flag).then(|| convert(raw))
 }
 
-pub fn map_options_to_native(options: &MapOptions) -> sys::mln_map_options {
+pub fn map_options_to_native(options: &MapOptions) -> Result<sys::mln_map_options> {
     options.to_native()
 }
 
@@ -204,11 +205,11 @@ pub fn map_tile_options_from_native(raw: sys::mln_map_tile_options) -> MapTileOp
 
 #[doc(hidden)]
 pub trait MapOptionsNativeExt {
-    fn to_native(&self) -> sys::mln_map_options;
+    fn to_native(&self) -> Result<sys::mln_map_options>;
 }
 
 impl MapOptionsNativeExt for MapOptions {
-    fn to_native(&self) -> sys::mln_map_options {
+    fn to_native(&self) -> Result<sys::mln_map_options> {
         map_options_to_native(self)
     }
 }
@@ -254,13 +255,20 @@ mod tests {
     fn map_options_materializes_defaults_and_fields() {
         let mut options = MapOptions::new(800, 600, 2.0);
         options.mode = MapMode::Static;
-        let raw = map_options_to_native(&options);
+        let raw = map_options_to_native(&options).unwrap();
 
         assert_eq!(raw.size, std::mem::size_of::<sys::mln_map_options>() as u32);
         assert_eq!(raw.width, 800);
         assert_eq!(raw.height, 600);
         assert_eq!(raw.scale_factor, 2.0);
         assert_eq!(raw.map_mode, sys::MLN_MAP_MODE_STATIC);
+    }
+
+    #[test]
+    fn map_options_rejects_unknown_mode_for_native() {
+        let mut options = MapOptions::new(800, 600, 2.0);
+        options.mode = MapMode::Unknown(999_030);
+        assert!(map_options_to_native(&options).is_err());
     }
 
     #[test]

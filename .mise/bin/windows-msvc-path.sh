@@ -17,8 +17,6 @@ load_windows_msvc_environment() {
   if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" ]]; then
     return 0
   fi
-  command -v cmd.exe >/dev/null
-  command -v cygpath >/dev/null
 
   local original_path="$PATH"
   original_path="$(cygpath -u -p "$original_path")"
@@ -42,12 +40,14 @@ load_windows_msvc_environment() {
   fi
 
   local vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
+  : "${MLN_FFI_MSVC_HOST_ARCH:?MLN_FFI_MSVC_HOST_ARCH is required for Windows MSVC setup}"
+  : "${MLN_FFI_MSVC_TARGET_ARCH:?MLN_FFI_MSVC_TARGET_ARCH is required for Windows MSVC setup}"
   local vs_dev_loader
   vs_dev_loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
   cat > "$vs_dev_loader" <<EOF
 @echo off
 set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem;%SystemRoot%\\System32\\WindowsPowerShell\\v1.0"
-call "$vs_dev_cmd" -arch=x64 -host_arch=x64 >nul
+call "$vs_dev_cmd" -arch=$MLN_FFI_MSVC_TARGET_ARCH -host_arch=$MLN_FFI_MSVC_HOST_ARCH >nul
 set
 EOF
 
@@ -98,12 +98,11 @@ normalize_windows_msvc_path() {
     echo "VCToolsInstallDir is required after Visual Studio environment setup" >&2
     return 1
   }
-  command -v cygpath >/dev/null
 
-  local host_arch="${VSCMD_ARG_HOST_ARCH:-x64}"
-  local target_arch="${VSCMD_ARG_TGT_ARCH:-x64}"
+  : "${MLN_FFI_MSVC_HOST_ARCH:?MLN_FFI_MSVC_HOST_ARCH is required for Windows MSVC setup}"
+  : "${MLN_FFI_MSVC_TARGET_ARCH:?MLN_FFI_MSVC_TARGET_ARCH is required for Windows MSVC setup}"
   local msvc_bin
-  msvc_bin="$(cygpath -u "${vc_tools_install_dir%\\}\\bin\\Host${host_arch^}\\${target_arch}")"
+  msvc_bin="$(cygpath -u "${vc_tools_install_dir%\\}\\bin\\Host${MLN_FFI_MSVC_HOST_ARCH^}\\${MLN_FFI_MSVC_TARGET_ARCH}")"
   if [[ ! -x "$msvc_bin/link.exe" ]]; then
     echo "MSVC link.exe was not found at $msvc_bin/link.exe" >&2
     return 1
@@ -129,5 +128,14 @@ normalize_windows_msvc_path() {
   export PATH="${dependency_path:+$dependency_path:}$msvc_bin${rest_path:+:$rest_path}"
 }
 
-load_windows_msvc_environment
-normalize_windows_msvc_path
+setup_windows_msvc_path() {
+  if [[ -z "${MLN_FFI_MSVC_HOST_ARCH:-}" && -z "${MLN_FFI_MSVC_TARGET_ARCH:-}" ]]; then
+    return 0
+  fi
+
+  : "${MLN_FFI_MSVC_HOST_ARCH:?MLN_FFI_MSVC_HOST_ARCH is required for Windows MSVC setup}"
+  : "${MLN_FFI_MSVC_TARGET_ARCH:?MLN_FFI_MSVC_TARGET_ARCH is required for Windows MSVC setup}"
+  load_windows_msvc_environment && normalize_windows_msvc_path
+}
+
+setup_windows_msvc_path

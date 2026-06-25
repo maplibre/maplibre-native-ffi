@@ -81,14 +81,20 @@ class CiConfig(StrictManifestModel):
     build: NonEmptyString | None = None
     test: NonEmptyString | None = None
     run: NonEmptyString | None = None
+    check: NonEmptyString | None = None
 
     @model_validator(mode="after")
     def require_action(self) -> "CiConfig":
-        if self.build is None and self.test is None and self.run is None:
+        if (
+            self.build is None
+            and self.test is None
+            and self.run is None
+            and self.check is None
+        ):
             raise ValueError("[ci] must contain at least one action")
         return self
 
-    @field_validator("build", "test", "run")
+    @field_validator("build", "test", "run", "check")
     @classmethod
     def require_task_name(cls, task: str | None) -> str | None:
         if task is not None and not TASK_PATTERN.fullmatch(task):

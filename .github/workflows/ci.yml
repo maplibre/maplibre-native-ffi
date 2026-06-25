@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -28,7 +28,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -40,7 +40,7 @@ jobs:
     env:
       MISE_ENV: linux-arm64-egl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -50,9 +50,11 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
       - run: mise run //bindings/rust:test
+      - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-arm64-vulkan:
@@ -62,7 +64,7 @@ jobs:
     env:
       MISE_ENV: linux-arm64-vulkan
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -72,9 +74,11 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
       - run: mise run //bindings/rust:test
+      - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-x64-egl:
@@ -84,53 +88,7 @@ jobs:
     env:
       MISE_ENV: linux-x64-egl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
-      - run: mise run configure
-      - run: mise run test
-      - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/kotlin:nativeTest
-      - run: mise run //bindings/node:ci
-      - run: mise run //bindings/rust:test
-      - run: mise run //bindings/zig:test
-      - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
-      - run: mise run //examples/zig-map:build
-      - run: mise run //examples/zig-readback:run
-  variant-linux-x64-vulkan:
-    name: variant / linux-x64-vulkan
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    env:
-      MISE_ENV: linux-x64-vulkan
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
-        with:
-          persist-credentials: false
-      - uses: ./.github/actions/setup-ci-deps
-      - run: mise run configure
-      - run: mise run test
-      - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/kotlin:nativeTest
-      - run: mise run //bindings/node:ci
-      - run: mise run //bindings/rust:test
-      - run: mise run //bindings/zig:test
-      - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
-      - run: mise run //examples/zig-map:build
-      - run: mise run //examples/zig-readback:run
-  variant-macos-arm64-metal:
-    name: variant / macos-arm64-metal
-    runs-on: macos-26
-    timeout-minutes: 120
-    env:
-      MISE_ENV: macos-arm64-metal
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -143,8 +101,59 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
+      - run: mise run //examples/zig-readback:run
+  variant-linux-x64-vulkan:
+    name: variant / linux-x64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: linux-x64-vulkan
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run test
+      - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/node:ci
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/swift:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
+      - run: mise run //examples/lwjgl-map:build
+      - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
+      - run: mise run //examples/zig-readback:run
+  variant-macos-arm64-metal:
+    name: variant / macos-arm64-metal
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      MISE_ENV: macos-arm64-metal
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run test
+      - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/node:ci
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/swift:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
+      - run: mise run //examples/lwjgl-map:build
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/swift-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
@@ -155,7 +164,7 @@ jobs:
     env:
       MISE_ENV: macos-arm64-vulkan
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -168,8 +177,9 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-egl:
@@ -179,7 +189,7 @@ jobs:
     env:
       MISE_ENV: macos-arm64-egl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -192,6 +202,7 @@ jobs:
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
@@ -202,7 +213,7 @@ jobs:
     env:
       MISE_ENV: android-arm64-egl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -217,7 +228,36 @@ jobs:
     env:
       MISE_ENV: android-arm64-vulkan
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
+  variant-android-x64-egl:
+    name: variant / android-x64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-x64-egl
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+      - run: mise run //bindings/kotlin:androidBuild
+      - run: mise run //examples/android-map:build
+  variant-android-x64-vulkan:
+    name: variant / android-x64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-x64-vulkan
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -231,7 +271,7 @@ jobs:
     env:
       MISE_ENV: ios-arm64-metal
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -246,7 +286,7 @@ jobs:
     env:
       MISE_ENV: ios-simulator-arm64-metal
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -262,12 +302,13 @@ jobs:
     env:
       MISE_ENV: ohos-arm64-egl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/rust:build
   variant-ohos-arm64-vulkan:
     name: variant / ohos-arm64-vulkan
     runs-on: ubuntu-latest
@@ -275,12 +316,13 @@ jobs:
     env:
       MISE_ENV: ohos-arm64-vulkan
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run //bindings/rust:build
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
@@ -288,7 +330,7 @@ jobs:
     env:
       MISE_ENV: windows-x64-vulkan
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -299,8 +341,9 @@ jobs:
       - run: mise run //bindings/node:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-windows-x64-wgl:
@@ -310,7 +353,7 @@ jobs:
     env:
       MISE_ENV: windows-x64-wgl
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
@@ -321,8 +364,55 @@ jobs:
       - run: mise run //bindings/node:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:test
+      - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
+      - run: mise run //examples/zig-readback:run
+  variant-windows-arm64-vulkan:
+    name: variant / windows-arm64-vulkan
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      MISE_ENV: windows-arm64-vulkan
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run test
+      - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/node:ci
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
+      - run: mise run //examples/lwjgl-map:build
+      - run: mise run //examples/rust-map:check
+      - run: mise run //examples/zig-map:build
+      - run: mise run //examples/zig-readback:run
+  variant-windows-arm64-wgl:
+    name: variant / windows-arm64-wgl
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    env:
+      MISE_ENV: windows-arm64-wgl
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run test
+      - run: mise run //bindings/dotnet:test
+      - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/node:ci
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/compose-map:build
+      - run: mise run //examples/lwjgl-map:build
+      - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   required:
@@ -342,12 +432,16 @@ jobs:
       - variant-macos-arm64-egl
       - variant-android-arm64-egl
       - variant-android-arm64-vulkan
+      - variant-android-x64-egl
+      - variant-android-x64-vulkan
       - variant-ios-arm64-metal
       - variant-ios-simulator-arm64-metal
       - variant-ohos-arm64-egl
       - variant-ohos-arm64-vulkan
       - variant-windows-x64-vulkan
       - variant-windows-x64-wgl
+      - variant-windows-arm64-vulkan
+      - variant-windows-arm64-wgl
     steps:
       - name: Fail if required jobs failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}

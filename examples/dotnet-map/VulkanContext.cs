@@ -127,12 +127,8 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         {
             return;
         }
-
         if (!HasWaylandDisplay())
         {
-            Console.Error.WriteLine(
-                "WAYLAND_DISPLAY is not set; Linux runtime support for this example targets Wayland."
-            );
             return;
         }
 

@@ -22,6 +22,8 @@ pub const AppError = error{
 pub const Viewport = struct {
     logical_width: u32,
     logical_height: u32,
+    window_width: u32,
+    window_height: u32,
     physical_width: u32,
     physical_height: u32,
     scale_factor: f64,

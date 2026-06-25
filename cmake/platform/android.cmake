@@ -35,7 +35,7 @@ function(mln_configure_android_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE MapLibreNative::Base::jni.hpp mbgl-vendor-icu android atomic)
+    PRIVATE MapLibreNative::Base::jni.hpp mbgl-vendor-icu android atomic z)
 
   mln_link_rust_platform(${target})
 endfunction()

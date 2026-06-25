@@ -27,16 +27,14 @@ before implementing or reviewing a binding.
 
 ## Getting Set Up
 
-Install the platform toolchain:
+Install the platform prerequisites:
 
 - On macOS, install the Xcode version listed in `.xcode-version`, or a recent
   compatible Xcode. Run the pinned
   [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
   switch to the repository version.
-- On Fedora, install the `C Development Tools and Libraries` package group with
-  `sudo dnf group install c-development`.
-- On Debian or Ubuntu, install the C and C++ compiler packages with
-  `sudo apt install build-essential`.
+- On Linux, the C and C++ compilers come from Pixi. Ensure graphics driver
+  packages are installed for the render backend you use.
 - On Windows, install a recent version of Visual Studio Community (or Build
   Tools) 2022 with the `Desktop development with C++` workload and
   `Git for Windows`. We rely on Git Bash to run project scripts.
@@ -91,7 +89,7 @@ Project-managed dependency state keeps builds reproducible. Mise supplies
 repository tools, owns task execution, and exports the environment consumed by
 build systems, bindings, and examples. Pixi currently supplies desktop native
 libraries from [`conda-forge`](https://conda-forge.org/). Platform SDKs such as
-Xcode, Visual Studio, Linux compiler packages, and the Android SDK remain host
+Xcode, Visual Studio, Linux graphics drivers, and the Android SDK remain host
 toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
@@ -100,10 +98,11 @@ Use `mise run ...` for common workflows: build, test, check, fix, and examples.
 Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
 and pnpm.
 
-[`pixi`](https://pixi.sh/) installs the desktop native libraries used by local
-builds. CMake, Ninja, pkg-config, shader tools, Doxygen, and clang-tidy are
-pinned by mise. Host platform toolchains provide C and C++ compilers, and CMake
-builds the native C/C++ library.
+[`pixi`](https://pixi.sh/) installs the Linux C and C++ compilers and desktop
+native libraries used by local builds. CMake, Ninja, pkg-config, shader tools,
+Doxygen, and clang-tidy are pinned by mise. Host platform toolchains provide
+Apple, Windows, Android, and graphics-driver integration, and CMake builds the
+native C/C++ library.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
