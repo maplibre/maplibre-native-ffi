@@ -19,6 +19,12 @@ from .query import (
     SourceFeatureQueryOptions,
 )
 
+_DETACHED_RENDER_SESSION_HANDLE_CREATE_KEY = object()
+_RENDER_SESSION_HANDLE_CREATE_KEY = object()
+_METAL_FRAME_HANDLE_CREATE_KEY = object()
+_VULKAN_FRAME_HANDLE_CREATE_KEY = object()
+_OPENGL_FRAME_HANDLE_CREATE_KEY = object()
+
 
 class RenderBackend(IntFlag):
     """Render backend support bits reported by the native library."""
@@ -380,8 +386,15 @@ class DetachedRenderSessionHandle(NativeHandleMixin):
 
     _handle_name = "DetachedRenderSessionHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _DETACHED_RENDER_SESSION_HANDLE_CREATE_KEY:
+            msg = "DetachedRenderSessionHandle instances are created by RenderSessionHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "DetachedRenderSessionHandle":
+        return cls(native, _create_key=_DETACHED_RENDER_SESSION_HANDLE_CREATE_KEY)
 
 
 class RenderSessionHandle(NativeHandleMixin):
@@ -389,9 +402,22 @@ class RenderSessionHandle(NativeHandleMixin):
 
     _handle_name = "RenderSessionHandle"
 
-    def __init__(self, native: Any, map_handle: MapHandle) -> None:
+    def __init__(
+        self,
+        native: Any,
+        map_handle: MapHandle,
+        *,
+        _create_key: object | None = None,
+    ) -> None:
+        if _create_key is not _RENDER_SESSION_HANDLE_CREATE_KEY:
+            msg = "RenderSessionHandle instances are created by MapHandle"
+            raise TypeError(msg)
         self._native = native
         self._map = map_handle
+
+    @classmethod
+    def _from_native(cls, native: Any, map_handle: MapHandle) -> "RenderSessionHandle":
+        return cls(native, map_handle, _create_key=_RENDER_SESSION_HANDLE_CREATE_KEY)
 
     @property
     def detached(self) -> bool:
@@ -408,7 +434,7 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle."""
-        return DetachedRenderSessionHandle(self._native.detach())
+        return DetachedRenderSessionHandle._from_native(self._native.detach())  # noqa: SLF001
 
     def reduce_memory_use(self) -> None:
         """Ask the session renderer to release cached resources where possible."""
@@ -440,19 +466,19 @@ class RenderSessionHandle(NativeHandleMixin):
 
     def acquire_metal_owned_texture_frame(self) -> "MetalOwnedTextureFrameHandle":
         """Acquire a borrowed Metal frame from a session-owned texture target."""
-        return MetalOwnedTextureFrameHandle(
+        return MetalOwnedTextureFrameHandle._from_native(  # noqa: SLF001
             self._native.acquire_metal_owned_texture_frame()
         )
 
     def acquire_vulkan_owned_texture_frame(self) -> "VulkanOwnedTextureFrameHandle":
         """Acquire a borrowed Vulkan frame from a session-owned texture target."""
-        return VulkanOwnedTextureFrameHandle(
+        return VulkanOwnedTextureFrameHandle._from_native(  # noqa: SLF001
             self._native.acquire_vulkan_owned_texture_frame()
         )
 
     def acquire_opengl_owned_texture_frame(self) -> "OpenGLOwnedTextureFrameHandle":
         """Acquire a borrowed OpenGL frame from a session-owned texture target."""
-        return OpenGLOwnedTextureFrameHandle(
+        return OpenGLOwnedTextureFrameHandle._from_native(  # noqa: SLF001
             self._native.acquire_opengl_owned_texture_frame()
         )
 
@@ -549,8 +575,15 @@ class MetalOwnedTextureFrameHandle(NativeHandleMixin):
 
     _handle_name = "MetalOwnedTextureFrameHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _METAL_FRAME_HANDLE_CREATE_KEY:
+            msg = "MetalOwnedTextureFrameHandle instances are created by RenderSessionHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "MetalOwnedTextureFrameHandle":
+        return cls(native, _create_key=_METAL_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> MetalOwnedTextureFrame:
@@ -581,8 +614,15 @@ class VulkanOwnedTextureFrameHandle(NativeHandleMixin):
 
     _handle_name = "VulkanOwnedTextureFrameHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _VULKAN_FRAME_HANDLE_CREATE_KEY:
+            msg = "VulkanOwnedTextureFrameHandle instances are created by RenderSessionHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "VulkanOwnedTextureFrameHandle":
+        return cls(native, _create_key=_VULKAN_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> VulkanOwnedTextureFrame:
@@ -622,8 +662,15 @@ class OpenGLOwnedTextureFrameHandle(NativeHandleMixin):
 
     _handle_name = "OpenGLOwnedTextureFrameHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _OPENGL_FRAME_HANDLE_CREATE_KEY:
+            msg = "OpenGLOwnedTextureFrameHandle instances are created by RenderSessionHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "OpenGLOwnedTextureFrameHandle":
+        return cls(native, _create_key=_OPENGL_FRAME_HANDLE_CREATE_KEY)
 
     @property
     def frame(self) -> OpenGLOwnedTextureFrame:

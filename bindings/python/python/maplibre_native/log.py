@@ -9,6 +9,8 @@ from typing import Any
 
 from . import _native
 
+_LOG_RECEIVER_CREATE_KEY = object()
+
 
 class LogSeverity(UnknownIntEnum):
     """Log severity values emitted by MapLibre Native."""
@@ -73,8 +75,15 @@ class LogRecord:
 class LogReceiver:
     """Bounded queue receiving copied process-global native log records."""
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _LOG_RECEIVER_CREATE_KEY:
+            msg = "LogReceiver instances are created by set_log_callback"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "LogReceiver":
+        return cls(native, _create_key=_LOG_RECEIVER_CREATE_KEY)
 
     @property
     def dropped_record_count(self) -> int:
@@ -95,7 +104,9 @@ def set_log_callback(
     consume: bool = False,
 ) -> LogReceiver:
     """Install a process-global bounded log-record receiver."""
-    return LogReceiver(_native.set_log_callback(max_queued_records, consume))
+    return LogReceiver._from_native(
+        _native.set_log_callback(max_queued_records, consume)
+    )
 
 
 def clear_log_callback() -> None:

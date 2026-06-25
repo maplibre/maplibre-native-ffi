@@ -86,12 +86,12 @@ struct PyLogCallbackState {
 #[derive(Debug)]
 struct GlobalPyLogCallbackState {
     current: Option<Arc<PyLogCallbackState>>,
-    retained: Vec<Arc<PyLogCallbackState>>,
+    retired: Vec<Arc<PyLogCallbackState>>,
 }
 
 static LOG_CALLBACK_STATE: Mutex<GlobalPyLogCallbackState> = Mutex::new(GlobalPyLogCallbackState {
     current: None,
-    retained: Vec::new(),
+    retired: Vec::new(),
 });
 
 #[pyclass(name = "_LogReceiver")]
@@ -3751,6 +3751,13 @@ impl CustomGeometrySourceHandle {
 
 #[pymethods]
 impl ResourceRequestHandle {
+    fn validate_completion_response(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
+        let response = resource_response_from_py(response)?;
+        let _native =
+            maplibre_core::resource::resource_response_to_native(&response).map_err(map_error)?;
+        Ok(())
+    }
+
     fn complete(&self, response: &Bound<'_, PyAny>) -> PyResult<()> {
         let response = resource_response_from_py(response)?;
         self.state.complete(&response).map_err(map_error)
@@ -6393,8 +6400,10 @@ fn set_log_callback(max_queued_records: usize, consume: bool) -> PyResult<LogRec
     let mut state = LOG_CALLBACK_STATE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(previous) = state.current.take() {
+        state.retired.push(previous);
+    }
     state.current = Some(Arc::clone(&replacement));
-    state.retained.push(Arc::clone(&replacement));
     Ok(LogReceiver { state: replacement })
 }
 
@@ -6403,10 +6412,12 @@ fn clear_log_callback() -> PyResult<()> {
     // SAFETY: mln_log_clear_callback takes no arguments and clears native's
     // process-global callback slot.
     maplibre_core::check(unsafe { sys::mln_log_clear_callback() }).map_err(map_error)?;
-    LOG_CALLBACK_STATE
+    let mut state = LOG_CALLBACK_STATE
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-        .current = None;
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(previous) = state.current.take() {
+        state.retired.push(previous);
+    }
     Ok(())
 }
 
@@ -6658,15 +6669,10 @@ fn create_map(
     scale_factor: f64,
     map_mode: u32,
 ) -> PyResult<MapHandle> {
-    let Some(mode) = maplibre_core::MapMode::from_raw(map_mode) else {
-        return Err(py_errors::InvalidArgumentError::new_err((
-            Option::<i32>::None,
-            format!("unknown map mode: {map_mode}"),
-        )));
-    };
+    let mode = maplibre_core::MapMode::from_raw(map_mode);
     let mut options = maplibre_core::MapOptions::new(width, height, scale_factor);
     options.mode = mode;
-    let raw_options = maplibre_core::options::map_options_to_native(&options);
+    let raw_options = maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
     let runtime_state = runtime.state();
     let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();
     // SAFETY: runtime_state owns or has released the runtime pointer. The C API

@@ -7,6 +7,8 @@ from ._lifecycle import ContextHandleMixin, WarnUnclosedMixin
 from dataclasses import dataclass
 from typing import Any, Callable
 
+_REQUEST_HANDLE_CREATE_KEY = object()
+
 
 class ResourceKind(UnknownIntEnum):
     """Network resource kind passed to resource callbacks."""
@@ -196,9 +198,16 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     _handle_name = "ResourceRequestHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _REQUEST_HANDLE_CREATE_KEY:
+            msg = "ResourceRequestHandle instances are created by resource providers"
+            raise TypeError(msg)
         self._native = native
         self._closed = False
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "ResourceRequestHandle":
+        return cls(native, _create_key=_REQUEST_HANDLE_CREATE_KEY)
 
     @property
     def closed(self) -> bool:
@@ -214,8 +223,10 @@ class ResourceRequestHandle(WarnUnclosedMixin, ContextHandleMixin):
                 None,
                 "resource request handle is already closed",
             )
+        native_response = response.to_native()
+        self._native.validate_completion_response(native_response)
         try:
-            self._native.complete(response.to_native())
+            self._native.complete(native_response)
         except BaseException:
             self.close()
             raise
@@ -246,7 +257,7 @@ ResourceProviderCallback = Callable[
 ]
 
 
-def adapt_resource_transform_callback(
+def _adapt_resource_transform_callback(
     callback: ResourceTransformCallback,
 ) -> Callable[[dict[str, Any]], str | None]:
     """Adapt a public resource transform callback for the native bridge."""
@@ -257,13 +268,13 @@ def adapt_resource_transform_callback(
     return adapted
 
 
-def adapt_resource_provider_callback(
+def _adapt_resource_provider_callback(
     callback: ResourceProviderCallback,
 ) -> Callable[[dict[str, Any], Any], int]:
     """Adapt a public resource provider callback for the native bridge."""
 
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
-        handle = ResourceRequestHandle(native_handle)
+        handle = ResourceRequestHandle._from_native(native_handle)  # noqa: SLF001
         decision = ResourceProviderDecision(
             callback(ResourceRequest.from_native(raw_request), handle)
         )

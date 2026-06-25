@@ -60,7 +60,10 @@ def test_frame_backend_values_are_scoped_to_open_frame_handle() -> None:
         def close(self) -> None:
             self.closed = True
 
-    metal = render.MetalOwnedTextureFrameHandle(FakeMetalFrame())
+    with pytest.raises(TypeError, match="created by RenderSessionHandle"):
+        render.MetalOwnedTextureFrameHandle(FakeMetalFrame())
+
+    metal = render.MetalOwnedTextureFrameHandle._from_native(FakeMetalFrame())
     texture = metal.texture
     device = metal.device
     assert texture.address == 0x1234
@@ -80,7 +83,7 @@ def test_frame_backend_values_are_scoped_to_open_frame_handle() -> None:
         def close(self) -> None:
             self.closed = True
 
-    opengl = render.OpenGLOwnedTextureFrameHandle(FakeOpenGLFrame())
+    opengl = render.OpenGLOwnedTextureFrameHandle._from_native(FakeOpenGLFrame())
     opengl_texture = opengl.texture
     assert int(opengl_texture) == 42
     opengl.close()
@@ -291,13 +294,44 @@ def test_runtime_close_from_wrong_thread_reports_wrong_thread() -> None:
         assert len(raised_error) == 1
         assert isinstance(raised_error[0], mln.WrongThreadError)
         assert raised_error[0].status == mln.MaplibreStatus.WRONG_THREAD
+        assert raised_error[0].diagnostic
     finally:
+        runtime.close()
+
+
+def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
+    runtime = mln.RuntimeHandle()
+    map_handle = runtime.create_map()
+    raised_errors: list[BaseException] = []
+
+    def call_owner_thread_methods() -> None:
+        for call in (runtime.run_once, runtime.poll_event, map_handle.request_repaint):
+            try:
+                call()
+            except BaseException as error:
+                raised_errors.append(error)
+
+    thread = threading.Thread(target=call_owner_thread_methods)
+    thread.start()
+    thread.join()
+
+    try:
+        assert len(raised_errors) == 3
+        for error in raised_errors:
+            assert isinstance(error, mln.WrongThreadError)
+            assert error.status == mln.MaplibreStatus.WRONG_THREAD
+            assert error.diagnostic
+    finally:
+        map_handle.close()
         runtime.close()
 
 
 def test_map_handle_context_manager_closes_once() -> None:
     with mln.RuntimeHandle() as runtime:
-        with mln.MapHandle(runtime, mln.MapOptions(width=128, height=64)) as map_handle:
+        with pytest.raises(TypeError, match="RuntimeHandle.create_map"):
+            mln.MapHandle(runtime, mln.MapOptions(width=128, height=64))
+
+        with runtime.create_map(mln.MapOptions(width=128, height=64)) as map_handle:
             assert not map_handle.closed
             map_handle.request_repaint()
 
@@ -894,6 +928,28 @@ def test_poll_event_returns_copied_map_event() -> None:
             assert loading_failed.message
 
 
+def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
+
+            style_loaded = None
+            for _ in range(32):
+                runtime.run_once()
+                while event := runtime.poll_event():
+                    if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
+                        style_loaded = event
+                        break
+                if style_loaded is not None:
+                    break
+
+            assert style_loaded is not None
+            assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
+            assert style_loaded.source.map_handle is map_handle
+            runtime.run_once()
+            assert runtime.poll_event() is None
+
+
 def test_runtime_event_payload_wire_shapes_include_native_fields() -> None:
     events = _native.runtime_event_payload_wire_shapes_for_test()
 
@@ -1056,7 +1112,10 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         }
 
     fake_native = FakeNativeRenderSession()
-    session = render.RenderSessionHandle(fake_native, object())
+    with pytest.raises(TypeError, match="created by MapHandle"):
+        render.RenderSessionHandle(fake_native, object())
+
+    session = render.RenderSessionHandle._from_native(fake_native, object())
     geometry = query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(1.0, 2.0))
     rendered_options = query.RenderedFeatureQueryOptions(
         layer_ids=("circle",),
@@ -1124,7 +1183,7 @@ def test_opengl_owned_texture_frame_public_api_uses_native_values() -> None:
         def close(self) -> None:
             self.closed = True
 
-    frame = render.OpenGLOwnedTextureFrameHandle(FakeNativeFrame())
+    frame = render.OpenGLOwnedTextureFrameHandle._from_native(FakeNativeFrame())
 
     assert frame.frame == render.OpenGLOwnedTextureFrame(
         generation=1,
@@ -1192,7 +1251,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
             self.remove_call = (source_id, source_layer_id, feature_id, state_key)
 
     fake_native = FakeNativeRenderSession()
-    session = render.RenderSessionHandle(fake_native, object())
+    session = render.RenderSessionHandle._from_native(fake_native, object())
     selector = query.FeatureStateSelector(
         source_id="points",
         source_layer_id="symbols",
@@ -1236,7 +1295,9 @@ def test_render_session_feature_state_empty_result_is_empty_object() -> None:
             )
             return json.JsonObject.from_pairs([])
 
-    session = render.RenderSessionHandle(FakeNativeRenderSession(), object())
+    session = render.RenderSessionHandle._from_native(
+        FakeNativeRenderSession(), object()
+    )
     selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
 
     assert json.to_python(session.get_feature_state(selector)) == []
@@ -1358,7 +1419,7 @@ def test_offline_region_operation_starts_return_public_handles(tmp_path: Path) -
 
         for operation in operations:
             assert isinstance(operation, offline.OfflineOperationHandle)
-            assert operation.operation_id > 0
+            assert not operation.closed
             operation.close()
             assert operation.closed
 
@@ -1454,14 +1515,21 @@ def test_offline_operation_take_results_convert_public_values() -> None:
 
     runtime = FakeRuntime()
 
-    region = offline.OfflineOperationHandle(runtime, 1).take_region()
-    optional = offline.OfflineOperationHandle(runtime, 2).take_optional_region()
-    listed = offline.OfflineOperationHandle(runtime, 3).take_region_list()
-    merged = offline.OfflineOperationHandle(runtime, 4).take_region_list(
+    with pytest.raises(TypeError, match="created by RuntimeHandle"):
+        offline.OfflineOperationHandle(runtime, 99)
+
+    region = offline.OfflineOperationHandle._from_native(runtime, 1).take_region()
+    optional = offline.OfflineOperationHandle._from_native(
+        runtime, 2
+    ).take_optional_region()
+    listed = offline.OfflineOperationHandle._from_native(runtime, 3).take_region_list()
+    merged = offline.OfflineOperationHandle._from_native(runtime, 4).take_region_list(
         merge_result=True,
     )
-    updated = offline.OfflineOperationHandle(runtime, 5).take_updated_region()
-    status = offline.OfflineOperationHandle(runtime, 6).take_status()
+    updated = offline.OfflineOperationHandle._from_native(
+        runtime, 5
+    ).take_updated_region()
+    status = offline.OfflineOperationHandle._from_native(runtime, 6).take_status()
 
     assert region.id == 42
     assert isinstance(region.definition, offline.OfflineTilePyramidRegionDefinition)
@@ -1535,7 +1603,7 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
 
     runtime = FakeRuntime()
 
-    status_handle = offline.OfflineOperationHandle(runtime, 10)
+    status_handle = offline.OfflineOperationHandle._from_native(runtime, 10)
     assert status_handle.take_status().complete is True
     with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
         status_handle.take_status()
@@ -1550,7 +1618,7 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
         lambda handle: handle.take_status(),
     )
     for offset, take in enumerate(closed_takes, start=20):
-        handle = offline.OfflineOperationHandle(runtime, offset)
+        handle = offline.OfflineOperationHandle._from_native(runtime, offset)
         handle.close()
         with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
             take(handle)
@@ -1560,18 +1628,19 @@ def test_offline_operation_take_rejects_closed_handles() -> None:
     assert runtime.operations == set()
 
 
-def test_runtime_close_marks_live_offline_operations_closed(tmp_path: Path) -> None:
+def test_runtime_close_rejects_live_offline_operations(tmp_path: Path) -> None:
     runtime = mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path)))
     operation = runtime.run_ambient_cache_operation(offline.AmbientCacheOperation.CLEAR)
+    try:
+        assert not operation.closed
+        with pytest.raises(mln.InvalidStateError, match="offline operation"):
+            runtime.close()
 
-    assert not operation.closed
-    runtime.close()
-
-    assert runtime.closed
-    assert operation.closed
-    operation.close()
-    with pytest.raises(mln.InvalidStateError, match="offline operation handle"):
-        operation.take_status()
+        assert not runtime.closed
+        assert not operation.closed
+    finally:
+        operation.close()
+        runtime.close()
 
 
 def test_ambient_cache_operation_starts_and_discards_through_public_api(
@@ -1583,7 +1652,6 @@ def test_ambient_cache_operation_starts_and_discards_through_public_api(
         )
 
         assert isinstance(operation, offline.OfflineOperationHandle)
-        assert operation.operation_id > 0
         assert not operation.closed
         operation.close()
         assert operation.closed
@@ -1832,7 +1900,7 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
         return resource.ResourceProviderDecision.PASS_THROUGH
 
     native = FakeNativeRequest()
-    adapted = resource.adapt_resource_provider_callback(provider)
+    adapted = resource._adapt_resource_provider_callback(provider)  # noqa: SLF001
 
     raw_request = {
         "url": "https://example.test/tile.pbf",
@@ -1882,6 +1950,11 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
             self.complete_count = 0
             self.closed = False
             self.close_count = 0
+            self.validation_error: BaseException | None = None
+
+        def validate_completion_response(self, response: dict[str, object]) -> None:
+            if self.validation_error is not None:
+                raise self.validation_error
 
         def complete(self, response: dict[str, object]) -> None:
             self.complete_count += 1
@@ -1895,7 +1968,10 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
             self.closed = True
 
     native = FakeNativeRequest()
-    handle = resource.ResourceRequestHandle(native)
+    with pytest.raises(TypeError, match="created by resource providers"):
+        resource.ResourceRequestHandle(native)
+
+    handle = resource.ResourceRequestHandle._from_native(native)
 
     assert handle.closed is False
     assert handle.is_cancelled() is False
@@ -1910,7 +1986,7 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
         handle.is_cancelled()
 
     closed_native = FakeNativeRequest()
-    closed = resource.ResourceRequestHandle(closed_native)
+    closed = resource.ResourceRequestHandle._from_native(closed_native)
     closed.close()
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         closed.complete(resource.ResourceResponse.no_content())
@@ -1919,14 +1995,39 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     assert closed_native.complete_count == 0
     assert closed_native.close_count == 1
 
+    retry_native = FakeNativeRequest()
+    retry = resource.ResourceRequestHandle._from_native(retry_native)
+
+    class InvalidResponse:
+        def to_native(self) -> dict[str, object]:
+            msg = "cannot materialize response"
+            raise ValueError(msg)
+
+    with pytest.raises(ValueError, match="cannot materialize response"):
+        retry.complete(InvalidResponse())  # type: ignore[arg-type]
+    assert retry.closed is False
+    assert retry_native.complete_count == 0
+    assert retry_native.close_count == 0
+    retry.close()
+
+    pre_c_native = FakeNativeRequest()
+    pre_c_native.validation_error = ValueError("native response validation failed")
+    pre_c = resource.ResourceRequestHandle._from_native(pre_c_native)
+    with pytest.raises(ValueError, match="native response validation failed"):
+        pre_c.complete(resource.ResourceResponse.no_content())
+    assert pre_c.closed is False
+    assert pre_c_native.complete_count == 0
+    assert pre_c_native.close_count == 0
+    pre_c.close()
+
     second_native = FakeNativeRequest()
-    with resource.ResourceRequestHandle(second_native) as second:
+    with resource.ResourceRequestHandle._from_native(second_native) as second:
         assert second.closed is False
     assert second.closed is True
     assert second_native.closed is True
 
     leaked_native = FakeNativeRequest()
-    leaked = resource.ResourceRequestHandle(leaked_native)
+    leaked = resource.ResourceRequestHandle._from_native(leaked_native)
     with pytest.warns(ResourceWarning, match="ResourceRequestHandle was not closed"):
         leaked.__del__()
     assert leaked_native.closed is False

@@ -50,6 +50,9 @@ from .style import (
     TileSourceOptions,
 )
 
+_MAP_HANDLE_CREATE_KEY = object()
+_MAP_PROJECTION_HANDLE_CREATE_KEY = object()
+
 
 class MapDebugOptions(IntFlag):
     """Map debug overlay mask bits."""
@@ -352,8 +355,15 @@ class MapProjectionHandle(NativeHandleMixin):
 
     _handle_name = "MapProjectionHandle"
 
-    def __init__(self, native: object) -> None:
+    def __init__(self, native: object, *, _create_key: object | None = None) -> None:
+        if _create_key is not _MAP_PROJECTION_HANDLE_CREATE_KEY:
+            msg = "MapProjectionHandle instances are created by MapHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: object) -> "MapProjectionHandle":
+        return cls(native, _create_key=_MAP_PROJECTION_HANDLE_CREATE_KEY)
 
     def get_camera(self) -> CameraOptions:
         """Return the helper's current camera snapshot."""
@@ -410,7 +420,12 @@ class MapHandle(NativeHandleMixin):
         self,
         runtime: RuntimeHandle,
         options: MapOptions | None = None,
+        *,
+        _create_key: object | None = None,
     ) -> None:
+        if _create_key is not _MAP_HANDLE_CREATE_KEY:
+            msg = "MapHandle instances are created by RuntimeHandle.create_map"
+            raise TypeError(msg)
         options = options or MapOptions()
         map_mode = (
             options.mode if isinstance(options.mode, MapMode) else MapMode(options.mode)
@@ -425,6 +440,12 @@ class MapHandle(NativeHandleMixin):
         )
         self._native_address_value = int(self._native.address())
         runtime._register_map(self)  # noqa: SLF001
+
+    @classmethod
+    def _create(
+        cls, runtime: RuntimeHandle, options: MapOptions | None = None
+    ) -> "MapHandle":
+        return cls(runtime, options, _create_key=_MAP_HANDLE_CREATE_KEY)
 
     def _native_address(self) -> int:
         return self._native_address_value
@@ -883,7 +904,7 @@ class MapHandle(NativeHandleMixin):
 
     def create_projection(self) -> MapProjectionHandle:
         """Create a standalone projection helper from the current map transform."""
-        return MapProjectionHandle(self._native.create_projection())
+        return MapProjectionHandle._from_native(self._native.create_projection())  # noqa: SLF001
 
     def get_camera(self) -> CameraOptions:
         """Return the current camera snapshot."""
@@ -1133,7 +1154,7 @@ class MapHandle(NativeHandleMixin):
             options.wrap,
             options.has_cancel_tile,
         )
-        return CustomGeometrySourceHandle(native)
+        return CustomGeometrySourceHandle._from_native(native)  # noqa: SLF001
 
     def set_custom_geometry_source_tile_data(
         self,
@@ -1189,7 +1210,7 @@ class MapHandle(NativeHandleMixin):
             extent.scale_factor,
             *args,
         )
-        return RenderSessionHandle(native, self)
+        return RenderSessionHandle._from_native(native, self)  # noqa: SLF001
 
     def attach_metal_surface(
         self, descriptor: MetalSurfaceDescriptor

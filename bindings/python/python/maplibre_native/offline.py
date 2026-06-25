@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from .geo import Geometry, LatLngBounds
 from .resource import ResourceErrorReason
 
+_OPERATION_HANDLE_CREATE_KEY = object()
+
 
 class AmbientCacheOperation(NativeIntEnum):
     """Ambient cache maintenance operation kinds."""
@@ -69,16 +71,30 @@ class OfflineOperationHandle(WarnUnclosedMixin, ContextHandleMixin):
 
     _handle_name = "OfflineOperationHandle"
 
-    def __init__(self, runtime: "RuntimeHandle", operation_id: int) -> None:
+    def __init__(
+        self,
+        runtime: "RuntimeHandle",
+        operation_id: int,
+        *,
+        _create_key: object | None = None,
+    ) -> None:
+        if _create_key is not _OPERATION_HANDLE_CREATE_KEY:
+            msg = "OfflineOperationHandle instances are created by RuntimeHandle"
+            raise TypeError(msg)
         self._runtime = runtime
         self._operation_id = operation_id
         self._closed = False
         runtime._register_offline_operation(self)  # noqa: SLF001
 
-    @property
-    def operation_id(self) -> int:
-        """Return the native offline operation ID."""
-        return self._operation_id
+    @classmethod
+    def _from_native(
+        cls, runtime: "RuntimeHandle", operation_id: int
+    ) -> "OfflineOperationHandle":
+        return cls(
+            runtime,
+            operation_id,
+            _create_key=_OPERATION_HANDLE_CREATE_KEY,
+        )
 
     @property
     def closed(self) -> bool:

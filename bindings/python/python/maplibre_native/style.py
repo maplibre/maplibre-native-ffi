@@ -10,6 +10,8 @@ from typing import Any
 from .geo import LatLngBounds
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
+_CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
+
 
 class TileScheme(NativeIntEnum):
     """Tile URL coordinate scheme values."""
@@ -197,8 +199,15 @@ class CustomGeometrySourceHandle(NativeHandleMixin):
 
     _handle_name = "CustomGeometrySourceHandle"
 
-    def __init__(self, native: Any) -> None:
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY:
+            msg = "CustomGeometrySourceHandle instances are created by MapHandle"
+            raise TypeError(msg)
         self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> "CustomGeometrySourceHandle":
+        return cls(native, _create_key=_CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY)
 
     @property
     def dropped_event_count(self) -> int:

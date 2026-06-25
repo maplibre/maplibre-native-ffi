@@ -203,7 +203,6 @@ class RuntimeEventSource:
     """Copied runtime event source metadata."""
 
     source_type: RuntimeEventSourceType
-    source_address: int
     map_handle: MapHandle | None = None
 
 
@@ -230,7 +229,6 @@ class RuntimeEvent:
             event_type=RuntimeEventType(raw["event_type"]),
             source=RuntimeEventSource(
                 source_type=source_type,
-                source_address=source_address,
                 map_handle=(
                     runtime._map_for_source_address(source_address)  # noqa: SLF001
                     if runtime is not None and source_type == RuntimeEventSourceType.MAP
@@ -271,18 +269,17 @@ class RuntimeHandle(NativeHandleMixin):
 
     def close(self) -> None:
         """Release this runtime handle exactly once."""
+        if self._offline_operations:
+            from .errors import InvalidStateError
+
+            raise InvalidStateError(None, "runtime has live offline operation handles")
         self._native.close()
-        self._close_offline_operations()
 
     def _register_offline_operation(self, operation: OfflineOperationHandle) -> None:
         self._offline_operations.add(operation)
 
     def _unregister_offline_operation(self, operation: OfflineOperationHandle) -> None:
         self._offline_operations.discard(operation)
-
-    def _close_offline_operations(self) -> None:
-        for operation in tuple(self._offline_operations):
-            operation._mark_runtime_closed()  # noqa: SLF001
 
     def _register_map(self, map_handle: MapHandle) -> None:
         self._maps[map_handle._native_address()] = weakref.ref(map_handle)  # noqa: SLF001
@@ -309,7 +306,7 @@ class RuntimeHandle(NativeHandleMixin):
     ) -> OfflineOperationHandle:
         from .offline import OfflineOperationHandle
 
-        return OfflineOperationHandle(self, start(*args))
+        return OfflineOperationHandle._from_native(self, start(*args))  # noqa: SLF001
 
     def run_ambient_cache_operation(
         self, operation: AmbientCacheOperation
@@ -410,10 +407,10 @@ class RuntimeHandle(NativeHandleMixin):
         max_pending_callbacks: int = 64,
     ) -> None:
         """Install or replace the runtime-scoped network URL transform."""
-        from .resource import adapt_resource_transform_callback
+        from .resource import _adapt_resource_transform_callback
 
         self._native.set_resource_transform(
-            adapt_resource_transform_callback(callback),
+            _adapt_resource_transform_callback(callback),
             max_pending_callbacks,
         )
 
@@ -428,10 +425,10 @@ class RuntimeHandle(NativeHandleMixin):
         max_pending_callbacks: int = 64,
     ) -> None:
         """Install or replace the runtime-scoped network resource provider."""
-        from .resource import adapt_resource_provider_callback
+        from .resource import _adapt_resource_provider_callback
 
         self._native.set_resource_provider(
-            adapt_resource_provider_callback(callback),
+            _adapt_resource_provider_callback(callback),
             max_pending_callbacks,
         )
 
@@ -446,7 +443,7 @@ class RuntimeHandle(NativeHandleMixin):
         """Create a map owned by this runtime."""
         from .map import MapHandle
 
-        return MapHandle(self, options)
+        return MapHandle._create(self, options)  # noqa: SLF001
 
 
 def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayload:
