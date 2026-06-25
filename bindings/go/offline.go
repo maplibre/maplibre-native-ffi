@@ -508,5 +508,8 @@ func startOfflineOperation[T any](runtime *RuntimeHandle, kind OfflineOperationK
 	if err := checkNative(func() int32 { return start(ptr, &id) }); err != nil {
 		return nil, err
 	}
+	if id == 0 {
+		return nil, newBindingError(ErrInvalidState, "offline operation did not return an ID")
+	}
 	return newOfflineOperationHandle[T](runtime, uint64(id), kind, resultKind), nil
 }

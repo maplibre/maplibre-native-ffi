@@ -452,6 +452,19 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	}
 }
 
+func TestStartOfflineOperationRejectsZeroID(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	operation, err := startOfflineOperationZeroIDForTest(runtime)
+	if !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("startOfflineOperation() error = %v, want ErrInvalidState", err)
+	}
+	if operation != nil {
+		t.Fatalf("startOfflineOperation() operation = %#v, want nil", operation)
+	}
+}
+
 func newFakeRuntimeHandle(t *testing.T) *RuntimeHandle {
 	t.Helper()
 	state, err := handle.New(&nativeRuntime{}, "RuntimeHandle")
