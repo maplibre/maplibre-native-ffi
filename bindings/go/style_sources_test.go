@@ -8,6 +8,8 @@ import (
 )
 
 func TestStyleSourceMetadataForMissingSources(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -78,6 +80,8 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 	}
 }
 func TestStyleSourceURLAndTileBindings(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -143,6 +147,8 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	}
 }
 func TestGeoJSONSourceDataDescriptors(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

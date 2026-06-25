@@ -9,6 +9,8 @@ import (
 )
 
 func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	var nilSession *RenderSessionHandle
 	if err := nilSession.Close(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle Close() error = %v, want ErrInvalidArgument", err)

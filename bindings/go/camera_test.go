@@ -6,6 +6,8 @@ import (
 )
 
 func TestMapCameraCommandsUseNativeABI(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -57,6 +59,8 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 	}
 }
 func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -107,6 +111,8 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	}
 }
 func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -173,6 +179,8 @@ func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	}
 }
 func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -205,6 +213,8 @@ func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
 	}
 }
 func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -243,6 +253,8 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	}
 }
 func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -309,6 +321,8 @@ func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 	}
 }
 func TestTileOptionsRejectInvalidPrefetchZoomDelta(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

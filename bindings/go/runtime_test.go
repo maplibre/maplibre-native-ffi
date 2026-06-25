@@ -9,6 +9,8 @@ import (
 )
 
 func TestRuntimeCreateWithOptions(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"}.WithMaximumCacheSize(0))
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
@@ -53,6 +55,8 @@ func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *tes
 	}
 }
 func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -78,6 +82,8 @@ func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
 	}
 }
 func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -94,6 +100,8 @@ func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
 	}
 }
 func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

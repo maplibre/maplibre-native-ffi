@@ -37,6 +37,13 @@ func TestRuntimeEventKnownMapPayloads(t *testing.T) {
 		}
 	})
 
+	t.Run("offline region status", func(t *testing.T) {
+		status := offlineRegionStatusForTest(0x7fff_0003)
+		if status.DownloadState != OfflineRegionDownloadState(0x7fff_0003) || status.RawDownloadState != 0x7fff_0003 {
+			t.Fatalf("offline status download state = (%d, %d)", status.DownloadState, status.RawDownloadState)
+		}
+	})
+
 	t.Run("style image missing", func(t *testing.T) {
 		event := runtimeEventStyleImageMissingForTest("marker-1")
 		payload, ok := event.Payload.(RuntimeEventStyleImageMissingPayload)
@@ -125,6 +132,8 @@ func TestRuntimeEventNilKnownPayloadRemainsNil(t *testing.T) {
 }
 
 func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

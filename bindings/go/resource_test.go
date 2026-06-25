@@ -6,6 +6,8 @@ import (
 )
 
 func TestRuntimeResourceProviderLifecycle(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -69,6 +71,8 @@ func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
 	}
 }
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -84,6 +88,8 @@ func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 	}
 }
 func TestRuntimeResourceProviderRequiresNoLiveMaps(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -109,6 +115,8 @@ func TestRuntimeResourceProviderRequiresNoLiveMaps(t *testing.T) {
 	}
 }
 func TestRuntimeResourceTransformLifecycle(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -138,6 +146,8 @@ func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 	}
 }
 func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

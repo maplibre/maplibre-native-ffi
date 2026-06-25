@@ -7,6 +7,8 @@ import (
 )
 
 func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -58,6 +60,8 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 	}
 }
 func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

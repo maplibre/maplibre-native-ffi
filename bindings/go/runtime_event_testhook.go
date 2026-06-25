@@ -75,6 +75,14 @@ func runtimeEventRenderMapForTest(mode uint32) *RuntimeEvent {
 	return runtimeEventWithPayloadForTest(uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP), unsafe.Pointer(&raw), unsafe.Sizeof(raw))
 }
 
+func offlineRegionStatusForTest(downloadState uint32) OfflineRegionStatus {
+	raw := C.mln_offline_region_status{
+		size:           C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{})),
+		download_state: C.uint32_t(downloadState),
+	}
+	return offlineRegionStatusFromC(raw)
+}
+
 func runtimeEventStyleImageMissingForTest(imageID string) *RuntimeEvent {
 	rawImageID := C.CString(imageID)
 	defer C.free(unsafe.Pointer(rawImageID))

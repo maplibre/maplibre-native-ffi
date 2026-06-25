@@ -7,6 +7,8 @@ import (
 )
 
 func TestDedicatedStyleLayerHelpers(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -86,6 +88,8 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	}
 }
 func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -184,6 +188,8 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	}
 }
 func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -227,6 +233,8 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	}
 }
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

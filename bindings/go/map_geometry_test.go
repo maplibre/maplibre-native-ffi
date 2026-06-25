@@ -6,6 +6,8 @@ import (
 )
 
 func TestMapCameraGeometryAndCoordinateConversions(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

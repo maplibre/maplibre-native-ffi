@@ -25,6 +25,8 @@ func waitForRuntimeEvent(t *testing.T, runtime *RuntimeHandle, eventType Runtime
 	return nil
 }
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -86,6 +88,8 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	}
 }
 func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

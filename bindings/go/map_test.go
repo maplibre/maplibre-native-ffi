@@ -11,6 +11,8 @@ import (
 )
 
 func TestRuntimeMapLifecycle(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -145,6 +147,8 @@ func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
 }
 
 func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -177,6 +181,8 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	}
 }
 func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -220,6 +226,8 @@ func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	}
 }
 func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -243,6 +251,8 @@ func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	}
 }
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

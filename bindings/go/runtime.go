@@ -729,6 +729,7 @@ func tileIDFromC(tileID C.mln_tile_id) TileID {
 func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionStatus {
 	return OfflineRegionStatus{
 		DownloadState:                  OfflineRegionDownloadState(status.download_state),
+		RawDownloadState:               uint32(status.download_state),
 		CompletedResourceCount:         uint64(status.completed_resource_count),
 		CompletedResourceSize:          uint64(status.completed_resource_size),
 		CompletedTileCount:             uint64(status.completed_tile_count),

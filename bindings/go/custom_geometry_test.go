@@ -7,6 +7,8 @@ import (
 )
 
 func TestCustomGeometrySourceDescriptors(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

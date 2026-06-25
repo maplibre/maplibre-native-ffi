@@ -54,6 +54,8 @@ func requireDiscardOfflineOperation[T any](t *testing.T, operation *OfflineOpera
 	}
 }
 func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
@@ -237,6 +239,8 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 	t.Fatal("offline completion event was not reported")
 }
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
+	lockOSThreadForTest(t)
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)

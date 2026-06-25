@@ -28,6 +28,18 @@ var logState struct {
 	active bool
 }
 
+var (
+	setNativeLogCallback = func(handle cgo.Handle) int32 {
+		return int32(C.mln_log_set_callback(
+			(C.mln_log_callback)(C.goMaplibreLogCallback),
+			C.mln_go_handle_to_pointer(C.uintptr_t(handle)),
+		))
+	}
+	clearNativeLogCallback = func() int32 {
+		return int32(C.mln_log_clear_callback())
+	}
+)
+
 // SetLogCallback installs or replaces the process-global native log callback.
 func SetLogCallback(callback LogCallback) int32 {
 	if callback == nil {
@@ -36,16 +48,15 @@ func SetLogCallback(callback LogCallback) int32 {
 
 	state := &logCallbackState{callback: callback}
 	handle := cgo.NewHandle(state)
-	status := int32(C.mln_log_set_callback(
-		(C.mln_log_callback)(C.goMaplibreLogCallback),
-		C.mln_go_handle_to_pointer(C.uintptr_t(handle)),
-	))
+
+	logState.Lock()
+	status := setNativeLogCallback(handle)
 	if status != int32(C.MLN_STATUS_OK) {
+		logState.Unlock()
 		handle.Delete()
 		return status
 	}
 
-	logState.Lock()
 	oldHandle := logState.handle
 	oldActive := logState.active
 	logState.handle = handle
@@ -60,12 +71,13 @@ func SetLogCallback(callback LogCallback) int32 {
 
 // ClearLogCallback clears the process-global native log callback.
 func ClearLogCallback() int32 {
-	status := int32(C.mln_log_clear_callback())
+	logState.Lock()
+	status := clearNativeLogCallback()
 	if status != int32(C.MLN_STATUS_OK) {
+		logState.Unlock()
 		return status
 	}
 
-	logState.Lock()
 	oldHandle := logState.handle
 	oldActive := logState.active
 	logState.handle = cgo.Handle(0)
