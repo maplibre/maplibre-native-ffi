@@ -1,7 +1,6 @@
 package callback
 
 import (
-	"runtime/cgo"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -54,7 +53,7 @@ func TestLogCallbackSetSerializesNativeAndGoState(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var calls atomic.Int32
-	setNativeLogCallback = func(cgo.Handle) int32 {
+	setNativeLogCallback = func() int32 {
 		if calls.Add(1) == 1 {
 			close(entered)
 			<-release
