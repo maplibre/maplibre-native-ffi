@@ -54,17 +54,6 @@ keep a small amount of Python-native ergonomics.
 These findings have a clear desired outcome and do not need further maintainer
 input before implementation.
 
-- [ ] `py-native-stub`: Replace the `Any` catch-all native extension stub.
-  - severity: low
-  - complexity: medium
-  - area: `_native.pyi`, typed package boundary
-  - outcome: Give wrapper-facing native calls typed internal interfaces instead
-    of `__getattr__(name: str) -> Any`.
-  - rationale: The raw layer stays private by convention, but type checking
-    cannot catch accidental raw-layer drift inside wrappers.
-  - implementation notes: Use an explicit private `_native.pyi` or typed
-    internal protocols for wrapper-facing native objects.
-
 - [ ] `py-abi-mismatch-test`: Add ABI mismatch coverage.
   - severity: medium
   - complexity: medium
@@ -155,3 +144,6 @@ input before implementation.
 - `py-runtime-close-race`: Runtime operations now pass through a binding-owned
   close gate before calling C, and closed-runtime map creation reports a copied
   binding diagnostic.
+- `py-native-stub`: `_native.pyi` now declares the wrapper-facing native handle
+  classes, methods, and module functions instead of exporting a catch-all
+  `__getattr__`.
