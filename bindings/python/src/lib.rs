@@ -6680,6 +6680,18 @@ fn status_error_after_support_call_for_test(raw_status: i32, diagnostic: String)
     Err(map_error(error))
 }
 
+/// Test helper that validates an injected ABI version before creating a runtime.
+#[pyfunction]
+fn create_runtime_with_abi_version_for_test(
+    actual_abi_version: u32,
+    asset_path: Option<String>,
+    cache_path: Option<String>,
+    maximum_cache_size: Option<u64>,
+) -> PyResult<RuntimeHandle> {
+    maplibre_core::validate_abi_version_value(actual_abi_version).map_err(map_error)?;
+    create_runtime(asset_path, cache_path, maximum_cache_size)
+}
+
 /// Test helper that exercises private runtime event payload wire conversion.
 #[pyfunction]
 fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyAny>> {
@@ -7283,6 +7295,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(status_error_for_test, module)?)?;
     module.add_function(wrap_pyfunction!(
         status_error_after_support_call_for_test,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        create_runtime_with_abi_version_for_test,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(

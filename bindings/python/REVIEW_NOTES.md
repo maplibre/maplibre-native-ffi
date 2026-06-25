@@ -54,17 +54,6 @@ keep a small amount of Python-native ergonomics.
 These findings have a clear desired outcome and do not need further maintainer
 input before implementation.
 
-- [ ] `py-abi-mismatch-test`: Add ABI mismatch coverage.
-  - severity: medium
-  - complexity: medium
-  - area: BND-001, native loading
-  - outcome: Prove ABI mismatch fails with the public ABI-version error before a
-    public wrapper stores a native handle.
-  - rationale: Runtime creation validates ABI before storing a public handle,
-    and tests cover the happy path, but there is no mismatch seam.
-  - implementation notes: Add an internal loader or version seam that forces
-    mismatch before public handle creation.
-
 - [ ] `py-render-integration-tests`: Add render workflow integration coverage.
   - severity: high
   - complexity: high
@@ -123,3 +112,7 @@ input before implementation.
   status category, OK status, unknown future status, stale diagnostic copying,
   binding-owned diagnostics without stale native leakage, embedded NUL
   validation, and cleanup/support-work diagnostic preservation.
+- `py-abi-mismatch-test`: Python runtime construction now has a test-only native
+  seam that injects an ABI version, verifies ABI mismatch maps to
+  `UnsupportedFeatureError`, and proves the public wrapper does not store a
+  native handle after validation failure.

@@ -187,6 +187,36 @@ def test_support_work_preserves_original_native_diagnostic() -> None:
     assert raised.value.diagnostic == "original native diagnostic"
 
 
+def test_runtime_abi_mismatch_reports_public_error_before_handle_storage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    actual_abi_version = mln.EXPECTED_C_ABI_VERSION + 1
+
+    def create_mismatched_runtime(
+        asset_path: str | None,
+        cache_path: str | None,
+        maximum_cache_size: int | None,
+    ) -> object:
+        return _native.create_runtime_with_abi_version_for_test(
+            actual_abi_version,
+            asset_path,
+            cache_path,
+            maximum_cache_size,
+        )
+
+    monkeypatch.setattr(_native, "create_runtime", create_mismatched_runtime)
+    runtime = mln.RuntimeHandle.__new__(mln.RuntimeHandle)
+
+    with pytest.raises(mln.UnsupportedFeatureError) as raised:
+        mln.RuntimeHandle.__init__(runtime)
+
+    assert not hasattr(runtime, "_native")
+    assert raised.value.status == mln.MaplibreStatus.UNSUPPORTED
+    assert raised.value.native_status_code is None
+    assert "unsupported MapLibre Native C ABI version" in raised.value.diagnostic
+    assert str(actual_abi_version) in raised.value.diagnostic
+
+
 def _native_invalid_network_status_error() -> mln.InvalidArgumentError:
     with pytest.raises(mln.InvalidArgumentError) as raised:
         _native.set_network_status_raw_unchecked_for_test(999_001)
