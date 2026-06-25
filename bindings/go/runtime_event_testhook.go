@@ -26,6 +26,19 @@ func runtimeEventUnknownPayloadForTest(payloadType uint32, payload []byte) *Runt
 	return runtimeEventWithPayloadForTest(payloadType, payloadPtr, uintptr(len(payload)))
 }
 
+func runtimeEventKnownPayloadSizesForTest() map[RuntimeEventPayloadType]uintptr {
+	return map[RuntimeEventPayloadType]uintptr{
+		RuntimeEventPayloadRenderFrame:                 unsafe.Sizeof(C.mln_runtime_event_render_frame{}),
+		RuntimeEventPayloadRenderMap:                   unsafe.Sizeof(C.mln_runtime_event_render_map{}),
+		RuntimeEventPayloadStyleImageMissing:           unsafe.Sizeof(C.mln_runtime_event_style_image_missing{}),
+		RuntimeEventPayloadTileAction:                  unsafe.Sizeof(C.mln_runtime_event_tile_action{}),
+		RuntimeEventPayloadOfflineRegionStatus:         unsafe.Sizeof(C.mln_runtime_event_offline_region_status{}),
+		RuntimeEventPayloadOfflineRegionResponseError:  unsafe.Sizeof(C.mln_runtime_event_offline_region_response_error{}),
+		RuntimeEventPayloadOfflineRegionTileCountLimit: unsafe.Sizeof(C.mln_runtime_event_offline_region_tile_count_limit{}),
+		RuntimeEventPayloadOfflineOperationCompleted:   unsafe.Sizeof(C.mln_runtime_event_offline_operation_completed{}),
+	}
+}
+
 func runtimeEventMapSourceForTest(runtime *RuntimeHandle, m *MapHandle) *RuntimeEvent {
 	ptr, _ := m.state.Ptr()
 	raw := C.mln_runtime_event{

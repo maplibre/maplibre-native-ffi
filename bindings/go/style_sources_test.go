@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	stdruntime "runtime"
 	"testing"
 )
@@ -164,7 +165,10 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
 	points := []LatLng{{Latitude: 1, Longitude: 2}, {Latitude: 3, Longitude: 4}}
-	properties := map[string]any{"name": "before", "rank": int64(7)}
+	properties := JSONMembers{
+		{Name: "name", Value: JSONString("before")},
+		{Name: "rank", Value: JSONInt(7)},
+	}
 	data := GeoJSONFeatureCollection([]Feature{{
 		Geometry:   LineStringGeometry(points),
 		Properties: properties,
@@ -174,7 +178,7 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
 	points[0] = LatLng{Latitude: 90, Longitude: 90}
-	properties["name"] = "after"
+	properties[0].Value = JSONString("after")
 	if err := m.SetGeoJSONSourceData("geojson-data", GeoJSON{Type: GeoJSONTypeGeometry, Geometry: PointGeometry(LatLng{Latitude: 5, Longitude: 6})}); err != nil {
 		t.Fatalf("SetGeoJSONSourceData(): %v", err)
 	}
@@ -219,18 +223,18 @@ func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	source := map[string]any{
-		"type": "geojson",
-		"data": map[string]any{
-			"type":     "FeatureCollection",
-			"features": []any{},
-		},
-		"attribution": "unit-test",
-	}
+	source := JSONObject(
+		JSONMember{Name: "type", Value: JSONString("geojson")},
+		JSONMember{Name: "data", Value: JSONObject(
+			JSONMember{Name: "type", Value: JSONString("FeatureCollection")},
+			JSONMember{Name: "features", Value: JSONArray()},
+		)},
+		JSONMember{Name: "attribution", Value: JSONString("unit-test")},
+	)
 	if err := m.AddStyleSourceJSON("go-json-source", source); err != nil {
 		t.Fatalf("AddStyleSourceJSON(): %v", err)
 	}
-	source["type"] = "mutated-after-call"
+	source.Object[0].Value = JSONString("mutated-after-call")
 	exists, err := m.StyleSourceExists("go-json-source")
 	if err != nil {
 		t.Fatalf("StyleSourceExists(): %v", err)
@@ -252,7 +256,7 @@ func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	if !found || info.IDSize != uint64(len("go-json-source")) {
 		t.Fatalf("StyleSourceInfo(go-json-source) = (%#v, %v), want copied ID size", info, found)
 	}
-	if err := m.AddStyleSourceJSON("bad-json-source", map[string]any{"type": make(chan int)}); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("AddStyleSourceJSON(unsupported Go value) error = %v, want ErrInvalidArgument", err)
+	if err := m.AddStyleSourceJSON("bad-json-source", JSONDouble(math.Inf(1))); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddStyleSourceJSON(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 }

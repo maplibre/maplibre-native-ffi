@@ -1,6 +1,9 @@
 package maplibre
 
-import "testing"
+import (
+	"slices"
+	"testing"
+)
 
 func TestRuntimeEventKnownMapPayloads(t *testing.T) {
 	t.Run("render frame", func(t *testing.T) {
@@ -77,6 +80,47 @@ func TestRuntimeEventUnknownPayloadPreservesBytes(t *testing.T) {
 	}
 	if len(payload.Bytes) != 3 || payload.Bytes[0] != 1 || payload.Bytes[1] != 2 || payload.Bytes[2] != 3 {
 		t.Fatalf("unknown payload bytes = %v", payload.Bytes)
+	}
+}
+
+func TestRuntimeEventKnownPayloadsRequireFullStructSize(t *testing.T) {
+	sizes := runtimeEventKnownPayloadSizesForTest()
+	for _, payloadType := range []RuntimeEventPayloadType{
+		RuntimeEventPayloadRenderFrame,
+		RuntimeEventPayloadRenderMap,
+		RuntimeEventPayloadStyleImageMissing,
+		RuntimeEventPayloadTileAction,
+		RuntimeEventPayloadOfflineRegionStatus,
+		RuntimeEventPayloadOfflineRegionResponseError,
+		RuntimeEventPayloadOfflineRegionTileCountLimit,
+		RuntimeEventPayloadOfflineOperationCompleted,
+	} {
+		size := sizes[payloadType]
+		if size < 2 {
+			t.Fatalf("payload type %v size = %d, want at least 2", payloadType, size)
+		}
+		raw := make([]byte, size-1)
+		for i := range raw {
+			raw[i] = byte(i + 1)
+		}
+		event := runtimeEventUnknownPayloadForTest(uint32(payloadType), raw)
+		payload, ok := event.Payload.(RuntimeEventUnknownPayload)
+		if !ok {
+			t.Fatalf("payload type %v decoded as %T, want RuntimeEventUnknownPayload", payloadType, event.Payload)
+		}
+		if event.PayloadType != payloadType || event.PayloadSize != uintptr(len(raw)) {
+			t.Fatalf("payload type %v metadata = (%d, %d)", payloadType, event.PayloadType, event.PayloadSize)
+		}
+		if !slices.Equal(payload.Bytes, raw) {
+			t.Fatalf("payload type %v bytes = %v, want %v", payloadType, payload.Bytes, raw)
+		}
+	}
+}
+
+func TestRuntimeEventNilKnownPayloadRemainsNil(t *testing.T) {
+	event := runtimeEventWithPayloadForTest(uint32(RuntimeEventPayloadRenderFrame), nil, runtimeEventKnownPayloadSizesForTest()[RuntimeEventPayloadRenderFrame])
+	if event.Payload != nil {
+		t.Fatalf("Payload = %T, want nil", event.Payload)
 	}
 }
 

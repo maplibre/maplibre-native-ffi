@@ -49,13 +49,13 @@ func RenderedQueryLineString(points []ScreenPoint) RenderedQueryGeometry {
 // RenderedFeatureQueryOptions configures rendered feature queries.
 type RenderedFeatureQueryOptions struct {
 	LayerIDs []string
-	Filter   any
+	Filter   *JSONValue
 }
 
 // SourceFeatureQueryOptions configures source feature queries.
 type SourceFeatureQueryOptions struct {
 	SourceLayerIDs []string
-	Filter         any
+	Filter         *JSONValue
 }
 
 // QueriedFeature contains one copied feature query result.
@@ -65,7 +65,7 @@ type QueriedFeature struct {
 	HasSourceID      bool
 	SourceLayerID    string
 	HasSourceLayerID bool
-	State            any
+	State            JSONValue
 	HasState         bool
 }
 
@@ -127,7 +127,7 @@ const (
 // FeatureExtensionResult contains one copied feature extension result.
 type FeatureExtensionResult struct {
 	Type     FeatureExtensionResultType
-	Value    any
+	Value    JSONValue
 	Features []Feature
 }
 
@@ -175,7 +175,7 @@ func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRe
 	}
 	if options.Filter != nil {
 		raw.materializer = newCJSONMaterializer()
-		filter, err := raw.materializer.value(options.Filter)
+		filter, err := raw.materializer.value(*options.Filter)
 		if err != nil {
 			raw.free()
 			return nil, err
@@ -223,7 +223,7 @@ func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSource
 	}
 	if options.Filter != nil {
 		raw.materializer = newCJSONMaterializer()
-		filter, err := raw.materializer.value(options.Filter)
+		filter, err := raw.materializer.value(*options.Filter)
 		if err != nil {
 			raw.free()
 			return nil, err
@@ -303,13 +303,13 @@ func cFeature(feature *C.mln_feature) (Feature, error) {
 	if err != nil {
 		return Feature{}, err
 	}
-	out := Feature{Geometry: geometry, Properties: make(map[string]any, int(C.mln_go_feature_property_count(feature)))}
+	out := Feature{Geometry: geometry, Properties: make(JSONMembers, int(C.mln_go_feature_property_count(feature)))}
 	for i := 0; i < int(C.mln_go_feature_property_count(feature)); i++ {
 		value, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(C.mln_go_feature_property_value(feature, C.size_t(i)))))
 		if err != nil {
 			return Feature{}, newBindingError(ErrNative, err.Error())
 		}
-		out.Properties[goStringView(C.mln_go_feature_property_key(feature, C.size_t(i)))] = value
+		out.Properties[i] = JSONMember{Name: goStringView(C.mln_go_feature_property_key(feature, C.size_t(i))), Value: value}
 	}
 	switch uint32(C.mln_go_feature_identifier_type(feature)) {
 	case C.MLN_FEATURE_IDENTIFIER_TYPE_NULL:
@@ -418,11 +418,12 @@ func featureExtensionResultForTest(resultType uint32) FeatureExtensionResult {
 
 // SetFeatureState sets per-feature state on a render source. The state value is
 // copied before the call returns.
-func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state map[string]any) error {
-	ptr, err := session.ptr()
+func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state JSONValue) error {
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	rawSelector := newCFeatureStateSelector(selector)
 	defer rawSelector.free()
@@ -432,49 +433,58 @@ func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelecto
 	if err != nil {
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return checkNative(func() int32 {
-		return int32(C.mln_render_session_set_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &rawState))
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_set_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &rawState))
+		})
 	})
 }
 
 // FeatureState returns copied per-feature state from a render source.
-func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) (any, error) {
-	ptr, err := session.ptr()
+func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) (JSONValue, error) {
+	ptr, release, err := session.ptr()
 	if err != nil {
-		return nil, err
+		return JSONValue{}, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	rawSelector := newCFeatureStateSelector(selector)
 	defer rawSelector.free()
 	var snapshot *C.mln_json_snapshot
-	if err := checkNative(func() int32 {
-		return int32(C.mln_render_session_get_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &snapshot))
+	if err := session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_get_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &snapshot))
+		})
 	}); err != nil {
-		return nil, err
+		return JSONValue{}, err
 	}
 	return cJSONSnapshotValue(snapshot)
 }
 
 // RemoveFeatureState removes per-feature state from a render source.
 func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSelector) error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	rawSelector := newCFeatureStateSelector(selector)
 	defer rawSelector.free()
-	return checkNative(func() int32 {
-		return int32(C.mln_render_session_remove_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw))
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_remove_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw))
+		})
 	})
 }
 
 // QueryRenderedFeatures queries rendered features from the latest render session state.
 func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions) ([]QueriedFeature, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	rawGeometry := newCRenderedQueryGeometry(geometry)
 	rawOptions, err := newCRenderedFeatureQueryOptions(options)
@@ -483,8 +493,10 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 	}
 	defer rawOptions.free()
 	var result *C.mln_feature_query_result
-	if err := checkNative(func() int32 {
-		return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawGeometry.raw, rawOptions.ptr(), &result))
+	if err := session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawGeometry.raw, rawOptions.ptr(), &result))
+		})
 	}); err != nil {
 		return nil, err
 	}
@@ -493,10 +505,11 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 
 // QuerySourceFeatures queries source features from the latest render session state.
 func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options *SourceFeatureQueryOptions) ([]QueriedFeature, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -506,8 +519,10 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 	}
 	defer rawOptions.free()
 	var result *C.mln_feature_query_result
-	if err := checkNative(func() int32 {
-		return int32(C.mln_render_session_query_source_features((*C.mln_render_session)(unsafe.Pointer(ptr)), sourceView.raw(), rawOptions.ptr(), &result))
+	if err := session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_query_source_features((*C.mln_render_session)(unsafe.Pointer(ptr)), sourceView.raw(), rawOptions.ptr(), &result))
+		})
 	}); err != nil {
 		return nil, err
 	}
@@ -515,11 +530,12 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 }
 
 // QueryFeatureExtensions queries a feature extension from the latest render session state.
-func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature Feature, extension string, extensionField string, arguments any) (FeatureExtensionResult, error) {
-	ptr, err := session.ptr()
+func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature Feature, extension string, extensionField string, arguments *JSONValue) (FeatureExtensionResult, error) {
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return FeatureExtensionResult{}, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
@@ -537,23 +553,25 @@ func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feat
 	defer jsonMaterializer.free()
 	var rawArguments *C.mln_json_value
 	if arguments != nil {
-		value, err := jsonMaterializer.value(arguments)
+		value, err := jsonMaterializer.value(*arguments)
 		if err != nil {
 			return FeatureExtensionResult{}, newBindingError(ErrInvalidArgument, err.Error())
 		}
 		rawArguments = &value
 	}
 	var result *C.mln_feature_extension_result
-	if err := checkNative(func() int32 {
-		return int32(C.mln_render_session_query_feature_extensions(
-			(*C.mln_render_session)(unsafe.Pointer(ptr)),
-			sourceView.raw(),
-			rawFeature,
-			extensionView.raw(),
-			extensionFieldView.raw(),
-			rawArguments,
-			&result,
-		))
+	if err := session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_query_feature_extensions(
+				(*C.mln_render_session)(unsafe.Pointer(ptr)),
+				sourceView.raw(),
+				rawFeature,
+				extensionView.raw(),
+				extensionFieldView.raw(),
+				rawArguments,
+				&result,
+			))
+		})
 	}); err != nil {
 		return FeatureExtensionResult{}, err
 	}

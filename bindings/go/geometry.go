@@ -85,10 +85,8 @@ type Geometry struct {
 
 // Feature is a GeoJSON feature descriptor.
 type Feature struct {
-	Geometry Geometry
-	// Properties uses Go map semantics: object member order is not preserved, and
-	// duplicate keys collapse to one value.
-	Properties map[string]any
+	Geometry   Geometry
+	Properties JSONMembers
 	Identifier any
 }
 

@@ -37,6 +37,37 @@ func TestResourceResponseRejectsEmbeddedNULStrings(t *testing.T) {
 		t.Fatalf("valid resource response error = %v", err)
 	}
 }
+func TestResourceResponseAllowsUnknownEnumsForNativeValidation(t *testing.T) {
+	if err := validateResourceResponse(ResourceResponse{Status: ResourceResponseStatus(99)}); err != nil {
+		t.Fatalf("unknown status error = %v, want nil", err)
+	}
+	if err := validateResourceResponse(ResourceResponse{Status: ResourceResponseStatusOK, ErrorReason: ResourceErrorReason(99)}); err != nil {
+		t.Fatalf("unknown error reason error = %v, want nil", err)
+	}
+}
+func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
+	statuses := []ResourceResponseStatus{
+		ResourceResponseStatusOK,
+		ResourceResponseStatusError,
+		ResourceResponseStatusNoContent,
+		ResourceResponseStatusNotModified,
+	}
+	reasons := []ResourceErrorReason{
+		ResourceErrorReasonNone,
+		ResourceErrorReasonNotFound,
+		ResourceErrorReasonServer,
+		ResourceErrorReasonConnection,
+		ResourceErrorReasonRateLimit,
+		ResourceErrorReasonOther,
+	}
+	for _, status := range statuses {
+		for _, reason := range reasons {
+			if err := validateResourceResponse(ResourceResponse{Status: status, ErrorReason: reason}); err != nil {
+				t.Fatalf("validateResourceResponse(%v, %v) error = %v", status, reason, err)
+			}
+		}
+	}
+}
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

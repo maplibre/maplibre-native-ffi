@@ -189,10 +189,15 @@ type OpenGLBorrowedTextureDescriptor struct {
 
 // RenderSessionHandle owns a map render session.
 type RenderSessionHandle struct {
-	state  *handle.State[nativeRenderSession]
-	parent *MapHandle
-	mu     sync.Mutex
-	frame  bool
+	state       *handle.State[nativeRenderSession]
+	parent      *MapHandle
+	parentChild *handle.Child
+	mu          sync.Mutex
+	frame       bool
+}
+
+var destroyRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
+	return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
 }
 
 type metalOwnedTextureFrameState struct {
@@ -216,71 +221,72 @@ type openglOwnedTextureFrameState struct {
 	closed  bool
 }
 
-// MetalOwnedTextureFrameInfo contains borrowed Metal objects for an acquired
+// MetalOwnedTextureFrameInfo contains copied metadata for an acquired
 // session-owned texture frame.
 type MetalOwnedTextureFrameInfo struct {
 	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	Texture     NativePointer
-	Device      NativePointer
 	PixelFormat uint64
 }
 
 // MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
-// Backend handles are borrowed and remain valid only during WithInfo. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
+// Backend handles are borrowed and remain valid only while the frame is active.
+// Close the frame on the render session owner thread before resizing, rendering,
+// reading back, detaching, closing the session, or acquiring another frame.
 type MetalOwnedTextureFrame struct {
-	info  MetalOwnedTextureFrameInfo
-	state *metalOwnedTextureFrameState
+	info    MetalOwnedTextureFrameInfo
+	texture NativePointer
+	device  NativePointer
+	state   *metalOwnedTextureFrameState
 }
 
-// VulkanOwnedTextureFrameInfo contains borrowed Vulkan objects for an acquired
+// VulkanOwnedTextureFrameInfo contains copied metadata for an acquired
 // session-owned texture frame.
 type VulkanOwnedTextureFrameInfo struct {
 	Generation  uint64
 	Width       uint32
 	Height      uint32
 	ScaleFactor float64
-	Image       NativePointer
-	ImageView   NativePointer
-	Device      NativePointer
 	Format      uint32
 	Layout      uint32
 }
 
 // VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
-// Backend handles are borrowed and remain valid only during WithInfo. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
+// Backend handles are borrowed and remain valid only while the frame is active.
+// Close the frame on the render session owner thread before resizing, rendering,
+// reading back, detaching, closing the session, or acquiring another frame.
 type VulkanOwnedTextureFrame struct {
-	info  VulkanOwnedTextureFrameInfo
-	state *vulkanOwnedTextureFrameState
+	info      VulkanOwnedTextureFrameInfo
+	image     NativePointer
+	imageView NativePointer
+	device    NativePointer
+	state     *vulkanOwnedTextureFrameState
 }
 
-// OpenGLOwnedTextureFrameInfo contains borrowed OpenGL object names for an
+// OpenGLOwnedTextureFrameInfo contains copied metadata for an
 // acquired session-owned texture frame.
 type OpenGLOwnedTextureFrameInfo struct {
 	Generation     uint64
 	Width          uint32
 	Height         uint32
 	ScaleFactor    float64
-	Texture        uint32
-	Target         uint32
 	InternalFormat uint32
 	Format         uint32
 	Type           uint32
 }
 
 // OpenGLOwnedTextureFrame is an acquired session-owned OpenGL texture frame.
-// Backend handles are borrowed and remain valid only during WithInfo. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
+// Backend object names are borrowed and remain valid only while the frame is
+// active. Close the frame on the render session owner thread before resizing,
+// rendering, reading back, detaching, closing the session, or acquiring another
+// frame.
 type OpenGLOwnedTextureFrame struct {
-	info  OpenGLOwnedTextureFrameInfo
-	state *openglOwnedTextureFrameState
+	info    OpenGLOwnedTextureFrameInfo
+	texture uint32
+	target  uint32
+	state   *openglOwnedTextureFrameState
 }
 
 func (extent RenderTargetExtent) validate() error {
@@ -411,7 +417,7 @@ func newRenderSessionHandle(parent *MapHandle, session *nativeRenderSession) (*R
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return &RenderSessionHandle{state: state, parent: parent}, nil
+	return &RenderSessionHandle{state: state, parent: parent, parentChild: parent.state.AddChild()}, nil
 }
 
 // AttachMetalSurface attaches a Metal native surface render target to this map.
@@ -420,10 +426,11 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -443,10 +450,11 @@ func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*Re
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -469,10 +477,11 @@ func (m *MapHandle) AttachOpenGLSurface(descriptor OpenGLSurfaceDescriptor) (*Re
 	if err := descriptor.Context.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -490,10 +499,11 @@ func (m *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescript
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -513,10 +523,11 @@ func (m *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDe
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -534,10 +545,11 @@ func (m *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescri
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -557,10 +569,11 @@ func (m *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTexture
 	if err := descriptor.Extent.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -581,10 +594,11 @@ func (m *MapHandle) AttachOpenGLOwnedTexture(descriptor OpenGLOwnedTextureDescri
 	if err := descriptor.Context.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -605,10 +619,11 @@ func (m *MapHandle) AttachOpenGLBorrowedTexture(descriptor OpenGLBorrowedTexture
 	if err := descriptor.Context.validate(); err != nil {
 		return nil, err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var session *C.mln_render_session
@@ -621,15 +636,15 @@ func (m *MapHandle) AttachOpenGLBorrowedTexture(descriptor OpenGLBorrowedTexture
 	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
-func (session *RenderSessionHandle) ptr() (*nativeRenderSession, error) {
+func (session *RenderSessionHandle) ptr() (*nativeRenderSession, func(), error) {
 	if session == nil || session.state == nil {
-		return nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
+		return nil, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
-	ptr, live := session.state.Ptr()
+	borrow, live := session.state.Borrow()
 	if !live {
-		return nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
+		return nil, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
 	}
-	return ptr, nil
+	return borrow.Ptr(), borrow.Release, nil
 }
 
 func (session *RenderSessionHandle) withNoAcquiredFrame(call func() error) error {
@@ -652,10 +667,11 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	if err := extent.validate(); err != nil {
 		return err
 	}
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
@@ -667,10 +683,11 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 
 // RenderUpdate renders one frame/update into the attached render target.
 func (session *RenderSessionHandle) RenderUpdate() error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
@@ -682,10 +699,11 @@ func (session *RenderSessionHandle) RenderUpdate() error {
 
 // Detach detaches the render target from the session.
 func (session *RenderSessionHandle) Detach() error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
@@ -695,50 +713,60 @@ func (session *RenderSessionHandle) Detach() error {
 
 // ReduceMemoryUse asks the render session to release cached render resources.
 func (session *RenderSessionHandle) ReduceMemoryUse() error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_render_session_reduce_memory_use((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_reduce_memory_use((*C.mln_render_session)(unsafe.Pointer(ptr))))
+		})
 	})
 }
 
 // ClearData clears render-session data.
 func (session *RenderSessionHandle) ClearData() error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_render_session_clear_data((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_clear_data((*C.mln_render_session)(unsafe.Pointer(ptr))))
+		})
 	})
 }
 
 // DumpDebugLogs dumps render-session debug logs.
 func (session *RenderSessionHandle) DumpDebugLogs() error {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(ptr))))
+		})
 	})
 }
 
 // ReadPremultipliedRGBA8 reads the latest session-owned texture frame into a
 // new byte slice.
 func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureImageInfo, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, TextureImageInfo{}, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 
@@ -769,10 +797,11 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureIma
 // ReadPremultipliedRGBA8Into reads the latest session-owned texture frame into
 // caller-owned storage.
 func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (TextureImageInfo, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return TextureImageInfo{}, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	var info TextureImageInfo
@@ -804,10 +833,11 @@ func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr *native
 // frame. While the frame is live, resize, render update, detach, readback,
 // session close, and another frame acquire are invalid.
 func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextureFrame, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	session.mu.Lock()
@@ -828,11 +858,11 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 			Width:       uint32(rawFrame.width),
 			Height:      uint32(rawFrame.height),
 			ScaleFactor: float64(rawFrame.scale_factor),
-			Texture:     NativePointer(uintptr(rawFrame.texture)),
-			Device:      NativePointer(uintptr(rawFrame.device)),
 			PixelFormat: uint64(rawFrame.pixel_format),
 		},
-		state: &metalOwnedTextureFrameState{session: session, raw: rawFrame},
+		texture: NativePointer(uintptr(rawFrame.texture)),
+		device:  NativePointer(uintptr(rawFrame.device)),
+		state:   &metalOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -840,10 +870,11 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 // frame. While the frame is live, resize, render update, detach, readback,
 // session close, and another frame acquire are invalid.
 func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTextureFrame, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	session.mu.Lock()
@@ -864,13 +895,13 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 			Width:       uint32(rawFrame.width),
 			Height:      uint32(rawFrame.height),
 			ScaleFactor: float64(rawFrame.scale_factor),
-			Image:       NativePointer(uintptr(rawFrame.image)),
-			ImageView:   NativePointer(uintptr(rawFrame.image_view)),
-			Device:      NativePointer(uintptr(rawFrame.device)),
 			Format:      uint32(rawFrame.format),
 			Layout:      uint32(rawFrame.layout),
 		},
-		state: &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
+		image:     NativePointer(uintptr(rawFrame.image)),
+		imageView: NativePointer(uintptr(rawFrame.image_view)),
+		device:    NativePointer(uintptr(rawFrame.device)),
+		state:     &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -878,10 +909,11 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 // frame. While the frame is live, resize, render update, detach, readback,
 // session close, and another frame acquire are invalid.
 func (session *RenderSessionHandle) AcquireOpenGLTextureFrame() (*OpenGLOwnedTextureFrame, error) {
-	ptr, err := session.ptr()
+	ptr, release, err := session.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	session.mu.Lock()
@@ -902,18 +934,17 @@ func (session *RenderSessionHandle) AcquireOpenGLTextureFrame() (*OpenGLOwnedTex
 			Width:          uint32(rawFrame.width),
 			Height:         uint32(rawFrame.height),
 			ScaleFactor:    float64(rawFrame.scale_factor),
-			Texture:        uint32(rawFrame.texture),
-			Target:         uint32(rawFrame.target),
 			InternalFormat: uint32(rawFrame.internal_format),
 			Format:         uint32(rawFrame.format),
 			Type:           uint32(rawFrame._type),
 		},
-		state: &openglOwnedTextureFrameState{session: session, raw: rawFrame},
+		texture: uint32(rawFrame.texture),
+		target:  uint32(rawFrame.target),
+		state:   &openglOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
-// WithInfo exposes borrowed Metal frame objects while the frame remains live.
-// The info value and backend handles must not be used after fn returns.
+// WithInfo passes copied Metal frame metadata after verifying the frame is live.
 func (frame *MetalOwnedTextureFrame) WithInfo(fn func(MetalOwnedTextureFrameInfo) error) error {
 	if frame == nil || frame.state == nil {
 		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
@@ -922,15 +953,42 @@ func (frame *MetalOwnedTextureFrame) WithInfo(fn func(MetalOwnedTextureFrameInfo
 		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame WithInfo callback is nil")
 	}
 	frame.state.mu.Lock()
-	defer frame.state.mu.Unlock()
 	if frame.state.closed {
+		frame.state.mu.Unlock()
 		return newBindingError(ErrInvalidState, "MetalOwnedTextureFrame is closed")
 	}
-	return fn(frame.info)
+	info := frame.info
+	frame.state.mu.Unlock()
+	return fn(info)
 }
 
-// WithInfo exposes borrowed Vulkan frame objects while the frame remains live.
-// The info value and backend handles must not be used after fn returns.
+// Texture returns the borrowed Metal texture while the frame remains live.
+func (frame *MetalOwnedTextureFrame) Texture() (NativePointer, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "MetalOwnedTextureFrame is closed")
+	}
+	return frame.texture, nil
+}
+
+// Device returns the borrowed Metal device while the frame remains live.
+func (frame *MetalOwnedTextureFrame) Device() (NativePointer, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "MetalOwnedTextureFrame is closed")
+	}
+	return frame.device, nil
+}
+
+// WithInfo passes copied Vulkan frame metadata after verifying the frame is live.
 func (frame *VulkanOwnedTextureFrame) WithInfo(fn func(VulkanOwnedTextureFrameInfo) error) error {
 	if frame == nil || frame.state == nil {
 		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
@@ -939,15 +997,55 @@ func (frame *VulkanOwnedTextureFrame) WithInfo(fn func(VulkanOwnedTextureFrameIn
 		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame WithInfo callback is nil")
 	}
 	frame.state.mu.Lock()
-	defer frame.state.mu.Unlock()
 	if frame.state.closed {
+		frame.state.mu.Unlock()
 		return newBindingError(ErrInvalidState, "VulkanOwnedTextureFrame is closed")
 	}
-	return fn(frame.info)
+	info := frame.info
+	frame.state.mu.Unlock()
+	return fn(info)
 }
 
-// WithInfo exposes borrowed OpenGL frame objects while the frame remains live.
-// The info value and backend object names must not be used after fn returns.
+// Image returns the borrowed Vulkan image while the frame remains live.
+func (frame *VulkanOwnedTextureFrame) Image() (NativePointer, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "VulkanOwnedTextureFrame is closed")
+	}
+	return frame.image, nil
+}
+
+// ImageView returns the borrowed Vulkan image view while the frame remains live.
+func (frame *VulkanOwnedTextureFrame) ImageView() (NativePointer, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "VulkanOwnedTextureFrame is closed")
+	}
+	return frame.imageView, nil
+}
+
+// Device returns the borrowed Vulkan device while the frame remains live.
+func (frame *VulkanOwnedTextureFrame) Device() (NativePointer, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "VulkanOwnedTextureFrame is closed")
+	}
+	return frame.device, nil
+}
+
+// WithInfo passes copied OpenGL frame metadata after verifying the frame is live.
 func (frame *OpenGLOwnedTextureFrame) WithInfo(fn func(OpenGLOwnedTextureFrameInfo) error) error {
 	if frame == nil || frame.state == nil {
 		return newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame is nil")
@@ -956,11 +1054,41 @@ func (frame *OpenGLOwnedTextureFrame) WithInfo(fn func(OpenGLOwnedTextureFrameIn
 		return newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame WithInfo callback is nil")
 	}
 	frame.state.mu.Lock()
-	defer frame.state.mu.Unlock()
 	if frame.state.closed {
+		frame.state.mu.Unlock()
 		return newBindingError(ErrInvalidState, "OpenGLOwnedTextureFrame is closed")
 	}
-	return fn(frame.info)
+	info := frame.info
+	frame.state.mu.Unlock()
+	return fn(info)
+}
+
+// Texture returns the borrowed OpenGL texture object name while the frame
+// remains live.
+func (frame *OpenGLOwnedTextureFrame) Texture() (uint32, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "OpenGLOwnedTextureFrame is closed")
+	}
+	return frame.texture, nil
+}
+
+// Target returns the borrowed OpenGL texture target while the frame remains
+// live.
+func (frame *OpenGLOwnedTextureFrame) Target() (uint32, error) {
+	if frame == nil || frame.state == nil {
+		return 0, newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return 0, newBindingError(ErrInvalidState, "OpenGLOwnedTextureFrame is closed")
+	}
+	return frame.target, nil
 }
 
 // Close releases this acquired Metal texture frame on the session owner thread.
@@ -976,10 +1104,11 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 	if state.closed {
 		return nil
 	}
-	ptr, err := state.session.ptr()
+	ptr, release, err := state.session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
@@ -1005,10 +1134,11 @@ func (frame *VulkanOwnedTextureFrame) Close() error {
 	if state.closed {
 		return nil
 	}
-	ptr, err := state.session.ptr()
+	ptr, release, err := state.session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
@@ -1034,10 +1164,11 @@ func (frame *OpenGLOwnedTextureFrame) Close() error {
 	if state.closed {
 		return nil
 	}
-	ptr, err := state.session.ptr()
+	ptr, release, err := state.session.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
@@ -1059,10 +1190,14 @@ func (session *RenderSessionHandle) Close() error {
 	}
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 {
+		if err := checkNative(func() int32 {
 			return session.state.Close(func(ptr *nativeRenderSession) int32 {
-				return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
+				return destroyRenderSessionHandle(ptr)
 			})
-		})
+		}); err != nil {
+			return err
+		}
+		session.parentChild.Release()
+		return nil
 	})
 }

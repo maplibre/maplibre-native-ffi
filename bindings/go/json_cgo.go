@@ -42,50 +42,26 @@ func (materializer *cJSONMaterializer) stringView(value string) C.mln_string_vie
 	return C.mln_string_view{data: (*C.char)(ptr), size: C.size_t(len(value))}
 }
 
-func (materializer *cJSONMaterializer) value(value any) (C.mln_json_value, error) {
-	switch typed := value.(type) {
-	case nil:
+func (materializer *cJSONMaterializer) value(value JSONValue) (C.mln_json_value, error) {
+	switch value.Type {
+	case JSONValueTypeNull:
 		return C.mln_go_json_null(), nil
-	case bool:
-		return C.mln_go_json_bool(C.bool(typed)), nil
-	case string:
-		return C.mln_go_json_string(materializer.stringView(typed)), nil
-	case int:
-		return C.mln_go_json_int(C.int64_t(typed)), nil
-	case int8:
-		return C.mln_go_json_int(C.int64_t(typed)), nil
-	case int16:
-		return C.mln_go_json_int(C.int64_t(typed)), nil
-	case int32:
-		return C.mln_go_json_int(C.int64_t(typed)), nil
-	case int64:
-		return C.mln_go_json_int(C.int64_t(typed)), nil
-	case uint:
-		return C.mln_go_json_uint(C.uint64_t(typed)), nil
-	case uint8:
-		return C.mln_go_json_uint(C.uint64_t(typed)), nil
-	case uint16:
-		return C.mln_go_json_uint(C.uint64_t(typed)), nil
-	case uint32:
-		return C.mln_go_json_uint(C.uint64_t(typed)), nil
-	case uint64:
-		return C.mln_go_json_uint(C.uint64_t(typed)), nil
-	case float32:
-		return materializer.float(float64(typed))
-	case float64:
-		return materializer.float(typed)
-	case []any:
-		return materializer.array(typed)
-	case []string:
-		values := make([]any, len(typed))
-		for i, item := range typed {
-			values[i] = item
-		}
-		return materializer.array(values)
-	case map[string]any:
-		return materializer.object(typed)
+	case JSONValueTypeBool:
+		return C.mln_go_json_bool(C.bool(value.Bool)), nil
+	case JSONValueTypeString:
+		return C.mln_go_json_string(materializer.stringView(value.String)), nil
+	case JSONValueTypeInt:
+		return C.mln_go_json_int(C.int64_t(value.Int)), nil
+	case JSONValueTypeUint:
+		return C.mln_go_json_uint(C.uint64_t(value.Uint)), nil
+	case JSONValueTypeDouble:
+		return materializer.float(value.Double)
+	case JSONValueTypeArray:
+		return materializer.array(value.Array)
+	case JSONValueTypeObject:
+		return materializer.object(value.Object)
 	default:
-		return C.mln_json_value{}, fmt.Errorf("unsupported JSON value type %T", value)
+		return C.mln_json_value{}, fmt.Errorf("unsupported JSON value type %d", value.Type)
 	}
 }
 
@@ -96,7 +72,7 @@ func (materializer *cJSONMaterializer) float(value float64) (C.mln_json_value, e
 	return C.mln_go_json_double(C.double(value)), nil
 }
 
-func (materializer *cJSONMaterializer) array(values []any) (C.mln_json_value, error) {
+func (materializer *cJSONMaterializer) array(values []JSONValue) (C.mln_json_value, error) {
 	if len(values) == 0 {
 		return C.mln_go_json_array(nil, 0), nil
 	}
@@ -111,7 +87,7 @@ func (materializer *cJSONMaterializer) array(values []any) (C.mln_json_value, er
 	return C.mln_go_json_array(rawValues, C.size_t(len(values))), nil
 }
 
-func (materializer *cJSONMaterializer) object(members map[string]any) (C.mln_json_value, error) {
+func (materializer *cJSONMaterializer) object(members JSONMembers) (C.mln_json_value, error) {
 	rawMembers, count, err := materializer.members(members)
 	if err != nil {
 		return C.mln_json_value{}, err
@@ -119,21 +95,19 @@ func (materializer *cJSONMaterializer) object(members map[string]any) (C.mln_jso
 	return C.mln_go_json_object(rawMembers, count), nil
 }
 
-func (materializer *cJSONMaterializer) members(members map[string]any) (*C.mln_json_member, C.size_t, error) {
+func (materializer *cJSONMaterializer) members(members JSONMembers) (*C.mln_json_member, C.size_t, error) {
 	if len(members) == 0 {
 		return nil, 0, nil
 	}
 	rawMembers := (*C.mln_json_member)(materializer.alloc(C.size_t(len(members)) * C.size_t(unsafe.Sizeof(C.mln_json_member{}))))
-	i := 0
-	for key, item := range members {
-		rawValue, err := materializer.value(item)
+	for i, member := range members {
+		rawValue, err := materializer.value(member.Value)
 		if err != nil {
 			return nil, 0, err
 		}
 		valuePtr := (*C.mln_json_value)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
 		*valuePtr = rawValue
-		*(*C.mln_json_member)(unsafe.Add(unsafe.Pointer(rawMembers), uintptr(i)*unsafe.Sizeof(C.mln_json_member{}))) = C.mln_go_json_member(materializer.stringView(key), valuePtr)
-		i++
+		*(*C.mln_json_member)(unsafe.Add(unsafe.Pointer(rawMembers), uintptr(i)*unsafe.Sizeof(C.mln_json_member{}))) = C.mln_go_json_member(materializer.stringView(member.Name), valuePtr)
 	}
 	return rawMembers, C.size_t(len(members)), nil
 }
@@ -256,61 +230,65 @@ func (materializer *cGeoJSONMaterializer) features(features []Feature) (*C.mln_f
 	return rawFeatures, nil
 }
 
-func cJSONSnapshotValue(snapshot *C.mln_json_snapshot) (any, error) {
+func cJSONSnapshotValue(snapshot *C.mln_json_snapshot) (JSONValue, error) {
 	defer C.mln_json_snapshot_destroy(snapshot)
 	var rawValue *C.mln_json_value
 	if err := checkNative(func() int32 {
 		return int32(C.mln_json_snapshot_get(snapshot, (**C.mln_json_value)(unsafe.Pointer(&rawValue))))
 	}); err != nil {
-		return nil, err
+		return JSONValue{}, err
 	}
 	value, err := cJSONValue(rawValue)
 	if err != nil {
-		return nil, newBindingError(ErrNative, err.Error())
+		return JSONValue{}, newBindingError(ErrNative, err.Error())
 	}
 	return value, nil
 }
 
-func cJSONValue(value *C.mln_json_value) (any, error) {
+func cJSONValue(value *C.mln_json_value) (JSONValue, error) {
 	if value == nil {
-		return nil, nil
+		return JSONNull(), nil
 	}
 	switch uint32(C.mln_go_json_type(value)) {
 	case uint32(C.MLN_JSON_VALUE_TYPE_NULL):
-		return nil, nil
+		return JSONNull(), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_BOOL):
-		return bool(C.mln_go_json_bool_value(value)), nil
+		return JSONBool(bool(C.mln_go_json_bool_value(value))), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_UINT):
-		return uint64(C.mln_go_json_uint_value(value)), nil
+		return JSONUint(uint64(C.mln_go_json_uint_value(value))), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_INT):
-		return int64(C.mln_go_json_int_value(value)), nil
+		return JSONInt(int64(C.mln_go_json_int_value(value))), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_DOUBLE):
-		return float64(C.mln_go_json_double_value(value)), nil
+		doubleValue := float64(C.mln_go_json_double_value(value))
+		if math.IsNaN(doubleValue) || math.IsInf(doubleValue, 0) {
+			return JSONValue{}, fmt.Errorf("JSON double value must be finite")
+		}
+		return JSONDouble(doubleValue), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_STRING):
-		return goStringView(C.mln_go_json_string_value(value)), nil
+		return JSONString(goStringView(C.mln_go_json_string_value(value))), nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_ARRAY):
 		count := int(C.mln_go_json_array_count(value))
-		items := make([]any, count)
+		items := make([]JSONValue, count)
 		for i := range items {
 			item, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(C.mln_go_json_array_get(value, C.size_t(i)))))
 			if err != nil {
-				return nil, err
+				return JSONValue{}, err
 			}
 			items[i] = item
 		}
-		return items, nil
+		return JSONValue{Type: JSONValueTypeArray, Array: items}, nil
 	case uint32(C.MLN_JSON_VALUE_TYPE_OBJECT):
 		count := int(C.mln_go_json_object_count(value))
-		members := make(map[string]any, count)
+		members := make(JSONMembers, count)
 		for i := 0; i < count; i++ {
 			item, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(C.mln_go_json_object_value(value, C.size_t(i)))))
 			if err != nil {
-				return nil, err
+				return JSONValue{}, err
 			}
-			members[goStringView(C.mln_go_json_object_key(value, C.size_t(i)))] = item
+			members[i] = JSONMember{Name: goStringView(C.mln_go_json_object_key(value, C.size_t(i))), Value: item}
 		}
-		return members, nil
+		return JSONValue{Type: JSONValueTypeObject, Object: members}, nil
 	default:
-		return nil, fmt.Errorf("unknown JSON value type %d", uint32(C.mln_go_json_type(value)))
+		return JSONValue{}, fmt.Errorf("unknown JSON value type %d", uint32(C.mln_go_json_type(value)))
 	}
 }

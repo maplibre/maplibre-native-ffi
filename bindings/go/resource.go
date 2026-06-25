@@ -6,6 +6,7 @@ package maplibre
 import "C"
 
 import (
+	"errors"
 	stdruntime "runtime"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
@@ -164,11 +165,9 @@ func (handle *ResourceRequestHandle) Complete(response ResourceResponse) error {
 	if handle == nil || handle.state == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
 	}
-	if err := validateResourceResponse(response); err != nil {
-		return err
-	}
-	return checkNative(func() int32 {
-		return int32(handle.state.Complete(callback.ResourceResponse{
+	var bindingErr error
+	if err := checkNative(func() int32 {
+		status, err := handle.state.CompleteChecked(callback.ResourceResponse{
 			Status:           uint32(response.Status),
 			ErrorReason:      uint32(response.ErrorReason),
 			Bytes:            response.Bytes,
@@ -181,8 +180,43 @@ func (handle *ResourceRequestHandle) Complete(response ResourceResponse) error {
 			ETag:             response.ETag,
 			HasRetryAfter:    response.HasRetryAfter,
 			RetryAfterUnixMS: response.RetryAfterUnixMS,
-		}))
-	})
+		}, func() error {
+			return validateResourceResponse(response)
+		})
+		if err != nil {
+			bindingErr = resourceRequestStateError(err)
+			return int32(C.MLN_STATUS_OK)
+		}
+		return int32(status)
+	}); err != nil {
+		return err
+	}
+	if bindingErr != nil {
+		return bindingErr
+	}
+	return nil
+}
+
+func resourceRequestStateError(err error) error {
+	switch {
+	case errors.Is(err, callback.ErrResourceRequestCompleted):
+		return newBindingError(ErrInvalidState, "ResourceRequestHandle is already completed")
+	case errors.Is(err, callback.ErrResourceRequestClosed):
+		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is closed")
+	default:
+		return err
+	}
+}
+
+func rawResourceProviderDecision(decision ResourceProviderDecision) uint32 {
+	switch decision {
+	case ResourceProviderDecisionPassThrough:
+		return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
+	case ResourceProviderDecisionHandle:
+		return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
+	default:
+		return uint32(decision)
+	}
 }
 
 // Cancelled reports whether native code cancelled the provider request.
@@ -191,12 +225,20 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 		return false, newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
 	}
 	var cancelled bool
+	var bindingErr error
 	if err := checkNative(func() int32 {
-		status, value := handle.state.Cancelled()
+		status, value, err := handle.state.CancelledChecked()
+		if err != nil {
+			bindingErr = resourceRequestStateError(err)
+			return int32(C.MLN_STATUS_OK)
+		}
 		cancelled = value
 		return int32(status)
 	}); err != nil {
 		return false, err
+	}
+	if bindingErr != nil {
+		return false, bindingErr
 	}
 	return cancelled, nil
 }

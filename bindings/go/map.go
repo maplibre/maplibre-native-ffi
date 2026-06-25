@@ -61,6 +61,7 @@ func NewMapOptions(width, height uint32, scaleFactor float64) MapOptions {
 type MapHandle struct {
 	state         *handle.State[nativeMap]
 	runtime       *RuntimeHandle
+	runtimeChild  *handle.Child
 	nativeAddress uintptr
 	id            MapID
 
@@ -68,15 +69,19 @@ type MapHandle struct {
 	customGeometrySources map[string]*callback.CustomGeometrySourceState
 }
 
-func (m *MapHandle) ptr() (*nativeMap, error) {
+var destroyMapHandle = func(ptr *nativeMap) int32 {
+	return int32(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(ptr))))
+}
+
+func (m *MapHandle) ptr() (*nativeMap, func(), error) {
 	if m == nil || m.state == nil {
-		return nil, newBindingError(ErrInvalidArgument, "MapHandle is nil")
+		return nil, nil, newBindingError(ErrInvalidArgument, "MapHandle is nil")
 	}
-	ptr, live := m.state.Ptr()
+	borrow, live := m.state.Borrow()
 	if !live {
-		return nil, newBindingError(ErrInvalidArgument, "MapHandle is closed")
+		return nil, nil, newBindingError(ErrInvalidArgument, "MapHandle is closed")
 	}
-	return ptr, nil
+	return borrow.Ptr(), borrow.Release, nil
 }
 
 func validateCStringArgument(name string, value string) error {
@@ -91,20 +96,22 @@ func validateCStringArgument(name string, value string) error {
 
 // RequestRepaint requests a repaint for a continuous map.
 func (m *MapHandle) RequestRepaint() error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 { return int32(C.mln_map_request_repaint((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // RequestStillImage requests one still image for a static or tile map.
 func (m *MapHandle) RequestStillImage() error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 { return int32(C.mln_map_request_still_image((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
@@ -114,10 +121,11 @@ func (m *MapHandle) SetStyleURL(url string) error {
 	if err := validateCStringArgument("style URL", url); err != nil {
 		return err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	cURL := C.CString(url)
 	defer C.free(unsafe.Pointer(cURL))
@@ -129,10 +137,11 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 	if err := validateCStringArgument("style JSON", json); err != nil {
 		return err
 	}
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	cJSON := C.CString(json)
 	defer C.free(unsafe.Pointer(cJSON))
@@ -145,10 +154,11 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 
 // SetDebugOptions applies MapLibre debug overlay mask bits to a map.
 func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_debug_options((*C.mln_map)(unsafe.Pointer(ptr)), C.uint32_t(options)))
@@ -157,10 +167,11 @@ func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
 
 // DebugOptions returns the current MapLibre debug overlay mask bits.
 func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return 0, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.uint32_t
 	if err := checkNative(func() int32 {
@@ -174,10 +185,11 @@ func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
 // SetRenderingStatsViewEnabled enables or disables MapLibre's rendering stats
 // overlay view.
 func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_rendering_stats_view_enabled((*C.mln_map)(unsafe.Pointer(ptr)), C.bool(enabled)))
@@ -187,10 +199,11 @@ func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) error {
 // RenderingStatsViewEnabled reports whether MapLibre's rendering stats overlay
 // view is enabled.
 func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return false, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var enabled C.bool
 	if err := checkNative(func() int32 {
@@ -204,10 +217,11 @@ func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
 // IsFullyLoaded reports whether MapLibre currently considers the map fully
 // loaded.
 func (m *MapHandle) IsFullyLoaded() (bool, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return false, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var loaded C.bool
 	if err := checkNative(func() int32 {
@@ -220,20 +234,22 @@ func (m *MapHandle) IsFullyLoaded() (bool, error) {
 
 // DumpDebugLogs dumps map debug logs through MapLibre Native logging.
 func (m *MapHandle) DumpDebugLogs() error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 { return int32(C.mln_map_dump_debug_logs((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // Camera returns the current camera snapshot.
 func (m *MapHandle) Camera() (CameraOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_camera_options = C.mln_camera_options_default()
 	if err := checkNative(func() int32 {
@@ -246,10 +262,11 @@ func (m *MapHandle) Camera() (CameraOptions, error) {
 
 // JumpTo applies a camera jump command.
 func (m *MapHandle) JumpTo(camera CameraOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	return checkNative(func() int32 {
@@ -260,10 +277,11 @@ func (m *MapHandle) JumpTo(camera CameraOptions) error {
 // EaseTo applies a camera ease transition command. Passing nil animation uses
 // the native default animation options.
 func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
@@ -276,10 +294,11 @@ func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) er
 // FlyTo applies a camera fly transition command. Passing nil animation uses the
 // native default animation options.
 func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
@@ -291,10 +310,11 @@ func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) err
 
 // MoveBy applies a screen-space pan command.
 func (m *MapHandle) MoveBy(delta ScreenPoint) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_move_by((*C.mln_map)(unsafe.Pointer(ptr)), C.double(delta.X), C.double(delta.Y)))
@@ -304,10 +324,11 @@ func (m *MapHandle) MoveBy(delta ScreenPoint) error {
 // MoveByAnimated applies an animated screen-space pan command. Passing nil
 // animation uses the native default animation options.
 func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
 	_ = rawAnimation
@@ -324,10 +345,11 @@ func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOption
 // ScaleBy applies a screen-space zoom command. Passing nil anchor uses the
 // native default zoom anchor.
 func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var rawAnchor C.mln_screen_point
 	var rawAnchorPtr *C.mln_screen_point
@@ -343,10 +365,11 @@ func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
 // ScaleByAnimated applies an animated screen-space zoom command. Passing nil
 // anchor or animation uses the native default for that option.
 func (m *MapHandle) ScaleByAnimated(scale float64, anchor *ScreenPoint, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var rawAnchor C.mln_screen_point
 	var rawAnchorPtr *C.mln_screen_point
@@ -368,10 +391,11 @@ func (m *MapHandle) ScaleByAnimated(scale float64, anchor *ScreenPoint, animatio
 
 // RotateBy applies a screen-space rotate command.
 func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_rotate_by((*C.mln_map)(unsafe.Pointer(ptr)), cScreenPoint(first), cScreenPoint(second)))
@@ -381,10 +405,11 @@ func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
 // RotateByAnimated applies an animated screen-space rotate command. Passing nil
 // animation uses the native default animation options.
 func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
 	_ = rawAnimation
@@ -400,10 +425,11 @@ func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, anim
 
 // PitchBy applies a pitch delta command.
 func (m *MapHandle) PitchBy(pitch float64) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_pitch_by((*C.mln_map)(unsafe.Pointer(ptr)), C.double(pitch)))
@@ -413,10 +439,11 @@ func (m *MapHandle) PitchBy(pitch float64) error {
 // PitchByAnimated applies an animated pitch delta command. Passing nil
 // animation uses the native default animation options.
 func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
 	_ = rawAnimation
@@ -427,10 +454,11 @@ func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) 
 
 // CancelTransitions cancels active camera transitions.
 func (m *MapHandle) CancelTransitions() error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	return checkNative(func() int32 { return int32(C.mln_map_cancel_transitions((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
@@ -438,10 +466,11 @@ func (m *MapHandle) CancelTransitions() error {
 // CameraForLatLngBounds computes a camera that fits geographic bounds. Passing
 // nil fitOptions uses native default fitting options.
 func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (CameraOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_camera_options = C.mln_camera_options_default()
 	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
@@ -462,10 +491,11 @@ func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *Camer
 // CameraForLatLngs computes a camera that fits geographic coordinates. Passing
 // nil fitOptions uses native default fitting options.
 func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (CameraOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_camera_options = C.mln_camera_options_default()
 	rawCoordinates := cLatLngSlice(coordinates)
@@ -492,10 +522,11 @@ func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFit
 // CameraForGeometry computes a camera that fits a geometry. Passing nil
 // fitOptions uses native default fitting options.
 func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOptions) (CameraOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_camera_options = C.mln_camera_options_default()
 	materializer := newCGeometryMaterializer()
@@ -522,10 +553,11 @@ func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOp
 // LatLngBoundsForCamera computes wrapped geographic bounds for a camera in the
 // current viewport.
 func (m *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (LatLngBounds, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return LatLngBounds{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	var raw C.mln_lat_lng_bounds
@@ -540,10 +572,11 @@ func (m *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (LatLngBounds, e
 // LatLngBoundsForCameraUnwrapped computes unwrapped geographic bounds for a
 // camera in the current viewport.
 func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLngBounds, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return LatLngBounds{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCamera := cCameraOptions(camera)
 	var raw C.mln_lat_lng_bounds
@@ -557,10 +590,11 @@ func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLng
 
 // Bounds returns map camera constraint options.
 func (m *MapHandle) Bounds() (BoundOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return BoundOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_bound_options = C.mln_bound_options_default()
 	if err := checkNative(func() int32 {
@@ -573,10 +607,11 @@ func (m *MapHandle) Bounds() (BoundOptions, error) {
 
 // SetBounds applies selected map camera constraint options.
 func (m *MapHandle) SetBounds(options BoundOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cBoundOptions(options)
 	return checkNative(func() int32 {
@@ -586,10 +621,11 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 
 // FreeCameraOptions returns current free camera position and orientation.
 func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return FreeCameraOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_free_camera_options = C.mln_free_camera_options_default()
 	if err := checkNative(func() int32 {
@@ -603,10 +639,11 @@ func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
 // SetFreeCameraOptions applies selected free camera position and orientation
 // fields.
 func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cFreeCameraOptions(options)
 	return checkNative(func() int32 {
@@ -616,10 +653,11 @@ func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) error {
 
 // ViewportOptions returns live map viewport and render-transform controls.
 func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return ViewportOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_map_viewport_options = C.mln_map_viewport_options_default()
 	if err := checkNative(func() int32 {
@@ -633,10 +671,11 @@ func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 // SetViewportOptions applies selected live map viewport and render-transform
 // controls.
 func (m *MapHandle) SetViewportOptions(options ViewportOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cViewportOptions(options)
 	return checkNative(func() int32 {
@@ -646,10 +685,11 @@ func (m *MapHandle) SetViewportOptions(options ViewportOptions) error {
 
 // TileOptions returns tile prefetch and LOD tuning controls.
 func (m *MapHandle) TileOptions() (TileOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return TileOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_map_tile_options = C.mln_map_tile_options_default()
 	if err := checkNative(func() int32 {
@@ -662,10 +702,11 @@ func (m *MapHandle) TileOptions() (TileOptions, error) {
 
 // SetTileOptions applies selected tile prefetch and LOD tuning controls.
 func (m *MapHandle) SetTileOptions(options TileOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cTileOptions(options)
 	return checkNative(func() int32 {
@@ -675,10 +716,11 @@ func (m *MapHandle) SetTileOptions(options TileOptions) error {
 
 // ProjectionMode returns current axonometric rendering options.
 func (m *MapHandle) ProjectionMode() (ProjectionModeOptions, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return ProjectionModeOptions{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_projection_mode = C.mln_projection_mode_default()
 	if err := checkNative(func() int32 {
@@ -691,10 +733,11 @@ func (m *MapHandle) ProjectionMode() (ProjectionModeOptions, error) {
 
 // SetProjectionMode applies axonometric rendering option fields.
 func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawOptions := cProjectionModeOptions(options)
 	return checkNative(func() int32 {
@@ -705,10 +748,11 @@ func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
 // PixelForLatLng converts a geographic coordinate to a logical screen point for
 // the current map.
 func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return ScreenPoint{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_screen_point
 	if err := checkNative(func() int32 {
@@ -722,10 +766,11 @@ func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 // LatLngForPixel converts a logical screen point to a geographic coordinate for
 // the current map.
 func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return LatLng{}, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	var raw C.mln_lat_lng
 	if err := checkNative(func() int32 {
@@ -739,10 +784,11 @@ func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 // PixelsForLatLngs converts geographic coordinates to logical screen points for
 // the current map.
 func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawCoordinates := cLatLngSlice(coordinates)
 	rawPoints := make([]C.mln_screen_point, len(coordinates))
@@ -768,10 +814,11 @@ func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error
 // LatLngsForPixels converts logical screen points to geographic coordinates for
 // the current map.
 func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 	rawPoints := cScreenPointSlice(points)
 	rawCoordinates := make([]C.mln_lat_lng, len(points))
@@ -803,10 +850,11 @@ func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {
 }
 
 func (m *MapHandle) releaseDetachedCustomGeometrySources() {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	m.customGeometryMu.Lock()
@@ -869,16 +917,30 @@ func (m *MapHandle) Close() error {
 			m.runtime.state.KeepAlive()
 		}
 	}()
+	var bindingErr error
 	if err := checkNative(func() int32 {
-		return m.state.Close(func(ptr *nativeMap) int32 {
-			return int32(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(ptr))))
+		status, err := m.state.CloseChecked(func(ptr *nativeMap) int32 {
+			return destroyMapHandle(ptr)
 		})
+		if err != nil {
+			if errors.Is(err, handle.ErrLiveChildren) {
+				bindingErr = newBindingError(ErrInvalidState, "MapHandle has live child handles")
+				return int32(C.MLN_STATUS_OK)
+			}
+			bindingErr = newBindingError(ErrInvalidState, err.Error())
+			return int32(C.MLN_STATUS_OK)
+		}
+		return status
 	}); err != nil {
 		return err
+	}
+	if bindingErr != nil {
+		return bindingErr
 	}
 	if m.runtime != nil {
 		m.runtime.unregisterMap(m)
 	}
+	m.runtimeChild.Release()
 	m.releaseCustomGeometrySources()
 	return nil
 }

@@ -41,6 +41,22 @@ func (definition OfflineTilePyramidRegionDefinition) validate() error {
 	return validateCStringArgument("offline region style URL", definition.StyleURL)
 }
 
+// OfflineGeometryRegionDefinition describes a geometry offline region.
+type OfflineGeometryRegionDefinition struct {
+	StyleURL          string
+	Geometry          Geometry
+	MinZoom           float64
+	MaxZoom           float64
+	PixelRatio        float32
+	IncludeIdeographs bool
+}
+
+func (OfflineGeometryRegionDefinition) offlineRegionDefinition() {}
+
+func (definition OfflineGeometryRegionDefinition) validate() error {
+	return validateCStringArgument("offline region style URL", definition.StyleURL)
+}
+
 // OfflineRegionInfo is a copied offline region snapshot.
 type OfflineRegionInfo struct {
 	ID                OfflineRegionID
@@ -87,6 +103,46 @@ func (definition cOfflineTilePyramidRegionDefinition) free() {
 	C.free(definition.styleURL)
 }
 
+type cOfflineGeometryRegionDefinition struct {
+	styleURL     unsafe.Pointer
+	materializer *cGeometryMaterializer
+	raw          C.mln_offline_region_definition
+}
+
+func newCOfflineGeometryRegionDefinition(definition OfflineGeometryRegionDefinition) (cOfflineGeometryRegionDefinition, error) {
+	styleURL := C.CString(definition.StyleURL)
+	materializer := newCGeometryMaterializer()
+	geometry, err := materializer.geometryPtr(definition.Geometry)
+	if err != nil {
+		C.free(unsafe.Pointer(styleURL))
+		materializer.free()
+		return cOfflineGeometryRegionDefinition{}, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	return cOfflineGeometryRegionDefinition{
+		styleURL:     unsafe.Pointer(styleURL),
+		materializer: materializer,
+		raw: C.mln_go_offline_geometry_region_definition(
+			styleURL,
+			geometry,
+			C.double(definition.MinZoom),
+			C.double(definition.MaxZoom),
+			C.float(definition.PixelRatio),
+			C.bool(definition.IncludeIdeographs),
+		),
+	}, nil
+}
+
+func (definition cOfflineGeometryRegionDefinition) free() {
+	if definition.materializer != nil {
+		definition.materializer.free()
+	}
+	C.free(definition.styleURL)
+}
+
+func (definition cOfflineGeometryRegionDefinition) copyDefinition() (OfflineRegionDefinition, error) {
+	return offlineRegionDefinitionFromC(&definition.raw)
+}
+
 func metadataPointer(metadata []byte) *C.uint8_t {
 	if len(metadata) == 0 {
 		return nil
@@ -96,24 +152,43 @@ func metadataPointer(metadata []byte) *C.uint8_t {
 
 // StartCreateOfflineRegion starts creating an offline region.
 func (runtime *RuntimeHandle) StartCreateOfflineRegion(definition OfflineRegionDefinition, metadata []byte) (*OfflineOperationHandle[OfflineRegionInfo], error) {
-	tile, ok := definition.(OfflineTilePyramidRegionDefinition)
-	if !ok {
+	switch region := definition.(type) {
+	case OfflineTilePyramidRegionDefinition:
+		if err := region.validate(); err != nil {
+			return nil, err
+		}
+		return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionCreate, OfflineOperationResultRegion, func(ptr *nativeRuntime, out *C.mln_offline_operation_id) int32 {
+			rawDefinition := newCOfflineTilePyramidRegionDefinition(region)
+			defer rawDefinition.free()
+			return int32(C.mln_runtime_offline_region_create_start(
+				(*C.mln_runtime)(unsafe.Pointer(ptr)),
+				&rawDefinition.raw,
+				metadataPointer(metadata),
+				C.size_t(len(metadata)),
+				out,
+			))
+		})
+	case OfflineGeometryRegionDefinition:
+		if err := region.validate(); err != nil {
+			return nil, err
+		}
+		rawDefinition, err := newCOfflineGeometryRegionDefinition(region)
+		if err != nil {
+			return nil, err
+		}
+		defer rawDefinition.free()
+		return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionCreate, OfflineOperationResultRegion, func(ptr *nativeRuntime, out *C.mln_offline_operation_id) int32 {
+			return int32(C.mln_runtime_offline_region_create_start(
+				(*C.mln_runtime)(unsafe.Pointer(ptr)),
+				&rawDefinition.raw,
+				metadataPointer(metadata),
+				C.size_t(len(metadata)),
+				out,
+			))
+		})
+	default:
 		return nil, newBindingError(ErrInvalidArgument, "unsupported offline region definition")
 	}
-	if err := tile.validate(); err != nil {
-		return nil, err
-	}
-	return startOfflineOperation[OfflineRegionInfo](runtime, OfflineOperationRegionCreate, OfflineOperationResultRegion, func(ptr *nativeRuntime, out *C.mln_offline_operation_id) int32 {
-		rawDefinition := newCOfflineTilePyramidRegionDefinition(tile)
-		defer rawDefinition.free()
-		return int32(C.mln_runtime_offline_region_create_start(
-			(*C.mln_runtime)(unsafe.Pointer(ptr)),
-			&rawDefinition.raw,
-			metadataPointer(metadata),
-			C.size_t(len(metadata)),
-			out,
-		))
-	})
 }
 
 // StartOfflineRegion starts getting an offline region snapshot by ID.
@@ -213,36 +288,38 @@ func (operation *OfflineOperationHandle[T]) Take() (T, error) {
 	id := operation.id
 	kind := operation.kind
 	resultKind := operation.resultKind
-	operation.mu.Unlock()
 
-	ptr, err := operation.runtime.ptr()
+	ptr, release, err := operation.runtime.ptr()
 	if err != nil {
+		operation.mu.Unlock()
 		return zero, err
 	}
+	defer release()
 	defer operation.runtime.state.KeepAlive()
 
-	result, err := takeOfflineOperationResult[T](ptr, C.mln_offline_operation_id(id), kind, resultKind)
+	result, consumed, err := takeOfflineOperationResult[T](ptr, C.mln_offline_operation_id(id), kind, resultKind)
+	child := operation.child
+	if consumed {
+		operation.live = false
+		operation.discarded = false
+		operation.child = nil
+	}
+	operation.mu.Unlock()
+	if consumed {
+		child.Release()
+	}
 	if err != nil {
 		return zero, err
 	}
-	operation.mu.Lock()
-	operation.live = false
-	operation.mu.Unlock()
 	return result, nil
 }
 
-func takeOfflineOperationResult[T any](runtime *nativeRuntime, id C.mln_offline_operation_id, kind OfflineOperationKind, resultKind OfflineOperationResultKind) (T, error) {
+func takeOfflineOperationResult[T any](runtime *nativeRuntime, id C.mln_offline_operation_id, kind OfflineOperationKind, resultKind OfflineOperationResultKind) (T, bool, error) {
 	var zero T
 	rawRuntime := (*C.mln_runtime)(unsafe.Pointer(runtime))
 	switch resultKind {
 	case OfflineOperationResultNone:
-		if err := checkNative(func() int32 { return int32(C.mln_runtime_offline_operation_discard(rawRuntime, id)) }); err != nil {
-			return zero, err
-		}
-		if result, ok := any(struct{}{}).(T); ok {
-			return result, nil
-		}
-		return zero, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+		return zero, false, newBindingError(ErrInvalidState, "offline operation does not produce a take result; poll its completion event and discard it")
 	case OfflineOperationResultRegion:
 		var snapshot *C.mln_offline_region_snapshot
 		var err error
@@ -256,39 +333,39 @@ func takeOfflineOperationResult[T any](runtime *nativeRuntime, id C.mln_offline_
 				return int32(C.mln_runtime_offline_region_update_metadata_take_result(rawRuntime, id, &snapshot))
 			})
 		default:
-			return zero, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
+			return zero, false, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
 		}
 		if err != nil {
-			return zero, err
+			return zero, false, err
 		}
 		info, err := offlineRegionSnapshotInfo(snapshot)
 		if err != nil {
-			return zero, err
+			return zero, true, err
 		}
 		if result, ok := any(info).(T); ok {
-			return result, nil
+			return result, true, nil
 		}
-		return zero, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
 	case OfflineOperationResultOptionalRegion:
 		var snapshot *C.mln_offline_region_snapshot
 		var found C.bool
 		if err := checkNative(func() int32 {
 			return int32(C.mln_runtime_offline_region_get_take_result(rawRuntime, id, &snapshot, &found))
 		}); err != nil {
-			return zero, err
+			return zero, false, err
 		}
 		var result *OfflineRegionInfo
 		if bool(found) {
 			info, err := offlineRegionSnapshotInfo(snapshot)
 			if err != nil {
-				return zero, err
+				return zero, true, err
 			}
 			result = &info
 		}
 		if typed, ok := any(result).(T); ok {
-			return typed, nil
+			return typed, true, nil
 		}
-		return zero, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
 	case OfflineOperationResultRegionList:
 		var list *C.mln_offline_region_list
 		var err error
@@ -302,30 +379,30 @@ func takeOfflineOperationResult[T any](runtime *nativeRuntime, id C.mln_offline_
 				return int32(C.mln_runtime_offline_regions_merge_database_take_result(rawRuntime, id, &list))
 			})
 		default:
-			return zero, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
+			return zero, false, newBindingError(ErrInvalidState, "offline operation result kind mismatch")
 		}
 		if err != nil {
-			return zero, err
+			return zero, false, err
 		}
 		regions, err := offlineRegionListInfos(list)
 		if err != nil {
-			return zero, err
+			return zero, true, err
 		}
 		if result, ok := any(regions).(T); ok {
-			return result, nil
+			return result, true, nil
 		}
-		return zero, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
 	case OfflineOperationResultRegionStatus:
 		raw := C.mln_offline_region_status{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{}))}
 		if err := checkNative(func() int32 { return int32(C.mln_runtime_offline_region_get_status_take_result(rawRuntime, id, &raw)) }); err != nil {
-			return zero, err
+			return zero, false, err
 		}
 		if result, ok := any(offlineRegionStatusFromC(raw)).(T); ok {
-			return result, nil
+			return result, true, nil
 		}
-		return zero, newBindingError(ErrInvalidState, "offline operation result type mismatch")
+		return zero, true, newBindingError(ErrInvalidState, "offline operation result type mismatch")
 	default:
-		return zero, newBindingError(ErrInvalidState, "unknown offline operation result kind")
+		return zero, false, newBindingError(ErrInvalidState, "unknown offline operation result kind")
 	}
 }
 
@@ -335,7 +412,7 @@ func offlineRegionSnapshotInfo(snapshot *C.mln_offline_region_snapshot) (Offline
 	if err := checkNative(func() int32 { return int32(C.mln_offline_region_snapshot_get(snapshot, &raw)) }); err != nil {
 		return OfflineRegionInfo{}, err
 	}
-	return offlineRegionInfoFromC(raw), nil
+	return offlineRegionInfoFromC(raw)
 }
 
 func offlineRegionListInfos(list *C.mln_offline_region_list) ([]OfflineRegionInfo, error) {
@@ -350,30 +427,64 @@ func offlineRegionListInfos(list *C.mln_offline_region_list) ([]OfflineRegionInf
 		if err := checkNative(func() int32 { return int32(C.mln_offline_region_list_get(list, C.size_t(index), &raw)) }); err != nil {
 			return nil, err
 		}
-		regions[index] = offlineRegionInfoFromC(raw)
+		info, err := offlineRegionInfoFromC(raw)
+		if err != nil {
+			return nil, err
+		}
+		regions[index] = info
 	}
 	return regions, nil
 }
 
-func offlineRegionInfoFromC(info C.mln_offline_region_info) OfflineRegionInfo {
+func offlineRegionInfoFromC(info C.mln_offline_region_info) (OfflineRegionInfo, error) {
 	definitionType := uint32(C.mln_go_offline_region_info_definition_type(&info))
+	metadata, ok := goByteSlice(unsafe.Pointer(info.metadata), info.metadata_size)
+	if !ok {
+		return OfflineRegionInfo{}, newBindingError(ErrNative, "offline region metadata buffer is invalid")
+	}
 	copied := OfflineRegionInfo{
 		ID:                OfflineRegionID(info.id),
 		RawDefinitionType: definitionType,
-		Metadata:          append([]byte(nil), unsafe.Slice((*byte)(unsafe.Pointer(info.metadata)), int(info.metadata_size))...),
+		Metadata:          metadata,
 	}
-	if definitionType == uint32(C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID) {
-		tile := C.mln_go_offline_region_info_tile_pyramid(&info)
-		copied.Definition = OfflineTilePyramidRegionDefinition{
+	definition, err := offlineRegionDefinitionFromC(&info.definition)
+	if err != nil {
+		return OfflineRegionInfo{}, err
+	}
+	copied.Definition = definition
+	return copied, nil
+}
+
+func offlineRegionDefinitionFromC(definition *C.mln_offline_region_definition) (OfflineRegionDefinition, error) {
+	definitionType := uint32(C.mln_go_offline_region_definition_type(definition))
+	switch definitionType {
+	case uint32(C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID):
+		tile := C.mln_go_offline_region_definition_tile_pyramid(definition)
+		return OfflineTilePyramidRegionDefinition{
 			StyleURL:          C.GoString(tile.style_url),
 			Bounds:            goLatLngBounds(tile.bounds),
 			MinZoom:           float64(tile.min_zoom),
 			MaxZoom:           float64(tile.max_zoom),
 			PixelRatio:        float32(tile.pixel_ratio),
 			IncludeIdeographs: bool(tile.include_ideographs),
+		}, nil
+	case uint32(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY):
+		geometry := C.mln_go_offline_region_definition_geometry(definition)
+		copiedGeometry, err := cGeometry((*C.mln_geometry)(unsafe.Pointer(geometry.geometry)))
+		if err != nil {
+			return nil, err
 		}
+		return OfflineGeometryRegionDefinition{
+			StyleURL:          C.GoString(geometry.style_url),
+			Geometry:          copiedGeometry,
+			MinZoom:           float64(geometry.min_zoom),
+			MaxZoom:           float64(geometry.max_zoom),
+			PixelRatio:        float32(geometry.pixel_ratio),
+			IncludeIdeographs: bool(geometry.include_ideographs),
+		}, nil
+	default:
+		return nil, nil
 	}
-	return copied
 }
 
 func rawOfflineRegionDownloadState(state OfflineRegionDownloadState) (uint32, error) {
@@ -386,10 +497,11 @@ func rawOfflineRegionDownloadState(state OfflineRegionDownloadState) (uint32, er
 }
 
 func startOfflineOperation[T any](runtime *RuntimeHandle, kind OfflineOperationKind, resultKind OfflineOperationResultKind, start func(*nativeRuntime, *C.mln_offline_operation_id) int32) (*OfflineOperationHandle[T], error) {
-	ptr, err := runtime.ptr()
+	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer runtime.state.KeepAlive()
 
 	var id C.mln_offline_operation_id

@@ -71,10 +71,25 @@ func goStringView(view C.mln_string_view) string {
 }
 
 func goCharBytes(data *C.char, size C.size_t) string {
-	if data == nil || size == 0 {
+	bytes, ok := goByteSlice(unsafe.Pointer(data), size)
+	if !ok {
 		return ""
 	}
-	return string(unsafe.Slice((*byte)(unsafe.Pointer(data)), int(size)))
+	return string(bytes)
+}
+
+func goByteSlice(data unsafe.Pointer, size C.size_t) ([]byte, bool) {
+	if size == 0 {
+		return nil, true
+	}
+	if data == nil {
+		return nil, false
+	}
+	n := uintptr(size)
+	if n > uintptr(int(^uint(0)>>1)) {
+		return nil, false
+	}
+	return append([]byte(nil), unsafe.Slice((*byte)(data), int(n))...), true
 }
 
 func cLatLng(coordinate LatLng) C.mln_lat_lng {

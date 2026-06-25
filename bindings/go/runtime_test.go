@@ -4,6 +4,8 @@ import (
 	"errors"
 	stdruntime "runtime"
 	"testing"
+
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func TestRuntimeCreateWithOptions(t *testing.T) {
@@ -19,6 +21,35 @@ func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 	_, err := NewRuntimeWithOptions(RuntimeOptions{AssetPath: "asset\x00root"})
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewRuntimeWithOptions embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+}
+func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *testing.T) {
+	createCalled := false
+	storeCalled := false
+
+	runtime, err := createRuntimeWithStateFactory(
+		ExpectedCABIVersion+1,
+		func(out **nativeRuntime) int32 {
+			createCalled = true
+			return 0
+		},
+		func(runtime *nativeRuntime) (*handle.State[nativeRuntime], error) {
+			storeCalled = true
+			return nil, nil
+		},
+	)
+
+	if runtime != nil {
+		t.Fatalf("createRuntimeWithStateFactory() runtime = %v, want nil", runtime)
+	}
+	if !errors.Is(err, ErrABIVersionMismatch) {
+		t.Fatalf("createRuntimeWithStateFactory() error = %v, want ErrABIVersionMismatch", err)
+	}
+	if createCalled {
+		t.Fatal("runtime create hook was called after ABI mismatch")
+	}
+	if storeCalled {
+		t.Fatal("runtime handle store hook was called after ABI mismatch")
 	}
 }
 func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
@@ -42,8 +73,8 @@ func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
 	if err := operation.Discard(); err != nil {
 		t.Fatalf("Discard(): %v", err)
 	}
-	if err := operation.Discard(); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("second Discard() error = %v, want ErrInvalidArgument", err)
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("second Discard(): %v", err)
 	}
 }
 func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {

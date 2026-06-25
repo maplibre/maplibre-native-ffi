@@ -241,12 +241,14 @@ Structs that C fills and returns by value become copied language values.
 
 ### Enums and masks
 
-Public enum values convert to C through a complete named-case mapping. Public
-values represent valid C enum inputs.
+Public enum values expose named cases for known C values and keep the
+represented raw value available for conversion to C.
 
 When C returns an enum value that the binding does not know yet, the binding
 preserves the raw value instead of collapsing it to a known case. Public input
-paths reject values outside the C input contract before crossing into C.
+paths pass represented raw enum values through to C unless the binding owns an
+additional state, lifetime, or type-safety invariant that must fail before C.
+Bindings do not duplicate enum validation performed by the C API.
 
 Public bit masks use a named public type that supports combining, testing, and
 empty values. C field masks stay internal to C struct materializers.
@@ -618,7 +620,7 @@ that a real native failure would expose.
 | BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                      |
 | BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                           |
 | BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                        |
-| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.                                                                               |
+| BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                   |
 | BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value. |
 
 ### Runtime and events

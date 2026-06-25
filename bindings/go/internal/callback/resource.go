@@ -11,6 +11,7 @@ extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_r
 */
 import "C"
 import (
+	"errors"
 	"runtime/cgo"
 	"strings"
 	"sync"
@@ -168,6 +169,18 @@ type ResourceRequestHandle struct {
 	completed         bool
 }
 
+var (
+	ErrResourceRequestCompleted = errors.New("resource request already completed")
+	ErrResourceRequestClosed    = errors.New("resource request handle is closed")
+
+	completeResourceRequest = func(handle *C.mln_resource_request_handle, response *C.mln_resource_response) int32 {
+		return int32(C.mln_resource_request_complete(handle, response))
+	}
+	releaseResourceRequest = func(handle *C.mln_resource_request_handle) {
+		C.mln_resource_request_release(handle)
+	}
+)
+
 // SetResourceProvider installs or replaces a runtime-scoped resource provider.
 func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
 	if callback == nil {
@@ -208,41 +221,109 @@ func newResourceRequestHandle(handle *C.mln_resource_request_handle) (*ResourceR
 	return &ResourceRequestHandle{handle: handle}, int32(C.MLN_STATUS_OK)
 }
 
-// Complete completes the request with copied response data.
-func (handle *ResourceRequestHandle) Complete(response ResourceResponse) int32 {
-	raw, allocations := resourceResponseToC(response)
-	defer freeAllocations(allocations)
+func newResourceRequestHandleForTest() *ResourceRequestHandle {
+	return &ResourceRequestHandle{handle: (*C.mln_resource_request_handle)(C.malloc(1))}
+}
 
+func freeResourceRequestHandleForTest(handle *ResourceRequestHandle) {
+	if handle == nil || handle.handle == nil {
+		return
+	}
+	C.free(unsafe.Pointer(handle.handle))
+	handle.handle = nil
+}
+
+func setResourceRequestHooksForTest(complete func() int32, release func()) func() {
+	previousComplete := completeResourceRequest
+	previousRelease := releaseResourceRequest
+	if complete != nil {
+		completeResourceRequest = func(*C.mln_resource_request_handle, *C.mln_resource_response) int32 {
+			return complete()
+		}
+	}
+	if release != nil {
+		releaseResourceRequest = func(*C.mln_resource_request_handle) {
+			release()
+		}
+	}
+	return func() {
+		completeResourceRequest = previousComplete
+		releaseResourceRequest = previousRelease
+	}
+}
+
+// Completed reports whether completion reached native for this handle.
+func (handle *ResourceRequestHandle) Completed() bool {
+	if handle == nil {
+		return false
+	}
+	handle.mu.Lock()
+	defer handle.mu.Unlock()
+	return handle.completed
+}
+
+// CompleteChecked completes the request with copied response data. validate runs
+// before completion reaches native, so validation failures leave the handle live.
+func (handle *ResourceRequestHandle) CompleteChecked(response ResourceResponse, validate func() error) (int32, error) {
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
 	if handle.completed {
-		return int32(C.MLN_STATUS_INVALID_STATE)
+		return 0, ErrResourceRequestCompleted
 	}
 	if handle.closed {
-		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		return 0, ErrResourceRequestClosed
 	}
-	status := int32(C.mln_resource_request_complete(handle.handle, &raw))
-	if status != int32(C.MLN_STATUS_OK) {
-		return status
+	if validate != nil {
+		if err := validate(); err != nil {
+			return 0, err
+		}
 	}
+	raw, allocations := resourceResponseToC(response)
+	defer freeAllocations(allocations)
+
+	status := completeResourceRequest(handle.handle, &raw)
 	handle.completed = true
 	handle.closed = true
 	if handle.decisionFinalized && handle.providerOwned {
 		handle.releaseIfOwnedLocked()
 	}
-	return int32(C.MLN_STATUS_OK)
+	return status, nil
+}
+
+// Complete completes the request with copied response data.
+func (handle *ResourceRequestHandle) Complete(response ResourceResponse) int32 {
+	status, err := handle.CompleteChecked(response, nil)
+	if err != nil {
+		if errors.Is(err, ErrResourceRequestClosed) {
+			return int32(C.MLN_STATUS_INVALID_ARGUMENT)
+		}
+		return int32(C.MLN_STATUS_INVALID_STATE)
+	}
+	return status
 }
 
 // Cancelled reports whether native cancelled the request.
 func (handle *ResourceRequestHandle) Cancelled() (int32, bool) {
+	status, cancelled, err := handle.CancelledChecked()
+	if err != nil {
+		if errors.Is(err, ErrResourceRequestClosed) {
+			return int32(C.MLN_STATUS_INVALID_ARGUMENT), false
+		}
+		return int32(C.MLN_STATUS_INVALID_STATE), false
+	}
+	return status, cancelled
+}
+
+// CancelledChecked reports whether native cancelled the request.
+func (handle *ResourceRequestHandle) CancelledChecked() (int32, bool, error) {
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
 	if handle.closed {
-		return int32(C.MLN_STATUS_INVALID_ARGUMENT), false
+		return 0, false, ErrResourceRequestClosed
 	}
 	var cancelled C.bool
 	status := int32(C.mln_resource_request_cancelled(handle.handle, &cancelled))
-	return status, bool(cancelled)
+	return status, bool(cancelled), nil
 }
 
 // Close releases the provider-owned handle without completing it.
@@ -281,7 +362,7 @@ func (handle *ResourceRequestHandle) finishProviderDecision(decision uint32) uin
 	handle.decisionFinalized = true
 	handle.releaseAccounted = true
 	handle.closed = true
-	return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
+	return decision
 }
 
 func (handle *ResourceRequestHandle) finishProviderException() uint32 {
@@ -304,7 +385,7 @@ func (handle *ResourceRequestHandle) releaseIfOwnedLocked() {
 		return
 	}
 	handle.releaseAccounted = true
-	C.mln_resource_request_release(handle.handle)
+	releaseResourceRequest(handle.handle)
 }
 
 func (handle *ResourceRequestHandle) invokeProvider(state *ResourceProviderState, request *C.mln_resource_request) (decision uint32) {
@@ -338,9 +419,25 @@ func resourceRequestFromC(request *C.mln_resource_request) ResourceRequest {
 		PriorETag:           C.GoString(request.prior_etag),
 	}
 	if request.prior_data != nil && request.prior_data_size > 0 {
-		copied.PriorData = C.GoBytes(unsafe.Pointer(request.prior_data), C.int(request.prior_data_size))
+		if bytes, ok := copyCBytes(unsafe.Pointer(request.prior_data), request.prior_data_size); ok {
+			copied.PriorData = bytes
+		}
 	}
 	return copied
+}
+
+func copyCBytes(data unsafe.Pointer, size C.size_t) ([]byte, bool) {
+	if size == 0 {
+		return nil, true
+	}
+	if data == nil {
+		return nil, false
+	}
+	n := uintptr(size)
+	if n > uintptr(int(^uint(0)>>1)) {
+		return nil, false
+	}
+	return append([]byte(nil), unsafe.Slice((*byte)(data), int(n))...), true
 }
 
 func invokeResourceProviderTrampolineForTest(state *ResourceProviderState) uint32 {

@@ -1,10 +1,33 @@
 package maplibre
 
-import "testing"
+import (
+	"errors"
+	"fmt"
+	"strings"
+	"testing"
+)
 
 func TestCVersionUsesNativeABI(t *testing.T) {
-	if got := CVersion(); got != 0 {
-		t.Fatalf("CVersion() = %d, want 0 while ABI is unstable", got)
+	if got := CVersion(); got != ExpectedCABIVersion {
+		t.Fatalf("CVersion() = %d, want %d", got, ExpectedCABIVersion)
+	}
+}
+func TestABIVersionMismatchUsesStableBindingError(t *testing.T) {
+	actualVersion := ExpectedCABIVersion + 1
+	err := checkCompatibleCABI(actualVersion)
+	if !errors.Is(err, ErrABIVersionMismatch) {
+		t.Fatalf("checkCompatibleCABI() error = %v, want ErrABIVersionMismatch", err)
+	}
+
+	var bindingErr *Error
+	if !errors.As(err, &bindingErr) {
+		t.Fatalf("checkCompatibleCABI() error = %T, want *Error", err)
+	}
+	diagnostic := bindingErr.Diagnostic()
+	if !strings.Contains(diagnostic, "C ABI version") ||
+		!strings.Contains(diagnostic, fmt.Sprintf("expected %d", ExpectedCABIVersion)) ||
+		!strings.Contains(diagnostic, fmt.Sprintf("version %d", actualVersion)) {
+		t.Fatalf("ABI mismatch diagnostic = %q", diagnostic)
 	}
 }
 func TestSupportedRenderBackendsUsesNativeABIConstants(t *testing.T) {

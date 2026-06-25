@@ -3,7 +3,11 @@ package maplibre
 import (
 	"errors"
 	stdruntime "runtime"
+	"sync/atomic"
 	"testing"
+	"time"
+
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func TestRuntimeMapLifecycle(t *testing.T) {
@@ -21,6 +25,13 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 		_ = m.Close()
 		_ = runtime.Close()
 		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
+	} else {
+		var bindingErr *Error
+		if !errors.As(err, &bindingErr) || bindingErr.Diagnostic() != "RuntimeHandle has live child handles" {
+			_ = m.Close()
+			_ = runtime.Close()
+			t.Fatalf("Close() with live map diagnostic = %v", err)
+		}
 	}
 	if err := m.Close(); err != nil {
 		_ = runtime.Close()
@@ -34,6 +45,105 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 		t.Fatalf("Runtime Close(): %v", err)
 	}
 }
+
+func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
+	state, err := handle.New(&nativeMap{}, "MapHandle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &MapHandle{state: state}
+
+	oldDestroy := destroyMapHandle
+	defer func() {
+		destroyMapHandle = oldDestroy
+	}()
+	var calls atomic.Int32
+	destroyMapHandle = func(*nativeMap) int32 {
+		if calls.Add(1) == 1 {
+			return -3
+		}
+		return 0
+	}
+
+	if err := m.Close(); !errors.Is(err, ErrWrongThread) {
+		t.Fatalf("first Close() error = %v, want ErrWrongThread", err)
+	}
+	ptr, release, err := m.ptr()
+	if err != nil {
+		t.Fatalf("ptr() after failed Close(): %v", err)
+	}
+	if ptr == nil {
+		t.Fatal("ptr() after failed Close() returned nil")
+	}
+	release()
+	if err := m.Close(); err != nil {
+		t.Fatalf("second Close(): %v", err)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatalf("third Close(): %v", err)
+	}
+	if got := calls.Load(); got != 2 {
+		t.Fatalf("destroy calls = %d, want 2", got)
+	}
+}
+
+func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
+	state, err := handle.New(&nativeMap{}, "MapHandle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &MapHandle{state: state}
+
+	ptr, release, err := m.ptr()
+	if err != nil {
+		t.Fatalf("ptr(): %v", err)
+	}
+	if ptr == nil {
+		t.Fatal("ptr() returned nil")
+	}
+
+	oldDestroy := destroyMapHandle
+	defer func() {
+		destroyMapHandle = oldDestroy
+	}()
+	destroyCalled := make(chan struct{})
+	destroyMapHandle = func(*nativeMap) int32 {
+		close(destroyCalled)
+		return 0
+	}
+
+	closeDone := make(chan error, 1)
+	go func() {
+		closeDone <- m.Close()
+	}()
+
+	deadline := time.After(2 * time.Second)
+	for {
+		if _, extraRelease, err := m.ptr(); err == nil {
+			extraRelease()
+			select {
+			case <-destroyCalled:
+				t.Fatal("destroy ran before active borrow was released")
+			case <-deadline:
+				t.Fatal("Close did not enter releasing state")
+			case <-time.After(100 * time.Microsecond):
+				continue
+			}
+		}
+		break
+	}
+
+	release()
+	if err := <-closeDone; err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+	select {
+	case <-destroyCalled:
+	default:
+		t.Fatal("destroy did not run after borrow release")
+	}
+}
+
 func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

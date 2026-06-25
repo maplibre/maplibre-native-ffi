@@ -21,10 +21,11 @@ type MapProjectionHandle struct {
 // NewProjection creates a standalone projection helper from this map's current
 // transform. Later map changes do not update the helper.
 func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
-	ptr, err := m.ptr()
+	ptr, release, err := m.ptr()
 	if err != nil {
 		return nil, err
 	}
+	defer release()
 	defer m.state.KeepAlive()
 
 	var projection *nativeProjection
@@ -45,15 +46,15 @@ func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	return &MapProjectionHandle{state: state}, nil
 }
 
-func (projection *MapProjectionHandle) ptr() (*nativeProjection, error) {
+func (projection *MapProjectionHandle) ptr() (*nativeProjection, func(), error) {
 	if projection == nil || projection.state == nil {
-		return nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
+		return nil, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
-	ptr, live := projection.state.Ptr()
+	borrow, live := projection.state.Borrow()
 	if !live {
-		return nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
+		return nil, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
 	}
-	return ptr, nil
+	return borrow.Ptr(), borrow.Release, nil
 }
 
 // Close destroys this projection helper. A successful close makes later calls
@@ -72,10 +73,11 @@ func (projection *MapProjectionHandle) Close() error {
 
 // Camera returns this projection helper's camera snapshot.
 func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return CameraOptions{}, err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 
 	var camera C.mln_camera_options = C.mln_camera_options_default()
@@ -89,10 +91,11 @@ func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
 
 // SetCamera applies selected camera fields to this projection helper.
 func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 
 	rawCamera := cCameraOptions(camera)
@@ -104,10 +107,11 @@ func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 // SetVisibleCoordinates updates this projection helper's camera to fit
 // coordinates inside padding.
 func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 
 	rawCoordinates := cLatLngSlice(coordinates)
@@ -128,10 +132,11 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 // SetVisibleGeometry updates this projection helper's camera to fit geometry
 // inside padding.
 func (projection *MapProjectionHandle) SetVisibleGeometry(geometry Geometry, padding EdgeInsets) error {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 	materializer := newCGeometryMaterializer()
 	defer materializer.free()
@@ -150,10 +155,11 @@ func (projection *MapProjectionHandle) SetVisibleGeometry(geometry Geometry, pad
 
 // PixelForLatLng converts a geographic coordinate to a logical screen point.
 func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return ScreenPoint{}, err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 
 	var point C.mln_screen_point
@@ -171,10 +177,11 @@ func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (Screen
 
 // LatLngForPixel converts a logical screen point to a geographic coordinate.
 func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
-	ptr, err := projection.ptr()
+	ptr, release, err := projection.ptr()
 	if err != nil {
 		return LatLng{}, err
 	}
+	defer release()
 	defer projection.state.KeepAlive()
 
 	var coordinate C.mln_lat_lng

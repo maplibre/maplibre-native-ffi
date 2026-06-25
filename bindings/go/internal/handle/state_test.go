@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 const (
@@ -87,6 +88,85 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 }
 
+func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	borrow, live := state.Borrow()
+	if !live {
+		t.Fatal("Borrow() failed for live state")
+	}
+	if ptr := borrow.Ptr(); ptr != native {
+		t.Fatalf("borrow Ptr() = %p, want %p", ptr, native)
+	}
+
+	destroyCalled := make(chan struct{})
+	closeDone := make(chan int32)
+	go func() {
+		closeDone <- state.Close(func(ptr *testNativeHandle) int32 {
+			if ptr != native {
+				t.Errorf("destroy pointer = %p, want %p", ptr, native)
+			}
+			close(destroyCalled)
+			return testStatusOK
+		})
+	}()
+
+	select {
+	case <-destroyCalled:
+		t.Fatal("destroy ran before active borrow was released")
+	default:
+	}
+	deadline := time.After(2 * time.Second)
+	for {
+		if borrow, live := state.Borrow(); live {
+			borrow.Release()
+			select {
+			case <-destroyCalled:
+				t.Fatal("destroy ran before active borrow was released")
+			case <-deadline:
+				t.Fatal("Close did not enter releasing state")
+			case <-time.After(100 * time.Microsecond):
+				continue
+			}
+		}
+		break
+	}
+
+	borrow.Release()
+	if status := <-closeDone; status != testStatusOK {
+		t.Fatalf("Close status = %d, want OK", status)
+	}
+	select {
+	case <-destroyCalled:
+	default:
+		t.Fatal("destroy did not run after borrow release")
+	}
+}
+
+func TestStateFailedCloseAllowsBorrowRetry(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if status := state.Close(func(*testNativeHandle) int32 { return testStatusWrongThread }); status != testStatusWrongThread {
+		t.Fatalf("Close status = %d, want wrong-thread", status)
+	}
+	borrow, live := state.Borrow()
+	if !live {
+		t.Fatal("Borrow() failed after failed close")
+	}
+	if ptr := borrow.Ptr(); ptr != native {
+		t.Fatalf("borrow Ptr() = %p, want %p", ptr, native)
+	}
+	borrow.Release()
+}
+
 func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 	native := &testNativeHandle{value: 1}
 	state, err := New(native, "test_handle")
@@ -116,6 +196,32 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 
 	if got := calls.Load(); got != 1 {
 		t.Fatalf("destroy calls = %d, want 1", got)
+	}
+}
+
+func TestStateCloseFailsWithLiveChildrenAndRetries(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	child := state.AddChild()
+	if status := state.Close(func(*testNativeHandle) int32 {
+		t.Fatal("destroy called while child is live")
+		return testStatusOK
+	}, testStatusWrongThread); status != testStatusWrongThread {
+		t.Fatalf("Close status = %d, want live-child status", status)
+	}
+	if borrow, live := state.Borrow(); !live {
+		t.Fatal("Borrow() failed after live-child close failure")
+	} else {
+		borrow.Release()
+	}
+
+	child.Release()
+	if status := state.Close(func(*testNativeHandle) int32 { return testStatusOK }, testStatusWrongThread); status != testStatusOK {
+		t.Fatalf("Close after child release status = %d, want OK", status)
 	}
 }
 

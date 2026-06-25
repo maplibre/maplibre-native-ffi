@@ -3,8 +3,11 @@ package maplibre
 import (
 	"errors"
 	stdruntime "runtime"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
 func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
@@ -20,6 +23,24 @@ func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
 		IncludeIdeographs: true,
 	}
 }
+
+func testOfflineGeometryDefinition() OfflineGeometryRegionDefinition {
+	return OfflineGeometryRegionDefinition{
+		StyleURL: "http://example.com/offline-geometry-style.json",
+		Geometry: PolygonGeometry([][]LatLng{{
+			{Latitude: -1, Longitude: -2},
+			{Latitude: -1, Longitude: 2},
+			{Latitude: 1, Longitude: 2},
+			{Latitude: 1, Longitude: -2},
+			{Latitude: -1, Longitude: -2},
+		}}),
+		MinZoom:           0,
+		MaxZoom:           1,
+		PixelRatio:        1,
+		IncludeIdeographs: true,
+	}
+}
+
 func requireDiscardOfflineOperation[T any](t *testing.T, operation *OfflineOperationHandle[T], kind OfflineOperationKind, resultKind OfflineOperationResultKind) {
 	t.Helper()
 	if operation.ID() == 0 {
@@ -48,6 +69,12 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 		t.Fatalf("StartCreateOfflineRegion(): %v", err)
 	}
 	requireDiscardOfflineOperation(t, create, OfflineOperationRegionCreate, OfflineOperationResultRegion)
+
+	createGeometry, err := runtime.StartCreateOfflineRegion(testOfflineGeometryDefinition(), []byte{1, 2, 3})
+	if err != nil {
+		t.Fatalf("StartCreateOfflineRegion(geometry): %v", err)
+	}
+	requireDiscardOfflineOperation(t, createGeometry, OfflineOperationRegionCreate, OfflineOperationResultRegion)
 
 	get, err := runtime.StartOfflineRegion(1)
 	if err != nil {
@@ -225,10 +252,230 @@ func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 	if _, err := runtime.StartCreateOfflineRegion(definition, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StartCreateOfflineRegion embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
+	geometryDefinition := testOfflineGeometryDefinition()
+	geometryDefinition.StyleURL = "http://example.com/\x00style.json"
+	if _, err := runtime.StartCreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StartCreateOfflineRegion geometry embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	geometryDefinition = testOfflineGeometryDefinition()
+	geometryDefinition.Geometry = Geometry{Type: GeometryType(999_999)}
+	if _, err := runtime.StartCreateOfflineRegion(geometryDefinition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StartCreateOfflineRegion bad geometry error = %v, want ErrInvalidArgument", err)
+	}
 	if _, err := runtime.StartMergeOfflineRegionsDatabase("/tmp/\x00side.db"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StartMergeOfflineRegionsDatabase embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 	if _, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(999_999)); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("StartSetOfflineRegionDownloadState unknown error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestOfflineGeometryDefinitionMaterializesAndCopies(t *testing.T) {
+	definition := testOfflineGeometryDefinition()
+	raw, err := newCOfflineGeometryRegionDefinition(definition)
+	if err != nil {
+		t.Fatalf("newCOfflineGeometryRegionDefinition(): %v", err)
+	}
+	defer raw.free()
+
+	copiedDefinition, err := raw.copyDefinition()
+	if err != nil {
+		t.Fatalf("copyDefinition(): %v", err)
+	}
+	copied, ok := copiedDefinition.(OfflineGeometryRegionDefinition)
+	if !ok {
+		t.Fatalf("copyDefinition() = %T, want OfflineGeometryRegionDefinition", copiedDefinition)
+	}
+	if copied.StyleURL != definition.StyleURL || copied.MinZoom != definition.MinZoom || copied.MaxZoom != definition.MaxZoom || copied.PixelRatio != definition.PixelRatio || copied.IncludeIdeographs != definition.IncludeIdeographs {
+		t.Fatalf("copied scalar fields = %#v, want %#v", copied, definition)
+	}
+	if copied.Geometry.Type != GeometryTypePolygon || len(copied.Geometry.Lines) != 1 || len(copied.Geometry.Lines[0]) != len(definition.Geometry.Lines[0]) {
+		t.Fatalf("copied geometry = %#v, want polygon with %d coordinates", copied.Geometry, len(definition.Geometry.Lines[0]))
+	}
+}
+
+func TestOfflineOperationDiscardIsIdempotentAfterSuccess(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	var calls int
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		calls++
+		return 0
+	})
+	defer restore()
+
+	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard(): %v", err)
+	}
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("second Discard(): %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("discard calls = %d, want 1", calls)
+	}
+}
+
+func TestOfflineOperationDiscardFailureLeavesHandleRetryable(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	statuses := []int32{-2, 0, 0}
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		status := statuses[0]
+		statuses = statuses[1:]
+		return status
+	})
+	defer restore()
+
+	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	if err := operation.Discard(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Discard() failure = %v, want ErrInvalidState", err)
+	}
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard() retry: %v", err)
+	}
+}
+
+func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		return 0
+	})
+	defer restore()
+	restoreRuntimeDestroy := replaceRuntimeDestroyForTest(func(ptr *nativeRuntime) int32 {
+		return 0
+	})
+	defer restoreRuntimeDestroy()
+
+	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Runtime Close() with live offline operation = %v, want ErrInvalidState", err)
+	}
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Runtime Close() after Discard(): %v", err)
+	}
+}
+
+func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var calls atomic.Int32
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		if calls.Add(1) == 1 {
+			close(entered)
+			<-release
+		}
+		return 0
+	})
+	defer restore()
+
+	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	firstDone := make(chan error, 1)
+	secondDone := make(chan error, 1)
+	go func() { firstDone <- operation.Discard() }()
+	<-entered
+	secondStarted := make(chan struct{})
+	go func() {
+		close(secondStarted)
+		secondDone <- operation.Discard()
+	}()
+	<-secondStarted
+	select {
+	case err := <-secondDone:
+		t.Fatalf("second Discard() completed while first discard was in flight: %v", err)
+	case <-time.After(25 * time.Millisecond):
+	}
+	close(release)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first Discard(): %v", err)
+	}
+	if err := <-secondDone; err != nil {
+		t.Fatalf("second Discard(): %v", err)
+	}
+	if calls.Load() != 1 {
+		t.Fatalf("native discard calls = %d, want 1", calls.Load())
+	}
+}
+
+func TestOfflineOperationTakeRejectsNoResultOperationWithoutDiscarding(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	var calls int
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		calls++
+		return 0
+	})
+	defer restore()
+
+	operation := newOfflineOperationHandle[struct{}](runtime, 1, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+	if _, err := operation.Take(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Take() no-result operation = %v, want ErrInvalidState", err)
+	}
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard() after rejected Take: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("discard calls = %d, want 1", calls)
+	}
+}
+
+func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
+	runtime := newFakeRuntimeHandle(t)
+	defer closeFakeRuntimeHandle(t, runtime)
+
+	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+		return 0
+	})
+	defer restore()
+
+	preConsume := newOfflineOperationHandle[struct{}](runtime, 2, OfflineOperationRegionSetObserved, OfflineOperationResultKind(999_999))
+	if _, err := preConsume.Take(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("Take() pre-consume mismatch = %v, want ErrInvalidState", err)
+	}
+	if err := preConsume.Discard(); err != nil {
+		t.Fatalf("Discard() after pre-consume mismatch: %v", err)
+	}
+}
+
+func newFakeRuntimeHandle(t *testing.T) *RuntimeHandle {
+	t.Helper()
+	state, err := handle.New(&nativeRuntime{}, "RuntimeHandle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &RuntimeHandle{state: state}
+}
+
+func closeFakeRuntimeHandle(t *testing.T, runtime *RuntimeHandle) {
+	t.Helper()
+	if status := runtime.state.Close(func(ptr *nativeRuntime) int32 { return 0 }); status != 0 {
+		t.Fatalf("fake runtime close status = %d, want 0", status)
+	}
+}
+
+func replaceOfflineOperationDiscardForTest(discard func(*nativeRuntime, uint64) int32) func() {
+	previous := offlineOperationDiscard
+	offlineOperationDiscard = discard
+	return func() {
+		offlineOperationDiscard = previous
+	}
+}
+
+func replaceRuntimeDestroyForTest(destroy func(*nativeRuntime) int32) func() {
+	previous := destroyRuntimeHandle
+	destroyRuntimeHandle = destroy
+	return func() {
+		destroyRuntimeHandle = previous
 	}
 }

@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -106,22 +107,27 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.AddStyleSourceJSON("points", map[string]any{
-		"type": "geojson",
-		"data": map[string]any{"type": "FeatureCollection", "features": []any{}},
-	}); err != nil {
+	if err := m.AddStyleSourceJSON("points", JSONObject(
+		JSONMember{Name: "type", Value: JSONString("geojson")},
+		JSONMember{Name: "data", Value: JSONObject(
+			JSONMember{Name: "type", Value: JSONString("FeatureCollection")},
+			JSONMember{Name: "features", Value: JSONArray()},
+		)},
+	)); err != nil {
 		t.Fatalf("AddStyleSourceJSON(points): %v", err)
 	}
-	layerJSON := map[string]any{
-		"id":     "points-layer",
-		"type":   "circle",
-		"source": "points",
-		"paint":  map[string]any{"circle-radius": float64(2)},
-	}
+	layerJSON := JSONObject(
+		JSONMember{Name: "id", Value: JSONString("points-layer")},
+		JSONMember{Name: "type", Value: JSONString("circle")},
+		JSONMember{Name: "source", Value: JSONString("points")},
+		JSONMember{Name: "paint", Value: JSONObject(
+			JSONMember{Name: "circle-radius", Value: JSONDouble(2)},
+		)},
+	)
 	if err := m.AddStyleLayerJSON(layerJSON, ""); err != nil {
 		t.Fatalf("AddStyleLayerJSON(): %v", err)
 	}
-	layerJSON["type"] = "mutated-after-call"
+	layerJSON.Object[1].Value = JSONString("mutated-after-call")
 	layerType, found, err := m.StyleLayerType("points-layer")
 	if err != nil {
 		t.Fatalf("StyleLayerType(): %v", err)
@@ -136,36 +142,42 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	if !found {
 		t.Fatalf("StyleLayerJSON(points-layer) found = false, want true")
 	}
-	copiedLayerObject, ok := copiedLayer.(map[string]any)
-	if !ok || copiedLayerObject["type"] != "circle" {
+	var copiedLayerType JSONValue
+	for _, member := range copiedLayer.Object {
+		if member.Name == "type" {
+			copiedLayerType = member.Value
+			break
+		}
+	}
+	if copiedLayer.Type != JSONValueTypeObject || copiedLayerType.Type != JSONValueTypeString || copiedLayerType.String != "circle" {
 		t.Fatalf("StyleLayerJSON(points-layer) = %#v, want copied circle object", copiedLayer)
 	}
-	if err := m.SetLayerProperty("points-layer", "circle-radius", float64(5)); err != nil {
+	if err := m.SetLayerProperty("points-layer", "circle-radius", JSONDouble(5)); err != nil {
 		t.Fatalf("SetLayerProperty(circle-radius): %v", err)
 	}
 	property, err := m.LayerProperty("points-layer", "circle-radius")
 	if err != nil {
 		t.Fatalf("LayerProperty(circle-radius): %v", err)
 	}
-	if property != float64(5) {
+	if property.Type != JSONValueTypeDouble || property.Double != 5 {
 		t.Fatalf("LayerProperty(circle-radius) = %#v, want 5", property)
 	}
-	filter := []any{"==", []any{"get", "kind"}, "unit"}
-	if err := m.SetLayerFilter("points-layer", filter); err != nil {
+	filter := JSONArray(JSONString("=="), JSONArray(JSONString("get"), JSONString("kind")), JSONString("unit"))
+	if err := m.SetLayerFilter("points-layer", &filter); err != nil {
 		t.Fatalf("SetLayerFilter(): %v", err)
 	}
 	gotFilter, err := m.LayerFilter("points-layer")
 	if err != nil {
 		t.Fatalf("LayerFilter(): %v", err)
 	}
-	if gotFilter == nil {
+	if gotFilter.Type == JSONValueTypeNull {
 		t.Fatalf("LayerFilter() = nil, want copied filter")
 	}
 	if err := m.SetLayerFilter("points-layer", nil); err != nil {
 		t.Fatalf("SetLayerFilter(nil): %v", err)
 	}
-	if err := m.SetLayerProperty("points-layer", "circle-radius", make(chan int)); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetLayerProperty(unsupported value) error = %v, want ErrInvalidArgument", err)
+	if err := m.SetLayerProperty("points-layer", "circle-radius", JSONDouble(math.NaN())); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetLayerProperty(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 	if _, err := m.LayerProperty("missing", "circle-radius"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("LayerProperty(missing layer) error = %v, want ErrInvalidArgument", err)
@@ -193,21 +205,25 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.SetStyleLightJSON(map[string]any{"anchor": "viewport", "color": "#ffffff", "intensity": float64(0.5)}); err != nil {
+	if err := m.SetStyleLightJSON(JSONObject(
+		JSONMember{Name: "anchor", Value: JSONString("viewport")},
+		JSONMember{Name: "color", Value: JSONString("#ffffff")},
+		JSONMember{Name: "intensity", Value: JSONDouble(0.5)},
+	)); err != nil {
 		t.Fatalf("SetStyleLightJSON(): %v", err)
 	}
-	if err := m.SetStyleLightProperty("intensity", float64(0.75)); err != nil {
+	if err := m.SetStyleLightProperty("intensity", JSONDouble(0.75)); err != nil {
 		t.Fatalf("SetStyleLightProperty(intensity): %v", err)
 	}
 	intensity, err := m.StyleLightProperty("intensity")
 	if err != nil {
 		t.Fatalf("StyleLightProperty(intensity): %v", err)
 	}
-	if intensity != float64(0.75) {
+	if intensity.Type != JSONValueTypeDouble || intensity.Double != 0.75 {
 		t.Fatalf("StyleLightProperty(intensity) = %#v, want 0.75", intensity)
 	}
-	if err := m.SetStyleLightProperty("intensity", make(chan int)); !errors.Is(err, ErrInvalidArgument) {
-		t.Fatalf("SetStyleLightProperty(unsupported value) error = %v, want ErrInvalidArgument", err)
+	if err := m.SetStyleLightProperty("intensity", JSONDouble(math.Inf(-1))); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleLightProperty(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 }
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {

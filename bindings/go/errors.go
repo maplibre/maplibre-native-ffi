@@ -26,6 +26,9 @@ var (
 	ErrUnsupported = errors.New("maplibre: unsupported")
 	// ErrNative reports a MapLibre Native error converted to a C status.
 	ErrNative = errors.New("maplibre: native error")
+	// ErrABIVersionMismatch reports that the loaded C ABI version is
+	// incompatible with this binding.
+	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
 	// ErrUnknownStatus reports a status value unknown to this binding version.
 	ErrUnknownStatus = errors.New("maplibre: unknown native status")
 )
@@ -40,6 +43,13 @@ type Error struct {
 
 func newBindingError(kind error, diagnostic string) *Error {
 	return &Error{kind: kind, diagnostic: diagnostic}
+}
+
+func newABIVersionMismatchError(expected, actual uint32) *Error {
+	return newBindingError(
+		ErrABIVersionMismatch,
+		fmt.Sprintf("unsupported MapLibre Native C ABI version %d; expected %d", actual, expected),
+	)
 }
 
 func newStatusError(failure *internalstatus.NativeError) *Error {
