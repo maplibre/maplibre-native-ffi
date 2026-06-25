@@ -14,6 +14,8 @@ local lintSteps = new Mapping<String, Step> {
     glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
     check = "actionlint {{files}}"
   }
+  // Only `.github/workflows/ci.yml` is checked in from CI manifests.
+  // `docs/src/generated/support-matrix.json` is gitignored and generated at docs build time.
   ["ci-workflow"] {
     glob = List(
       "ci/**/*.toml",

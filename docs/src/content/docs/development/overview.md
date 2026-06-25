@@ -130,3 +130,11 @@ output, interactive input, or host graphics integration.
 Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this
 repository.
+
+## CI Manifests And Generated Artifacts
+
+Variant CI jobs and the documentation support matrix both read from
+`ci/subprojects/*.toml`. Only `.github/workflows/ci.yml` is checked in;
+regenerate it with `mise run ci:generate-workflow` when CI manifests change. The
+support matrix JSON under `docs/src/generated/` is gitignored and regenerated
+automatically by `mise install` and `//docs:build`.
