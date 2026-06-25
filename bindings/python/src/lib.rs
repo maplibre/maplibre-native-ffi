@@ -232,6 +232,17 @@ struct OpenGLOwnedTextureFrameRaw {
     type_: u32,
 }
 
+enum OwnedTextureFrameRelease {
+    Metal(MetalOwnedTextureFrameRaw),
+    Vulkan(VulkanOwnedTextureFrameRaw),
+    OpenGL(OpenGLOwnedTextureFrameRaw),
+}
+
+struct OwnedTextureFrameAcquisitionGuard {
+    session: Arc<Mutex<RenderSessionState>>,
+    frame: Option<OwnedTextureFrameRelease>,
+}
+
 #[pyclass(name = "_OpenGLOwnedTextureFrameHandle")]
 struct OpenGLOwnedTextureFrameHandle {
     session: Arc<Mutex<RenderSessionState>>,
@@ -250,7 +261,9 @@ impl RuntimeHandle {
         &self,
     ) -> PyResult<MutexGuard<'_, maplibre_core::handle::NativeHandleState<sys::mln_runtime>>> {
         self.operation_gate.ensure_open()?;
-        Ok(self.state())
+        let state = self.state();
+        self.operation_gate.ensure_open()?;
+        Ok(state)
     }
 }
 
@@ -3598,9 +3611,13 @@ impl RenderSessionHandle {
         texture_image_info_to_py(py, info)
     }
 
-    fn acquire_metal_owned_texture_frame(&self) -> PyResult<MetalOwnedTextureFrameHandle> {
-        let mut state = self
-            .state
+    fn acquire_metal_owned_texture_frame(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Py<MetalOwnedTextureFrameHandle>> {
+        let session = Arc::clone(&self.state);
+        let guard_session = Arc::clone(&session);
+        let mut state = session
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
@@ -3612,16 +3629,28 @@ impl RenderSessionHandle {
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
-        Ok(MetalOwnedTextureFrameHandle {
-            session: Arc::clone(&self.state),
-            raw: MetalOwnedTextureFrameRaw::from_native(&raw),
-            closed: Mutex::new(false),
-        })
+        let raw = MetalOwnedTextureFrameRaw::from_native(&raw);
+        let mut guard = OwnedTextureFrameAcquisitionGuard::metal(guard_session, raw);
+        drop(state);
+        let frame = Py::new(
+            py,
+            MetalOwnedTextureFrameHandle {
+                session,
+                raw,
+                closed: Mutex::new(false),
+            },
+        )?;
+        guard.disarm();
+        Ok(frame)
     }
 
-    fn acquire_vulkan_owned_texture_frame(&self) -> PyResult<VulkanOwnedTextureFrameHandle> {
-        let mut state = self
-            .state
+    fn acquire_vulkan_owned_texture_frame(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Py<VulkanOwnedTextureFrameHandle>> {
+        let session = Arc::clone(&self.state);
+        let guard_session = Arc::clone(&session);
+        let mut state = session
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
@@ -3633,16 +3662,28 @@ impl RenderSessionHandle {
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
-        Ok(VulkanOwnedTextureFrameHandle {
-            session: Arc::clone(&self.state),
-            raw: VulkanOwnedTextureFrameRaw::from_native(&raw),
-            closed: Mutex::new(false),
-        })
+        let raw = VulkanOwnedTextureFrameRaw::from_native(&raw);
+        let mut guard = OwnedTextureFrameAcquisitionGuard::vulkan(guard_session, raw);
+        drop(state);
+        let frame = Py::new(
+            py,
+            VulkanOwnedTextureFrameHandle {
+                session,
+                raw,
+                closed: Mutex::new(false),
+            },
+        )?;
+        guard.disarm();
+        Ok(frame)
     }
 
-    fn acquire_opengl_owned_texture_frame(&self) -> PyResult<OpenGLOwnedTextureFrameHandle> {
-        let mut state = self
-            .state
+    fn acquire_opengl_owned_texture_frame(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<Py<OpenGLOwnedTextureFrameHandle>> {
+        let session = Arc::clone(&self.state);
+        let guard_session = Arc::clone(&session);
+        let mut state = session
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
@@ -3654,11 +3695,19 @@ impl RenderSessionHandle {
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
-        Ok(OpenGLOwnedTextureFrameHandle {
-            session: Arc::clone(&self.state),
-            raw: OpenGLOwnedTextureFrameRaw::from_native(&raw),
-            closed: Mutex::new(false),
-        })
+        let raw = OpenGLOwnedTextureFrameRaw::from_native(&raw);
+        let mut guard = OwnedTextureFrameAcquisitionGuard::opengl(guard_session, raw);
+        drop(state);
+        let frame = Py::new(
+            py,
+            OpenGLOwnedTextureFrameHandle {
+                session,
+                raw,
+                closed: Mutex::new(false),
+            },
+        )?;
+        guard.disarm();
+        Ok(frame)
     }
 
     #[getter]
@@ -6067,6 +6116,72 @@ fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
         internal_format: 0,
         format: 0,
         type_: 0,
+    }
+}
+
+impl OwnedTextureFrameAcquisitionGuard {
+    fn metal(session: Arc<Mutex<RenderSessionState>>, raw: MetalOwnedTextureFrameRaw) -> Self {
+        Self {
+            session,
+            frame: Some(OwnedTextureFrameRelease::Metal(raw)),
+        }
+    }
+
+    fn vulkan(session: Arc<Mutex<RenderSessionState>>, raw: VulkanOwnedTextureFrameRaw) -> Self {
+        Self {
+            session,
+            frame: Some(OwnedTextureFrameRelease::Vulkan(raw)),
+        }
+    }
+
+    fn opengl(session: Arc<Mutex<RenderSessionState>>, raw: OpenGLOwnedTextureFrameRaw) -> Self {
+        Self {
+            session,
+            frame: Some(OwnedTextureFrameRelease::OpenGL(raw)),
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.frame = None;
+    }
+}
+
+impl Drop for OwnedTextureFrameAcquisitionGuard {
+    fn drop(&mut self) {
+        let Some(frame) = self.frame.take() else {
+            return;
+        };
+        let mut session = self
+            .session
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match frame {
+            OwnedTextureFrameRelease::Metal(raw) => {
+                let raw = raw.to_native();
+                // SAFETY: raw reconstructs the frame returned by a successful
+                // native acquire call whose Python object construction failed.
+                let _ = maplibre_core::check(unsafe {
+                    sys::mln_metal_owned_texture_release_frame(session.as_ptr(), &raw)
+                });
+            }
+            OwnedTextureFrameRelease::Vulkan(raw) => {
+                let raw = raw.to_native();
+                // SAFETY: raw reconstructs the frame returned by a successful
+                // native acquire call whose Python object construction failed.
+                let _ = maplibre_core::check(unsafe {
+                    sys::mln_vulkan_owned_texture_release_frame(session.as_ptr(), &raw)
+                });
+            }
+            OwnedTextureFrameRelease::OpenGL(raw) => {
+                let raw = raw.to_native();
+                // SAFETY: raw reconstructs the frame returned by a successful
+                // native acquire call whose Python object construction failed.
+                let _ = maplibre_core::check(unsafe {
+                    sys::mln_opengl_owned_texture_release_frame(session.as_ptr(), &raw)
+                });
+            }
+        }
+        session.frame_acquired = false;
     }
 }
 

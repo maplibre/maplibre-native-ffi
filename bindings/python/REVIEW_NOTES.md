@@ -104,20 +104,6 @@ input before implementation.
   - implementation notes: Mirror the dedicated C/Zig resource scenarios through
     public Python APIs.
 
-- [ ] `py-frame-acquire-construction-failure`: Add post-acquire cleanup guards
-      for owned texture frames.
-  - severity: medium
-  - complexity: medium
-  - area: owned texture frame acquisition in `src/lib.rs`
-  - outcome: If Python wrapper construction fails after native frame
-    acquisition, the binding releases the native frame and clears the active
-    frame state.
-  - rationale: Frame acquisition marks a frame active and returns a PyO3 frame
-    object. Frame `Drop` intentionally does not release native state from
-    cleanup hooks, so construction failure needs an explicit guard.
-  - implementation notes: Add an acquisition guard that releases the native
-    frame on post-acquire failure and disarms after successful object creation.
-
 ## Invalidated
 
 - `py-sealed-handle-tests`: Sealed handle tests instantiate non-public
@@ -141,3 +127,6 @@ input before implementation.
   wrong-thread propagation coverage. Native render-session wrong-thread coverage
   remains part of `py-render-integration-tests`, where backend render fixtures
   can exercise real session handles.
+- `py-frame-acquire-construction-failure`: Owned texture frame acquisition now
+  uses a cleanup guard that releases the native frame and clears active-frame
+  state if Python frame-handle construction fails.
