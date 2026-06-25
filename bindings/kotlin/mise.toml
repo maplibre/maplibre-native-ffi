@@ -4,6 +4,7 @@ run = '''
 if [[ "$MISE_ENV" != android-* ]]; then
   echo "Use an Android mise environment, for example:" >&2
   echo "  mise -E android-arm64-egl run //bindings/kotlin:androidBuild" >&2
+  echo "  mise -E android-x64-egl run //bindings/kotlin:androidBuild" >&2
   exit 1
 fi
 '''

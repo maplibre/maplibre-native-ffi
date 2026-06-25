@@ -35,7 +35,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
     {
         get
         {
-            ValidateDescriptorOptions();
+            ValidateDescriptorShape();
             NativeLibraryLoader.EnsureLoaded();
             var descriptor = NativeMethods.mln_custom_geometry_source_options_default();
             descriptor.fetch_tile = &FetchTile;
@@ -87,9 +87,12 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
         }
     }
 
-    private void ValidateDescriptorOptions()
+    // Binding-owned cast-safety: Buffer is `double?` in the public API but the
+    // C field is uint. Values in (-1, 0) would silently truncate to 0u and
+    // bypass the C-side unsigned-domain check. Reject them before the cast.
+    private void ValidateDescriptorShape()
     {
-        if (options.Buffer < 0)
+        if (options.Buffer is { } buffer && buffer < 0)
         {
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,

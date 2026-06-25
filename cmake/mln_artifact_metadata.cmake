@@ -20,15 +20,6 @@ function(mln_json_array out)
   set("${out}" "[${joined}]" PARENT_SCOPE)
 endfunction()
 
-function(mln_append_env_path list_name env_name)
-  set(paths ${${list_name}})
-  if(DEFINED ENV{${env_name}}
-     AND NOT "$ENV{${env_name}}" STREQUAL "")
-    list(APPEND paths "$ENV{${env_name}}")
-  endif()
-  set("${list_name}" "${paths}" PARENT_SCOPE)
-endfunction()
-
 function(mln_write_artifact_metadata target)
   set(include_dirs "${PROJECT_SOURCE_DIR}/include")
   set(library_dirs "")
@@ -37,10 +28,10 @@ function(mln_write_artifact_metadata target)
   set(frameworks "")
   set(supports_linker_rpath false)
 
-  mln_append_env_path(include_dirs MLN_FFI_DEPENDENCY_INCLUDE_DIR)
-  mln_append_env_path(include_dirs MLN_FFI_VULKAN_INCLUDE_DIR)
+  list(APPEND include_dirs "$ENV{MLN_FFI_DEPENDENCY_INCLUDE_DIR}")
+  list(APPEND include_dirs "$ENV{MLN_FFI_VULKAN_INCLUDE_DIR}")
   if(NOT CMAKE_CROSSCOMPILING)
-    mln_append_env_path(library_dirs MLN_FFI_DEPENDENCY_LIBRARY_DIR)
+    list(APPEND library_dirs "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
   endif()
 
   if(MLN_FFI_EGL_ROOT)
@@ -48,12 +39,13 @@ function(mln_write_artifact_metadata target)
     list(APPEND library_dirs "${MLN_FFI_EGL_ROOT}")
   endif()
 
-  if(UNIX AND MLN_FFI_ARTIFACT_SHAPE STREQUAL "shared-private")
-    set(rpaths ${library_dirs})
+  if(UNIX
+     AND (NOT CMAKE_SYSTEM_NAME STREQUAL "iOS" OR MLN_FFI_IS_IOS_SIMULATOR))
+    set(rpaths "$<TARGET_FILE_DIR:${target}>" ${library_dirs})
     set(supports_linker_rpath true)
   endif()
 
-  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     list(
       APPEND library_dirs "${CMAKE_BINARY_DIR}"
       "${CMAKE_BINARY_DIR}/maplibre-native"
@@ -90,7 +82,6 @@ function(mln_write_artifact_metadata target)
   endif()
 
   mln_json_escape(render_backend "${MLN_FFI_RENDER_BACKEND}")
-  mln_json_escape(artifact_shape "${MLN_FFI_ARTIFACT_SHAPE}")
   mln_json_array(include_dirs_json ${include_dirs})
   mln_json_array(library_dirs_json ${library_dirs})
   mln_json_array(rpaths_json ${rpaths})
@@ -103,7 +94,6 @@ function(mln_write_artifact_metadata target)
     CONTENT
       "{
   \"render_backend\": \"${render_backend}\",
-  \"artifact_shape\": \"${artifact_shape}\",
   \"library_path\": \"$<TARGET_FILE:${target}>\",
   \"import_library_path\": \"$<TARGET_LINKER_FILE:${target}>\",
   \"supports_linker_rpath\": ${supports_linker_rpath},

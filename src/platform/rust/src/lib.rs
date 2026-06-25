@@ -1,3 +1,3 @@
 mod android;
-mod http;
+mod http_client;
 mod image;

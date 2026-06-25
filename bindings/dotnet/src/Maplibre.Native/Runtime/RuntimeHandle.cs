@@ -102,9 +102,9 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 resourceProviderState = replacement;
                 previous?.Dispose();
             }
-            catch
+            catch (Exception error)
             {
-                replacement.Dispose();
+                DisposeAndSuppress(error, replacement);
                 throw;
             }
         }
@@ -124,9 +124,9 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 resourceTransformState = replacement;
                 previous?.Dispose();
             }
-            catch
+            catch (Exception error)
             {
-                replacement.Dispose();
+                DisposeAndSuppress(error, replacement);
                 throw;
             }
         }
@@ -654,6 +654,18 @@ public sealed unsafe class RuntimeHandle : IDisposable
             resourceTransformState = null;
             provider?.Dispose();
             transform?.Dispose();
+        }
+    }
+
+    private static void DisposeAndSuppress(Exception error, IDisposable? disposable)
+    {
+        try
+        {
+            disposable?.Dispose();
+        }
+        catch (Exception cleanup)
+        {
+            error.Data["SuppressedCleanupException"] = cleanup;
         }
     }
 }

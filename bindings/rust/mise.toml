@@ -2,6 +2,7 @@
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
 cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 '''
 
@@ -9,6 +10,7 @@ cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+env LD_LIBRARY_PATH="$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
 cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
 '''

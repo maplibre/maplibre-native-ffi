@@ -143,8 +143,9 @@ public abstract record RuntimeEventPayload
 
         public Unknown(uint RawPayloadType, byte[] PayloadBytes)
         {
+            ArgumentNullException.ThrowIfNull(PayloadBytes);
             this.RawPayloadType = RawPayloadType;
-            payloadBytes = PayloadBytes is null ? [] : (byte[])PayloadBytes.Clone();
+            payloadBytes = (byte[])PayloadBytes.Clone();
         }
 
         public uint RawPayloadType { get; }

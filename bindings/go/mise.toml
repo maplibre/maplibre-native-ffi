@@ -1,0 +1,29 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = '''
+export CGO_CFLAGS="-I$MLN_FFI_INCLUDE_DIR -I$MLN_FFI_VULKAN_INCLUDE_DIR ${CGO_CFLAGS:-}"
+export CGO_LDFLAGS="-L$MLN_FFI_BUILD_DIR -Wl,-rpath,$MLN_FFI_BUILD_DIR -lmaplibre-native-c ${CGO_LDFLAGS:-}"
+go test ./...
+'''
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+run = '''
+export CGO_CFLAGS="-I$MLN_FFI_INCLUDE_DIR -I$MLN_FFI_VULKAN_INCLUDE_DIR ${CGO_CFLAGS:-}"
+export CGO_LDFLAGS="-L$MLN_FFI_BUILD_DIR -Wl,-rpath,$MLN_FFI_BUILD_DIR -lmaplibre-native-c ${CGO_LDFLAGS:-}"
+go test ./...
+'''
+
+[tasks.ci]
+depends = ["//:ensure-native-library"]
+run = '''
+export CGO_CFLAGS="-I$MLN_FFI_INCLUDE_DIR -I$MLN_FFI_VULKAN_INCLUDE_DIR ${CGO_CFLAGS:-}"
+export CGO_LDFLAGS="-L$MLN_FFI_BUILD_DIR -Wl,-rpath,$MLN_FFI_BUILD_DIR -lmaplibre-native-c ${CGO_LDFLAGS:-}"
+unformatted="$(gofmt -l .)"
+if [[ -n "$unformatted" ]]; then
+  echo "$unformatted" >&2
+  exit 1
+fi
+go test ./...
+go vet ./...
+'''

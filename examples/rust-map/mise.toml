@@ -3,7 +3,7 @@ hide = true
 run = '''
 set -euo pipefail
 
-if [[ "${MLN_FFI_RENDER_BACKEND:-}" == "vulkan" ]]; then
+if [[ "$MLN_FFI_RENDER_BACKEND" == "vulkan" ]]; then
   glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv
   glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv
 fi
@@ -13,20 +13,24 @@ fi
 depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-case "${MLN_FFI_RENDER_BACKEND:-}" in
+set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
+  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
 esac
 cargo build -p rust-map --no-default-features --features "$feature"
 '''
 
-[tasks.test]
+[tasks.check]
 depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-case "${MLN_FFI_RENDER_BACKEND:-}" in
+set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
+  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
 esac
 cargo clippy -p rust-map --no-default-features --features "$feature" --all-targets -- -D warnings
 '''
@@ -36,11 +40,13 @@ depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
 run = '''
-case "${MLN_FFI_RENDER_BACKEND:-}" in
+set -euo pipefail
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+case "$MLN_FFI_RENDER_BACKEND" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
+  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
 esac
-cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
+env LD_LIBRARY_PATH="$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]

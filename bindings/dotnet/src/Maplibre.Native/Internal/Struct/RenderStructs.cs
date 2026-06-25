@@ -10,21 +10,6 @@ internal static unsafe class RenderStructs
 {
     internal static mln_render_target_extent ToNative(RenderTargetExtent extent)
     {
-        if (extent == default)
-        {
-            extent = new RenderTargetExtent(256, 256, 1.0);
-        }
-
-        if (!double.IsFinite(extent.ScaleFactor) || extent.ScaleFactor <= 0)
-        {
-            throw new InvalidArgumentException(
-                MaplibreStatus.InvalidArgument,
-                null,
-                "Render target scale factor must be positive and finite.",
-                null
-            );
-        }
-
         return new mln_render_target_extent
         {
             size = (uint)sizeof(mln_render_target_extent),

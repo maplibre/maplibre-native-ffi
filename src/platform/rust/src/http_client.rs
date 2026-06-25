@@ -7,10 +7,18 @@ use std::sync::{
     Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Duration;
 
-const HTTP_WORKER_THREADS: usize = 16;
-const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
-const HTTP_MAX_REDIRECTS: usize = 100;
+// Matches `mbgl::util::DEFAULT_MAXIMUM_CONCURRENT_REQUESTS` enforced by
+// `OnlineFileSource` in maplibre-native's default platform layer.
+const HTTP_WORKER_THREADS: usize = 20;
+// Upstream default `http_file_source.cpp` does not set `CURLOPT_TIMEOUT`; cap
+// connection establishment so hung TCP/TLS handshakes do not occupy a worker
+// thread indefinitely, without bounding slow but progressing body downloads.
+const HTTP_CONNECT_TIMEOUT_SECONDS: u64 = 30;
+// Upstream uses `CURLOPT_FOLLOWLOCATION` without `CURLOPT_MAXREDIRS`; match
+// libcurl 8's default redirect limit.
+const HTTP_MAX_REDIRECTS: u32 = 30;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
@@ -64,7 +72,7 @@ pub unsafe extern "C" fn mlnffi_rust_http_request_start(
     let callback_user_data = user_data as usize;
     http_thread_pool().execute(move || {
         let response = if thread_canceled.load(Ordering::Acquire) {
-            http_error(HTTP_ERROR_OTHER, "HTTP request canceled before start")
+            http_error(HTTP_ERROR_OTHER, "HTTP request canceled")
         } else {
             send_http_request(request)
         };
@@ -80,9 +88,34 @@ pub unsafe extern "C" fn mlnffi_rust_http_request_start(
 
 fn http_thread_pool() -> &'static threadpool::ThreadPool {
     static HTTP_THREAD_POOL: OnceLock<threadpool::ThreadPool> = OnceLock::new();
-    // TODO(android): Replace this hardcoded worker count with MapLibre's
-    // MAX_CONCURRENT_REQUESTS_KEY file-source property.
     HTTP_THREAD_POOL.get_or_init(|| threadpool::ThreadPool::new(HTTP_WORKER_THREADS))
+}
+
+fn http_agent() -> &'static ureq::Agent {
+    static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+    AGENT.get_or_init(|| {
+        let mut tls_builder =
+            ureq::tls::TlsConfig::builder().root_certs(ureq::tls::RootCerts::PlatformVerifier);
+        #[cfg(target_os = "windows")]
+        {
+            tls_builder = tls_builder.provider(ureq::tls::TlsProvider::NativeTls);
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            tls_builder = tls_builder.provider(ureq::tls::TlsProvider::Rustls);
+        }
+
+        let mut config_builder = ureq::config::Config::builder()
+            .http_status_as_error(false)
+            // Redirects are handled manually so each hop can be checked on Android.
+            .max_redirects(0)
+            .timeout_connect(Some(Duration::from_secs(HTTP_CONNECT_TIMEOUT_SECONDS)))
+            .tls_config(tls_builder.build());
+        if let Some(proxy) = ureq::Proxy::try_from_env() {
+            config_builder = config_builder.proxy(Some(proxy));
+        }
+        config_builder.build().into()
+    })
 }
 
 #[unsafe(no_mangle)]
@@ -150,11 +183,6 @@ fn copy_http_request(
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
     let mut url = request.url;
 
-    let has_accept_encoding = request
-        .headers
-        .iter()
-        .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
-
     for _ in 0..=HTTP_MAX_REDIRECTS {
         if is_https_url(&url) && !crate::android::tls_verifier_initialized() {
             return http_error(
@@ -163,50 +191,121 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
             );
         }
 
-        let mut minreq = minreq::get(&url)
-            .with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS)
-            .with_follow_redirects(false);
+        let agent = http_agent();
+        let mut builder = agent.get(&url);
+        let has_accept_encoding = request
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
+        let has_range = request
+            .headers
+            .iter()
+            .any(|(name, _)| name.eq_ignore_ascii_case("range"));
         for (name, value) in &request.headers {
-            minreq = minreq.with_header(name, value);
+            builder = builder.header(name, value);
         }
-        if !has_accept_encoding {
-            minreq = minreq.with_header("Accept-Encoding", "identity");
+        if !has_accept_encoding && has_range {
+            builder = builder.header("Accept-Encoding", "identity");
         }
 
-        match minreq.send() {
-            Ok(response) if is_redirect_status(response.status_code) => {
-                let Some(location) = response.header("location") else {
-                    return http_error(HTTP_ERROR_OTHER, "HTTP redirect missing Location header");
-                };
-                if location.is_empty() {
-                    return http_error(HTTP_ERROR_OTHER, "HTTP redirect Location header is empty");
+        match builder.call() {
+            Ok(mut response) => {
+                let status_code = response.status().as_u16();
+                if is_redirect_status(status_code) {
+                    let Some(location) = response_header(&response, "location") else {
+                        return http_error(
+                            HTTP_ERROR_OTHER,
+                            "HTTP redirect missing Location header",
+                        );
+                    };
+                    if location.is_empty() {
+                        return http_error(
+                            HTTP_ERROR_OTHER,
+                            "HTTP redirect Location header is empty",
+                        );
+                    }
+                    url = match redirect_url(&url, &location) {
+                        Some(url) => url,
+                        None => {
+                            return http_error(HTTP_ERROR_OTHER, "unsupported HTTP redirect URL");
+                        }
+                    };
+                    continue;
                 }
-                url = match redirect_url(&url, location) {
-                    Some(url) => url,
-                    None => {
-                        return http_error(HTTP_ERROR_OTHER, "unsupported HTTP redirect URL");
-                    }
-                };
+                return http_response(&mut response, has_range);
             }
-            Ok(response) => return http_response(response),
-            Err(error) => {
-                let reason = match error {
-                    minreq::Error::AddressNotFound | minreq::Error::IoError(_) => {
-                        HTTP_ERROR_CONNECTION
-                    }
-                    _ => HTTP_ERROR_OTHER,
-                };
-                return http_error(reason, &error.to_string());
-            }
+            Err(error) => return http_error(map_transport_error(&error), &error.to_string()),
         }
     }
 
     http_error(HTTP_ERROR_OTHER, "too many HTTP redirects")
 }
 
-fn is_https_url(url: &str) -> bool {
-    url.get(..8)
-        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
+fn http_response(
+    response: &mut http::Response<ureq::Body>,
+    ranged_request: bool,
+) -> MlnRustHttpResponse {
+    let status_code = response.status().as_u16();
+    if ranged_request && (status_code == 200 || status_code == 206) {
+        if let Some(encoding) = response_header(response, "content-encoding")
+            && !encoding.eq_ignore_ascii_case("identity")
+        {
+            return http_error(
+                HTTP_ERROR_OTHER,
+                &format!("unsupported HTTP content encoding: {encoding}"),
+            );
+        }
+    }
+
+    let etag = response_header(response, "etag");
+    let modified = response_header(response, "last-modified");
+    let cache_control = response_header(response, "cache-control");
+    let expires = response_header(response, "expires");
+    let retry_after = response_header(response, "retry-after");
+    let x_rate_limit_reset = response_header(response, "x-rate-limit-reset");
+
+    // libcurl/minreq had no response body cap; ureq's convenience read_to_vec() defaults to 10 MiB.
+    let body = match response
+        .body_mut()
+        .with_config()
+        .limit(u64::MAX)
+        .read_to_vec()
+    {
+        Ok(body) => body,
+        Err(error) => {
+            return http_error(HTTP_ERROR_CONNECTION, &error.to_string());
+        }
+    };
+
+    let data_len = body.len();
+    let data = if body.is_empty() {
+        ptr::null_mut()
+    } else {
+        let body = body.into_boxed_slice();
+        Box::into_raw(body) as *mut u8
+    };
+
+    MlnRustHttpResponse {
+        status_code,
+        error_reason: 0,
+        data,
+        data_len,
+        error: ptr::null_mut(),
+        etag: optional_c_string_ptr(etag),
+        modified: optional_c_string_ptr(modified),
+        cache_control: optional_c_string_ptr(cache_control),
+        expires: optional_c_string_ptr(expires),
+        retry_after: optional_c_string_ptr(retry_after),
+        x_rate_limit_reset: optional_c_string_ptr(x_rate_limit_reset),
+    }
+}
+
+fn response_header(response: &http::Response<ureq::Body>, name: &str) -> Option<String> {
+    response
+        .headers()
+        .get(name)
+        .and_then(|value| value.to_str().ok())
+        .map(str::to_owned)
 }
 
 fn is_redirect_status(status_code: u16) -> bool {
@@ -317,65 +416,20 @@ fn normalize_url_path(path: &str) -> String {
     normalized
 }
 
-fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
-    let status_code = response.status_code;
-    if (status_code == 200 || status_code == 206)
-        && let Some(encoding) = response.header("content-encoding")
-        && !encoding.eq_ignore_ascii_case("identity")
-    {
-        return http_error(
-            HTTP_ERROR_OTHER,
-            &format!("unsupported HTTP content encoding: {encoding}"),
-        );
+fn map_transport_error(error: &ureq::Error) -> u8 {
+    match error {
+        ureq::Error::HostNotFound
+        | ureq::Error::ConnectionFailed
+        | ureq::Error::Timeout(_)
+        | ureq::Error::Io(_)
+        | ureq::Error::ConnectProxyFailed(_) => HTTP_ERROR_CONNECTION,
+        _ => HTTP_ERROR_OTHER,
     }
+}
 
-    let etag = response
-        .header("etag")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-    let modified = response
-        .header("last-modified")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-    let cache_control = response
-        .header("cache-control")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-    let expires = response
-        .header("expires")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-    let retry_after = response
-        .header("retry-after")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-    let x_rate_limit_reset = response
-        .header("x-rate-limit-reset")
-        .and_then(c_string_ptr)
-        .unwrap_or(ptr::null_mut());
-
-    let body = response.into_bytes();
-    let data_len = body.len();
-    let data = if body.is_empty() {
-        ptr::null_mut()
-    } else {
-        let body = body.into_boxed_slice();
-        Box::into_raw(body) as *mut u8
-    };
-
-    MlnRustHttpResponse {
-        status_code,
-        error_reason: 0,
-        data,
-        data_len,
-        error: ptr::null_mut(),
-        etag,
-        modified,
-        cache_control,
-        expires,
-        retry_after,
-        x_rate_limit_reset,
-    }
+fn is_https_url(url: &str) -> bool {
+    url.get(..8)
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
 }
 
 fn http_error(reason: u8, message: &str) -> MlnRustHttpResponse {
@@ -421,6 +475,12 @@ fn free_http_response(response: MlnRustHttpResponse) {
 
 fn c_string_ptr(value: &str) -> Option<*mut c_char> {
     CString::new(value).ok().map(CString::into_raw)
+}
+
+fn optional_c_string_ptr(value: Option<String>) -> *mut c_char {
+    value
+        .and_then(|value| c_string_ptr(&value))
+        .unwrap_or(ptr::null_mut())
 }
 
 fn free_c_string(value: *mut c_char) {

@@ -9,12 +9,16 @@ run = [
 [tasks."api:rust"]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = [
-  "rm -rf docs/public/reference/rust",
-  "mkdir -p docs/public/reference",
-  "cargo doc -p maplibre-native --no-deps",
-  "cp -a target/doc/. docs/public/reference/rust/",
-]
+run = '''
+rm -rf docs/public/reference/rust
+mkdir -p docs/public/reference
+cargo doc -p maplibre-native --no-deps
+doc_dir="target/doc"
+if [ -n "${CARGO_BUILD_TARGET:-}" ]; then
+  doc_dir="target/${CARGO_BUILD_TARGET}/doc"
+fi
+cp -a "${doc_dir}/." docs/public/reference/rust/
+'''
 
 [tasks."api:zig"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"

@@ -161,7 +161,7 @@ impl MapHandle {
     pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
         let runtime_ptr = runtime.inner.as_ptr()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();
-        let raw_options = options.to_native();
+        let raw_options = options.to_native()?;
 
         // SAFETY: runtime_ptr is a live runtime handle. raw_options is a
         // materialized map descriptor with size filled by the binding. out is a

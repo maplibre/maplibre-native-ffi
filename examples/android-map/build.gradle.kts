@@ -1,5 +1,7 @@
 plugins { alias(libs.plugins.android.application) }
 
+val androidNdkAbi = org.maplibre.nativeffi.gradle.AndroidTarget.ndkAbiForGradleConfiguration()
+
 android {
   namespace = "org.maplibre.nativeffi.examples.androidmap"
   compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -11,7 +13,7 @@ android {
     versionCode = 1
     versionName = "0"
 
-    ndk { abiFilters += "arm64-v8a" }
+    ndk { abiFilters += androidNdkAbi }
 
     externalNativeBuild { cmake { arguments += "-DANDROID_STL=c++_shared" } }
 

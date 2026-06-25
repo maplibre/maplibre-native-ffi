@@ -33,10 +33,10 @@ pub const Controller = struct {
         current_viewport: types.Viewport,
     ) !Result {
         return switch (event.type) {
-            c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, map, diagnostic_store),
+            c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, map, diagnostic_store, current_viewport),
             c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button),
-            c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, map, diagnostic_store),
-            c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, map, diagnostic_store),
+            c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, map, diagnostic_store, current_viewport),
+            c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, map, diagnostic_store, current_viewport),
             c.SDL_EVENT_KEY_DOWN => handleKeyDown(event.key, map, diagnostic_store, current_viewport),
             else => .{},
         };
@@ -47,9 +47,11 @@ pub const Controller = struct {
         button: c.SDL_MouseButtonEvent,
         map: *maplibre.MapHandle,
         diagnostic_store: *const maplibre.DiagnosticStore,
+        current_viewport: types.Viewport,
     ) !Result {
-        self.last_x = button.x;
-        self.last_y = button.y;
+        const cursor = logicalPoint(button.x, button.y, current_viewport);
+        self.last_x = cursor.x;
+        self.last_y = cursor.y;
 
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
@@ -78,9 +80,11 @@ pub const Controller = struct {
         motion: c.SDL_MouseMotionEvent,
         map: *maplibre.MapHandle,
         diagnostic_store: *const maplibre.DiagnosticStore,
+        current_viewport: types.Viewport,
     ) !Result {
-        const x: f64 = motion.x;
-        const y: f64 = motion.y;
+        const cursor = logicalPoint(motion.x, motion.y, current_viewport);
+        const x = cursor.x;
+        const y = cursor.y;
         defer {
             self.last_x = x;
             self.last_y = y;
@@ -130,11 +134,12 @@ fn handleMouseWheel(
     wheel: c.SDL_MouseWheelEvent,
     map: *maplibre.MapHandle,
     diagnostic_store: *const maplibre.DiagnosticStore,
+    current_viewport: types.Viewport,
 ) !Result {
     const delta: f64 = wheel.y;
     if (delta == 0) return .{ .handled = true };
 
-    const anchor = point(wheel.mouse_x, wheel.mouse_y);
+    const anchor = logicalPoint(wheel.mouse_x, wheel.mouse_y, current_viewport);
     const scale = std.math.pow(f64, 2.0, delta * 0.25);
     try expectCameraStatus(map.scaleBy(scale, anchor), "camera zoom failed", diagnostic_store);
     return .{ .handled = true, .camera_changed = true };
@@ -278,6 +283,19 @@ fn expectCameraStatus(
 
 fn point(x: f64, y: f64) maplibre.ScreenPoint {
     return .{ .x = x, .y = y };
+}
+
+fn logicalPoint(x: f64, y: f64, current_viewport: types.Viewport) maplibre.ScreenPoint {
+    return point(
+        logicalCoordinate(x, current_viewport.window_width, current_viewport.logical_width),
+        logicalCoordinate(y, current_viewport.window_height, current_viewport.logical_height),
+    );
+}
+
+fn logicalCoordinate(value: f64, window_size: u32, logical_size: u32) f64 {
+    if (window_size == 0) return value;
+    return value * @as(f64, @floatFromInt(logical_size)) /
+        @as(f64, @floatFromInt(window_size));
 }
 
 fn cameraAnimation(duration_ms: f64) maplibre.AnimationOptions {

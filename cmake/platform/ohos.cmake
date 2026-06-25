@@ -43,6 +43,11 @@ function(mln_configure_ohos_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      image_source mbgl-vendor-icu pixelmap hilog_ndk.z
-      ${MLN_FFI_OHOS_NET_HTTP_LIBRARY} uv)
+      image_source
+      mbgl-vendor-icu
+      pixelmap
+      hilog_ndk.z
+      ${MLN_FFI_OHOS_NET_HTTP_LIBRARY}
+      uv
+      z)
 endfunction()

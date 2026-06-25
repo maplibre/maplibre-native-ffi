@@ -107,9 +107,9 @@ const wgl = if (builtin.os.tag == .windows) struct {
     }
 
     fn getProcAddress(name: [*:0]const u8) ?gl.PROC {
-        if (wglGetProcAddress(name)) |proc| return @ptrCast(proc);
+        if (wglGetProcAddress(name)) |proc| return @ptrCast(@alignCast(proc));
         const module = GetModuleHandleA("opengl32.dll") orelse LoadLibraryA("opengl32.dll") orelse return null;
-        return @ptrCast(GetProcAddress(module, name) orelse return null);
+        return @ptrCast(@alignCast(GetProcAddress(module, name) orelse return null));
     }
 } else struct {};
 

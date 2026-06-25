@@ -15,17 +15,6 @@ function(mln_configure_options)
   set_property(CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER PROPERTY STRINGS egl wgl)
   set(MLN_FFI_EGL_ROOT "" CACHE PATH "Path to a local EGL/GLES package")
 
-  if(NOT MLN_FFI_RENDER_BACKEND)
-    if(APPLE)
-      set(MLN_FFI_RENDER_BACKEND "metal")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux"
-           OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-      set(MLN_FFI_RENDER_BACKEND "vulkan")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-      set(MLN_FFI_RENDER_BACKEND "vulkan")
-    endif()
-  endif()
-
   string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
   string(TOLOWER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
          MLN_FFI_OPENGL_CONTEXT_PROVIDER)
@@ -37,12 +26,6 @@ function(mln_configure_options)
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
      AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
     set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
-  endif()
-
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-    set(MLN_FFI_ARTIFACT_SHAPE "static-monolithic")
-  else()
-    set(MLN_FFI_ARTIFACT_SHAPE "shared-private")
   endif()
 
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
@@ -113,16 +96,15 @@ function(mln_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
     message(
       STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER} as ${MLN_FFI_ARTIFACT_SHAPE}")
+        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend with ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
   else()
     message(
-      STATUS
-        "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend as ${MLN_FFI_ARTIFACT_SHAPE}")
+      STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")
   endif()
 
   set(MLN_FFI_RENDER_BACKEND "${MLN_FFI_RENDER_BACKEND}" PARENT_SCOPE)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
       PARENT_SCOPE)
   set(MLN_FFI_EGL_ROOT "${MLN_FFI_EGL_ROOT}" PARENT_SCOPE)
-  set(MLN_FFI_ARTIFACT_SHAPE "${MLN_FFI_ARTIFACT_SHAPE}" PARENT_SCOPE)
+  set(MLN_FFI_IS_IOS_SIMULATOR "${MLN_FFI_IS_IOS_SIMULATOR}" PARENT_SCOPE)
 endfunction()

@@ -1,0 +1,57 @@
+name: Setup Windows OpenGL software driver
+description: Install a software WGL driver for Windows CI
+
+runs:
+  using: composite
+  steps:
+    - name: Install WGL driver
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = "Stop"
+        $ProgressPreference = "SilentlyContinue"
+
+        if ($env:RUNNER_ARCH -eq "ARM64") {
+          # mmozeiko's ARM64 Mesa build is packaged for per-app use, but its
+          # opengl32.dll exports the Windows ICD entry points used by mesadrv.dll.
+          $mesaVersion = "26.1.3"
+          $mesaArchive = Join-Path $env:RUNNER_TEMP "mesa-llvmpipe-arm64-$mesaVersion.7z"
+          $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa-llvmpipe-arm64-$mesaVersion"
+          $mesaUrl = "https://github.com/mmozeiko/build-mesa/releases/download/$mesaVersion/mesa-llvmpipe-arm64-$mesaVersion.7z"
+          $expectedHash = "442F24756DDAF97C1C08B57C0A90661B22010390A35B2CEF69D3C6FD8B3EA32C"
+          $driverFilter = "opengl32.dll"
+          $driverPathPattern = "mesa-llvmpipe-arm64"
+        } else {
+          $mesaVersion = "26.0.8"
+          $mesaArchive = Join-Path $env:RUNNER_TEMP "mesa3d-$mesaVersion-release-msvc.7z"
+          $mesaRoot = Join-Path $env:RUNNER_TEMP "mesa3d-wgl-$mesaVersion"
+          $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/mesa3d-$mesaVersion-release-msvc.7z"
+          $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
+          $driverFilter = "libgallium_wgl.dll"
+          $driverPathPattern = "x64"
+        }
+
+        Invoke-WebRequest -Uri $mesaUrl -OutFile $mesaArchive
+        $actualHash = (Get-FileHash $mesaArchive -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) {
+          throw "Mesa archive hash mismatch: expected $expectedHash, got $actualHash"
+        }
+        7z x $mesaArchive "-o$mesaRoot" -y | Out-Null
+
+        $mesaWglDriver = Get-ChildItem $mesaRoot -Recurse -Filter $driverFilter |
+          Where-Object { $_.FullName -match $driverPathPattern } |
+          Select-Object -First 1
+        if (-not $mesaWglDriver) {
+          throw "Missing Mesa WGL driver in $mesaArchive"
+        }
+
+        Copy-Item $mesaWglDriver.FullName (Join-Path $env:WINDIR "System32\mesadrv.dll") -Force
+
+        $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
+        New-Item -Path $openglDriverKey -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DLL -PropertyType String -Value "mesadrv.dll" -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DriverVersion -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
+
+        "GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV
+        "Path=$($mesaWglDriver.Directory.FullName);$env:Path" >> $env:GITHUB_ENV
