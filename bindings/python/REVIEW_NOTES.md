@@ -54,33 +54,23 @@ keep a small amount of Python-native ergonomics.
 These findings have a clear desired outcome and do not need further maintainer
 input before implementation.
 
-- [ ] `py-render-integration-tests`: Add render workflow integration coverage.
+- [ ] `py-metal-render-integration-tests`: Add Metal render workflow integration
+      coverage under macOS.
   - severity: high
   - complexity: high
-  - area: BND-162 through BND-173
-  - outcome: Cover successful attach, readback, frame acquire/release,
-    active-frame rejection, stale-frame behavior, caller-owned resource
-    preservation, and native render-session wrong-thread behavior for configured
-    backends.
-  - rationale: Current tests rely heavily on descriptors, fake natives, and
-    invalid attach paths. The spec requires successful backend-specific native
-    workflows.
-  - implementation notes: Add backend-gated public tests that use real render
-    resources for each configured backend.
-
-- [ ] `py-resource-integration-tests`: Add resource provider and transform
-      integration coverage.
-  - severity: high
-  - complexity: high
-  - area: BND-140 through BND-153
-  - outcome: Cover URL rewrite, copied request data, native pass-through,
-    inline/deferred/cross-thread handled completion, cancellation, stale
-    handles, double completion, release races, and terminal completion behavior.
-  - rationale: Current tests cover adapters, fake request handles, and
-    registration bounds. The spec requires real public workflows crossing the
-    binding/C boundary.
-  - implementation notes: Mirror the dedicated C/Zig resource scenarios through
-    public Python APIs.
+  - area: BND-162 through BND-173 on Metal variants
+  - outcome: Add macOS Python fixtures that create `MTLDevice`, `CAMetalLayer`,
+    and caller-owned `MTLTexture` objects, expose their raw Objective-C object
+    pointers through `NativePointer`, and mirror the Vulkan/OpenGL successful
+    attach, readback, frame acquire/release, active-frame rejection, stale-frame
+    behavior, caller-owned resource preservation, and native wrong-thread tests.
+  - rationale: This branch now covers Vulkan on `linux-x64-vulkan` and
+    OpenGL/EGL on `linux-x64-egl`. The binding specification also applies to
+    Metal configured variants.
+  - implementation notes: Use a macOS validation pass before landing the
+    fixture. `pyobjc-framework-Metal` is the likely device/texture bridge;
+    `pyobjc-framework-Quartz` and `pyobjc-framework-Cocoa` are likely needed for
+    `CAMetalLayer` and any hidden-window surface setup.
 
 ## Invalidated
 
@@ -103,8 +93,7 @@ input before implementation.
 - `py-wrong-thread-coverage`: Resource transform set/clear now have real
   wrong-thread tests, and render-session public methods now have wrapper-level
   wrong-thread propagation coverage. Native render-session wrong-thread coverage
-  remains part of `py-render-integration-tests`, where backend render fixtures
-  can exercise real session handles.
+  now exercises live Vulkan and OpenGL/EGL render sessions.
 - `py-frame-acquire-construction-failure`: Owned texture frame acquisition now
   uses a cleanup guard that releases the native frame and clears active-frame
   state if Python frame-handle construction fails.
@@ -116,3 +105,26 @@ input before implementation.
   seam that injects an ABI version, verifies ABI mismatch maps to
   `UnsupportedFeatureError`, and proves the public wrapper does not store a
   native handle after validation failure.
+- `py-resource-integration-tests`: Public Python tests now cover resource
+  transform URL rewrite, transform clear, copied transform/provider request
+  values, native HTTP pass-through, inline/deferred/cross-thread handled style
+  completions, double completion, released/stale handles, cancellation before
+  late completion, terminal completion after native failure, release/check
+  synchronization, and resource error events for both map loading and offline
+  region download.
+- `py-vulkan-render-integration-tests`: Public Python tests now use the `vulkan`
+  and `glfw` Python packages to cover Vulkan surface, session-owned texture, and
+  caller-owned texture attach paths; second-session invalid state; render-update
+  invalid state; resize; CPU readback; owned-frame metadata, release,
+  active-frame rejection, failed release retry, and stale handle behavior;
+  caller-owned resource preservation; unsupported frame acquisition on
+  caller-owned sessions; and real wrong-thread diagnostics for live Vulkan
+  render sessions.
+- `py-opengl-egl-render-integration-tests`: Public Python tests now use
+  PyOpenGL's EGL/OpenGL ES bindings to cover Linux EGL surface, session-owned
+  texture, and caller-owned texture attach paths; second-session invalid state;
+  render-update invalid state; resize; CPU readback; owned-frame metadata,
+  release, active-frame rejection, failed release retry, and stale texture-name
+  behavior; caller-owned resource preservation; unsupported frame acquisition on
+  caller-owned sessions; and real wrong-thread diagnostics for live OpenGL/EGL
+  render sessions.

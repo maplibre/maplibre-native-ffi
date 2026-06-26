@@ -1,9 +1,12 @@
+import contextlib
+import http.server
 import math
 from pathlib import Path
 import subprocess
 import sys
 import textwrap
 import threading
+import time
 import typing
 import warnings
 
@@ -23,6 +26,96 @@ from maplibre_native import (
     resource,
     style,
 )
+
+_EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
+_EMPTY_STYLE_BYTES = _EMPTY_STYLE_JSON.encode()
+
+
+@contextlib.contextmanager
+def _online_network() -> typing.Iterator[None]:
+    original = mln.network_status()
+    mln.set_network_status(mln.NetworkStatus.ONLINE)
+    try:
+        yield
+    finally:
+        mln.set_network_status(original)
+
+
+@contextlib.contextmanager
+def _http_style_server() -> typing.Iterator[tuple[str, threading.Event]]:
+    served = threading.Event()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802
+            served.set()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(_EMPTY_STYLE_BYTES)))
+            self.end_headers()
+            self.wfile.write(_EMPTY_STYLE_BYTES)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        host, port = server.server_address
+        yield f"http://{host}:{port}/style.json", served
+    finally:
+        server.shutdown()
+        thread.join(timeout=2)
+        server.server_close()
+
+
+def _wait_for_runtime_event(
+    runtime: mln.RuntimeHandle,
+    event_type: mln.RuntimeEventType,
+    *,
+    iterations: int = 5000,
+) -> mln.RuntimeEvent:
+    for _ in range(iterations):
+        runtime.run_once()
+        while event := runtime.poll_event():
+            if event.event_type == event_type:
+                return event
+        time.sleep(0.001)
+    raise AssertionError(f"runtime event {event_type!r} was not observed")
+
+
+def _wait_for_provider_handle(
+    runtime: mln.RuntimeHandle,
+    handles: list[resource.ResourceRequestHandle],
+    *,
+    iterations: int = 5000,
+) -> resource.ResourceRequestHandle:
+    for _ in range(iterations):
+        runtime.run_once()
+        if handles:
+            return handles.pop(0)
+        time.sleep(0.001)
+    raise AssertionError("resource provider did not expose a handled request")
+
+
+def _wait_for_offline_operation(
+    runtime: mln.RuntimeHandle,
+    operation: offline.OfflineOperationHandle,
+    *,
+    iterations: int = 5000,
+) -> mln.RuntimeEvent:
+    operation_id = operation._operation_id  # noqa: SLF001
+    for _ in range(iterations):
+        runtime.run_once()
+        while event := runtime.poll_event():
+            if (
+                event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
+                and isinstance(event.payload, offline.OfflineOperationCompleted)
+                and event.payload.operation_id == operation_id
+            ):
+                return event
+        time.sleep(0.001)
+    raise AssertionError(f"offline operation {operation_id!r} did not complete")
 
 
 def test_c_version_matches_expected_abi_version() -> None:
@@ -2398,6 +2491,391 @@ def test_resource_callback_registration_validates_bounds_and_lifecycle() -> None
         with runtime.create_map():
             with pytest.raises(mln.InvalidStateError):
                 runtime.set_resource_provider(provider, max_pending_callbacks=1)
+
+
+def test_resource_provider_pass_through_delegates_to_native_http() -> None:
+    calls: list[resource.ResourceRequest] = []
+    temporary_handles: list[resource.ResourceRequestHandle] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        calls.append(request)
+        temporary_handles.append(handle)
+        return resource.ResourceProviderDecision.PASS_THROUGH
+
+    with _online_network(), _http_style_server() as (style_url, served):
+        with mln.RuntimeHandle() as runtime:
+            runtime.set_resource_provider(provider, max_pending_callbacks=4)
+            with runtime.create_map() as map_handle:
+                map_handle.set_style_url(style_url)
+                _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+        assert served.is_set()
+        assert any(request.kind == resource.ResourceKind.STYLE for request in calls)
+        assert temporary_handles
+        assert all(handle.closed for handle in temporary_handles)
+        with pytest.raises(mln.InvalidStateError, match="already closed"):
+            temporary_handles[0].complete(resource.ResourceResponse.no_content())
+
+
+def test_resource_transform_rewrites_copied_network_style_request() -> None:
+    transform_requests: list[resource.ResourceTransformRequest] = []
+
+    def transform(request: resource.ResourceTransformRequest) -> str | None:
+        transform_requests.append(request)
+        if request.url == "http://example.invalid/original-style.json":
+            return rewritten_style_url
+        return None
+
+    with _online_network(), _http_style_server() as (rewritten_style_url, served):
+        with mln.RuntimeHandle() as runtime:
+            runtime.set_resource_transform(transform, max_pending_callbacks=4)
+            with runtime.create_map() as map_handle:
+                map_handle.set_style_url("http://example.invalid/original-style.json")
+                _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert served.is_set()
+    assert transform_requests
+    assert transform_requests[0].kind == resource.ResourceKind.STYLE
+    assert transform_requests[0].url == "http://example.invalid/original-style.json"
+
+
+def test_resource_transform_can_be_cleared_after_map_creation() -> None:
+    calls: list[resource.ResourceTransformRequest] = []
+
+    def transform(request: resource.ResourceTransformRequest) -> str:
+        calls.append(request)
+        return "unsupported://unexpected-rewrite.json"
+
+    with _online_network(), _http_style_server() as (style_url, served):
+        with mln.RuntimeHandle() as runtime:
+            runtime.set_resource_transform(transform, max_pending_callbacks=1)
+            with runtime.create_map() as map_handle:
+                runtime.clear_resource_transform()
+                map_handle.set_style_url(style_url)
+                _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert served.is_set()
+    assert calls == []
+
+
+def test_resource_provider_inline_completion_overrides_pass_through_return() -> None:
+    completions = 0
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        nonlocal completions
+        if request.url != "custom://inline-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+        completions += 1
+        return resource.ResourceProviderDecision.PASS_THROUGH
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://inline-style.json")
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert completions == 1
+
+
+def test_resource_provider_deferred_completion_loads_style_with_copied_request() -> (
+    None
+):
+    handles: list[resource.ResourceRequestHandle] = []
+    requests: list[resource.ResourceRequest] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if not request.url.startswith("custom://deferred-style"):
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        requests.append(request)
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://deferred-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+
+            assert handle.is_cancelled() is False
+            with pytest.raises(mln.InvalidArgumentError):
+                handle.complete(
+                    resource.ResourceResponse.error(
+                        resource.ResourceErrorReason.OTHER,
+                        "bad\0message",
+                    )
+                )
+            assert handle.closed is False
+
+            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            with pytest.raises(mln.InvalidStateError, match="already closed"):
+                handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert requests[0].kind == resource.ResourceKind.STYLE
+    assert requests[0].loading_method == resource.ResourceLoadingMethod.ALL
+    assert requests[0].priority == resource.ResourcePriority.REGULAR
+    assert requests[0].usage == resource.ResourceUsage.ONLINE
+    assert requests[0].storage_policy == resource.ResourceStoragePolicy.PERMANENT
+    assert requests[0].range is None
+    assert requests[0].prior_data == b""
+
+
+def test_resource_provider_can_complete_request_from_another_thread() -> None:
+    handles: list[resource.ResourceRequestHandle] = []
+    thread_errors: list[BaseException] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.url != "custom://cross-thread-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    def complete_on_thread(handle: resource.ResourceRequestHandle) -> None:
+        try:
+            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+        except BaseException as error:  # pragma: no cover - re-raised below
+            thread_errors.append(error)
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://cross-thread-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+
+            thread = threading.Thread(target=complete_on_thread, args=(handle,))
+            thread.start()
+            thread.join(timeout=2)
+
+            assert not thread.is_alive()
+            assert thread_errors == []
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+
+def test_resource_provider_error_response_reports_loading_failure_event() -> None:
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.url != "custom://error-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handle.complete(
+            resource.ResourceResponse.error(
+                resource.ResourceErrorReason.NOT_FOUND,
+                "custom style failed",
+            )
+        )
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://error-style.json")
+            event = _wait_for_runtime_event(
+                runtime,
+                mln.RuntimeEventType.MAP_LOADING_FAILED,
+            )
+
+    assert event.message
+
+
+def test_resource_provider_error_response_reports_offline_response_error_event(
+    tmp_path: Path,
+) -> None:
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.url != "custom://offline-error-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handle.complete(
+            resource.ResourceResponse.error(
+                resource.ResourceErrorReason.NOT_FOUND,
+                "offline style failed",
+            )
+        )
+        return resource.ResourceProviderDecision.HANDLE
+
+    definition = offline.OfflineTilePyramidRegionDefinition(
+        style_url="custom://offline-error-style.json",
+        bounds=geo.LatLngBounds(
+            southwest=geo.LatLng(1.0, 2.0),
+            northeast=geo.LatLng(3.0, 4.0),
+        ),
+        min_zoom=5.0,
+        max_zoom=6.0,
+        pixel_ratio=1.0,
+    )
+
+    with mln.RuntimeHandle(
+        mln.RuntimeOptions(cache_path=str(tmp_path / "offline-cache.db"))
+    ) as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        create = runtime.create_offline_region(definition, b"metadata")
+        _wait_for_offline_operation(runtime, create)
+        region = create.take_region()
+
+        observe = runtime.set_offline_region_observed(region.id, True)
+        _wait_for_offline_operation(runtime, observe)
+        observe.close()
+
+        activate = runtime.set_offline_region_download_state(
+            region.id,
+            offline.OfflineRegionDownloadState.ACTIVE,
+        )
+        try:
+            event = _wait_for_runtime_event(
+                runtime,
+                mln.RuntimeEventType.OFFLINE_REGION_RESPONSE_ERROR,
+            )
+        finally:
+            activate.close()
+
+        deactivate = runtime.set_offline_region_download_state(
+            region.id,
+            offline.OfflineRegionDownloadState.INACTIVE,
+        )
+        _wait_for_offline_operation(runtime, deactivate)
+        deactivate.close()
+
+        unobserve = runtime.set_offline_region_observed(region.id, False)
+        _wait_for_offline_operation(runtime, unobserve)
+        unobserve.close()
+
+    assert isinstance(event.payload, offline.OfflineRegionResponseError)
+    assert event.payload.region_id == region.id
+    assert event.payload.reason == resource.ResourceErrorReason.NOT_FOUND
+    assert event.message
+
+
+def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
+    handles: list[resource.ResourceRequestHandle] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.url != "custom://cancelled-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        map_handle = runtime.create_map()
+        map_handle.set_style_url("custom://cancelled-style.json")
+        handle = _wait_for_provider_handle(runtime, handles)
+
+        map_handle.close()
+        for _ in range(5000):
+            runtime.run_once()
+            if handle.is_cancelled():
+                break
+            time.sleep(0.001)
+        else:
+            raise AssertionError("resource request was not cancelled")
+
+        with pytest.raises(mln.InvalidStateError) as native_error:
+            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+        assert native_error.value.native_status_code == -2
+        assert native_error.value.diagnostic
+
+        with pytest.raises(mln.InvalidStateError) as terminal_error:
+            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+        assert terminal_error.value.native_status_code is None
+
+
+def test_released_resource_request_handle_stays_stale_after_later_request() -> None:
+    handles: list[resource.ResourceRequestHandle] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if not request.url.startswith("custom://stale-style"):
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://stale-style-1.json")
+            stale_handle = _wait_for_provider_handle(runtime, handles)
+            stale_handle.close()
+            with pytest.raises(mln.InvalidStateError, match="already closed"):
+                stale_handle.is_cancelled()
+
+            map_handle.set_style_url("custom://stale-style-2.json")
+            live_handle = _wait_for_provider_handle(runtime, handles)
+            with pytest.raises(mln.InvalidStateError, match="already closed"):
+                stale_handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            assert live_handle.is_cancelled() is False
+            live_handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+
+def test_resource_request_release_race_with_cancellation_checks_closes_cleanly() -> (
+    None
+):
+    handles: list[resource.ResourceRequestHandle] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.url != "custom://release-race-style.json":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        handles.append(handle)
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("custom://release-race-style.json")
+            handle = _wait_for_provider_handle(runtime, handles)
+
+            started = threading.Event()
+            stop = threading.Event()
+            saw_closed = threading.Event()
+            unexpected_errors: list[BaseException] = []
+
+            def probe_cancelled() -> None:
+                while not stop.is_set():
+                    try:
+                        handle.is_cancelled()
+                        started.set()
+                    except mln.InvalidArgumentError, mln.InvalidStateError:
+                        saw_closed.set()
+                        stop.set()
+                    except BaseException as error:  # pragma: no cover - re-raised below
+                        unexpected_errors.append(error)
+                        stop.set()
+
+            thread = threading.Thread(target=probe_cancelled)
+            thread.start()
+            assert started.wait(timeout=2)
+            handle.close()
+            assert saw_closed.wait(timeout=2)
+            stop.set()
+            thread.join(timeout=2)
+
+            assert not thread.is_alive()
+            assert unexpected_errors == []
+            with pytest.raises(mln.InvalidStateError, match="already closed"):
+                handle.is_cancelled()
 
 
 def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
