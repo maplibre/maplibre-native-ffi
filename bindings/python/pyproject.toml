@@ -19,6 +19,8 @@ dependencies = []
 dev = [
   "glfw>=2.10,<3",
   "maturin[patchelf]>=1.13,<2",
+  "pyobjc-framework-metal>=12,<13 ; sys_platform == 'darwin'",
+  "pyobjc-framework-quartz>=12,<13 ; sys_platform == 'darwin'",
   "pyopengl>=3.1.10,<4",
   "pytest>=9,<10",
   "ty==0.0.34",
