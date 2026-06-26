@@ -369,13 +369,24 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      // Unique: an owned-texture session drives this GL context exclusively
+      // for mbgl rendering, so gl::Context can trust its internal state
+      // cache and skip redundant rebinds of buffers/programs/textures — a
+      // meaningful CPU win on draw-call-heavy styles under software GL. The
+      // Metal and Vulkan texture backends already use Unique, so the
+      // one-session-per-context contract this assumes is the same one they
+      // already rely on; OpenGL was the only backend still on Shared.
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context) {}
 
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
+      // Shared (deliberately not Unique like the owned-texture ctor above):
+      // a borrowed texture commonly implies the caller also drives this GL
+      // context for its own rendering between renders, so mbgl must not
+      // trust its state cache.
       : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
