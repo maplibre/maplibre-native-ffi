@@ -88,8 +88,8 @@ class OpenGLOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON)
-        request_still_image_if_needed(self.map)
-        render_until_update(self.runtime, self.session)
+        frame = wait_for_opengl_frame(self, lambda _: True)
+        frame.close()
 
 
 @pytest.fixture

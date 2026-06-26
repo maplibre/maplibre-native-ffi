@@ -12,7 +12,6 @@ from maplibre_native import camera, geo, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
-    render_until_update,
     skip_or_fail_fixture_setup,
 )
 
@@ -84,8 +83,8 @@ class MetalOwnedSession:
 
     def render_once(self) -> None:
         self.map.set_style_json(EMPTY_STYLE_JSON)
-        request_still_image_if_needed(self.map)
-        render_until_update(self.runtime, self.session)
+        frame = wait_for_metal_frame(self, lambda _: True)
+        frame.close()
 
 
 @pytest.fixture
