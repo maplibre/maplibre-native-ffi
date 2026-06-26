@@ -11,7 +11,11 @@ import pytest
 import maplibre_native as mln
 from maplibre_native import camera, geo, query, render
 
-from render_backend_helpers.runtime import EMPTY_STYLE_JSON, render_until_update
+from render_backend_helpers.runtime import (
+    EMPTY_STYLE_JSON,
+    render_until_update,
+    skip_or_fail_fixture_setup,
+)
 
 try:
     from render_backend_helpers.egl import (
@@ -21,8 +25,10 @@ try:
         EglUnavailableError,
     )
 except ImportError as error:  # pragma: no cover - host fixture dependency
-    pytest.skip(
+    skip_or_fail_fixture_setup(
         f"EGL Python render fixtures are unavailable: {error}",
+        "opengl",
+        context_provider="egl",
         allow_module_level=True,
     )
 
@@ -46,7 +52,11 @@ class OpenGLOwnedSession:
         try:
             context = EglContext.create()
         except EglUnavailableError as error:
-            pytest.skip(f"EGL fixture creation is unavailable: {error}")
+            skip_or_fail_fixture_setup(
+                f"EGL fixture creation is unavailable: {error}",
+                "opengl",
+                context_provider="egl",
+            )
 
         runtime = mln.RuntimeHandle()
         try:
@@ -93,9 +103,17 @@ def opengl_owned_session() -> Iterator[OpenGLOwnedSession]:
 
 def _require_native_opengl_egl_support() -> None:
     if not (mln.supported_render_backends() & mln.RenderBackend.OPENGL):
-        pytest.skip("native library does not support OpenGL render sessions")
+        skip_or_fail_fixture_setup(
+            "native library does not support OpenGL render sessions",
+            "opengl",
+            context_provider="egl",
+        )
     if not (mln.supported_opengl_context_providers() & mln.OpenGLContextProvider.EGL):
-        pytest.skip("native library does not support EGL OpenGL contexts")
+        skip_or_fail_fixture_setup(
+            "native library does not support EGL OpenGL contexts",
+            "opengl",
+            context_provider="egl",
+        )
 
 
 @contextmanager
@@ -104,7 +122,11 @@ def _egl_context() -> Iterator[EglContext]:
     try:
         context = EglContext.create()
     except EglUnavailableError as error:
-        pytest.skip(f"EGL fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"EGL fixture creation is unavailable: {error}",
+            "opengl",
+            context_provider="egl",
+        )
 
     try:
         yield context
@@ -117,7 +139,11 @@ def _egl_pbuffer_surface(context: EglContext) -> Iterator[EglPbufferSurface]:
     try:
         surface = context.pbuffer_surface(width=32, height=16)
     except EglUnavailableError as error:
-        pytest.skip(f"EGL pbuffer fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"EGL pbuffer fixture creation is unavailable: {error}",
+            "opengl",
+            context_provider="egl",
+        )
 
     try:
         yield surface
@@ -130,7 +156,11 @@ def _egl_borrowed_texture(context: EglContext) -> Iterator[EglBorrowedTexture]:
     try:
         texture = context.borrowed_texture(width=32, height=16)
     except EglUnavailableError as error:
-        pytest.skip(f"EGL texture fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"EGL texture fixture creation is unavailable: {error}",
+            "opengl",
+            context_provider="egl",
+        )
 
     try:
         yield texture

@@ -10,13 +10,18 @@ import pytest
 import maplibre_native as mln
 from maplibre_native import camera, geo, query, render
 
-from render_backend_helpers.runtime import EMPTY_STYLE_JSON, render_until_update
+from render_backend_helpers.runtime import (
+    EMPTY_STYLE_JSON,
+    render_until_update,
+    skip_or_fail_fixture_setup,
+)
 
 try:
     from render_backend_helpers.metal import MetalContext, MetalUnavailableError
 except ImportError as error:  # pragma: no cover - host fixture dependency
-    pytest.skip(
+    skip_or_fail_fixture_setup(
         f"Metal Python render fixtures are unavailable: {error}",
+        "metal",
         allow_module_level=True,
     )
 
@@ -37,11 +42,17 @@ class MetalOwnedSession:
         scale_factor: float = 1.0,
     ) -> MetalOwnedSession:
         if not mln.supported_render_backends() & mln.RenderBackend.METAL:
-            pytest.skip("native library does not support Metal render sessions")
+            skip_or_fail_fixture_setup(
+                "native library does not support Metal render sessions",
+                "metal",
+            )
         try:
             context = MetalContext.create()
         except MetalUnavailableError as error:
-            pytest.skip(f"Metal fixture creation is unavailable: {error}")
+            skip_or_fail_fixture_setup(
+                f"Metal fixture creation is unavailable: {error}",
+                "metal",
+            )
 
         runtime = mln.RuntimeHandle()
         try:

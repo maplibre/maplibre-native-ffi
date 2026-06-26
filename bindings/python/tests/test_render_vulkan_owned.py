@@ -10,7 +10,11 @@ import pytest
 import maplibre_native as mln
 from maplibre_native import camera, geo, query, render
 
-from render_backend_helpers.runtime import EMPTY_STYLE_JSON, render_until_update
+from render_backend_helpers.runtime import (
+    EMPTY_STYLE_JSON,
+    render_until_update,
+    skip_or_fail_fixture_setup,
+)
 from render_backend_helpers.vulkan import VulkanContext, VulkanUnavailableError
 
 
@@ -30,11 +34,17 @@ class VulkanOwnedSession:
         scale_factor: float = 1.0,
     ) -> VulkanOwnedSession:
         if not mln.supported_render_backends() & mln.RenderBackend.VULKAN:
-            pytest.skip("native library does not support Vulkan render sessions")
+            skip_or_fail_fixture_setup(
+                "native library does not support Vulkan render sessions",
+                "vulkan",
+            )
         try:
             context = VulkanContext.create()
         except VulkanUnavailableError as error:
-            pytest.skip(f"Vulkan fixture creation is unavailable: {error}")
+            skip_or_fail_fixture_setup(
+                f"Vulkan fixture creation is unavailable: {error}",
+                "vulkan",
+            )
 
         runtime = mln.RuntimeHandle()
         try:

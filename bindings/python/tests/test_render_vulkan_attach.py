@@ -8,7 +8,11 @@ import pytest
 import maplibre_native as mln
 from maplibre_native import render
 
-from render_backend_helpers.runtime import EMPTY_STYLE_JSON, render_until_update
+from render_backend_helpers.runtime import (
+    EMPTY_STYLE_JSON,
+    render_until_update,
+    skip_or_fail_fixture_setup,
+)
 
 try:
     from render_backend_helpers.vulkan import (
@@ -18,8 +22,9 @@ try:
         VulkanUnavailableError,
     )
 except ImportError as error:  # pragma: no cover - host fixture dependency
-    pytest.skip(
+    skip_or_fail_fixture_setup(
         f"Vulkan Python render fixtures are unavailable: {error}",
+        "vulkan",
         allow_module_level=True,
     )
 
@@ -27,7 +32,10 @@ except ImportError as error:  # pragma: no cover - host fixture dependency
 def _require_native_vulkan_support() -> None:
     if mln.supported_render_backends() & mln.RenderBackend.VULKAN:
         return
-    pytest.skip("native library was not built with Vulkan render backend support")
+    skip_or_fail_fixture_setup(
+        "native library was not built with Vulkan render backend support",
+        "vulkan",
+    )
 
 
 @contextmanager
@@ -37,8 +45,14 @@ def _vulkan_context(*, surface_extensions: bool = False) -> Iterator[VulkanConte
     except VulkanUnavailableError as error:
         reason = str(error)
         if surface_extensions and "GLFW" in reason:
-            pytest.skip(f"GLFW Vulkan surface creation is unavailable: {reason}")
-        pytest.skip(f"Vulkan fixture creation is unavailable: {reason}")
+            skip_or_fail_fixture_setup(
+                f"GLFW Vulkan surface creation is unavailable: {reason}",
+                "vulkan",
+            )
+        skip_or_fail_fixture_setup(
+            f"Vulkan fixture creation is unavailable: {reason}",
+            "vulkan",
+        )
 
     try:
         yield context
@@ -51,7 +65,10 @@ def _vulkan_surface(context: VulkanContext) -> Iterator[VulkanSurface]:
     try:
         surface = context.surface(width=32, height=16)
     except VulkanUnavailableError as error:
-        pytest.skip(f"GLFW Vulkan surface creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"GLFW Vulkan surface creation is unavailable: {error}",
+            "vulkan",
+        )
 
     try:
         yield surface
@@ -64,7 +81,10 @@ def _vulkan_borrowed_image(context: VulkanContext) -> Iterator[VulkanBorrowedIma
     try:
         image = context.borrowed_image(width=64, height=64)
     except VulkanUnavailableError as error:
-        pytest.skip(f"Vulkan borrowed-image fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"Vulkan borrowed-image fixture creation is unavailable: {error}",
+            "vulkan",
+        )
 
     try:
         yield image

@@ -8,7 +8,11 @@ import pytest
 import maplibre_native as mln
 from maplibre_native import render
 
-from render_backend_helpers.runtime import EMPTY_STYLE_JSON, render_until_update
+from render_backend_helpers.runtime import (
+    EMPTY_STYLE_JSON,
+    render_until_update,
+    skip_or_fail_fixture_setup,
+)
 
 try:
     from render_backend_helpers.metal import (
@@ -27,12 +31,18 @@ except ImportError:
 def _require_native_metal_support() -> None:
     if mln.supported_render_backends() & mln.RenderBackend.METAL:
         return
-    pytest.skip("native library was not built with Metal render backend support")
+    skip_or_fail_fixture_setup(
+        "native library was not built with Metal render backend support",
+        "metal",
+    )
 
 
 def _require_metal_fixture_support() -> None:
     if MetalContext is None:
-        pytest.skip("Metal Python render fixtures are unavailable")
+        skip_or_fail_fixture_setup(
+            "Metal Python render fixtures are unavailable",
+            "metal",
+        )
 
 
 @contextmanager
@@ -42,7 +52,10 @@ def _metal_context() -> Iterator[MetalContext]:
     try:
         context = MetalContext.create()
     except MetalUnavailableError as error:
-        pytest.skip(f"Metal fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"Metal fixture creation is unavailable: {error}",
+            "metal",
+        )
 
     try:
         yield context
@@ -55,7 +68,10 @@ def _metal_surface(context: MetalContext) -> Iterator[MetalSurface]:
     try:
         surface = context.surface(width=32, height=16)
     except MetalUnavailableError as error:
-        pytest.skip(f"Metal surface fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"Metal surface fixture creation is unavailable: {error}",
+            "metal",
+        )
 
     try:
         yield surface
@@ -70,7 +86,10 @@ def _metal_borrowed_texture(
     try:
         texture = context.borrowed_texture(width=64, height=64)
     except MetalUnavailableError as error:
-        pytest.skip(f"Metal borrowed-texture fixture creation is unavailable: {error}")
+        skip_or_fail_fixture_setup(
+            f"Metal borrowed-texture fixture creation is unavailable: {error}",
+            "metal",
+        )
 
     try:
         yield texture
