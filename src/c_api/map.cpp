@@ -7,6 +7,7 @@
 
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
+#include "render/render_session_common.hpp"
 
 auto mln_map_options_default(void) noexcept -> mln_map_options {
   return mln::core::map_options_default();
@@ -91,6 +92,13 @@ auto mln_map_request_repaint(mln_map* map) noexcept -> mln_status {
 auto mln_map_request_still_image(mln_map* map) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_request_still_image(map);
+  });
+}
+
+auto mln_map_render_still_blocking(mln_map* map, uint64_t timeout_ms) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_render_still_blocking(map, timeout_ms);
   });
 }
 

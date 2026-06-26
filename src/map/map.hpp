@@ -364,6 +364,12 @@ auto map_native(mln_map* map) -> mbgl::Map*;
 auto map_latest_update(mln_map* map) -> std::shared_ptr<mbgl::UpdateParameters>;
 auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver*;
 auto map_run_render_jobs(mln_map* map) -> void;
+auto map_runtime(mln_map* map) -> mln_runtime*;
+auto map_render_target_session(mln_map* map) -> void*;
+auto map_set_self_draw(mln_map* map, bool enabled) -> void;
+auto map_take_pending_self_draw(mln_map* map) -> bool;
+auto map_begin_still_request(mln_map* map) -> mln_status;
+auto map_end_still_request(mln_map* map) -> void;
 auto map_attach_render_target_session(mln_map* map, void* session)
   -> mln_status;
 auto map_detach_render_target_session(mln_map* map, void* session)

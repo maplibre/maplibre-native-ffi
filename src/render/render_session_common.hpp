@@ -247,6 +247,13 @@ auto render_session_resize(
   double scale_factor
 ) -> mln_status;
 auto render_session_render_update(mln_render_session* session) -> mln_status;
+// Renders a still image to completion synchronously by driving the runtime
+// RunLoop in C++ and self-drawing each progressive frame into the map's
+// attached render session — no MAP_RENDER_UPDATE_AVAILABLE events, no caller
+// pump. Implemented here because it bridges the map (renderStill, frontend)
+// and render (render_session_render_update) layers. See
+// mln_map_render_still_blocking.
+auto map_render_still_blocking(mln_map* map, uint64_t timeout_ms) -> mln_status;
 auto render_session_detach(mln_render_session* session) -> mln_status;
 auto render_session_destroy(mln_render_session* session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session* session)

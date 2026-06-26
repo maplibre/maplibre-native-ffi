@@ -116,6 +116,23 @@ func (m *MapHandle) RequestStillImage() error {
 	return checkNative(func() int32 { return int32(C.mln_map_request_still_image((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
+// RenderStillBlocking renders one still image to completion synchronously,
+// driving the runtime RunLoop in native code. No render-update events are
+// emitted and the caller does not pump during the call. timeoutMs == 0 blocks
+// until done; timeoutMs > 0 returns an error with status MLN_STATUS_TIMEOUT if
+// the deadline is exceeded.
+func (m *MapHandle) RenderStillBlocking(timeoutMs uint64) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_render_still_blocking((*C.mln_map)(unsafe.Pointer(ptr)), C.uint64_t(timeoutMs)))
+	})
+}
+
 // SetStyleURL loads a style URL through MapLibre Native style APIs.
 func (m *MapHandle) SetStyleURL(url string) error {
 	if err := validateCStringArgument("style URL", url); err != nil {

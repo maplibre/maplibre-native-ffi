@@ -1230,17 +1230,50 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   }
 
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
-    const std::scoped_lock lock(latest_update_mutex_);
-    latest_update_ = std::move(update);
-    mln::core::push_runtime_map_event(
-      runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
-    );
+    bool self_draw = false;
+    {
+      const std::scoped_lock lock(latest_update_mutex_);
+      latest_update_ = std::move(update);
+      if (self_draw_) {
+        pending_self_draw_ = true;
+        self_draw = true;
+      }
+    }
+    // In self-draw mode (a blocking render is driving the loop in C++) we
+    // record a pending draw instead of queuing an event — no
+    // MAP_RENDER_UPDATE_AVAILABLE is emitted and the caller never pumps.
+    if (!self_draw) {
+      mln::core::push_runtime_map_event(
+        runtime_, map_, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE
+      );
+    }
   }
 
   [[nodiscard]] auto latest_update() const
     -> std::shared_ptr<mbgl::UpdateParameters> {
     const std::scoped_lock lock(latest_update_mutex_);
     return latest_update_;
+  }
+
+  // Enables/disables self-draw mode (see update()). Resets the pending-draw
+  // flag so the first draw of a blocking render happens only after a fresh
+  // update() — matching the event-driven path, where a render-update is
+  // serviced only after the frontend has produced parameters. Owner thread
+  // only.
+  auto set_self_draw(bool enabled) -> void {
+    const std::scoped_lock lock(latest_update_mutex_);
+    self_draw_ = enabled;
+    pending_self_draw_ = false;
+  }
+
+  // Returns whether a self-draw is pending and clears the flag, so multiple
+  // update() calls between pumps collapse into a single draw (the same
+  // coalescing the event path gets from the runtime queue).
+  [[nodiscard]] auto take_pending_self_draw() -> bool {
+    const std::scoped_lock lock(latest_update_mutex_);
+    const bool pending = pending_self_draw_;
+    pending_self_draw_ = false;
+    return pending;
   }
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
@@ -1261,6 +1294,10 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
   mbgl::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mbgl::UpdateParameters> latest_update_;
+  // Self-draw mode for mln_map_render_still_blocking. Guarded by
+  // latest_update_mutex_; only touched on the runtime owner thread.
+  bool self_draw_ = false;
+  bool pending_self_draw_ = false;
 };
 
 auto validate_map_options(const mln_map_options* options) -> mln_status {
@@ -2796,6 +2833,62 @@ auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver* {
 
 auto map_run_render_jobs(mln_map* map) -> void {
   map->frontend->run_render_jobs();
+}
+
+auto map_runtime(mln_map* map) -> mln_runtime* {
+  if (map == nullptr) {
+    return nullptr;
+  }
+  return map->runtime;
+}
+
+auto map_render_target_session(mln_map* map) -> void* {
+  if (map == nullptr) {
+    return nullptr;
+  }
+  return map->render_target_session;
+}
+
+auto map_set_self_draw(mln_map* map, bool enabled) -> void {
+  if (map == nullptr || map->frontend == nullptr) {
+    return;
+  }
+  map->frontend->set_self_draw(enabled);
+}
+
+auto map_take_pending_self_draw(mln_map* map) -> bool {
+  if (map == nullptr || map->frontend == nullptr) {
+    return false;
+  }
+  return map->frontend->take_pending_self_draw();
+}
+
+// Reserves the single still-image slot for a synchronous blocking render,
+// applying the same guards as map_request_still_image but without installing
+// the event-pushing completion callback. The caller drives renderStill itself
+// and must pair this with map_end_still_request.
+auto map_begin_still_request(mln_map* map) -> mln_status {
+  const auto status = validate_map(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (!is_still_map_mode(map->map_mode)) {
+    set_thread_error("map is not in static or tile mode");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (map->still_image_request_pending) {
+    set_thread_error("map already has a pending still-image request");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  map->still_image_request_pending = true;
+  return MLN_STATUS_OK;
+}
+
+auto map_end_still_request(mln_map* map) -> void {
+  if (map == nullptr) {
+    return;
+  }
+  map->still_image_request_pending = false;
 }
 
 auto map_attach_render_target_session(mln_map* map, void* session)

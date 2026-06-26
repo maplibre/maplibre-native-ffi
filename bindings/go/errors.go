@@ -26,6 +26,9 @@ var (
 	ErrUnsupported = errors.New("maplibre: unsupported")
 	// ErrNative reports a MapLibre Native error converted to a C status.
 	ErrNative = errors.New("maplibre: native error")
+	// ErrTimeout reports that a blocking call (e.g. RenderStillBlocking)
+	// exceeded its caller-supplied timeout.
+	ErrTimeout = errors.New("maplibre: timeout")
 	// ErrABIVersionMismatch reports that the loaded C ABI version is
 	// incompatible with this binding.
 	ErrABIVersionMismatch = errors.New("maplibre: ABI version mismatch")
@@ -121,6 +124,8 @@ func kindForStatus(status int32) error {
 		return ErrUnsupported
 	case int32(C.MLN_STATUS_NATIVE_ERROR):
 		return ErrNative
+	case int32(C.MLN_STATUS_TIMEOUT):
+		return ErrTimeout
 	default:
 		return ErrUnknownStatus
 	}

@@ -1063,6 +1063,49 @@ MLN_API mln_status mln_map_request_repaint(mln_map* map) MLN_NOEXCEPT;
 MLN_API mln_status mln_map_request_still_image(mln_map* map) MLN_NOEXCEPT;
 
 /**
+ * Renders one still image to completion synchronously.
+ *
+ * Unlike mln_map_request_still_image(), this drives the runtime's RunLoop
+ * internally (mirroring mbgl's HeadlessFrontend::render): the frontend
+ * self-draws the progressive frames into the attached render session, so NO
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE events are emitted and the
+ * caller does NOT pump, poll, or call mln_render_session_render_update() during
+ * this call. It blocks the runtime owner thread until the still image is
+ * complete, then leaves the finished frame in the attached render session for
+ * readback via the existing texture/surface API.
+ *
+ * Requires a render session attached to the map (see
+ * mln_render_session attach calls). timeout_ms == 0 blocks until the render
+ * completes; timeout_ms > 0 returns MLN_STATUS_TIMEOUT if the deadline is
+ * exceeded.
+ *
+ * On timeout the in-flight render is left pending — mbgl provides no
+ * still-render cancellation, and starting a second render while one is pending
+ * is rejected. It resolves (and frees the map for a new still request) only
+ * when the runtime RunLoop is next driven, e.g. by a subsequent
+ * mln_map_render_still_blocking() or mln_runtime_run_once() on the same
+ * runtime. A caller that stops driving the runtime after a timeout therefore
+ * leaves the still-image slot pending, and later still requests on that map
+ * return MLN_STATUS_INVALID_STATE until it resolves. For purely synchronous
+ * callers, prefer timeout_ms == 0 and treat any non-zero timeout as a
+ * deadlock backstop rather than routine cancellation.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the still image rendered successfully.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live.
+ * - MLN_STATUS_INVALID_STATE when map is not in MLN_MAP_MODE_STATIC or
+ *   MLN_MAP_MODE_TILE, when a still-image request is already pending, or when
+ * no render session is attached.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_TIMEOUT when timeout_ms > 0 elapses before completion.
+ * - MLN_STATUS_NATIVE_ERROR when the render fails or an internal exception is
+ *   converted to status.
+ */
+MLN_API mln_status
+mln_map_render_still_blocking(mln_map* map, uint64_t timeout_ms) MLN_NOEXCEPT;
+
+/**
  * Destroys a map handle on its owner thread.
  *
  * The map must not have an attached render session.

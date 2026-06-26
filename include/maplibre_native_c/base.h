@@ -47,6 +47,8 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_UNSUPPORTED = -4,
   /** A native MapLibre error or C++ exception was converted to status. */
   MLN_STATUS_NATIVE_ERROR = -5,
+  /** A blocking call exceeded its caller-supplied timeout. */
+  MLN_STATUS_TIMEOUT = -6,
 } mln_status;
 
 /** Render backend support flags reported by this native library build. */
