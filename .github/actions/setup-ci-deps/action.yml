@@ -31,7 +31,14 @@ runs:
           libvulkan1 \
           mesa-utils \
           mesa-utils-extra \
-          mesa-vulkan-drivers
+          mesa-vulkan-drivers \
+          xvfb
+        # Vulkan surface tests create a hidden GLFW window so the binding can
+        # pass a real VkSurfaceKHR through the public attach API.
+        if [[ "${MISE_ENV:-}" == *-vulkan ]]; then
+          Xvfb :99 -screen 0 1280x1024x24 >/tmp/maplibre-native-ffi-xvfb.log 2>&1 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+        fi
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"

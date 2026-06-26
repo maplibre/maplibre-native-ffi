@@ -18,7 +18,7 @@ from render_backend_helpers.runtime import (
 
 try:
     from render_backend_helpers.metal import MetalContext, MetalUnavailableError
-except ImportError as error:  # pragma: no cover - host fixture dependency
+except Exception as error:  # pragma: no cover - host fixture dependency
     skip_or_fail_fixture_setup(
         f"Metal Python render fixtures are unavailable: {error}",
         "metal",

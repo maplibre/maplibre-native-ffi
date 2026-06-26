@@ -15,7 +15,15 @@ from render_backend_helpers.runtime import (
     render_until_update,
     skip_or_fail_fixture_setup,
 )
-from render_backend_helpers.vulkan import VulkanContext, VulkanUnavailableError
+
+try:
+    from render_backend_helpers.vulkan import VulkanContext, VulkanUnavailableError
+except Exception as error:  # pragma: no cover - host fixture dependency
+    skip_or_fail_fixture_setup(
+        f"Vulkan Python render fixtures are unavailable: {error}",
+        "vulkan",
+        allow_module_level=True,
+    )
 
 
 @dataclass(slots=True)

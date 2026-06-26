@@ -21,11 +21,14 @@ try:
         MetalSurface,
         MetalUnavailableError,
     )
-except ImportError:
+except Exception as error:
     MetalBorrowedTexture = None  # type: ignore[assignment]
     MetalContext = None  # type: ignore[assignment]
     MetalSurface = None  # type: ignore[assignment]
     MetalUnavailableError = RuntimeError  # type: ignore[assignment]
+    _METAL_FIXTURE_IMPORT_ERROR = error
+else:
+    _METAL_FIXTURE_IMPORT_ERROR = None
 
 
 def _require_native_metal_support() -> None:
@@ -39,8 +42,11 @@ def _require_native_metal_support() -> None:
 
 def _require_metal_fixture_support() -> None:
     if MetalContext is None:
+        detail = (
+            f": {_METAL_FIXTURE_IMPORT_ERROR}" if _METAL_FIXTURE_IMPORT_ERROR else ""
+        )
         skip_or_fail_fixture_setup(
-            "Metal Python render fixtures are unavailable",
+            f"Metal Python render fixtures are unavailable{detail}",
             "metal",
         )
 

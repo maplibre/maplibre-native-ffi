@@ -24,7 +24,7 @@ try:
         EglPbufferSurface,
         EglUnavailableError,
     )
-except ImportError as error:  # pragma: no cover - host fixture dependency
+except Exception as error:  # pragma: no cover - host fixture dependency
     skip_or_fail_fixture_setup(
         f"EGL Python render fixtures are unavailable: {error}",
         "opengl",
