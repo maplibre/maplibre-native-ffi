@@ -4,8 +4,6 @@
 # dependencies = ["pydantic==2.13.4"]
 # ///
 
-import argparse
-import difflib
 import json
 import pathlib
 import sys
@@ -315,31 +313,8 @@ def render_json() -> str:
     return json.dumps(support_matrix(), indent=2, sort_keys=False) + "\n"
 
 
-def check_output(expected: str) -> int:
-    actual = OUTPUT_PATH.read_text() if OUTPUT_PATH.exists() else ""
-    if actual == expected:
-        return 0
-    diff = difflib.unified_diff(
-        actual.splitlines(keepends=True),
-        expected.splitlines(keepends=True),
-        fromfile=str(OUTPUT_PATH),
-        tofile=f"{OUTPUT_PATH} (generated)",
-    )
-    sys.stderr.writelines(diff)
-    return 1
-
-
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--check", action="store_true", help="fail if support matrix data is stale"
-    )
-    args = parser.parse_args()
-
     rendered = render_json()
-    if args.check:
-        return check_output(rendered)
-
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(rendered)
     return 0
