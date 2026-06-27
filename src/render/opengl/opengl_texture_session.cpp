@@ -376,10 +376,6 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      // Shared (deliberately not Unique like the owned-texture ctor above):
-      // a borrowed texture commonly implies the caller also drives this GL
-      // context for its own rendering between renders, so mbgl must not
-      // trust its state cache.
       : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
