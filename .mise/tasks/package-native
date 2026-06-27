@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
 # MISE description="Install and archive the active native variant."
 
-from __future__ import annotations
-
 import json
 import os
 import pathlib

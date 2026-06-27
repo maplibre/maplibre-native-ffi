@@ -62,7 +62,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-linux-arm64-vulkan:
     name: variant / linux-arm64-vulkan
     runs-on: ubuntu-24.04-arm
@@ -92,7 +91,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-linux-x64-egl:
     name: variant / linux-x64-egl
     runs-on: ubuntu-latest
@@ -123,7 +121,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-linux-x64-vulkan:
     name: variant / linux-x64-vulkan
     runs-on: ubuntu-latest
@@ -154,7 +151,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-macos-arm64-metal:
     name: variant / macos-arm64-metal
     runs-on: macos-26
@@ -186,7 +182,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-macos-arm64-vulkan:
     name: variant / macos-arm64-vulkan
     runs-on: macos-26
@@ -217,7 +212,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-macos-arm64-egl:
     name: variant / macos-arm64-egl
     runs-on: macos-26
@@ -247,7 +241,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-android-arm64-egl:
     name: variant / android-arm64-egl
     runs-on: ubuntu-latest
@@ -268,7 +261,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-android-arm64-vulkan:
     name: variant / android-arm64-vulkan
     runs-on: ubuntu-latest
@@ -288,7 +280,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-android-x64-egl:
     name: variant / android-x64-egl
     runs-on: ubuntu-latest
@@ -309,7 +300,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-android-x64-vulkan:
     name: variant / android-x64-vulkan
     runs-on: ubuntu-latest
@@ -329,7 +319,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
     runs-on: macos-26
@@ -350,7 +339,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-ios-simulator-arm64-metal:
     name: variant / ios-simulator-arm64-metal
     runs-on: macos-26
@@ -372,7 +360,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-ohos-arm64-egl:
     name: variant / ohos-arm64-egl
     runs-on: ubuntu-latest
@@ -392,7 +379,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-ohos-arm64-vulkan:
     name: variant / ohos-arm64-vulkan
     runs-on: ubuntu-latest
@@ -412,7 +398,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
@@ -440,7 +425,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-windows-x64-wgl:
     name: variant / windows-x64-wgl
     runs-on: windows-2022
@@ -468,7 +452,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-windows-arm64-vulkan:
     name: variant / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -496,7 +479,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   variant-windows-arm64-wgl:
     name: variant / windows-arm64-wgl
     runs-on: windows-11-arm
@@ -524,7 +506,6 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
-          retention-days: 90
   required:
     name: ci-required
     runs-on: ubuntu-latest
