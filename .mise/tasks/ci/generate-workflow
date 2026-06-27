@@ -25,6 +25,7 @@ from ci.manifest import (  # noqa: E402
 
 CHECKOUT_ACTION = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
 UPLOAD_ARTIFACT_ACTION = "actions/upload-artifact@v4"
+DESKTOP_OSES = {"linux", "macos", "windows"}
 
 
 def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
@@ -97,6 +98,10 @@ def native_package_steps() -> list[dict[str, object]]:
     ]
 
 
+def package_native_variant(variant: Variant) -> bool:
+    return variant.os in DESKTOP_OSES
+
+
 def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> str:
     jobs = {
         "hygiene": {
@@ -131,7 +136,7 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
                 *setup_steps(),
                 {"run": "mise run configure"},
                 *({"run": command} for command in variant_commands),
-                *native_package_steps(),
+                *(native_package_steps() if package_native_variant(variant) else []),
             ],
         }
 

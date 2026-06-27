@@ -256,11 +256,6 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
       - run: mise run //examples/android-map:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-android-arm64-vulkan:
     name: variant / android-arm64-vulkan
     runs-on: ubuntu-latest
@@ -275,11 +270,6 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-android-x64-egl:
     name: variant / android-x64-egl
     runs-on: ubuntu-latest
@@ -295,11 +285,6 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
       - run: mise run //examples/android-map:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-android-x64-vulkan:
     name: variant / android-x64-vulkan
     runs-on: ubuntu-latest
@@ -314,11 +299,6 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/kotlin:androidBuild
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
     runs-on: macos-26
@@ -334,11 +314,6 @@ jobs:
       - run: mise run build
       - run: mise run //bindings/swift:build
       - run: mise run //examples/swift-map:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-ios-simulator-arm64-metal:
     name: variant / ios-simulator-arm64-metal
     runs-on: macos-26
@@ -355,11 +330,6 @@ jobs:
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/swift-map:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-ohos-arm64-egl:
     name: variant / ohos-arm64-egl
     runs-on: ubuntu-latest
@@ -374,11 +344,6 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/rust:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-ohos-arm64-vulkan:
     name: variant / ohos-arm64-vulkan
     runs-on: ubuntu-latest
@@ -393,11 +358,6 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/rust:build
-      - run: mise run package-native
-      - uses: actions/upload-artifact@v4
-        with:
-          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
