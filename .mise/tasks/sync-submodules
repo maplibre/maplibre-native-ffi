@@ -41,11 +41,6 @@ vendor_paths=(
   vendor/glslang # SPIR-V toolchain (MLN_WITH_VULKAN)
 )
 
-# Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
-# zip-archive, webgpu-cpp, wgpu-native (mln-ffi WebGPU is browser/emdawn only),
-# docs/doxygen, platform/windows/vendor/vcpkg, and nested .mason / test fixture /
-# glfw submodules under the paths above.
-
 git -c submodule.recurse=false submodule sync "$mln_path"
 git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
 

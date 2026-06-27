@@ -1,3 +1,14 @@
+// clang-format off
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
+
+// Include WebGPU headers first to define WEBGPU_H_ before MapLibre WebGPU
+// headers.
 #include <webgpu/webgpu.h>
 #include <webgpu/webgpu_cpp.h>
 
@@ -10,19 +21,12 @@
 #include <mbgl/webgpu/renderable_resource.hpp>
 #include <mbgl/webgpu/renderer_backend.hpp>
 
-#include <cstdint>
-#include <cstring>
-#include <memory>
-#include <stdexcept>
-#include <string>
-#include <utility>
-#include <vector>
-
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/surface.h"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
+// clang-format on
 
 namespace {
 
@@ -40,10 +44,11 @@ auto request_adapter_blocking(
   wgpu::Adapter adapter;
   auto status = wgpu::RequestAdapterStatus::Error;
   const auto future = instance.RequestAdapter(
-    &options,
-    wgpu::CallbackMode::WaitAnyOnly,
-    [&](wgpu::RequestAdapterStatus callback_status, wgpu::Adapter result,
-        wgpu::StringView) {
+    &options, wgpu::CallbackMode::WaitAnyOnly,
+    [&](
+      wgpu::RequestAdapterStatus callback_status, wgpu::Adapter result,
+      wgpu::StringView
+    ) {
       status = callback_status;
       adapter = std::move(result);
     }
@@ -62,10 +67,11 @@ auto request_device_blocking(
   wgpu::Device device;
   auto status = wgpu::RequestDeviceStatus::Error;
   const auto future = adapter.RequestDevice(
-    &descriptor,
-    wgpu::CallbackMode::WaitAnyOnly,
-    [&](wgpu::RequestDeviceStatus callback_status, wgpu::Device result,
-        wgpu::StringView) {
+    &descriptor, wgpu::CallbackMode::WaitAnyOnly,
+    [&](
+      wgpu::RequestDeviceStatus callback_status, wgpu::Device result,
+      wgpu::StringView
+    ) {
       status = callback_status;
       device = std::move(result);
     }
@@ -81,27 +87,10 @@ auto request_device_blocking(
 
 auto validate_webgpu_descriptor(const mln_webgpu_surface_descriptor* descriptor)
   -> mln_status {
-  if (descriptor == nullptr) {
-    mln::core::set_thread_error("surface descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_webgpu_surface_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_webgpu_surface_descriptor.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto extent_status = mln::core::validate_render_target_extent(
-    descriptor->extent, "surface dimensions and scale_factor must be positive"
-  );
-  if (extent_status != MLN_STATUS_OK) {
-    return extent_status;
-  }
-  if (descriptor->context.size < sizeof(mln_webgpu_context_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_webgpu_context_descriptor.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto descriptor_status =
+    mln::core::validate_webgpu_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
   }
 #if defined(__EMSCRIPTEN__)
   if (
@@ -122,7 +111,8 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
  public:
   class RenderableResource final : public mbgl::webgpu::RenderableResource {
    public:
-    explicit RenderableResource(WebGPUSurfaceBackend& backend_) : backend(backend_) {}
+    explicit RenderableResource(WebGPUSurfaceBackend& backend_)
+        : backend(backend_) {}
 
     void bind() override {}
 
@@ -137,7 +127,9 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
       return dummy;
     }
 
-    WGPURenderPassEncoder getRenderPassEncoder() const override { return nullptr; }
+    WGPURenderPassEncoder getRenderPassEncoder() const override {
+      return nullptr;
+    }
 
     WGPUTextureView getColorTextureView() override {
       return static_cast<WGPUTextureView>(backend.getCurrentTextureView());
@@ -180,7 +172,9 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
       return;
     }
     if (current_texture_view_ != nullptr && !frame_presented_) {
+#if !defined(__EMSCRIPTEN__)
       wgpuSurfacePresent(surface_);
+#endif
       frame_presented_ = true;
       wgpuTextureViewRelease(current_texture_view_);
       current_texture_view_ = nullptr;
@@ -205,9 +199,8 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     WGPUSurfaceTexture surface_texture{};
     wgpuSurfaceGetCurrentTexture(surface_, &surface_texture);
 
-    const auto texture_status = static_cast<WGPUSurfaceGetCurrentTextureStatus>(
-      surface_texture.status
-    );
+    const auto texture_status =
+      static_cast<WGPUSurfaceGetCurrentTextureStatus>(surface_texture.status);
     if (
       texture_status == WGPUSurfaceGetCurrentTextureStatus_Outdated ||
       texture_status == WGPUSurfaceGetCurrentTextureStatus_Lost
@@ -294,7 +287,8 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
     const char* selector = descriptor_.canvas_selector;
     wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector canvas_source{};
     canvas_source.selector = wgpu::StringView{
-      selector, selector != nullptr ? std::strlen(selector) : 0};
+      selector, selector != nullptr ? std::strlen(selector) : 0
+    };
 
     wgpu::SurfaceDescriptor surface_desc{};
     surface_desc.nextInChain = &canvas_source;
@@ -370,14 +364,11 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
         }
       }
     }
-    wgpuSupportedFeaturesFreeMembers(features);
-
     wgpu::DeviceDescriptor device_desc{};
     device_desc.requiredFeatureCount = required_features.size();
     device_desc.requiredFeatures = required_features.data();
-    wgpu_device_ = request_device_blocking(
-      wgpu_instance_, wgpu_adapter_, device_desc
-    );
+    wgpu_device_ =
+      request_device_blocking(wgpu_instance_, wgpu_adapter_, device_desc);
     device_ = wgpu_device_.Get();
     wgpuDeviceAddRef(device_);
     wgpu_queue_ = wgpu_device_.GetQueue();
@@ -500,7 +491,8 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
 
     releaseDepthStencilTexture();
 
-    const auto depth_format = static_cast<WGPUTextureFormat>(getDepthStencilFormat());
+    const auto depth_format =
+      static_cast<WGPUTextureFormat>(getDepthStencilFormat());
     WGPUTextureDescriptor depth_desc{};
     depth_desc.usage = WGPUTextureUsage_RenderAttachment;
     depth_desc.dimension = WGPUTextureDimension_2D;
@@ -616,28 +608,6 @@ class WebGPUSurfaceSessionBackend final
 
 namespace mln::core {
 
-auto webgpu_surface_descriptor_default() noexcept
-  -> mln_webgpu_surface_descriptor {
-  return mln_webgpu_surface_descriptor{
-    .size = sizeof(mln_webgpu_surface_descriptor),
-    .extent =
-      mln_render_target_extent{
-        .size = sizeof(mln_render_target_extent),
-        .width = 800,
-        .height = 600,
-        .scale_factor = 1.0,
-      },
-    .context =
-      mln_webgpu_context_descriptor{
-        .size = sizeof(mln_webgpu_context_descriptor),
-        .instance = nullptr,
-        .device = nullptr,
-        .queue = nullptr,
-      },
-    .canvas_selector = "#canvas",
-  };
-}
-
 auto webgpu_surface_attach(
   mln_map* map, const mln_webgpu_surface_descriptor* descriptor,
   mln_render_session** out_session
@@ -668,6 +638,14 @@ auto webgpu_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
+
+#if defined(__EMSCRIPTEN__)
+  set_thread_error(
+    "WebGPU browser surface sessions require synchronous adapter/device setup "
+    "via Asyncify or JSPI; use WebGPU texture sessions in this build"
+  );
+  return MLN_STATUS_UNSUPPORTED;
+#endif
 
   try {
     auto session = std::make_unique<mln_render_session>();

@@ -9,6 +9,7 @@ bitflags::bitflags! {
         const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
         const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
         const OPENGL = sys::MLN_RENDER_BACKEND_FLAG_OPENGL;
+        const WEBGPU = sys::MLN_RENDER_BACKEND_FLAG_WEBGPU;
         const _ = !0;
     }
 }

@@ -26,7 +26,8 @@ use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
     OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor, OpenGLSurfaceDescriptor,
     RenderSessionHandle, VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor,
-    VulkanSurfaceDescriptor,
+    VulkanSurfaceDescriptor, WebGPUBorrowedTextureDescriptor, WebGPUOwnedTextureDescriptor,
+    WebGPUSurfaceDescriptor,
 };
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
@@ -763,6 +764,23 @@ impl MapHandle {
         })
     }
 
+    /// Attaches a WebGPU native surface render target to this map.
+    ///
+    /// On Emscripten builds, `canvas_selector` names the browser canvas the
+    /// native WebGPU session renders into.
+    pub fn attach_webgpu_surface(
+        &self,
+        descriptor: &WebGPUSurfaceDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let (raw, _canvas_selector) = descriptor.to_native()?;
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, _canvas_selector keeps the raw string pointer alive,
+            // and out is a null-initialized out-pointer.
+            unsafe { sys::mln_webgpu_surface_attach(map, &raw, out) }
+        })
+    }
+
     /// Attaches a Metal session-owned texture render target to this map.
     ///
     /// The device pointer must name a valid Metal device that remains usable on
@@ -859,6 +877,39 @@ impl MapHandle {
             // SAFETY: map is live, raw is a materialized descriptor valid for
             // this call, and out is a null-initialized out-pointer.
             unsafe { sys::mln_opengl_borrowed_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a WebGPU session-owned texture render target to this map.
+    ///
+    /// WebGPU context handles are borrowed. They must remain valid until the
+    /// session is detached or closed.
+    pub fn attach_webgpu_owned_texture(
+        &self,
+        descriptor: &WebGPUOwnedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_webgpu_owned_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a WebGPU caller-owned texture render target to this map.
+    ///
+    /// The texture and texture view are borrowed. The caller owns them, keeps
+    /// them valid until detach or close, and synchronizes use outside this
+    /// session.
+    pub fn attach_webgpu_borrowed_texture(
+        &self,
+        descriptor: &WebGPUBorrowedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_webgpu_borrowed_texture_attach(map, &raw, out) }
         })
     }
 }

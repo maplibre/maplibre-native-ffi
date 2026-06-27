@@ -1,0 +1,68 @@
+[tasks.build]
+description = "Build the browser WebGPU map example."
+depends = ["//:ensure-native-library"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = '''
+set -euo pipefail
+if [[ "${MISE_ENV:-}" != "browser-wasm64-webgpu" ]]; then
+  echo "browser-map requires the browser WebGPU environment:" >&2
+  echo "  mise -E browser-wasm64-webgpu run //examples/browser-map:build" >&2
+  exit 1
+fi
+
+source "$EMSDK/emsdk_env.sh"
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+
+browser_link_flags=(
+  "-Cpanic=abort"
+  "-Clink-arg=-fwasm-exceptions"
+  "-Clink-arg=--use-port=emdawnwebgpu"
+  "-Clink-arg=-sINITIAL_MEMORY=256MB"
+  "-Clink-arg=-sSTACK_SIZE=1MB"
+  "-Clink-arg=-sALLOW_MEMORY_GROWTH=1"
+  "-Clink-arg=-sUSE_ZLIB=1"
+  "-Clink-arg=-sFETCH=1"
+  "-Clink-arg=-sENVIRONMENT=web,worker"
+  "-Clink-arg=-sEXPORTED_FUNCTIONS=['_mln_browser_map_init','_mln_browser_map_render_frame','_mln_browser_map_acquire_owned_texture','_mln_browser_map_release_owned_texture_frame','_mln_browser_map_resize','_mln_browser_map_move_by','_mln_browser_map_scale_by','_mln_browser_map_rotate_pitch_by','_mln_browser_map_rotate_by','_mln_browser_map_pitch_by','_mln_browser_map_reset_orientation','_mln_browser_map_jump_to','_mln_browser_map_cancel_transitions','_main','_malloc','_free']"
+  "-Clink-arg=-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
+  "-Clink-arg=-sMODULARIZE=1"
+  "-Clink-arg=-sEXPORT_NAME=createMapLibreModule"
+  "-Clink-arg=-sASSERTIONS=1"
+  "-Clink-arg=-sINVOKE_RUN=0"
+  "-Clink-arg=--post-js=$MLN_FFI_REPO_ROOT/examples/browser-map/post.js"
+)
+encoded_browser_flags="$(printf '%s\x1f' "${browser_link_flags[@]}")"
+encoded_browser_flags="${encoded_browser_flags%$'\x1f'}"
+if [[ -n "${CARGO_ENCODED_RUSTFLAGS:-}" ]]; then
+  export CARGO_ENCODED_RUSTFLAGS="${encoded_browser_flags}"$'\x1f'"${CARGO_ENCODED_RUSTFLAGS}"
+else
+  export CARGO_ENCODED_RUSTFLAGS="${encoded_browser_flags}"
+fi
+
+cargo build -p browser-map --target wasm32-unknown-emscripten
+
+output_dir="$MLN_FFI_BUILD_DIR/examples/browser-map"
+rm -rf "$output_dir"
+pnpm exec vp build "$MLN_FFI_REPO_ROOT/examples/browser-map" \
+  --config "$MLN_FFI_REPO_ROOT/examples/browser-map/vite.config.ts" \
+  --outDir "$output_dir" \
+  --emptyOutDir
+cp target/wasm32-unknown-emscripten/debug/browser-map.js "$output_dir/browser-map.js"
+cp target/wasm32-unknown-emscripten/debug/browser_map.wasm "$output_dir/browser_map.wasm"
+if [[ -f target/wasm32-unknown-emscripten/debug/browser-map.worker.js ]]; then
+  cp target/wasm32-unknown-emscripten/debug/browser-map.worker.js "$output_dir/browser-map.worker.js"
+fi
+'''
+
+[tasks.run]
+description = "Serve the browser WebGPU map example."
+run = '''
+set -euo pipefail
+
+mise run build
+exec pnpm exec vp dev "$MLN_FFI_REPO_ROOT/examples/browser-map" \
+  --config "$MLN_FFI_REPO_ROOT/examples/browser-map/vite.config.ts" \
+  --host 0.0.0.0 \
+  --port 8080 \
+  --strictPort
+'''

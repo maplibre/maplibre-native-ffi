@@ -575,9 +575,12 @@
 --include-function mln_opengl_surface_descriptor_default
 --include-function mln_vulkan_surface_attach
 --include-function mln_vulkan_surface_descriptor_default
+--include-function mln_webgpu_surface_attach
+--include-function mln_webgpu_surface_descriptor_default
 --include-struct mln_metal_surface_descriptor
 --include-struct mln_opengl_surface_descriptor
 --include-struct mln_vulkan_surface_descriptor
+--include-struct mln_webgpu_surface_descriptor
 
 # include/maplibre_native_c/texture.h
 --include-function mln_metal_borrowed_texture_attach
@@ -600,6 +603,12 @@
 --include-function mln_vulkan_owned_texture_attach
 --include-function mln_vulkan_owned_texture_descriptor_default
 --include-function mln_vulkan_owned_texture_release_frame
+--include-function mln_webgpu_borrowed_texture_attach
+--include-function mln_webgpu_borrowed_texture_descriptor_default
+--include-function mln_webgpu_owned_texture_acquire_frame
+--include-function mln_webgpu_owned_texture_attach
+--include-function mln_webgpu_owned_texture_descriptor_default
+--include-function mln_webgpu_owned_texture_release_frame
 --include-struct mln_metal_borrowed_texture_descriptor
 --include-struct mln_metal_owned_texture_descriptor
 --include-struct mln_metal_owned_texture_frame
@@ -610,3 +619,6 @@
 --include-struct mln_vulkan_borrowed_texture_descriptor
 --include-struct mln_vulkan_owned_texture_descriptor
 --include-struct mln_vulkan_owned_texture_frame
+--include-struct mln_webgpu_borrowed_texture_descriptor
+--include-struct mln_webgpu_owned_texture_descriptor
+--include-struct mln_webgpu_owned_texture_frame

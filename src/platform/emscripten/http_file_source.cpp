@@ -97,44 +97,58 @@ class FetchRequestState
   }
 
   void cancel() {
-    std::scoped_lock lock(mutex);
-    canceled = true;
-    callback = nullptr;
-    if (fetch != nullptr) {
-      emscripten_fetch_close(fetch);
+    auto* fetch_to_close = static_cast<emscripten_fetch_t*>(nullptr);
+    {
+      std::scoped_lock lock(mutex);
+      canceled = true;
+      callback = nullptr;
+      fetch_to_close = fetch;
       fetch = nullptr;
+    }
+    if (fetch_to_close != nullptr) {
+      emscripten_fetch_close(fetch_to_close);
     }
   }
 
  private:
   static void onFetchComplete(emscripten_fetch_t* fetch) {
+    auto* holder_ptr =
+      static_cast<std::shared_ptr<FetchRequestState>*>(fetch->userData);
+    if (holder_ptr == nullptr) {
+      return;
+    }
+    fetch->userData = nullptr;
     const auto holder = std::unique_ptr<std::shared_ptr<FetchRequestState>>{
-      static_cast<std::shared_ptr<FetchRequestState>*>(fetch->userData),
+      holder_ptr,
     };
     (*holder)->complete(fetch);
   }
 
   void complete(emscripten_fetch_t* completed_fetch) {
+    auto should_deliver = false;
     {
       std::scoped_lock lock(mutex);
       if (canceled) {
-        emscripten_fetch_close(completed_fetch);
         return;
       }
       response = makeResponse(resource, completed_fetch);
       fetch = nullptr;
+      pending_delivery = shared_from_this();
+      should_deliver = true;
     }
     emscripten_fetch_close(completed_fetch);
-    if (async) {
+    if (should_deliver && async) {
       async->send();
     }
   }
 
   void deliver() {
+    std::shared_ptr<FetchRequestState> keep_alive;
     FileSource::Callback callback_copy;
     Response response_copy;
     {
       std::scoped_lock lock(mutex);
+      keep_alive = std::move(pending_delivery);
       if (canceled || !callback) {
         return;
       }
@@ -149,6 +163,7 @@ class FetchRequestState
   FileSource::Callback callback;
   Response response;
   std::unique_ptr<util::AsyncTask> async;
+  std::shared_ptr<FetchRequestState> pending_delivery;
   emscripten_fetch_t* fetch = nullptr;
   std::mutex mutex;
   bool canceled = false;

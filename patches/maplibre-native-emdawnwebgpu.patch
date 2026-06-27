@@ -19,19 +19,355 @@ index 0b6bd0b..c4b5d60 100644
 +if(NOT MLN_WEBGPU_EMDAWN)
 +    list(APPEND SRC_FILES ${PROJECT_SOURCE_DIR}/src/mbgl/webgpu/headless_backend.cpp)
 +endif()
+diff --git a/include/mbgl/gfx/dynamic_texture.hpp b/include/mbgl/gfx/dynamic_texture.hpp
+index 06faf03..85c9f64 100644
+--- a/include/mbgl/gfx/dynamic_texture.hpp
++++ b/include/mbgl/gfx/dynamic_texture.hpp
+@@ -64,8 +64,11 @@ public:
+     virtual bool removeTexture(const TextureHandle& texHandle);
+
+ protected:
++    DynamicTexture(Size size, TexturePixelType pixelType);
++
+     mapbox::ShelfPack shelfPack;
+     Texture2DPtr texture;
++    TexturePixelType pixelFormat;
+     int numTextures = 0;
+     std::mutex mutex;
+ };
+diff --git a/include/mbgl/webgpu/dynamic_texture.hpp b/include/mbgl/webgpu/dynamic_texture.hpp
+index 766087b..f3bb214 100644
+--- a/include/mbgl/webgpu/dynamic_texture.hpp
++++ b/include/mbgl/webgpu/dynamic_texture.hpp
+@@ -19,6 +19,9 @@ public:
+         std::unordered_map<gfx::TextureHandle, std::unique_ptr<uint8_t[]>, gfx::TextureHandle::Hasher>;
+
+ private:
++    Context& context;
++    Size size;
++    gfx::TexturePixelType pixelType;
+     bool deferredCreation = false;
+     ImagesToUpload imagesToUpload;
+ };
+diff --git a/src/mbgl/actor/scheduler.cpp b/src/mbgl/actor/scheduler.cpp
+index f7c623d..029100a 100644
+--- a/src/mbgl/actor/scheduler.cpp
++++ b/src/mbgl/actor/scheduler.cpp
+@@ -3,6 +3,8 @@
+ #include <mbgl/util/thread_pool.hpp>
+ #include <mbgl/util/run_loop.hpp>
+
++#include <queue>
++
+ namespace mbgl {
+
+ std::function<void()> Scheduler::bindOnce(std::function<void()> fn) {
+@@ -18,6 +20,123 @@ std::function<void()> Scheduler::bindOnce(std::function<void()> fn) {
+ namespace {
+
+ thread_local Scheduler* localScheduler;
++
++#if defined(MLN_EMSCRIPTEN_SINGLE_THREADED)
++class BrowserScheduler final : public Scheduler {
++public:
++    void schedule(std::function<void()>&& fn) override {
++        schedule(util::SimpleIdentity::Empty, std::move(fn));
++    }
++
++    void schedule(const util::SimpleIdentity tag, std::function<void()>&& fn) override {
++        if (!fn) {
++            return;
++        }
++
++        std::scoped_lock lock(mtx);
++        queues[tag].push(std::move(fn));
++    }
++
++    mapbox::base::WeakPtr<Scheduler> makeWeakPtr() override {
++        return weakFactory.makeWeakPtr();
++    }
++
++    void runOnRenderThread(const util::SimpleIdentity tag, std::function<void()>&& fn) override {
++        if (!fn) {
++            return;
++        }
++
++        std::scoped_lock lock(mtx);
++        renderQueues[tag].push(std::move(fn));
++    }
++
++    void runRenderJobs(const util::SimpleIdentity tag, bool closeQueue = false) override {
++        drainAll(queues, false);
++        drain(renderQueues, tag, closeQueue);
++    }
++
++    void waitForEmpty(const util::SimpleIdentity tag = util::SimpleIdentity::Empty) override {
++        if (tag.isEmpty()) {
++            drainAll(queues, true);
++            return;
++        }
++        drain(queues, tag, true);
++    }
++
++private:
++    using TaskQueue = std::queue<std::function<void()>>;
++    using QueueMap = mbgl::unordered_map<util::SimpleIdentity, TaskQueue>;
++
++    void drainAll(QueueMap& targetQueues, bool closeQueue) {
++        while (true) {
++            auto task = popNext(targetQueues, closeQueue);
++            if (!task) {
++                return;
++            }
++            task();
++        }
++    }
++
++    void drain(QueueMap& targetQueues, const util::SimpleIdentity tag, bool closeQueue) {
++        while (true) {
++            auto task = popTagged(targetQueues, tag, closeQueue);
++            if (!task) {
++                return;
++            }
++            task();
++        }
++    }
++
++    std::function<void()> popNext(QueueMap& targetQueues, bool closeQueue) {
++        std::scoped_lock lock(mtx);
++        for (auto it = targetQueues.begin(); it != targetQueues.end(); ++it) {
++            if (it->second.empty()) {
++                continue;
++            }
++
++            auto task = std::move(it->second.front());
++            it->second.pop();
++            if (closeQueue && it->second.empty()) {
++                targetQueues.erase(it);
++            }
++            return task;
++        }
++        return {};
++    }
++
++    std::function<void()> popTagged(QueueMap& targetQueues, const util::SimpleIdentity tag, bool closeQueue) {
++        std::scoped_lock lock(mtx);
++        auto it = targetQueues.find(tag);
++        if (it == targetQueues.end()) {
++            return {};
++        }
++
++        if (it->second.empty()) {
++            if (closeQueue) {
++                targetQueues.erase(it);
++            }
++            return {};
++        }
++
++        auto task = std::move(it->second.front());
++        it->second.pop();
++        if (closeQueue && it->second.empty()) {
++            targetQueues.erase(it);
++        }
++        return task;
++    }
++
++    std::mutex mtx;
++    QueueMap queues;
++    QueueMap renderQueues;
++    mapbox::base::WeakPtrFactory<Scheduler> weakFactory{this};
++};
++
++std::shared_ptr<Scheduler> browserScheduler() {
++    static auto scheduler = std::make_shared<BrowserScheduler>();
++    return scheduler;
++}
++#endif
+ } // namespace
+
+ void Scheduler::SetCurrent(Scheduler* scheduler) {
+@@ -34,6 +153,9 @@ Scheduler* Scheduler::GetCurrent(bool init) {
+
+ // static
+ std::shared_ptr<Scheduler> Scheduler::GetBackground() {
++#if defined(MLN_EMSCRIPTEN_SINGLE_THREADED)
++    return browserScheduler();
++#else
+     static std::weak_ptr<Scheduler> weak;
+     static std::mutex mtx;
+
+@@ -45,10 +167,14 @@ std::shared_ptr<Scheduler> Scheduler::GetBackground() {
+     }
+
+     return scheduler;
++#endif
+ }
+
+ // static
+ std::shared_ptr<Scheduler> Scheduler::GetSequenced() {
++#if defined(MLN_EMSCRIPTEN_SINGLE_THREADED)
++    return browserScheduler();
++#else
+     constexpr std::size_t kSchedulersCount = 10;
+     static std::vector<std::weak_ptr<Scheduler>> weaks(kSchedulersCount);
+     static std::mutex mtx;
+@@ -65,6 +191,7 @@ std::shared_ptr<Scheduler> Scheduler::GetSequenced() {
+         weaks[lastUsedIndex] = result;
+         return result;
+     }
++#endif
+ }
+
+ } // namespace mbgl
+diff --git a/src/mbgl/gfx/dynamic_texture.cpp b/src/mbgl/gfx/dynamic_texture.cpp
+index 60bec82..5dfa10a 100644
+--- a/src/mbgl/gfx/dynamic_texture.cpp
++++ b/src/mbgl/gfx/dynamic_texture.cpp
+@@ -5,11 +5,15 @@
+ namespace mbgl {
+ namespace gfx {
+
+-DynamicTexture::DynamicTexture(Context& context, Size size, TexturePixelType pixelType) {
++DynamicTexture::DynamicTexture(Size size, TexturePixelType pixelType)
++    : pixelFormat(pixelType) {
+     mapbox::ShelfPack::ShelfPackOptions options;
+     options.autoResize = false;
+     shelfPack = mapbox::ShelfPack(size.width, size.height, options);
++}
+
++DynamicTexture::DynamicTexture(Context& context, Size size, TexturePixelType pixelType)
++    : DynamicTexture(size, pixelType) {
+     texture = context.createTexture2D();
+     texture->setSize(size);
+     texture->setFormat(pixelType, gfx::TextureChannelDataType::UnsignedByte);
+@@ -24,7 +28,7 @@ const gfx::Texture2DPtr& DynamicTexture::getTexture() const {
+ }
+
+ TexturePixelType DynamicTexture::getPixelFormat() const {
+-    return getTexture()->getFormat();
++    return pixelFormat;
+ }
+
+ bool DynamicTexture::isEmpty() const {
+diff --git a/src/mbgl/webgpu/dynamic_texture.cpp b/src/mbgl/webgpu/dynamic_texture.cpp
+index 4f9425c..f4f0f10 100644
+--- a/src/mbgl/webgpu/dynamic_texture.cpp
++++ b/src/mbgl/webgpu/dynamic_texture.cpp
+@@ -6,18 +6,37 @@ namespace mbgl {
+ namespace webgpu {
+
+ DynamicTexture::DynamicTexture(Context& context, Size size, gfx::TexturePixelType pixelType)
+-    : gfx::DynamicTexture(context, size, pixelType) {
++    : gfx::DynamicTexture(size, pixelType),
++      context(context),
++      size(size),
++      pixelType(pixelType) {
+     deferredCreation = true;
+ }
+
++namespace {
++size_t pixelStride(gfx::TexturePixelType pixelType) {
++    switch (pixelType) {
++        case gfx::TexturePixelType::Alpha:
++        case gfx::TexturePixelType::Luminance:
++            return 1;
++        case gfx::TexturePixelType::RGBA:
++            return 4;
++        case gfx::TexturePixelType::Stencil:
++        case gfx::TexturePixelType::Depth:
++            return 4;
++    }
++    return 4;
++}
++} // namespace
++
+ void DynamicTexture::uploadImage(const uint8_t* pixelData, gfx::TextureHandle& texHandle) {
+     std::scoped_lock lock(mutex);
+     const auto& rect = texHandle.getRectangle();
+     const auto imageSize = Size(rect.w, rect.h);
+
+-    auto size = imageSize.area() * texture->getPixelStride();
+-    auto imageData = std::make_unique<uint8_t[]>(size);
+-    std::copy(pixelData, pixelData + size, imageData.get());
++    auto byteSize = imageSize.area() * pixelStride(pixelType);
++    auto imageData = std::make_unique<uint8_t[]>(byteSize);
++    std::copy(pixelData, pixelData + byteSize, imageData.get());
+     imagesToUpload.emplace(texHandle, std::move(imageData));
+
+     gfx::DynamicTexture::uploadImage(pixelData, texHandle);
+@@ -26,6 +45,12 @@ void DynamicTexture::uploadImage(const uint8_t* pixelData, gfx::TextureHandle& t
+ void DynamicTexture::uploadDeferredImages() {
+     std::scoped_lock lock(mutex);
+     if (deferredCreation) {
++        texture = context.createTexture2D();
++        texture->setSize(size);
++        texture->setFormat(pixelType, gfx::TextureChannelDataType::UnsignedByte);
++        texture->setSamplerConfiguration({.filter = gfx::TextureFilterType::Linear,
++                                          .wrapU = gfx::TextureWrapType::Clamp,
++                                          .wrapV = gfx::TextureWrapType::Clamp});
+         texture->create();
+         deferredCreation = false;
+     }
 diff --git a/src/mbgl/webgpu/offscreen_texture.cpp b/src/mbgl/webgpu/offscreen_texture.cpp
 index 1a4642c..79de183 100644
 --- a/src/mbgl/webgpu/offscreen_texture.cpp
 +++ b/src/mbgl/webgpu/offscreen_texture.cpp
 @@ -149,7 +149,7 @@ public:
          }
- 
+
          // Process all pending device operations to ensure rendering is complete
 -#if MLN_WEBGPU_IMPL_DAWN
 +#if MLN_WEBGPU_IMPL_DAWN && !MLN_WEBGPU_EMDAWN
          wgpuDeviceTick(device);
  #endif
- 
+
+diff --git a/src/mbgl/webgpu/uniform_buffer.cpp b/src/mbgl/webgpu/uniform_buffer.cpp
+index 33a705c..37f81cd 100644
+--- a/src/mbgl/webgpu/uniform_buffer.cpp
++++ b/src/mbgl/webgpu/uniform_buffer.cpp
+@@ -6,6 +6,7 @@
+ #include <mbgl/util/logging.hpp>
+ #include <cstring>
+ #include <cstdint>
++#include <vector>
+
+ namespace mbgl {
+ namespace webgpu {
+@@ -28,6 +29,7 @@ UniformBuffer::UniformBuffer(Context& context_, const void* data, std::size_t si
+
+     auto& backend = static_cast<RendererBackend&>(context.getBackend());
+     WGPUDevice device = static_cast<WGPUDevice>(backend.getDevice());
++    WGPUQueue queue = static_cast<WGPUQueue>(backend.getQueue());
+
+     if (device && alignedSize > 0) {
+         WGPUBufferDescriptor bufferDesc = {};
+@@ -35,18 +37,17 @@ UniformBuffer::UniformBuffer(Context& context_, const void* data, std::size_t si
+         bufferDesc.label = label;
+         bufferDesc.size = alignedSize;
+         bufferDesc.usage = WGPUBufferUsage_Uniform | WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst;
+-        bufferDesc.mappedAtCreation = data ? 1 : 0;
++        bufferDesc.mappedAtCreation = 0;
+
+         buffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+
+-        if (buffer && data) {
+-            void* mappedData = wgpuBufferGetMappedRange(buffer, 0, alignedSize);
+-            if (mappedData) {
+-                std::memcpy(mappedData, data, size_);
+-                if (alignedSize > size_) {
+-                    std::memset(static_cast<std::uint8_t*>(mappedData) + size_, 0, alignedSize - size_);
+-                }
+-                wgpuBufferUnmap(buffer);
++        if (buffer && data && queue) {
++            if (alignedSize == size_) {
++                wgpuQueueWriteBuffer(queue, buffer, 0, data, size_);
++            } else {
++                std::vector<std::uint8_t> padded(alignedSize, 0);
++                std::memcpy(padded.data(), data, size_);
++                wgpuQueueWriteBuffer(queue, buffer, 0, padded.data(), alignedSize);
+             }
+         }
+     }
 diff --git a/vendor/dawn.cmake b/vendor/dawn.cmake
 index 48c05e1..ec3153d 100644
 --- a/vendor/dawn.cmake
@@ -39,7 +375,7 @@ index 48c05e1..ec3153d 100644
 @@ -8,6 +8,20 @@ if(NOT MLN_WITH_WEBGPU)
      return()
  endif()
- 
+
 +if(MLN_WEBGPU_EMDAWN)
 +    message(STATUS "Configuring emdawnwebgpu (host supplies --use-port=emdawnwebgpu)")
 +    add_library(mbgl-vendor-dawn INTERFACE)
@@ -62,12 +398,12 @@ index dad2a52..a268992 100644
 --- a/vendor/webgpu.cmake
 +++ b/vendor/webgpu.cmake
 @@ -3,11 +3,21 @@
- 
+
  set(MLN_WEBGPU_IMPL_DAWN OFF CACHE STRING "WebGPU with Dawn implementation")
  set(MLN_WEBGPU_IMPL_WGPU OFF CACHE STRING "WebGPU with wgpu implementation")
 +set(MLN_WEBGPU_EMDAWN OFF
 +    CACHE BOOL "Use Emscripten emdawnwebgpu with Dawn headers (requires MLN_WEBGPU_IMPL_DAWN)")
- 
+
  if(MLN_WITH_WEBGPU)
 +    if(MLN_WEBGPU_EMDAWN AND NOT MLN_WEBGPU_IMPL_DAWN)
 +        message(FATAL_ERROR "MLN_WEBGPU_EMDAWN requires MLN_WEBGPU_IMPL_DAWN")
@@ -80,6 +416,6 @@ index dad2a52..a268992 100644
 +            message(STATUS "Using emdawnwebgpu port for browser WebGPU")
 +            add_compile_definitions(MLN_WEBGPU_EMDAWN)
 +        endif()
- 
+
      elseif(MLN_WEBGPU_IMPL_WGPU)
          message(STATUS "Using wgpu as WebGPU backend")

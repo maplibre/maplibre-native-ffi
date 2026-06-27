@@ -47,6 +47,61 @@ auto validate_live_attached_texture(mln_render_session* texture) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto validate_webgpu_owned_texture_descriptor(
+  const mln_webgpu_owned_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_webgpu_owned_texture_descriptor)) {
+    set_thread_error("mln_webgpu_owned_texture_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  return validate_webgpu_context(descriptor->context, true);
+}
+
+auto validate_webgpu_borrowed_texture_descriptor(
+  const mln_webgpu_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_webgpu_borrowed_texture_descriptor)) {
+    set_thread_error(
+      "mln_webgpu_borrowed_texture_descriptor.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto context_status =
+    validate_webgpu_context(descriptor->context, true);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->texture == nullptr || descriptor->texture_view == nullptr) {
+    set_thread_error("WebGPU texture and texture_view must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->format == 0) {
+    set_thread_error("WebGPU texture format must be specified");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto texture_read_premultiplied_rgba8(
   mln_render_session* texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info

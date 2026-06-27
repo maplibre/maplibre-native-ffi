@@ -388,6 +388,38 @@ impl Default for EglContextDescriptor {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
+pub struct WebGPUContextDescriptor {
+    pub instance: NativePointer,
+    pub device: NativePointer,
+    pub queue: NativePointer,
+}
+
+impl WebGPUContextDescriptor {
+    pub fn new(device: NativePointer, queue: NativePointer) -> Self {
+        Self {
+            instance: NativePointer::NULL,
+            device,
+            queue,
+        }
+    }
+
+    pub(crate) fn to_core(&self) -> maplibre_core::render::WebGPUContextDescriptorFields {
+        maplibre_core::render::WebGPUContextDescriptorFields {
+            instance: self.instance.as_void_ptr(),
+            device: self.device.as_void_ptr(),
+            queue: self.queue.as_void_ptr(),
+        }
+    }
+}
+
+impl Default for WebGPUContextDescriptor {
+    fn default() -> Self {
+        Self::new(NativePointer::NULL, NativePointer::NULL)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum OpenGLContextDescriptor {
     Wgl(WglContextDescriptor),
     Egl(EglContextDescriptor),
@@ -499,6 +531,42 @@ impl OpenGLSurfaceDescriptor {
                 surface: self.surface.as_void_ptr(),
             },
         )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WebGPUSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: WebGPUContextDescriptor,
+    pub canvas_selector: String,
+}
+
+impl WebGPUSurfaceDescriptor {
+    pub fn new(
+        extent: RenderTargetExtent,
+        context: WebGPUContextDescriptor,
+        canvas_selector: impl Into<String>,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            canvas_selector: canvas_selector.into(),
+        }
+    }
+
+    pub(crate) fn to_native(
+        &self,
+    ) -> Result<(sys::mln_webgpu_surface_descriptor, std::ffi::CString)> {
+        let canvas_selector = maplibre_core::string::c_string(&self.canvas_selector)?;
+        let raw = maplibre_core::render::webgpu_surface_descriptor_to_native(
+            maplibre_core::render::WebGPUSurfaceDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+                canvas_selector: &canvas_selector,
+            },
+        );
+        Ok((raw, canvas_selector))
     }
 }
 
@@ -670,6 +738,68 @@ impl OpenGLBorrowedTextureDescriptor {
                 context: self.context.to_core(),
                 texture: self.texture,
                 target: self.target,
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WebGPUOwnedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: WebGPUContextDescriptor,
+}
+
+impl WebGPUOwnedTextureDescriptor {
+    pub fn new(extent: RenderTargetExtent, context: WebGPUContextDescriptor) -> Self {
+        Self { extent, context }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_webgpu_owned_texture_descriptor {
+        maplibre_core::render::webgpu_owned_texture_descriptor_to_native(
+            maplibre_core::render::WebGPUOwnedTextureDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WebGPUBorrowedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: WebGPUContextDescriptor,
+    pub texture: NativePointer,
+    pub texture_view: NativePointer,
+    pub format: u32,
+}
+
+impl WebGPUBorrowedTextureDescriptor {
+    pub fn new(
+        extent: RenderTargetExtent,
+        context: WebGPUContextDescriptor,
+        texture: NativePointer,
+        texture_view: NativePointer,
+        format: u32,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            texture,
+            texture_view,
+            format,
+        }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_webgpu_borrowed_texture_descriptor {
+        maplibre_core::render::webgpu_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::WebGPUBorrowedTextureDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+                texture: self.texture.as_void_ptr(),
+                texture_view: self.texture_view.as_void_ptr(),
+                format: self.format,
             },
         )
     }
@@ -859,6 +989,34 @@ impl OpenGLOwnedTextureFrame {
             internal_format: raw.internal_format,
             format: raw.format,
             type_: raw.type_,
+        }
+    }
+}
+
+/// Copied metadata for an acquired WebGPU session-owned texture frame.
+///
+/// Backend pointers are exposed by [`WebGPUOwnedTextureFrameHandle`] so their
+/// lifetime stays tied to the open frame handle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct WebGPUOwnedTextureFrame {
+    pub generation: u64,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: u64,
+    pub format: u32,
+}
+
+impl WebGPUOwnedTextureFrame {
+    fn from_native(raw: &sys::mln_webgpu_owned_texture_frame) -> Self {
+        Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            format: raw.format,
         }
     }
 }
@@ -1168,6 +1326,124 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
     }
 }
 
+/// RAII guard for an acquired WebGPU session-owned texture frame.
+///
+/// Releasing the guard ends the borrow of the backend WebGPU texture, texture
+/// view, and device.
+pub struct WebGPUOwnedTextureFrameHandle {
+    session: Rc<RenderSessionState>,
+    raw: sys::mln_webgpu_owned_texture_frame,
+    frame: WebGPUOwnedTextureFrame,
+    closed: Cell<bool>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl fmt::Debug for WebGPUOwnedTextureFrameHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WebGPUOwnedTextureFrameHandle")
+            .field("closed", &self.closed.get())
+            .field("frame", &self.frame)
+            .finish()
+    }
+}
+
+impl WebGPUOwnedTextureFrameHandle {
+    /// Returns copied metadata for this acquired frame.
+    pub fn frame(&self) -> Result<&WebGPUOwnedTextureFrame> {
+        if self.closed.get() {
+            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
+        } else {
+            Ok(&self.frame)
+        }
+    }
+
+    /// Returns the borrowed WebGPU texture pointer for backend interop.
+    ///
+    /// # Safety
+    ///
+    /// The returned pointer is valid only while this frame handle remains open.
+    /// The caller must not store or use it after frame release and must satisfy
+    /// WebGPU synchronization and thread-affinity requirements.
+    pub unsafe fn texture(&self) -> Result<FrameNativePointer<'_>> {
+        if self.closed.get() {
+            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
+        } else {
+            // SAFETY: The active native frame owns the validity contract for
+            // this borrowed backend handle until release.
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture) })
+        }
+    }
+
+    /// Returns the borrowed WebGPU texture view pointer for backend interop.
+    ///
+    /// # Safety
+    ///
+    /// The returned pointer has the same lifetime and synchronization
+    /// requirements as [`WebGPUOwnedTextureFrameHandle::texture`].
+    pub unsafe fn texture_view(&self) -> Result<FrameNativePointer<'_>> {
+        if self.closed.get() {
+            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
+        } else {
+            // SAFETY: See texture above.
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture_view) })
+        }
+    }
+
+    /// Returns the borrowed WebGPU device pointer for backend interop.
+    ///
+    /// # Safety
+    ///
+    /// The returned pointer has the same lifetime and synchronization
+    /// requirements as [`WebGPUOwnedTextureFrameHandle::texture`].
+    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
+        if self.closed.get() {
+            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
+        } else {
+            // SAFETY: See texture above.
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
+        }
+    }
+
+    /// Explicitly releases this frame.
+    #[allow(clippy::result_large_err)]
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if self.closed.get() {
+            return Ok(());
+        }
+        let session = match self.session.as_ptr() {
+            Ok(session) => session,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
+        // SAFETY: session is live, and raw is the active frame returned by a
+        // successful acquire for this session until release succeeds.
+        if let Err(error) = maplibre_core::check(unsafe {
+            sys::mln_webgpu_owned_texture_release_frame(session, &self.raw)
+        }) {
+            return Err(HandleOperationError::new(error, self));
+        }
+        self.closed.set(true);
+        self.session.frame_acquired.set(false);
+        Ok(())
+    }
+}
+
+impl Drop for WebGPUOwnedTextureFrameHandle {
+    fn drop(&mut self) {
+        if self.closed.get() {
+            return;
+        }
+        if let Ok(session) = self.session.as_ptr() {
+            // SAFETY: Best-effort release of the active frame. Drop cannot
+            // report errors and never panics.
+            let status = unsafe { sys::mln_webgpu_owned_texture_release_frame(session, &self.raw) };
+            if status == sys::MLN_STATUS_OK {
+                self.closed.set(true);
+                self.session.frame_acquired.set(false);
+            }
+        }
+    }
+}
+
 impl RenderSessionHandle {
     pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
     where
@@ -1359,6 +1635,25 @@ impl RenderSessionHandle {
             _thread_affine: PhantomData,
         })
     }
+
+    /// Acquires a borrowed WebGPU frame from a session-owned texture target.
+    pub fn acquire_webgpu_owned_texture_frame(&self) -> Result<WebGPUOwnedTextureFrameHandle> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let mut raw = empty_webgpu_owned_texture_frame();
+        // SAFETY: session is live and raw points to initialized writable frame storage.
+        maplibre_core::check(unsafe {
+            sys::mln_webgpu_owned_texture_acquire_frame(session, &mut raw)
+        })?;
+        self.inner.frame_acquired.set(true);
+        Ok(WebGPUOwnedTextureFrameHandle {
+            session: Rc::clone(&self.inner),
+            frame: WebGPUOwnedTextureFrame::from_native(&raw),
+            raw,
+            closed: Cell::new(false),
+            _thread_affine: PhantomData,
+        })
+    }
 }
 
 fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
@@ -1404,6 +1699,21 @@ fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
         internal_format: 0,
         format: 0,
         type_: 0,
+    }
+}
+
+fn empty_webgpu_owned_texture_frame() -> sys::mln_webgpu_owned_texture_frame {
+    sys::mln_webgpu_owned_texture_frame {
+        size: mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as u32,
+        generation: 0,
+        width: 0,
+        height: 0,
+        scale_factor: 0.0,
+        frame_id: 0,
+        texture: std::ptr::null_mut(),
+        texture_view: std::ptr::null_mut(),
+        device: std::ptr::null_mut(),
+        format: 0,
     }
 }
 

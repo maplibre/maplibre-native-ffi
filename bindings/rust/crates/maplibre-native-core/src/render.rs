@@ -41,6 +41,13 @@ pub struct EglContextDescriptorFields {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGPUContextDescriptorFields {
+    pub instance: *mut c_void,
+    pub device: *mut c_void,
+    pub queue: *mut c_void,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OpenGLContextDescriptorFields {
     Wgl(WglContextDescriptorFields),
     Egl(EglContextDescriptorFields),
@@ -65,6 +72,13 @@ pub struct OpenGLSurfaceDescriptorFields {
     pub extent: RenderTargetExtentFields,
     pub context: OpenGLContextDescriptorFields,
     pub surface: *mut c_void,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGPUSurfaceDescriptorFields<'a> {
+    pub extent: RenderTargetExtentFields,
+    pub context: WebGPUContextDescriptorFields,
+    pub canvas_selector: &'a std::ffi::CStr,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -108,6 +122,21 @@ pub struct OpenGLBorrowedTextureDescriptorFields {
     pub context: OpenGLContextDescriptorFields,
     pub texture: u32,
     pub target: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGPUOwnedTextureDescriptorFields {
+    pub extent: RenderTargetExtentFields,
+    pub context: WebGPUContextDescriptorFields,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct WebGPUBorrowedTextureDescriptorFields {
+    pub extent: RenderTargetExtentFields,
+    pub context: WebGPUContextDescriptorFields,
+    pub texture: *mut c_void,
+    pub texture_view: *mut c_void,
+    pub format: u32,
 }
 
 fn render_target_extent_to_native(
@@ -168,6 +197,17 @@ fn egl_context_descriptor_to_native(
     }
 }
 
+fn webgpu_context_descriptor_to_native(
+    fields: WebGPUContextDescriptorFields,
+) -> sys::mln_webgpu_context_descriptor {
+    sys::mln_webgpu_context_descriptor {
+        size: std::mem::size_of::<sys::mln_webgpu_context_descriptor>() as u32,
+        instance: fields.instance,
+        device: fields.device,
+        queue: fields.queue,
+    }
+}
+
 fn opengl_context_descriptor_to_native(
     fields: OpenGLContextDescriptorFields,
 ) -> sys::mln_opengl_context_descriptor {
@@ -219,6 +259,17 @@ pub fn opengl_surface_descriptor_to_native(
     raw.extent = render_target_extent_to_native(fields.extent);
     raw.context = opengl_context_descriptor_to_native(fields.context);
     raw.surface = fields.surface;
+    raw
+}
+
+pub fn webgpu_surface_descriptor_to_native(
+    fields: WebGPUSurfaceDescriptorFields<'_>,
+) -> sys::mln_webgpu_surface_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_surface_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw.canvas_selector = fields.canvas_selector.as_ptr();
     raw
 }
 
@@ -289,6 +340,29 @@ pub fn opengl_borrowed_texture_descriptor_to_native(
     raw
 }
 
+pub fn webgpu_owned_texture_descriptor_to_native(
+    fields: WebGPUOwnedTextureDescriptorFields,
+) -> sys::mln_webgpu_owned_texture_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_owned_texture_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw
+}
+
+pub fn webgpu_borrowed_texture_descriptor_to_native(
+    fields: WebGPUBorrowedTextureDescriptorFields,
+) -> sys::mln_webgpu_borrowed_texture_descriptor {
+    // SAFETY: Default constructor takes no arguments and initializes size fields.
+    let mut raw = unsafe { sys::mln_webgpu_borrowed_texture_descriptor_default() };
+    raw.extent = render_target_extent_to_native(fields.extent);
+    raw.context = webgpu_context_descriptor_to_native(fields.context);
+    raw.texture = fields.texture;
+    raw.texture_view = fields.texture_view;
+    raw.format = fields.format;
+    raw
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,6 +412,14 @@ mod tests {
             share_context: ptr(base + 2),
             get_proc_address: ptr(base + 3),
         })
+    }
+
+    fn webgpu_context(base: usize) -> WebGPUContextDescriptorFields {
+        WebGPUContextDescriptorFields {
+            instance: ptr(base),
+            device: ptr(base + 1),
+            queue: ptr(base + 2),
+        }
     }
 
     #[test]
@@ -481,5 +563,54 @@ mod tests {
         );
         assert_eq!(borrowed.texture, 12);
         assert_eq!(borrowed.target, 0x0de1);
+    }
+
+    #[test]
+    fn webgpu_descriptors_fill_sizes_fields_and_pointers() {
+        let canvas_selector = std::ffi::CString::new("#canvas").unwrap();
+        let surface = webgpu_surface_descriptor_to_native(WebGPUSurfaceDescriptorFields {
+            extent: extent(),
+            context: webgpu_context(1),
+            canvas_selector: &canvas_selector,
+        });
+        assert_eq!(
+            surface.size,
+            std::mem::size_of::<sys::mln_webgpu_surface_descriptor>() as u32
+        );
+        assert_eq!(surface.context.instance, ptr(1));
+        assert_eq!(surface.context.device, ptr(2));
+        assert_eq!(surface.context.queue, ptr(3));
+        assert_eq!(surface.canvas_selector, canvas_selector.as_ptr());
+
+        let owned = webgpu_owned_texture_descriptor_to_native(WebGPUOwnedTextureDescriptorFields {
+            extent: extent(),
+            context: webgpu_context(4),
+        });
+        assert_eq!(
+            owned.size,
+            std::mem::size_of::<sys::mln_webgpu_owned_texture_descriptor>() as u32
+        );
+        assert_eq!(owned.context.instance, ptr(4));
+        assert_eq!(owned.context.device, ptr(5));
+        assert_eq!(owned.context.queue, ptr(6));
+
+        let borrowed =
+            webgpu_borrowed_texture_descriptor_to_native(WebGPUBorrowedTextureDescriptorFields {
+                extent: extent(),
+                context: webgpu_context(7),
+                texture: ptr(10),
+                texture_view: ptr(11),
+                format: 18,
+            });
+        assert_eq!(
+            borrowed.size,
+            std::mem::size_of::<sys::mln_webgpu_borrowed_texture_descriptor>() as u32
+        );
+        assert_eq!(borrowed.context.instance, ptr(7));
+        assert_eq!(borrowed.context.device, ptr(8));
+        assert_eq!(borrowed.context.queue, ptr(9));
+        assert_eq!(borrowed.texture, ptr(10));
+        assert_eq!(borrowed.texture_view, ptr(11));
+        assert_eq!(borrowed.format, 18);
     }
 }

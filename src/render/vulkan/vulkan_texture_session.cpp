@@ -710,6 +710,68 @@ auto opengl_borrowed_texture_attach(
   return MLN_STATUS_UNSUPPORTED;
 }
 
+auto webgpu_owned_texture_attach(
+  mln_map* map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) -> mln_status {
+  const auto map_status = validate_map(map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status =
+    validate_webgpu_owned_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  set_thread_error("WebGPU texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto webgpu_borrowed_texture_attach(
+  mln_map* map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) -> mln_status {
+  const auto map_status = validate_map(map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status =
+    validate_webgpu_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  set_thread_error("WebGPU texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
 auto metal_owned_texture_acquire_frame(
   mln_render_session* texture, mln_metal_owned_texture_frame* out_frame
 ) -> mln_status {
@@ -775,6 +837,41 @@ auto opengl_owned_texture_release_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto webgpu_owned_texture_acquire_frame(
+  mln_render_session* texture, mln_webgpu_owned_texture_frame* out_frame
+) -> mln_status {
+  const auto status = validate_texture(texture);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_frame == nullptr ||
+    out_frame->size < sizeof(mln_webgpu_owned_texture_frame)
+  ) {
+    set_thread_error("out_frame must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  set_thread_error("WebGPU texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto webgpu_owned_texture_release_frame(
+  mln_render_session* texture, const mln_webgpu_owned_texture_frame* frame
+) -> mln_status {
+  const auto status = validate_texture(texture);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    frame == nullptr || frame->size < sizeof(mln_webgpu_owned_texture_frame)
+  ) {
+    set_thread_error("frame must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  set_thread_error("WebGPU texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
 

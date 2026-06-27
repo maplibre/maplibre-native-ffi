@@ -119,6 +119,50 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
   };
 }
 
+auto webgpu_owned_texture_descriptor_default() noexcept
+  -> mln_webgpu_owned_texture_descriptor {
+  return mln_webgpu_owned_texture_descriptor{
+    .size = sizeof(mln_webgpu_owned_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = mln_webgpu_context_descriptor{
+      .size = sizeof(mln_webgpu_context_descriptor),
+      .instance = nullptr,
+      .device = nullptr,
+      .queue = nullptr,
+    },
+  };
+}
+
+auto webgpu_borrowed_texture_descriptor_default() noexcept
+  -> mln_webgpu_borrowed_texture_descriptor {
+  return mln_webgpu_borrowed_texture_descriptor{
+    .size = sizeof(mln_webgpu_borrowed_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context =
+      mln_webgpu_context_descriptor{
+        .size = sizeof(mln_webgpu_context_descriptor),
+        .instance = nullptr,
+        .device = nullptr,
+        .queue = nullptr,
+      },
+    .texture = nullptr,
+    .texture_view = nullptr,
+    .format = 0,
+  };
+}
+
 auto opengl_surface_descriptor_default() noexcept
   -> mln_opengl_surface_descriptor {
   return mln_opengl_surface_descriptor{
@@ -192,6 +236,20 @@ auto validate_opengl_context(
 
   set_thread_error("OpenGL context platform is invalid");
   return MLN_STATUS_INVALID_ARGUMENT;
+}
+
+auto validate_webgpu_context(
+  const mln_webgpu_context_descriptor& context, bool require_device
+) -> mln_status {
+  if (context.size < sizeof(mln_webgpu_context_descriptor)) {
+    set_thread_error("mln_webgpu_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (require_device && context.device == nullptr) {
+    set_thread_error("WebGPU device must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
 }
 
 }  // namespace mln::core

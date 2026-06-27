@@ -1,80 +1,28 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>MapLibre Native FFI — WebGPU Browser Demo</title>
     <style>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        background: #0b1020;
-        color: #f5f7ff;
-        font-family:
-          system-ui,
-          -apple-system,
-          sans-serif;
-      }
+    html,
+    body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
 
-      main {
-        display: grid;
-        gap: 1rem;
-        place-items: center;
-        min-height: 100%;
-        padding: 1.5rem;
-        box-sizing: border-box;
-      }
-
-      canvas {
-        width: min(100vw - 2rem, 800px);
-        height: auto;
-        aspect-ratio: 4 / 3;
-        border: 1px solid #314164;
-        border-radius: 0.75rem;
-        background: #11182b;
-      }
-
-      #status {
-        max-width: 48rem;
-        text-align: center;
-        line-height: 1.5;
-      }
+    canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      touch-action: none;
+      user-select: none;
+    }
     </style>
   </head>
   <body>
-    <main>
-      <h1>MapLibre Native FFI in the browser</h1>
-      <p id="status">Loading WebAssembly module…</p>
-      <canvas id="canvas" width="800" height="600"></canvas>
-    </main>
-    <script src="browser-map.js"></script>
-    <script>
-      const status = document.getElementById("status");
-
-      if (!("gpu" in navigator)) {
-        status.textContent =
-          "WebGPU is not available in this browser. Use a recent Chrome, Edge, or Safari build.";
-        throw new Error("WebGPU unavailable");
-      }
-
-      createMapLibreModule({
-        locateFile: (path) => path,
-      })
-        .then((module) => {
-          const result = module._mln_browser_map_init();
-          if (result === 0) {
-            status.textContent =
-              "Rendering OpenFreeMap bright style with the WebGPU backend.";
-          } else {
-            status.textContent =
-              "Initialization failed. Check the browser console for diagnostics.";
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-          status.textContent = `Failed to load WebAssembly module: ${error}`;
-        });
-    </script>
+    <canvas id="canvas" width="960" height="640" tabindex="0"></canvas>
+    <script type="module" src="/browser/main.ts"></script>
   </body>
 </html>

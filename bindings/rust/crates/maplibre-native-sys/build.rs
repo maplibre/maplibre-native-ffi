@@ -11,6 +11,9 @@ const LIBRARY_NAME: &str = "maplibre-native-c";
 struct Artifact {
     include_dirs: Vec<PathBuf>,
     import_library_path: PathBuf,
+    library_dirs: Vec<PathBuf>,
+    link_libraries: Vec<String>,
+    frameworks: Vec<String>,
     rpaths: Vec<PathBuf>,
     supports_linker_rpath: bool,
 }
@@ -22,6 +25,10 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
     let artifact = load_artifact()?;
+    println!(
+        "cargo:rerun-if-changed={}",
+        artifact.import_library_path.display()
+    );
     let import_library_dir = artifact.import_library_path.parent().ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::InvalidData,
@@ -35,7 +42,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cargo:rustc-link-search=native={}",
         import_library_dir.display()
     );
+    for library_dir in &artifact.library_dirs {
+        println!("cargo:rustc-link-search=native={}", library_dir.display());
+    }
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
+    for library in &artifact.link_libraries {
+        if library != LIBRARY_NAME {
+            println!("cargo:rustc-link-lib={library}");
+        }
+    }
+    for framework in &artifact.frameworks {
+        println!("cargo:rustc-link-lib=framework={framework}");
+    }
     if artifact.supports_linker_rpath {
         for rpath in &artifact.rpaths {
             println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());

@@ -66,7 +66,9 @@ pub use render::{
     RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
     TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
     VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
-    VulkanSurfaceDescriptor, WglContextDescriptor,
+    VulkanSurfaceDescriptor, WebGPUBorrowedTextureDescriptor, WebGPUContextDescriptor,
+    WebGPUOwnedTextureDescriptor, WebGPUOwnedTextureFrame, WebGPUOwnedTextureFrameHandle,
+    WebGPUSurfaceDescriptor, WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,

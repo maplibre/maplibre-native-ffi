@@ -6,7 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["staticlib"]
+crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }

@@ -444,4 +444,34 @@ auto opengl_surface_attach(
   );
 }
 
+auto webgpu_surface_attach(
+  mln_map* map, const mln_webgpu_surface_descriptor* descriptor,
+  mln_render_session** out_session
+) -> mln_status {
+  const auto map_status = validate_map(map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status = validate_webgpu_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  set_thread_error("WebGPU surface sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
 }  // namespace mln::core
