@@ -24,7 +24,9 @@ from ci.manifest import (  # noqa: E402
 )
 
 CHECKOUT_ACTION = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
-UPLOAD_ARTIFACT_ACTION = "actions/upload-artifact@v4"
+UPLOAD_ARTIFACT_ACTION = (
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"  # v7.0.1
+)
 DESKTOP_OSES = {"linux", "macos", "windows"}
 
 

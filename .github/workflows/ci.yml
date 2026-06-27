@@ -58,7 +58,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -87,7 +87,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -117,7 +117,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -147,7 +147,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -178,7 +178,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -208,7 +208,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -237,7 +237,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -381,7 +381,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -408,7 +408,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -435,7 +435,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
@@ -462,7 +462,7 @@ jobs:
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
       - run: mise run package-native
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
