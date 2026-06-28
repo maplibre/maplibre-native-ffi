@@ -1,27 +1,13 @@
 include(GNUInstallDirs)
 
-function(mln_install_c_api_library target)
-  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
-  set(MLN_FFI_NATIVE_COMPONENT native)
-  set(MLN_FFI_LOCAL_RUNTIME_COMPONENT local-runtime)
-
-  set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
-  if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
-    set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
-  endif()
-
-  set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
-  configure_file(
-    "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"
-    @ONLY)
-
+function(mln_install_c_api_artifact target runtime_dependency_set)
   get_target_property(MLN_FFI_INSTALL_ARCHIVE ${target} MLN_FFI_INSTALL_ARCHIVE)
   if(MLN_FFI_INSTALL_ARCHIVE)
     install(
       FILES "${MLN_FFI_INSTALL_ARCHIVE}"
       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
       COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
-  else()
+  elseif(runtime_dependency_set)
     install(
       TARGETS ${target}
       RUNTIME_DEPENDENCY_SET mln_ffi_local_runtime_dependencies
@@ -34,6 +20,45 @@ function(mln_install_c_api_library target)
       ARCHIVE
         DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  else()
+    install(
+      TARGETS ${target}
+      RUNTIME
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
+      LIBRARY
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
+      ARCHIVE
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+  endif()
+endfunction()
+
+function(mln_install_c_api_library target)
+  set(MLN_FFI_NATIVE_COMPONENT native)
+  set(MLN_FFI_LOCAL_RUNTIME_COMPONENT local-runtime)
+
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
+  if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
+  endif()
+
+  set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"
+    @ONLY)
+
+  mln_install_c_api_artifact(${target} TRUE)
+
+  get_target_property(MLN_FFI_ADDITIONAL_INSTALL_TARGETS ${target}
+                      MLN_FFI_ADDITIONAL_INSTALL_TARGETS)
+  if(MLN_FFI_ADDITIONAL_INSTALL_TARGETS)
+    foreach(MLN_FFI_ADDITIONAL_INSTALL_TARGET IN LISTS
+            MLN_FFI_ADDITIONAL_INSTALL_TARGETS)
+      mln_install_c_api_artifact(${MLN_FFI_ADDITIONAL_INSTALL_TARGET} FALSE)
+    endforeach()
   endif()
 
   set(MLN_FFI_LOCAL_RUNTIME_DEPENDENCY_DIRS

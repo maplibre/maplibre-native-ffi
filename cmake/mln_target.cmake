@@ -37,10 +37,28 @@ function(mln_configure_complete_static_archive target)
     endif()
   endforeach()
 
+  set(MLN_FFI_OSX_ARCHITECTURES ${CMAKE_OSX_ARCHITECTURES})
+  if(NOT MLN_FFI_OSX_ARCHITECTURES)
+    set(MLN_FFI_OSX_ARCHITECTURES "${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  if(NOT MLN_FFI_OSX_ARCHITECTURES)
+    set(MLN_FFI_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}")
+  endif()
+  if(NOT MLN_FFI_OSX_ARCHITECTURES)
+    message(FATAL_ERROR "Apple complete static archive requires a target arch")
+  endif()
+  list(GET MLN_FFI_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
+
   set(MLN_FFI_LD_PLATFORM_FLAGS "")
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -ios_version_min
-         "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND MLN_FFI_IS_IOS_SIMULATOR)
+    list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version ios-simulator
+         "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version ios
+         "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version macos
+         "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
   endif()
 
   add_custom_command(
@@ -52,7 +70,7 @@ function(mln_configure_complete_static_archive target)
       "${CMAKE_LINKER}"
       -r
       -arch
-      "${CMAKE_OSX_ARCHITECTURES}"
+      "${MLN_FFI_OSX_ARCHITECTURE}"
       -syslibroot
       "$ENV{MLN_FFI_SYSTEM_ROOT}"
       ${MLN_FFI_LD_PLATFORM_FLAGS}
@@ -74,6 +92,22 @@ function(mln_configure_complete_static_archive target)
   set_property(
     TARGET ${target}
     PROPERTY MLN_FFI_INSTALL_ARCHIVE "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
+endfunction()
+
+function(mln_configure_build_rpath target)
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  if(NOT MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    return()
+  endif()
+
+  # Build-tree binaries find provider-supplied shared libraries through
+  # embedded runtime search paths. iOS images are bundled; skip rpath there.
+  if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set_property(
+      TARGET ${target}
+      APPEND
+      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
+  endif()
 endfunction()
 
 function(mln_configure_shared_exports target)
@@ -127,7 +161,58 @@ function(mln_configure_install_rpath target)
     PROPERTY INSTALL_RPATH "${install_rpath}")
 endfunction()
 
-function(mln_add_c_api_library target)
+function(mln_set_c_api_output_properties target)
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      CXX_VISIBILITY_PRESET
+      hidden
+      C_VISIBILITY_PRESET
+      hidden
+      C_STANDARD
+      23
+      C_STANDARD_REQUIRED
+      YES
+      C_EXTENSIONS
+      OFF
+      CXX_STANDARD
+      20
+      CXX_STANDARD_REQUIRED
+      YES
+      CXX_EXTENSIONS
+      OFF
+      VISIBILITY_INLINES_HIDDEN
+      YES
+      OUTPUT_NAME
+      maplibre-native-c)
+endfunction()
+
+function(mln_configure_c_api_compile_options target)
+  target_compile_options(
+    ${target}
+    PRIVATE
+      $<$<AND:$<COMPILE_LANGUAGE:CXX,OBJCXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<CXX_COMPILER_ID:MSVC>>:/MP>
+      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
+      $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
+endfunction()
+
+function(mln_configure_c_api_static_dependencies target)
+  set_property(
+    TARGET ${target}
+    PROPERTY
+      MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES
+      mbgl-core
+      mbgl-freetype
+      mbgl-harfbuzz
+      mbgl-vendor-csscolorparser
+      mbgl-vendor-nunicode
+      mbgl-vendor-parsedate
+      mbgl-vendor-sqlite
+      mlt-cpp)
+endfunction()
+
+function(mln_configure_c_api_implementation target)
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
@@ -153,11 +238,6 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-    add_library(${target} STATIC)
-  else()
-    add_library(${target} SHARED)
-  endif()
   mln_target_project_sources(${target} ${MLN_FFI_C_API_SOURCES})
 
   target_include_directories(
@@ -172,63 +252,84 @@ function(mln_add_c_api_library target)
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
       mbgl-vendor-sqlite)
-  set_property(
-    TARGET ${target}
-    PROPERTY
-      MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES
-      mbgl-core
-      mbgl-freetype
-      mbgl-harfbuzz
-      mbgl-vendor-csscolorparser
-      mbgl-vendor-nunicode
-      mbgl-vendor-parsedate
-      mbgl-vendor-sqlite
-      mlt-cpp)
 
-  target_compile_options(
-    ${target}
-    PRIVATE
-      $<$<AND:$<COMPILE_LANGUAGE:CXX,OBJCXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
-      $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<CXX_COMPILER_ID:MSVC>>:/MP>
-      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
-      $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
-
-  # Build-tree binaries find provider-supplied shared libraries through
-  # embedded runtime search paths. iOS images are bundled; skip rpath there.
-  if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set_property(
-      TARGET ${target}
-      APPEND
-      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
-  endif()
-
-  set_target_properties(
-    ${target}
-    PROPERTIES
-      CXX_VISIBILITY_PRESET
-      hidden
-      C_VISIBILITY_PRESET
-      hidden
-      C_STANDARD
-      23
-      C_STANDARD_REQUIRED
-      YES
-      C_EXTENSIONS
-      OFF
-      CXX_STANDARD
-      20
-      CXX_STANDARD_REQUIRED
-      YES
-      CXX_EXTENSIONS
-      OFF
-      VISIBILITY_INLINES_HIDDEN
-      YES
-      OUTPUT_NAME
-      maplibre-native-c)
+  mln_configure_c_api_compile_options(${target})
+  mln_set_c_api_output_properties(${target})
 
   mln_configure_source_linting(${target})
   mln_configure_platform_support(${target})
   mln_configure_render_backend(${target})
+endfunction()
+
+function(mln_link_c_api_implementation target implementation_target)
+  target_sources(${target} PRIVATE $<TARGET_OBJECTS:${implementation_target}>)
+
+  get_target_property(MLN_FFI_IMPLEMENTATION_LINK_LIBRARIES
+                      ${implementation_target} LINK_LIBRARIES)
+  if(MLN_FFI_IMPLEMENTATION_LINK_LIBRARIES)
+    target_link_libraries(
+      ${target}
+      PRIVATE ${MLN_FFI_IMPLEMENTATION_LINK_LIBRARIES})
+  endif()
+
+  get_target_property(MLN_FFI_IMPLEMENTATION_INCLUDE_DIRECTORIES
+                      ${implementation_target} INCLUDE_DIRECTORIES)
+  if(MLN_FFI_IMPLEMENTATION_INCLUDE_DIRECTORIES)
+    target_include_directories(
+      ${target}
+      PRIVATE ${MLN_FFI_IMPLEMENTATION_INCLUDE_DIRECTORIES})
+  endif()
+endfunction()
+
+function(mln_configure_c_api_wrapper target implementation_target)
+  mln_link_c_api_implementation(${target} ${implementation_target})
+  target_include_directories(
+    ${target}
+    PUBLIC
+      $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+      $<INSTALL_INTERFACE:include>)
+  mln_set_c_api_output_properties(${target})
+  mln_configure_build_rpath(${target})
+  mln_configure_shared_exports(${target})
+  mln_configure_install_rpath(${target})
+endfunction()
+
+function(mln_add_apple_c_api_library target)
+  set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
+  add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
+  mln_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
+    add_library(${target} STATIC)
+    mln_configure_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
+    mln_configure_c_api_static_dependencies(${target})
+    mln_configure_complete_static_archive(${target})
+    return()
+  endif()
+
+  add_library(${target} SHARED)
+  mln_configure_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
+
+  set(MLN_FFI_STATIC_TARGET "${target}_static")
+  add_library(${MLN_FFI_STATIC_TARGET} STATIC)
+  mln_configure_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
+                              ${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_configure_c_api_static_dependencies(${MLN_FFI_STATIC_TARGET})
+  mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET})
+  set_property(
+    TARGET ${target}
+    PROPERTY MLN_FFI_ADDITIONAL_INSTALL_TARGETS ${MLN_FFI_STATIC_TARGET})
+endfunction()
+
+function(mln_add_c_api_library target)
+  if(APPLE)
+    mln_add_apple_c_api_library(${target})
+    return()
+  endif()
+
+  add_library(${target} SHARED)
+  mln_configure_c_api_implementation(${target})
+  mln_configure_build_rpath(${target})
   mln_configure_shared_exports(${target})
   mln_configure_install_rpath(${target})
   mln_configure_complete_static_archive(${target})
