@@ -1,5 +1,7 @@
 [requires]
 backend = ["opengl"]
+# SDL3 is not available from conda-forge on win-arm64, and this example uses
+# cgo pkg-config discovery for SDL3.
 exclude = ["windows-arm64-wgl"]
 os = ["linux", "macos", "windows"]
 
