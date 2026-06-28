@@ -44,7 +44,7 @@ function(mln_install_c_api_library target)
     mln_install_c_api_shared_target(${target})
   endif()
 
-  if(APPLE AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+  if(TARGET ${target}_static)
     mln_install_c_api_complete_static_archive(${target}_static)
   endif()
 
