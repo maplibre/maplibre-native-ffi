@@ -383,15 +383,15 @@ impl NativeRuntimeHandle {
             Some(resource_provider_trampoline),
             Arc::as_ptr(&provider) as *mut c_void,
         );
+        let mut provider_slot = self
+            .resource_provider
+            .lock()
+            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?;
         core::check(unsafe {
             sys::mln_runtime_set_resource_provider(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        let replaced = self
-            .resource_provider
-            .lock()
-            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?
-            .replace(provider);
+        let replaced = provider_slot.replace(provider);
         drop(replaced);
         Ok(())
     }
@@ -411,14 +411,15 @@ impl NativeRuntimeHandle {
             Some(resource_transform_trampoline),
             Arc::as_ptr(&transform) as *mut c_void,
         );
+        let mut transform_slot = self
+            .resource_transform
+            .lock()
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?;
         core::check(unsafe {
             sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        self.resource_transform
-            .lock()
-            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
-            .replace(transform);
+        drop(transform_slot.replace(transform));
         Ok(())
     }
 
