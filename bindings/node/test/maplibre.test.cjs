@@ -85,6 +85,10 @@ test("concept subpath modules expose curated public API groups", () => {
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
   assert.equal(runtimeModule.networkStatus, networkStatus);
+  assert.equal(
+    runtimeModule.supportedOpenGLContextProviders,
+    supportedOpenGLContextProviders,
+  );
   assert.equal(renderModule.RenderSessionHandle, RenderSessionHandle);
   assert.equal(renderModule.NativeBuffer, NativeBuffer);
   assert.equal(errorModule.InvalidArgumentError, InvalidArgumentError);
@@ -929,6 +933,41 @@ test("resource provider routes validate Node handoff shape", async () => {
       InvalidStateError,
     );
     assert.throws(() => failedCompletionHandle.cancelled(), InvalidStateError);
+
+    /** @type {any} */
+    let staleHandle;
+    nativeAddon.nativeResourceRequestComplete =
+      /** @type {(completionToken: string, response: any) => void} */ (
+        () => {
+          throw new InvalidStateError(null, "ResourceRequestHandle is closed");
+        }
+      );
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:8",
+                "custom://stale",
+              ),
+            );
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        staleHandle = request.handle;
+      },
+    );
+    assert.ok(staleHandle);
+    assert.throws(
+      () => staleHandle.complete({ bytes: new Uint8Array([1]) }),
+      InvalidStateError,
+    );
+    assert.equal(staleHandle.closed, true);
   } finally {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;

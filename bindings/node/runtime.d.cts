@@ -2,6 +2,7 @@ export {
   RuntimeHandle,
   cVersion,
   supportedRenderBackends,
+  supportedOpenGLContextProviders,
   threadLastErrorMessage,
   takeNativeLeakReports,
   networkStatus,
@@ -28,4 +29,5 @@ export {
   type NetworkStatusValue,
   type NativeLeakReport,
   type RenderBackends,
+  type OpenGLContextProviders,
 } from "./index.cjs";

@@ -3,6 +3,7 @@ export {
   cVersion,
   networkStatus,
   setNetworkStatus,
+  supportedOpenGLContextProviders,
   supportedRenderBackends,
   takeNativeLeakReports,
   threadLastErrorMessage,

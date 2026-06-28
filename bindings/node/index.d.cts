@@ -1055,6 +1055,13 @@ export interface ScreenPoint {
   y: number;
 }
 
+/**
+ * JavaScript-native JSON value used by structured JSON and GeoJSON APIs.
+ *
+ * Object member order, duplicate names, and integer precision follow
+ * JavaScript JSON semantics. Use `MapHandle.setStyleJson(json: string)` for a
+ * raw style document that must pass through without wrapper parsing.
+ */
 export type JsonValue =
   | null
   | boolean

@@ -308,10 +308,10 @@ pub fn native_resource_request_complete(
     let response = resource_response_from_input(response)?;
     let registration = resource_request_handles()
         .lock()
-        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .map_err(|_| error::invalid_state("resource request registry lock is poisoned"))?
         .get(&completion_token)
         .cloned()
-        .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
+        .ok_or_else(|| error::invalid_state("ResourceRequestHandle is closed"))?;
     unregister_resource_request_handle(&completion_token);
     registration
         .handle
@@ -324,10 +324,10 @@ pub fn native_resource_request_cancelled(completion_token: String) -> Result<boo
     validate_resource_request_completion_token(&completion_token)?;
     let registration = resource_request_handles()
         .lock()
-        .map_err(|_| error::invalid_argument("resource request registry lock is poisoned"))?
+        .map_err(|_| error::invalid_state("resource request registry lock is poisoned"))?
         .get(&completion_token)
         .cloned()
-        .ok_or_else(|| error::invalid_argument("ResourceRequestHandle is closed"))?;
+        .ok_or_else(|| error::invalid_state("ResourceRequestHandle is closed"))?;
     registration.handle.is_cancelled().map_err(error::from_core)
 }
 
@@ -807,7 +807,10 @@ unsafe fn resource_provider_trampoline_inner(
         Ok(handle_state) => handle_state,
         Err(_) => return core::resource::UNKNOWN_PROVIDER_DECISION,
     };
-    let completion_token = register_resource_request_handle(handle_state.clone(), &provider);
+    let Some(completion_token) = register_resource_request_handle(handle_state.clone(), &provider)
+    else {
+        return handle_state.finish_provider_exception();
+    };
     let provider_request = resource_provider_request_from_core(request, completion_token.clone());
     let status = provider.callback.call(
         Ok(provider_request),
@@ -847,7 +850,12 @@ unsafe fn resource_transform_trampoline_inner(
         return sys::MLN_STATUS_INVALID_ARGUMENT;
     }
 
-    let transform = unsafe { &*(user_data as *const ResourceTransformState) };
+    let transform_ptr = user_data as *const ResourceTransformState;
+    // SAFETY: user_data was created from Arc::as_ptr. Take an owned Arc clone
+    // while the callback reads rules so concurrent clear/replace cannot free
+    // the callback state mid-call.
+    unsafe { Arc::increment_strong_count(transform_ptr) };
+    let transform = unsafe { Arc::from_raw(transform_ptr) };
     let url = unsafe { CStr::from_ptr(url) }.to_string_lossy();
     let Some(rule) = transform
         .rules
@@ -908,10 +916,13 @@ fn resource_request_handles() -> &'static Mutex<HashMap<String, ResourceRequestR
 fn register_resource_request_handle(
     handle: Arc<core::resource::ResourceRequestHandleState>,
     provider: &Arc<ResourceProviderState>,
-) -> String {
+) -> Option<String> {
     let token_id = RESOURCE_REQUEST_TOKEN_IDS.fetch_add(1, Ordering::Relaxed);
     let completion_token = format!("resource-request:{token_id}");
-    if let Ok(mut handles) = resource_request_handles().lock() {
+    {
+        let Ok(mut handles) = resource_request_handles().lock() else {
+            return None;
+        };
         handles.insert(
             completion_token.clone(),
             ResourceRequestRegistration {
@@ -920,10 +931,15 @@ fn register_resource_request_handle(
             },
         );
     }
-    if let Ok(mut pending) = provider.pending_completion_tokens.lock() {
-        pending.insert(completion_token.clone());
-    }
-    completion_token
+    let pending = provider.pending_completion_tokens.lock();
+    let Ok(mut pending) = pending else {
+        let _ = resource_request_handles()
+            .lock()
+            .map(|mut handles| handles.remove(&completion_token));
+        return None;
+    };
+    pending.insert(completion_token.clone());
+    Some(completion_token)
 }
 
 fn unregister_resource_request_handle(

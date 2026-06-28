@@ -575,6 +575,7 @@ impl NativeRenderSessionHandle {
         &self,
         frame: NativeMetalOwnedTextureFrame,
     ) -> Result<()> {
+        self.ensure_frame_acquired()?;
         let frame = frame.into_native()?;
         core::check(unsafe {
             sys::mln_metal_owned_texture_release_frame(self.state.as_ptr(), &frame)
@@ -613,6 +614,7 @@ impl NativeRenderSessionHandle {
         &self,
         frame: NativeVulkanOwnedTextureFrame,
     ) -> Result<()> {
+        self.ensure_frame_acquired()?;
         let frame = frame.into_native()?;
         core::check(unsafe {
             sys::mln_vulkan_owned_texture_release_frame(self.state.as_ptr(), &frame)
@@ -651,6 +653,7 @@ impl NativeRenderSessionHandle {
         &self,
         frame: NativeOpenGLOwnedTextureFrame,
     ) -> Result<()> {
+        self.ensure_frame_acquired()?;
         let raw = frame.into_native()?;
         core::check(unsafe {
             sys::mln_opengl_owned_texture_release_frame(self.state.as_ptr(), &raw)
@@ -713,6 +716,15 @@ impl NativeRenderSessionHandle {
 }
 
 impl NativeRenderSessionHandle {
+    fn ensure_frame_acquired(&self) -> Result<()> {
+        if !self.frame_acquired.get() {
+            return Err(error::invalid_state(
+                "texture frame scope is not active for this render session",
+            ));
+        }
+        Ok(())
+    }
+
     fn ensure_no_frame_acquired(&self) -> Result<()> {
         if self.frame_acquired.get() {
             return Err(error::invalid_state(

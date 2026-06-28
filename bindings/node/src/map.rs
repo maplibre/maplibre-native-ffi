@@ -1676,7 +1676,7 @@ impl NativeMapHandle {
         let json = c_string(json, "style JSON")?;
         core::check(unsafe { sys::mln_map_set_style_json(self.state.as_ptr(), json.as_ptr()) })
             .map_err(error::from_core)?;
-        self.clear_all_custom_geometry_source_state();
+        self.retire_all_custom_geometry_sources();
         Ok(())
     }
 

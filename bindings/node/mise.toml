@@ -1,12 +1,15 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "pnpm --filter @maplibre/native-ffi-node build"
+run = """
+source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
+pnpm --filter @maplibre/native-ffi-node build
+"""
 
 [tasks.test]
 depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "pnpm --filter @maplibre/native-ffi-node test"
+run = "env LD_LIBRARY_PATH=\"$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" pnpm --filter @maplibre/native-ffi-node test"
 
 [tasks.ci]
 depends = [":test"]
