@@ -27,13 +27,6 @@ def run(command: list[str], *, env: dict[str, str] | None = None) -> None:
     subprocess.run(command, check=True, env=env)
 
 
-def required_tool(name: str) -> str:
-    path = shutil.which(name)
-    if path is None:
-        raise SystemExit(f"{name} is required")
-    return path
-
-
 def update_macos_install_names(package_root: pathlib.Path) -> None:
     install_name_tool = shutil.which("install_name_tool")
     if install_name_tool is None:
@@ -43,46 +36,21 @@ def update_macos_install_names(package_root: pathlib.Path) -> None:
         run([install_name_tool, "-id", f"@rpath/{dylib.name}", str(dylib)])
 
 
-def add_macos_debug_symbols(package_root: pathlib.Path) -> None:
-    dsymutil = required_tool("dsymutil")
-    dylibs = [
-        path for path in package_root.rglob("*.dylib") if ".dSYM" not in path.parts
-    ]
-    for dylib in dylibs:
-        dsym = dylib.with_name(f"{dylib.name}.dSYM")
-        shutil.rmtree(dsym, ignore_errors=True)
-        run([dsymutil, str(dylib), "-o", str(dsym)])
-
-
-def find_binutils_tool(*names: str) -> str:
-    for name in names:
+def find_strip_tool() -> str:
+    for name in ("strip", "llvm-strip"):
         path = shutil.which(name)
         if path is not None:
             return path
-    raise SystemExit(f"one of {', '.join(names)} is required")
+    raise SystemExit("strip (or llvm-strip) is required on Linux")
 
 
-def add_linux_debug_symbols(package_root: pathlib.Path) -> None:
-    objcopy = find_binutils_tool("objcopy", "llvm-objcopy")
-    strip = find_binutils_tool("strip", "llvm-strip")
+def strip_shared_libraries(package_root: pathlib.Path) -> None:
+    if not sys.platform.startswith("linux"):
+        return
 
+    strip = find_strip_tool()
     for shared_library in package_root.rglob("*.so*"):
-        if ".debug" in shared_library.parts:
-            continue
-        debug_dir = shared_library.parent / ".debug"
-        debug_dir.mkdir(exist_ok=True)
-        debug_file = debug_dir / f"{shared_library.name}.debug"
-
-        run([objcopy, "--only-keep-debug", str(shared_library), str(debug_file)])
         run([strip, "--strip-debug", str(shared_library)])
-        run([objcopy, f"--add-gnu-debuglink={debug_file}", str(shared_library)])
-
-
-def add_debug_symbols(package_root: pathlib.Path) -> None:
-    if sys.platform == "darwin":
-        add_macos_debug_symbols(package_root)
-    elif sys.platform.startswith("linux"):
-        add_linux_debug_symbols(package_root)
 
 
 def archive_package(
@@ -117,7 +85,7 @@ def main() -> int:
 
     run(["cmake", "--install", str(build_dir), "--prefix", str(package_root)])
     update_macos_install_names(package_root)
-    add_debug_symbols(package_root)
+    strip_shared_libraries(package_root)
 
     archive = dist_dir / f"{package_name}.tar.gz"
     archive_package(package_parent, package_name, archive)

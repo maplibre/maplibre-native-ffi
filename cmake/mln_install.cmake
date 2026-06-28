@@ -12,13 +12,6 @@ function(mln_install_c_api_library target)
     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 
-  if(MSVC)
-    install(
-      FILES "$<TARGET_PDB_FILE:${target}>"
-      DESTINATION "${CMAKE_INSTALL_BINDIR}"
-      OPTIONAL)
-  endif()
-
   install(
     FILES "${PROJECT_SOURCE_DIR}/include/maplibre_native_c.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
