@@ -5,8 +5,6 @@
 #include <algorithm>
 #include <atomic>
 #include <cctype>
-#include <cstdarg>
-#include <cstdio>
 #include <cstring>
 #include <deque>
 #include <memory>
@@ -37,20 +35,7 @@ namespace {
 // wasm heap before C++ can drop obsolete responses, so bound active transport
 // requests below OnlineFileSource's platform-wide concurrency limit.
 constexpr auto maxActiveFetches = std::size_t{16};
-std::atomic_bool traceHttpEnabled = false;
 std::atomic_uint64_t nextRequestId = 1;
-
-void traceHttp(const char* format, ...) {
-  if (!traceHttpEnabled.load(std::memory_order_relaxed)) {
-    return;
-  }
-  std::fprintf(stderr, "browser http: ");
-  va_list args;
-  va_start(args, format);
-  std::vfprintf(stderr, format, args);
-  va_end(args);
-  std::fprintf(stderr, "\n");
-}
 
 auto lowerASCII(std::string value) -> std::string {
   std::transform(
@@ -271,11 +256,6 @@ void FetchRequestQueue::enqueue(
   {
     std::scoped_lock lock(mutex_);
     pending_.push_back(state);
-    traceHttp(
-      "enqueue id=%llu active=%zu pending=%zu url=%s",
-      static_cast<unsigned long long>(state->id()), active_.size(),
-      pending_.size(), state->resourceURL().c_str()
-    );
   }
   pump();
 }
@@ -289,15 +269,9 @@ void FetchRequestQueue::release(uint64_t id, const FetchRequestState* state) {
         return active && active->id() == id && active.get() == state;
       }
     );
-    if (found == active_.end()) {
-      traceHttp("release missing id=%llu", static_cast<unsigned long long>(id));
-    } else {
+    if (found != active_.end()) {
       active_.erase(found);
     }
-    traceHttp(
-      "release id=%llu active=%zu pending=%zu",
-      static_cast<unsigned long long>(id), active_.size(), pending_.size()
-    );
   }
   pump();
 }
@@ -326,11 +300,6 @@ void FetchRequestQueue::pump() {
 
         state->activate();
         active_.push_back(state);
-        traceHttp(
-          "activate id=%llu active=%zu pending=%zu",
-          static_cast<unsigned long long>(state->id()), active_.size(),
-          pending_.size()
-        );
         ready.push_back(std::move(state));
       }
     }
@@ -411,9 +380,6 @@ void FetchRequestState::start() {
   }
 
   const auto url = resource_.url;
-  traceHttp(
-    "start id=%llu url=%s", static_cast<unsigned long long>(id_), url.c_str()
-  );
   auto* startedFetch = emscripten_fetch(&attributes, url.c_str());
   if (startedFetch == nullptr) {
     delete holder;
@@ -465,10 +431,6 @@ void FetchRequestState::cancel() {
     holder = takeHolder(fetchToClose);
   }
 
-  traceHttp(
-    "cancel id=%llu had_fetch=%d active=%d",
-    static_cast<unsigned long long>(id_), fetchToClose != nullptr, wasActive
-  );
   if (fetchToClose != nullptr) {
     emscripten_fetch_close(fetchToClose);
   }
@@ -498,12 +460,6 @@ void FetchRequestState::onFetchComplete(emscripten_fetch_t* fetch) {
 
 void FetchRequestState::complete(emscripten_fetch_t* completedFetch) {
   const auto response = makeResponse(resource_, completedFetch);
-  traceHttp(
-    "complete id=%llu status=%u bytes=%llu url=%s",
-    static_cast<unsigned long long>(id_), completedFetch->status,
-    static_cast<unsigned long long>(completedFetch->numBytes),
-    resource_.url.c_str()
-  );
   {
     std::scoped_lock lock(mutex_);
     if (fetch_ == completedFetch) {
@@ -664,11 +620,3 @@ ClientOptions HTTPFileSource::getClientOptions() {
 }
 
 }  // namespace mbgl
-
-extern "C" {
-
-EMSCRIPTEN_KEEPALIVE void mln_emscripten_http_trace_set(int enabled) {
-  mbgl::traceHttpEnabled.store(enabled != 0, std::memory_order_relaxed);
-}
-
-}  // extern "C"

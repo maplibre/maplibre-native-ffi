@@ -1,4 +1,3 @@
-import { BrowserBenchmark } from "./benchmark";
 import { InputController } from "./input";
 import type { BrowserMapModule, Viewport } from "./types";
 import { readViewport, setCanvasPhysicalSize } from "./viewport";
@@ -20,14 +19,10 @@ const defaultCamera: InitialCamera = {
   pitch: 30,
 };
 
-const crashLogStorageKey = "maplibre-browser-map-crash-log";
-const maxCrashLogEntries = 200;
-
 class BrowserMapShell {
   private module: BrowserMapModule | null = null;
   private webgpuHost: WebGPUDeviceHost | null = null;
   private textureHost: WebGPUTextureHost | null = null;
-  private benchmark: BrowserBenchmark | null = null;
   private viewport: Viewport = { width: 960, height: 640, scale: 1 };
   private readonly input: InputController;
 
@@ -48,11 +43,7 @@ class BrowserMapShell {
       .then(() =>
         createMapLibreModule({
           locateFile: (path) => path,
-          printErr: (message) => {
-            const text = String(message);
-            persistCrashLog(text);
-            console.error(text);
-          },
+          printErr: (message) => console.error(message),
         }),
       )
       .then((module) => this.initialize(module))
@@ -64,7 +55,6 @@ class BrowserMapShell {
   private async initialize(module: BrowserMapModule): Promise<void> {
     this.module = module;
     window.maplibreBrowserMap = module;
-    module._mln_browser_map_set_trace(traceEnabled() ? 1 : 0);
 
     this.viewport = readViewport(this.canvas);
     setCanvasPhysicalSize(this.canvas, this.viewport);
@@ -93,8 +83,7 @@ class BrowserMapShell {
         camera.bearing,
         camera.pitch,
       );
-      this.benchmark = BrowserBenchmark.create(module, () => this.viewport);
-      requestAnimationFrame((timestamp) => this.frame(timestamp));
+      requestAnimationFrame(() => this.frame());
     } else {
       console.error("Browser map initialization failed");
     }
@@ -125,42 +114,18 @@ class BrowserMapShell {
     this.viewport = nextViewport;
   }
 
-  private frame(timestamp: DOMHighResTimeStamp): void {
+  private frame(): void {
     if (!this.module || !this.textureHost) return;
     this.input.applyPending();
-    const nativeStart = performance.now();
     const frameResult = this.module._mln_browser_map_render_frame();
-    const nativeMs = performance.now() - nativeStart;
-    const runLoopMs = this.module._mln_browser_map_last_run_loop_ms();
-    const runnableMs = this.module._mln_browser_map_last_runnable_ms();
-    const readyRunnableCount =
-      this.module._mln_browser_map_last_ready_runnable_count();
-    const runnableCount = this.module._mln_browser_map_last_runnable_count();
-    const eventDrainMs = this.module._mln_browser_map_last_event_drain_ms();
-    const renderUpdateMs = this.module._mln_browser_map_last_render_update_ms();
-    let presentMs = 0;
     if (frameResult === 1) {
       const texturePtr = this.module._mln_browser_map_acquire_owned_texture();
       if (texturePtr !== 0) {
-        const presentStart = performance.now();
         this.textureHost.presentOwnedTexture(texturePtr);
         this.module._mln_browser_map_release_owned_texture_frame();
-        presentMs = performance.now() - presentStart;
       }
     }
-    this.benchmark?.recordFrame(
-      timestamp,
-      frameResult === 1,
-      nativeMs,
-      runLoopMs,
-      runnableMs,
-      readyRunnableCount,
-      runnableCount,
-      eventDrainMs,
-      renderUpdateMs,
-      presentMs,
-    );
-    requestAnimationFrame((nextTimestamp) => this.frame(nextTimestamp));
+    requestAnimationFrame(() => this.frame());
   }
 }
 
@@ -173,10 +138,6 @@ function readInitialCamera(): InitialCamera {
     bearing: numberParam(params, "bearing", defaultCamera.bearing),
     pitch: numberParam(params, "pitch", defaultCamera.pitch),
   };
-}
-
-function traceEnabled(): boolean {
-  return new URLSearchParams(location.search).get("trace") === "1";
 }
 
 function numberParam(
@@ -199,57 +160,6 @@ function loadScript(source: string): Promise<void> {
     document.head.append(script);
   });
 }
-
-function persistCrashLog(message: string): void {
-  if (!isCrashLogMessage(message)) return;
-  try {
-    const entries = readCrashLog();
-    entries.push({
-      timestamp: new Date().toISOString(),
-      url: location.href,
-      message,
-    });
-    localStorage.setItem(
-      crashLogStorageKey,
-      JSON.stringify(entries.slice(-maxCrashLogEntries)),
-    );
-  } catch {
-    // Diagnostic only; storage may be unavailable in some browser modes.
-  }
-}
-
-function readCrashLog(): Array<{
-  timestamp: string;
-  url: string;
-  message: string;
-}> {
-  const raw = localStorage.getItem(crashLogStorageKey);
-  if (!raw) return [];
-  const parsed = JSON.parse(raw);
-  return Array.isArray(parsed) ? parsed : [];
-}
-
-function isCrashLogMessage(message: string): boolean {
-  return (
-    message.includes("std::terminate") ||
-    message.includes("RuntimeError") ||
-    message.includes("Aborted") ||
-    message.includes("memory access") ||
-    message.includes("unreachable") ||
-    message.includes("WebGPU device lost") ||
-    message.includes("WebGPU uncaptured error")
-  );
-}
-
-window.addEventListener("error", (event) => {
-  persistCrashLog(
-    `${event.message}${event.error?.stack ? `\n${event.error.stack}` : ""}`,
-  );
-});
-
-window.addEventListener("unhandledrejection", (event) => {
-  persistCrashLog(String(event.reason));
-});
 
 const canvas = document.getElementById("canvas");
 if (!(canvas instanceof HTMLCanvasElement)) {

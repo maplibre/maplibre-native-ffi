@@ -1,6 +1,5 @@
 #pragma once
 
-#include <atomic>
 #include <condition_variable>
 #include <list>
 #include <memory>
@@ -11,15 +10,7 @@
 
 namespace mbgl::platform::emscripten {
 
-inline std::atomic_bool run_loop_trace_enabled = false;
-
 struct RunLoopWake {
-  struct Stats {
-    std::size_t readyCount = 0;
-    std::size_t runnableCount = 0;
-    double elapsedMs = 0.0;
-  };
-
   class Runnable {
    public:
     virtual ~Runnable() = default;
@@ -35,8 +26,6 @@ struct RunLoopWake {
 
   std::mutex runnables_mutex;
   std::list<std::shared_ptr<Runnable>> runnables;
-  std::mutex stats_mutex;
-  Stats lastStats;
 
   void notify() {
     std::lock_guard lock(wake_mutex);
@@ -58,23 +47,10 @@ struct RunLoopWake {
   }
 
   auto processRunnables() -> mbgl::Milliseconds {
-    auto const started = mbgl::Clock::now();
     auto ready = readyRunnables();
     for (auto& runnable : ready) {
       runnable->runTask();
     }
-    auto const elapsed =
-      std::chrono::duration<double, std::milli>(mbgl::Clock::now() - started)
-        .count();
-    {
-      std::lock_guard lock(stats_mutex);
-      lastStats = Stats{
-        .readyCount = ready.size(),
-        .runnableCount = runnableCount(),
-        .elapsedMs = elapsed,
-      };
-    }
-
     return nextDelay();
   }
 
@@ -88,11 +64,6 @@ struct RunLoopWake {
     return true;
   }
 
-  auto stats() -> Stats {
-    std::lock_guard lock(stats_mutex);
-    return lastStats;
-  }
-
  private:
   auto readyRunnables() -> std::vector<std::shared_ptr<Runnable>> {
     auto ready = std::vector<std::shared_ptr<Runnable>>{};
@@ -104,11 +75,6 @@ struct RunLoopWake {
       }
     }
     return ready;
-  }
-
-  auto runnableCount() -> std::size_t {
-    std::lock_guard lock(runnables_mutex);
-    return runnables.size();
   }
 
   auto nextDelay() -> mbgl::Milliseconds {

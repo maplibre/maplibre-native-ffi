@@ -11,8 +11,7 @@ set(MLN_EMSCRIPTEN_PTHREAD_POOL_SIZE "16"
     CACHE STRING "Emscripten pre-spawned pthread pool size")
 
 set(MLN_EMSCRIPTEN_INITIAL_MEMORY "512MB"
-    CACHE
-      STRING "Initial WASM linear memory (pthread builds cannot grow the heap)")
+    CACHE STRING "Initial WASM linear memory")
 
 set(MLN_EMSCRIPTEN_STACK_SIZE "1MB"
     CACHE STRING "WASM stack size for native C++ rendering code")
