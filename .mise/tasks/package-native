@@ -32,8 +32,13 @@ def update_macos_install_names(package_root: pathlib.Path) -> None:
     if install_name_tool is None:
         return
 
+    codesign = shutil.which("codesign")
+    if codesign is None:
+        raise SystemExit("codesign is required after editing macOS dylibs")
+
     for dylib in package_root.rglob("*.dylib"):
         run([install_name_tool, "-id", f"@rpath/{dylib.name}", str(dylib)])
+        run([codesign, "--force", "--sign", "-", str(dylib)])
 
 
 def find_strip_tool() -> str:

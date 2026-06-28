@@ -23,5 +23,5 @@ function(mln_install_c_api_library target)
   install(
     FILES "${PROJECT_SOURCE_DIR}/LICENSE"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/maplibre-native-c")
-  install(FILES "${pc_file}" DESTINATION "${CMAKE_INSTALL_LIBDIR}/pkgconfig")
+  install(FILES "${pc_file}" DESTINATION "${CMAKE_INSTALL_DATADIR}/pkgconfig")
 endfunction()
