@@ -1,6 +1,13 @@
 include(GNUInstallDirs)
 
 function(mln_install_c_api_library target)
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+
+  set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
+  if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
+  endif()
+
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"

@@ -62,6 +62,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-arm64-vulkan:
     name: variant / linux-arm64-vulkan
     runs-on: ubuntu-24.04-arm
@@ -91,6 +92,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-x64-egl:
     name: variant / linux-x64-egl
     runs-on: ubuntu-latest
@@ -121,6 +123,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-x64-vulkan:
     name: variant / linux-x64-vulkan
     runs-on: ubuntu-latest
@@ -151,6 +154,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-metal:
     name: variant / macos-arm64-metal
     runs-on: macos-26
@@ -182,6 +186,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-vulkan:
     name: variant / macos-arm64-vulkan
     runs-on: macos-26
@@ -212,6 +217,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-egl:
     name: variant / macos-arm64-egl
     runs-on: macos-26
@@ -241,6 +247,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-android-arm64-egl:
     name: variant / android-arm64-egl
     runs-on: ubuntu-latest
@@ -385,6 +392,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-x64-wgl:
     name: variant / windows-x64-wgl
     runs-on: windows-2022
@@ -412,6 +420,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-arm64-vulkan:
     name: variant / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -439,6 +448,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-arm64-wgl:
     name: variant / windows-arm64-wgl
     runs-on: windows-11-arm
@@ -466,6 +476,7 @@ jobs:
         with:
           name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
           path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   required:
     name: ci-required
     runs-on: ubuntu-latest

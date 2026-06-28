@@ -95,6 +95,7 @@ def native_package_steps() -> list[dict[str, object]]:
             "with": {
                 "name": "native-package-${{ env.MISE_ENV }}-${{ github.sha }}",
                 "path": "build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz",
+                "if-no-files-found": "error",
             },
         },
     ]
