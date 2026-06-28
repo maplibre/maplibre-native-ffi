@@ -11,6 +11,7 @@ MLN_FFI_CMAKE_ARGS = """
 -DMLN_FFI_ENABLE_CLANG_TIDY=OFF
 """
 CMAKE_PREFIX_PATH = ""
+PKG_CONFIG = "{{config_root}}/.pixi/envs/default/bin/pkg-config"
 CARGO_BUILD_TARGET = "aarch64-unknown-linux-ohos"
 LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
 BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos = "--target=aarch64-linux-ohos --sysroot={{env.OHOS_SDK_NATIVE}}/sysroot -I{{env.OHOS_SDK_NATIVE}}/sysroot/usr/include/aarch64-linux-ohos"
