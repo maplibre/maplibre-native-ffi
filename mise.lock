@@ -846,6 +846,30 @@ backend = "http:zig"
 checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
 url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
 
+[[tools.java]]
+version = "zulu-25.34.17.0"
+backend = "core:java"
+
+[tools.java."platforms.linux-arm64"]
+checksum = "sha256:2610e5c64df94cee5fb591d70183c5bf8532d8e1d394c754e8ba06751bcceb1b"
+url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-linux_aarch64.tar.gz"
+
+[tools.java."platforms.linux-x64"]
+checksum = "sha256:3a93235f4e5b313232647916219e91dc5cca0b9835c9b52a404ba58c43571697"
+url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-linux_x64.tar.gz"
+
+[tools.java."platforms.macos-arm64"]
+checksum = "sha256:74847e7ac930ad143950607421dd6c0a7ccb3d1cbbd8b1665f24ab62b8b7de42"
+url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-macosx_aarch64.tar.gz"
+
+[tools.java."platforms.windows-arm64"]
+checksum = "sha256:60b6b1faa1a93fea8e64b09f2b9ab136a86b02428f004f8378cfb04cd818a0d4"
+url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_aarch64.zip"
+
+[tools.java."platforms.windows-x64"]
+checksum = "sha256:ddd68ee54e78b6b19388f517b8a61fbed2856ae3320febe42449bac3021e2729"
+url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_x64.zip"
+
 [[tools.node]]
 version = "24.11.0"
 backend = "core:node"

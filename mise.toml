@@ -51,6 +51,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:pnpm/pnpm" = "10.33.2"
 
 # Java/Kotlin ecosystem
+"core:java" = "zulu-25.34.17.0"
 "aqua:facebook/ktfmt" = "0.62"
 "aqua:google/google-java-format" = "1.35.0"
 
