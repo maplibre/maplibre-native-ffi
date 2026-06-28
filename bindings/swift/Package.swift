@@ -17,14 +17,6 @@ func nativeLinkerFlags() -> [String] {
     Context.environment["MISE_ENV"]?.hasPrefix("ios-simulator-") != true
   if isIOSDevice {
     flags += [
-      "-lmbgl-core",
-      "-lmbgl-freetype",
-      "-lmbgl-harfbuzz",
-      "-lmbgl-vendor-csscolorparser",
-      "-lmbgl-vendor-nunicode",
-      "-lmbgl-vendor-parsedate",
-      "-lmbgl-vendor-sqlite",
-      "-lmlt-cpp",
       "-lc++",
       "-lobjc",
       "-lsqlite3",

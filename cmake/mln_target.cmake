@@ -2,8 +2,83 @@ include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
 
+function(mln_configure_complete_static_archive target)
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  if(NOT MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
+    return()
+  endif()
+
+  if(NOT APPLE)
+    return()
+  endif()
+
+  get_target_property(MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES ${target}
+                      MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES)
+  if(NOT MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES)
+    return()
+  endif()
+
+  find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
+
+  set(MLN_FFI_COMPLETE_STATIC_DIR
+      "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
+  set(MLN_FFI_COMPLETE_STATIC_OBJECT
+      "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c.o")
+  set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
+      "${MLN_FFI_COMPLETE_STATIC_DIR}/libmaplibre-native-c.a")
+
+  set(MLN_FFI_INPUT_ARCHIVES "$<TARGET_FILE:${target}>")
+  set(MLN_FFI_INPUT_TARGETS ${target})
+  foreach(MLN_FFI_STATIC_DEPENDENCY IN LISTS MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES)
+    if(TARGET ${MLN_FFI_STATIC_DEPENDENCY})
+      list(APPEND MLN_FFI_INPUT_ARCHIVES
+           "$<TARGET_FILE:${MLN_FFI_STATIC_DEPENDENCY}>")
+      list(APPEND MLN_FFI_INPUT_TARGETS ${MLN_FFI_STATIC_DEPENDENCY})
+    endif()
+  endforeach()
+
+  set(MLN_FFI_LD_PLATFORM_FLAGS "")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -ios_version_min
+         "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  endif()
+
+  add_custom_command(
+    OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+    COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
+    COMMAND
+      "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
+    COMMAND
+      "${CMAKE_LINKER}"
+      -r
+      -arch
+      "${CMAKE_OSX_ARCHITECTURES}"
+      -syslibroot
+      "$ENV{MLN_FFI_SYSTEM_ROOT}"
+      ${MLN_FFI_LD_PLATFORM_FLAGS}
+      -o
+      "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+      -all_load
+      ${MLN_FFI_INPUT_ARCHIVES}
+    COMMAND
+      "${MLN_FFI_LIBTOOL}" -static -o "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+      "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+    DEPENDS ${MLN_FFI_INPUT_TARGETS}
+    VERBATIM)
+
+  set(MLN_FFI_COMPLETE_STATIC_TARGET "${target}_complete_static")
+  add_custom_target(
+    ${MLN_FFI_COMPLETE_STATIC_TARGET}
+    ALL
+    DEPENDS "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
+  set_property(
+    TARGET ${target}
+    PROPERTY MLN_FFI_INSTALL_ARCHIVE "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
+endfunction()
+
 function(mln_configure_shared_exports target)
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  if(NOT MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     return()
   endif()
 
@@ -97,6 +172,18 @@ function(mln_add_c_api_library target)
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
       mbgl-vendor-sqlite)
+  set_property(
+    TARGET ${target}
+    PROPERTY
+      MLN_FFI_STATIC_ARCHIVE_DEPENDENCIES
+      mbgl-core
+      mbgl-freetype
+      mbgl-harfbuzz
+      mbgl-vendor-csscolorparser
+      mbgl-vendor-nunicode
+      mbgl-vendor-parsedate
+      mbgl-vendor-sqlite
+      mlt-cpp)
 
   target_compile_options(
     ${target}
@@ -144,4 +231,5 @@ function(mln_add_c_api_library target)
   mln_configure_render_backend(${target})
   mln_configure_shared_exports(${target})
   mln_configure_install_rpath(${target})
+  mln_configure_complete_static_archive(${target})
 endfunction()

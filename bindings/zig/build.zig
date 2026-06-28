@@ -44,14 +44,6 @@ fn nativeRuntimeDir(b: *std.Build, install_dir: std.Build.LazyPath, target: std.
 fn staticIosLinkLibraries() []const []const u8 {
     return &.{
         "maplibre-native-c",
-        "mbgl-core",
-        "mbgl-freetype",
-        "mbgl-harfbuzz",
-        "mbgl-vendor-csscolorparser",
-        "mbgl-vendor-nunicode",
-        "mbgl-vendor-parsedate",
-        "mbgl-vendor-sqlite",
-        "mlt-cpp",
         "c++",
         "objc",
         "sqlite3",

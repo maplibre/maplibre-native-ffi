@@ -23,22 +23,7 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/platform/time.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/filesystem.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/utf.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/background_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/circle_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/color_relief_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/custom_drawable_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/custom_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/fill_extrusion_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/fill_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/heatmap_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/hillshade_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/layer_manager.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/line_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/location_indicator_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/raster_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/symbol_layer_factory.cpp)
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/utf.cpp)
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "OHOS")
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
