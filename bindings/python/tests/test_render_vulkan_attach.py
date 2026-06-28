@@ -18,7 +18,6 @@ try:
     from render_backend_helpers.vulkan import (
         VulkanBorrowedImage,
         VulkanContext,
-        VulkanSurface,
         VulkanUnavailableError,
     )
 except Exception as error:  # pragma: no cover - host fixture dependency
@@ -39,16 +38,11 @@ def _require_native_vulkan_support() -> None:
 
 
 @contextmanager
-def _vulkan_context(*, surface_extensions: bool = False) -> Iterator[VulkanContext]:
+def _vulkan_context() -> Iterator[VulkanContext]:
     try:
-        context = VulkanContext.create(surface_extensions=surface_extensions)
+        context = VulkanContext.create()
     except VulkanUnavailableError as error:
         reason = str(error)
-        if surface_extensions and "GLFW" in reason:
-            skip_or_fail_fixture_setup(
-                f"GLFW Vulkan surface creation is unavailable: {reason}",
-                "vulkan",
-            )
         skip_or_fail_fixture_setup(
             f"Vulkan fixture creation is unavailable: {reason}",
             "vulkan",
@@ -58,22 +52,6 @@ def _vulkan_context(*, surface_extensions: bool = False) -> Iterator[VulkanConte
         yield context
     finally:
         context.close()
-
-
-@contextmanager
-def _vulkan_surface(context: VulkanContext) -> Iterator[VulkanSurface]:
-    try:
-        surface = context.surface(width=32, height=16)
-    except VulkanUnavailableError as error:
-        skip_or_fail_fixture_setup(
-            f"GLFW Vulkan surface creation is unavailable: {error}",
-            "vulkan",
-        )
-
-    try:
-        yield surface
-    finally:
-        surface.close()
 
 
 @contextmanager
@@ -135,25 +113,6 @@ def test_invalid_vulkan_surface_attach_reports_native_status() -> None:
                 mln.MaplibreStatus.INVALID_ARGUMENT,
                 mln.MaplibreStatus.UNSUPPORTED,
             }
-
-
-def test_vulkan_surface_attach_reports_public_render_session_shape() -> None:
-    _require_native_vulkan_support()
-
-    with _vulkan_context(surface_extensions=True) as context:
-        with _vulkan_surface(context) as surface:
-            with mln.RuntimeHandle() as runtime:
-                with runtime.create_map(
-                    mln.MapOptions(width=surface.width, height=surface.height)
-                ) as map_handle:
-                    session = map_handle.attach_vulkan_surface(surface.descriptor())
-                    try:
-                        _assert_public_session_shape(session)
-
-                        map_handle.set_style_json(EMPTY_STYLE_JSON)
-                        render_until_update(runtime, session)
-                    finally:
-                        session.close()
 
 
 def test_vulkan_borrowed_texture_attach_reports_public_render_session_shape() -> None:

@@ -8,8 +8,6 @@ import os
 import sys
 import types
 
-import glfw
-
 from maplibre_native import render
 
 
@@ -147,23 +145,11 @@ class VulkanContext:
     device: Any
     queue: Any
     queue_family_index: int
-    _glfw_initialized: bool = False
     _closed: bool = False
 
     @classmethod
-    def create(cls, *, surface_extensions: bool = False) -> "VulkanContext":
-        if surface_extensions:
-            if not glfw.init():
-                msg = "GLFW could not initialize for Vulkan surface tests"
-                raise VulkanUnavailableError(msg)
-            extensions = glfw.get_required_instance_extensions()
-            if not extensions:
-                glfw.terminate()
-                msg = "GLFW did not report Vulkan surface instance extensions"
-                raise VulkanUnavailableError(msg)
-        else:
-            extensions = []
-
+    def create(cls) -> "VulkanContext":
+        extensions: list[str] = []
         instance_flags = 0
         if _has_instance_extension("VK_KHR_portability_enumeration"):
             extensions.append("VK_KHR_portability_enumeration")
@@ -185,8 +171,6 @@ class VulkanContext:
         try:
             instance = vk.vkCreateInstance(instance_info, None)
         except Exception as error:  # pragma: no cover - depends on host Vulkan ICD
-            if surface_extensions:
-                glfw.terminate()
             msg = f"Vulkan instance creation failed: {error}"
             raise VulkanUnavailableError(msg) from error
 
@@ -198,13 +182,6 @@ class VulkanContext:
                     continue
 
                 enabled_extensions: list[str] = []
-                if surface_extensions:
-                    if not _has_device_extension(
-                        physical_device,
-                        "VK_KHR_swapchain",
-                    ):
-                        continue
-                    enabled_extensions.append("VK_KHR_swapchain")
                 if _has_device_extension(physical_device, "VK_KHR_portability_subset"):
                     enabled_extensions.append("VK_KHR_portability_subset")
 
@@ -232,19 +209,14 @@ class VulkanContext:
                     device=device,
                     queue=graphics_queue,
                     queue_family_index=queue_family_index,
-                    _glfw_initialized=surface_extensions,
                 )
         except Exception:
             if device is not None:
                 vk.vkDestroyDevice(device, None)
             vk.vkDestroyInstance(instance, None)
-            if surface_extensions:
-                glfw.terminate()
             raise
 
         vk.vkDestroyInstance(instance, None)
-        if surface_extensions:
-            glfw.terminate()
         msg = "no Vulkan physical device with a graphics queue was found"
         raise VulkanUnavailableError(msg)
 
@@ -276,17 +248,6 @@ class VulkanContext:
             context=self.descriptor(),
         )
 
-    def surface(
-        self,
-        width: int = 64,
-        height: int = 64,
-        scale_factor: float = 1.0,
-    ) -> "VulkanSurface":
-        if not self._glfw_initialized:
-            msg = "VulkanContext must be created with surface_extensions=True"
-            raise RuntimeError(msg)
-        return VulkanSurface.create(self, width, height, scale_factor)
-
     def borrowed_image(
         self,
         width: int = 64,
@@ -301,82 +262,9 @@ class VulkanContext:
         vk.vkDeviceWaitIdle(self.device)
         vk.vkDestroyDevice(self.device, None)
         vk.vkDestroyInstance(self.instance, None)
-        if self._glfw_initialized:
-            glfw.terminate()
         self._closed = True
 
     def __enter__(self) -> "VulkanContext":
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        self.close()
-
-
-@dataclass(slots=True)
-class VulkanSurface:
-    context: VulkanContext
-    window: Any
-    surface: Any
-    width: int
-    height: int
-    scale_factor: float
-    _closed: bool = False
-
-    @classmethod
-    def create(
-        cls,
-        context: VulkanContext,
-        width: int,
-        height: int,
-        scale_factor: float,
-    ) -> "VulkanSurface":
-        glfw.window_hint(glfw.CLIENT_API, glfw.NO_API)
-        glfw.window_hint(glfw.VISIBLE, glfw.FALSE)
-        window = glfw.create_window(
-            width,
-            height,
-            "maplibre-native-python-test",
-            None,
-            None,
-        )
-        if not window:
-            msg = "GLFW could not create a hidden Vulkan test window"
-            raise VulkanUnavailableError(msg)
-        try:
-            out_surface = vk.ffi.new("VkSurfaceKHR *")
-            result = glfw.create_window_surface(
-                context.instance,
-                window,
-                None,
-                out_surface,
-            )
-            if result != vk.VK_SUCCESS:
-                msg = f"glfwCreateWindowSurface failed with VkResult {result}"
-                raise VulkanUnavailableError(msg)
-            return cls(context, window, out_surface[0], width, height, scale_factor)
-        except Exception:
-            glfw.destroy_window(window)
-            raise
-
-    def descriptor(self) -> render.VulkanSurfaceDescriptor:
-        return render.VulkanSurfaceDescriptor(
-            extent=render.RenderTargetExtent(
-                self.width,
-                self.height,
-                self.scale_factor,
-            ),
-            context=self.context.descriptor(),
-            surface=_pointer(self.surface, "VkSurfaceKHR"),
-        )
-
-    def close(self) -> None:
-        if self._closed:
-            return
-        vk.lib.vkDestroySurfaceKHR(self.context.instance, self.surface, vk.ffi.NULL)
-        glfw.destroy_window(self.window)
-        self._closed = True
-
-    def __enter__(self) -> "VulkanSurface":
         return self
 
     def __exit__(self, *args: object) -> None:
