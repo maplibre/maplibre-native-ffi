@@ -5,6 +5,7 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
@@ -16,162 +17,71 @@ pub const RenderBackend = enum {
     vulkan,
 };
 
-const NativeArtifactConfig = struct {
-    render_backend: []const u8 = "",
-    library_path: []const u8 = "",
-    import_library_path: []const u8 = "",
-    include_dirs: []const []const u8 = &.{},
-    library_dirs: []const []const u8 = &.{},
-    link_dirs: []const []const u8 = &.{},
-    runtime_library_dirs: []const []const u8 = &.{},
-    link_libraries: []const []const u8 = &.{},
-    frameworks: []const []const u8 = &.{},
-};
-
-const NativeArtifactConfigCache = struct {
-    path: ?std.Build.LazyPath = null,
-    path_loaded: bool = false,
-    config: ?NativeArtifactConfig = null,
-    config_loaded: bool = false,
-};
-
-var native_artifact_config_caches = std.AutoArrayHashMapUnmanaged(*std.Build, NativeArtifactConfigCache){};
-
-fn nativeArtifactConfigCache(b: *std.Build) *NativeArtifactConfigCache {
-    const result = native_artifact_config_caches.getOrPut(b.allocator, b) catch @panic("out of memory");
-    if (!result.found_existing) {
-        result.value_ptr.* = .{};
-    }
-    return result.value_ptr;
-}
-
 fn parseRenderBackend(value: []const u8) RenderBackend {
     return std.meta.stringToEnum(RenderBackend, value) orelse
-        std.debug.panic("unsupported render backend in native artifact config: {s}", .{value});
-}
-
-fn usesStaticMonolithicLink(config: NativeArtifactConfig) bool {
-    return std.ascii.endsWithIgnoreCase(config.library_path, ".a");
-}
-
-fn maybeNativeArtifactConfigPath(b: *std.Build) ?std.Build.LazyPath {
-    const cache = nativeArtifactConfigCache(b);
-    if (!cache.path_loaded) {
-        cache.path = b.option(
-            std.Build.LazyPath,
-            "native-config",
-            "Generated native artifact config from the CMake build directory",
-        );
-        cache.path_loaded = true;
-    }
-    return cache.path;
-}
-
-pub fn nativeArtifactConfigPath(b: *std.Build) std.Build.LazyPath {
-    return maybeNativeArtifactConfigPath(b) orelse @panic("missing required -Dnative-config=<path-to-maplibre-native-c.zig-config>");
-}
-
-fn pathListSeparator() u8 {
-    return if (builtin.os.tag == .windows) ';' else ':';
-}
-
-fn parsePathList(b: *std.Build, value: []const u8) []const []const u8 {
-    if (value.len == 0) return &.{};
-
-    var count: usize = 0;
-    var counter = std.mem.tokenizeScalar(u8, value, pathListSeparator());
-    while (counter.next() != null) count += 1;
-
-    const paths = b.allocator.alloc([]const u8, count) catch @panic("out of memory");
-    var index: usize = 0;
-    var tokens = std.mem.tokenizeScalar(u8, value, pathListSeparator());
-    while (tokens.next()) |path| {
-        paths[index] = path;
-        index += 1;
-    }
-    return paths;
-}
-
-fn parseNativeArtifactConfig(b: *std.Build, config_path: std.Build.LazyPath) NativeArtifactConfig {
-    const config_bytes = std.Io.Dir.cwd().readFileAlloc(
-        b.graph.io,
-        config_path.getPath(b),
-        b.allocator,
-        .limited(1024 * 1024),
-    ) catch |err| std.debug.panic("failed to read native artifact config: {s}: {}", .{ config_path.getPath(b), err });
-
-    var config = NativeArtifactConfig{};
-    var lines = std.mem.splitScalar(u8, config_bytes, '\n');
-    while (lines.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, " \t\r");
-        if (line.len == 0) continue;
-        const separator = std.mem.indexOfScalar(u8, line, '=') orelse
-            std.debug.panic("invalid native artifact config line: {s}", .{line});
-        const key = line[0..separator];
-        const value = line[separator + 1 ..];
-
-        if (std.mem.eql(u8, key, "render_backend")) {
-            config.render_backend = value;
-        } else if (std.mem.eql(u8, key, "library_path")) {
-            config.library_path = value;
-        } else if (std.mem.eql(u8, key, "import_library_path")) {
-            config.import_library_path = value;
-        } else if (std.mem.eql(u8, key, "include_dirs")) {
-            config.include_dirs = parsePathList(b, value);
-        } else if (std.mem.eql(u8, key, "library_dirs")) {
-            config.library_dirs = parsePathList(b, value);
-        } else if (std.mem.eql(u8, key, "link_dirs")) {
-            config.link_dirs = parsePathList(b, value);
-        } else if (std.mem.eql(u8, key, "runtime_library_dirs")) {
-            config.runtime_library_dirs = parsePathList(b, value);
-        } else if (std.mem.eql(u8, key, "link_libraries")) {
-            config.link_libraries = parsePathList(b, value);
-        } else if (std.mem.eql(u8, key, "frameworks")) {
-            config.frameworks = parsePathList(b, value);
-        }
-    }
-
-    if (config.render_backend.len == 0 or config.library_path.len == 0) {
-        std.debug.panic("native artifact config is incomplete: {s}", .{config_path.getPath(b)});
-    }
-    return config;
-}
-
-fn maybeNativeArtifactConfig(b: *std.Build) ?NativeArtifactConfig {
-    const cache = nativeArtifactConfigCache(b);
-    if (cache.config_loaded) return cache.config;
-    const config_path = maybeNativeArtifactConfigPath(b) orelse return null;
-    cache.config = parseNativeArtifactConfig(b, config_path);
-    cache.config_loaded = true;
-    return cache.config;
-}
-
-fn nativeArtifactConfig(b: *std.Build) NativeArtifactConfig {
-    return maybeNativeArtifactConfig(b) orelse @panic("missing required -Dnative-config=<path-to-maplibre-native-c.zig-config>");
+        std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
 fn lazyPath(path: []const u8) std.Build.LazyPath {
     return .{ .cwd_relative = path };
 }
 
-fn lazyPathsFromStrings(b: *std.Build, paths: []const []const u8) []const std.Build.LazyPath {
-    const lazy_paths = b.allocator.alloc(std.Build.LazyPath, paths.len) catch @panic("out of memory");
-    for (paths, lazy_paths) |path, *lazy_path_| {
-        lazy_path_.* = lazyPath(path);
-    }
-    return lazy_paths;
+fn installPath(b: *std.Build, install_dir: std.Build.LazyPath, sub_path: []const u8) std.Build.LazyPath {
+    return lazyPath(b.pathJoin(&.{ install_dir.getPath(b), sub_path }));
+}
+
+fn withInstallIncludeDir(b: *std.Build, install_dir: std.Build.LazyPath, dependency_include_dirs: []const std.Build.LazyPath) []const std.Build.LazyPath {
+    const include_dirs = b.allocator.alloc(std.Build.LazyPath, dependency_include_dirs.len + 1) catch @panic("out of memory");
+    include_dirs[0] = installPath(b, install_dir, "include");
+    @memcpy(include_dirs[1..], dependency_include_dirs);
+    return include_dirs;
+}
+
+fn nativeRuntimeDir(b: *std.Build, install_dir: std.Build.LazyPath, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return installPath(b, install_dir, if (target.result.os.tag == .windows) "bin" else "lib");
+}
+
+fn staticIosLinkLibraries() []const []const u8 {
+    return &.{
+        "maplibre-native-c",
+        "mbgl-core",
+        "mbgl-freetype",
+        "mbgl-harfbuzz",
+        "mbgl-vendor-csscolorparser",
+        "mbgl-vendor-nunicode",
+        "mbgl-vendor-parsedate",
+        "mbgl-vendor-sqlite",
+        "mlt-cpp",
+        "c++",
+        "objc",
+        "sqlite3",
+        "z",
+    };
+}
+
+fn staticIosFrameworks(render_backend_: RenderBackend) []const []const u8 {
+    return if (render_backend_ == .metal)
+        &.{ "CoreFoundation", "CoreGraphics", "CoreText", "Foundation", "ImageIO", "Metal", "MetalKit", "QuartzCore" }
+    else
+        &.{ "CoreFoundation", "CoreGraphics", "CoreText", "Foundation", "ImageIO", "Metal", "MetalKit" };
 }
 
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     include_dirs: []const std.Build.LazyPath,
+    native_install_dir: std.Build.LazyPath,
+    render_backend: RenderBackend,
+    dependency_library_dirs: []const std.Build.LazyPath,
 };
 
 pub const DependencyOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    native_config_path: std.Build.LazyPath,
+    native_install_dir: std.Build.LazyPath,
+    render_backend: RenderBackend,
+    dependency_include_dirs: []const std.Build.LazyPath = &.{},
+    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub const RenderBackendLinkOptions = struct {
@@ -181,11 +91,34 @@ pub const RenderBackendLinkOptions = struct {
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
-    return parseRenderBackend(nativeArtifactConfig(b).render_backend);
+    const value = b.option([]const u8, "render-backend", "Native render backend") orelse
+        @panic("missing required -Drender-backend=<metal|opengl|vulkan>");
+    return parseRenderBackend(value);
 }
 
 pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return lazyPathsFromStrings(b, nativeArtifactConfig(b).include_dirs);
+    return withInstallIncludeDir(b, nativeInstallDirPath(b), dependencyIncludeDirs(b));
+}
+
+pub fn installedIncludeDirs(b: *std.Build, install_dir: std.Build.LazyPath, dependency_include_dirs: []const std.Build.LazyPath) []const std.Build.LazyPath {
+    return withInstallIncludeDir(b, install_dir, dependency_include_dirs);
+}
+
+pub fn nativeInstallDirPath(b: *std.Build) std.Build.LazyPath {
+    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c") orelse
+        @panic("missing required -Dnative-install-dir=<path-to-cmake-install-prefix>");
+}
+
+pub fn maybeNativeInstallDirPath(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c");
+}
+
+pub fn dependencyIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
+    return b.option([]const std.Build.LazyPath, "dependency-include-dir", "Additional local dependency include directory") orelse &.{};
+}
+
+pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
+    return b.option([]const std.Build.LazyPath, "dependency-library-dir", "Additional local dependency library directory") orelse &.{};
 }
 
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
@@ -291,10 +224,6 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .include_dirs = options.include_dirs,
         }));
     }
-}
-
-pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
-    return lazyPathsFromStrings(b, nativeArtifactConfig(b).library_dirs);
 }
 
 fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
@@ -416,12 +345,18 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
 fn dependencyArgs(options: DependencyOptions) struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    @"native-config": std.Build.LazyPath,
+    @"native-install-dir": std.Build.LazyPath,
+    @"render-backend": []const u8,
+    @"dependency-include-dir": []const std.Build.LazyPath,
+    @"dependency-library-dir": []const std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
         .optimize = options.optimize,
-        .@"native-config" = options.native_config_path,
+        .@"native-install-dir" = options.native_install_dir,
+        .@"render-backend" = @tagName(options.render_backend),
+        .@"dependency-include-dir" = options.dependency_include_dirs,
+        .@"dependency-library-dir" = options.dependency_library_dirs,
     };
 }
 
@@ -438,6 +373,9 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .target = options.target,
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
+        .native_install_dir = options.native_install_dir,
+        .render_backend = options.render_backend,
+        .dependency_library_dirs = options.dependency_library_dirs,
     };
 }
 
@@ -469,20 +407,18 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .optimize = options.optimize,
     });
-    const config = nativeArtifactConfig(b);
-    const dependency_library_dirs = lazyPathsFromStrings(b, config.library_dirs);
-    const link_dirs = lazyPathsFromStrings(b, config.link_dirs);
-    const runtime_library_dirs = lazyPathsFromStrings(b, config.runtime_library_dirs);
-    if (usesStaticMonolithicLink(config)) {
+    const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
+    const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
+    if (options.target.result.os.tag == .ios and !isIosSimulator(options.target)) {
         addLibraryPaths(module_, link_dirs);
-        linkSystemLibraries(module_, config.link_libraries);
+        linkSystemLibraries(module_, staticIosLinkLibraries());
         if (options.target.result.os.tag == .ios) {
             const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT").?;
             module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
         }
-        linkFrameworks(module_, config.frameworks);
+        linkFrameworks(module_, staticIosFrameworks(options.render_backend));
     } else if (options.target.result.os.tag == .windows) {
-        module_.addObjectFile(lazyPath(config.import_library_path));
+        module_.addObjectFile(installPath(b, options.native_install_dir, "lib/maplibre-native-c.lib"));
     } else {
         addLibraryPaths(module_, link_dirs);
         addRPaths(module_, runtime_library_dirs);
@@ -490,8 +426,8 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     }
     linkRenderBackend(b, module_, .{
         .target = options.target,
-        .render_backend = parseRenderBackend(config.render_backend),
-        .dependency_library_dirs = dependency_library_dirs,
+        .render_backend = options.render_backend,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 }
 
@@ -630,14 +566,17 @@ pub fn build(b: *std.Build) void {
         include_dirs_from_cli orelse defaultDocIncludeDirs(b),
     );
 
-    _ = maybeNativeArtifactConfigPath(b) orelse return;
+    const native_install_dir = maybeNativeInstallDirPath(b) orelse return;
+    const dependency_include_dirs = dependencyIncludeDirs(b);
+    const dependency_library_dirs = dependencyLibraryDirs(b);
 
     const backend = renderBackend(b);
     const options = BuildOptions{
         .target = target,
         .optimize = testOptimize(target, optimize),
-        .include_dirs = includeDirs(b),
-        .dependency_library_dirs = dependencyLibraryDirs(b),
+        .native_install_dir = native_install_dir,
+        .include_dirs = installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
     };
 

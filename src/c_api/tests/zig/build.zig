@@ -5,6 +5,7 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
@@ -49,6 +50,9 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .target = options.target,
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
+        .native_install_dir = options.native_install_dir,
+        .render_backend = options.render_backend,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
     return c_tests;
 }
@@ -56,10 +60,12 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const render_backend = maplibre_build.renderBackend(b);
+    const native_install_dir = maplibre_build.nativeInstallDirPath(b);
     const options = BuildOptions{
         .target = target,
         .optimize = maplibre_build.testOptimize(target, b.standardOptimizeOption(.{})),
-        .include_dirs = maplibre_build.includeDirs(b),
+        .native_install_dir = native_install_dir,
+        .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, maplibre_build.dependencyIncludeDirs(b)),
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };

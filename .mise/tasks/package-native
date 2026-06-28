@@ -88,7 +88,17 @@ def main() -> int:
     package_root.mkdir(parents=True)
     dist_dir.mkdir(parents=True, exist_ok=True)
 
-    run(["cmake", "--install", str(build_dir), "--prefix", str(package_root)])
+    run(
+        [
+            "cmake",
+            "--install",
+            str(build_dir),
+            "--prefix",
+            str(package_root),
+            "--component",
+            "native",
+        ]
+    )
     update_macos_install_names(package_root)
     strip_shared_libraries(package_root)
 

@@ -77,12 +77,13 @@ UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
+MLN_FFI_NATIVE_INSTALL_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
-MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
+MLN_FFI_ZIG_NATIVE_ARGS = ""
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
 LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
@@ -146,10 +147,14 @@ cmake "${build_args[@]}"'''
 
 [tasks.ensure-native-library]
 depends = ["//:build"]
-run = { task = "//:native-metadata" }
+run = [
+  'rm -rf "$MLN_FFI_NATIVE_INSTALL_DIR"',
+  'cmake --install "$MLN_FFI_BUILD_DIR" --prefix "$MLN_FFI_NATIVE_INSTALL_DIR"',
+  { task = "//:native-zig-libc" },
+]
 
 [tasks.clean]
-run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
+run = "rm -rf \"$MLN_FFI_BUILD_DIR\" \"$MLN_FFI_NATIVE_INSTALL_DIR\""
 
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
@@ -164,7 +169,7 @@ depends = ["//:ensure-native-library"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 

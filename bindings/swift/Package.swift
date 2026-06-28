@@ -4,18 +4,52 @@ import Foundation
 import PackageDescription
 
 func nativeLinkerFlags() -> [String] {
-  guard let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] else {
-    fatalError("MLN_FFI_BUILD_DIR is required")
+  guard let nativeInstallDir = Context
+    .environment["MLN_FFI_NATIVE_INSTALL_DIR"]
+  else {
+    fatalError("MLN_FFI_NATIVE_INSTALL_DIR is required")
   }
-  let flagsFile = "\(nativeBuildDir)/maplibre-native-c.swift-linker-flags"
+  let libDir = "\(nativeInstallDir)/lib"
+  var flags = ["-L", libDir, "-lmaplibre-native-c"]
 
-  do {
-    return try String(contentsOfFile: flagsFile, encoding: .utf8)
-      .split { $0.isNewline }
-      .map(String.init)
-  } catch {
-    fatalError("failed to read native linker flags from \(flagsFile): \(error)")
+  let isIOSDevice = Context.environment["MISE_ENV"]?
+    .hasPrefix("ios-") == true &&
+    Context.environment["MISE_ENV"]?.hasPrefix("ios-simulator-") != true
+  if isIOSDevice {
+    flags += [
+      "-lmbgl-core",
+      "-lmbgl-freetype",
+      "-lmbgl-harfbuzz",
+      "-lmbgl-vendor-csscolorparser",
+      "-lmbgl-vendor-nunicode",
+      "-lmbgl-vendor-parsedate",
+      "-lmbgl-vendor-sqlite",
+      "-lmlt-cpp",
+      "-lc++",
+      "-lobjc",
+      "-lsqlite3",
+      "-lz",
+      "-framework",
+      "CoreFoundation",
+      "-framework",
+      "CoreGraphics",
+      "-framework",
+      "CoreText",
+      "-framework",
+      "Foundation",
+      "-framework",
+      "ImageIO",
+      "-framework",
+      "Metal",
+      "-framework",
+      "MetalKit",
+      "-framework",
+      "QuartzCore",
+    ]
+  } else {
+    flags += ["-Xlinker", "-rpath", "-Xlinker", libDir]
   }
+  return flags
 }
 
 let isIOSSimulator = Context.environment["MISE_ENV"]?

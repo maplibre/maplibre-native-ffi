@@ -20,7 +20,7 @@ android {
     buildConfigField(
       "String",
       "RENDER_BACKEND",
-      "\"${providers.environmentVariable("MLN_FFI_RENDER_BACKEND").getOrElse("opengl")}\"",
+      "\"${providers.environmentVariable("MLN_FFI_RENDER_BACKEND").get()}\"",
     )
   }
 

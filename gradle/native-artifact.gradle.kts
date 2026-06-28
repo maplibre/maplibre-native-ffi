@@ -1,19 +1,18 @@
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
-fun Project.maplibreNativeCPropertiesFile(): File {
-  // These binding builds consume a configured native artifact and are invoked through mise tasks.
-  val buildDir =
-    providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
+fun Project.maplibreNativeCInstallDir(): File {
+  val installDir =
+    providers.environmentVariable("MLN_FFI_NATIVE_INSTALL_DIR").orNull
       ?: throw GradleException(
-        "MLN_FFI_BUILD_DIR is required; run native binding builds through mise."
+        "MLN_FFI_NATIVE_INSTALL_DIR is required; run native binding builds through mise."
       )
-  return file("$buildDir/maplibre-native-c.gradle.properties")
+  return file(installDir)
 }
 
-val maplibreNativeCPropertiesFile = maplibreNativeCPropertiesFile()
+val maplibreNativeCInstallDir = maplibreNativeCInstallDir()
 
-if (!maplibreNativeCPropertiesFile.isFile) {
-  throw GradleException("Missing native artifact properties: $maplibreNativeCPropertiesFile")
+if (!maplibreNativeCInstallDir.isDirectory) {
+  throw GradleException("Missing native install directory: $maplibreNativeCInstallDir")
 }
 
-extensions.add("maplibreNativeC", MaplibreNativeCArtifact(maplibreNativeCPropertiesFile))
+extensions.add("maplibreNativeC", MaplibreNativeCArtifact(maplibreNativeCInstallDir))

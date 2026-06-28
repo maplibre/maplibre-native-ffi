@@ -5,8 +5,9 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    native_config_path: std.Build.LazyPath,
+    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
+    dependency_include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
@@ -41,7 +42,10 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
         .optimize = options.optimize,
-        .native_config_path = options.native_config_path,
+        .native_install_dir = options.native_install_dir,
+        .render_backend = options.render_backend,
+        .dependency_include_dirs = options.dependency_include_dirs,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 }
 
@@ -111,11 +115,14 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const render_backend = maplibre_build.renderBackend(b);
+    const native_install_dir = maplibre_build.nativeInstallDirPath(b);
+    const dependency_include_dirs = maplibre_build.dependencyIncludeDirs(b);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .native_config_path = maplibre_build.nativeArtifactConfigPath(b),
-        .include_dirs = maplibre_build.includeDirs(b),
+        .native_install_dir = native_install_dir,
+        .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .dependency_include_dirs = dependency_include_dirs,
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };

@@ -1,7 +1,9 @@
 [env]
 MLN_FFI_RENDER_BACKEND = "opengl"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/ohos-arm64-egl"
+MLN_FFI_NATIVE_INSTALL_DIR = "{{config_root}}/build/ohos-arm64-egl/install"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-linux-ohos"
+MLN_FFI_ZIG_NATIVE_ARGS = "-Dnative-install-dir={{config_root}}/build/ohos-arm64-egl/install -Drender-backend=opengl -Ddependency-include-dir={{env.MLN_FFI_DEPENDENCY_INCLUDE_DIR}} -Ddependency-include-dir={{env.MLN_FFI_VULKAN_INCLUDE_DIR}} -Ddependency-library-dir={{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 MLN_FFI_SYSTEM_ROOT = "{{env.OHOS_SDK_NATIVE}}/sysroot"
 OHOS_SDK_NATIVE = { required = true }
 MLN_FFI_CMAKE_ARGS = """

@@ -428,9 +428,9 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
     }
 
     private fun resolveAngleRoot(): Path {
-      val fromEnvironment = System.getenv("MLN_FFI_EGL_ROOT")?.let(::Path)
-      if (fromEnvironment != null && fromEnvironment.exists()) {
-        return fromEnvironment.absolute()
+      val fromInstall = System.getenv("MLN_FFI_NATIVE_INSTALL_DIR")?.let { Path(it).resolve("lib") }
+      if (fromInstall != null && fromInstall.exists()) {
+        return fromInstall.absolute()
       }
       val fromCheckout =
         Path("third_party/angle/chromium-7151_rev1/macos-arm64").absolute().normalize()
@@ -438,7 +438,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
         return fromCheckout
       }
       throw NativeSurfaceBridgeException(
-        "ANGLE root is unavailable; set MLN_FFI_EGL_ROOT to the directory containing libEGL.dylib"
+        "ANGLE root is unavailable; set MLN_FFI_NATIVE_INSTALL_DIR to the native install prefix"
       )
     }
   }

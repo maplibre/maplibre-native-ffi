@@ -1095,15 +1095,20 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    if let Ok(library_dir) = std::env::var("MLN_FFI_DEPENDENCY_LIBRARY_DIR") {
+    if let Ok(install_dir) = std::env::var("MLN_FFI_NATIVE_INSTALL_DIR") {
+        let library_dir = std::path::Path::new(&install_dir).join(if cfg!(target_os = "windows") {
+            "bin"
+        } else {
+            "lib"
+        });
         let library_name = if cfg!(target_os = "macos") {
-            "libvulkan.dylib"
+            "libvulkan.1.dylib"
         } else if cfg!(target_os = "windows") {
             "vulkan-1.dll"
         } else {
             "libvulkan.so.1"
         };
-        let library_path = std::path::Path::new(&library_dir).join(library_name);
+        let library_path = library_dir.join(library_name);
         if library_path.exists() {
             // SAFETY: Loading the Vulkan loader is delegated to ash.
             return unsafe { ash::Entry::load_from(&library_path) }.map_err(Into::into);

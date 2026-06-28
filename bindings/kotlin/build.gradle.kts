@@ -124,7 +124,7 @@ tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
   inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
-  inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
+  inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
 }
 
 tasks.register("nativeTest") {

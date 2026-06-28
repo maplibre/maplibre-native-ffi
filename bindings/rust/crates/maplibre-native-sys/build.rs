@@ -3,57 +3,38 @@ use std::error::Error;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
-
 const LIBRARY_NAME: &str = "maplibre-native-c";
 
-#[derive(Deserialize)]
-struct Artifact {
-    include_dirs: Vec<PathBuf>,
-    import_library_path: PathBuf,
-    rpaths: Vec<PathBuf>,
-    supports_linker_rpath: bool,
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let repo_root = repo_root_from_manifest_dir(&manifest_dir)?;
-    let header = repo_root.join("include/maplibre_native_c.h");
+    println!("cargo:rerun-if-env-changed=MLN_FFI_NATIVE_INSTALL_DIR");
+    let install_dir = native_install_dir()?;
+    let include_dir = install_dir.join("include");
+    let link_dir = install_dir.join("lib");
+    let runtime_dir = native_runtime_dir(&install_dir);
+    let header = include_dir.join("maplibre_native_c.h");
 
-    println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
-    let artifact = load_artifact()?;
-    let import_library_dir = artifact.import_library_path.parent().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-                "native metadata import_library_path has no parent directory: {}",
-                artifact.import_library_path.display()
-            ),
-        )
-    })?;
-    println!(
-        "cargo:rustc-link-search=native={}",
-        import_library_dir.display()
-    );
+    require_dir(&include_dir, "native include directory")?;
+    require_dir(&link_dir, "native link directory")?;
+    require_dir(&runtime_dir, "native runtime library directory")?;
+
+    println!("cargo:rustc-link-search=native={}", link_dir.display());
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
-    if artifact.supports_linker_rpath {
-        for rpath in &artifact.rpaths {
-            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
-        }
+    if cfg!(unix) {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
+    }
+    for link_arg in ohos_link_args() {
+        println!("cargo:rustc-link-arg={link_arg}");
     }
 
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
-    print_rerun_if_changed(&repo_root.join("include"));
+    print_rerun_if_changed(&include_dir);
 
-    let mut bindings = bindgen::Builder::default()
+    let bindings = bindgen::Builder::default()
         .header(header.display().to_string())
         .clang_arg("-xc")
-        .clang_arg("-std=c23");
-    for include_path in &artifact.include_dirs {
-        bindings = bindings.clang_arg(format!("-I{}", include_path.display()));
-    }
-    let bindings = bindings
+        .clang_arg("-std=c23")
+        .clang_arg(format!("-I{}", include_dir.display()))
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
@@ -68,50 +49,51 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn load_artifact() -> Result<Artifact, Box<dyn Error>> {
-    let build_dir = env::var_os("MLN_FFI_BUILD_DIR").ok_or_else(|| {
+fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let install_dir = env::var_os("MLN_FFI_NATIVE_INSTALL_DIR").ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            "MLN_FFI_BUILD_DIR is required; run Rust binding builds through mise",
+            "MLN_FFI_NATIVE_INSTALL_DIR is required; run Rust binding builds through mise",
         )
     })?;
-    let metadata_path = PathBuf::from(build_dir).join(format!("{LIBRARY_NAME}.dev.json"));
-    println!("cargo:rerun-if-changed={}", metadata_path.display());
-
-    let metadata = std::fs::read_to_string(&metadata_path).map_err(|error| {
-        io::Error::new(
-            error.kind(),
-            format!(
-                "failed to read native artifact metadata at {}; run `mise run build` first: {error}",
-                metadata_path.display()
-            ),
-        )
-    })?;
-    let artifact = serde_json::from_str::<Artifact>(&metadata).map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-                "invalid native artifact metadata at {}: {error}",
-                metadata_path.display()
-            ),
-        )
-    })?;
-
-    Ok(artifact)
+    Ok(PathBuf::from(install_dir))
 }
 
-fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    manifest_dir
-        .ancestors()
-        .find(|ancestor| ancestor.join("include/maplibre_native_c.h").is_file())
-        .map(Path::to_path_buf)
-        .ok_or_else(|| {
-            format!(
-                "could not locate repository root containing include/maplibre_native_c.h from {}",
-                manifest_dir.display()
-            )
-            .into()
-        })
+fn native_runtime_dir(install_dir: &Path) -> PathBuf {
+    install_dir.join(if cfg!(windows) { "bin" } else { "lib" })
+}
+
+fn ohos_link_args() -> Vec<String> {
+    let Some(target) = env::var("CARGO_BUILD_TARGET")
+        .ok()
+        .filter(|target| target.ends_with("-linux-ohos"))
+    else {
+        return vec![];
+    };
+    let Some(ohos_sdk) = env::var_os("OHOS_SDK_NATIVE").filter(|value| !value.is_empty()) else {
+        return vec![];
+    };
+    let clang_target = target.replace("-unknown-", "-");
+    let sysroot = PathBuf::from(ohos_sdk).join("sysroot");
+    vec![
+        format!("--target={clang_target}"),
+        format!("--sysroot={}", sysroot.display()),
+        "-fuse-ld=lld".to_string(),
+    ]
+}
+
+fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!(
+            "missing {label}: {}; run `mise run build` first",
+            path.display()
+        ),
+    )
+    .into())
 }
 
 fn print_rerun_if_changed(path: &Path) {

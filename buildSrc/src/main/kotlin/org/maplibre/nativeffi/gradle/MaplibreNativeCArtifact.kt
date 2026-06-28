@@ -1,34 +1,37 @@
 package org.maplibre.nativeffi.gradle
 
 import java.io.File
-import java.util.Properties
 
-class MaplibreNativeCArtifact(propertiesFile: File) {
-  val propertiesFile: File = propertiesFile
-
-  private val properties: Properties =
-    propertiesFile.inputStream().use { input -> Properties().apply { load(input) } }
-
+class MaplibreNativeCArtifact(val installDir: File) {
   val libraryPath: File
-    get() = File(property("maplibreNativeC.libraryPath"))
+    get() = runtimeLibraryDir.resolve(libraryFileName())
 
   val includeDirs: List<File>
-    get() = pathList("maplibreNativeC.includeDirs").map(::File)
+    get() = listOf(installDir.resolve("include"))
 
   val linkDirs: List<File>
-    get() = pathList("maplibreNativeC.linkDirs").map(::File)
+    get() = listOf(installDir.resolve("lib"))
 
   val runtimeLibraryDirs: List<File>
-    get() = pathList("maplibreNativeC.runtimeLibraryDirs").map(::File)
+    get() = listOf(runtimeLibraryDir)
 
   val linkLibraries: List<String>
-    get() = pathList("maplibreNativeC.linkLibraries")
+    get() = listOf("maplibre-native-c")
 
   val frameworks: List<String>
-    get() = pathList("maplibreNativeC.frameworks")
+    get() = emptyList()
 
-  private fun property(name: String): String = properties.getProperty(name, "")
+  private val runtimeLibraryDir: File
+    get() = installDir.resolve(if (isWindows()) "bin" else "lib")
 
-  private fun pathList(name: String): List<String> =
-    property(name).split(File.pathSeparatorChar).filter { it.isNotBlank() }
+  private fun libraryFileName(): String =
+    when {
+      isWindows() -> "maplibre-native-c.dll"
+      isMac() -> "libmaplibre-native-c.dylib"
+      else -> "libmaplibre-native-c.so"
+    }
+
+  private fun isMac(): Boolean = System.getProperty("os.name").lowercase().contains("mac")
+
+  private fun isWindows(): Boolean = System.getProperty("os.name").lowercase().contains("windows")
 }

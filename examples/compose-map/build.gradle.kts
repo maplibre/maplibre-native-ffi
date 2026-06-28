@@ -75,5 +75,5 @@ tasks.withType<JavaExec>().configureEach {
   inputs
     .files(maplibreNativeC.runtimeLibraryDirs)
     .withPropertyName("maplibreNativeCRuntimeLibraryDirs")
-  inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
+  inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
 }

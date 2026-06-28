@@ -1,4 +1,3 @@
-include(mln_artifact_metadata)
 include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
@@ -28,6 +27,29 @@ function(mln_configure_shared_exports target)
       target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
     endif()
   endif()
+endfunction()
+
+function(mln_configure_install_rpath target)
+  get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  if(NOT MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    return()
+  endif()
+
+  if(APPLE)
+    set(install_rpath "@loader_path")
+    set_target_properties(
+      ${target}
+      PROPERTIES BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "@rpath")
+  elseif(UNIX)
+    set(install_rpath "$ORIGIN")
+  else()
+    return()
+  endif()
+
+  set_property(
+    TARGET ${target}
+    APPEND
+    PROPERTY INSTALL_RPATH "${install_rpath}")
 endfunction()
 
 function(mln_add_c_api_library target)
@@ -121,5 +143,5 @@ function(mln_add_c_api_library target)
   mln_configure_platform_support(${target})
   mln_configure_render_backend(${target})
   mln_configure_shared_exports(${target})
-  mln_write_artifact_metadata(${target})
+  mln_configure_install_rpath(${target})
 endfunction()
