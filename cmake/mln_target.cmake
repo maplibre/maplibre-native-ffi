@@ -15,10 +15,15 @@ set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
 function(mln_configure_complete_static_archive target)
   set(MLN_FFI_COMPLETE_STATIC_DIR
       "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
-  set(MLN_FFI_COMPLETE_STATIC_OBJECT
-      "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c.o")
-  set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
-      "${MLN_FFI_COMPLETE_STATIC_DIR}/libmaplibre-native-c.a")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
+        "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c-static.lib")
+  else()
+    set(MLN_FFI_COMPLETE_STATIC_OBJECT
+        "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c.o")
+    set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
+        "${MLN_FFI_COMPLETE_STATIC_DIR}/libmaplibre-native-c.a")
+  endif()
 
   set(MLN_FFI_INPUT_ARCHIVES "$<TARGET_FILE:${target}>")
   set(MLN_FFI_INPUT_TARGETS ${target})
@@ -28,7 +33,18 @@ function(mln_configure_complete_static_archive target)
     list(APPEND MLN_FFI_INPUT_TARGETS ${MLN_FFI_STATIC_DEPENDENCY})
   endforeach()
 
-  if(APPLE)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    add_custom_command(
+      OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+      COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
+      COMMAND
+        "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
+      COMMAND
+        "${CMAKE_AR}" /NOLOGO "/OUT:${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+        ${MLN_FFI_INPUT_ARCHIVES}
+      DEPENDS ${MLN_FFI_INPUT_TARGETS}
+      VERBATIM)
+  elseif(APPLE)
     find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
     list(GET CMAKE_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
 
@@ -300,11 +316,11 @@ function(mln_complete_static_dependencies_for_target out_var)
   set(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
       ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
 
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS)$")
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS|Windows)$")
     list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES mbgl-vendor-icu)
   endif()
 
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux)$")
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|Windows)$")
     list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
          maplibre_native_platform_rust)
   endif()
@@ -312,7 +328,7 @@ function(mln_complete_static_dependencies_for_target out_var)
   set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
 endfunction()
 
-function(mln_add_elf_c_api_library target)
+function(mln_add_shared_and_static_c_api_library target)
   set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
   add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
   mln_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
@@ -325,6 +341,11 @@ function(mln_add_elf_c_api_library target)
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
   mln_configure_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
                               ${MLN_FFI_C_API_OBJECT_TARGET})
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set_target_properties(
+      ${MLN_FFI_STATIC_TARGET}
+      PROPERTIES OUTPUT_NAME maplibre-native-c-static-base)
+  endif()
   mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET}
                                         ${MLN_FFI_STATIC_DEPS})
 endfunction()
@@ -335,8 +356,8 @@ function(mln_add_c_api_library target)
     return()
   endif()
 
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS)$")
-    mln_add_elf_c_api_library(${target})
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS|Windows)$")
+    mln_add_shared_and_static_c_api_library(${target})
     return()
   endif()
 
