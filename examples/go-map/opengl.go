@@ -144,6 +144,21 @@ func (ctx *openGLContext) surface() maplibre.NativePointer {
 	return nativePointer(ctx.platform.egl.surface)
 }
 
+func (ctx *openGLContext) refreshPlatformSurface() error {
+	if ctx.platform.egl == nil {
+		return nil
+	}
+	if err := ctx.MakeCurrent(); err != nil {
+		return err
+	}
+	platform, err := platformOpenGLContext(ctx.window, ctx.context)
+	if err != nil {
+		return err
+	}
+	ctx.platform.egl = platform.egl
+	return nil
+}
+
 func nativePointer(value unsafe.Pointer) maplibre.NativePointer {
 	return maplibre.NativePointer(uintptr(value))
 }
@@ -414,6 +429,9 @@ type openGLSurfaceTarget struct {
 }
 
 func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle) (*openGLSurfaceTarget, error) {
+	if err := context.refreshPlatformSurface(); err != nil {
+		return nil, fmt.Errorf("OpenGL surface refresh failed: %w", err)
+	}
 	target := &openGLSurfaceTarget{context: context}
 	session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{Extent: v.extent(), Context: context.descriptor(), Surface: context.surface()})
 	if err != nil {
@@ -435,7 +453,9 @@ func (target *openGLSurfaceTarget) Close() error {
 
 func (target *openGLSurfaceTarget) Resize(v viewport) error { return target.session.Resize(v.extent()) }
 
-func (*openGLSurfaceTarget) NeedsReattachOnResize() bool { return false }
+func (target *openGLSurfaceTarget) NeedsReattachOnResize() bool {
+	return target.context.platform.egl != nil
+}
 
 func (target *openGLSurfaceTarget) FinishFrame() error {
 	if err := target.context.MakeCurrent(); err != nil {
