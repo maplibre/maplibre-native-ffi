@@ -5,11 +5,16 @@ interface DragState {
   x: number;
   y: number;
   mode: "pan" | "rotate";
-  buttonMask: number;
 }
 
 export class InputController {
   private drag: DragState | null = null;
+  private pendingPanX = 0;
+  private pendingPanY = 0;
+  private pendingBearingDelta = 0;
+  private pendingPitchDelta = 0;
+  private pendingScale = 1;
+  private pendingScaleAnchor: { x: number; y: number } | null = null;
 
   constructor(
     private readonly canvas: HTMLCanvasElement,
@@ -18,9 +23,28 @@ export class InputController {
   ) {}
 
   attach(): void {
-    this.canvas.addEventListener("contextmenu", (event) => {
-      event.preventDefault();
+    this.canvas.style.touchAction = "none";
+    this.canvas.addEventListener(
+      "contextmenu",
+      (event) => this.suppress(event),
+      {
+        capture: true,
+      },
+    );
+    this.canvas.addEventListener("auxclick", (event) => this.suppress(event), {
+      capture: true,
     });
+    this.canvas.addEventListener(
+      "mousedown",
+      (event) => {
+        if (event.button === 1 || event.button === 2) {
+          this.suppress(event);
+        }
+      },
+      {
+        capture: true,
+      },
+    );
     this.canvas.addEventListener("pointerdown", (event) => {
       this.pointerDown(event);
     });
@@ -40,23 +64,33 @@ export class InputController {
       passive: false,
     });
     window.addEventListener("blur", () => this.clearDrag());
+    window.addEventListener(
+      "contextmenu",
+      (event) => {
+        if (this.drag?.mode === "rotate") {
+          this.suppress(event);
+        }
+      },
+      {
+        capture: true,
+      },
+    );
     window.addEventListener("keydown", (event) => this.keydown(event));
   }
 
   private pointerDown(event: PointerEvent): void {
-    if (event.button !== 0 && event.button !== 2) return;
+    const leftDown =
+      event.button === 0 || (event.buttons & pointerButtonMask(0)) !== 0;
+    const rightDown =
+      event.button === 2 || (event.buttons & pointerButtonMask(2)) !== 0;
+    if (!leftDown && !rightDown) return;
     this.canvas.focus();
     this.canvas.setPointerCapture(event.pointerId);
-    this.getModule()?._mln_browser_map_cancel_transitions();
     this.drag = {
       pointerId: event.pointerId,
       x: event.clientX,
       y: event.clientY,
-      buttonMask: pointerButtonMask(event.button),
-      mode:
-        event.button === 2 || (event.button === 0 && event.ctrlKey)
-          ? "rotate"
-          : "pan",
+      mode: rightDown || event.ctrlKey ? "rotate" : "pan",
     };
     event.preventDefault();
   }
@@ -66,15 +100,17 @@ export class InputController {
     if (!this.drag || this.drag.pointerId !== event.pointerId || !module) {
       return;
     }
-    if ((event.buttons & this.drag.buttonMask) === 0) {
+    if (event.buttons === 0) {
       this.endDrag(event);
       return;
     }
     const delta = this.logicalDelta(this.drag, event);
-    if (this.drag.mode === "pan") {
-      module._mln_browser_map_move_by(delta.x, delta.y);
+    if (this.drag.mode === "rotate") {
+      this.pendingBearingDelta += delta.x * 0.5;
+      this.pendingPitchDelta += -delta.y * 0.5;
     } else {
-      module._mln_browser_map_rotate_pitch_by(delta.x * 0.5, -delta.y * 0.5);
+      this.pendingPanX += delta.x;
+      this.pendingPanY += delta.y;
     }
     this.drag.x = event.clientX;
     this.drag.y = event.clientY;
@@ -104,9 +140,46 @@ export class InputController {
     const divisor = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 100 : 3;
     const delta = -event.deltaY / divisor;
     const scale = Math.pow(2, delta * 0.25);
+    if (!Number.isFinite(scale) || scale <= 0) {
+      event.preventDefault();
+      return;
+    }
     const point = this.logicalPoint(event);
-    module._mln_browser_map_scale_by(scale, point.x, point.y);
+    const pendingScale = this.pendingScale * scale;
+    this.pendingScale =
+      Number.isFinite(pendingScale) && pendingScale > 0 ? pendingScale : scale;
+    this.pendingScaleAnchor = point;
     event.preventDefault();
+  }
+
+  applyPending(): void {
+    const module = this.getModule();
+    if (!module) return;
+
+    if (this.pendingPanX !== 0 || this.pendingPanY !== 0) {
+      module._mln_browser_map_move_by(this.pendingPanX, this.pendingPanY);
+      this.pendingPanX = 0;
+      this.pendingPanY = 0;
+    }
+
+    if (this.pendingScale !== 1 && this.pendingScaleAnchor) {
+      module._mln_browser_map_scale_by(
+        this.pendingScale,
+        this.pendingScaleAnchor.x,
+        this.pendingScaleAnchor.y,
+      );
+      this.pendingScale = 1;
+      this.pendingScaleAnchor = null;
+    }
+
+    if (this.pendingBearingDelta !== 0 || this.pendingPitchDelta !== 0) {
+      module._mln_browser_map_rotate_pitch_by(
+        this.pendingBearingDelta,
+        this.pendingPitchDelta,
+      );
+      this.pendingBearingDelta = 0;
+      this.pendingPitchDelta = 0;
+    }
   }
 
   private keydown(event: KeyboardEvent): void {
@@ -120,30 +193,30 @@ export class InputController {
       case "ArrowLeft":
       case "a":
       case "A":
-        module._mln_browser_map_move_by(-pan, 0);
+        module._mln_browser_map_move_by_animated(pan, 0);
         break;
       case "ArrowRight":
       case "d":
       case "D":
-        module._mln_browser_map_move_by(pan, 0);
+        module._mln_browser_map_move_by_animated(-pan, 0);
         break;
       case "ArrowUp":
       case "w":
       case "W":
-        module._mln_browser_map_move_by(0, -pan);
+        module._mln_browser_map_move_by_animated(0, pan);
         break;
       case "ArrowDown":
       case "s":
       case "S":
-        module._mln_browser_map_move_by(0, pan);
+        module._mln_browser_map_move_by_animated(0, -pan);
         break;
       case "+":
       case "=":
-        module._mln_browser_map_scale_by(1.25, centerX, centerY);
+        module._mln_browser_map_scale_by_animated(1.25, centerX, centerY);
         break;
       case "-":
       case "_":
-        module._mln_browser_map_scale_by(1 / 1.25, centerX, centerY);
+        module._mln_browser_map_scale_by_animated(1 / 1.25, centerX, centerY);
         break;
       case "q":
       case "Q":
@@ -187,6 +260,11 @@ export class InputController {
       x: ((event.clientX - previous.x) / rect.width) * viewport.width,
       y: ((event.clientY - previous.y) / rect.height) * viewport.height,
     };
+  }
+
+  private suppress(event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
   }
 }
 

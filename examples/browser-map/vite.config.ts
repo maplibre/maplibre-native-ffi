@@ -3,11 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { defineConfig } from "vite-plus";
 
-const generatedAssetNames = new Set([
-  "/browser-map.js",
-  "/browser-map.worker.js",
-  "/browser_map.wasm",
-]);
+const generatedAssetNames = new Set(["/browser-map.js", "/browser-map.wasm"]);
 
 export default defineConfig({
   plugins: [
@@ -42,6 +38,9 @@ export default defineConfig({
           } else {
             response.setHeader("Content-Type", "text/javascript");
           }
+          response.setHeader("Cache-Control", "no-store");
+          response.setHeader("Cross-Origin-Embedder-Policy", "require-corp");
+          response.setHeader("Cross-Origin-Opener-Policy", "same-origin");
           fs.createReadStream(assetPath).pipe(response);
         });
       },

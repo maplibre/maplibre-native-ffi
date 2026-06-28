@@ -181,13 +181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "browser-map"
-version = "0.0.0"
-dependencies = [
- "maplibre-native",
-]
-
-[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

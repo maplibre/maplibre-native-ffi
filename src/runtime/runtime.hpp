@@ -57,6 +57,7 @@ struct mln_runtime {
   std::thread::id owner_thread;
   std::unique_ptr<mbgl::util::RunLoop> run_loop;
   std::string asset_path;
+  bool has_cache_path = false;
   std::string cache_path;
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
   bool has_maximum_cache_size = false;

@@ -882,9 +882,9 @@ version = "1.95.0"
 backend = "core:rust"
 
 [tools.rust.options]
-components = "clippy,rustfmt"
+components = "clippy,rust-src,rustfmt"
 profile = "minimal"
-targets = "aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-ohos,x86_64-linux-android,x86_64-pc-windows-msvc"
+targets = "aarch64-linux-android,aarch64-pc-windows-msvc,aarch64-unknown-linux-ohos,wasm32-unknown-emscripten,x86_64-linux-android,x86_64-pc-windows-msvc"
 
 [[tools.swift]]
 version = "6.3.1"

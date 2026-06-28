@@ -55,3 +55,7 @@ mln_add_maplibre_native()
 mln_add_c_api_library(maplibre_native_c)
 
 add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
+
+if(EMSCRIPTEN AND MLN_FFI_RENDER_BACKEND STREQUAL "webgpu")
+  add_subdirectory(examples/browser-map)
+endif()

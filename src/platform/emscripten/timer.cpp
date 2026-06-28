@@ -1,125 +1,96 @@
-#include <mbgl/util/run_loop.hpp>
-#include <mbgl/util/timer.hpp>
-
-#include <emscripten.h>
-#include <emscripten/eventloop.h>
-#include <emscripten/threading.h>
-
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <thread>
+#include <memory>
+#include <utility>
+
+#include <mbgl/util/run_loop.hpp>
+#include <mbgl/util/timer.hpp>
+
+#include "run_loop_wake.hpp"
 
 namespace mbgl {
 namespace util {
 
-class Timer::Impl {
+class TimerState : public platform::emscripten::RunLoopWake::Runnable,
+                   public std::enable_shared_from_this<TimerState> {
  public:
-  void start(uint64_t timeout, uint64_t repeat, std::function<void()>&& cb_) {
+  TimerState()
+      : wake(
+          static_cast<platform::emscripten::RunLoopWake*>(
+            RunLoop::getLoopHandle()
+          )
+        ) {}
+
+  void start(Duration timeout, Duration repeat_, std::function<void()>&& cb_) {
     stop();
     cb = std::move(cb_);
-    repeat_ms_ = repeat;
-
-    if (emscripten_is_main_browser_thread()) {
-      startOnMainThread(timeout, repeat);
-      return;
-    }
-
-    startOnWorkerThread(timeout, repeat);
+    repeat = repeat_;
+    due =
+      timeout == Duration::max() ? TimePoint::max() : Clock::now() + timeout;
+    active = true;
+    wake->addRunnable(shared_from_this());
   }
 
   void stop() {
-    if (handle_ != 0) {
-      if (repeat_ms_ > 0) {
-        emscripten_clear_interval(handle_);
-      } else {
-        emscripten_clear_timeout(handle_);
-      }
-      handle_ = 0;
-    }
-
-    cancelled_ = true;
-    if (worker_.joinable()) {
-      worker_.join();
-    }
-    cancelled_ = false;
-
+    active = false;
+    wake->removeRunnable(shared_from_this());
     cb = nullptr;
-    repeat_ms_ = 0;
   }
 
- private:
-  void startOnMainThread(uint64_t timeout, uint64_t repeat) {
-    if (repeat > 0) {
-      handle_ = emscripten_set_interval(
-        [](void* userdata) {
-          auto* self = static_cast<Impl*>(userdata);
-          if (self->cb) {
-            self->cb();
-          }
-        },
-        static_cast<double>(timeout),
-        this
-      );
+  auto dueTime() const -> TimePoint override { return due; }
+
+  void runTask() override {
+    if (!active) {
       return;
     }
 
-    handle_ = emscripten_set_timeout(
-      [](void* userdata) {
-        auto* self = static_cast<Impl*>(userdata);
-        if (self->cb) {
-          self->cb();
-        }
-        self->handle_ = 0;
-      },
-      static_cast<double>(timeout),
-      this
-    );
+    if (repeat == Duration::zero()) {
+      active = false;
+      wake->removeRunnable(shared_from_this());
+    } else {
+      due = Clock::now() + repeat;
+      wake->notify();
+    }
+
+    if (cb) {
+      cb();
+    }
   }
 
-  void startOnWorkerThread(uint64_t timeout, uint64_t repeat) {
-    auto* loop = RunLoop::Get();
-    cancelled_ = false;
-    worker_ = std::thread([this, loop, timeout, repeat]() {
-      uint64_t delay = timeout;
-      while (!cancelled_) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
-        if (cancelled_) {
-          return;
-        }
-
-        loop->invoke([this]() {
-          if (cb) {
-            cb();
-          }
-        });
-
-        if (cancelled_ || repeat == 0) {
-          return;
-        }
-
-        delay = repeat;
-      }
-    });
-  }
+ private:
+  platform::emscripten::RunLoopWake* wake;
+  TimePoint due = TimePoint::max();
+  Duration repeat = Duration::zero();
 
   std::function<void()> cb;
-  int handle_ = 0;
-  uint64_t repeat_ms_ = 0;
-  std::atomic<bool> cancelled_{false};
-  std::thread worker_;
+  std::atomic<bool> active{false};
+};
+
+class Timer::Impl {
+ public:
+  Impl() : state(std::make_shared<TimerState>()) {}
+
+  ~Impl() { state->stop(); }
+
+  void start(Duration timeout, Duration repeat, std::function<void()>&& cb) {
+    state->start(timeout, repeat, std::move(cb));
+  }
+
+  void stop() { state->stop(); }
+
+ private:
+  std::shared_ptr<TimerState> state;
 };
 
 Timer::Timer() : impl(std::make_unique<Impl>()) {}
 
 Timer::~Timer() = default;
 
-void Timer::start(Duration timeout, Duration repeat, std::function<void()>&& cb) {
-  impl->start(
-    static_cast<uint64_t>(std::chrono::duration_cast<Milliseconds>(timeout).count()),
-    static_cast<uint64_t>(std::chrono::duration_cast<Milliseconds>(repeat).count()),
-    std::move(cb)
-  );
+void Timer::start(
+  Duration timeout, Duration repeat, std::function<void()>&& cb
+) {
+  impl->start(timeout, repeat, std::move(cb));
 }
 
 void Timer::stop() { impl->stop(); }

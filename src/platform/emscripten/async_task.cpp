@@ -1,49 +1,73 @@
-#include <mbgl/util/async_task.hpp>
-
-#include <emscripten.h>
-#include <emscripten/threading.h>
-
 #include <atomic>
 #include <functional>
+#include <memory>
+
+#include <mbgl/util/async_task.hpp>
+#include <mbgl/util/run_loop.hpp>
 
 #include "run_loop_wake.hpp"
 
 namespace mbgl {
 namespace util {
 
-class AsyncTask::Impl {
+class AsyncTaskState : public platform::emscripten::RunLoopWake::Runnable,
+                       public std::enable_shared_from_this<AsyncTaskState> {
  public:
-  explicit Impl(std::function<void()> fn) : task(std::move(fn)) {
-    wake = platform::emscripten::pending_wake_for_async_task;
+  explicit AsyncTaskState(std::function<void()> fn)
+      : wake(
+          static_cast<platform::emscripten::RunLoopWake*>(
+            RunLoop::getLoopHandle()
+          )
+        ),
+        task(std::move(fn)) {}
+
+  void cancel() {
+    alive = false;
+    wake->removeRunnable(shared_from_this());
   }
 
   void maySend() {
-    if (emscripten_is_main_browser_thread()) {
-      if (scheduled.exchange(true)) {
-        return;
-      }
+    if (!queued.exchange(true)) {
+      wake->addRunnable(shared_from_this());
+    }
+  }
 
-      emscripten_async_call(
-        [](void* userdata) {
-          auto* self = static_cast<Impl*>(userdata);
-          self->scheduled = false;
-          self->task();
-        },
-        this,
-        0
-      );
+  auto dueTime() const -> mbgl::TimePoint override {
+    return mbgl::Clock::now();
+  }
+
+  auto countsForWaitForEmpty() const -> bool override { return true; }
+
+  void runTask() override {
+    if (!queued.load()) {
       return;
     }
 
-    if (wake != nullptr) {
-      wake->notify();
+    wake->removeRunnable(shared_from_this());
+    queued.store(false);
+    if (alive) {
+      task();
     }
   }
 
  private:
+  platform::emscripten::RunLoopWake* wake;
+  std::atomic<bool> queued{false};
+  std::atomic<bool> alive{true};
   std::function<void()> task;
-  platform::emscripten::RunLoopWake* wake = nullptr;
-  std::atomic<bool> scheduled{false};
+};
+
+class AsyncTask::Impl {
+ public:
+  explicit Impl(std::function<void()> fn)
+      : state(std::make_shared<AsyncTaskState>(std::move(fn))) {}
+
+  ~Impl() { state->cancel(); }
+
+  void maySend() { state->maySend(); }
+
+ private:
+  std::shared_ptr<AsyncTaskState> state;
 };
 
 AsyncTask::AsyncTask(std::function<void()>&& fn)

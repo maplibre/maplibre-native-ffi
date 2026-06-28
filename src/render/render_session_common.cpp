@@ -1023,7 +1023,9 @@ auto render_session_resize(
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
   map_native(session->map)->setSize(mbgl::Size{width, height});
-  session->renderer.reset();
+  if (session->kind == RenderSessionKind::Surface) {
+    session->renderer.reset();
+  }
   session->rendered_generation = 0;
   session->width = width;
   session->height = height;

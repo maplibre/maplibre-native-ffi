@@ -993,10 +993,11 @@ auto create_runtime(
     options == nullptr || options->asset_path == nullptr
       ? std::string{}
       : std::string{options->asset_path};
-  owned_runtime->cache_path =
-    options == nullptr || options->cache_path == nullptr
-      ? std::string{}
-      : std::string{options->cache_path};
+  owned_runtime->has_cache_path =
+    options != nullptr && options->cache_path != nullptr;
+  owned_runtime->cache_path = owned_runtime->has_cache_path
+                                ? std::string{options->cache_path}
+                                : std::string{};
   owned_runtime->has_maximum_cache_size =
     options != nullptr &&
     (options->flags & MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE) != 0;
@@ -2483,8 +2484,12 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   if (!runtime->asset_path.empty()) {
     options.withAssetPath(runtime->asset_path);
   }
-  if (!runtime->cache_path.empty()) {
+  if (runtime->has_cache_path) {
     options.withCachePath(runtime->cache_path);
+#if defined(__EMSCRIPTEN__)
+  } else {
+    options.withCachePath("");
+#endif
   }
   if (runtime->has_maximum_cache_size) {
     options.withMaximumCacheSize(runtime->maximum_cache_size);

@@ -305,6 +305,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
       depth_stencil_view_ = nullptr;
     }
     if (depth_stencil_texture_ != nullptr) {
+      wgpuTextureDestroy(depth_stencil_texture_);
       wgpuTextureRelease(depth_stencil_texture_);
       depth_stencil_texture_ = nullptr;
     }
@@ -317,6 +318,9 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
       color_view_ = nullptr;
     }
     if (texture_ != nullptr) {
+      if (owns_color_texture_) {
+        wgpuTextureDestroy(texture_);
+      }
       wgpuTextureRelease(texture_);
       texture_ = nullptr;
     }

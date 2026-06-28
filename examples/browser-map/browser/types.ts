@@ -11,6 +11,7 @@ interface EmscriptenWebGPU {
 
 export interface BrowserMapModule {
   webgpu: EmscriptenWebGPU;
+  _mln_browser_map_set_trace(enabled: number): void;
   _mln_browser_map_init(
     logicalWidth: number,
     logicalHeight: number,
@@ -27,7 +28,13 @@ export interface BrowserMapModule {
     scaleFactor: number,
   ): number;
   _mln_browser_map_move_by(deltaX: number, deltaY: number): number;
+  _mln_browser_map_move_by_animated(deltaX: number, deltaY: number): number;
   _mln_browser_map_scale_by(scale: number, x: number, y: number): number;
+  _mln_browser_map_scale_by_animated(
+    scale: number,
+    x: number,
+    y: number,
+  ): number;
   _mln_browser_map_rotate_pitch_by(
     bearingDelta: number,
     pitchDelta: number,
@@ -42,7 +49,26 @@ export interface BrowserMapModule {
     bearing: number,
     pitch: number,
   ): number;
-  _mln_browser_map_cancel_transitions(): number;
+  _mln_browser_map_fly_to(
+    longitude: number,
+    latitude: number,
+    zoom: number,
+    bearing: number,
+    pitch: number,
+  ): number;
+  _mln_browser_map_is_fully_loaded(): number;
+  _mln_browser_map_last_run_loop_ms(): number;
+  _mln_browser_map_last_runnable_ms(): number;
+  _mln_browser_map_last_event_drain_ms(): number;
+  _mln_browser_map_last_render_update_ms(): number;
+  _mln_browser_map_last_ready_runnable_count(): number;
+  _mln_browser_map_last_runnable_count(): number;
+  _mln_browser_map_heap_size(): number;
+  _mln_browser_map_heap_max(): number;
+  _mln_browser_map_malloc_arena(): number;
+  _mln_browser_map_malloc_allocated(): number;
+  _mln_browser_map_malloc_free(): number;
+  _mln_browser_map_malloc_keepcost(): number;
 }
 
 export interface BrowserMapBenchmarkReport {
@@ -56,11 +82,63 @@ export interface BrowserMapBenchmarkReport {
   maxMs: number;
   framesOver50Ms: number;
   framesOver100Ms: number;
+  nativeP95Ms: number;
+  nativeP99Ms: number;
+  nativeMaxMs: number;
+  runLoopP95Ms: number;
+  runLoopP99Ms: number;
+  runLoopMaxMs: number;
+  runnableP95Ms: number;
+  runnableP99Ms: number;
+  runnableMaxMs: number;
+  readyRunnableMax: number;
+  runnableMax: number;
+  eventDrainP95Ms: number;
+  eventDrainP99Ms: number;
+  eventDrainMaxMs: number;
+  renderUpdateP95Ms: number;
+  renderUpdateP99Ms: number;
+  renderUpdateMaxMs: number;
+  presentP95Ms: number;
+  presentP99Ms: number;
+  presentMaxMs: number;
+  heapSizeBytes: number;
+  heapMaxBytes: number;
+  memorySamples: BrowserMapMemorySample[];
   cities: string[];
+  slowFrames: BrowserMapSlowFrame[];
+}
+
+export interface BrowserMapMemorySample {
+  elapsedMs: number;
+  reason: string;
+  city: string;
+  heapSizeBytes: number;
+  heapMaxBytes: number;
+  mallocArenaBytes: number;
+  mallocAllocatedBytes: number;
+  mallocFreeBytes: number;
+  mallocKeepcostBytes: number;
+}
+
+export interface BrowserMapSlowFrame {
+  elapsedMs: number;
+  deltaMs: number;
+  nativeMs: number;
+  runLoopMs: number;
+  runnableMs: number;
+  readyRunnableCount: number;
+  runnableCount: number;
+  eventDrainMs: number;
+  renderUpdateMs: number;
+  presentMs: number;
+  rendered: boolean;
+  city: string;
 }
 
 export interface ModuleFactoryOptions {
   locateFile(path: string): string;
+  printErr?(message: unknown): void;
 }
 
 declare global {

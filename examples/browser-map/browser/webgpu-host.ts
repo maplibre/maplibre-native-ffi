@@ -48,6 +48,12 @@ export class WebGPUDeviceHost {
       throw new Error("No WebGPU adapter found");
     }
     const device = await adapter.requestDevice();
+    device.addEventListener("uncapturederror", (event) => {
+      console.error(`WebGPU uncaptured error: ${event.error.message}`);
+    });
+    void device.lost.then((info) => {
+      console.error(`WebGPU device lost: ${info.reason}: ${info.message}`);
+    });
     return new WebGPUDeviceHost(module, device);
   }
 
@@ -69,6 +75,9 @@ export class WebGPUTextureHost {
   private readonly sampler: GPUSampler;
   private readonly bindGroupLayout: GPUBindGroupLayout;
   private readonly pipeline: GPURenderPipeline;
+  private presentedTexturePtr = 0;
+  private presentedTextureView: GPUTextureView | null = null;
+  private presentedBindGroup: GPUBindGroup | null = null;
 
   constructor(
     module: BrowserMapModule,
@@ -93,17 +102,23 @@ export class WebGPUTextureHost {
   }
 
   resize(viewport: Viewport): number {
-    this.configure(viewport);
-    return this.module._mln_browser_map_resize(
+    const status = this.module._mln_browser_map_resize(
       viewport.width,
       viewport.height,
       viewport.scale,
     );
+    if (status !== 0) {
+      return status;
+    }
+    this.configure(viewport);
+    this.presentedTexturePtr = 0;
+    this.presentedTextureView = null;
+    this.presentedBindGroup = null;
+    return 0;
   }
 
   presentOwnedTexture(texturePtr: number): void {
-    const texture = this.module.webgpu.getJsObject(texturePtr);
-    this.presentTextureView(texture.createView());
+    this.presentTexture(texturePtr);
   }
 
   private configure(viewport: Viewport): void {
@@ -159,15 +174,24 @@ export class WebGPUTextureHost {
     });
   }
 
-  private presentTextureView(textureView: GPUTextureView): void {
+  private presentTexture(texturePtr: number): void {
+    if (texturePtr !== this.presentedTexturePtr) {
+      const texture = this.module.webgpu.getJsObject(texturePtr);
+      this.presentedTextureView = texture.createView();
+      this.presentedBindGroup = this.device.createBindGroup({
+        layout: this.bindGroupLayout,
+        entries: [
+          { binding: 0, resource: this.sampler },
+          { binding: 1, resource: this.presentedTextureView },
+        ],
+      });
+      this.presentedTexturePtr = texturePtr;
+    }
+    if (!this.presentedBindGroup) {
+      return;
+    }
+
     const outputView = this.canvasContext.getCurrentTexture().createView();
-    const bindGroup = this.device.createBindGroup({
-      layout: this.bindGroupLayout,
-      entries: [
-        { binding: 0, resource: this.sampler },
-        { binding: 1, resource: textureView },
-      ],
-    });
     const encoder = this.device.createCommandEncoder();
     const pass = encoder.beginRenderPass({
       colorAttachments: [
@@ -180,7 +204,7 @@ export class WebGPUTextureHost {
       ],
     });
     pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(0, this.presentedBindGroup);
     pass.draw(3);
     pass.end();
     this.device.queue.submit([encoder.finish()]);

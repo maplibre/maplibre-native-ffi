@@ -238,7 +238,13 @@ typedef struct mln_runtime_options {
   uint32_t flags;
   /** Filesystem root for asset:// URLs. Copied during runtime creation. */
   const char* asset_path;
-  /** Cache database path. Copied during runtime creation. */
+  /**
+   * Cache database path. Copied during runtime creation.
+   *
+   * Null uses the platform default cache path. Browser builds default to an
+   * empty cache path. An empty string explicitly clears the cache path for file
+   * sources that support running without one.
+   */
   const char* cache_path;
   /** Maximum ambient cache size in bytes when the matching flag is set. */
   uint64_t maximum_cache_size;
@@ -648,9 +654,11 @@ mln_runtime_clear_resource_transform(mln_runtime* runtime) MLN_NOEXCEPT;
 /**
  * Starts a MapLibre ambient cache maintenance operation for this runtime.
  *
- * When runtime options omit cache_path, this operates on MapLibre's default
- * in-memory database and its effects are not durable beyond the native database
- * lifetime. Completion is reported through
+ * When runtime options omit cache_path, this operates on the platform default
+ * ambient cache. Native desktop defaults to MapLibre's in-memory database and
+ * its effects are not durable beyond the native database lifetime. Browser
+ * builds default to the platform's empty-path database behavior. Completion is
+ * reported through
  * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
  *
  * Returns:

@@ -532,6 +532,7 @@ class WebGPUSurfaceBackend final : public mbgl::webgpu::RendererBackend,
       depth_stencil_view_ = nullptr;
     }
     if (depth_stencil_texture_ != nullptr) {
+      wgpuTextureDestroy(depth_stencil_texture_);
       wgpuTextureRelease(depth_stencil_texture_);
       depth_stencil_texture_ = nullptr;
     }

@@ -9,15 +9,8 @@ function(mln_configure_emdawnwebgpu target)
 
   target_compile_options(${target} ${_scope} "${_emdawn_flags}" "-fexceptions"
                          "-sUSE_ZLIB=1")
-  target_link_options(
-    ${target}
-    ${_scope}
-    "${_emdawn_flags}"
-    "-sASYNCIFY"
-    "-sNO_DISABLE_EXCEPTION_CATCHING"
-    "-sUSE_ZLIB=1"
-    "-sFETCH=1"
-    "-sENVIRONMENT=web,worker")
+  target_link_options(${target} ${_scope} "${_emdawn_flags}" "-sUSE_ZLIB=1"
+                      "-sFETCH=1" "-sENVIRONMENT=web,worker")
 endfunction()
 
 function(mln_prepare_emdawnwebgpu_vendor)

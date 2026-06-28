@@ -35,6 +35,19 @@ index 06faf03..85c9f64 100644
      int numTextures = 0;
      std::mutex mutex;
  };
+diff --git a/include/mbgl/webgpu/command_encoder.hpp b/include/mbgl/webgpu/command_encoder.hpp
+index 125bc0d..ee1dc8b 100644
+--- a/include/mbgl/webgpu/command_encoder.hpp
++++ b/include/mbgl/webgpu/command_encoder.hpp
+@@ -36,7 +36,7 @@ public:
+     void present(gfx::Renderable&) override;
+
+     // WebGPU-specific: submit command buffer directly
+-    void submitCommandBuffer();
++    void submitCommandBuffer(bool createReplacementEncoder);
+
+     template <typename TFunc>
+     void visitDebugGroups(TFunc f) {
 diff --git a/include/mbgl/webgpu/dynamic_texture.hpp b/include/mbgl/webgpu/dynamic_texture.hpp
 index 766087b..f3bb214 100644
 --- a/include/mbgl/webgpu/dynamic_texture.hpp
@@ -50,7 +63,7 @@ index 766087b..f3bb214 100644
      ImagesToUpload imagesToUpload;
  };
 diff --git a/src/mbgl/actor/scheduler.cpp b/src/mbgl/actor/scheduler.cpp
-index f7c623d..029100a 100644
+index f7c623d..28b281b 100644
 --- a/src/mbgl/actor/scheduler.cpp
 +++ b/src/mbgl/actor/scheduler.cpp
 @@ -3,6 +3,8 @@
@@ -186,17 +199,20 @@ index f7c623d..029100a 100644
  } // namespace
 
  void Scheduler::SetCurrent(Scheduler* scheduler) {
-@@ -34,6 +153,9 @@ Scheduler* Scheduler::GetCurrent(bool init) {
+@@ -34,6 +153,12 @@ Scheduler* Scheduler::GetCurrent(bool init) {
 
  // static
  std::shared_ptr<Scheduler> Scheduler::GetBackground() {
 +#if defined(MLN_EMSCRIPTEN_SINGLE_THREADED)
 +    return browserScheduler();
++#elif defined(__EMSCRIPTEN__)
++    static auto scheduler = std::make_shared<ThreadPool>();
++    return scheduler;
 +#else
      static std::weak_ptr<Scheduler> weak;
      static std::mutex mtx;
 
-@@ -45,10 +167,14 @@ std::shared_ptr<Scheduler> Scheduler::GetBackground() {
+@@ -45,10 +170,27 @@ std::shared_ptr<Scheduler> Scheduler::GetBackground() {
      }
 
      return scheduler;
@@ -207,11 +223,24 @@ index f7c623d..029100a 100644
  std::shared_ptr<Scheduler> Scheduler::GetSequenced() {
 +#if defined(MLN_EMSCRIPTEN_SINGLE_THREADED)
 +    return browserScheduler();
++#elif defined(__EMSCRIPTEN__)
++    constexpr std::size_t kSchedulersCount = 10;
++    static std::mutex mtx;
++    static std::size_t lastUsedIndex = 0u;
++    static std::vector<std::shared_ptr<Scheduler>> schedulers(kSchedulersCount);
++
++    std::scoped_lock lock(mtx);
++    lastUsedIndex = (lastUsedIndex + 1) % kSchedulersCount;
++    auto& scheduler = schedulers[lastUsedIndex];
++    if (!scheduler) {
++        scheduler = std::make_shared<SequencedScheduler>();
++    }
++    return scheduler;
 +#else
      constexpr std::size_t kSchedulersCount = 10;
      static std::vector<std::weak_ptr<Scheduler>> weaks(kSchedulersCount);
      static std::mutex mtx;
-@@ -65,6 +191,7 @@ std::shared_ptr<Scheduler> Scheduler::GetSequenced() {
+@@ -65,6 +207,7 @@ std::shared_ptr<Scheduler> Scheduler::GetSequenced() {
          weaks[lastUsedIndex] = result;
          return result;
      }
@@ -249,6 +278,152 @@ index 60bec82..5dfa10a 100644
  }
 
  bool DynamicTexture::isEmpty() const {
+diff --git a/src/mbgl/webgpu/buffer_resource.cpp b/src/mbgl/webgpu/buffer_resource.cpp
+index 2296411..a0e5e7b 100644
+--- a/src/mbgl/webgpu/buffer_resource.cpp
++++ b/src/mbgl/webgpu/buffer_resource.cpp
+@@ -19,16 +19,14 @@ BufferResource::BufferResource(
+         return;
+     }
+
+-    // Store raw data if provided
+-    if (data) {
+-        raw.resize(size);
+-        std::memcpy(raw.data(), data, size);
+-    }
+-
+     auto& backend = static_cast<RendererBackend&>(context.getBackend());
+     WGPUDevice device = static_cast<WGPUDevice>(backend.getDevice());
+
+     if (!device) {
++        if (data) {
++            raw.resize(size);
++            std::memcpy(raw.data(), data, size);
++        }
+         return;
+     }
+
+@@ -45,6 +43,11 @@ BufferResource::BufferResource(
+     // Create buffer
+     buffer = wgpuDeviceCreateBuffer(device, &bufferDesc);
+
++    if (persistent && data) {
++        raw.resize(size);
++        std::memcpy(raw.data(), data, size);
++    }
++
+     if (buffer && data) {
+         // Upload initial data via queue write
+         WGPUQueue queue = static_cast<WGPUQueue>(backend.getQueue());
+@@ -85,6 +88,7 @@ BufferResource::BufferResource(BufferResource&& other) noexcept
+
+ BufferResource::~BufferResource() noexcept {
+     if (buffer) {
++        wgpuBufferDestroy(buffer);
+         wgpuBufferRelease(buffer);
+         buffer = nullptr;
+     }
+@@ -96,6 +100,7 @@ BufferResource& BufferResource::operator=(BufferResource&& other) noexcept {
+         assert(&context == &other.context);
+
+         if (buffer) {
++            wgpuBufferDestroy(buffer);
+             wgpuBufferRelease(buffer);
+         }
+         buffer = other.buffer;
+diff --git a/src/mbgl/webgpu/command_encoder.cpp b/src/mbgl/webgpu/command_encoder.cpp
+index cf3f9d8..a4325be 100644
+--- a/src/mbgl/webgpu/command_encoder.cpp
++++ b/src/mbgl/webgpu/command_encoder.cpp
+@@ -46,8 +46,11 @@ std::unique_ptr<gfx::UploadPass> CommandEncoder::createUploadPass(const char* na
+ }
+
+ void CommandEncoder::present(gfx::Renderable& renderable) {
++    auto& backend = static_cast<RendererBackend&>(context.getBackend());
++    const bool isDefaultRenderable = &renderable == &backend.getDefaultRenderable();
++
+     // Submit the command buffer first
+-    submitCommandBuffer();
++    submitCommandBuffer(!isDefaultRenderable);
+
+     // Then call swap on the RenderableResource to present the surface
+     // This matches Metal's pattern where swap handles surface presentation
+@@ -58,7 +61,7 @@ void CommandEncoder::present(gfx::Renderable& renderable) {
+     }
+ }
+
+-void CommandEncoder::submitCommandBuffer() {
++void CommandEncoder::submitCommandBuffer(bool createReplacementEncoder) {
+     // Submit command buffer directly (for cases without RenderableResource)
+     auto& backend = static_cast<RendererBackend&>(context.getBackend());
+     WGPUDevice device = static_cast<WGPUDevice>(backend.getDevice());
+@@ -73,6 +76,8 @@ void CommandEncoder::submitCommandBuffer() {
+     WGPUStringView label = {"Command Buffer", strlen("Command Buffer")};
+     cmdBufferDesc.label = label;
+     WGPUCommandBuffer cmdBuffer = wgpuCommandEncoderFinish(encoder, &cmdBufferDesc);
++    wgpuCommandEncoderRelease(encoder);
++    encoder = nullptr;
+
+     if (cmdBuffer) {
+         wgpuQueueSubmit(queue, 1, &cmdBuffer);
+@@ -81,6 +86,11 @@ void CommandEncoder::submitCommandBuffer() {
+         Log::Error(Event::Render, "WebGPU: Failed to finish command encoder");
+     }
+
++    if (!createReplacementEncoder) {
++        context.setCurrentCommandEncoder(nullptr);
++        return;
++    }
++
+     // Create a new command encoder so subsequent passes in the same frame can continue recording
+     WGPUCommandEncoderDescriptor desc = {};
+     WGPUStringView encoderLabel = {"MapLibre Command Encoder", strlen("MapLibre Command Encoder")};
+diff --git a/src/mbgl/webgpu/context.cpp b/src/mbgl/webgpu/context.cpp
+index 5457894..e2b41c2 100644
+--- a/src/mbgl/webgpu/context.cpp
++++ b/src/mbgl/webgpu/context.cpp
+@@ -53,10 +53,12 @@ Context::Context(RendererBackend& backend_)
+       backend(backend_),
+       globalUniformBuffers(std::make_unique<UniformBufferArray>()) {}
+
+-Context::~Context() = default;
++Context::~Context() {
++    backend.getThreadPool().runRenderJobs(true /* closeQueue */);
++}
+
+ void Context::beginFrame() {
+-    // Begin a new frame - WebGPU command recording starts here
++    backend.getThreadPool().runRenderJobs();
+ }
+
+ void Context::endFrame() {
+@@ -64,11 +66,11 @@ void Context::endFrame() {
+ }
+
+ void Context::performCleanup() {
+-    // Clean up unused resources
++    backend.getThreadPool().runRenderJobs();
+ }
+
+ void Context::reduceMemoryUsage() {
+-    // Free cached resources to reduce memory
++    backend.getThreadPool().runRenderJobs();
+ }
+
+ std::unique_ptr<gfx::OffscreenTexture> Context::createOffscreenTexture(Size size,
+diff --git a/src/mbgl/webgpu/drawable.cpp b/src/mbgl/webgpu/drawable.cpp
+index e93ad83..e127645 100644
+--- a/src/mbgl/webgpu/drawable.cpp
++++ b/src/mbgl/webgpu/drawable.cpp
+@@ -376,7 +376,7 @@ void Drawable::upload(gfx::UploadPass& uploadPass) {
+     if (buildInstanceBuffer) {
+         // Apply instance values to shader defaults (matching Metal's approach)
+         std::vector<std::unique_ptr<gfx::VertexBufferResource>> instanceBuffers;
+-        auto instanceBindings_ = webgpuUploadPass.buildAttributeBindings(impl->vertexCount,
++        auto instanceBindings_ = webgpuUploadPass.buildAttributeBindings(instanceAttributes->getMinCount(),
+                                                                          impl->vertexType,
+                                                                          /*vertexAttributeIndex=*/-1,
+                                                                          /*vertexData=*/{},
 diff --git a/src/mbgl/webgpu/dynamic_texture.cpp b/src/mbgl/webgpu/dynamic_texture.cpp
 index 4f9425c..f4f0f10 100644
 --- a/src/mbgl/webgpu/dynamic_texture.cpp
@@ -309,7 +484,7 @@ index 4f9425c..f4f0f10 100644
          deferredCreation = false;
      }
 diff --git a/src/mbgl/webgpu/offscreen_texture.cpp b/src/mbgl/webgpu/offscreen_texture.cpp
-index 1a4642c..79de183 100644
+index 1a4642c..9ad0780 100644
 --- a/src/mbgl/webgpu/offscreen_texture.cpp
 +++ b/src/mbgl/webgpu/offscreen_texture.cpp
 @@ -149,7 +149,7 @@ public:
@@ -321,8 +496,36 @@ index 1a4642c..79de183 100644
          wgpuDeviceTick(device);
  #endif
 
+@@ -294,6 +294,7 @@ public:
+         }
+
+         wgpuBufferUnmap(stagingBuffer);
++        wgpuBufferDestroy(stagingBuffer);
+         wgpuBufferRelease(stagingBuffer);
+
+         return {size, std::move(data)};
+diff --git a/src/mbgl/webgpu/texture2d.cpp b/src/mbgl/webgpu/texture2d.cpp
+index 4788a21..615f2bd 100644
+--- a/src/mbgl/webgpu/texture2d.cpp
++++ b/src/mbgl/webgpu/texture2d.cpp
+@@ -63,6 +63,7 @@ Texture2D::~Texture2D() {
+         textureView = nullptr;
+     }
+     if (texture) {
++        wgpuTextureDestroy(texture);
+         wgpuTextureRelease(texture);
+         texture = nullptr;
+     }
+@@ -214,6 +215,7 @@ void Texture2D::create() noexcept {
+         textureView = nullptr;
+     }
+     if (texture) {
++        wgpuTextureDestroy(texture);
+         wgpuTextureRelease(texture);
+         texture = nullptr;
+     }
 diff --git a/src/mbgl/webgpu/uniform_buffer.cpp b/src/mbgl/webgpu/uniform_buffer.cpp
-index 33a705c..37f81cd 100644
+index 33a705c..7436736 100644
 --- a/src/mbgl/webgpu/uniform_buffer.cpp
 +++ b/src/mbgl/webgpu/uniform_buffer.cpp
 @@ -6,6 +6,7 @@
@@ -368,6 +571,82 @@ index 33a705c..37f81cd 100644
              }
          }
      }
+@@ -70,6 +71,7 @@ UniformBuffer::UniformBuffer(UniformBuffer&& other) noexcept
+
+ UniformBuffer::~UniformBuffer() {
+     if (buffer) {
++        wgpuBufferDestroy(buffer);
+         wgpuBufferRelease(buffer);
+         buffer = nullptr;
+     }
+diff --git a/src/mbgl/webgpu/upload_pass.cpp b/src/mbgl/webgpu/upload_pass.cpp
+index 5e2bc54..239d735 100644
+--- a/src/mbgl/webgpu/upload_pass.cpp
++++ b/src/mbgl/webgpu/upload_pass.cpp
+@@ -145,52 +145,34 @@ gfx::AttributeBindingArray UploadPass::buildAttributeBindings(
+         bindings.resize(std::max(bindings.size(), index + 1));
+
+         if (!override_) {
+-            // No attribute was provided. WebGPU requires all vertex attributes to have buffers bound,
+-            // so we create a dummy buffer with default values.
+             const auto stride = VertexAttribute::getStrideOf(defaultAttr.getDataType());
+-            const auto bufferSize = stride * vertexCount;
+-
+-            // Create a buffer with appropriate default values
+-            std::vector<uint8_t> dummyData(bufferSize);
+-
+-            // Fill with appropriate default values based on the attribute type
++            std::vector<uint8_t> dummyData(stride, 0);
+             const auto dataType = defaultAttr.getDataType();
+             if (dataType == gfx::AttributeDataType::Float4) {
+-                // For color attribute - default to white (1,1,1,1)
+-                float* floatData = reinterpret_cast<float*>(dummyData.data());
+-                for (size_t i = 0; i < vertexCount; ++i) {
+-                    floatData[i * 4 + 0] = 1.0f; // R
+-                    floatData[i * 4 + 1] = 1.0f; // G
+-                    floatData[i * 4 + 2] = 1.0f; // B
+-                    floatData[i * 4 + 3] = 1.0f; // A
+-                }
++                auto* floatData = reinterpret_cast<float*>(dummyData.data());
++                floatData[0] = 1.0f;
++                floatData[1] = 1.0f;
++                floatData[2] = 1.0f;
++                floatData[3] = 1.0f;
+             } else if (dataType == gfx::AttributeDataType::Float2) {
+-                // For opacity attribute - default to full opacity (1,1)
+-                float* floatData = reinterpret_cast<float*>(dummyData.data());
+-                for (size_t i = 0; i < vertexCount; ++i) {
+-                    floatData[i * 2 + 0] = 1.0f;
+-                    floatData[i * 2 + 1] = 1.0f;
+-                }
+-            } else {
+-                // For other types, fill with zeros
+-                std::fill(dummyData.begin(), dummyData.end(), 0);
++                auto* floatData = reinterpret_cast<float*>(dummyData.data());
++                floatData[0] = 1.0f;
++                floatData[1] = 1.0f;
+             }
+
+-            // Create vertex buffer resource for the dummy data
+             auto dummyBuffer = createVertexBufferResource(dummyData.data(),
+-                                                          bufferSize,
++                                                          dummyData.size(),
+                                                           usage,
+                                                           /*persistent=*/false);
+
+             bindings[index] = {
+                 /*.attribute = */ {defaultAttr.getDataType(), /*offset=*/0},
+-                /*.vertexStride = */ static_cast<uint32_t>(stride),
++                /*.vertexStride = */ 0,
+                 /*.vertexBufferResource = */ dummyBuffer.get(),
+                 /*.vertexOffset = */ 0,
+                 /*.bufferIndex = */ 0,
+             };
+
+-            // Store the buffer so it doesn't get destroyed
+             vertexBuffers.push_back(std::move(dummyBuffer));
+
+             return;
 diff --git a/vendor/dawn.cmake b/vendor/dawn.cmake
 index 48c05e1..ec3153d 100644
 --- a/vendor/dawn.cmake
