@@ -17,8 +17,6 @@ struct Artifact {
     #[serde(default)]
     rpaths: Vec<PathBuf>,
     #[serde(default)]
-    supports_linker_rpath: bool,
-    #[serde(default)]
     frameworks: Vec<String>,
 }
 
@@ -54,10 +52,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     for framework in artifact.frameworks {
         println!("cargo:rustc-link-lib=framework={framework}");
     }
-    if artifact.supports_linker_rpath {
-        for rpath in artifact.rpaths {
-            println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
-        }
+    for rpath in artifact.rpaths {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
     }
 
     Ok(())
