@@ -13,7 +13,7 @@ test = false
 [dependencies]
 maplibre-native-core = { path = "../rust/crates/maplibre-native-core" }
 maplibre-native-sys = { path = "../rust/crates/maplibre-native-sys" }
-pyo3 = "0.28.3"
+pyo3 = "0.29.0"
 
 [build-dependencies]
 serde = { version = "1.0.228", features = ["derive"] }
