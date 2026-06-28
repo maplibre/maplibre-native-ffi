@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     if cfg!(unix) {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
     }
-    for link_arg in ohos_link_args() {
+    for link_arg in ohos_link_args()? {
         println!("cargo:rustc-link-arg={link_arg}");
     }
 
@@ -63,23 +63,28 @@ fn native_runtime_dir(install_dir: &Path) -> PathBuf {
     install_dir.join(if cfg!(windows) { "bin" } else { "lib" })
 }
 
-fn ohos_link_args() -> Vec<String> {
+fn ohos_link_args() -> Result<Vec<String>, Box<dyn Error>> {
     let Some(target) = env::var("CARGO_BUILD_TARGET")
         .ok()
         .filter(|target| target.ends_with("-linux-ohos"))
     else {
-        return vec![];
+        return Ok(vec![]);
     };
-    let Some(ohos_sdk) = env::var_os("OHOS_SDK_NATIVE").filter(|value| !value.is_empty()) else {
-        return vec![];
-    };
+    let ohos_sdk = env::var_os("OHOS_SDK_NATIVE")
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::NotFound,
+                "OHOS_SDK_NATIVE is required for OHOS Rust binding builds",
+            )
+        })?;
     let clang_target = target.replace("-unknown-", "-");
     let sysroot = PathBuf::from(ohos_sdk).join("sysroot");
-    vec![
+    Ok(vec![
         format!("--target={clang_target}"),
         format!("--sysroot={}", sysroot.display()),
         "-fuse-ld=lld".to_string(),
-    ]
+    ])
 }
 
 fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {

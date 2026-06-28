@@ -38,7 +38,7 @@ function(mln_install_c_api_library target)
     "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in" "${pc_file}"
     @ONLY)
 
-  if(APPLE AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
+  if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
     mln_install_c_api_complete_static_archive(${target})
   else()
     mln_install_c_api_shared_target(${target})

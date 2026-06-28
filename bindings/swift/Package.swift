@@ -3,18 +3,24 @@
 import Foundation
 import PackageDescription
 
-func nativeLinkerFlags() -> [String] {
-  guard let nativeInstallDir = Context
-    .environment["MLN_FFI_NATIVE_INSTALL_DIR"]
+func requiredEnvironment(_ name: String) -> String {
+  guard let value = Context
+    .environment[name]
   else {
-    fatalError("MLN_FFI_NATIVE_INSTALL_DIR is required")
+    fatalError("\(name) is required")
   }
+  return value
+}
+
+let miseEnv = requiredEnvironment("MISE_ENV")
+
+func nativeLinkerFlags() -> [String] {
+  let nativeInstallDir = requiredEnvironment("MLN_FFI_NATIVE_INSTALL_DIR")
   let libDir = "\(nativeInstallDir)/lib"
   var flags = ["-L", libDir, "-lmaplibre-native-c"]
 
-  let isIOSDevice = Context.environment["MISE_ENV"]?
-    .hasPrefix("ios-") == true &&
-    Context.environment["MISE_ENV"]?.hasPrefix("ios-simulator-") != true
+  let isIOSDevice = miseEnv.hasPrefix("ios-") &&
+    !miseEnv.hasPrefix("ios-simulator-")
   if isIOSDevice {
     flags += [
       "-lc++",
@@ -44,8 +50,7 @@ func nativeLinkerFlags() -> [String] {
   return flags
 }
 
-let isIOSSimulator = Context.environment["MISE_ENV"]?
-  .hasPrefix("ios-simulator-") == true
+let isIOSSimulator = miseEnv.hasPrefix("ios-simulator-")
 let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let testDependencies: [Target.Dependency] = [
   "MaplibreNative",
