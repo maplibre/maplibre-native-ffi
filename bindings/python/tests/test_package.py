@@ -31,6 +31,16 @@ _EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
 _EMPTY_STYLE_BYTES = _EMPTY_STYLE_JSON.encode()
 
 
+def _json_object(value: object) -> json.JsonObject:
+    converted = json.from_python(value)
+    assert isinstance(converted, json.JsonObject)
+    return converted
+
+
+def _json_value(value: object) -> json.JsonValue:
+    return json.from_python(value)
+
+
 @contextlib.contextmanager
 def _online_network() -> typing.Iterator[None]:
     original = mln.network_status()
@@ -560,7 +570,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         "dump_debug_logs": "wrong thread while dumping debug logs",
         "texture_image_info": "wrong thread while reading texture info",
         "read_premultiplied_rgba8_into": "wrong thread while reading into buffer",
-        "read_premultiplied_rgba8": "wrong thread while reading image",
         "acquire_metal_owned_texture_frame": "wrong thread while acquiring Metal frame",
         "acquire_vulkan_owned_texture_frame": (
             "wrong thread while acquiring Vulkan frame"
@@ -612,9 +621,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
 
         def read_premultiplied_rgba8_into(self, buffer: object) -> None:
             self._wrong_thread("read_premultiplied_rgba8_into")
-
-        def read_premultiplied_rgba8(self) -> None:
-            self._wrong_thread("read_premultiplied_rgba8")
 
         def acquire_metal_owned_texture_frame(self) -> None:
             self._wrong_thread("acquire_metal_owned_texture_frame")
@@ -685,7 +691,7 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(1.0, 2.0)
     )
-    feature = geo.Feature(geometry=geo.point(1.0, 2.0))
+    feature = geo.Feature(geometry=geo.Point(geo.LatLng(1.0, 2.0)))
     selector = query.FeatureStateSelector(source_id="points", feature_id="feature-1")
     calls = {
         "close": session.close,
@@ -699,7 +705,6 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         "read_premultiplied_rgba8_into": (
             lambda: session.read_premultiplied_rgba8_into(bytearray(4))
         ),
-        "read_premultiplied_rgba8": session.read_premultiplied_rgba8,
         "acquire_metal_owned_texture_frame": session.acquire_metal_owned_texture_frame,
         "acquire_vulkan_owned_texture_frame": (
             session.acquire_vulkan_owned_texture_frame
@@ -715,11 +720,14 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
                 feature,
                 "supercluster",
                 "leaves",
-                {"limit": 10},
+                json.JsonObject((json.JsonMember("limit", json.JsonInt(10)),)),
             )
         ),
         "set_feature_state": (
-            lambda: session.set_feature_state(selector, {"hover": True})
+            lambda: session.set_feature_state(
+                selector,
+                json.JsonObject((json.JsonMember("hover", True),)),
+            )
         ),
         "get_feature_state": lambda: session.get_feature_state(selector),
         "remove_feature_state": lambda: session.remove_feature_state(selector),
@@ -841,13 +849,15 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
             map_handle.add_style_source_json(
                 "style-json-points",
-                {
-                    "type": "geojson",
-                    "data": {
-                        "type": "FeatureCollection",
-                        "features": [],
-                    },
-                },
+                _json_object(
+                    {
+                        "type": "geojson",
+                        "data": {
+                            "type": "FeatureCollection",
+                            "features": [],
+                        },
+                    }
+                ),
             )
             map_handle.add_geojson_source_url(
                 "points", "https://example.test/points.geojson"
@@ -855,7 +865,7 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
             inline_points = geo.FeatureCollection(
                 (
                     geo.Feature(
-                        geometry=geo.point(1.0, 2.0),
+                        geometry=geo.Point(geo.LatLng(1.0, 2.0)),
                         properties=(json.JsonMember("name", "one"),),
                         identifier=geo.FeatureIdentifierString("point-1"),
                     ),
@@ -1035,9 +1045,10 @@ def test_image_source_url_image_and_coordinates_public_api() -> None:
 
 
 def test_style_json_light_layer_property_and_filter_public_api() -> None:
-    background = {"id": "json-background", "type": "background"}
-    circle = {"id": "json-circle", "type": "circle", "source": "points"}
-    filter_value = ["==", ["get", "kind"], "park"]
+    background = _json_object({"id": "json-background", "type": "background"})
+    circle = _json_object({"id": "json-circle", "type": "circle", "source": "points"})
+    raw_filter = ["==", ["get", "kind"], "park"]
+    filter_value = _json_value(raw_filter)
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
@@ -1045,6 +1056,18 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
                 "points",
                 "https://example.test/points.geojson",
             )
+            with pytest.raises(TypeError, match="unsupported JSON value: dict"):
+                map_handle.add_style_layer_json(
+                    typing.cast(
+                        typing.Any,
+                        {"id": "raw-dict", "type": "background"},
+                    )
+                )
+            with pytest.raises(TypeError, match="unsupported JSON value: int"):
+                map_handle.set_style_light_property(
+                    "intensity",
+                    typing.cast(typing.Any, 1),
+                )
             map_handle.add_style_layer_json(background)
             map_handle.add_style_layer_json(circle)
             map_handle.set_layer_property(
@@ -1053,8 +1076,8 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
                 "#ff0000",
             )
             map_handle.set_layer_filter("json-circle", filter_value)
-            map_handle.set_style_light_json({"anchor": "viewport"})
-            map_handle.set_style_light_property("intensity", 0.5)
+            map_handle.set_style_light_json(_json_object({"anchor": "viewport"}))
+            map_handle.set_style_light_property("intensity", json.JsonDouble(0.5))
 
             layer_json = map_handle.get_style_layer_json("json-background")
             assert layer_json is not None
@@ -1067,16 +1090,17 @@ def test_style_json_light_layer_property_and_filter_public_api() -> None:
             assert isinstance(background_color, json.JsonArray)
             assert background_color.values[0] == "rgba"
             assert (
-                json.to_python(map_handle.get_layer_filter("json-circle"))
-                == filter_value
+                json.to_python(map_handle.get_layer_filter("json-circle")) == raw_filter
             )
             assert map_handle.get_style_light_property("anchor") == "viewport"
-            assert map_handle.get_style_light_property("intensity") == json.json_double(
+            assert map_handle.get_style_light_property("intensity") == json.JsonDouble(
                 0.5
             )
 
             with pytest.raises(ValueError, match="finite"):
-                map_handle.set_style_light_property("intensity", math.inf)
+                map_handle.set_style_light_property(
+                    "intensity", json.JsonDouble(math.inf)
+                )
 
             map_handle.set_layer_filter("json-circle", None)
             assert map_handle.get_layer_filter("json-circle") is None
@@ -1281,7 +1305,7 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
                 fit,
             )
             fit_geometry = map_handle.camera_for_geometry(
-                geo.line_string((bounds.southwest, bounds.northeast)),
+                geo.LineString((bounds.southwest, bounds.northeast)),
                 fit,
             )
             visible_bounds = map_handle.lat_lng_bounds_for_camera(target)
@@ -1530,13 +1554,13 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     def queried_feature_native() -> dict[str, object]:
         return {
             "feature": geo.Feature(
-                geometry=geo.point(1.0, 2.0),
+                geometry=geo.Point(geo.LatLng(1.0, 2.0)),
                 properties=(json.JsonMember("name", "one"),),
                 identifier=geo.FeatureIdentifierString("feature-1"),
             ),
             "source_id": "points",
             "source_layer_id": None,
-            "state": json.JsonObject.from_pairs([("hover", True)]),
+            "state": json.JsonObject((json.JsonMember("hover", True),)),
         }
 
     fake_native = FakeNativeRenderSession()
@@ -1547,14 +1571,14 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
     geometry = query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(1.0, 2.0))
     rendered_options = query.RenderedFeatureQueryOptions(
         layer_ids=("circle",),
-        filter=["==", ["get", "kind"], "park"],
+        filter=_json_value(["==", ["get", "kind"], "park"]),
     )
     source_options = query.SourceFeatureQueryOptions(
         source_layer_ids=("landuse",),
-        filter=["==", ["get", "kind"], "park"],
+        filter=_json_value(["==", ["get", "kind"], "park"]),
     )
     feature = geo.Feature(
-        geometry=geo.point(1.0, 2.0),
+        geometry=geo.Point(geo.LatLng(1.0, 2.0)),
         properties=(json.JsonMember("name", "one"),),
         identifier=geo.FeatureIdentifierString("feature-1"),
     )
@@ -1566,24 +1590,24 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         feature,
         "supercluster",
         "leaves",
-        {"limit": 10},
+        _json_object({"limit": 10}),
     )
 
     assert fake_native.rendered_call == (
         {"type": "point", "point": (1.0, 2.0)},
         ("circle",),
-        ["==", ["get", "kind"], "park"],
+        _json_value(["==", ["get", "kind"], "park"]),
     )
     assert fake_native.source_call[0] == "points"
     assert fake_native.source_call[1] == ("landuse",)
     assert rendered[0].feature == feature
-    assert source[0].state == json.JsonObject.from_pairs([("hover", True)])
+    assert source[0].state == json.JsonObject((json.JsonMember("hover", True),))
     assert fake_native.extension_call == (
         "points",
         feature,
         "supercluster",
         "leaves",
-        {"limit": 10},
+        _json_object({"limit": 10}),
     )
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 
@@ -1667,7 +1691,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
                 "feature-1",
                 "hover",
             )
-            return json.JsonObject.from_pairs([("hover", True)])
+            return json.JsonObject((json.JsonMember("hover", True),))
 
         def remove_feature_state(
             self,
@@ -1686,7 +1710,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
         feature_id="feature-1",
         state_key="hover",
     )
-    state = {"hover": True}
+    state = json.JsonObject((json.JsonMember("hover", True),))
 
     session.set_feature_state(selector, state)
     returned = session.get_feature_state(selector)
@@ -1697,7 +1721,7 @@ def test_render_session_feature_state_public_api_uses_json_values() -> None:
         "symbols",
         "feature-1",
         "hover",
-        {"hover": True},
+        state,
     )
     assert json.to_python(returned) == [("hover", True)]
     assert fake_native.remove_call == ("points", "symbols", "feature-1", "hover")
@@ -1721,7 +1745,7 @@ def test_render_session_feature_state_empty_result_is_empty_object() -> None:
                 "feature-1",
                 None,
             )
-            return json.JsonObject.from_pairs([])
+            return json.JsonObject(())
 
     session = render.RenderSessionHandle._from_native(
         FakeNativeRenderSession(), object()
@@ -1803,7 +1827,7 @@ def test_map_projection_converts_coordinates_and_closes() -> None:
                     camera.EdgeInsets(),
                 )
                 projection.set_visible_geometry(
-                    geo.line_string((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
+                    geo.LineString((geo.LatLng(-1.0, -1.0), geo.LatLng(1.0, 1.0))),
                     camera.EdgeInsets(),
                 )
 
@@ -2155,7 +2179,7 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
     )
     rendered_options = query.RenderedFeatureQueryOptions(
         layer_ids=("landuse",),
-        filter=json.json_array(("==", "class", "park")),
+        filter=json.JsonArray(("==", "class", "park")),
     )
     source_options = query.SourceFeatureQueryOptions(source_layer_ids=("landuse",))
     selector = query.FeatureStateSelector(
@@ -2164,12 +2188,12 @@ def test_query_descriptors_and_results_preserve_public_shape() -> None:
         feature_id="feature-1",
         state_key="hover",
     )
-    feature = geo.Feature(geo.point(0.0, 0.0))
+    feature = geo.Feature(geo.Point(geo.LatLng(0.0, 0.0)))
     queried = query.QueriedFeature(
         feature=feature,
         source_id="source",
         source_layer_id="layer",
-        state=json.json_object((json.JsonMember("hover", True),)),
+        state=json.JsonObject((json.JsonMember("hover", True),)),
     )
     extension = query.FeatureExtensionResult.feature_collection_result((feature,))
 
@@ -2237,11 +2261,11 @@ def test_log_receiver_reports_dropped_records() -> None:
 
 
 def test_json_values_preserve_order_duplicates_and_numeric_shape() -> None:
-    value = json.json_object(
+    value = json.JsonObject(
         (
-            json.JsonMember("same", json.json_uint(1)),
-            json.JsonMember("same", json.json_int(-1)),
-            json.JsonMember("nested", json.json_array((True, json.json_double(1.5)))),
+            json.JsonMember("same", json.JsonUInt(1)),
+            json.JsonMember("same", json.JsonInt(-1)),
+            json.JsonMember("nested", json.JsonArray((True, json.JsonDouble(1.5)))),
         )
     )
 
@@ -2256,7 +2280,7 @@ def test_json_values_preserve_order_duplicates_and_numeric_shape() -> None:
 
 def test_geojson_values_preserve_geometry_and_properties() -> None:
     feature = geo.Feature(
-        geometry=geo.line_string((geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))),
+        geometry=geo.LineString((geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))),
         properties=(
             json.JsonMember("name", "road"),
             json.JsonMember("name", "duplicate"),
@@ -2291,9 +2315,10 @@ def test_resource_values_preserve_native_shape() -> None:
             "prior_data": b"old",
         }
     )
-    response = resource.ResourceResponse.error(
-        resource.ResourceErrorReason.NOT_FOUND,
-        "missing",
+    response = resource.ResourceResponse(
+        status=resource.ResourceResponseStatus.ERROR,
+        error_reason=resource.ResourceErrorReason.NOT_FOUND,
+        error_message="missing",
     )
 
     assert request.kind == resource.ResourceKind.TILE
@@ -2352,6 +2377,57 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
     assert not captured
 
 
+def test_resource_provider_adapter_closes_temporary_handle_on_exception() -> None:
+    class FakeNativeRequest:
+        def __init__(self) -> None:
+            self.closed = False
+            self.close_count = 0
+
+        def complete(self, response: dict[str, object]) -> None:
+            raise AssertionError(response)
+
+        def is_cancelled(self) -> bool:
+            return False
+
+        def close(self) -> None:
+            self.close_count += 1
+            self.closed = True
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        assert request.url == "https://example.test/tile.pbf"
+        assert handle.closed is False
+        msg = "contained provider failure"
+        raise RuntimeError(msg)
+
+    raw_request = {
+        "url": "https://example.test/tile.pbf",
+        "kind": resource.ResourceKind.TILE.native_code,
+        "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
+        "priority": resource.ResourcePriority.LOW,
+        "usage": resource.ResourceUsage.ONLINE,
+        "storage_policy": resource.ResourceStoragePolicy.VOLATILE,
+        "range": None,
+        "prior_modified_unix_ms": None,
+        "prior_expires_unix_ms": None,
+        "prior_etag": None,
+        "prior_data": b"",
+    }
+    native = FakeNativeRequest()
+    adapted = resource._adapt_resource_provider_callback(provider)  # noqa: SLF001
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always", ResourceWarning)
+        with pytest.raises(RuntimeError, match="contained provider failure"):
+            adapted(raw_request, native)
+
+    assert native.closed is True
+    assert native.close_count == 1
+    assert not captured
+
+
 def test_offline_download_state_setter_rejects_unknown_before_native_call() -> None:
     class FakeRuntimeNative:
         def offline_region_set_download_state_start(
@@ -2403,12 +2479,16 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
 
     assert handle.closed is False
     assert handle.is_cancelled() is False
-    handle.complete(resource.ResourceResponse.no_content())
+    handle.complete(
+        resource.ResourceResponse(status=resource.ResourceResponseStatus.NO_CONTENT)
+    )
     assert handle.closed is True
     assert native.completed["status"] == resource.ResourceResponseStatus.NO_CONTENT
     assert native.complete_count == 1
     with pytest.raises(mln.InvalidStateError, match="already closed"):
-        handle.complete(resource.ResourceResponse.no_content())
+        handle.complete(
+            resource.ResourceResponse(status=resource.ResourceResponseStatus.NO_CONTENT)
+        )
     assert native.complete_count == 1
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         handle.is_cancelled()
@@ -2417,7 +2497,9 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     closed = resource.ResourceRequestHandle._from_native(closed_native)
     closed.close()
     with pytest.raises(mln.InvalidStateError, match="already closed"):
-        closed.complete(resource.ResourceResponse.no_content())
+        closed.complete(
+            resource.ResourceResponse(status=resource.ResourceResponseStatus.NO_CONTENT)
+        )
     with pytest.raises(mln.InvalidStateError, match="already closed"):
         closed.is_cancelled()
     assert closed_native.complete_count == 0
@@ -2442,7 +2524,9 @@ def test_resource_request_handle_close_context_and_completion_state() -> None:
     pre_c_native.validation_error = ValueError("native response validation failed")
     pre_c = resource.ResourceRequestHandle._from_native(pre_c_native)
     with pytest.raises(ValueError, match="native response validation failed"):
-        pre_c.complete(resource.ResourceResponse.no_content())
+        pre_c.complete(
+            resource.ResourceResponse(status=resource.ResourceResponseStatus.NO_CONTENT)
+        )
     assert pre_c.closed is False
     assert pre_c_native.complete_count == 0
     assert pre_c_native.close_count == 0
@@ -2517,7 +2601,11 @@ def test_resource_provider_pass_through_delegates_to_native_http() -> None:
         assert temporary_handles
         assert all(handle.closed for handle in temporary_handles)
         with pytest.raises(mln.InvalidStateError, match="already closed"):
-            temporary_handles[0].complete(resource.ResourceResponse.no_content())
+            temporary_handles[0].complete(
+                resource.ResourceResponse(
+                    status=resource.ResourceResponseStatus.NO_CONTENT
+                )
+            )
 
 
 def test_resource_transform_rewrites_copied_network_style_request() -> None:
@@ -2571,7 +2659,7 @@ def test_resource_provider_inline_completion_overrides_pass_through_return() -> 
         nonlocal completions
         if request.url != "custom://inline-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
-        handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+        handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
         completions += 1
         return resource.ResourceProviderDecision.PASS_THROUGH
 
@@ -2609,16 +2697,17 @@ def test_resource_provider_deferred_completion_loads_style_with_copied_request()
             assert handle.is_cancelled() is False
             with pytest.raises(mln.InvalidArgumentError):
                 handle.complete(
-                    resource.ResourceResponse.error(
-                        resource.ResourceErrorReason.OTHER,
-                        "bad\0message",
+                    resource.ResourceResponse(
+                        status=resource.ResourceResponseStatus.ERROR,
+                        error_reason=resource.ResourceErrorReason.OTHER,
+                        error_message="bad\0message",
                     )
                 )
             assert handle.closed is False
 
-            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
             with pytest.raises(mln.InvalidStateError, match="already closed"):
-                handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+                handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
     assert requests[0].kind == resource.ResourceKind.STYLE
@@ -2645,7 +2734,7 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
 
     def complete_on_thread(handle: resource.ResourceRequestHandle) -> None:
         try:
-            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
         except BaseException as error:  # pragma: no cover - re-raised below
             thread_errors.append(error)
 
@@ -2672,9 +2761,10 @@ def test_resource_provider_error_response_reports_loading_failure_event() -> Non
         if request.url != "custom://error-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handle.complete(
-            resource.ResourceResponse.error(
-                resource.ResourceErrorReason.NOT_FOUND,
-                "custom style failed",
+            resource.ResourceResponse(
+                status=resource.ResourceResponseStatus.ERROR,
+                error_reason=resource.ResourceErrorReason.NOT_FOUND,
+                error_message="custom style failed",
             )
         )
         return resource.ResourceProviderDecision.HANDLE
@@ -2701,9 +2791,10 @@ def test_resource_provider_error_response_reports_offline_response_error_event(
         if request.url != "custom://offline-error-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handle.complete(
-            resource.ResourceResponse.error(
-                resource.ResourceErrorReason.NOT_FOUND,
-                "offline style failed",
+            resource.ResourceResponse(
+                status=resource.ResourceResponseStatus.ERROR,
+                error_reason=resource.ResourceErrorReason.NOT_FOUND,
+                error_message="offline style failed",
             )
         )
         return resource.ResourceProviderDecision.HANDLE
@@ -2788,12 +2879,12 @@ def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
             raise AssertionError("resource request was not cancelled")
 
         with pytest.raises(mln.InvalidStateError) as native_error:
-            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
         assert native_error.value.native_status_code == -2
         assert native_error.value.diagnostic
 
         with pytest.raises(mln.InvalidStateError) as terminal_error:
-            handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
         assert terminal_error.value.native_status_code is None
 
 
@@ -2821,9 +2912,11 @@ def test_released_resource_request_handle_stays_stale_after_later_request() -> N
             map_handle.set_style_url("custom://stale-style-2.json")
             live_handle = _wait_for_provider_handle(runtime, handles)
             with pytest.raises(mln.InvalidStateError, match="already closed"):
-                stale_handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+                stale_handle.complete(
+                    resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES)
+                )
             assert live_handle.is_cancelled() is False
-            live_handle.complete(resource.ResourceResponse.ok(_EMPTY_STYLE_BYTES))
+            live_handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
             _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
 
 
@@ -2902,7 +2995,9 @@ def test_custom_geometry_source_scaffolding_queues_copied_events() -> None:
             assert source.dropped_event_count == 1
 
             tile = style.CanonicalTileId(0, 0, 0)
-            data = geo.FeatureCollection((geo.Feature(geometry=geo.point(0.0, 0.0)),))
+            data = geo.FeatureCollection(
+                (geo.Feature(geometry=geo.Point(geo.LatLng(0.0, 0.0))),)
+            )
             bounds = geo.LatLngBounds(
                 southwest=geo.LatLng(-1.0, -1.0),
                 northeast=geo.LatLng(1.0, 1.0),

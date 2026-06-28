@@ -154,30 +154,6 @@ class ResourceResponse:
     etag: str | None = None
     retry_after_unix_ms: int | None = None
 
-    @classmethod
-    def ok(cls, bytes_: bytes = b"") -> "ResourceResponse":
-        """Return a successful response with optional bytes."""
-        return cls(status=ResourceResponseStatus.OK, bytes=bytes_)
-
-    @classmethod
-    def no_content(cls) -> "ResourceResponse":
-        """Return a successful no-content response."""
-        return cls(status=ResourceResponseStatus.NO_CONTENT)
-
-    @classmethod
-    def not_modified(cls) -> "ResourceResponse":
-        """Return a successful not-modified response."""
-        return cls(status=ResourceResponseStatus.NOT_MODIFIED)
-
-    @classmethod
-    def error(cls, reason: ResourceErrorReason, message: str) -> "ResourceResponse":
-        """Return an error response."""
-        return cls(
-            status=ResourceResponseStatus.ERROR,
-            error_reason=reason,
-            error_message=message,
-        )
-
     def _to_native(self) -> dict[str, Any]:
         """Return private native bridge values for this response."""
         return {
@@ -275,9 +251,14 @@ def _adapt_resource_provider_callback(
 
     def adapted(raw_request: dict[str, Any], native_handle: Any) -> int:
         handle = ResourceRequestHandle._from_native(native_handle)  # noqa: SLF001
-        decision = ResourceProviderDecision(
-            callback(ResourceRequest._from_native(raw_request), handle)
-        )
+        try:
+            decision = ResourceProviderDecision(
+                callback(ResourceRequest._from_native(raw_request), handle)
+            )
+        except BaseException:
+            if not handle.closed:
+                handle.close()
+            raise
         if decision is not ResourceProviderDecision.HANDLE and not handle.closed:
             handle.close()
         return decision.native_code

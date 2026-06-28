@@ -1,8 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 import ctypes
+import os
+import sys
+
+
+if sys.platform == "darwin":
+    os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
+    _egl_root = Path(os.environ.get("MLN_FFI_EGL_ROOT", "")).expanduser()
+    _cdll = ctypes.CDLL
+
+    class _MacAngleCDLL(_cdll):  # type: ignore[misc]
+        def __init__(self, name: Any, *args: Any, **kwargs: Any) -> None:
+            name = _macos_angle_library_path(name)
+            super().__init__(name, *args, **kwargs)
+
+    def _macos_angle_library_path(name: Any) -> Any:
+        if name in {"EGL", "GLESv2"} and _egl_root.is_dir():
+            library_path = _egl_root / f"lib{name}.dylib"
+            if library_path.is_file():
+                return str(library_path)
+        return name
+
+    ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
+    ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]
 
 from OpenGL import EGL
 from OpenGL import GLES3 as GL
@@ -14,12 +38,33 @@ class EglUnavailableError(RuntimeError):
     pass
 
 
+EGL_PLATFORM_ANGLE_ANGLE = 0x3202
+EGL_PLATFORM_ANGLE_TYPE_ANGLE = 0x3203
+EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE = 0x3209
+EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE = 0x320A
+EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE = 0x3489
+
+
 def _addr(value: Any) -> int:
     return ctypes.cast(value, ctypes.c_void_p).value or 0
 
 
 def _pointer(value: Any, name: str) -> render.NativePointer:
     return render.NativePointer(_addr(value), _diagnostic_name=name)
+
+
+def _display() -> Any:
+    if sys.platform != "darwin":
+        return EGL.eglGetDisplay(EGL.EGL_DEFAULT_DISPLAY)
+
+    attributes = [
+        EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+        EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+        EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
+        EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+        EGL.EGL_NONE,
+    ]
+    return EGL.eglGetPlatformDisplayEXT(EGL_PLATFORM_ANGLE_ANGLE, None, attributes)
 
 
 @dataclass(slots=True)
@@ -31,9 +76,9 @@ class EglContext:
 
     @classmethod
     def create(cls) -> "EglContext":
-        display = EGL.eglGetDisplay(EGL.EGL_DEFAULT_DISPLAY)
+        display = _display()
         if _addr(display) == 0:
-            msg = "eglGetDisplay returned EGL_NO_DISPLAY"
+            msg = "EGL display creation returned EGL_NO_DISPLAY"
             raise EglUnavailableError(msg)
 
         major = EGL.EGLint()

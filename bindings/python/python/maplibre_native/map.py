@@ -21,7 +21,7 @@ from .camera import (
     ScreenPoint,
 )
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
-from .json import JsonLike, JsonObjectLike, JsonValue
+from .json import JsonObject, JsonValue
 from .render import (
     EglContextDescriptor,
     MetalBorrowedTextureDescriptor,
@@ -535,9 +535,7 @@ class MapHandle(NativeHandleMixin):
         """Load inline style JSON through MapLibre Native style APIs."""
         self._native.set_style_json(json)
 
-    def add_style_source_json(
-        self, source_id: str, source_json: JsonObjectLike
-    ) -> None:
+    def add_style_source_json(self, source_id: str, source_json: JsonObject) -> None:
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)
 
@@ -758,7 +756,7 @@ class MapHandle(NativeHandleMixin):
 
     def add_style_layer_json(
         self,
-        layer_json: JsonObjectLike,
+        layer_json: JsonObject,
         before_layer_id: str | None = None,
     ) -> None:
         """Add one style layer from a full style-spec layer JSON object."""
@@ -768,11 +766,11 @@ class MapHandle(NativeHandleMixin):
         """Return one style layer as a full style-spec layer JSON object."""
         return self._native.get_style_layer_json(layer_id)
 
-    def set_style_light_json(self, light_json: JsonObjectLike) -> None:
+    def set_style_light_json(self, light_json: JsonObject) -> None:
         """Set the style light from a style-spec light JSON object."""
         self._native.set_style_light_json(light_json)
 
-    def set_style_light_property(self, property_name: str, value: JsonLike) -> None:
+    def set_style_light_property(self, property_name: str, value: JsonValue) -> None:
         """Set one style light property by style-spec property name."""
         self._native.set_style_light_property(property_name, value)
 
@@ -784,7 +782,7 @@ class MapHandle(NativeHandleMixin):
         self,
         layer_id: str,
         property_name: str,
-        value: JsonLike,
+        value: JsonValue,
     ) -> None:
         """Set one layer property by style-spec property name."""
         self._native.set_layer_property(layer_id, property_name, value)
@@ -793,7 +791,7 @@ class MapHandle(NativeHandleMixin):
         """Return one layer property as a style-spec JSON value."""
         return self._native.get_layer_property(layer_id, property_name)
 
-    def set_layer_filter(self, layer_id: str, filter: JsonLike | None) -> None:
+    def set_layer_filter(self, layer_id: str, filter: JsonValue | None) -> None:
         """Set or clear one layer filter."""
         self._native.set_layer_filter(layer_id, filter)
 

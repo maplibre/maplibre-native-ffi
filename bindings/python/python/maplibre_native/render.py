@@ -9,7 +9,7 @@ from typing import Any
 from collections.abc import Callable
 
 from .geo import Feature
-from .json import JsonLike, JsonObjectLike, JsonValue
+from .json import JsonObject, JsonValue
 from .query import (
     FeatureExtensionResult,
     FeatureStateSelector,
@@ -458,12 +458,6 @@ class RenderSessionHandle(NativeHandleMixin):
             self._native.read_premultiplied_rgba8_into(buffer)
         )
 
-    def read_premultiplied_rgba8(self) -> PremultipliedRgba8Image:
-        """Read the latest texture frame into copied bytes."""
-        return PremultipliedRgba8Image._from_native(
-            self._native.read_premultiplied_rgba8()
-        )
-
     def acquire_metal_owned_texture_frame(self) -> "MetalOwnedTextureFrameHandle":
         """Acquire a borrowed Metal frame from a session-owned texture target."""
         return MetalOwnedTextureFrameHandle._from_native(  # noqa: SLF001
@@ -523,7 +517,7 @@ class RenderSessionHandle(NativeHandleMixin):
         feature: Feature,
         extension: str,
         extension_field: str,
-        arguments: JsonObjectLike | None = None,
+        arguments: JsonObject | None = None,
     ) -> FeatureExtensionResult:
         """Query a feature extension from the latest render session state."""
         from .query import FeatureExtensionResult
@@ -540,7 +534,7 @@ class RenderSessionHandle(NativeHandleMixin):
     def set_feature_state(
         self,
         selector: FeatureStateSelector,
-        state: JsonLike,
+        state: JsonValue,
     ) -> None:
         """Set per-feature state on a render source for this render session."""
         self._native.set_feature_state(

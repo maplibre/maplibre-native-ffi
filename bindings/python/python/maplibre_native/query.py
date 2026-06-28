@@ -8,7 +8,7 @@ from typing import Any
 
 from .camera import ScreenPoint
 from .geo import Feature
-from .json import JsonLike, JsonValue
+from .json import JsonValue
 
 
 class RenderedQueryGeometryType(NativeIntEnum):
@@ -80,7 +80,7 @@ class RenderedFeatureQueryOptions:
     """Options for rendered feature queries."""
 
     layer_ids: tuple[str, ...] | None = None
-    filter: JsonLike | None = None
+    filter: JsonValue | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,7 +88,7 @@ class SourceFeatureQueryOptions:
     """Options for source feature queries."""
 
     source_layer_ids: tuple[str, ...] | None = None
-    filter: JsonLike | None = None
+    filter: JsonValue | None = None
 
 
 @dataclass(frozen=True, slots=True)

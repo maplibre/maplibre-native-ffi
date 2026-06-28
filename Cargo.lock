@@ -990,8 +990,9 @@ version = "0.0.0"
 dependencies = [
  "maplibre-native-core",
  "maplibre-native-sys",
- "pkg-config",
  "pyo3",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

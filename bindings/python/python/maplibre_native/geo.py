@@ -165,33 +165,6 @@ class FeatureCollection:
 GeoJson: TypeAlias = GeometryGeoJson | FeatureGeoJson | FeatureCollection
 
 
-def empty_geometry() -> EmptyGeometry:
-    """Create an empty geometry."""
-    return EmptyGeometry()
-
-
-def point(latitude: float, longitude: float) -> Point:
-    """Create a point geometry from latitude and longitude."""
-    return Point(LatLng(latitude, longitude))
-
-
-def line_string(coordinates: list[LatLng] | tuple[LatLng, ...]) -> LineString:
-    """Create a line string geometry."""
-    return LineString(tuple(coordinates))
-
-
-def polygon(rings: list[list[LatLng]] | tuple[tuple[LatLng, ...], ...]) -> Polygon:
-    """Create a polygon geometry."""
-    return Polygon(tuple(tuple(ring) for ring in rings))
-
-
-def geometry_collection(
-    geometries: list[Geometry] | tuple[Geometry, ...],
-) -> GeometryCollection:
-    """Create a geometry collection."""
-    return GeometryCollection(tuple(geometries))
-
-
 __all__ = [
     "EmptyGeometry",
     "Feature",
@@ -214,9 +187,4 @@ __all__ = [
     "MultiPolygon",
     "Point",
     "Polygon",
-    "empty_geometry",
-    "geometry_collection",
-    "line_string",
-    "point",
-    "polygon",
 ]

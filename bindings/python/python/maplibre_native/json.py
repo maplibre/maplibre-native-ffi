@@ -59,58 +59,18 @@ class JsonObject:
 
     members: tuple[JsonMember, ...]
 
-    @classmethod
-    def from_pairs(cls, pairs: list[tuple[str, JsonValue]]) -> "JsonObject":
-        """Build an object from ordered key/value pairs."""
-        return cls(tuple(JsonMember(key, value) for key, value in pairs))
-
 
 JsonScalar: TypeAlias = None | bool | str | JsonUInt | JsonInt | JsonDouble
 JsonValue: TypeAlias = JsonScalar | JsonArray | JsonObject
-JsonLike: TypeAlias = (
-    JsonScalar
-    | int
-    | float
-    | JsonArray
-    | JsonObject
-    | list["JsonLike"]
-    | tuple["JsonLike", ...]
-    | dict[object, "JsonLike"]
-)
-JsonObjectLike: TypeAlias = JsonObject | dict[object, JsonLike]
-
-
-def json_uint(value: int) -> JsonUInt:
-    """Create an unsigned JSON integer."""
-    return JsonUInt(value)
-
-
-def json_int(value: int) -> JsonInt:
-    """Create a signed JSON integer."""
-    return JsonInt(value)
-
-
-def json_double(value: float) -> JsonDouble:
-    """Create a finite JSON double."""
-    return JsonDouble(value)
-
-
-def json_array(values: list[JsonValue] | tuple[JsonValue, ...]) -> JsonArray:
-    """Create an ordered JSON array."""
-    return JsonArray(tuple(values))
-
-
-def json_object(members: list[JsonMember] | tuple[JsonMember, ...]) -> JsonObject:
-    """Create an ordered JSON object."""
-    return JsonObject(tuple(members))
 
 
 def from_python(value: Any) -> JsonValue:
     """Convert ordinary Python values to explicit JSON values.
 
     Python `dict` preserves insertion order, but cannot represent duplicate
-    keys. Use `JsonObject.from_pairs()` when duplicate object members matter.
-    Python `int` converts to `JsonInt`; use `json_uint()` to preserve unsigned
+    keys. Use `JsonObject` with explicit `JsonMember` values when duplicate
+    object members matter.
+    Python `int` converts to `JsonInt`; use `JsonUInt` to preserve unsigned
     integer shape.
     """
     if value is None or isinstance(value, bool | str):
@@ -118,7 +78,7 @@ def from_python(value: Any) -> JsonValue:
     if isinstance(value, int):
         return JsonInt(value)
     if isinstance(value, float):
-        return json_double(value)
+        return JsonDouble(value)
     if isinstance(value, list | tuple):
         return JsonArray(tuple(from_python(item) for item in value))
     if isinstance(value, dict):
@@ -150,18 +110,11 @@ __all__ = [
     "JsonArray",
     "JsonDouble",
     "JsonInt",
-    "JsonLike",
     "JsonMember",
     "JsonObject",
-    "JsonObjectLike",
     "JsonScalar",
     "JsonUInt",
     "JsonValue",
     "from_python",
-    "json_array",
-    "json_double",
-    "json_int",
-    "json_object",
-    "json_uint",
     "to_python",
 ]

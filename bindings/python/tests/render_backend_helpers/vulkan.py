@@ -1,16 +1,82 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import metadata, util
+from pathlib import Path
 from typing import Any
+import os
+import sys
+import types
 
 import glfw
-import vulkan as vk
 
 from maplibre_native import render
 
 
 class VulkanUnavailableError(RuntimeError):
     pass
+
+
+def _import_vulkan() -> Any:
+    if sys.platform != "darwin":
+        import vulkan
+
+        return vulkan
+
+    library_dir = Path(os.environ.get("MLN_FFI_DEPENDENCY_LIBRARY_DIR", ""))
+    library_path = library_dir / "libvulkan.dylib"
+    if not library_path.is_file():
+        import vulkan
+
+        return vulkan
+
+    distribution = metadata.distribution("vulkan")
+    package_root = Path(distribution.locate_file("vulkan"))
+    sys.modules.pop("vulkan", None)
+
+    package = types.ModuleType("vulkan")
+    package.__file__ = str(package_root / "__init__.py")
+    package.__path__ = [str(package_root)]
+    package.__package__ = "vulkan"
+    package.__version__ = distribution.version
+    sys.modules["vulkan"] = package
+
+    cache_spec = util.spec_from_file_location(
+        "vulkan._vulkancache",
+        package_root / "_vulkancache.py",
+    )
+    if cache_spec is None or cache_spec.loader is None:
+        msg = "could not load vulkan._vulkancache"
+        raise VulkanUnavailableError(msg)
+    cache_module = util.module_from_spec(cache_spec)
+    sys.modules[cache_spec.name] = cache_module
+    cache_spec.loader.exec_module(cache_module)
+
+    vulkan_spec = util.spec_from_file_location(
+        "vulkan._vulkan", package_root / "_vulkan.py"
+    )
+    if vulkan_spec is None or vulkan_spec.loader is None:
+        msg = "could not load vulkan._vulkan"
+        raise VulkanUnavailableError(msg)
+    vulkan_module = util.module_from_spec(vulkan_spec)
+    sys.modules[vulkan_spec.name] = vulkan_module
+    source = (package_root / "_vulkan.py").read_text(encoding="utf-8")
+    source = source.replace(
+        "_lib_names = ('libvulkan.so.1', 'vulkan-1.dll', 'libvulkan.dylib')",
+        f"_lib_names = ({str(library_path)!r}, 'libvulkan.so.1', 'vulkan-1.dll', 'libvulkan.dylib')",
+    )
+    exec(
+        compile(source, str(package_root / "_vulkan.py"), "exec"),
+        vulkan_module.__dict__,
+    )
+
+    for name, value in vulkan_module.__dict__.items():
+        if not name.startswith("_"):
+            setattr(package, name, value)
+    return package
+
+
+vk = _import_vulkan()
 
 
 def _addr(value: Any) -> int:
@@ -32,6 +98,13 @@ def _has_device_extension(physical_device: Any, name: str) -> bool:
     return any(
         _extension_name(extension) == name
         for extension in vk.vkEnumerateDeviceExtensionProperties(physical_device, None)
+    )
+
+
+def _has_instance_extension(name: str) -> bool:
+    return any(
+        _extension_name(extension) == name
+        for extension in vk.vkEnumerateInstanceExtensionProperties(None)
     )
 
 
@@ -91,6 +164,11 @@ class VulkanContext:
         else:
             extensions = []
 
+        instance_flags = 0
+        if _has_instance_extension("VK_KHR_portability_enumeration"):
+            extensions.append("VK_KHR_portability_enumeration")
+            instance_flags |= vk.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR
+
         app = vk.VkApplicationInfo(
             pApplicationName="maplibre-native-python-render-tests",
             applicationVersion=1,
@@ -99,6 +177,7 @@ class VulkanContext:
             apiVersion=vk.VK_API_VERSION_1_0,
         )
         instance_info = vk.VkInstanceCreateInfo(
+            flags=instance_flags,
             pApplicationInfo=app,
             enabledExtensionCount=len(extensions),
             ppEnabledExtensionNames=extensions,

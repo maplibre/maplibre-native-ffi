@@ -7,7 +7,7 @@ use maplibre_native_core::{
 };
 use maplibre_native_sys as sys;
 use pyo3::buffer::PyBuffer;
-use pyo3::exceptions::PyValueError;
+use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyList, PyTuple};
 use std::collections::{HashMap, VecDeque};
@@ -5396,28 +5396,8 @@ fn json_value_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonVal
         _ => {}
     }
 
-    if let Ok(value) = raw.extract::<i64>() {
-        return Ok(maplibre_core::JsonValue::Int(value));
-    }
-    if let Ok(value) = raw.extract::<f64>() {
-        if !value.is_finite() {
-            return Err(PyValueError::new_err("JSON float values must be finite"));
-        }
-        return Ok(maplibre_core::JsonValue::Double(value));
-    }
-    if let Ok(values) = raw.cast::<PyList>() {
-        return json_array_from_sequence(values.iter(), values.len());
-    }
-    if let Ok(values) = raw.cast::<PyTuple>() {
-        return json_array_from_sequence(values.iter(), values.len());
-    }
-    if let Ok(dict) = raw.cast::<PyDict>() {
-        return json_object_from_dict(dict);
-    }
-
-    Err(invalid_argument_error(format!(
-        "unsupported JSON value: {}",
-        type_name
+    Err(PyTypeError::new_err(format!(
+        "unsupported JSON value: {type_name}"
     )))
 }
 
@@ -5442,51 +5422,6 @@ fn json_array_from_sequence<'py>(
         copied.push(json_value_from_py(&value)?);
     }
     Ok(maplibre_core::JsonValue::Array(copied))
-}
-
-fn json_object_from_dict(dict: &Bound<'_, PyDict>) -> PyResult<maplibre_core::JsonValue> {
-    if let Some(kind) = dict.get_item("type")? {
-        if let Ok(kind) = kind.extract::<String>() {
-            let is_wire = match kind.as_str() {
-                "uint" | "int" | "double" => dict.contains("value")?,
-                "array" => dict.contains("values")?,
-                "object" => dict.contains("members")?,
-                _ => false,
-            };
-            if is_wire {
-                return json_wire_dict_from_py(dict, &kind);
-            }
-        }
-    }
-
-    let mut copied = Vec::with_capacity(dict.len());
-    for (key, value) in dict.iter() {
-        copied.push(maplibre_core::JsonMember::new(
-            key.str()?.to_str()?.to_owned(),
-            json_value_from_py(&value)?,
-        ));
-    }
-    Ok(maplibre_core::JsonValue::Object(copied))
-}
-
-fn json_wire_dict_from_py(
-    dict: &Bound<'_, PyDict>,
-    kind: &str,
-) -> PyResult<maplibre_core::JsonValue> {
-    match kind {
-        "uint" => Ok(maplibre_core::JsonValue::UInt(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "int" => Ok(maplibre_core::JsonValue::Int(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "double" => Ok(maplibre_core::JsonValue::Double(
-            required_dict_item(dict, "value")?.extract()?,
-        )),
-        "array" => json_array_from_py(&required_dict_item(dict, "values")?),
-        "object" => json_object_members_from_py(&required_dict_item(dict, "members")?),
-        _ => unreachable!("wire JSON kind was pre-filtered"),
-    }
 }
 
 fn json_object_members_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::JsonValue> {

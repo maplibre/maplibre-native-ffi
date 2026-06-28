@@ -8,7 +8,7 @@ import time
 import pytest
 
 import maplibre_native as mln
-from maplibre_native import camera, geo, query, render
+from maplibre_native import camera, geo, json, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
@@ -337,7 +337,7 @@ def test_active_vulkan_frame_rejects_nested_acquire_and_session_operations(
     point_query = query.RenderedQueryGeometry.point_geometry(
         camera.ScreenPoint(0.0, 0.0)
     )
-    feature = geo.Feature(geometry=geo.empty_geometry())
+    feature = geo.Feature(geometry=geo.EmptyGeometry())
 
     calls: tuple[Callable[[], object], ...] = (
         lambda: vulkan_owned_session.session.resize(16, 16, 1.0),
@@ -350,7 +350,6 @@ def test_active_vulkan_frame_rejects_nested_acquire_and_session_operations(
         lambda: vulkan_owned_session.session.read_premultiplied_rgba8_into(
             bytearray(4)
         ),
-        vulkan_owned_session.session.read_premultiplied_rgba8,
         vulkan_owned_session.session.acquire_metal_owned_texture_frame,
         vulkan_owned_session.session.acquire_vulkan_owned_texture_frame,
         vulkan_owned_session.session.acquire_opengl_owned_texture_frame,
@@ -364,7 +363,7 @@ def test_active_vulkan_frame_rejects_nested_acquire_and_session_operations(
         ),
         lambda: vulkan_owned_session.session.set_feature_state(
             selector,
-            {"hover": True},
+            json.JsonObject((json.JsonMember("hover", True),)),
         ),
         lambda: vulkan_owned_session.session.get_feature_state(selector),
         lambda: vulkan_owned_session.session.remove_feature_state(selector),
