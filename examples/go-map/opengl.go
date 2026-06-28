@@ -61,6 +61,10 @@ func newOpenGLContext(window *sdl.Window) (*openGLContext, error) {
 		return nil, err
 	}
 	ctx.platform = platform
+	if err := glLoad(); err != nil {
+		_ = ctx.Close()
+		return nil, err
+	}
 	return ctx, nil
 }
 
@@ -144,14 +148,14 @@ func nativePointer(value unsafe.Pointer) maplibre.NativePointer {
 	return maplibre.NativePointer(uintptr(value))
 }
 
-func newOpenGLRenderTarget(window *sdl.Window, v viewport, mode renderTargetMode, m *maplibre.MapHandle) (renderTarget, error) {
+func newOpenGLRenderTarget(context *openGLContext, v viewport, mode renderTargetMode, m *maplibre.MapHandle) (renderTarget, error) {
 	switch mode {
 	case modeOwnedTexture:
-		return newOpenGLOwnedTextureTarget(window, v, m)
+		return newOpenGLOwnedTextureTarget(context, v, m)
 	case modeBorrowedTexture:
-		return newOpenGLBorrowedTextureTarget(window, v, m)
+		return newOpenGLBorrowedTextureTarget(context, v, m)
 	case modeNativeSurface:
-		return newOpenGLSurfaceTarget(window, v, m)
+		return newOpenGLSurfaceTarget(context, v, m)
 	default:
 		return nil, fmt.Errorf("unsupported render target mode: %s", mode)
 	}
@@ -164,16 +168,8 @@ type openGLTextureCompositor struct {
 	view    viewport
 }
 
-func newOpenGLTextureCompositor(window *sdl.Window, v viewport) (*openGLTextureCompositor, error) {
-	context, err := newOpenGLContext(window)
-	if err != nil {
-		return nil, err
-	}
+func newOpenGLTextureCompositor(context *openGLContext, v viewport) (*openGLTextureCompositor, error) {
 	compositor := &openGLTextureCompositor{context: context, view: v}
-	if err := glLoad(); err != nil {
-		_ = compositor.Close()
-		return nil, err
-	}
 	program, err := createTextureProgram()
 	if err != nil {
 		_ = compositor.Close()
@@ -210,10 +206,6 @@ func (compositor *openGLTextureCompositor) Close() error {
 	if compositor.program != 0 {
 		glDeleteProgram(compositor.program)
 		compositor.program = 0
-	}
-	if compositor.context != nil {
-		result = errors.Join(result, compositor.context.Close())
-		compositor.context = nil
 	}
 	return result
 }
@@ -267,8 +259,8 @@ type openGLOwnedTextureTarget struct {
 	session    *maplibre.RenderSessionHandle
 }
 
-func newOpenGLOwnedTextureTarget(window *sdl.Window, v viewport, m *maplibre.MapHandle) (*openGLOwnedTextureTarget, error) {
-	compositor, err := newOpenGLTextureCompositor(window, v)
+func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle) (*openGLOwnedTextureTarget, error) {
+	compositor, err := newOpenGLTextureCompositor(context, v)
 	if err != nil {
 		return nil, err
 	}
@@ -338,8 +330,8 @@ type openGLBorrowedTextureTarget struct {
 	texture    uint32
 }
 
-func newOpenGLBorrowedTextureTarget(window *sdl.Window, v viewport, m *maplibre.MapHandle) (*openGLBorrowedTextureTarget, error) {
-	compositor, err := newOpenGLTextureCompositor(window, v)
+func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *maplibre.MapHandle) (*openGLBorrowedTextureTarget, error) {
+	compositor, err := newOpenGLTextureCompositor(context, v)
 	if err != nil {
 		return nil, err
 	}
@@ -421,16 +413,8 @@ type openGLSurfaceTarget struct {
 	session *maplibre.RenderSessionHandle
 }
 
-func newOpenGLSurfaceTarget(window *sdl.Window, v viewport, m *maplibre.MapHandle) (*openGLSurfaceTarget, error) {
-	context, err := newOpenGLContext(window)
-	if err != nil {
-		return nil, err
-	}
+func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapHandle) (*openGLSurfaceTarget, error) {
 	target := &openGLSurfaceTarget{context: context}
-	if err := glLoad(); err != nil {
-		_ = target.Close()
-		return nil, err
-	}
 	session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{Extent: v.extent(), Context: context.descriptor(), Surface: context.surface()})
 	if err != nil {
 		_ = target.Close()
@@ -445,10 +429,6 @@ func (target *openGLSurfaceTarget) Close() error {
 	if target.session != nil {
 		result = errors.Join(result, target.session.Close())
 		target.session = nil
-	}
-	if target.context != nil {
-		result = errors.Join(result, target.context.Close())
-		target.context = nil
 	}
 	return result
 }

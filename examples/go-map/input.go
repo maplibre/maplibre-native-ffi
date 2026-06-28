@@ -155,7 +155,7 @@ func handleKeyDown(event *sdl.KeyboardEvent, m *maplibre.MapHandle, v viewport) 
 	case sdl.ScancodeLeftbracket:
 		return true, adjustPitchAnimated(m, -pitchStep, &animation)
 	case sdl.Scancode0:
-		resetAnimation := maplibre.AnimationOptions{}.WithDurationMS(220)
+		resetAnimation := maplibre.AnimationOptions{}.WithDurationMS(160)
 		return true, m.EaseTo(maplibre.CameraOptions{}.WithBearing(0).WithPitch(0), &resetAnimation)
 	default:
 		return false, nil

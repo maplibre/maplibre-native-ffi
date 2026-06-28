@@ -3,10 +3,10 @@ package main
 import (
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"strings"
-	"time"
 
 	"github.com/jfreymuth/go-sdl3/sdl"
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
@@ -91,12 +91,20 @@ func run(mode renderTargetMode) error {
 	}
 	defer window.Destroy()
 	_ = window.Raise()
-	_ = sdl.GL_SetSwapInterval(1)
 
 	view := currentViewport(window)
 	view.log("initial viewport")
+	if view.empty() {
+		return errors.New("initial viewport is empty")
+	}
 
-	state, err := newMapState(window, view, mode)
+	graphics, err := newOpenGLContext(window)
+	if err != nil {
+		return err
+	}
+	_ = sdl.GL_SetSwapInterval(1)
+
+	state, err := newMapState(graphics, view, mode)
 	if err != nil {
 		return err
 	}
@@ -108,30 +116,42 @@ func run(mode renderTargetMode) error {
 	logControls()
 
 	running := true
-	hasPresentedFrame := false
 	renderPending := true
 	input := inputController{}
+	handleEvent := func(event *sdl.Event) error {
+		switch event.Type() {
+		case sdl.EventQuit, sdl.EventWindowCloseRequested:
+			running = false
+		case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
+			view = currentViewport(window)
+			view.log("resized viewport")
+			if view.empty() {
+				renderPending = false
+				return nil
+			}
+			if err := state.resize(view, mode); err != nil {
+				return err
+			}
+			renderPending = true
+		default:
+			if view.empty() {
+				return nil
+			}
+			changed, err := input.handleEvent(event, state.mapRef, view)
+			if err != nil {
+				return err
+			}
+			renderPending = renderPending || changed
+		}
+		return nil
+	}
 	for running {
 		didWork := false
 		var event sdl.Event
 		for sdl.PollEvent(&event) {
 			didWork = true
-			switch event.Type() {
-			case sdl.EventQuit, sdl.EventWindowCloseRequested:
-				running = false
-			case sdl.EventWindowResized, sdl.EventWindowPixelSizeChanged, sdl.EventWindowDisplayScaleChanged:
-				view = currentViewport(window)
-				view.log("resized viewport")
-				if err := state.resize(window, view, mode); err != nil {
-					return err
-				}
-				renderPending = true
-			default:
-				changed, err := input.handleEvent(&event, state.mapRef, view)
-				if err != nil {
-					return err
-				}
-				renderPending = renderPending || changed
+			if err := handleEvent(&event); err != nil {
+				return err
 			}
 		}
 
@@ -148,7 +168,7 @@ func run(mode renderTargetMode) error {
 		if err := state.finishFrame(); err != nil {
 			return err
 		}
-		if renderPending {
+		if renderPending && !view.empty() {
 			rendered, err := state.renderUpdate()
 			if err != nil {
 				return err
@@ -156,19 +176,41 @@ func run(mode renderTargetMode) error {
 			if rendered {
 				renderPending = false
 				didWork = true
-				hasPresentedFrame = true
 			}
 		}
 
-		if !didWork {
-			if hasPresentedFrame {
-				time.Sleep(8 * time.Millisecond)
-			} else {
-				time.Sleep(time.Millisecond)
+		if !didWork && running {
+			if sdl.WaitEventTimeout(&event, displayRefreshTimeoutMS(window)) {
+				if err := handleEvent(&event); err != nil {
+					return err
+				}
 			}
 		}
 	}
 	return nil
+}
+
+func displayRefreshTimeoutMS(window *sdl.Window) int32 {
+	display, err := sdl.GetDisplayForWindow(window)
+	if err != nil {
+		return 16
+	}
+	mode, err := display.CurrentDisplayMode()
+	if err != nil {
+		return 16
+	}
+	hz := float64(mode.RefreshRate)
+	if mode.RefreshRateNumerator > 0 && mode.RefreshRateDenominator > 0 {
+		hz = float64(mode.RefreshRateNumerator) / float64(mode.RefreshRateDenominator)
+	}
+	if hz <= 0 {
+		return 16
+	}
+	timeout := int32(math.Ceil(1000 / hz))
+	if timeout < 1 {
+		return 1
+	}
+	return timeout
 }
 
 func validateNativeRenderBackend() error {

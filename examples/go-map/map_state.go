@@ -4,22 +4,23 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jfreymuth/go-sdl3/sdl"
 	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
 )
 
 type mapState struct {
-	runtime *maplibre.RuntimeHandle
-	mapRef  *maplibre.MapHandle
-	target  renderTarget
+	runtime  *maplibre.RuntimeHandle
+	mapRef   *maplibre.MapHandle
+	graphics *openGLContext
+	target   renderTarget
 }
 
-func newMapState(window *sdl.Window, v viewport, mode renderTargetMode) (*mapState, error) {
+func newMapState(graphics *openGLContext, v viewport, mode renderTargetMode) (*mapState, error) {
 	runtimeHandle, err := maplibre.NewRuntimeWithOptions(maplibre.RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
+		_ = graphics.Close()
 		return nil, fmt.Errorf("runtime create failed: %w", err)
 	}
-	state := &mapState{runtime: runtimeHandle}
+	state := &mapState{runtime: runtimeHandle, graphics: graphics}
 
 	mapHandle, err := runtimeHandle.NewMapWithOptions(maplibre.NewMapOptions(v.logicalWidth, v.logicalHeight, v.scaleFactor))
 	if err != nil {
@@ -42,7 +43,7 @@ func newMapState(window *sdl.Window, v viewport, mode renderTargetMode) (*mapSta
 		return nil, fmt.Errorf("camera jump failed: %w", err)
 	}
 
-	target, err := newOpenGLRenderTarget(window, v, mode, mapHandle)
+	target, err := newOpenGLRenderTarget(graphics, v, mode, mapHandle)
 	if err != nil {
 		_ = state.Close()
 		return nil, err
@@ -65,10 +66,14 @@ func (state *mapState) Close() error {
 		result = errors.Join(result, state.runtime.Close())
 		state.runtime = nil
 	}
+	if state.graphics != nil {
+		result = errors.Join(result, state.graphics.Close())
+		state.graphics = nil
+	}
 	return result
 }
 
-func (state *mapState) resize(window *sdl.Window, v viewport, mode renderTargetMode) error {
+func (state *mapState) resize(v viewport, mode renderTargetMode) error {
 	if state.target == nil {
 		return errors.New("render target is not attached")
 	}
@@ -77,7 +82,7 @@ func (state *mapState) resize(window *sdl.Window, v viewport, mode renderTargetM
 			return err
 		}
 		state.target = nil
-		target, err := newOpenGLRenderTarget(window, v, mode, state.mapRef)
+		target, err := newOpenGLRenderTarget(state.graphics, v, mode, state.mapRef)
 		if err != nil {
 			return err
 		}

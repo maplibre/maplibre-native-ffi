@@ -23,14 +23,17 @@ func currentViewport(window *sdl.Window) viewport {
 		physicalWidth, physicalHeight = windowWidth, windowHeight
 	}
 
-	safeWindowWidth := maxInt(windowWidth, 1)
-	safeWindowHeight := maxInt(windowHeight, 1)
-	safePhysicalWidth := maxInt(physicalWidth, 1)
-	safePhysicalHeight := maxInt(physicalHeight, 1)
+	safeWindowWidth := maxInt(windowWidth, 0)
+	safeWindowHeight := maxInt(windowHeight, 0)
+	safePhysicalWidth := maxInt(physicalWidth, 0)
+	safePhysicalHeight := maxInt(physicalHeight, 0)
 	sizeScale := math.Max(
-		float64(safePhysicalWidth)/float64(safeWindowWidth),
-		float64(safePhysicalHeight)/float64(safeWindowHeight),
+		float64(safePhysicalWidth)/float64(maxInt(safeWindowWidth, 1)),
+		float64(safePhysicalHeight)/float64(maxInt(safeWindowHeight, 1)),
 	)
+	if sizeScale <= 0 {
+		sizeScale = 1
+	}
 
 	fallbackScale := sizeScale
 	if density, err := window.PixelDensity(); err == nil && density > 0 {
@@ -56,11 +59,18 @@ func (v viewport) extent() maplibre.RenderTargetExtent {
 	return maplibre.RenderTargetExtent{Width: v.logicalWidth, Height: v.logicalHeight, ScaleFactor: v.scaleFactor}
 }
 
+func (v viewport) empty() bool {
+	return v.logicalWidth == 0 || v.logicalHeight == 0 || v.physicalWidth == 0 || v.physicalHeight == 0
+}
+
 func (v viewport) log(label string) {
 	fmt.Printf("%s: logical=%dx%d physical=%dx%d scale=%.2f\n", label, v.logicalWidth, v.logicalHeight, v.physicalWidth, v.physicalHeight, v.scaleFactor)
 }
 
 func scaledLogicalSize(physical int, scale float64) uint32 {
+	if physical <= 0 {
+		return 0
+	}
 	return uint32(math.Max(math.Ceil(float64(physical)/scale), 1))
 }
 
