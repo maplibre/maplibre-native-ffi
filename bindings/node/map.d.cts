@@ -12,4 +12,11 @@ export {
   type BoundOptions,
   type CameraOptions,
   type AnimationOptions,
+  type StyleImageInput,
+  type StyleImageInfo,
+  type StyleImage,
+  type StyleSourceInfo,
+  type CustomGeometrySourceOptions,
+  type CustomGeometrySourceCallback,
+  type LocationIndicatorImageKind,
 } from "./index.cjs";

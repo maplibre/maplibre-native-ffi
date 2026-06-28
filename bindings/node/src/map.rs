@@ -181,6 +181,7 @@ pub struct StyleImage {
     pub width: u32,
     pub height: u32,
     pub stride: u32,
+    pub byte_length: i64,
     pub pixel_ratio: f64,
     pub sdf: bool,
     pub pixels: Uint8Array,
@@ -190,7 +191,6 @@ pub struct StyleImage {
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
     custom_geometry_sources: Mutex<HashMap<String, Box<CustomGeometrySourceState>>>,
-    retired_custom_geometry_sources: Mutex<Vec<CustomGeometrySourceStateBox>>,
 }
 
 #[napi(js_name = "createNativeMapHandle")]
@@ -211,7 +211,6 @@ pub fn create_native_map_handle(
     Ok(NativeMapHandle {
         state,
         custom_geometry_sources: Mutex::new(HashMap::new()),
-        retired_custom_geometry_sources: Mutex::new(Vec::new()),
     })
 }
 
@@ -756,14 +755,10 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         if removed {
-            let removed_source = self
-                .custom_geometry_sources
+            self.custom_geometry_sources
                 .lock()
                 .expect("custom geometry source mutex poisoned")
                 .remove(&source_id_string);
-            if let Some(source) = removed_source {
-                self.retire_custom_geometry_source(source);
-            }
         }
         Ok(removed)
     }
@@ -1000,14 +995,10 @@ impl NativeMapHandle {
         })
         .map_err(error::from_core)?;
         if let Some(state) = state {
-            let replaced = self
-                .custom_geometry_sources
+            self.custom_geometry_sources
                 .lock()
                 .expect("custom geometry source mutex poisoned")
                 .insert(source_id, state);
-            if let Some(replaced) = replaced {
-                self.retire_custom_geometry_source(replaced);
-            }
         }
         Ok(())
     }
@@ -1175,6 +1166,7 @@ impl NativeMapHandle {
             width: info.width,
             height: info.height,
             stride: info.stride,
+            byte_length: byte_length as i64,
             pixel_ratio: info.pixel_ratio,
             sdf: info.sdf,
             pixels: Uint8Array::from(pixels),
@@ -1676,7 +1668,7 @@ impl NativeMapHandle {
         let json = c_string(json, "style JSON")?;
         core::check(unsafe { sys::mln_map_set_style_json(self.state.as_ptr(), json.as_ptr()) })
             .map_err(error::from_core)?;
-        self.retire_all_custom_geometry_sources();
+        self.clear_all_custom_geometry_source_state();
         Ok(())
     }
 
@@ -1685,15 +1677,50 @@ impl NativeMapHandle {
         let url = c_string(url, "style URL")?;
         core::check(unsafe { sys::mln_map_set_style_url(self.state.as_ptr(), url.as_ptr()) })
             .map_err(error::from_core)?;
-        self.retire_all_custom_geometry_sources();
         Ok(())
     }
 
     #[napi(js_name = "releaseDetachedCustomGeometrySources")]
     pub fn release_detached_custom_geometry_sources(&self) {
-        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
-            retired_sources.clear();
+        let source_ids = match self.custom_geometry_sources.lock() {
+            Ok(sources) => sources.keys().cloned().collect::<Vec<_>>(),
+            Err(_) => return,
+        };
+        let mut detached_sources = Vec::new();
+        for source_id in source_ids {
+            let source_id_view = core::string::string_view(&source_id);
+            let mut source_type = 0;
+            let mut found = false;
+            let status = unsafe {
+                sys::mln_map_get_style_source_type(
+                    self.state.as_ptr(),
+                    source_id_view.raw(),
+                    &mut source_type,
+                    &mut found,
+                )
+            };
+            if status == sys::MLN_STATUS_OK
+                && (!found || source_type != sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
+            {
+                detached_sources.push(source_id);
+            }
         }
+        if detached_sources.is_empty() {
+            return;
+        }
+        if let Ok(mut sources) = self.custom_geometry_sources.lock() {
+            for source_id in detached_sources {
+                sources.remove(&source_id);
+            }
+        }
+    }
+
+    #[napi(js_name = "customGeometrySourceCountForTesting")]
+    pub fn custom_geometry_source_count_for_testing(&self) -> u32 {
+        self.custom_geometry_sources
+            .lock()
+            .expect("custom geometry source mutex poisoned")
+            .len() as u32
     }
 }
 
@@ -1703,11 +1730,6 @@ impl Drop for NativeMapHandle {
             crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut sources) = self.custom_geometry_sources.lock() {
                 for (_, source) in sources.drain() {
-                    Box::leak(source);
-                }
-            }
-            if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
-                for source in retired_sources.drain(..) {
                     Box::leak(source);
                 }
             }
@@ -2157,8 +2179,6 @@ fn location_indicator_image_kind_from_string(kind: &str) -> Result<u32> {
     }
 }
 
-type CustomGeometrySourceStateBox = Box<CustomGeometrySourceState>;
-
 struct CustomGeometrySourceState {
     fetch_tile: Arc<ThreadsafeFunction<CanonicalTileId>>,
     cancel_tile: Option<Arc<ThreadsafeFunction<CanonicalTileId>>>,
@@ -2176,44 +2196,9 @@ struct CustomGeometryUpcallGuard<'a> {
 }
 
 impl NativeMapHandle {
-    fn retire_custom_geometry_source(&self, source: CustomGeometrySourceStateBox) {
-        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
-            retired_sources.push(source);
-        } else {
-            Box::leak(source);
-        }
-    }
-
-    fn retire_all_custom_geometry_sources(&self) {
-        let sources = self.custom_geometry_sources.lock().map(|mut sources| {
-            sources
-                .drain()
-                .map(|(_, source)| source)
-                .collect::<Vec<_>>()
-        });
-        match sources {
-            Ok(sources) => {
-                for source in sources {
-                    self.retire_custom_geometry_source(source);
-                }
-            }
-            Err(_) => {
-                // If the active-source registry is poisoned, keep the map live
-                // and let Drop leak the native handle rather than free callback
-                // state whose native reachability is no longer knowable.
-                if let Some(address) = self.state.leak_for_report() {
-                    crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
-                }
-            }
-        }
-    }
-
     fn clear_all_custom_geometry_source_state(&self) {
         if let Ok(mut sources) = self.custom_geometry_sources.lock() {
             sources.clear();
-        }
-        if let Ok(mut retired_sources) = self.retired_custom_geometry_sources.lock() {
-            retired_sources.clear();
         }
     }
 }

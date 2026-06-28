@@ -4,7 +4,7 @@ use std::os::raw::c_char;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
@@ -245,7 +245,7 @@ static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<String, ResourceRequestR
 #[derive(Clone)]
 struct ResourceRequestRegistration {
     handle: Arc<core::resource::ResourceRequestHandleState>,
-    provider: Arc<ResourceProviderState>,
+    provider: Weak<ResourceProviderState>,
 }
 
 struct ResourceMatcher {
@@ -774,9 +774,9 @@ unsafe fn resource_provider_trampoline_inner(
         return core::resource::UNKNOWN_PROVIDER_DECISION;
     }
     let provider_ptr = user_data as *const ResourceProviderState;
-    // SAFETY: user_data was created from Arc::as_ptr and native retains it only
-    // while runtime state owns the provider or a pending request registration
-    // keeps it alive. Increment before from_raw to create an owned clone.
+    // SAFETY: user_data was created from Arc::as_ptr and native retains it while
+    // the runtime state owns the provider. Increment before from_raw to create
+    // an owned clone for this callback invocation.
     unsafe { Arc::increment_strong_count(provider_ptr) };
     let provider = unsafe { Arc::from_raw(provider_ptr) };
     let raw_request = unsafe { &*request };
@@ -928,7 +928,7 @@ fn register_resource_request_handle(
             completion_token.clone(),
             ResourceRequestRegistration {
                 handle,
-                provider: Arc::clone(provider),
+                provider: Arc::downgrade(provider),
             },
         );
     }
@@ -951,7 +951,8 @@ fn unregister_resource_request_handle(
         .ok()
         .and_then(|mut handles| handles.remove(completion_token));
     if let Some(registration) = &registration
-        && let Ok(mut pending) = registration.provider.pending_completion_tokens.lock()
+        && let Some(provider) = registration.provider.upgrade()
+        && let Ok(mut pending) = provider.pending_completion_tokens.lock()
     {
         pending.remove(completion_token);
     }

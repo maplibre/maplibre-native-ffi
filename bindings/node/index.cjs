@@ -624,7 +624,30 @@ function takeOfflineOperation(
   );
   const result = translateNativeErrors(() => take(operationId));
   operation._markConsumed();
-  return result;
+  return translateOfflineOperationResult(result);
+}
+
+function translateOfflineOperationResult(result) {
+  if (Array.isArray(result)) {
+    return result.map(translateOfflineRegionInfo);
+  }
+  return translateOfflineRegionInfo(result);
+}
+
+function translateOfflineRegionInfo(region) {
+  if (
+    region?.definition?.kind !== "geometry" ||
+    region.definition.geometry == null
+  ) {
+    return region;
+  }
+  return {
+    ...region,
+    definition: {
+      ...region.definition,
+      geometry: parseJson(region.definition.geometry),
+    },
+  };
 }
 
 function validateByteLength(byteLength) {
@@ -1429,7 +1452,12 @@ class RenderSessionHandle {
     }
     recordHandleEnvironment(this);
     defineCheckedNative(this, nativeHandle);
-    this.map = map;
+    Object.defineProperty(this, "map", {
+      value: map,
+      enumerable: true,
+      configurable: false,
+      writable: false,
+    });
   }
 
   close() {
@@ -2051,6 +2079,12 @@ class MapHandle {
     }
   }
 
+  _customGeometrySourceCountForTesting() {
+    return translateNativeErrors(() =>
+      liveNativeOf(this).customGeometrySourceCountForTesting(),
+    );
+  }
+
   setCustomGeometrySourceTileData(sourceId, tileId, data) {
     return translateNativeErrors(() =>
       liveNativeOf(this).setCustomGeometrySourceTileData(
@@ -2307,6 +2341,17 @@ function stringifyJson(value) {
     );
   }
   return json;
+}
+
+function parseJson(value) {
+  try {
+    return JSON.parse(value);
+  } catch (error) {
+    throw new InvalidArgumentError(
+      null,
+      `JSON value from native is invalid: ${error.message}`,
+    );
+  }
 }
 
 function translateNativeErrors(callback) {

@@ -37,6 +37,8 @@ const {
 } = require("..");
 const nativeAddon = require("../index.js");
 
+const EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}';
+
 /**
  * @param {string} completionToken
  * @param {string} url
@@ -1408,6 +1410,7 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     });
     const copiedImage = map.copyStyleImagePremultipliedRgba8("red-pixel");
     assert.ok(copiedImage);
+    assert.equal(copiedImage.byteLength, 4);
     assert.deepEqual([...copiedImage.pixels], [255, 0, 0, 255]);
     assert.equal(map.copyStyleImagePremultipliedRgba8("missing-image"), null);
     assert.equal(map.removeStyleImage("red-pixel"), true);
@@ -1603,6 +1606,88 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     assert.throws(
       () => map.addStyleLayerJson(/** @type {any} */ (undefined)),
       InvalidArgumentError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
+});
+
+test("custom geometry callback retention follows current style ownership", async () => {
+  const runtime = new RuntimeHandle();
+  runtime.setResourceProviderRoutes(
+    [{ kind: "style", url: "custom://empty-style.json" }],
+    (request) => {
+      assert.equal(request.kind, "style");
+      request.handle.complete({
+        bytes: new TextEncoder().encode(EMPTY_STYLE_JSON),
+      });
+    },
+  );
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setStyleJson(EMPTY_STYLE_JSON);
+    map.addCustomGeometrySource("custom-geometry", {
+      fetchTile() {},
+    });
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      1,
+    );
+
+    /** @type {any} */ (map)._releaseDetachedCustomGeometrySources();
+    assert.equal(map.getStyleSourceType("custom-geometry"), "custom-vector");
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      1,
+    );
+
+    assert.equal(map.removeStyleSource("custom-geometry"), true);
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      0,
+    );
+
+    map.addCustomGeometrySource("custom-geometry", {
+      fetchTile() {},
+    });
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      1,
+    );
+    map.setStyleJson(EMPTY_STYLE_JSON);
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      0,
+    );
+
+    map.addCustomGeometrySource("custom-geometry", {
+      fetchTile() {},
+    });
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      1,
+    );
+    for (let i = 0; i < 5; i += 1) {
+      runtime.runOnce();
+      while (runtime.pollEvent() != null) {}
+    }
+
+    map.setStyleUrl("custom://empty-style.json");
+    await eventually(() => {
+      runtime.runOnce();
+      let event;
+      while ((event = runtime.pollEvent()) != null) {
+        if (event.eventType === "map-style-loaded") {
+          return event;
+        }
+      }
+      return null;
+    });
+    assert.equal(
+      /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
+      0,
     );
   } finally {
     map.close();

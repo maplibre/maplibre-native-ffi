@@ -216,7 +216,9 @@ extern "C" fn log_trampoline(
     }
 
     let _ = catch_unwind(AssertUnwindSafe(|| {
-        let state = unsafe { &*user_data.cast::<LogCallbackState>() };
+        let state_ptr = user_data.cast::<LogCallbackState>();
+        unsafe { Arc::increment_strong_count(state_ptr) };
+        let state = unsafe { Arc::from_raw(state_ptr) };
         state.callback.call(
             Ok(LogRecord {
                 severity: log_severity_name(severity).to_owned(),

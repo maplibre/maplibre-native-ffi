@@ -1,8 +1,4 @@
-import {
-  type JsonValue,
-  type RenderedQueryGeometry,
-  type StyleImageInput,
-} from "@maplibre/native-ffi-node";
+import { type JsonValue } from "@maplibre/native-ffi-node";
 import { InvalidArgumentError } from "@maplibre/native-ffi-node/error";
 import {
   projectedMetersForLatLng,
@@ -12,15 +8,22 @@ import { setLogCallback, type LogRecord } from "@maplibre/native-ffi-node/log";
 import {
   MapHandle,
   type CameraOptions,
+  type CustomGeometrySourceOptions,
+  type LocationIndicatorImageKind,
   type MapTileOptionsInput,
   type MapViewportOptionsInput,
+  type StyleImageInfo,
+  type StyleImageInput,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
 import {
   NativeBuffer,
   NativePointer,
   RenderSessionHandle,
+  type FeatureStateSelector,
   type MetalBorrowedTextureDescriptor,
+  type QueriedFeature,
+  type RenderedQueryGeometry,
   type TextureReadbackBuffer,
 } from "@maplibre/native-ffi-node/render";
 import {
@@ -112,6 +115,20 @@ const image: StyleImageInput = {
   height: 1,
   pixels: new Uint8Array(4),
 };
+const imageInfo: StyleImageInfo = {
+  width: 1,
+  height: 1,
+  stride: 4,
+  byteLength: 4,
+  pixelRatio: 1,
+  sdf: false,
+};
+const customGeometryOptions: CustomGeometrySourceOptions = {
+  fetchTile: (tileId) => void tileId.z,
+};
+const locationIndicatorKind: LocationIndicatorImageKind = "top";
+const featureSelector: FeatureStateSelector = { sourceId: "source" };
+const queriedFeature: QueriedFeature = { feature: { type: "Feature" } };
 const json: JsonValue = { ok: true };
 void camera;
 void descriptor;
@@ -129,4 +146,9 @@ void readbackBuffer;
 void invalidTransformRuleMissingPrefix;
 void invalidTransformRuleBothReplacements;
 void image;
+void imageInfo;
+void customGeometryOptions;
+void locationIndicatorKind;
+void featureSelector;
+void queriedFeature;
 void json;

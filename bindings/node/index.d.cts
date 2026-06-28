@@ -583,7 +583,7 @@ export interface OfflineRegionDefinitionValue {
   kind: "tilePyramid" | "geometry";
   styleUrl: string;
   bounds?: LatLngBounds | null;
-  geometry?: string | null;
+  geometry?: JsonValue | null;
   minZoom: number;
   maxZoom: number;
   pixelRatio: number;
