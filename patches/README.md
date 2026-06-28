@@ -52,9 +52,9 @@ The patch currently carries these logical changes:
 
 The browser example freeze observed while stress testing was caused by retained
 WebGPU render-thread cleanup jobs, not HTTP slot management or tile-cache
-eviction. A 45.5 second city-flight benchmark previously exhausted the 2 GB Wasm
-heap around Paris/Sydney. After draining WebGPU render jobs from the context
-cleanup path, the same benchmark completed with no current-run crash, heap
+eviction. A 45.5 second manual city-flight stress run previously exhausted the 2
+GB Wasm heap around Paris/Sydney. After draining WebGPU render jobs from the
+context cleanup path, the same route completed with no current-run crash, heap
 allocation stayed within the initial 1 GB reservation, and live malloc
 allocation settled around 285 MB.
 
