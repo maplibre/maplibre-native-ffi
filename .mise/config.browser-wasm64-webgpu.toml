@@ -17,9 +17,3 @@ MLN_FFI_CMAKE_ARGS = """
 -DMLN_EMSCRIPTEN_STACK_SIZE={{env.MLN_EMSCRIPTEN_STACK_SIZE}}
 -DMLN_EMSCRIPTEN_PTHREAD_POOL_SIZE={{env.MLN_EMSCRIPTEN_PTHREAD_POOL_SIZE}}
 """
-
-[tools]
-emsdk = "4.0.10"
-
-[tasks.run]
-run = [{ task = "//examples/browser-map:run" }]

@@ -49,13 +49,11 @@ function(mln_write_artifact_metadata target)
     list(
       APPEND library_dirs "${CMAKE_BINARY_DIR}"
       "${CMAKE_BINARY_DIR}/maplibre-native"
-      "${CMAKE_BINARY_DIR}/maplibre-native/vendor/maplibre-tile-spec/cpp"
-      "${PROJECT_SOURCE_DIR}/target/$ENV{CARGO_BUILD_TARGET}/release")
+      "${CMAKE_BINARY_DIR}/maplibre-native/vendor/maplibre-tile-spec/cpp")
     list(
       APPEND
       link_libraries
       maplibre-native-c
-      maplibre_native_platform
       mbgl-core
       mbgl-freetype
       mbgl-harfbuzz

@@ -320,6 +320,7 @@
 --include-struct mln_opengl_context_descriptor
 --include-struct mln_render_target_extent
 --include-struct mln_vulkan_context_descriptor
+--include-struct mln_webgpu_context_descriptor
 --include-struct mln_wgl_context_descriptor
 
 # include/maplibre_native_c/runtime.h

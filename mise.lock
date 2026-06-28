@@ -695,6 +695,10 @@ conda_deps = [
 version = "10.0.203"
 backend = "core:dotnet"
 
+[[tools.emsdk]]
+version = "4.0.10"
+backend = "asdf:emsdk"
+
 [[tools."github:prefix-dev/pixi"]]
 version = "0.68.1"
 backend = "github:prefix-dev/pixi"
