@@ -52,11 +52,10 @@ struct NativeLeakReportEntry {
     address: usize,
 }
 
-static LOG_CALLBACK: OnceLock<Mutex<Option<LogCallbackState>>> = OnceLock::new();
+static LOG_CALLBACK: OnceLock<Mutex<Option<Arc<LogCallbackState>>>> = OnceLock::new();
 static LOG_CALLBACK_IDS: AtomicU64 = AtomicU64::new(1);
 static NATIVE_LEAK_REPORTS: OnceLock<Mutex<Vec<NativeLeakReportEntry>>> = OnceLock::new();
 
-#[derive(Clone)]
 struct LogCallbackState {
     id: u64,
     callback: Arc<ThreadsafeFunction<LogRecord>>,
@@ -133,27 +132,36 @@ pub fn set_network_status(status: String) -> Result<()> {
 
 #[napi(js_name = "nativeSetLogCallback")]
 pub fn native_set_log_callback(env: Env, callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
-    let state = LogCallbackState {
+    let state = Arc::new(LogCallbackState {
         id: LOG_CALLBACK_IDS.fetch_add(1, Ordering::Relaxed),
         callback: Arc::new(callback),
-    };
+    });
     env.add_env_cleanup_hook(state.id, clear_log_callback_if_current)?;
-    maplibre_native_core::check(unsafe {
-        maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), std::ptr::null_mut())
-    })
-    .map_err(error::from_core)?;
-    *log_callback_slot()
-        .lock()
-        .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))? = Some(state);
+    let user_data = Arc::as_ptr(&state).cast_mut().cast::<c_void>();
+    let previous = {
+        let mut slot = log_callback_slot()
+            .lock()
+            .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))?;
+        maplibre_native_core::check(unsafe {
+            maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), user_data)
+        })
+        .map_err(error::from_core)?;
+        slot.replace(state)
+    };
+    drop(previous);
     Ok(())
 }
 
 #[napi(js_name = "nativeClearLogCallback")]
 pub fn native_clear_log_callback() -> Result<()> {
-    clear_native_log_callback()?;
-    *log_callback_slot()
-        .lock()
-        .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))? = None;
+    let previous = {
+        let mut slot = log_callback_slot()
+            .lock()
+            .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))?;
+        clear_native_log_callback()?;
+        slot.take()
+    };
+    drop(previous);
     Ok(())
 }
 
@@ -197,30 +205,29 @@ pub fn native_log_severity_mask_bit(severity: String) -> Result<u32> {
 }
 
 extern "C" fn log_trampoline(
-    _user_data: *mut c_void,
+    user_data: *mut c_void,
     severity: u32,
     event: u32,
     code: i64,
     message: *const c_char,
 ) -> u32 {
+    if user_data.is_null() {
+        return 0;
+    }
+
     let _ = catch_unwind(AssertUnwindSafe(|| {
-        let callback = log_callback_slot()
-            .lock()
-            .ok()
-            .and_then(|slot| slot.as_ref().map(|state| Arc::clone(&state.callback)));
-        if let Some(callback) = callback {
-            callback.call(
-                Ok(LogRecord {
-                    severity: log_severity_name(severity).to_owned(),
-                    raw_severity: severity,
-                    event: log_event_name(event).to_owned(),
-                    raw_event: event,
-                    code,
-                    message: copy_log_message(message),
-                }),
-                ThreadsafeFunctionCallMode::NonBlocking,
-            );
-        }
+        let state = unsafe { &*user_data.cast::<LogCallbackState>() };
+        state.callback.call(
+            Ok(LogRecord {
+                severity: log_severity_name(severity).to_owned(),
+                raw_severity: severity,
+                event: log_event_name(event).to_owned(),
+                raw_event: event,
+                code,
+                message: copy_log_message(message),
+            }),
+            ThreadsafeFunctionCallMode::NonBlocking,
+        );
     }));
     0
 }
@@ -238,22 +245,16 @@ fn native_leak_reports() -> &'static Mutex<Vec<NativeLeakReportEntry>> {
     NATIVE_LEAK_REPORTS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-fn log_callback_slot() -> &'static Mutex<Option<LogCallbackState>> {
+fn log_callback_slot() -> &'static Mutex<Option<Arc<LogCallbackState>>> {
     LOG_CALLBACK.get_or_init(|| Mutex::new(None))
 }
 
 fn clear_log_callback_if_current(id: u64) {
-    let should_clear = log_callback_slot()
-        .lock()
-        .map(|slot| slot.as_ref().is_some_and(|state| state.id == id))
-        .unwrap_or(false);
-    if should_clear {
-        let _ = clear_native_log_callback();
-        if let Ok(mut slot) = log_callback_slot().lock()
-            && slot.as_ref().is_some_and(|state| state.id == id)
-        {
-            *slot = None;
-        }
+    let Ok(mut slot) = log_callback_slot().lock() else {
+        return;
+    };
+    if slot.as_ref().is_some_and(|state| state.id == id) && clear_native_log_callback().is_ok() {
+        drop(slot.take());
     }
 }
 
