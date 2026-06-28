@@ -1,0 +1,7 @@
+[requires]
+backend = ["opengl"]
+exclude = ["windows-arm64-wgl"]
+os = ["linux", "macos", "windows"]
+
+[ci]
+check = "//examples/go-map:check"
