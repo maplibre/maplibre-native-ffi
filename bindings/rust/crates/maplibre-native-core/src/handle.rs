@@ -59,6 +59,18 @@ impl<T> NativeHandleState<T> {
             .map_or(std::ptr::null_mut(), |address| address as *mut T)
     }
 
+    pub fn address(&self) -> Option<usize> {
+        self.address.get()
+    }
+
+    pub fn mark_closed(&self) {
+        self.address.set(None);
+    }
+
+    pub fn restore_address_for_retry(&self, address: usize) {
+        self.address.set(Some(address));
+    }
+
     pub fn as_non_null(&self) -> Option<NonNull<T>> {
         NonNull::new(self.as_ptr())
     }

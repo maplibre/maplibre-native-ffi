@@ -1,0 +1,116 @@
+name: Snapshots
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: native package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      actions: read
+      contents: write
+    concurrency:
+      group: snapshot-releases
+      cancel-in-progress: false
+    env:
+      CI_RUN_URL: ${{ github.event.workflow_run.html_url }}
+      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_TAG: unstable-native-snapshot
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+          pattern: native-package-*-${{ github.event.workflow_run.head_sha }}
+          path: build/packages/native/release
+          merge-multiple: true
+      - name: Prepare release assets
+        run: |
+          python3 - build/packages/native/release <<'PY'
+          import hashlib
+          import os
+          import pathlib
+          import sys
+
+          release_dir = pathlib.Path(sys.argv[1])
+          tarballs = sorted(release_dir.glob("*.tar.gz"))
+          if not tarballs:
+              raise SystemExit(f"no native package tarballs found in {release_dir}")
+
+          server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+          repository = os.environ["GITHUB_REPOSITORY"]
+          snapshot_sha = os.environ["SNAPSHOT_SHA"]
+          notes = "\n".join(
+              [
+                  "Unstable native package snapshot.",
+                  "",
+                  f"Commit: {server_url}/{repository}/commit/{snapshot_sha}",
+                  f"CI run: {os.environ['CI_RUN_URL']}",
+                  f"Snapshot run: {server_url}/{repository}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+                  "",
+              ]
+          )
+          (release_dir / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
+
+          checksums = []
+          for path in tarballs:
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              checksums.append(f"{digest}  {path.name}")
+          (release_dir / "SHA256SUMS").write_text(
+              "\n".join(checksums) + "\n", encoding="utf-8"
+          )
+          PY
+      - name: Move snapshot tag
+        id: move_snapshot_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
+          if [[ "$main_sha" != "$SNAPSHOT_SHA" ]]; then
+            echo "Skipping snapshot publish because main advanced to $main_sha"
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${SNAPSHOT_TAG}" >/dev/null 2>&1; then
+            gh api \
+              --method PATCH \
+              "repos/${GITHUB_REPOSITORY}/git/refs/tags/${SNAPSHOT_TAG}" \
+              -f sha="$SNAPSHOT_SHA" \
+              -F force=true >/dev/null
+          else
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${SNAPSHOT_TAG}" \
+              -f sha="$SNAPSHOT_SHA" >/dev/null
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+      - name: Publish floating release
+        if: ${{ steps.move_snapshot_tag.outputs.publish == 'true' }}
+        uses: softprops/action-gh-release@2bb465e97f322d3cb2a965294d483e0d26a67aa9 # v3.0.1
+        with:
+          tag_name: ${{ env.SNAPSHOT_TAG }}
+          target_commitish: ${{ env.SNAPSHOT_SHA }}
+          name: Native package snapshot
+          body_path: build/packages/native/release/RELEASE_NOTES.md
+          prerelease: true
+          make_latest: false
+          fail_on_unmatched_files: true
+          files: |
+            build/packages/native/release/*.tar.gz
+            build/packages/native/release/SHA256SUMS

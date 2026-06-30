@@ -1,0 +1,23 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev maturin build --auditwheel skip"
+
+[tasks.develop]
+depends = ["//:ensure-native-library"]
+run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev maturin develop"
+
+[tasks.test]
+depends = [":develop"]
+run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev pytest"
+
+[tasks.typecheck]
+depends = ["//:ensure-native-library"]
+run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python"
+
+[tasks.ci]
+run = [
+  "mise run //bindings/python:test",
+  "mise run //bindings/python:typecheck",
+  "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev maturin build --auditwheel skip",
+  'env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev python -c "import importlib.metadata; import maplibre_native; import maplibre_native._native; assert importlib.metadata.version(\"maplibre-native\") == \"0.0.0\""',
+]

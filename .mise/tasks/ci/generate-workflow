@@ -24,6 +24,10 @@ from ci.manifest import (  # noqa: E402
 )
 
 CHECKOUT_ACTION = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0"
+UPLOAD_ARTIFACT_ACTION = (
+    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"  # v7.0.1
+)
+DESKTOP_OSES = {"linux", "macos", "windows"}
 
 
 def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
@@ -83,6 +87,24 @@ def represent_literal_string(dumper: yaml.Dumper, data: LiteralString) -> yaml.N
 WorkflowDumper.add_representer(LiteralString, represent_literal_string)
 
 
+def native_package_steps() -> list[dict[str, object]]:
+    return [
+        {"run": "mise run package-native"},
+        {
+            "uses": UPLOAD_ARTIFACT_ACTION,
+            "with": {
+                "name": "native-package-${{ env.MISE_ENV }}-${{ github.sha }}",
+                "path": "build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz",
+                "if-no-files-found": "error",
+            },
+        },
+    ]
+
+
+def package_native_variant(variant: Variant) -> bool:
+    return variant.os in DESKTOP_OSES
+
+
 def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> str:
     jobs = {
         "hygiene": {
@@ -117,6 +139,7 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
                 *setup_steps(),
                 {"run": "mise run configure"},
                 *({"run": command} for command in variant_commands),
+                *(native_package_steps() if package_native_variant(variant) else []),
             ],
         }
 
