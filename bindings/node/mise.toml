@@ -9,7 +9,7 @@ pnpm --filter @maplibre/native-ffi-node build
 [tasks.test]
 depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "env LD_LIBRARY_PATH=\"$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" pnpm --filter @maplibre/native-ffi-node test"
+run = "env LD_LIBRARY_PATH=\"$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\" PATH=\"$MLN_FFI_BUILD_DIR:$PATH\" pnpm --filter @maplibre/native-ffi-node test"
 
 [tasks.ci]
 depends = [":test"]

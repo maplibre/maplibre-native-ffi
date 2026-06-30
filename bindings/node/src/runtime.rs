@@ -44,7 +44,7 @@ pub struct OfflineRegionDefinitionValue {
     pub kind: String,
     pub style_url: String,
     pub bounds: Option<crate::values::LatLngBounds>,
-    pub geometry: Option<String>,
+    pub geometry: Option<serde_json::Value>,
     pub min_zoom: f64,
     pub max_zoom: f64,
     pub pixel_ratio: f64,
@@ -1628,7 +1628,7 @@ fn offline_region_definition_to_value(
             kind: "geometry".to_owned(),
             style_url,
             bounds: None,
-            geometry: Some(json_string_from_serde(geometry_to_serde(geometry))?),
+            geometry: Some(geometry_to_serde(geometry)),
             min_zoom,
             max_zoom,
             pixel_ratio: f64::from(pixel_ratio),
@@ -1704,14 +1704,6 @@ fn coordinates_to_serde(coordinates: Vec<core::LatLng>) -> serde_json::Value {
             .map(|coordinate| serde_json::json!([coordinate.longitude, coordinate.latitude]))
             .collect(),
     )
-}
-
-fn json_string_from_serde(value: serde_json::Value) -> Result<String> {
-    serde_json::to_string(&value).map_err(|serialize_error| {
-        error::invalid_argument(format!(
-            "JSON value could not be serialized: {serialize_error}"
-        ))
-    })
 }
 
 fn offline_operation_start(operation_id: u64) -> OfflineOperationStart {

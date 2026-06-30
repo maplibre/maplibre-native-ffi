@@ -220,6 +220,22 @@ test("binding-managed callbacks contain user exceptions", () => {
   assert.doesNotThrow(() => callbacks.cancel?.(null, { z: 0, x: 0, y: 0 }));
 });
 
+test("runtime construction checks the loaded C ABI version first", () => {
+  const originalCVersion = nativeAddon.cVersion;
+  nativeAddon.cVersion = () => 999;
+
+  try {
+    assert.throws(
+      () => new RuntimeHandle(),
+      (error) =>
+        error instanceof MaplibreError &&
+        error.status === MaplibreStatus.abiVersionMismatch,
+    );
+  } finally {
+    nativeAddon.cVersion = originalCVersion;
+  }
+});
+
 test("async log severities map string values and reject unknown values", () => {
   setAsyncLogSeverities(["info", "warning"]);
   setAsyncLogSeverities(new Set(["error"]));

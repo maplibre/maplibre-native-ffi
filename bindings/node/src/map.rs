@@ -190,7 +190,7 @@ pub struct StyleImage {
 #[napi(js_name = "NativeMapHandle")]
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
-    custom_geometry_sources: Mutex<HashMap<String, Box<CustomGeometrySourceState>>>,
+    custom_geometry_sources: Mutex<HashMap<String, CustomGeometrySourceRegistration>>,
 }
 
 #[napi(js_name = "createNativeMapHandle")]
@@ -981,11 +981,10 @@ impl NativeMapHandle {
         cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
     ) -> Result<()> {
         let source_id_view = core::string::string_view(&source_id);
-        let mut state = CustomGeometrySourceState::new(fetch_tile, cancel_tile).map(Box::new);
-        let options = custom_geometry_source_options_to_native(
-            options.unwrap_or_default(),
-            state.as_deref_mut(),
-        );
+        let state = CustomGeometrySourceState::new(fetch_tile, cancel_tile)
+            .map(CustomGeometrySourceRegistration::new);
+        let options =
+            custom_geometry_source_options_to_native(options.unwrap_or_default(), state.as_ref());
         core::check(unsafe {
             sys::mln_map_add_custom_geometry_source(
                 self.state.as_ptr(),
@@ -1730,7 +1729,7 @@ impl Drop for NativeMapHandle {
             crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut sources) = self.custom_geometry_sources.lock() {
                 for (_, source) in sources.drain() {
-                    Box::leak(source);
+                    source.leak();
                 }
             }
         }
@@ -2186,13 +2185,18 @@ struct CustomGeometrySourceState {
     idle: Condvar,
 }
 
+struct CustomGeometrySourceRegistration {
+    state: Arc<CustomGeometrySourceState>,
+    user_data: usize,
+}
+
 struct CustomGeometrySourceLifecycle {
     closing: bool,
     active: usize,
 }
 
-struct CustomGeometryUpcallGuard<'a> {
-    state: &'a CustomGeometrySourceState,
+struct CustomGeometryUpcallGuard {
+    state: Arc<CustomGeometrySourceState>,
 }
 
 impl NativeMapHandle {
@@ -2219,8 +2223,8 @@ impl CustomGeometrySourceState {
         })
     }
 
-    fn enter_callback(&self) -> Option<CustomGeometryUpcallGuard<'_>> {
-        let mut lifecycle = self
+    fn enter_callback(state: Arc<Self>) -> Option<CustomGeometryUpcallGuard> {
+        let mut lifecycle = state
             .lifecycle
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -2228,7 +2232,8 @@ impl CustomGeometrySourceState {
             return None;
         }
         lifecycle.active += 1;
-        Some(CustomGeometryUpcallGuard { state: self })
+        drop(lifecycle);
+        Some(CustomGeometryUpcallGuard { state })
     }
 
     fn close(&self) {
@@ -2246,13 +2251,32 @@ impl CustomGeometrySourceState {
     }
 }
 
+impl CustomGeometrySourceRegistration {
+    fn new(state: CustomGeometrySourceState) -> Self {
+        let state = Arc::new(state);
+        let user_data = Arc::into_raw(Arc::clone(&state)) as usize;
+        Self { state, user_data }
+    }
+
+    fn leak(self) {
+        std::mem::forget(self);
+    }
+}
+
+impl Drop for CustomGeometrySourceRegistration {
+    fn drop(&mut self) {
+        self.state.close();
+        unsafe { Arc::decrement_strong_count(self.user_data as *const CustomGeometrySourceState) };
+    }
+}
+
 impl Drop for CustomGeometrySourceState {
     fn drop(&mut self) {
         self.close();
     }
 }
 
-impl Drop for CustomGeometryUpcallGuard<'_> {
+impl Drop for CustomGeometryUpcallGuard {
     fn drop(&mut self) {
         let mut lifecycle = self
             .state
@@ -2280,8 +2304,10 @@ extern "C" fn custom_geometry_source_fetch_tile_callback(
         if user_data.is_null() {
             return;
         }
-        let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
-        let Some(_guard) = state.enter_callback() else {
+        let state_ptr = user_data.cast::<CustomGeometrySourceState>();
+        unsafe { Arc::increment_strong_count(state_ptr) };
+        let state = unsafe { Arc::from_raw(state_ptr) };
+        let Some(_guard) = CustomGeometrySourceState::enter_callback(Arc::clone(&state)) else {
             return;
         };
         state.fetch_tile.call(
@@ -2299,8 +2325,10 @@ extern "C" fn custom_geometry_source_cancel_tile_callback(
         if user_data.is_null() {
             return;
         }
-        let state = unsafe { &*(user_data as *const CustomGeometrySourceState) };
-        let Some(_guard) = state.enter_callback() else {
+        let state_ptr = user_data.cast::<CustomGeometrySourceState>();
+        unsafe { Arc::increment_strong_count(state_ptr) };
+        let state = unsafe { Arc::from_raw(state_ptr) };
+        let Some(_guard) = CustomGeometrySourceState::enter_callback(Arc::clone(&state)) else {
             return;
         };
         if let Some(cancel_tile) = &state.cancel_tile {
@@ -2314,17 +2342,17 @@ extern "C" fn custom_geometry_source_cancel_tile_callback(
 
 fn custom_geometry_source_options_to_native(
     options: CustomGeometrySourceOptions,
-    state: Option<&mut CustomGeometrySourceState>,
+    state: Option<&CustomGeometrySourceRegistration>,
 ) -> sys::mln_custom_geometry_source_options {
     let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
     if let Some(state) = state {
         raw.fetch_tile = Some(custom_geometry_source_fetch_tile_callback);
-        raw.cancel_tile = if state.cancel_tile.is_some() {
+        raw.cancel_tile = if state.state.cancel_tile.is_some() {
             Some(custom_geometry_source_cancel_tile_callback)
         } else {
             None
         };
-        raw.user_data = state as *mut CustomGeometrySourceState as *mut c_void;
+        raw.user_data = state.user_data as *mut c_void;
     } else {
         raw.fetch_tile = Some(custom_geometry_source_noop_tile_callback);
         raw.cancel_tile = Some(custom_geometry_source_noop_tile_callback);

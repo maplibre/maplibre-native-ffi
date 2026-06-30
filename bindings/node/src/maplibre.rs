@@ -231,7 +231,7 @@ extern "C" fn log_trampoline(
             ThreadsafeFunctionCallMode::NonBlocking,
         );
     }));
-    0
+    1
 }
 
 pub(crate) fn report_native_handle_leak(handle_type: &str, address: usize) {

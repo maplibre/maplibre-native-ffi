@@ -2,6 +2,8 @@
 
 const native = require("./index.js");
 
+const EXPECTED_C_ABI_VERSION = 0;
+
 const MaplibreStatus = Object.freeze({
   invalidArgument: "invalid-argument",
   invalidState: "invalid-state",
@@ -904,6 +906,7 @@ class RuntimeHandle {
 
   constructor(options) {
     recordHandleEnvironment(this);
+    assertNativeAbiVersion();
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
@@ -2341,6 +2344,17 @@ function stringifyJson(value) {
     );
   }
   return json;
+}
+
+function assertNativeAbiVersion() {
+  const actual = native.cVersion();
+  if (actual !== EXPECTED_C_ABI_VERSION) {
+    throw new MaplibreError(
+      MaplibreStatus.abiVersionMismatch,
+      null,
+      `maplibre-native-c ABI version ${actual} does not match binding ABI version ${EXPECTED_C_ABI_VERSION}`,
+    );
+  }
 }
 
 function parseJson(value) {
