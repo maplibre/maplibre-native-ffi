@@ -29,8 +29,12 @@ function(mln_install_c_api_library target)
 
   get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
   set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
+  set(MLN_FFI_PKG_CONFIG_LIBS "")
   if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MLN_FFI_PKG_CONFIG_LIBS "-ldl")
   endif()
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
@@ -59,7 +63,14 @@ function(mln_install_c_api_library target)
      AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     install(
       RUNTIME_DEPENDENCY_SET mln_ffi_local_runtime_dependencies
-      PRE_EXCLUDE_REGEXES "^/System/" "^/usr/lib/" "^api-ms-" "^ext-ms-"
+      PRE_EXCLUDE_REGEXES
+        "^/System/"
+        "^/usr/lib/"
+        "^api-ms-"
+        "^ext-ms-"
+        "^[Hh]vsiFileTrust\\.dll$"
+        "^[Vv]ulkan-1\\.dll$"
+        "^[Ww]paxholder\\.dll$"
       POST_EXCLUDE_REGEXES "^/System/" "^/usr/lib/"
       DIRECTORIES ${MLN_FFI_LOCAL_RUNTIME_DEPENDENCY_DIRS}
       LIBRARY

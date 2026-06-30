@@ -25,7 +25,7 @@ dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
 run = '''
 rm -rf ../../docs/public/reference/zig
 mkdir -p ../../docs/public/reference
-zig build docs -Dinclude-dir="{{config_root}}/include" --prefix ../../docs/public/reference/zig
+zig build docs -Dinclude-dir="{{env.MLN_FFI_REPO_ROOT}}/include" --prefix ../../docs/public/reference/zig
 '''
 
 [tasks.api]
