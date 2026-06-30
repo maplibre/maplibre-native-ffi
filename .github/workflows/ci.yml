@@ -49,6 +49,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -79,6 +80,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -110,6 +112,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -141,6 +144,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -172,6 +176,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -204,6 +209,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -235,6 +241,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -380,6 +387,7 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -408,6 +416,7 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -436,6 +445,7 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -464,6 +474,7 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build

@@ -1,0 +1,4 @@
+.venv/
+dist/
+python/maplibre_native/_native*.so
+python/maplibre_native/_native*.pyd

@@ -65,7 +65,10 @@ pub use resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
     ResourceTransformRequest,
 };
-pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
+pub use runtime::{
+    OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions, network_status, set_network_status,
+    set_network_status_raw,
+};
 pub use style::{SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,

@@ -3,7 +3,31 @@ use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
-use crate::{Result, string, validate_abi_version};
+use crate::{NetworkStatus, Result, check, string, validate_abi_version};
+
+/// Reads MapLibre Native's process-global network status.
+pub fn network_status() -> Result<NetworkStatus> {
+    let mut raw_status = 0;
+    // SAFETY: out_status points to valid writable storage for one u32.
+    check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
+    Ok(NetworkStatus::from_raw(raw_status))
+}
+
+/// Sets MapLibre Native's process-global network status.
+pub fn set_network_status(status: NetworkStatus) -> Result<()> {
+    set_network_status_raw(status.raw()?)
+}
+
+/// Sets MapLibre Native's process-global network status from a raw C value.
+///
+/// This helper is for bridge tests and native status conversion paths. Public
+/// bindings should normally map their language enum first so unknown values can
+/// fail before crossing the C boundary.
+pub fn set_network_status_raw(raw_status: u32) -> Result<()> {
+    // SAFETY: The raw value is passed by value. The C API validates the enum
+    // domain and reports invalid values as MLN_STATUS_INVALID_ARGUMENT.
+    check(unsafe { sys::mln_network_status_set(raw_status) })
+}
 
 /// Options used when creating a runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

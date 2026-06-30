@@ -257,21 +257,17 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 
 /// Reads MapLibre Native's process-global network status.
 pub fn network_status() -> Result<NetworkStatus> {
-    let mut raw_status = 0;
-    // SAFETY: out_status points to valid writable storage for one u32.
-    maplibre_core::check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
-    Ok(NetworkStatus::from_raw(raw_status))
+    maplibre_core::network_status()
 }
 
 /// Sets MapLibre Native's process-global network status.
 pub fn set_network_status(status: NetworkStatus) -> Result<()> {
-    set_network_status_raw(status.raw()?)
+    maplibre_core::set_network_status(status)
 }
 
+#[cfg(test)]
 fn set_network_status_raw(raw_status: u32) -> Result<()> {
-    // SAFETY: The raw value is passed by value. The C API validates the enum
-    // domain and reports invalid values as MLN_STATUS_INVALID_ARGUMENT.
-    maplibre_core::check(unsafe { sys::mln_network_status_set(raw_status) })
+    maplibre_core::set_network_status_raw(raw_status)
 }
 
 #[cfg(test)]
