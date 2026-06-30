@@ -9,7 +9,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MLN_FFI_NATIVE_INSTALL_DIR");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
-    let link_dir = install_dir.join("lib");
+    let link_dir = native_library_dir(&install_dir);
     let runtime_dir = native_runtime_dir(&install_dir);
     let header = include_dir.join("maplibre_native_c.h");
 
@@ -22,10 +22,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     if cfg!(unix) {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
     }
-    for link_arg in ohos_link_args()? {
-        println!("cargo:rustc-link-arg={link_arg}");
-    }
-
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&include_dir);
@@ -60,31 +56,21 @@ fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
 }
 
 fn native_runtime_dir(install_dir: &Path) -> PathBuf {
-    install_dir.join(if cfg!(windows) { "bin" } else { "lib" })
+    if cfg!(windows) {
+        install_dir.join("bin")
+    } else {
+        native_library_dir(install_dir)
+    }
 }
 
-fn ohos_link_args() -> Result<Vec<String>, Box<dyn Error>> {
-    let Some(target) = env::var("CARGO_BUILD_TARGET")
-        .ok()
-        .filter(|target| target.ends_with("-linux-ohos"))
-    else {
-        return Ok(vec![]);
-    };
-    let ohos_sdk = env::var_os("OHOS_SDK_NATIVE")
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::NotFound,
-                "OHOS_SDK_NATIVE is required for OHOS Rust binding builds",
-            )
-        })?;
-    let clang_target = target.replace("-unknown-", "-");
-    let sysroot = PathBuf::from(ohos_sdk).join("sysroot");
-    Ok(vec![
-        format!("--target={clang_target}"),
-        format!("--sysroot={}", sysroot.display()),
-        "-fuse-ld=lld".to_string(),
-    ])
+fn native_library_dir(install_dir: &Path) -> PathBuf {
+    for dirname in ["lib", "lib64"] {
+        let candidate = install_dir.join(dirname);
+        if candidate.is_dir() {
+            return candidate;
+        }
+    }
+    install_dir.join("lib")
 }
 
 fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {

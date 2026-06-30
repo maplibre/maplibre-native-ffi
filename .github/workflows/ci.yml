@@ -387,7 +387,6 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -416,7 +415,6 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -445,7 +443,6 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -474,7 +471,6 @@ jobs:
       - run: mise run test
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
-      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build

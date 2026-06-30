@@ -10,14 +10,15 @@ mise run build
 
 app_dir=".build/$MISE_ENV/SwiftMapIOS.app"
 executable=".build/$MISE_ENV/$MLN_FFI_SWIFT_TARGET_BIN_DIR/debug/swift-map-ios"
-native_library="$MLN_FFI_NATIVE_RUNTIME_LIBRARY_DIR/libmaplibre-native-c.dylib"
+native_library_dir="$MLN_FFI_NATIVE_INSTALL_DIR/lib"
+native_library="$native_library_dir/libmaplibre-native-c.dylib"
 info_plist="$app_dir/Info.plist"
 
 rm -rf "$app_dir"
 mkdir -p "$app_dir"
 cp "$executable" "$app_dir/swift-map-ios"
 cp "$native_library" "$app_dir/libmaplibre-native-c.dylib"
-install_name_tool -delete_rpath "$MLN_FFI_NATIVE_RUNTIME_LIBRARY_DIR" "$app_dir/swift-map-ios"
+install_name_tool -delete_rpath "$native_library_dir" "$app_dir/swift-map-ios"
 install_name_tool -add_rpath "@executable_path" "$app_dir/swift-map-ios"
 
 /usr/libexec/PlistBuddy -c 'Clear dict' "$info_plist" 2>/dev/null || true

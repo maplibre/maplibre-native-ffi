@@ -1,92 +1,103 @@
 use std::env;
 use std::error::Error;
 use std::io;
-use std::path::PathBuf;
-
-use serde::Deserialize;
+use std::path::Path;
+use std::process::Command;
 
 const LIBRARY_NAME: &str = "maplibre-native-c";
 
-#[derive(Deserialize)]
-struct Artifact {
-    import_library_path: PathBuf,
-    #[serde(default)]
-    library_dirs: Vec<PathBuf>,
-    #[serde(default)]
-    link_libraries: Vec<String>,
-    #[serde(default)]
-    rpaths: Vec<PathBuf>,
-    #[serde(default)]
-    frameworks: Vec<String>,
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
-    let artifact = load_artifact()?;
+    println!("cargo:rerun-if-env-changed=MLN_FFI_NATIVE_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
 
-    let import_library_dir = artifact.import_library_path.parent().ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-                "native metadata import_library_path has no parent directory: {}",
-                artifact.import_library_path.display()
-            ),
-        )
-    })?;
+    let install_dir = native_install_dir()?;
+    let pkg_config_dir = install_dir.join("share/pkgconfig");
+    require_dir(&pkg_config_dir, "native pkg-config directory")?;
     println!(
-        "cargo:rustc-link-search=native={}",
-        import_library_dir.display()
+        "cargo:rerun-if-changed={}",
+        pkg_config_dir.join(format!("{LIBRARY_NAME}.pc")).display()
     );
-    for library_dir in artifact.library_dirs {
-        println!("cargo:rustc-link-search=native={}", library_dir.display());
-    }
 
-    let link_libraries = if artifact.link_libraries.is_empty() {
-        vec![LIBRARY_NAME.to_string()]
-    } else {
-        artifact.link_libraries
+    let pkg_config_path = match env::var_os("PKG_CONFIG_PATH") {
+        Some(existing) if !existing.is_empty() => {
+            format!(
+                "{}:{}",
+                pkg_config_dir.display(),
+                existing.to_string_lossy()
+            )
+        }
+        _ => pkg_config_dir.display().to_string(),
     };
-    for link_library in link_libraries {
-        println!("cargo:rustc-link-lib={link_library}");
+
+    for flag in pkg_config_flags("--libs", &pkg_config_path)? {
+        emit_link_flag(&flag);
     }
-    for framework in artifact.frameworks {
-        println!("cargo:rustc-link-lib=framework={framework}");
-    }
-    for rpath in artifact.rpaths {
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", rpath.display());
+    for flag in pkg_config_flags("--cflags", &pkg_config_path)? {
+        if let Some(include_dir) = flag.strip_prefix("-I") {
+            println!("cargo:include={include_dir}");
+        }
     }
 
     Ok(())
 }
 
-fn load_artifact() -> Result<Artifact, Box<dyn Error>> {
-    let build_dir = env::var_os("MLN_FFI_BUILD_DIR").ok_or_else(|| {
+fn native_install_dir() -> Result<std::path::PathBuf, Box<dyn Error>> {
+    let install_dir = env::var_os("MLN_FFI_NATIVE_INSTALL_DIR").ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            "MLN_FFI_BUILD_DIR is required; run Python binding builds through mise",
+            "MLN_FFI_NATIVE_INSTALL_DIR is required; run Python binding builds through mise",
         )
     })?;
-    let metadata_path = PathBuf::from(build_dir).join(format!("{LIBRARY_NAME}.dev.json"));
-    println!("cargo:rerun-if-changed={}", metadata_path.display());
+    Ok(install_dir.into())
+}
 
-    let metadata = std::fs::read_to_string(&metadata_path).map_err(|error| {
-        io::Error::new(
-            error.kind(),
-            format!(
-                "failed to read native artifact metadata at {}; run `mise run build` first: {error}",
-                metadata_path.display()
-            ),
-        )
-    })?;
-    let artifact = serde_json::from_str::<Artifact>(&metadata).map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!(
-                "invalid native artifact metadata at {}: {error}",
-                metadata_path.display()
-            ),
-        )
-    })?;
+fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!(
+            "missing {label}: {}; run `mise run build` first",
+            path.display()
+        ),
+    )
+    .into())
+}
 
-    Ok(artifact)
+fn pkg_config_flags(arg: &str, pkg_config_path: &str) -> Result<Vec<String>, Box<dyn Error>> {
+    let output = Command::new("pkg-config")
+        .arg(arg)
+        .arg(LIBRARY_NAME)
+        .env("PKG_CONFIG_PATH", pkg_config_path)
+        .output()
+        .map_err(|error| {
+            io::Error::new(
+                error.kind(),
+                format!("failed to run pkg-config for {LIBRARY_NAME}: {error}"),
+            )
+        })?;
+    if !output.status.success() {
+        return Err(io::Error::other(format!(
+            "pkg-config {arg} {LIBRARY_NAME} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ))
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect())
+}
+
+fn emit_link_flag(flag: &str) {
+    if let Some(path) = flag.strip_prefix("-L") {
+        println!("cargo:rustc-link-search=native={path}");
+    } else if let Some(name) = flag.strip_prefix("-l") {
+        println!("cargo:rustc-link-lib={name}");
+    } else if let Some(rpath) = flag.strip_prefix("-Wl,-rpath,") {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{rpath}");
+    } else {
+        println!("cargo:rustc-link-arg={flag}");
+    }
 }
