@@ -100,16 +100,6 @@ def properties_escape(value: str) -> str:
     return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
 
 
-def pc_escape(value: str) -> str:
-    return (
-        value.replace("\\", "\\\\")
-        .replace(" ", "\\ ")
-        .replace("\t", "\\\t")
-        .replace("#", "\\#")
-        .replace("$", "\\$")
-    )
-
-
 def linker_flags(artifact: Artifact) -> list[str]:
     flags = []
     flags.extend(f"-L{link_dir}" for link_dir in artifact.link_dirs)
@@ -123,33 +113,6 @@ def linker_flags(artifact: Artifact) -> list[str]:
 
 def write_lines(path: Path, lines: list[str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def write_pkg_config(artifact: Artifact, out_dir: Path) -> None:
-    libs = [
-        *(f"-L{pc_escape(link_dir)}" for link_dir in artifact.link_dirs),
-        *(f"-l{pc_escape(link_library)}" for link_library in artifact.link_libraries),
-        *(
-            f"-Wl,-rpath,{pc_escape(runtime_dir)}"
-            for runtime_dir in artifact.runtime_library_dirs
-        ),
-        *(
-            flag
-            for framework in artifact.frameworks
-            for flag in ("-framework", pc_escape(framework))
-        ),
-    ]
-    write_lines(
-        out_dir / f"{LIBRARY_NAME}.pc",
-        [
-            f"Name: {LIBRARY_NAME}",
-            "Description: MapLibre Native C development artifact",
-            "Version: 0",
-            "Cflags: "
-            + " ".join(f"-I{pc_escape(path)}" for path in artifact.include_dirs),
-            "Libs: " + " ".join(libs),
-        ],
-    )
 
 
 def write_gradle_properties(artifact: Artifact, out_dir: Path) -> None:
@@ -312,7 +275,6 @@ def generate(metadata_path: Path) -> None:
     with metadata_path.open(encoding="utf-8") as metadata_file:
         metadata = json.load(metadata_file)
     artifact = load_artifact(metadata_path)
-    write_pkg_config(artifact, out_dir)
     write_gradle_properties(artifact, out_dir)
     write_msbuild_props(artifact, out_dir)
     (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)

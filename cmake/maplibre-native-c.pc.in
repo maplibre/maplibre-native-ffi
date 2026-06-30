@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${prefix}/@CMAKE_INSTALL_LIBDIR@
+includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+
+Name: maplibre-native-c
+Description: MapLibre Native C API
+Version: @PROJECT_VERSION@
+Cflags: -I${includedir}
+Libs: -L${libdir}@MLN_FFI_PKG_CONFIG_RPATH_FLAGS@ -lmaplibre-native-c

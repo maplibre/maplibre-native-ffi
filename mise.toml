@@ -29,7 +29,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 [tools]
 # General tooling
-"aqua:jdx/usage" = "3.3.0" # CLI completion for mise tasks
 "aqua:jdx/hk" = "1.45.0" # Linter orchestration
 "aqua:apple/pkl" = "0.31.0" # hk config dependency
 "aqua:dprint/dprint" = "0.53.2" # Formatter orchestration

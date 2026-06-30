@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+# MISE description="Prepare native package snapshot release assets."
+
+import hashlib
+import os
+import pathlib
+import sys
+
+
+RELEASE_NOTES_NAME = "RELEASE_NOTES.md"
+
+
+def required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise SystemExit(f"{name} is required")
+    return value
+
+
+def sha256(path: pathlib.Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as file:
+        for chunk in iter(lambda: file.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def snapshot_context() -> dict[str, str]:
+    server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    repository = required_env("GITHUB_REPOSITORY")
+    snapshot_sha = required_env("SNAPSHOT_SHA")
+
+    return {
+        "ci_workflow_run_url": required_env("CI_RUN_URL"),
+        "commit_url": f"{server_url}/{repository}/commit/{snapshot_sha}",
+        "git_sha": snapshot_sha,
+        "snapshot_workflow_run_url": f"{server_url}/{repository}/actions/runs/{required_env('GITHUB_RUN_ID')}",
+        "tag": required_env("SNAPSHOT_TAG"),
+    }
+
+
+def write_release_notes(release_dir: pathlib.Path, context: dict[str, str]) -> None:
+    notes = "\n".join(
+        [
+            "Unstable native package snapshot.",
+            "",
+            f"Commit: {context['commit_url']}",
+            f"CI run: {context['ci_workflow_run_url']}",
+            f"Snapshot run: {context['snapshot_workflow_run_url']}",
+            "",
+        ],
+    )
+    (release_dir / RELEASE_NOTES_NAME).write_text(notes, encoding="utf-8")
+
+
+def write_checksums(release_dir: pathlib.Path, files: list[pathlib.Path]) -> None:
+    lines = [f"{sha256(path)}  {path.name}" for path in files]
+    (release_dir / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(f"usage: {pathlib.Path(sys.argv[0]).name} <release-dir>", file=sys.stderr)
+        return 2
+
+    release_dir = pathlib.Path(sys.argv[1])
+    tarballs = sorted(release_dir.glob("*.tar.gz"))
+    if not tarballs:
+        print(f"no native package tarballs found in {release_dir}", file=sys.stderr)
+        return 1
+
+    context = snapshot_context()
+    write_release_notes(release_dir, context)
+    write_checksums(release_dir, tarballs)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -50,6 +50,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -58,6 +59,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-arm64-vulkan:
     name: variant / linux-arm64-vulkan
     runs-on: ubuntu-24.04-arm
@@ -75,6 +82,7 @@ jobs:
       - run: mise run //bindings/go:ci
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -83,6 +91,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-x64-egl:
     name: variant / linux-x64-egl
     runs-on: ubuntu-latest
@@ -101,6 +115,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -109,6 +124,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-linux-x64-vulkan:
     name: variant / linux-x64-vulkan
     runs-on: ubuntu-latest
@@ -127,6 +148,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -135,6 +157,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-metal:
     name: variant / macos-arm64-metal
     runs-on: macos-26
@@ -153,6 +181,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -162,6 +191,12 @@ jobs:
       - run: mise run //examples/swift-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-vulkan:
     name: variant / macos-arm64-vulkan
     runs-on: macos-26
@@ -180,6 +215,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -188,6 +224,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-macos-arm64-egl:
     name: variant / macos-arm64-egl
     runs-on: macos-26
@@ -206,6 +248,7 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
@@ -213,6 +256,12 @@ jobs:
       - run: mise run //examples/lwjgl-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-android-arm64-egl:
     name: variant / android-arm64-egl
     runs-on: ubuntu-latest
@@ -346,6 +395,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -353,6 +403,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-x64-wgl:
     name: variant / windows-x64-wgl
     runs-on: windows-2022
@@ -369,6 +425,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -376,6 +433,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-arm64-vulkan:
     name: variant / windows-arm64-vulkan
     runs-on: windows-11-arm
@@ -392,6 +455,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -399,6 +463,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   variant-windows-arm64-wgl:
     name: variant / windows-arm64-wgl
     runs-on: windows-11-arm
@@ -415,6 +485,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/node:ci
+      - run: mise run //bindings/python:ci
       - run: mise run //bindings/rust:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/compose-map:build
@@ -422,6 +493,12 @@ jobs:
       - run: mise run //examples/rust-map:check
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
+      - run: mise run package-native
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: native-package-${{ env.MISE_ENV }}-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-${{ env.MISE_ENV }}.tar.gz
+          if-no-files-found: error
   required:
     name: ci-required
     runs-on: ubuntu-latest

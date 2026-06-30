@@ -486,7 +486,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     } else {
         addLibraryPaths(module_, link_dirs);
         addRPaths(module_, runtime_library_dirs);
-        module_.linkSystemLibrary("maplibre-native-c", .{});
+        module_.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .no });
     }
     linkRenderBackend(b, module_, .{
         .target = options.target,
