@@ -1052,16 +1052,13 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
   session->renderer.reset();
   session->surface.backend.reset();
   session->texture.backend.reset();
-  const auto cleanup_status = *thread_last_error_message() != '\0'
-                                ? MLN_STATUS_NATIVE_ERROR
-                                : MLN_STATUS_OK;
   session->attached = false;
   session->rendered_generation = 0;
   session->texture.rendered_native_texture = nullptr;
   session->texture.acquired_native_texture = nullptr;
   session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   ++session->generation;
-  return cleanup_status;
+  return MLN_STATUS_OK;
 }
 
 auto render_session_destroy(mln_render_session* session) -> mln_status {

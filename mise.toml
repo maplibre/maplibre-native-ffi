@@ -170,7 +170,8 @@ depends = ["//:ensure-native-library"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  zig_native_args="${MLN_FFI_ZIG_NATIVE_ARGS//\\//}"
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} $zig_native_args --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 

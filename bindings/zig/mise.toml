@@ -1,7 +1,13 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }}"
+run = '''
+zig_native_args="${MLN_FFI_ZIG_NATIVE_ARGS//\\//}"
+zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} $zig_native_args
+'''
 
 [tasks.test]
 depends = [":build"]
-run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }} --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
+run = '''
+zig_native_args="${MLN_FFI_ZIG_NATIVE_ARGS//\\//}"
+zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} $zig_native_args --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+'''
