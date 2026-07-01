@@ -11,7 +11,6 @@ endfunction()
 function(mln_install_c_api_shared_target target)
   install(
     TARGETS ${target}
-    RUNTIME_DEPENDENCY_SET mln_ffi_local_runtime_dependencies
     RUNTIME
       DESTINATION "${CMAKE_INSTALL_BINDIR}"
       COMPONENT "${MLN_FFI_NATIVE_COMPONENT}"
@@ -21,6 +20,35 @@ function(mln_install_c_api_shared_target target)
     ARCHIVE
       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
       COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
+endfunction()
+
+function(mln_install_local_runtime_libraries)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    return()
+  endif()
+  if(NOT MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    return()
+  endif()
+  if(NOT MLN_FFI_EGL_ROOT)
+    return()
+  endif()
+
+  find_library(
+    MLN_FFI_LOCAL_RUNTIME_EGL_LIBRARY
+    NAMES EGL
+    HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES . lib
+    REQUIRED NO_DEFAULT_PATH)
+  find_library(
+    MLN_FFI_LOCAL_RUNTIME_GLESV2_LIBRARY
+    NAMES GLESv2
+    HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES . lib
+    REQUIRED NO_DEFAULT_PATH)
+
+  install(
+    FILES "${MLN_FFI_LOCAL_RUNTIME_EGL_LIBRARY}"
+    "${MLN_FFI_LOCAL_RUNTIME_GLESV2_LIBRARY}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}")
 endfunction()
 
 function(mln_install_c_api_library target)
@@ -52,36 +80,8 @@ function(mln_install_c_api_library target)
     mln_install_c_api_complete_static_archive(${target}_static)
   endif()
 
-  set(MLN_FFI_LOCAL_RUNTIME_DEPENDENCY_DIRS
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
-  if(MLN_FFI_EGL_ROOT)
-    list(APPEND MLN_FFI_LOCAL_RUNTIME_DEPENDENCY_DIRS "${MLN_FFI_EGL_ROOT}"
-         "${MLN_FFI_EGL_ROOT}/lib")
-  endif()
-
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Darwin|Linux|Windows)$"
-     AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
-    install(
-      RUNTIME_DEPENDENCY_SET mln_ffi_local_runtime_dependencies
-      PRE_EXCLUDE_REGEXES
-        "^/System/"
-        "^/usr/lib/"
-        "^api-ms-"
-        "^ext-ms-"
-        "^[Hh]vsiFileTrust\\.dll$"
-        "^[Vv]ulkan-1\\.dll$"
-        "^[Ww]paxholder\\.dll$"
-      POST_EXCLUDE_REGEXES "^/System/" "^/usr/lib/"
-      DIRECTORIES ${MLN_FFI_LOCAL_RUNTIME_DEPENDENCY_DIRS}
-      LIBRARY
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}"
-      RUNTIME
-        DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}"
-      FRAMEWORK
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}")
+  if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
+    mln_install_local_runtime_libraries()
   endif()
 
   install(

@@ -12,6 +12,26 @@ set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
     mbgl-vendor-sqlite
     mlt-cpp)
 
+set(MLN_FFI_VULKAN_STATIC_ARCHIVE_DEPENDENCIES
+    glslang
+    SPIRV
+    glslang-default-resource-limits
+    OSDependent
+    MachineIndependent
+    GenericCodeGen
+    SPIRV-Tools
+    SPIRV-Tools-opt)
+
+function(mln_append_existing_targets out_var)
+  set(MLN_FFI_TARGETS "${${out_var}}")
+  foreach(MLN_FFI_TARGET ${ARGN})
+    if(TARGET ${MLN_FFI_TARGET})
+      list(APPEND MLN_FFI_TARGETS ${MLN_FFI_TARGET})
+    endif()
+  endforeach()
+  set(${out_var} ${MLN_FFI_TARGETS} PARENT_SCOPE)
+endfunction()
+
 function(mln_configure_complete_static_archive target)
   set(MLN_FFI_COMPLETE_STATIC_DIR
       "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
@@ -28,10 +48,17 @@ function(mln_configure_complete_static_archive target)
   set(MLN_FFI_INPUT_ARCHIVES "$<TARGET_FILE:${target}>")
   set(MLN_FFI_INPUT_TARGETS ${target})
   foreach(MLN_FFI_STATIC_DEPENDENCY ${ARGN})
-    list(APPEND MLN_FFI_INPUT_ARCHIVES
-         "$<TARGET_FILE:${MLN_FFI_STATIC_DEPENDENCY}>")
-    list(APPEND MLN_FFI_INPUT_TARGETS ${MLN_FFI_STATIC_DEPENDENCY})
+    if(TARGET ${MLN_FFI_STATIC_DEPENDENCY})
+      list(APPEND MLN_FFI_INPUT_ARCHIVES
+           "$<TARGET_FILE:${MLN_FFI_STATIC_DEPENDENCY}>")
+      list(APPEND MLN_FFI_INPUT_TARGETS ${MLN_FFI_STATIC_DEPENDENCY})
+    else()
+      list(APPEND MLN_FFI_INPUT_ARCHIVES "${MLN_FFI_STATIC_DEPENDENCY}")
+      list(APPEND MLN_FFI_INPUT_TARGETS "${MLN_FFI_STATIC_DEPENDENCY}")
+    endif()
   endforeach()
+  list(REMOVE_DUPLICATES MLN_FFI_INPUT_ARCHIVES)
+  list(REMOVE_DUPLICATES MLN_FFI_INPUT_TARGETS)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     add_custom_command(
@@ -292,12 +319,12 @@ function(mln_add_apple_c_api_library target)
   set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
   add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
   mln_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_complete_static_dependencies_for_target(MLN_FFI_STATIC_DEPS)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     add_library(${target} STATIC)
     mln_configure_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
-    mln_configure_complete_static_archive(${target}
-                                          ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
+    mln_configure_complete_static_archive(${target} ${MLN_FFI_STATIC_DEPS})
     return()
   endif()
 
@@ -309,7 +336,7 @@ function(mln_add_apple_c_api_library target)
   mln_configure_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
                               ${MLN_FFI_C_API_OBJECT_TARGET})
   mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET}
-                                        ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
+                                        ${MLN_FFI_STATIC_DEPS})
 endfunction()
 
 function(mln_complete_static_dependencies_for_target out_var)
@@ -323,6 +350,22 @@ function(mln_complete_static_dependencies_for_target out_var)
   if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|Windows)$")
     list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
          maplibre_native_platform_rust)
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    list(
+      APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
+      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+         "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/zlibstatic.lib")
+    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES libuv::uv_a)
+  endif()
+
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+                                ${MLN_FFI_VULKAN_STATIC_ARCHIVE_DEPENDENCIES})
   endif()
 
   set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)

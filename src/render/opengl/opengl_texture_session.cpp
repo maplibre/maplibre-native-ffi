@@ -386,7 +386,17 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(OpenGLTextureBackend&&) = delete;
   auto operator=(OpenGLTextureBackend&&) -> OpenGLTextureBackend& = delete;
 
-  ~OpenGLTextureBackend() override {
+  ~OpenGLTextureBackend() noexcept override {
+    try {
+      destroy_backend();
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("destroying OpenGL texture backend failed");
+    }
+  }
+
+  void destroy_backend() {
     auto cleanup = [this] {
       resource.reset();
       context.reset();
