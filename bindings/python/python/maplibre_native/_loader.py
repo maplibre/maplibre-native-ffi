@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 import sys
@@ -44,46 +43,13 @@ def _native_loader_dirs() -> list[Path]:
 
 def _candidate_loader_dirs() -> list[Path]:
     package_dir = Path(__file__).resolve().parent
-    result = [package_dir]
-
-    build_dir = os.environ.get("MLN_FFI_BUILD_DIR")
-    if build_dir:
-        build_path = Path(build_dir)
-        result.append(build_path)
-        result.extend(_metadata_loader_dirs(build_path / "maplibre-native-c.dev.json"))
-
-    dependency_library_dir = os.environ.get("MLN_FFI_DEPENDENCY_LIBRARY_DIR")
-    if dependency_library_dir:
-        result.extend(_library_dir_loader_dirs(Path(dependency_library_dir)))
-
-    return result
-
-
-def _metadata_loader_dirs(metadata_path: Path) -> list[Path]:
-    try:
-        with metadata_path.open(encoding="utf-8") as metadata_file:
-            metadata = json.load(metadata_file)
-    except OSError, json.JSONDecodeError:
-        return []
-
-    result = []
-    library_path = metadata.get("library_path")
-    if isinstance(library_path, str) and library_path:
-        result.append(Path(library_path).parent)
-
-    for key in ("library_dirs", "rpaths"):
-        values = metadata.get(key, [])
-        if not isinstance(values, list):
-            continue
-        for value in values:
-            if isinstance(value, str) and value:
-                result.extend(_library_dir_loader_dirs(Path(value)))
-
-    return result
-
-
-def _library_dir_loader_dirs(library_dir: Path) -> list[Path]:
-    return [library_dir, library_dir.parent / "bin"]
+    install_runtime_dir = Path(os.environ["MLN_FFI_NATIVE_INSTALL_DIR"]) / "bin"
+    host_library_dirs = [
+        Path(directory)
+        for directory in os.environ["MLN_FFI_HOST_LIBRARY_DIRS"].split(os.pathsep)
+        if directory
+    ]
+    return [package_dir, install_runtime_dir, *host_library_dirs]
 
 
 configure_native_loader()

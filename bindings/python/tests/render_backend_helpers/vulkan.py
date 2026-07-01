@@ -21,12 +21,7 @@ def _import_vulkan() -> Any:
 
         return vulkan
 
-    library_dir = Path(os.environ.get("MLN_FFI_DEPENDENCY_LIBRARY_DIR", ""))
-    library_path = library_dir / "libvulkan.dylib"
-    if not library_path.is_file():
-        import vulkan
-
-        return vulkan
+    library_path = _host_library_path("libvulkan.dylib")
 
     distribution = metadata.distribution("vulkan")
     package_root = Path(distribution.locate_file("vulkan"))
@@ -72,6 +67,17 @@ def _import_vulkan() -> Any:
         if not name.startswith("_"):
             setattr(package, name, value)
     return package
+
+
+def _host_library_path(name: str) -> Path:
+    for directory in os.environ["MLN_FFI_HOST_LIBRARY_DIRS"].split(os.pathsep):
+        if directory == "":
+            continue
+        library_path = Path(directory) / name
+        if library_path.is_file():
+            return library_path
+    msg = f"missing host library {name} in MLN_FFI_HOST_LIBRARY_DIRS"
+    raise VulkanUnavailableError(msg)
 
 
 vk = _import_vulkan()

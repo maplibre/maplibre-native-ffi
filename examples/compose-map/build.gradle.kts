@@ -63,17 +63,21 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach { options.release = 24 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
+val nativeLibraryDirsProperty = "org.maplibre.nativeffi.library.dirs"
 val nativeLibraryPath = maplibreNativeC.libraryPath
-val nativeRuntimeLibraryPath =
-  maplibreNativeC.runtimeLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
+val nativeHostLibraryPath =
+  maplibreNativeC.hostLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
+val nativeLoaderLibraryPath =
+  maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(composeMapJvmArgs)
-  systemProperty("org.lwjgl.librarypath", nativeRuntimeLibraryPath)
+  systemProperty("org.lwjgl.librarypath", nativeHostLibraryPath)
   systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)
+  systemProperty(nativeLibraryDirsProperty, nativeLoaderLibraryPath)
   inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary")
   inputs
-    .files(maplibreNativeC.runtimeLibraryDirs)
-    .withPropertyName("maplibreNativeCRuntimeLibraryDirs")
+    .files(maplibreNativeC.loaderLibraryDirs)
+    .withPropertyName("maplibreNativeCLoaderLibraryDirs")
   inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
 }

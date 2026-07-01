@@ -82,6 +82,7 @@ MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"Rel
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
+MLN_FFI_HOST_LIBRARY_DIRS = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_ZIG_NATIVE_ARGS = ""
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
@@ -170,8 +171,9 @@ depends = ["//:ensure-native-library"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig_native_args="${MLN_FFI_ZIG_NATIVE_ARGS//\\//}"
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} $zig_native_args --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
+  mln_build_zig_native_args
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 

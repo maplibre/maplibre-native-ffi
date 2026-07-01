@@ -14,6 +14,12 @@ func requiredEnvironment(_ name: String) -> String {
 
 let miseEnv = requiredEnvironment("MISE_ENV")
 
+func hostLibraryDirs() -> [String] {
+  requiredEnvironment("MLN_FFI_HOST_LIBRARY_DIRS")
+    .split(separator: ":")
+    .map(String.init)
+}
+
 func nativeLinkerFlags() -> [String] {
   let nativeInstallDir = requiredEnvironment("MLN_FFI_NATIVE_INSTALL_DIR")
   let libDir = "\(nativeInstallDir)/lib"
@@ -21,6 +27,7 @@ func nativeLinkerFlags() -> [String] {
 
   let isIOSDevice = miseEnv.hasPrefix("ios-") &&
     !miseEnv.hasPrefix("ios-simulator-")
+  let isDesktop = miseEnv.hasPrefix("linux-") || miseEnv.hasPrefix("macos-")
   if isIOSDevice {
     flags += [
       "-lc++",
@@ -46,6 +53,11 @@ func nativeLinkerFlags() -> [String] {
     ]
   } else {
     flags += ["-Xlinker", "-rpath", "-Xlinker", libDir]
+    if isDesktop {
+      for hostLibraryDir in hostLibraryDirs() {
+        flags += ["-Xlinker", "-rpath", "-Xlinker", hostLibraryDir]
+      }
+    }
   }
   return flags
 }

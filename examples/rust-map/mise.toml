@@ -14,6 +14,8 @@ depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
 set -euo pipefail
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_rust_runtime_rpaths
 cargo build -p rust-map --no-default-features --features "$MLN_FFI_RENDER_BACKEND"
 '''
 
@@ -22,6 +24,8 @@ depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
 set -euo pipefail
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_rust_runtime_rpaths
 cargo clippy -p rust-map --no-default-features --features "$MLN_FFI_RENDER_BACKEND" --all-targets -- -D warnings
 '''
 
@@ -31,7 +35,9 @@ dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
 run = '''
 set -euo pipefail
-env LD_LIBRARY_PATH="$MLN_FFI_NATIVE_INSTALL_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" DYLD_LIBRARY_PATH="$MLN_FFI_NATIVE_INSTALL_DIR/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}" cargo run -p rust-map --no-default-features --features "$MLN_FFI_RENDER_BACKEND" -- "{{ usage.render_target }}"
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_rust_runtime_rpaths
+cargo run -p rust-map --no-default-features --features "$MLN_FFI_RENDER_BACKEND" -- "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]

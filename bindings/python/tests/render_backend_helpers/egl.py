@@ -10,7 +10,6 @@ import sys
 
 if sys.platform == "darwin":
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-    _egl_root = Path(os.environ.get("MLN_FFI_EGL_ROOT", "")).expanduser()
     _cdll = ctypes.CDLL
 
     class _MacAngleCDLL(_cdll):  # type: ignore[misc]
@@ -19,11 +18,20 @@ if sys.platform == "darwin":
             super().__init__(name, *args, **kwargs)
 
     def _macos_angle_library_path(name: Any) -> Any:
-        if name in {"EGL", "GLESv2"} and _egl_root.is_dir():
-            library_path = _egl_root / f"lib{name}.dylib"
-            if library_path.is_file():
-                return str(library_path)
+        if name in {"EGL", "GLESv2"}:
+            return str(_macos_angle_runtime_library_path(name))
         return name
+
+    def _macos_angle_runtime_library_path(name: str) -> Path:
+        egl_root = os.environ.get("MLN_FFI_EGL_ROOT")
+        if egl_root is None or egl_root == "":
+            msg = "MLN_FFI_EGL_ROOT is required for macOS EGL tests"
+            raise RuntimeError(msg)
+        library_path = Path(egl_root).expanduser() / f"lib{name}.dylib"
+        if not library_path.is_file():
+            msg = f"missing ANGLE runtime library: {library_path}"
+            raise RuntimeError(msg)
+        return library_path
 
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]

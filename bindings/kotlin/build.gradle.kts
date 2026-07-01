@@ -50,7 +50,7 @@ kotlin {
       linkerOpts(maplibreNativeC.linkDirs.map { "-L$it" })
       linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
       if (hostPlatform.isMac || hostPlatform.isLinux) {
-        linkerOpts(maplibreNativeC.runtimeLibraryDirs.map { "-Wl,-rpath,$it" })
+        linkerOpts(maplibreNativeC.runtimeLinkLibraryDirs.map { "-Wl,-rpath,$it" })
       }
       if (hostPlatform.isMac) {
         linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
@@ -123,7 +123,14 @@ tasks.configureEach {
 tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   systemProperty("org.maplibre.nativeffi.library.path", maplibreNativeC.libraryPath.absolutePath)
+  systemProperty(
+    "org.maplibre.nativeffi.library.dirs",
+    maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
+  )
   inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
+  inputs
+    .files(maplibreNativeC.loaderLibraryDirs)
+    .withPropertyName("maplibreNativeCLoaderLibraryDirs")
   inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
 }
 

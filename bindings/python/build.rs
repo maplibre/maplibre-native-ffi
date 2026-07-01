@@ -8,9 +8,11 @@ const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=MLN_FFI_NATIVE_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=MLN_FFI_HOST_LIBRARY_DIRS");
     println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
 
     let install_dir = native_install_dir()?;
+    let host_library_dirs = host_library_dirs()?;
     let pkg_config_dir = install_dir.join("share/pkgconfig");
     require_dir(&pkg_config_dir, "native pkg-config directory")?;
     println!(
@@ -32,6 +34,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     for flag in pkg_config_flags("--libs", &pkg_config_path)? {
         emit_link_flag(&flag);
     }
+    if cfg!(unix) {
+        for host_library_dir in &host_library_dirs {
+            println!(
+                "cargo:rustc-link-arg=-Wl,-rpath,{}",
+                host_library_dir.display()
+            );
+        }
+    }
     for flag in pkg_config_flags("--cflags", &pkg_config_path)? {
         if let Some(include_dir) = flag.strip_prefix("-I") {
             println!("cargo:include={include_dir}");
@@ -39,6 +49,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+fn host_library_dirs() -> Result<Vec<std::path::PathBuf>, Box<dyn Error>> {
+    let library_dirs = env::var_os("MLN_FFI_HOST_LIBRARY_DIRS").ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "MLN_FFI_HOST_LIBRARY_DIRS is required; run Python binding builds through mise",
+        )
+    })?;
+    let separator = if cfg!(windows) { ';' } else { ':' };
+    Ok(library_dirs
+        .to_string_lossy()
+        .split(separator)
+        .filter(|path| !path.is_empty())
+        .map(std::path::PathBuf::from)
+        .collect())
 }
 
 fn native_install_dir() -> Result<std::path::PathBuf, Box<dyn Error>> {

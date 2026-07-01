@@ -1,27 +1,24 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_NATIVE_INSTALL_DIR/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-export CGO_CFLAGS="$(pkg-config --cflags maplibre-native-c) ${CGO_CFLAGS:-}"
-export CGO_LDFLAGS="$(pkg-config --libs maplibre-native-c) ${CGO_LDFLAGS:-}"
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_cgo_maplibre_native_flags
 go test ./...
 '''
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_NATIVE_INSTALL_DIR/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-export CGO_CFLAGS="$(pkg-config --cflags maplibre-native-c) ${CGO_CFLAGS:-}"
-export CGO_LDFLAGS="$(pkg-config --libs maplibre-native-c) ${CGO_LDFLAGS:-}"
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_cgo_maplibre_native_flags
 go test ./...
 '''
 
 [tasks.ci]
 depends = ["//:ensure-native-library"]
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_NATIVE_INSTALL_DIR/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
-export CGO_CFLAGS="$(pkg-config --cflags maplibre-native-c) ${CGO_CFLAGS:-}"
-export CGO_LDFLAGS="$(pkg-config --libs maplibre-native-c) ${CGO_LDFLAGS:-}"
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-runtime-env.sh"
+mln_export_cgo_maplibre_native_flags
 unformatted="$(gofmt -l .)"
 if [[ -n "$unformatted" ]]; then
   echo "$unformatted" >&2

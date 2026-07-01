@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.gradle
 
 import java.io.File
 
-class MaplibreNativeCArtifact(val installDir: File) {
+class MaplibreNativeCArtifact(val installDir: File, val hostLibraryDirs: List<File>) {
   val libraryPath: File
     get() = runtimeLibraryDir.resolve(libraryFileName())
 
@@ -14,6 +14,12 @@ class MaplibreNativeCArtifact(val installDir: File) {
 
   val runtimeLibraryDirs: List<File>
     get() = listOf(runtimeLibraryDir)
+
+  val loaderLibraryDirs: List<File>
+    get() = runtimeLibraryDirs + hostLibraryDirs
+
+  val runtimeLinkLibraryDirs: List<File>
+    get() = runtimeLibraryDirs + hostLibraryDirs
 
   val linkLibraries: List<String>
     get() = listOf("maplibre-native-c")

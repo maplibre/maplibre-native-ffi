@@ -11,12 +11,20 @@ fi
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }}"
+run = '''
+source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
+mln_build_zig_native_args
+zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}"
+'''
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 usage = 'arg "render-target"'
-run = 'zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} {{ env.MLN_FFI_ZIG_NATIVE_ARGS }} -- "{{ usage.render_target }}"'
+run = '''
+source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
+mln_build_zig_native_args
+zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" -- "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
