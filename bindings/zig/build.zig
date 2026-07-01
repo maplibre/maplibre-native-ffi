@@ -313,6 +313,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
         },
         .opengl => switch (options.target.result.os.tag) {
             .linux => {
+                addDependencyLibraryPaths(module, options.dependency_library_dirs);
                 module.linkSystemLibrary("EGL", .{});
                 module.linkSystemLibrary("GLESv2", .{});
             },

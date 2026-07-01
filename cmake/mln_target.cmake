@@ -308,6 +308,11 @@ function(mln_configure_c_api_wrapper target implementation_target)
   mln_set_c_api_output_properties(${target})
 endfunction()
 
+function(mln_configure_static_c_api_wrapper target implementation_target)
+  mln_configure_c_api_wrapper(${target} ${implementation_target})
+  target_compile_definitions(${target} PUBLIC MLN_STATIC)
+endfunction()
+
 function(mln_configure_shared_c_api_wrapper target implementation_target)
   mln_configure_c_api_wrapper(${target} ${implementation_target})
   mln_configure_build_rpath(${target})
@@ -323,7 +328,7 @@ function(mln_add_apple_c_api_library target)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
     add_library(${target} STATIC)
-    mln_configure_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
+    mln_configure_static_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
     mln_configure_complete_static_archive(${target} ${MLN_FFI_STATIC_DEPS})
     return()
   endif()
@@ -333,8 +338,8 @@ function(mln_add_apple_c_api_library target)
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
-  mln_configure_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
-                              ${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
+                                     ${MLN_FFI_C_API_OBJECT_TARGET})
   mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET}
                                         ${MLN_FFI_STATIC_DEPS})
 endfunction()
@@ -382,8 +387,8 @@ function(mln_add_shared_and_static_c_api_library target)
 
   set(MLN_FFI_STATIC_TARGET "${target}_static")
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
-  mln_configure_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
-                              ${MLN_FFI_C_API_OBJECT_TARGET})
+  mln_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
+                                     ${MLN_FFI_C_API_OBJECT_TARGET})
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set_target_properties(
       ${MLN_FFI_STATIC_TARGET}

@@ -22,7 +22,7 @@ function(mln_install_c_api_shared_target target)
       COMPONENT "${MLN_FFI_NATIVE_COMPONENT}")
 endfunction()
 
-function(mln_install_local_runtime_libraries)
+function(mln_install_local_opengl_runtime_libraries)
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     return()
   endif()
@@ -51,13 +51,42 @@ function(mln_install_local_runtime_libraries)
     COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}")
 endfunction()
 
+function(mln_install_local_vulkan_runtime_libraries)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    return()
+  endif()
+  if(NOT MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+    return()
+  endif()
+
+  find_library(
+    MLN_FFI_LOCAL_RUNTIME_VULKAN_LIBRARY
+    NAMES vulkan.1 vulkan
+    HINTS "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}"
+    REQUIRED NO_DEFAULT_PATH)
+
+  install(
+    FILES "${MLN_FFI_LOCAL_RUNTIME_VULKAN_LIBRARY}"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    COMPONENT "${MLN_FFI_LOCAL_RUNTIME_COMPONENT}")
+endfunction()
+
+function(mln_install_local_runtime_libraries)
+  mln_install_local_opengl_runtime_libraries()
+  mln_install_local_vulkan_runtime_libraries()
+endfunction()
+
 function(mln_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
   set(MLN_FFI_LOCAL_RUNTIME_COMPONENT local-runtime)
 
   get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
+  set(MLN_FFI_PKG_CONFIG_CFLAGS "")
   set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS "")
   set(MLN_FFI_PKG_CONFIG_LIBS "")
+  if(MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
+    set(MLN_FFI_PKG_CONFIG_CFLAGS " -DMLN_STATIC")
+  endif()
   if(UNIX AND MLN_FFI_C_API_LIBRARY_TYPE STREQUAL "SHARED_LIBRARY")
     set(MLN_FFI_PKG_CONFIG_RPATH_FLAGS " -Wl,-rpath,\${libdir}")
   endif()
