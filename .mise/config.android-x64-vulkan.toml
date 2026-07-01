@@ -5,7 +5,7 @@ MLN_FFI_NATIVE_INSTALL_DIR = "{{config_root}}/build/android-x64-vulkan/install"
 PKG_CONFIG_PATH = "{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 PKG_CONFIG_ALLOW_CROSS = "1"
 ANDROID_HOME = { required = true }
-ANDROID_NDK_HOME = { required = true }
+ANDROID_NDK_HOME = "{% if env.ANDROID_NDK_HOME is defined %}{{ env.ANDROID_NDK_HOME }}{% elif os() == \"macos\" %}{{ exec(command='find \"$HOME/Library/Android/sdk/ndk\" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1') | trim }}{% elif os() == \"linux\" %}{{ exec(command='find \"$HOME/Android/Sdk/ndk\" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1') | trim }}{% elif os() == \"windows\" %}{{ exec(command='find \"$LOCALAPPDATA/Android/Sdk/ndk\" -mindepth 1 -maxdepth 1 -type d | sort | tail -n 1') | trim }}{% endif %}"
 MLN_FFI_CMAKE_ARGS = """
 -DCMAKE_TOOLCHAIN_FILE={{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake
 -DANDROID_ABI=x86_64
