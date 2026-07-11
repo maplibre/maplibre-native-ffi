@@ -1,129 +1,80 @@
 // swift-tools-version: 6.0
 
-import Foundation
 import PackageDescription
 
-func requiredEnvironment(_ name: String) -> String {
-  guard let value = Context
-    .environment[name]
-  else {
-    fatalError("\(name) is required")
-  }
-  return value
-}
-
-let miseEnv = requiredEnvironment("MISE_ENV")
-
-func hostLibraryDirs() -> [String] {
-  requiredEnvironment("MLN_FFI_HOST_LIBRARY_DIRS")
-    .split(separator: ":")
-    .map(String.init)
-}
-
-func nativeLinkerFlags() -> [String] {
-  let nativeInstallDir = requiredEnvironment("MLN_FFI_NATIVE_INSTALL_DIR")
-  let libDir = "\(nativeInstallDir)/lib"
-  var flags = ["-L", libDir, "-lmaplibre-native-c"]
-
-  let isIOSDevice = miseEnv.hasPrefix("ios-") &&
-    !miseEnv.hasPrefix("ios-simulator-")
-  let isDesktop = miseEnv.hasPrefix("linux-") || miseEnv.hasPrefix("macos-")
-  if isIOSDevice {
-    flags += [
-      "-lc++",
-      "-lobjc",
-      "-lsqlite3",
-      "-lz",
-      "-framework",
-      "CoreFoundation",
-      "-framework",
-      "CoreGraphics",
-      "-framework",
-      "CoreText",
-      "-framework",
-      "Foundation",
-      "-framework",
-      "ImageIO",
-      "-framework",
-      "Metal",
-      "-framework",
-      "MetalKit",
-      "-framework",
-      "QuartzCore",
-    ]
-  } else {
-    flags += ["-Xlinker", "-rpath", "-Xlinker", libDir]
-    if isDesktop {
-      for hostLibraryDir in hostLibraryDirs() {
-        flags += ["-Xlinker", "-rpath", "-Xlinker", hostLibraryDir]
-      }
-    }
-  }
-  return flags
-}
-
-let isIOSSimulator = miseEnv.hasPrefix("ios-simulator-")
-let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 let testDependencies: [Target.Dependency] = [
   "MaplibreNative",
   "CMaplibreNativeC",
 ]
 
-var products: [Product] = [
-  .library(name: "MaplibreNative", targets: ["MaplibreNative"]),
+let testSourceFiles = [
+  "MaplibreNativeTests/CameraAdvancedTests.swift",
+  "MaplibreNativeTests/LoggingTests.swift",
+  "MaplibreNativeTests/MapHandleTests.swift",
+  "MaplibreNativeTests/MaplibreTests.swift",
+  "MaplibreNativeTests/NativeHandleLeakTestSupport.swift",
+  "MaplibreNativeTests/OfflineTests.swift",
+  "MaplibreNativeTests/ProjectionTests.swift",
+  "MaplibreNativeTests/QueryTests.swift",
+  "MaplibreNativeTests/RenderTests.swift",
+  "MaplibreNativeTests/RuntimeTests.swift",
+  "MaplibreNativeTests/StyleTests.swift",
+  "MaplibreNativeTests/SupportHelperTests.swift",
+  "MaplibreNativeTests/ValueTests.swift",
 ]
 
-var targets: [Target] = [
-  .systemLibrary(name: "CMaplibreNativeC"),
+let products: [Product] = [
+  .library(name: "MaplibreNative", targets: ["MaplibreNative"]),
+  .executable(
+    name: "MaplibreNativeIOSSimulatorTests",
+    targets: ["MaplibreNativeIOSSimulatorTests"]
+  ),
+]
+
+let targets: [Target] = [
+  .systemLibrary(
+    name: "CMaplibreNativeC",
+    pkgConfig: "maplibre-native-c"
+  ),
   .target(
     name: "MaplibreNative",
     dependencies: ["CMaplibreNativeC"],
     linkerSettings: [
-      .unsafeFlags(nativeLinkerFlags()),
+      .linkedLibrary("c++", .when(platforms: [.iOS])),
+      .linkedLibrary("objc", .when(platforms: [.iOS])),
+      .linkedLibrary("sqlite3", .when(platforms: [.iOS])),
+      .linkedLibrary("z", .when(platforms: [.iOS])),
+      .linkedFramework("CoreFoundation", .when(platforms: [.iOS])),
+      .linkedFramework("CoreGraphics", .when(platforms: [.iOS])),
+      .linkedFramework("CoreText", .when(platforms: [.iOS])),
+      .linkedFramework("Foundation", .when(platforms: [.iOS])),
+      .linkedFramework("ImageIO", .when(platforms: [.iOS])),
+      .linkedFramework("Metal", .when(platforms: [.iOS])),
+      .linkedFramework("MetalKit", .when(platforms: [.iOS])),
+      .linkedFramework("QuartzCore", .when(platforms: [.iOS])),
     ]
   ),
+  .target(
+    name: "MaplibreNativeTestCases",
+    dependencies: testDependencies,
+    path: "Tests",
+    exclude: [
+      "MaplibreNativeIOSSimulatorTests",
+      "MaplibreNativeTestsHost",
+    ],
+    sources: testSourceFiles
+  ),
+  .testTarget(
+    name: "MaplibreNativeTests",
+    dependencies: ["MaplibreNativeTestCases"],
+    path: "Tests/MaplibreNativeTestsHost"
+  ),
+  .executableTarget(
+    name: "MaplibreNativeIOSSimulatorTests",
+    dependencies: ["MaplibreNativeTestCases"],
+    path: "Tests/MaplibreNativeIOSSimulatorTests"
+  ),
 ]
-
-if isIOSSimulator {
-  let testSourcesPath = "Tests/MaplibreNativeTests"
-  let testSourceFiles: [String]
-  do {
-    testSourceFiles = try FileManager.default
-      .contentsOfDirectory(atPath: packageRoot.appendingPathComponent(
-        testSourcesPath
-      ).path)
-      .filter { $0.hasSuffix(".swift") }
-      .sorted()
-      .map { "MaplibreNativeTests/\($0)" }
-  } catch {
-    fatalError(
-      "failed to list Swift test sources in \(testSourcesPath): \(error)"
-    )
-  }
-
-  products.append(
-    .executable(
-      name: "MaplibreNativeIOSSimulatorTests",
-      targets: ["MaplibreNativeIOSSimulatorTests"]
-    )
-  )
-  targets.append(
-    .executableTarget(
-      name: "MaplibreNativeIOSSimulatorTests",
-      dependencies: testDependencies,
-      path: "Tests",
-      sources: testSourceFiles +
-        ["MaplibreNativeIOSSimulatorTests/Runner.swift"]
-    )
-  )
-} else {
-  targets.append(
-    .testTarget(
-      name: "MaplibreNativeTests",
-      dependencies: testDependencies
-    )
-  )
-}
 
 let package = Package(
   name: "maplibre-native-swift",

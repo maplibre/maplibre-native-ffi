@@ -1,0 +1,7 @@
+{
+  module: {
+    name: "maplibre_native_ffi",
+    type: "har",
+    deviceTypes: ["default", "tablet"],
+  },
+}

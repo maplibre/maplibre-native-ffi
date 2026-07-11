@@ -9,12 +9,18 @@ const BuildOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
+    system_root: ?std.Build.LazyPath,
 };
 
 pub const RenderBackend = enum {
     metal,
     opengl,
     vulkan,
+};
+
+const ArtifactDescriptor = struct {
+    renderBackend: []const u8,
+    zigTarget: []const u8,
 };
 
 fn parseRenderBackend(value: []const u8) RenderBackend {
@@ -28,6 +34,19 @@ fn lazyPath(path: []const u8) std.Build.LazyPath {
 
 fn installPath(b: *std.Build, install_dir: std.Build.LazyPath, sub_path: []const u8) std.Build.LazyPath {
     return lazyPath(b.pathJoin(&.{ install_dir.getPath(b), sub_path }));
+}
+
+fn installedArtifactDescriptor(b: *std.Build, install_dir: std.Build.LazyPath) ArtifactDescriptor {
+    const descriptor_path = b.pathJoin(&.{ install_dir.getPath(b), "share", "maplibre-native-c", "artifact.json" });
+    const descriptor = std.Io.Dir.cwd().readFileAlloc(b.graph.io, descriptor_path, b.allocator, .limited(4096)) catch
+        std.debug.panic("failed to read native artifact descriptor: {s}", .{descriptor_path});
+    const parsed = std.json.parseFromSlice(
+        ArtifactDescriptor,
+        b.allocator,
+        descriptor,
+        .{},
+    ) catch std.debug.panic("invalid native artifact descriptor: {s}", .{descriptor_path});
+    return parsed.value;
 }
 
 fn withInstallIncludeDir(b: *std.Build, install_dir: std.Build.LazyPath, dependency_include_dirs: []const std.Build.LazyPath) []const std.Build.LazyPath {
@@ -65,6 +84,7 @@ pub const LinkOptions = struct {
     native_install_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath,
+    system_root: ?std.Build.LazyPath,
 };
 
 pub const DependencyOptions = struct {
@@ -74,18 +94,29 @@ pub const DependencyOptions = struct {
     render_backend: RenderBackend,
     dependency_include_dirs: []const std.Build.LazyPath = &.{},
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    system_root: ?std.Build.LazyPath = null,
 };
 
 pub const RenderBackendLinkOptions = struct {
     target: std.Build.ResolvedTarget,
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    system_root: ?std.Build.LazyPath = null,
 };
 
-pub fn renderBackend(b: *std.Build) RenderBackend {
-    const value = b.option([]const u8, "render-backend", "Native render backend") orelse
-        @panic("missing required -Drender-backend=<metal|opengl|vulkan>");
-    return parseRenderBackend(value);
+pub fn renderBackend(b: *std.Build, install_dir: std.Build.LazyPath) RenderBackend {
+    if (b.option([]const u8, "render-backend", "Override the installed native render backend")) |value| {
+        return parseRenderBackend(value);
+    }
+
+    return parseRenderBackend(installedArtifactDescriptor(b, install_dir).renderBackend);
+}
+
+pub fn nativeTarget(b: *std.Build, install_dir: std.Build.LazyPath) std.Build.ResolvedTarget {
+    const descriptor = installedArtifactDescriptor(b, install_dir);
+    const default_target = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
+        std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
+    return b.standardTargetOptions(.{ .default_target = default_target });
 }
 
 pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
@@ -111,6 +142,10 @@ pub fn dependencyIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
 
 pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
     return b.option([]const std.Build.LazyPath, "dependency-library-dir", "Additional local dependency library directory") orelse &.{};
+}
+
+pub fn maybeSystemRootPath(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(std.Build.LazyPath, "system-root", "Target platform SDK or sysroot");
 }
 
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
@@ -156,6 +191,7 @@ pub const TranslateCModuleOptions = struct {
     optimize: std.builtin.OptimizeMode,
     include_dirs: []const std.Build.LazyPath,
     c_macros: []const CMacro = &.{},
+    system_root: ?std.Build.LazyPath = null,
 };
 
 pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Build.Module {
@@ -165,7 +201,7 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         .optimize = options.optimize,
     });
     addTranslateCIncludePaths(translate_c, options.include_dirs);
-    addPlatformSystemHeaderPaths(b, translate_c, options.target);
+    addPlatformSystemHeaderPaths(b, translate_c, options.target, options.system_root);
     for (options.c_macros) |c_macro| {
         translate_c.defineCMacro(c_macro.name, c_macro.value);
     }
@@ -197,6 +233,7 @@ pub const RenderBackendTranslateCOptions = struct {
     optimize: std.builtin.OptimizeMode,
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
+    system_root: ?std.Build.LazyPath = null,
 };
 
 pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: RenderBackendTranslateCOptions) void {
@@ -206,6 +243,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .target = options.target,
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
+            .system_root = options.system_root,
         }));
     }
     if (options.render_backend == .opengl and (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)) {
@@ -214,6 +252,7 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
             .target = options.target,
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
+            .system_root = options.system_root,
         }));
     }
 }
@@ -225,28 +264,28 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
     }
 }
 
-fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget) void {
+fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
-    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
-    if (system_root.len == 0) return;
+    const root = system_root orelse return;
+    const system_root_path = root.getPath(b);
 
     if (target.result.os.tag.isDarwin()) {
-        destination.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
+        destination.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
     }
-    destination.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+    destination.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
 }
 
-pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    addPlatformSystemHeaderPaths(b, module, target);
+pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
+    addPlatformSystemHeaderPaths(b, module, target, system_root);
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
-    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
-    if (system_root.len == 0) return;
+    const root = system_root orelse return;
+    const system_root_path = root.getPath(b);
 
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
     if (target.result.os.tag == .linux) {
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "lib" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "lib64" }) });
     }
 }
 
@@ -304,7 +343,7 @@ pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend
 }
 
 pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: RenderBackendLinkOptions) void {
-    addPlatformSystemPaths(b, module, options.target);
+    addPlatformSystemPaths(b, module, options.target, options.system_root);
 
     switch (options.render_backend) {
         .metal => {
@@ -342,6 +381,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"render-backend": []const u8,
     @"dependency-include-dir": []const std.Build.LazyPath,
     @"dependency-library-dir": []const std.Build.LazyPath,
+    @"system-root": ?std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -350,6 +390,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"render-backend" = @tagName(options.render_backend),
         .@"dependency-include-dir" = options.dependency_include_dirs,
         .@"dependency-library-dir" = options.dependency_library_dirs,
+        .@"system-root" = options.system_root,
     };
 }
 
@@ -369,6 +410,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .native_install_dir = options.native_install_dir,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     };
 }
 
@@ -376,6 +418,7 @@ pub const IncludeOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    system_root: ?std.Build.LazyPath = null,
 };
 
 /// Configures the raw C declarations without linking maplibre-native-c.
@@ -387,6 +430,7 @@ pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, opti
         .target = options.target,
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
+        .system_root = options.system_root,
     }));
 }
 
@@ -399,6 +443,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .include_dirs = options.include_dirs,
         .target = options.target,
         .optimize = options.optimize,
+        .system_root = options.system_root,
     });
     const link_dirs = &.{installPath(b, options.native_install_dir, "lib")};
     const runtime_library_dirs = &.{nativeRuntimeDir(b, options.native_install_dir, options.target)};
@@ -406,8 +451,9 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         addLibraryPaths(module_, link_dirs);
         linkSystemLibraries(module_, staticIosLinkLibraries());
         if (options.target.result.os.tag == .ios) {
-            const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT").?;
-            module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+            const system_root = options.system_root orelse
+                @panic("iOS builds require -Dsystem-root=<path-to-iOS-SDK>");
+            module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root.getPath(b), "usr", "lib", "libc++.tbd" }) });
         }
         linkFrameworks(module_, staticIosFrameworks(options.render_backend));
     } else if (options.target.result.os.tag == .windows) {
@@ -421,6 +467,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
 }
 
@@ -493,6 +540,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
+        .system_root = options.system_root,
     });
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
@@ -543,7 +591,11 @@ pub fn addTestRunStep(
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    const native_install_dir = maybeNativeInstallDirPath(b);
+    const target = if (native_install_dir) |install_dir|
+        nativeTarget(b, install_dir)
+    else
+        b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     const include_dirs_from_cli = b.option(
@@ -559,18 +611,20 @@ pub fn build(b: *std.Build) void {
         include_dirs_from_cli orelse defaultDocIncludeDirs(b),
     );
 
-    const native_install_dir = maybeNativeInstallDirPath(b) orelse return;
+    const required_native_install_dir = native_install_dir orelse return;
     const dependency_include_dirs = dependencyIncludeDirs(b);
     const dependency_library_dirs = dependencyLibraryDirs(b);
+    const system_root = maybeSystemRootPath(b);
 
-    const backend = renderBackend(b);
+    const backend = renderBackend(b, required_native_install_dir);
     const options = BuildOptions{
         .target = target,
         .optimize = testOptimize(target, optimize),
-        .native_install_dir = native_install_dir,
-        .include_dirs = installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .native_install_dir = required_native_install_dir,
+        .include_dirs = installedIncludeDirs(b, required_native_install_dir, dependency_include_dirs),
         .dependency_library_dirs = dependency_library_dirs,
         .render_backend = backend,
+        .system_root = system_root,
     };
 
     const maplibre_native = addMaplibreNativeModule(b, options);

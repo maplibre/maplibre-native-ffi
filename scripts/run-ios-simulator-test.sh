@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ $# -ne 1 ]]; then
-  echo "usage: $0 <test-executable>" >&2
+if [[ $# -lt 1 || $# -gt 2 ]]; then
+  echo "usage: $0 <test-executable> [timeout-seconds]" >&2
   exit 2
 fi
 
 test_executable=$1
+timeout_seconds=${2:-120}
 if [[ ! -x "$test_executable" ]]; then
   echo "iOS simulator test executable is not executable: $test_executable" >&2
   exit 2
@@ -27,13 +28,9 @@ if [[ "$state" != "Booted" ]]; then
   xcrun simctl bootstatus "$device" -b
 fi
 
-if [[ -n "${MLN_FFI_TEST_TIMEOUT:-}" ]]; then
-  if [[ ! "$MLN_FFI_TEST_TIMEOUT" =~ ^[0-9]+s?$ ]]; then
-    echo "Invalid MLN_FFI_TEST_TIMEOUT: $MLN_FFI_TEST_TIMEOUT" >&2
-    exit 2
-  fi
-  seconds=${MLN_FFI_TEST_TIMEOUT%s}
-  exec perl -e 'alarm shift; exec @ARGV' "$seconds" xcrun simctl spawn "$device" "$test_executable"
+if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then
+  echo "Invalid timeout: $timeout_seconds" >&2
+  exit 2
 fi
 
-exec xcrun simctl spawn "$device" "$test_executable"
+exec perl -e 'alarm shift; exec @ARGV' "$timeout_seconds" xcrun simctl spawn "$device" "$test_executable"

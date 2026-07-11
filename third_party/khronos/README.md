@@ -24,8 +24,6 @@ and uses WGL extension declarations from `GL/wglext.h`. Upstream MapLibre
 Native gets those headers from its vendored vcpkg
 [`opengl-registry`](https://vcpkg.io/en/package/opengl-registry.html) port.
 
-This project uses Pixi for native dependencies. Conda-forge provides the EGL
-and [`libgles-devel`](https://prefix.dev/channels/conda-forge/packages/libgles-devel)
-headers used by the Linux EGL profiles, but it does not provide an equivalent
-`opengl-registry` package for `win-64`. The Windows SDK provides the base
-WGL/OpenGL API, but not this Khronos registry header set.
+Linux system packages provide the EGL and GLES headers used by Linux EGL
+presets. The Windows SDK provides the base WGL/OpenGL API, but not this Khronos
+registry header set.

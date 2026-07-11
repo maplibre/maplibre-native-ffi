@@ -2,15 +2,12 @@
 #MISE description="Package the Swift map iOS simulator app bundle."
 set -euo pipefail
 
-if [[ "$MISE_ENV" != ios-simulator-* ]]; then
-  exec mise -E ios-simulator-arm64-metal run //examples/swift-map:package:ios-simulator
-fi
+mise run build:ios-simulator
 
-mise run build
-
-app_dir=".build/$MISE_ENV/SwiftMapIOS.app"
-executable=".build/$MISE_ENV/$MLN_FFI_SWIFT_TARGET_BIN_DIR/debug/swift-map-ios"
-native_library_dir="$MLN_FFI_NATIVE_INSTALL_DIR/lib"
+app_dir=".build/ios-simulator/SwiftMapIOS.app"
+executable=".build/ios-simulator/arm64-apple-ios-simulator/debug/swift-map-ios"
+repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+native_library_dir="$repo_root/build/ios-simulator-arm64-metal/install/lib"
 native_library="$native_library_dir/libmaplibre-native-c.dylib"
 info_plist="$app_dir/Info.plist"
 

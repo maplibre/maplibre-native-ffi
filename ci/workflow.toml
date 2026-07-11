@@ -1,0 +1,240 @@
+# These remain Gradle builds because the multi-ABI row has no CMake preset.
+android = [
+  { target = "android-arm64-egl", abi = "arm64-v8a", backend = "opengl", build_map = true },
+  { target = "android-arm64-vulkan", abi = "arm64-v8a", backend = "vulkan", build_map = false },
+  { target = "android-x64-egl", abi = "x86_64", backend = "opengl", build_map = true },
+  { target = "android-x64-vulkan", abi = "x86_64", backend = "vulkan", build_map = false },
+  { target = "android-multi-vulkan", abi = "arm64-v8a,x86_64", backend = "vulkan", build_map = true },
+]
+
+# Target metadata drives the native, package, and desktop ecosystem matrices.
+[[targets]]
+preset = "linux-arm64-egl"
+runner = "ubuntu-24.04-arm"
+backend = "opengl"
+graphics = "software"
+platform_sdk = "none"
+test = true
+package = true
+
+[[targets]]
+preset = "linux-arm64-vulkan"
+runner = "ubuntu-24.04-arm"
+backend = "vulkan"
+graphics = "software"
+platform_sdk = "none"
+test = true
+package = true
+
+[[targets]]
+preset = "linux-x64-egl"
+runner = "ubuntu-latest"
+backend = "opengl"
+graphics = "software"
+platform_sdk = "none"
+test = true
+package = true
+
+[[targets]]
+preset = "linux-x64-vulkan"
+runner = "ubuntu-latest"
+backend = "vulkan"
+graphics = "software"
+platform_sdk = "none"
+test = true
+package = true
+
+[[targets]]
+preset = "macos-arm64-metal"
+runner = "macos-26"
+backend = "metal"
+graphics = "native"
+platform_sdk = "macos"
+test = true
+package = true
+
+[[targets]]
+preset = "macos-arm64-vulkan"
+runner = "macos-26"
+backend = "vulkan"
+graphics = "native"
+platform_sdk = "macos"
+test = true
+package = true
+
+[[targets]]
+preset = "macos-arm64-egl"
+runner = "macos-26"
+backend = "opengl"
+graphics = "angle"
+platform_sdk = "macos"
+test = true
+package = true
+
+[[targets]]
+preset = "ios-arm64-metal"
+runner = "macos-26"
+backend = "metal"
+graphics = "native"
+platform_sdk = "ios"
+test = false
+package = false
+
+[[targets]]
+preset = "ios-simulator-arm64-metal"
+runner = "macos-26"
+backend = "metal"
+graphics = "native"
+platform_sdk = "ios-simulator"
+test = true
+package = false
+
+[[targets]]
+preset = "android-arm64-egl"
+runner = "ubuntu-latest"
+backend = "opengl"
+graphics = "none"
+platform_sdk = "android"
+test = false
+package = false
+
+[[targets]]
+preset = "android-arm64-vulkan"
+runner = "ubuntu-latest"
+backend = "vulkan"
+graphics = "none"
+platform_sdk = "android"
+test = false
+package = false
+
+[[targets]]
+preset = "android-x64-egl"
+runner = "ubuntu-latest"
+backend = "opengl"
+graphics = "none"
+platform_sdk = "android"
+test = false
+package = false
+
+[[targets]]
+preset = "android-x64-vulkan"
+runner = "ubuntu-latest"
+backend = "vulkan"
+graphics = "none"
+platform_sdk = "android"
+test = false
+package = false
+
+[[targets]]
+preset = "ohos-arm64-egl"
+runner = "ubuntu-latest"
+backend = "opengl"
+graphics = "none"
+platform_sdk = "ohos"
+test = false
+package = false
+
+[[targets]]
+preset = "ohos-arm64-vulkan"
+runner = "ubuntu-latest"
+backend = "vulkan"
+graphics = "none"
+platform_sdk = "ohos"
+test = false
+package = false
+
+[[targets]]
+preset = "windows-x64-vulkan"
+runner = "windows-2022"
+backend = "vulkan"
+graphics = "software"
+platform_sdk = "windows"
+test = true
+package = true
+
+[[targets]]
+preset = "windows-x64-wgl"
+runner = "windows-2022"
+backend = "wgl"
+graphics = "software"
+platform_sdk = "windows"
+test = true
+package = true
+
+[[targets]]
+preset = "windows-arm64-vulkan"
+runner = "windows-11-arm"
+backend = "vulkan"
+graphics = "software"
+platform_sdk = "windows"
+test = true
+package = true
+
+[[targets]]
+preset = "windows-arm64-wgl"
+runner = "windows-11-arm"
+backend = "wgl"
+graphics = "software"
+platform_sdk = "windows"
+test = true
+package = true
+
+[[suites]]
+id = "rust"
+project = "rust"
+platforms = ["linux", "macos", "windows"]
+commands = [
+  { task = "//bindings/rust:test" },
+  { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
+]
+
+[[suites]]
+id = "zig"
+project = "zig"
+platforms = ["linux", "macos", "windows"]
+commands = [
+  { task = "//bindings/zig:test" },
+  { task = "//examples/zig-map:build" },
+  { task = "//examples/zig-readback:run" },
+]
+
+[[suites]]
+id = "kotlin"
+project = "kotlin"
+platforms = ["linux", "macos", "windows"]
+commands = [
+  { task = "//bindings/kotlin:jvmTest" },
+  { task = "//bindings/kotlin:nativeTest", platforms = ["linux", "macos"] },
+  { task = "//examples/compose-map:build" },
+  { task = "//examples/lwjgl-map:build" },
+]
+
+[[suites]]
+id = "swift"
+project = "swift"
+platforms = ["linux", "macos"]
+commands = [
+  { task = "//bindings/swift:test" },
+  { task = "//examples/swift-map:build", include = ["macos-arm64-metal"] },
+]
+
+[[suites]]
+id = "dotnet"
+project = "dotnet"
+platforms = ["linux", "macos", "windows"]
+commands = [
+  { task = "//bindings/dotnet:test" },
+  { task = "//examples/dotnet-map:build" },
+]
+
+[[suites]]
+id = "go"
+project = "go"
+platforms = ["linux", "macos"]
+commands = [{ task = "//bindings/go:ci" }]
+
+[[suites]]
+id = "python"
+project = "python"
+platforms = ["linux", "macos"]
+commands = [{ task = "//bindings/python:ci" }]

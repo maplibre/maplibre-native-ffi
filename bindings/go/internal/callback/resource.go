@@ -2,6 +2,7 @@ package callback
 
 /*
 #cgo CFLAGS: -std=c2x
+#cgo pkg-config: maplibre-native-c
 #include <stdlib.h>
 #include <stdint.h>
 #include "../cgo_shim.h"

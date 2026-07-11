@@ -22,36 +22,14 @@ function(mln_configure_options)
     message(FATAL_ERROR "Unsupported render backend: ${MLN_FFI_RENDER_BACKEND}")
   endif()
 
-  set(MLN_FFI_IS_IOS_SIMULATOR FALSE)
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
-     AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
-    set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
-  endif()
-
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
-    if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER)
-      if(CMAKE_SYSTEM_NAME STREQUAL "Linux"
-         OR CMAKE_SYSTEM_NAME STREQUAL "Android")
-        set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "egl")
-      elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-        set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "egl")
-      elseif(WIN32)
-        set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "wgl")
-      endif()
-    endif()
     if(NOT MLN_FFI_OPENGL_CONTEXT_PROVIDER MATCHES "^(egl|wgl)$")
       message(
         FATAL_ERROR
           "Unsupported OpenGL context provider: ${MLN_FFI_OPENGL_CONTEXT_PROVIDER}")
-    endif()
-    if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl"
-       AND CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-      if(NOT MLN_FFI_EGL_ROOT)
-        message(FATAL_ERROR "macOS EGL builds require MLN_FFI_EGL_ROOT")
-      endif()
     endif()
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl" AND NOT WIN32)
       message(FATAL_ERROR "OpenGL WGL builds require Windows")
@@ -106,5 +84,4 @@ function(mln_configure_options)
   set(MLN_FFI_OPENGL_CONTEXT_PROVIDER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
       PARENT_SCOPE)
   set(MLN_FFI_EGL_ROOT "${MLN_FFI_EGL_ROOT}" PARENT_SCOPE)
-  set(MLN_FFI_IS_IOS_SIMULATOR "${MLN_FFI_IS_IOS_SIMULATOR}" PARENT_SCOPE)
 endfunction()

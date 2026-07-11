@@ -20,13 +20,13 @@ interop or the popular MapLibre Android/iOS SDKs.
 ## Workflow
 
 ```bash
-# Install/refresh all tools, submodules, and dependencies
-mise install
+# Install/refresh system packages, tools, and repository hooks
+mise bootstrap
 
 # List available tasks across the workspace
 mise tasks --all
 
-# Build the native library (also runs configure)
+# Build the host native library (also installs native dependencies)
 mise run build
 
 # Build and run C API tests (also runs build)
@@ -41,8 +41,16 @@ mise run //examples/zig-readback:run
 # GUI map app — use a brief timeout or run in background
 mise run //examples/zig-map:run:owned-texture
 
-# Build and test for a different variant (override auto-detected env)
-mise -E linux-x64-egl run test
+# Build a different native target/backend
+mise run build linux-x64-egl
+
+# Package a desktop native artifact with CPack
+mise run package-native linux-x64-egl
+
+# Build the Android binding for one ABI/backend
+mise run //bindings/kotlin:androidBuild -- \
+  -Pmaplibre.android.abis=x86_64 \
+  -Pmaplibre.android.backend=opengl
 
 # Run formatters and linters on _all_ files (will stage affected files)
 mise run fix
@@ -51,11 +59,11 @@ mise run fix
 hk fix [FILES...]
 ```
 
-Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
-`linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`,
-`windows-x64-vulkan`, `windows-x64-wgl`, `android-arm64-egl`,
-`android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan`. The
-host-matching variant is selected automatically via `.miserc.toml`.
+Native CMake presets cover Linux (`x64`/`arm64`, EGL/Vulkan), macOS ARM64
+(Metal/EGL/Vulkan), Windows (`x64`/`arm64`, WGL/Vulkan), Android (`x64`/`arm64`,
+EGL/Vulkan), iOS device/simulator, and OpenHarmony ARM64. Gradle and Hvigor
+select the Android and OpenHarmony presets when building platform packages. Host
+workflows use the host's default CMake preset.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.
@@ -76,8 +84,8 @@ the PR description if more detail is needed. More context:
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- The environment is defined by `mise`; pixi is the current desktop native
-  library provider behind mise-managed paths.
+- Mise defines tools, system packages, and common workflows. CMake presets
+  define portable native builds, and Gradle defines Android builds.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
@@ -173,6 +181,3 @@ Read these docs whenever relevant:
   - <https://viteplus.dev/guide/monorepo>
   - <https://viteplus.dev/guide/lint>
   - <https://viteplus.dev/guide/run>
-- `pixi`:
-  - <https://pixi.prefix.dev/latest/reference/pixi_manifest/>
-  - <https://pixi.prefix.dev/latest/reference/pixi_configuration/>

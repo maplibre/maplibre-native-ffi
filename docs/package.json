@@ -3,6 +3,7 @@
   "type": "module",
   "private": "true",
   "scripts": {
+    "generate-support-matrix": "python scripts/generate-support-matrix.py",
     "dev": "astro dev",
     "start": "astro dev",
     "build": "astro build",

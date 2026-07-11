@@ -1,29 +1,27 @@
-[tasks.compile-shaders]
-hide = true
-run = '''
-set -euo pipefail
-
-if [[ "$MLN_FFI_RENDER_BACKEND" == "vulkan" ]]; then
-  glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv
-  glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/sample.frag.spv
-fi
-'''
-
 [tasks.build]
-depends = ["//:ensure-native-library", ":compile-shaders"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
-zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}"
+zig_args=(
+  -Dnative-install-dir="../../build/$usage_preset/install"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build {{vars.zig_host_args}} "${zig_args[@]}"
 '''
 
 [tasks.run]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-usage = 'arg "render-target"'
+depends = ["//:build"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" -- "{{ usage.render_target }}"
+zig_args=(
+  -Dnative-install-dir="{{vars.host_native_install_dir}}"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]

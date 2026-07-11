@@ -1,3 +1,0 @@
-[requires]
-exclude = ["ios-arm64-metal"]
-os = ["linux", "macos", "windows", "ios"]

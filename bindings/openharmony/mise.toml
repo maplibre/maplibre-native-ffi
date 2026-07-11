@@ -1,0 +1,50 @@
+[tasks.install]
+run = "pnpm --filter @maplibre-native-ffi/openharmony install --frozen-lockfile --loglevel warn"
+
+[tasks.sdk]
+run = '''
+component_root="$(dirname "$OHOS_SDK_NATIVE")"
+rm -rf build/sdk/24
+mkdir -p build/sdk/24
+for component in ets js native previewer toolchains; do
+  ln -s "$component_root/$component" "build/sdk/24/$component"
+done
+'''
+
+[tasks."build:native"]
+description = "Build an OpenHarmony native CMake preset through Hvigor."
+usage = '''
+arg "<preset>" {
+  choices "ohos-arm64-egl" "ohos-arm64-vulkan"
+}
+'''
+depends = ["install", "sdk"]
+env = { OHOS_BASE_SDK_HOME = "{{config_root}}/build/sdk" }
+run = '''
+case "$usage_preset" in
+  ohos-arm64-egl) task=buildNativeEgl ;;
+  ohos-arm64-vulkan) task=buildNativeVulkan ;;
+esac
+pnpm run hvigor "$task" --no-daemon
+'''
+
+[tasks.build]
+description = "Build an OpenHarmony HAR containing the native C API."
+usage = '''
+arg "<preset>" {
+  choices "ohos-arm64-egl" "ohos-arm64-vulkan"
+}
+'''
+depends = [
+  "install",
+  "sdk",
+  { task = "build:native", args = ["{{usage.preset}}"] },
+]
+env = { OHOS_BASE_SDK_HOME = "{{config_root}}/build/sdk" }
+run = '''
+pnpm run hvigor assembleHar --no-daemon
+package_dir="../../build/packages/openharmony/$usage_preset"
+mkdir -p "$package_dir"
+cp library/build/default/outputs/default/maplibre_native_ffi.har \
+  "$package_dir/maplibre-native-c.har"
+'''

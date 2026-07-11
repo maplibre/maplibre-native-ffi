@@ -1,30 +1,22 @@
-[tasks.ensure-android-environment]
-hide = true
-run = '''
-if [[ "$MISE_ENV" != android-* ]]; then
-  echo "Use an Android mise environment, for example:" >&2
-  echo "  mise -E android-arm64-egl run //bindings/kotlin:androidBuild" >&2
-  echo "  mise -E android-x64-egl run //bindings/kotlin:androidBuild" >&2
-  exit 1
-fi
-'''
-
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:assemble"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:assemble'
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:check"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:check'
 
 [tasks.jvmTest]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:jvmTest"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:jvmTest'
 
 [tasks.nativeTest]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:nativeTest"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:nativeTest'
 
 [tasks.androidBuild]
-depends = ["ensure-android-environment", "//:ensure-native-library"]
 run = "../../gradlew :bindings:kotlin:androidBuild"

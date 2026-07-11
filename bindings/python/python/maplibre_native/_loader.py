@@ -43,13 +43,16 @@ def _native_loader_dirs() -> list[Path]:
 
 def _candidate_loader_dirs() -> list[Path]:
     package_dir = Path(__file__).resolve().parent
-    install_runtime_dir = Path(os.environ["MLN_FFI_NATIVE_INSTALL_DIR"]) / "bin"
-    host_library_dirs = [
+    install_dir = os.environ.get("MAPLIBRE_NATIVE_C_INSTALL_DIR")
+    install_runtime_dirs = [Path(install_dir) / "bin"] if install_dir else []
+    runtime_library_dirs = [
         Path(directory)
-        for directory in os.environ["MLN_FFI_HOST_LIBRARY_DIRS"].split(os.pathsep)
+        for directory in os.environ.get(
+            "MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS", ""
+        ).split(os.pathsep)
         if directory
     ]
-    return [package_dir, install_runtime_dir, *host_library_dirs]
+    return [package_dir, *install_runtime_dirs, *runtime_library_dirs]
 
 
 configure_native_loader()

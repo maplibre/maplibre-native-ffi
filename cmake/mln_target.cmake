@@ -12,16 +12,6 @@ set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
     mbgl-vendor-sqlite
     mlt-cpp)
 
-set(MLN_FFI_VULKAN_STATIC_ARCHIVE_DEPENDENCIES
-    glslang
-    SPIRV
-    glslang-default-resource-limits
-    OSDependent
-    MachineIndependent
-    GenericCodeGen
-    SPIRV-Tools
-    SPIRV-Tools-opt)
-
 function(mln_append_existing_targets out_var)
   set(MLN_FFI_TARGETS "${${out_var}}")
   foreach(MLN_FFI_TARGET ${ARGN})
@@ -33,9 +23,11 @@ function(mln_append_existing_targets out_var)
 endfunction()
 
 function(mln_configure_complete_static_archive target)
+  get_target_property(MLN_FFI_ARCHIVE_FORMAT mln_ffi_platform_dependencies
+                      MLN_FFI_ARCHIVE_FORMAT)
   set(MLN_FFI_COMPLETE_STATIC_DIR
       "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
-  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "coff")
     set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
         "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c-static.lib")
   else()
@@ -60,7 +52,7 @@ function(mln_configure_complete_static_archive target)
   list(REMOVE_DUPLICATES MLN_FFI_INPUT_ARCHIVES)
   list(REMOVE_DUPLICATES MLN_FFI_INPUT_TARGETS)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "coff")
     add_custom_command(
       OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
       COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
@@ -71,22 +63,12 @@ function(mln_configure_complete_static_archive target)
         ${MLN_FFI_INPUT_ARCHIVES}
       DEPENDS ${MLN_FFI_INPUT_TARGETS}
       VERBATIM)
-  elseif(APPLE)
-    find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
-    list(GET CMAKE_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
-
-    set(MLN_FFI_LD_PLATFORM_FLAGS "")
-    if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND MLN_FFI_IS_IOS_SIMULATOR)
-      list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version ios-simulator
-           "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-      list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version ios
-           "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-      list(APPEND MLN_FFI_LD_PLATFORM_FLAGS -platform_version macos
-           "${CMAKE_OSX_DEPLOYMENT_TARGET}" "${CMAKE_OSX_DEPLOYMENT_TARGET}")
-    endif()
-
+  elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "apple")
+    get_target_property(MLN_FFI_ARCHIVE_TOOL mln_ffi_platform_dependencies
+                        MLN_FFI_ARCHIVE_TOOL)
+    get_target_property(
+      MLN_FFI_RELOCATABLE_LINK_OPTIONS mln_ffi_platform_dependencies
+      MLN_FFI_RELOCATABLE_LINK_OPTIONS)
     add_custom_command(
       OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
       COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
@@ -95,21 +77,17 @@ function(mln_configure_complete_static_archive target)
       COMMAND
         "${CMAKE_LINKER}"
         -r
-        -arch
-        "${MLN_FFI_OSX_ARCHITECTURE}"
-        -syslibroot
-        "$ENV{MLN_FFI_SYSTEM_ROOT}"
-        ${MLN_FFI_LD_PLATFORM_FLAGS}
+        ${MLN_FFI_RELOCATABLE_LINK_OPTIONS}
         -o
         "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
         -all_load
         ${MLN_FFI_INPUT_ARCHIVES}
       COMMAND
-        "${MLN_FFI_LIBTOOL}" -static -o "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        "${MLN_FFI_ARCHIVE_TOOL}" -static -o
+        "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
       DEPENDS ${MLN_FFI_INPUT_TARGETS}
       VERBATIM)
-  else()
+  elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "elf")
     add_custom_command(
       OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
       COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
@@ -129,6 +107,8 @@ function(mln_configure_complete_static_archive target)
       COMMAND "${CMAKE_RANLIB}" "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
       DEPENDS ${MLN_FFI_INPUT_TARGETS}
       VERBATIM)
+  else()
+    message(FATAL_ERROR "Unsupported archive format: ${MLN_FFI_ARCHIVE_FORMAT}")
   endif()
 
   set(MLN_FFI_COMPLETE_STATIC_TARGET "${target}_complete_static")
@@ -139,17 +119,6 @@ function(mln_configure_complete_static_archive target)
   set_property(
     TARGET ${target}
     PROPERTY MLN_FFI_INSTALL_ARCHIVE "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
-endfunction()
-
-function(mln_configure_build_rpath target)
-  # Build-tree binaries find provider-supplied shared libraries through
-  # embedded runtime search paths. iOS images are bundled; skip rpath there.
-  if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set_property(
-      TARGET ${target}
-      APPEND
-      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
-  endif()
 endfunction()
 
 function(mln_configure_shared_exports target)
@@ -315,18 +284,40 @@ endfunction()
 
 function(mln_configure_shared_c_api_wrapper target implementation_target)
   mln_configure_c_api_wrapper(${target} ${implementation_target})
-  mln_configure_build_rpath(${target})
   mln_configure_shared_exports(${target})
   mln_configure_install_rpath(${target})
 endfunction()
 
-function(mln_add_apple_c_api_library target)
+function(mln_complete_static_dependencies_for_target out_var)
+  set(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+      ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
+
+  get_target_property(MLN_FFI_PLATFORM_STATIC_DEPENDENCIES
+                      mln_ffi_platform_dependencies MLN_FFI_STATIC_ARCHIVES)
+  if(MLN_FFI_PLATFORM_STATIC_DEPENDENCIES)
+    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+         ${MLN_FFI_PLATFORM_STATIC_DEPENDENCIES})
+  endif()
+
+  get_target_property(MLN_FFI_RENDER_STATIC_DEPENDENCIES
+                      mln_ffi_render_dependencies MLN_FFI_STATIC_ARCHIVES)
+  if(MLN_FFI_RENDER_STATIC_DEPENDENCIES)
+    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+                                ${MLN_FFI_RENDER_STATIC_DEPENDENCIES})
+  endif()
+
+  set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
+endfunction()
+
+function(mln_add_c_api_library target)
   set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
   add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
   mln_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
   mln_complete_static_dependencies_for_target(MLN_FFI_STATIC_DEPS)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
+  get_target_property(MLN_FFI_SHARED_SUPPORTED mln_ffi_platform_dependencies
+                      MLN_FFI_SHARED_SUPPORTED)
+  if(NOT MLN_FFI_SHARED_SUPPORTED)
     add_library(${target} STATIC)
     mln_configure_static_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
     mln_configure_complete_static_archive(${target} ${MLN_FFI_STATIC_DEPS})
@@ -340,78 +331,14 @@ function(mln_add_apple_c_api_library target)
   add_library(${MLN_FFI_STATIC_TARGET} STATIC)
   mln_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
                                      ${MLN_FFI_C_API_OBJECT_TARGET})
-  mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET}
-                                        ${MLN_FFI_STATIC_DEPS})
-endfunction()
-
-function(mln_complete_static_dependencies_for_target out_var)
-  set(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-      ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
-
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS|Windows)$")
-    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES mbgl-vendor-icu)
-  endif()
-
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|Windows)$")
-    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-         maplibre_native_platform_rust)
-  endif()
-
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    list(
-      APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a")
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-         "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/zlibstatic.lib")
-    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES libuv::uv_a)
-  endif()
-
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
-    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-                                ${MLN_FFI_VULKAN_STATIC_ARCHIVE_DEPENDENCIES})
-  endif()
-
-  set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
-endfunction()
-
-function(mln_add_shared_and_static_c_api_library target)
-  set(MLN_FFI_C_API_OBJECT_TARGET "${target}_objects")
-  add_library(${MLN_FFI_C_API_OBJECT_TARGET} OBJECT)
-  mln_configure_c_api_implementation(${MLN_FFI_C_API_OBJECT_TARGET})
-  mln_complete_static_dependencies_for_target(MLN_FFI_STATIC_DEPS)
-
-  add_library(${target} SHARED)
-  mln_configure_shared_c_api_wrapper(${target} ${MLN_FFI_C_API_OBJECT_TARGET})
-
-  set(MLN_FFI_STATIC_TARGET "${target}_static")
-  add_library(${MLN_FFI_STATIC_TARGET} STATIC)
-  mln_configure_static_c_api_wrapper(${MLN_FFI_STATIC_TARGET}
-                                     ${MLN_FFI_C_API_OBJECT_TARGET})
-  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  get_target_property(
+    MLN_FFI_STATIC_BASE_OUTPUT_NAME mln_ffi_platform_dependencies
+    MLN_FFI_STATIC_BASE_OUTPUT_NAME)
+  if(MLN_FFI_STATIC_BASE_OUTPUT_NAME)
     set_target_properties(
       ${MLN_FFI_STATIC_TARGET}
-      PROPERTIES OUTPUT_NAME maplibre-native-c-static-base)
+      PROPERTIES OUTPUT_NAME "${MLN_FFI_STATIC_BASE_OUTPUT_NAME}")
   endif()
   mln_configure_complete_static_archive(${MLN_FFI_STATIC_TARGET}
                                         ${MLN_FFI_STATIC_DEPS})
-endfunction()
-
-function(mln_add_c_api_library target)
-  if(APPLE)
-    mln_add_apple_c_api_library(${target})
-    return()
-  endif()
-
-  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux|OHOS|Windows)$")
-    mln_add_shared_and_static_c_api_library(${target})
-    return()
-  endif()
-
-  add_library(${target} SHARED)
-  mln_configure_c_api_implementation(${target})
-  mln_configure_build_rpath(${target})
-  mln_configure_shared_exports(${target})
-  mln_configure_install_rpath(${target})
 endfunction()

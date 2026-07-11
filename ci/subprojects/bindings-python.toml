@@ -1,5 +1,0 @@
-[requires]
-os = ["linux", "macos"]
-
-[ci]
-test = "//bindings/python:ci"

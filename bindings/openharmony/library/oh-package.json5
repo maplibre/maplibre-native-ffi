@@ -1,0 +1,9 @@
+{
+  modelVersion: "6.1.1",
+  name: "@maplibre-native-ffi/openharmony-library",
+  version: "1.0.0",
+  description: "OpenHarmony native package for maplibre-native-c",
+  main: "Index.ets",
+  license: "BSD-2-Clause",
+  dependencies: {},
+}

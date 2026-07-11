@@ -429,14 +429,14 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
 
     private fun resolveAngleRoot(): Path {
       val angleRoot =
-        System.getenv("MLN_FFI_EGL_ROOT")
+        System.getProperty("org.maplibre.nativeffi.library.path")?.let { Path(it).parent }
           ?: throw NativeSurfaceBridgeException(
-            "MLN_FFI_EGL_ROOT is required for macOS EGL; run the example through mise"
+            "The native library path is required for macOS EGL; run the example through Gradle"
           )
       val angleRootPath = Path(angleRoot)
       if (angleRootPath.isAngleRoot()) return angleRootPath.absolute()
       throw NativeSurfaceBridgeException(
-        "ANGLE runtime libraries are unavailable in $angleRootPath; run the example through mise"
+        "ANGLE runtime libraries are unavailable in $angleRootPath"
       )
     }
 

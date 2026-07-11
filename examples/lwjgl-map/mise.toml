@@ -1,11 +1,23 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:lwjgl-map:build"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+../../gradlew :examples:lwjgl-map:build \
+  -PmaplibreNativeCInstallDir="../../build/$usage_preset/install"
+'''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
-usage = 'arg "render-target"'
-run = '../../gradlew :examples:lwjgl-map:run --args="{{ usage.render_target }}"'
+depends = ["//:build"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
+run = '''
+../../gradlew :examples:lwjgl-map:run \
+  -PmaplibreNativeCInstallDir="{{vars.host_native_install_dir}}" \
+  --args="{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

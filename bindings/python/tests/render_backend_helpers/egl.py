@@ -23,15 +23,11 @@ if sys.platform == "darwin":
         return name
 
     def _macos_angle_runtime_library_path(name: str) -> Path:
-        egl_root = os.environ.get("MLN_FFI_EGL_ROOT")
-        if egl_root is None or egl_root == "":
-            msg = "MLN_FFI_EGL_ROOT is required for macOS EGL tests"
-            raise RuntimeError(msg)
-        library_path = Path(egl_root).expanduser() / f"lib{name}.dylib"
-        if not library_path.is_file():
-            msg = f"missing ANGLE runtime library: {library_path}"
-            raise RuntimeError(msg)
-        return library_path
+        install_dir = os.environ.get("MAPLIBRE_NATIVE_C_INSTALL_DIR")
+        library_path = Path(install_dir or "") / "lib" / f"lib{name}.dylib"
+        if install_dir and library_path.is_file():
+            return library_path
+        raise RuntimeError(f"missing packaged ANGLE runtime library {library_path}")
 
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]

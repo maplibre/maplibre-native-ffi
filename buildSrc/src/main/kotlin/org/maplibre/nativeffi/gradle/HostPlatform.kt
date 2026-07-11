@@ -74,6 +74,12 @@ class HostPlatform private constructor(osName: String, arch: String) {
         else -> throw IllegalStateException("Unsupported Android NDK host: $osName/$arch")
       }
 
+  val executableSuffix: String
+    get() = if (isWindows) ".exe" else ""
+
+  val androidNdkCommandSuffix: String
+    get() = if (isWindows) ".cmd" else ""
+
   val kotlinNativeTargetPresetName: String?
     get() =
       when {

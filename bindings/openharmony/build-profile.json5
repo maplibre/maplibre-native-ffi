@@ -1,0 +1,29 @@
+{
+  app: {
+    products: [
+      {
+        name: "default",
+        compileSdkVersion: 24,
+        compatibleSdkVersion: 24,
+        targetSdkVersion: 24,
+        runtimeOS: "OpenHarmony",
+      },
+    ],
+    buildModeSet: [
+      { name: "debug" },
+      { name: "release" },
+    ],
+  },
+  modules: [
+    {
+      name: "maplibre_native_ffi",
+      srcPath: "./library",
+      targets: [
+        {
+          name: "default",
+          applyToProducts: ["default"],
+        },
+      ],
+    },
+  ],
+}

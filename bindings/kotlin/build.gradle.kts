@@ -2,6 +2,7 @@ import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
@@ -14,6 +15,15 @@ apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 val hostPlatform = HostPlatform.current()
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
+val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
+val androidBackend =
+  AndroidTarget.parseBackend(
+    providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
+  )
+val androidTargets =
+  AndroidTarget.parseAbis(
+    providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
+  )
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
@@ -61,8 +71,8 @@ kotlin {
       cinterops {
         create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
-          includeDirs.headerFilterOnly(*maplibreNativeC.includeDirs.toTypedArray())
-          compilerOpts(maplibreNativeC.includeDirs.map { "-I$it" })
+          includeDirs.headerFilterOnly(checkedInCHeaders.asFile)
+          compilerOpts("-I${checkedInCHeaders.asFile}")
         }
       }
     }
@@ -87,6 +97,9 @@ dependencies.add("javaCppTool", libs.javacpp)
 
 apply(from = "gradle/jextract-jvm.gradle.kts")
 
+extensions.extraProperties["maplibreAndroidSdkDirectory"] =
+  androidComponents.sdkComponents.sdkDirectory
+
 apply(from = "gradle/javacpp-android.gradle.kts")
 
 tasks.named<KotlinJvmCompile>("compileKotlinJvm") {
@@ -101,9 +114,15 @@ androidComponents {
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
     )
-    variant.sources.jniLibs?.addStaticSourceDirectory(
-      packagedAndroidNativeLibs.get().asFile.absolutePath
-    )
+    androidTargets.forEach { target ->
+      variant.sources.jniLibs?.addStaticSourceDirectory(
+        packagedAndroidNativeLibs
+          .get()
+          .dir("$androidBackend/${target.cargoTarget}")
+          .asFile
+          .absolutePath
+      )
+    }
   }
 }
 
@@ -115,10 +134,11 @@ tasks.configureEach {
     "preAndroidMainBuild",
     "mergeAndroidMainJniLibFolders" -> {
       dependsOn("packageAndroidNativeLibraries")
-      inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
     }
   }
 }
+
+val hostNativeInstallConfigured = providers.gradleProperty("maplibreNativeCInstallDir").isPresent
 
 tasks.named<Test>("jvmTest") {
   jvmArgs("--enable-native-access=ALL-UNNAMED")
@@ -127,11 +147,13 @@ tasks.named<Test>("jvmTest") {
     "org.maplibre.nativeffi.library.dirs",
     maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath },
   )
-  inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
-  inputs
-    .files(maplibreNativeC.loaderLibraryDirs)
-    .withPropertyName("maplibreNativeCLoaderLibraryDirs")
-  inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  if (hostNativeInstallConfigured) {
+    inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
+    inputs
+      .files(maplibreNativeC.loaderLibraryDirs)
+      .withPropertyName("maplibreNativeCLoaderLibraryDirs")
+    inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  }
 }
 
 tasks.register("nativeTest") {

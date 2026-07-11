@@ -9,6 +9,7 @@ const BuildOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
+    system_root: ?std.Build.LazyPath,
 };
 
 fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
@@ -26,6 +27,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
+        .system_root = options.system_root,
     });
     if (maplibre_build.isIosSimulator(options.target)) {
         c_tests.root_module.addCSourceFile(.{ .file = b.path("../../../zig_test_support/ios_simulator_dyld_stub.m") });
@@ -53,14 +55,15 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .native_install_dir = options.native_install_dir,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
     return c_tests;
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const render_backend = maplibre_build.renderBackend(b);
     const native_install_dir = maplibre_build.nativeInstallDirPath(b);
+    const target = maplibre_build.nativeTarget(b, native_install_dir);
+    const render_backend = maplibre_build.renderBackend(b, native_install_dir);
     const options = BuildOptions{
         .target = target,
         .optimize = maplibre_build.testOptimize(target, b.standardOptimizeOption(.{})),
@@ -68,6 +71,7 @@ pub fn build(b: *std.Build) void {
         .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, maplibre_build.dependencyIncludeDirs(b)),
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
+        .system_root = maplibre_build.maybeSystemRootPath(b),
     };
 
     const c_tests = addCTests(b, options);

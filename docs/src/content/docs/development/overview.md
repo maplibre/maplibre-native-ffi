@@ -29,36 +29,75 @@ before implementing or reviewing a binding.
 
 Install the platform prerequisites:
 
-- On macOS, install the Xcode version listed in `.xcode-version`, or a recent
-  compatible Xcode. Run the pinned
-  [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
-  switch to the repository version.
-- On Linux, the C and C++ compilers come from Pixi. Ensure graphics driver
-  packages are installed for the render backend you use.
+- On macOS Apple Silicon, install and initialize the Xcode version listed in
+  `.xcode-version`, or a recent compatible Xcode.
+- On Linux, mise bootstrap installs the compiler and development libraries
+  through the available system package manager. Install a Vulkan ICD for the
+  default backend if the machine does not already provide one.
 - On Windows, install a recent version of Visual Studio Community (or Build
-  Tools) 2022 with the `Desktop development with C++` workload and
-  `Git for Windows`. We rely on Git Bash to run project scripts.
+  Tools) 2022 with the `Desktop development with C++` workload, the C++ Clang
+  tools component, and `Git for Windows`. We rely on Git Bash to run project
+  scripts.
+- For Android, install the Android SDK packages pinned in
+  `gradle/libs.versions.toml`.
+- For OpenHarmony, install an API 24 SDK.
 
-Install [`mise`](https://mise.jdx.dev/), then install pinned project tools and
-run repository setup hooks:
-
-```bash
-mise install
-```
-
-The setup hooks install project dependencies and initialize the MapLibre Native
-submodule at `third_party/maplibre-native`.
-
-Run the Zig map example as a smoke test:
+Install [`mise`](https://mise.jdx.dev/), then bootstrap system packages, install
+pinned project tools, and run repository setup hooks:
 
 ```bash
-mise run //examples/zig-map:run:owned-texture
+mise trust
+mise bootstrap
 ```
 
-Mise selects the native build profile that matches your host when one is
-available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
-`mise -E <variant> run ...`, to build, test, or run examples for another
-platform and render backend.
+Android and OpenHarmony builds require their SDK paths in environment variables.
+Put the absolute paths in the Git-ignored `mise.local.toml` at the repository
+root:
+
+```toml
+[env]
+ANDROID_HOME = "/home/you/Android/Sdk"
+OHOS_SDK_NATIVE = "/home/you/HarmonyOS/command-line-tools/sdk/default/openharmony/native"
+```
+
+Use the Android SDK package versions pinned in `gradle/libs.versions.toml`. Only
+define the Android variable when building Android targets and `OHOS_SDK_NATIVE`
+when building OpenHarmony targets. Mise loads `mise.local.toml` automatically.
+
+The setup hooks install repository hooks, initialize the MapLibre Native
+submodule at `third_party/maplibre-native`, and refresh generated support data.
+Each workflow installs the package-manager dependencies it owns.
+
+Run the headless Zig readback example as a smoke test:
+
+```bash
+mise run //examples/zig-readback:run
+```
+
+Host workflows use the matching default CMake preset: Metal on macOS and Vulkan
+on Linux and Windows. Pass a preset to the native task to build another native
+target or backend:
+
+```bash
+mise run build linux-x64-egl
+```
+
+Android is Gradle-owned. Select its backend and ABIs with Gradle properties:
+
+```bash
+mise run //examples/android-map:build -- \
+  -Pmaplibre.android.backend=opengl \
+  -Pmaplibre.android.abis=arm64-v8a
+```
+
+OpenHarmony is Hvigor-owned. Build either native backend through its platform
+project:
+
+```bash
+mise run //bindings/openharmony:build ohos-arm64-vulkan
+```
+
+The HAR is written under `build/packages/openharmony/<preset>/`.
 
 ## Common Commands
 
@@ -85,24 +124,47 @@ This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
 
-Project-managed dependency state keeps builds reproducible. Mise supplies
-repository tools, owns task execution, and exports the environment consumed by
-build systems, bindings, and examples. Pixi currently supplies desktop native
-libraries from [`conda-forge`](https://conda-forge.org/). Platform SDKs such as
-Xcode, Visual Studio, Linux graphics drivers, and the Android SDK remain host
-toolchain inputs.
+Mise supplies repository tools, system package declarations, and small common
+workflow tasks. Those tasks call the build system that owns each ecosystem and
+pass artifacts explicitly. Platform SDKs such as Xcode, Visual Studio, Linux
+graphics drivers, and the Android SDK remain host toolchain inputs.
+
+Native dependencies follow four ownership rules:
+
+- System package managers provide Linux compilers and desktop development
+  libraries through mise bootstrap.
+- Platform SDKs own Apple and Windows compilers, system libraries, graphics
+  drivers, frameworks, and mobile toolchains.
+- MapLibre Native's pinned submodules own libraries compiled into the native
+  artifact.
+- CMake acquires pinned Windows zlib and libuv sources and the ANGLE runtime for
+  macOS EGL builds.
+
+CMake discovers each provider and exposes project-owned dependency targets to
+the platform and renderer modules. Those modules consume targets rather than
+package-manager paths, raw library searches, or SDK layout details. CTest uses
+the same target metadata for headers, library search paths, runtime paths, and
+the Vulkan ICD.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
-tools, installs Git hooks, selects backend variants, and runs repository tasks.
-Use `mise run ...` for common workflows: build, test, check, fix, and examples.
-Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
-and pnpm.
+tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
+common workflows: build, test, check, fix, and examples. Mise delegates native
+variant definitions to CMake presets. Gradle and Hvigor select those presets for
+Android and OpenHarmony platform builds instead of imposing a repository-wide
+target environment.
 
-[`pixi`](https://pixi.sh/) installs the Linux C and C++ compilers and desktop
-native libraries used by local builds. CMake, Ninja, pkg-config, shader tools,
-Doxygen, and clang-tidy are pinned by mise. Host platform toolchains provide
-Apple, Windows, Android, and graphics-driver integration, and CMake builds the
-native C/C++ library.
+Mise bootstrap installs Linux and macOS native prerequisites through apt, dnf,
+or Homebrew. CMake uses the host compiler and standard package discovery rather
+than a repository-local dependency prefix. On Windows, Visual Studio supplies
+the toolchain while CMake builds pinned zlib and libuv sources. CMake builds
+portable native artifacts and CPack archives desktop distributions. Gradle
+invokes Android presets and packages their outputs with the Kotlin binding and
+applications. Hvigor invokes OpenHarmony presets and packages their outputs.
+
+Gradle owns Android platform builds and Hvigor owns OpenHarmony platform builds.
+Both select native variants defined by CMake presets, then own their platform
+module and application packaging. Direct CMake workflows remain available for
+native development and diagnostics without duplicating variant definitions.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

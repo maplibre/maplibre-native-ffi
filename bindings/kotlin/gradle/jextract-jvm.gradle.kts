@@ -9,7 +9,6 @@ import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 import org.maplibre.nativeffi.gradle.HostPlatform
-import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 import org.maplibre.nativeffi.gradle.catalogVersionInt
 
 abstract class DownloadJextractTask : DefaultTask() {
@@ -47,8 +46,8 @@ abstract class DownloadJextractTask : DefaultTask() {
 }
 
 val hostPlatform = HostPlatform.current()
-val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val jextractDistribution = hostPlatform.jextractDistribution
+val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val jextractArchive = layout.buildDirectory.file("jextract/openjdk-25-jextract.tar.gz")
@@ -81,7 +80,7 @@ val generateJvmJextractBindings =
     description = "Generates JVM FFM declarations for the MapLibre Native C ABI with jextract."
     dependsOn(extractJextract)
     inputs.file("src/jextract/maplibre-native-c.includes")
-    inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
+    inputs.dir(checkedInCHeaders).withPropertyName("maplibreNativeCHeaders")
     outputs.dir(generatedJextractSources)
     executable = jextractExecutable.get().absolutePath
     args(
@@ -92,7 +91,8 @@ val generateJvmJextractBindings =
       "--header-class-name",
       "MapLibreNativeC",
       "@${layout.projectDirectory.file("src/jextract/maplibre-native-c.includes").asFile.absolutePath}",
-      *maplibreNativeC.includeDirs.flatMap { listOf("-I", it.absolutePath) }.toTypedArray(),
+      "-I",
+      checkedInCHeaders.asFile.absolutePath,
       rootProject.layout.projectDirectory.file("include/maplibre_native_c.h").asFile.absolutePath,
     )
   }

@@ -3,6 +3,7 @@
 # repository tasks.
 
 experimental_monorepo_root = true
+min_version = "2026.6.12"
 
 [settings]
 lockfile = true
@@ -16,8 +17,8 @@ lockfile_platforms = [
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
-windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
+windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
+windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 unix_default_file_shell_args = "bash"
 unix_default_inline_shell_args = "bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
@@ -37,14 +38,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
 # C/C++ ecosystem
-"github:prefix-dev/pixi" = "0.68.1"
-"aqua:Kitware/CMake" = "4.3.3"
-"aqua:ninja-build/ninja" = "1.13.2"
-"conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:pkg-config" = { version = "0.29.2", os = ["linux", "macos"] } # CMake and local bindings use pkg-config
-"aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
 # Node.js ecosystem
 "core:node" = "24.11.0"
@@ -60,7 +53,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:astral-sh/uv" = "0.11.11"
 
 # Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["linux", "macos"] }
+"core:swift" = { version = "6.3.1", os = ["linux"] }
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
@@ -72,116 +65,61 @@ swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat",
 "core:go" = "1.26.3"
 "core:dotnet" = "10.0.203"
 
+[vars]
+host_native_preset = "{% if os() == 'macos' %}macos-arm64-metal{% elif os() == 'windows' %}windows-{{ arch() }}-vulkan{% else %}linux-{{ arch() }}-vulkan{% endif %}"
+host_native_install_dir = "{{config_root}}/build/{{vars.host_native_preset}}/install"
+vulkan_include_dir = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+zig_host_args = ""
+
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
-MLN_FFI_REPO_ROOT = "{{config_root}}"
-MLN_FFI_RENDER_BACKEND = { required = true }
-MLN_FFI_BUILD_DIR = { required = true }
-MLN_FFI_NATIVE_INSTALL_DIR = { required = true }
-MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
-MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
-MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
-MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
-MLN_FFI_HOST_LIBRARY_DIRS = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
-MLN_FFI_ZIG_BUILD_ARGS = { required = true }
-MLN_FFI_ZIG_NATIVE_ARGS = ""
-MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
-LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
 
 [hooks]
 postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
-  "pixi install --locked --quiet",
-  "uv sync --locked --quiet",
-  "pnpm install --frozen-lockfile --loglevel warn",
-  "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
-  "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet",
   # Generated docs data is imported by Astro components and checked by vp.
   { task = "docs:generate-support-matrix" },
-  # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
-  "pnpm --filter docs exec astro sync",
 ]
 
 [tasks.configure]
-depends = ["//:deps"]
-run = [
-  '''
-  cmake_args=(
-    -S .
-    -B "$MLN_FFI_BUILD_DIR"
-    -G Ninja
-    -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
-    -DCMAKE_INSTALL_LIBDIR=lib
-    -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
-    -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
-    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
-  )
-
-  while IFS= read -r cmake_arg; do
-    [[ -n "$cmake_arg" ]] && cmake_args+=("$cmake_arg")
-  done <<< "${MLN_FFI_CMAKE_ARGS:-}"
-
-  cmake "${cmake_args[@]}"
-  ''',
-  '''
-  if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
-    mkdir -p build/clangd
-    compile_commands_link="build/clangd/compile_commands.json"
-    compile_commands_tmp="${compile_commands_link}.tmp"
-    rm -f "$compile_commands_tmp"
-    ln -s "$MLN_FFI_BUILD_DIR/compile_commands.json" "$compile_commands_tmp"
-    mv -f "$compile_commands_tmp" "$compile_commands_link"
-  fi
-  ''',
-]
+description = "Configure a native CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'cmake --preset "$usage_preset"'
 
 [tasks.build]
-depends = ["//:configure"]
-run = '''
-build_args=(
-  --build "$MLN_FFI_BUILD_DIR"
-  --parallel
-)
-
-cmake "${build_args[@]}"'''
-
-[tasks.ensure-native-library]
-depends = ["//:build"]
-run = [
-  'rm -rf "$MLN_FFI_NATIVE_INSTALL_DIR"',
-  'cmake --install "$MLN_FFI_BUILD_DIR" --prefix "$MLN_FFI_NATIVE_INSTALL_DIR"',
-  { task = "//:native-zig-libc" },
-]
+description = "Configure, build, and install a native CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'cmake --workflow --preset "$usage_preset"'
 
 [tasks.clean]
-run = "rm -rf \"$MLN_FFI_BUILD_DIR\" \"$MLN_FFI_NATIVE_INSTALL_DIR\""
+description = "Remove one native preset build tree."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'rm -rf "{{config_root}}/build/$usage_preset"'
 
-[tasks.deps]
-description = "Install variant-specific managed dependencies."
-run = '''
-if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
-  mise run deps:angle
-fi
-'''
+[tasks.package-native]
+description = "Build and archive a desktop native CMake preset."
+usage = 'arg "<preset>"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = 'cpack --preset "$usage_preset"'
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-run = '''
-(
-  cd src/c_api/tests/zig
-  source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-  mln_build_zig_native_args
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
-)
-'''
+description = "Build and run C API tests for a CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = 'ctest --preset "$usage_preset"'
 
 [tasks.check]
+depends = ["//:format-deps", "//docs:install"]
 run = "hk check --all"
 
 [tasks.fix]
+depends = ["//:format-deps", "//docs:install"]
 run = "hk fix --all"
+
+[tasks.format-deps]
+hide = true
+run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet"
 
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."
@@ -192,15 +130,4 @@ description = "Called by dprint.jsonc"
 hide = true
 run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
 # ktfmt on windows doesn't work in git bash for some reason
-shell = '{% if os() == "windows" %}cmd /c{% else %}sh -c -o errexit{% endif %}'
-
-[tasks."ci:lint"]
-run = [
-  # Warm process-plugin cache before hk runs parallel dprint batches.
-  "dprint output-resolved-config > /dev/null",
-  "hk fix --all",
-  "git update-index -q --refresh",
-  # Lockfile drift is common across different mise builds
-  "git diff --exit-code -- . ':(exclude)mise.lock'",
-  "git diff --cached --exit-code -- . ':(exclude)mise.lock'",
-]
+run_windows = 'cmd /c java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'

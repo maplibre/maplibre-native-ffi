@@ -1,6 +1,5 @@
 <Project>
   <PropertyGroup>
-    <MaplibreNativeCInstallDir>$(MLN_FFI_NATIVE_INSTALL_DIR)</MaplibreNativeCInstallDir>
     <MaplibreNativeCLinkDir>$(MaplibreNativeCInstallDir)/lib</MaplibreNativeCLinkDir>
     <MaplibreNativeCRuntimeDir Condition="'$(OS)' == 'Windows_NT'">$(MaplibreNativeCInstallDir)/bin</MaplibreNativeCRuntimeDir>
     <MaplibreNativeCRuntimeDir Condition="'$(OS)' != 'Windows_NT'">$(MaplibreNativeCInstallDir)/lib</MaplibreNativeCRuntimeDir>
@@ -9,7 +8,6 @@
     <MaplibreNativeCLibraryPath Condition="'$(OS)' != 'Windows_NT' and !$([MSBuild]::IsOSPlatform('OSX'))">$(MaplibreNativeCRuntimeDir)/libmaplibre-native-c.so</MaplibreNativeCLibraryPath>
     <MaplibreNativeCPathSeparator Condition="'$(OS)' == 'Windows_NT'">;</MaplibreNativeCPathSeparator>
     <MaplibreNativeCPathSeparator Condition="'$(OS)' != 'Windows_NT'">:</MaplibreNativeCPathSeparator>
-    <MaplibreNativeCHostLibraryDirs>$(MLN_FFI_HOST_LIBRARY_DIRS)</MaplibreNativeCHostLibraryDirs>
     <MaplibreNativeCLoaderLibraryDirs>$(MaplibreNativeCRuntimeDir)$(MaplibreNativeCPathSeparator)$(MaplibreNativeCHostLibraryDirs)</MaplibreNativeCLoaderLibraryDirs>
   </PropertyGroup>
 

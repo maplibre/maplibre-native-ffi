@@ -1,16 +1,22 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
-zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}"
+zig_args=(
+  -Dnative-install-dir="../../build/$usage_preset/install"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build {{vars.zig_host_args}} "${zig_args[@]}"
 '''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
 mkdir -p zig-out
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" -- zig-out/zig-readback.ppm
+zig_args=(
+  -Dnative-install-dir="../../build/$usage_preset/install"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- zig-out/zig-readback.ppm
 '''

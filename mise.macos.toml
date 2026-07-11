@@ -1,0 +1,12 @@
+[bootstrap.packages]
+"brew:cmake" = "latest"
+"brew:doxygen" = "latest"
+"brew:glslang" = "latest"
+"brew:llvm" = "latest"
+"brew:molten-vk" = "latest"
+"brew:ninja" = "latest"
+"brew:pkgconf" = "latest"
+"brew:vulkan-loader" = "latest"
+
+[vars]
+zig_host_args = "-Ddependency-library-dir=/opt/homebrew/lib -Dsystem-root=\"{{ exec(command='xcrun --sdk macosx --show-sdk-path') }}\""

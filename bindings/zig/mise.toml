@@ -1,15 +1,34 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
-zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}"
+zig_args=(
+  -Dnative-install-dir="../../build/$usage_preset/install"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build {{vars.zig_host_args}} "${zig_args[@]}"
 '''
 
 [tasks.test]
-depends = [":build"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-native-args.sh"
-mln_build_zig_native_args
-zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} "${mln_zig_native_args[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+zig_args=(
+  -Dnative-install-dir="../../build/$usage_preset/install"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build test {{vars.zig_host_args}} "${zig_args[@]}" --test-timeout 30s --summary all --verbose
+'''
+
+[tasks."test:ios-simulator"]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+native_install_dir="../../build/ios-simulator-arm64-metal/install"
+zig build test \
+  -Dtarget=aarch64-ios-simulator \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="../../third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+  --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+  --test-timeout 120s --summary all --verbose
 '''

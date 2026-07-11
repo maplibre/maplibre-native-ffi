@@ -6,13 +6,15 @@ use std::path::{Path, PathBuf};
 const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    println!("cargo:rerun-if-env-changed=MLN_FFI_NATIVE_INSTALL_DIR");
-    println!("cargo:rerun-if-env-changed=MLN_FFI_HOST_LIBRARY_DIRS");
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_FAMILY");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
     let install_dir = native_install_dir()?;
     let include_dir = install_dir.join("include");
     let link_dir = native_library_dir(&install_dir);
-    let runtime_dir = native_runtime_dir(&install_dir);
-    let host_library_dirs = host_library_dirs()?;
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
+    let runtime_dir = native_runtime_dir(&install_dir, &target_os);
     let header = include_dir.join("maplibre_native_c.h");
 
     require_dir(&include_dir, "native include directory")?;
@@ -21,14 +23,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rustc-link-search=native={}", link_dir.display());
     println!("cargo:rustc-link-lib={LIBRARY_NAME}");
-    if cfg!(unix) {
+    if target_family.split(',').any(|family| family == "unix") {
         println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
-        for host_library_dir in &host_library_dirs {
-            println!(
-                "cargo:rustc-link-arg=-Wl,-rpath,{}",
-                host_library_dir.display()
-            );
-        }
     }
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
@@ -53,34 +49,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn host_library_dirs() -> Result<Vec<PathBuf>, Box<dyn Error>> {
-    let library_dirs = env::var_os("MLN_FFI_HOST_LIBRARY_DIRS").ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::NotFound,
-            "MLN_FFI_HOST_LIBRARY_DIRS is required; run Rust binding builds through mise",
-        )
-    })?;
-    let separator = if cfg!(windows) { ';' } else { ':' };
-    Ok(library_dirs
-        .to_string_lossy()
-        .split(separator)
-        .filter(|path| !path.is_empty())
-        .map(PathBuf::from)
-        .collect())
-}
-
 fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
-    let install_dir = env::var_os("MLN_FFI_NATIVE_INSTALL_DIR").ok_or_else(|| {
+    let install_dir = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR").ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::NotFound,
-            "MLN_FFI_NATIVE_INSTALL_DIR is required; run Rust binding builds through mise",
+            "MAPLIBRE_NATIVE_C_INSTALL_DIR is required",
         )
     })?;
     Ok(PathBuf::from(install_dir))
 }
 
-fn native_runtime_dir(install_dir: &Path) -> PathBuf {
-    if cfg!(windows) {
+fn native_runtime_dir(install_dir: &Path, target_os: &str) -> PathBuf {
+    if target_os == "windows" {
         install_dir.join("bin")
     } else {
         native_library_dir(install_dir)

@@ -1,20 +1,53 @@
 function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-  set(rust_target "$ENV{CARGO_BUILD_TARGET}")
-  if(rust_target STREQUAL "")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    if(ANDROID_ABI STREQUAL "arm64-v8a")
+      set(rust_target "aarch64-linux-android")
+    elseif(ANDROID_ABI STREQUAL "x86_64")
+      set(rust_target "x86_64-linux-android")
+    else()
+      message(FATAL_ERROR "Unsupported Android ABI for Rust: ${ANDROID_ABI}")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+      set(rust_target "aarch64-unknown-linux-gnu")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+      set(rust_target "x86_64-unknown-linux-gnu")
+    else()
+      message(
+        FATAL_ERROR
+          "Unsupported Linux architecture for Rust: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(rust_arch "${CMAKE_GENERATOR_PLATFORM}")
+    if(NOT rust_arch)
+      set(rust_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    if(rust_arch MATCHES "^(aarch64|ARM64|arm64)$")
+      set(rust_target "aarch64-pc-windows-msvc")
+    elseif(rust_arch MATCHES "^(AMD64|x64|x86_64)$")
+      set(rust_target "x86_64-pc-windows-msvc")
+    else()
+      message(
+        FATAL_ERROR "Unsupported Windows architecture for Rust: ${rust_arch}")
+    endif()
+  else()
     message(
       FATAL_ERROR
-        "CARGO_BUILD_TARGET must be set for Rust platform builds (see .mise/config.*.toml)")
+        "Rust platform support is unavailable for ${CMAKE_SYSTEM_NAME}")
   endif()
 
+  set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/target"
+      CACHE
+        PATH "Cargo target directory for the native platform support library")
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(rust_library
-        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/maplibre_native_platform.lib")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/maplibre_native_platform.lib")
   else()
     set(rust_library
-        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/libmaplibre_native_platform.a")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/libmaplibre_native_platform.a")
   endif()
   file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
        "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
@@ -68,6 +101,7 @@ function(mln_link_rust_platform target)
       "AR_${rust_target_env_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
+      "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}"
       "${CARGO_EXECUTABLE}"
       build
       --manifest-path

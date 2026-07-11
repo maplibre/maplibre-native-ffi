@@ -1095,7 +1095,7 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    if let Ok(install_dir) = std::env::var("MLN_FFI_NATIVE_INSTALL_DIR") {
+    if let Ok(install_dir) = std::env::var("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
         let library_dir = std::path::Path::new(&install_dir).join(if cfg!(target_os = "windows") {
             "bin"
         } else {
