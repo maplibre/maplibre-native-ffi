@@ -1,5 +1,33 @@
 [tasks.build]
-run = "../../gradlew :examples:android-map:assembleDebug"
+description = "Build the Android map example."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+'''
+run = '''
+../../gradlew \
+  -Pmaplibre.android.backend="$usage_backend" \
+  -Pmaplibre.android.abis="$usage_abis" \
+  :examples:android-map:assembleDebug
+'''
 
 [tasks.run]
-run = "../../gradlew :examples:android-map:runDebug"
+description = "Build, install, and start the Android map example."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+'''
+run = '''
+../../gradlew \
+  -Pmaplibre.android.backend="$usage_backend" \
+  -Pmaplibre.android.abis="$usage_abis" \
+  :examples:android-map:runDebug
+'''

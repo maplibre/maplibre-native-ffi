@@ -19,4 +19,18 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:nativeTest'
 
 [tasks.androidBuild]
-run = "../../gradlew :bindings:kotlin:androidBuild"
+description = "Build the Kotlin Android binding."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+'''
+run = '''
+../../gradlew \
+  -Pmaplibre.android.backend="$usage_backend" \
+  -Pmaplibre.android.abis="$usage_abis" \
+  :bindings:kotlin:androidBuild
+'''

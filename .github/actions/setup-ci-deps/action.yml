@@ -2,27 +2,10 @@ name: Setup CI deps
 description: Install the toolchain and target-specific CI prerequisites
 
 inputs:
-  project:
-    description: Dependency group to install
-    required: false
-    default: all
   target:
     description: Native target name
     required: false
     default: host
-  backend:
-    description: Render backend (metal, opengl, vulkan, or wgl)
-    required: false
-    default: none
-  graphics:
-    description: Graphics implementation (angle, native, none, or software)
-    required: false
-    default: none
-  platform-sdk:
-    description: Platform SDK (android, ios, ios-simulator, macos, none, ohos, or windows)
-    required: false
-    default: none
-
 runs:
   using: composite
   steps:
@@ -32,7 +15,6 @@ runs:
       run: git config --global core.longpaths true
 
     - name: Cache MapLibre Native source
-      if: ${{ inputs.project != 'hygiene' }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
@@ -41,11 +23,10 @@ runs:
         key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
 
     - name: Install sccache
-      if: ${{ inputs.project != 'hygiene' }}
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
     - name: Use Linux software graphics drivers
-      if: ${{ runner.os == 'Linux' && inputs.graphics == 'software' }}
+      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
       shell: bash
       run: |
         sudo apt-get update
@@ -62,15 +43,14 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Use Windows Vulkan software driver
-      if: ${{ runner.os == 'Windows' && inputs.backend == 'vulkan' && inputs.graphics == 'software' }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
       uses: ./.github/actions/setup-windows-vulkan-software
 
     - name: Use Windows OpenGL software driver
-      if: ${{ runner.os == 'Windows' && inputs.backend == 'wgl' && inputs.graphics == 'software' }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
-      if: ${{ inputs.project != 'hygiene' }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
@@ -80,14 +60,14 @@ runs:
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache OpenHarmony SDK
-      if: ${{ inputs.platform-sdk == 'ohos' }}
+      if: ${{ startsWith(inputs.target, 'ohos-') }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/setup-ohos-sdk
         key: ohos-sdk-v2-v6.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Setup OpenHarmony SDK
-      if: ${{ inputs.platform-sdk == 'ohos' }}
+      if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -118,13 +98,12 @@ runs:
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
 
     - name: Install Android native SDK packages
-      if: ${{ inputs.platform-sdk == 'android' }}
+      if: ${{ startsWith(inputs.target, 'android-') }}
       shell: bash
       run: |
         sdkmanager "ndk;28.2.13676358" "cmake;4.1.2"
 
     - name: Cache Gradle
-      if: ${{ inputs.project == 'all' || inputs.project == 'android' || inputs.project == 'hygiene' || inputs.project == 'kotlin' }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
@@ -165,7 +144,7 @@ runs:
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
     - name: Install Windows ARM64 Vulkan SDK
-      if: ${{ inputs.target == 'windows-arm64-vulkan' && inputs.backend == 'vulkan' }}
+      if: ${{ inputs.target == 'windows-arm64-vulkan' }}
       uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
       with:
         vulkan_version: 1.4.341.0
@@ -176,20 +155,14 @@ runs:
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
         cache: true
-        cache_key_prefix: mise-v3-${{ inputs.project }}
+        cache_key_prefix: mise-v4
         install: false
 
-    - name: Install project dependencies
+    - name: Bootstrap repository
       shell: bash
-      run: mise run ci:setup ${{ inputs.project }}
-
-    - name: Install desktop system packages
-      if: ${{ runner.os != 'Windows' && inputs.project != 'hygiene' }}
-      shell: bash
-      run: mise bootstrap packages install --yes
+      run: mise bootstrap --yes
 
     - name: Wire sccache into CMake
-      if: ${{ inputs.project != 'hygiene' }}
       shell: bash
       run: |
         {

@@ -29,15 +29,13 @@ before implementing or reviewing a binding.
 
 Install the platform prerequisites:
 
-- On macOS Apple Silicon, install and initialize the Xcode version listed in
-  `.xcode-version`, or a recent compatible Xcode.
+- On macOS Apple Silicon, install Homebrew and initialize the Xcode version
+  listed in `.xcode-version`, or a recent compatible Xcode.
 - On Linux, mise bootstrap installs the compiler and development libraries
-  through the available system package manager. Install a Vulkan ICD for the
-  default backend if the machine does not already provide one.
-- On Windows, install a recent version of Visual Studio Community (or Build
-  Tools) 2022 with the `Desktop development with C++` workload, the C++ Clang
-  tools component, and `Git for Windows`. We rely on Git Bash to run project
-  scripts.
+  through apt on Ubuntu and dnf on Fedora.
+- On Windows, install Visual Studio Build Tools 2022 with the
+  `Desktop development with C++` workload and C++ Clang tools component, Git for
+  Windows, and the Vulkan SDK. We rely on Git Bash to run project scripts.
 - For Android, install the Android SDK packages pinned in
   `gradle/libs.versions.toml`.
 - For OpenHarmony, install an API 24 SDK.
@@ -82,12 +80,12 @@ target or backend:
 mise run build linux-x64-egl
 ```
 
-Android is Gradle-owned. Select its backend and ABIs with Gradle properties:
+Android is Gradle-owned. Its mise tasks default to OpenGL for both supported
+ABIs. Pass the backend and ABI set to select another build:
 
 ```bash
-mise run //examples/android-map:build -- \
-  -Pmaplibre.android.backend=opengl \
-  -Pmaplibre.android.abis=arm64-v8a
+mise run //examples/android-map:build
+mise run //examples/android-map:build vulkan arm64-v8a
 ```
 
 OpenHarmony is Hvigor-owned. Build either native backend through its platform

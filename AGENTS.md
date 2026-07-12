@@ -48,9 +48,7 @@ mise run build linux-x64-egl
 mise run package-native linux-x64-egl
 
 # Build the Android binding for one ABI/backend
-mise run //bindings/kotlin:androidBuild -- \
-  -Pmaplibre.android.abis=x86_64 \
-  -Pmaplibre.android.backend=opengl
+mise run //bindings/kotlin:androidBuild opengl x86_64
 
 # Run formatters and linters on _all_ files (will stage affected files)
 mise run fix

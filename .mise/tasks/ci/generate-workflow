@@ -19,13 +19,95 @@ DESKTOP = {"linux", "macos", "windows"}
 
 
 def platform(preset: str) -> str:
+    if preset.startswith("ios-simulator-"):
+        return "ios-simulator"
     return preset.split("-", 1)[0]
 
 
-def scalar(value: object) -> str:
-    if isinstance(value, bool):
-        return str(value).lower()
-    return str(value)
+def architecture(preset: str) -> str:
+    parts = preset.split("-")
+    for candidate in ("x64", "arm64"):
+        if candidate in parts:
+            return candidate
+    raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
+
+
+def backend(preset: str) -> str:
+    value = preset.rsplit("-", 1)[-1]
+    if value not in {"egl", "metal", "vulkan", "wgl"}:
+        raise SystemExit(f"error: cannot determine backend from preset {preset!r}")
+    return value
+
+
+def runner(preset: str) -> str:
+    target_platform = platform(preset)
+    target_architecture = architecture(preset)
+    if target_platform == "linux":
+        return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-latest"
+    if target_platform in {"macos", "ios", "ios-simulator"}:
+        return "macos-26"
+    if target_platform == "windows":
+        return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
+    if target_platform in {"android", "ohos"}:
+        return "ubuntu-latest"
+    raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
+
+
+def suite_commands(source: dict[str, object], preset: str) -> list[str]:
+    commands = []
+    for suite in source["suites"]:
+        if platform(preset) not in suite["platforms"]:
+            continue
+        for command in suite["commands"]:
+            if command.get("platforms") and platform(preset) not in command["platforms"]:
+                continue
+            if command.get("include") and preset not in command["include"]:
+                continue
+            if preset in command.get("exclude", []):
+                continue
+            commands.append(f"mise run {command['task']} {preset}")
+    return commands
+
+
+def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
+    render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
+    arguments = f"{render_backend} {abi}"
+    commands = [f"mise run //bindings/kotlin:androidBuild {arguments}"]
+    if build_map:
+        commands.append(f"mise run //examples/android-map:build {arguments}")
+    return commands
+
+
+def target_commands(
+    source: dict[str, object], preset: str, tested: set[str]
+) -> list[str]:
+    target_platform = platform(preset)
+    if target_platform == "ohos":
+        return [f"mise run //bindings/rust:build:ohos {preset}"]
+
+    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+    if target_platform == "android":
+        abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
+        commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
+    elif target_platform == "ios":
+        commands.extend(
+            [
+                "mise run //bindings/swift:build:ios",
+                "mise run //examples/swift-map:build:ios",
+            ]
+        )
+    elif target_platform == "ios-simulator":
+        commands.extend(
+            [
+                "mise run //bindings/swift:build:ios-simulator",
+                "mise run //bindings/zig:test:ios-simulator",
+                "bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120",
+                "mise run //examples/swift-map:build:ios-simulator",
+            ]
+        )
+    elif target_platform in DESKTOP:
+        commands.extend(suite_commands(source, preset))
+    return commands
 
 
 def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
@@ -33,58 +115,72 @@ def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
     for row in rows:
         first, *rest = row.items()
         key, value = first
-        lines.append(" " * (indent + 2) + f"- {key}: {scalar(value)}")
-        lines.extend(
-            " " * (indent + 4) + f"{key}: {scalar(value)}" for key, value in rest
-        )
+        lines.append(" " * (indent + 2) + f"- {key}: {value}")
+        for key, value in rest:
+            if isinstance(value, list):
+                lines.append(" " * (indent + 4) + f"{key}: >-")
+                for index, command in enumerate(value):
+                    suffix = " &&" if index < len(value) - 1 else ""
+                    lines.append(" " * (indent + 6) + f"{command}{suffix}")
+            else:
+                scalar = str(value).lower() if isinstance(value, bool) else value
+                lines.append(" " * (indent + 4) + f"{key}: {scalar}")
     return lines
 
 
-def setup(project: str) -> list[str]:
-    return [
+def setup(target: str | None = None) -> list[str]:
+    lines = [
         f"      - uses: {CHECKOUT}",
         "        with:",
         "          persist-credentials: false",
         "      - uses: ./.github/actions/setup-ci-deps",
-        "        with:",
-        f"          project: {project}",
-        "          target: ${{ matrix.preset }}",
-        "          backend: ${{ matrix.backend }}",
-        "          graphics: ${{ matrix.graphics }}",
-        "          platform-sdk: ${{ matrix.platform-sdk }}",
     ]
+    inputs = []
+    if target:
+        inputs.append(f"          target: {target}")
+    if inputs:
+        lines.append("        with:")
+        lines.extend(inputs)
+    return lines
 
 
-def validate(source: dict[str, object], presets: dict[str, object]) -> None:
-    targets = source["targets"]
-    names = [target["preset"] for target in targets]
-    if len(names) != len(set(names)):
-        raise SystemExit("error: duplicate target in ci/workflow.toml")
-    configured = {
+def render(source: dict[str, object], presets: dict[str, object]) -> str:
+    configured = [
         preset["name"]
         for preset in presets["configurePresets"]
         if not preset.get("hidden", False)
-    }
-    if set(names) != configured:
-        raise SystemExit(
-            f"error: CI targets differ from CMake configure presets: "
-            f"missing={sorted(configured - set(names))}, extra={sorted(set(names) - configured)}"
-        )
+    ]
+    built = {preset["name"] for preset in presets.get("buildPresets", [])}
+    tested = {preset["name"] for preset in presets.get("testPresets", [])}
     packaged = {preset["name"] for preset in presets.get("packagePresets", [])}
-    selected = {target["preset"] for target in targets if target["package"]}
-    if selected != packaged:
+    if set(configured) != built:
         raise SystemExit(
-            f"error: CI package targets differ from CMake package presets: "
-            f"missing={sorted(packaged - selected)}, extra={sorted(selected - packaged)}"
+            "error: configure and build presets differ: "
+            f"missing={sorted(set(configured) - built)}, extra={sorted(built - set(configured))}"
         )
+    if not tested <= set(configured) or not packaged <= set(configured):
+        raise SystemExit("error: test and package presets must reference configure presets")
 
+    rows = [
+        {
+            "preset": preset,
+            "runner": runner(preset),
+            "package": preset in packaged,
+            "commands": target_commands(source, preset, tested),
+        }
+        for preset in configured
+    ]
+    android_multi = source["android_multi"]
+    multi_preset = android_multi["preset"]
+    rows.append(
+        {
+            "preset": multi_preset,
+            "runner": "ubuntu-latest",
+            "package": False,
+            "commands": android_commands(multi_preset, android_multi["abis"], True),
+        }
+    )
 
-def render(source: dict[str, object]) -> str:
-    targets = source["targets"]
-    suites = source["suites"]
-    job_ids = ["hygiene", "docs", "native", "android"] + [
-        suite["id"] for suite in suites
-    ] + ["package"]
     lines = [
         "# Generated by `mise run ci:generate-workflow`. Do not edit directly.",
         "name: CI",
@@ -110,16 +206,7 @@ def render(source: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
         "    steps:",
-        f"      - uses: {CHECKOUT}",
-        "        with:",
-        "          persist-credentials: false",
-        "      - uses: ./.github/actions/setup-ci-deps",
-        "        with:",
-        "          project: hygiene",
-        "          target: linux-x64",
-        "          backend: vulkan",
-        "          graphics: none",
-        "          platform-sdk: none",
+        *setup(),
         "      - run: mise run ci:generate-workflow --check",
         "      - run: mise run format-deps",
         "      - run: mise run //docs:install",
@@ -136,196 +223,50 @@ def render(source: dict[str, object]) -> str:
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 60",
         "    steps:",
-        f"      - uses: {CHECKOUT}",
-        "        with:",
-        "          persist-credentials: false",
-        "      - uses: ./.github/actions/setup-ci-deps",
-        "        with:",
-        "          project: docs",
-        "          target: linux-x64",
-        "          backend: vulkan",
-        "          graphics: none",
-        "          platform-sdk: none",
+        *setup(),
         "      - run: mise run //docs:build",
         "",
-        "  native:",
-        "    name: native / ${{ matrix.preset }}",
+        "  target:",
+        "    name: target / ${{ matrix.preset }}",
         "    runs-on: ${{ matrix.runner }}",
         "    timeout-minutes: 120",
         "    strategy:",
         "      fail-fast: false",
         "      matrix:",
-        *matrix(
-            [
-                {
-                    "preset": target["preset"],
-                    "runner": target["runner"],
-                    "backend": target["backend"],
-                    "graphics": target["graphics"],
-                    "platform-sdk": target["platform_sdk"],
-                    "test": target["test"],
-                }
-                for target in targets
-            ]
-        ),
+        *matrix(rows),
         "    steps:",
-        *setup("${{ matrix.platform-sdk == 'ohos' && 'openharmony' || matrix.platform-sdk == 'android' && 'android' || 'native' }}"),
-        "      - name: Validate native target",
-        "        if: ${{ matrix.platform-sdk != 'ohos' }}",
-        "        run: mise run build ${{ matrix.preset }}",
-        "      - name: Test native target",
-        "        if: ${{ matrix.test }}",
-        "        run: mise run test ${{ matrix.preset }}",
-        "      - name: Build OpenHarmony Rust binding",
-        "        if: ${{ matrix.platform-sdk == 'ohos' }}",
-        "        run: mise run //bindings/rust:build:ohos ${{ matrix.preset }}",
-        "      - name: Build iOS Swift binding",
-        "        if: ${{ matrix.platform-sdk == 'ios' }}",
-        "        run: mise run //bindings/swift:build:ios",
-        "      - name: Build iOS Swift example",
-        "        if: ${{ matrix.platform-sdk == 'ios' }}",
-        "        run: mise run //examples/swift-map:build:ios",
-        "      - name: Build iOS simulator Swift binding",
-        "        if: ${{ matrix.platform-sdk == 'ios-simulator' }}",
-        "        run: mise run //bindings/swift:build:ios-simulator",
-        "      - name: Test iOS simulator Zig binding",
-        "        if: ${{ matrix.platform-sdk == 'ios-simulator' }}",
-        "        run: mise run //bindings/zig:test:ios-simulator",
-        "      - name: Test iOS simulator Swift binding",
-        "        if: ${{ matrix.platform-sdk == 'ios-simulator' }}",
-        "        run: >-",
-        "          bash scripts/run-ios-simulator-test.sh",
-        "          bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests",
-        "          120",
-        "      - name: Build iOS simulator Swift example",
-        "        if: ${{ matrix.platform-sdk == 'ios-simulator' }}",
-        "        run: mise run //examples/swift-map:build:ios-simulator",
+        *setup("${{ matrix.preset }}"),
+        "      - name: Run target checks",
+        "        run: ${{ matrix.commands }}",
+        "      - name: Package native artifact",
+        "        if: ${{ matrix.package }}",
+        "        run: mise run package-native ${{ matrix.preset }}",
+        "      - name: Upload native artifact",
+        "        if: ${{ matrix.package }}",
+        f"        uses: {UPLOAD}",
+        "        with:",
+        "          name: native-package-${{ matrix.preset }}-${{ github.sha }}",
+        "          path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
+        "          if-no-files-found: error",
         "",
-        "  android:",
-        "    name: android / ${{ matrix.target }}",
+        "  required:",
+        "    name: ci-required",
         "    runs-on: ubuntu-latest",
-        "    timeout-minutes: 120",
-        "    strategy:",
-        "      fail-fast: false",
-        "      matrix:",
-        *matrix(source["android"]),
+        "    timeout-minutes: 5",
+        "    if: ${{ always() }}",
+        "    needs:",
+        "      - hygiene",
+        "      - docs",
+        "      - target",
         "    steps:",
-        f"      - uses: {CHECKOUT}",
-        "        with:",
-        "          persist-credentials: false",
-        "      - uses: ./.github/actions/setup-ci-deps",
-        "        with:",
-        "          project: android",
-        "          target: ${{ matrix.target }}",
-        "          backend: ${{ matrix.backend }}",
-        "          graphics: none",
-        "          platform-sdk: android",
-        "      - name: Build Kotlin Android binding",
-        "        run: >-",
-        "          mise run //bindings/kotlin:androidBuild --",
-        "          -Pmaplibre.android.abis=${{ matrix.abi }}",
-        "          -Pmaplibre.android.backend=${{ matrix.backend }}",
-        "      - name: Build Android map",
-        "        if: ${{ matrix.build_map }}",
-        "        run: >-",
-        "          mise run //examples/android-map:build --",
-        "          -Pmaplibre.android.abis=${{ matrix.abi }}",
-        "          -Pmaplibre.android.backend=${{ matrix.backend }}",
+        "      - name: Fail if required jobs failed",
+        "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
+        "        run: |",
+        "          echo '${{ toJSON(needs) }}'",
+        "          exit 1",
+        '      - run: "true"',
         "",
     ]
-
-    for suite in suites:
-        rows = []
-        for target in targets:
-            preset = target["preset"]
-            if platform(preset) not in suite["platforms"]:
-                continue
-            commands = []
-            for command in suite["commands"]:
-                if command.get("platforms") and platform(preset) not in command["platforms"]:
-                    continue
-                if command.get("include") and preset not in command["include"]:
-                    continue
-                if preset in command.get("exclude", []):
-                    continue
-                commands.append(command["task"])
-            rows.append(
-                {
-                    "preset": preset,
-                    "runner": target["runner"],
-                    "backend": target["backend"],
-                    "graphics": target["graphics"],
-                    "platform-sdk": target["platform_sdk"],
-                    "commands": " && ".join(
-                        f"mise run {task} {preset}" for task in commands
-                    ),
-                }
-            )
-        lines.extend(
-            [
-                f"  {suite['id']}:",
-                f"    name: {suite['id']} / ${{{{ matrix.preset }}}}",
-                "    runs-on: ${{ matrix.runner }}",
-                "    timeout-minutes: 90",
-                "    strategy:",
-                "      fail-fast: false",
-                "      matrix:",
-                *matrix(rows),
-                "    steps:",
-                *setup(suite["project"]),
-                "      - run: ${{ matrix.commands }}",
-                "",
-            ]
-        )
-
-    package_targets = [target for target in targets if target["package"]]
-    lines.extend(
-        [
-            "  package:",
-            "    name: package / ${{ matrix.preset }}",
-            "    runs-on: ${{ matrix.runner }}",
-            "    timeout-minutes: 120",
-            "    strategy:",
-            "      fail-fast: false",
-            "      matrix:",
-            *matrix(
-                [
-                    {
-                        "preset": target["preset"],
-                        "runner": target["runner"],
-                        "backend": target["backend"],
-                        "graphics": target["graphics"],
-                        "platform-sdk": target["platform_sdk"],
-                    }
-                    for target in package_targets
-                ]
-            ),
-            "    steps:",
-            *setup("package"),
-            "      - run: mise run package-native ${{ matrix.preset }}",
-            f"      - uses: {UPLOAD}",
-            "        with:",
-            "          name: native-package-${{ matrix.preset }}-${{ github.sha }}",
-            "          path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
-            "          if-no-files-found: error",
-            "",
-            "  required:",
-            "    name: ci-required",
-            "    runs-on: ubuntu-latest",
-            "    timeout-minutes: 5",
-            "    if: ${{ always() }}",
-            "    needs:",
-            *[f"      - {job_id}" for job_id in job_ids],
-            "    steps:",
-            "      - name: Fail if required jobs failed",
-            "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
-            "        run: |",
-            "          echo '${{ toJSON(needs) }}'",
-            "          exit 1",
-            '      - run: "true"',
-            "",
-        ]
-    )
     return "\n".join(lines)
 
 
@@ -336,8 +277,7 @@ def main() -> int:
     with SOURCE.open("rb") as file:
         source = tomllib.load(file)
     presets = json.loads(PRESETS.read_text())
-    validate(source, presets)
-    expected = render(source)
+    expected = render(source, presets)
     actual = OUTPUT.read_text() if OUTPUT.exists() else ""
     if args.check:
         if actual == expected:
