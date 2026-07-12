@@ -20,3 +20,13 @@ zig_args=(
 )
 zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- zig-out/zig-readback.ppm
 '''
+run_windows = '''
+mkdir -p zig-out
+native_install_dir="../../build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+zig_args=(
+  -Dnative-install-dir="$native_install_dir"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- zig-out/zig-readback.ppm
+'''

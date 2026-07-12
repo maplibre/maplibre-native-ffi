@@ -433,7 +433,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
           ?: throw NativeSurfaceBridgeException(
             "The native library path is required for macOS EGL; run the example through Gradle"
           )
-      val angleRootPath = Path(angleRoot)
+      val angleRootPath = angleRoot
       if (angleRootPath.isAngleRoot()) return angleRootPath.absolute()
       throw NativeSurfaceBridgeException(
         "ANGLE runtime libraries are unavailable in $angleRootPath"

@@ -23,6 +23,14 @@ zig_args=(
 )
 zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- "{{ usage.render_target }}"
 '''
+run_windows = '''
+export PATH="$(cygpath -u "{{vars.host_native_install_dir}}/bin")${PATH:+:${PATH}}"
+zig_args=(
+  -Dnative-install-dir="{{vars.host_native_install_dir}}"
+  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
+)
+zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
