@@ -13,4 +13,4 @@ host_native_preset = "macos-arm64-metal"
 [env]
 JDK_JAVA_OPTIONS = "-Djava.library.path=/opt/homebrew/opt/vulkan-loader/lib -Dorg.lwjgl.vulkan.libname=libvulkan.1.dylib"
 MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
-VK_ICD_FILENAMES = "/opt/homebrew/etc/vulkan/icd.d/MoltenVK_icd.json"
+VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
