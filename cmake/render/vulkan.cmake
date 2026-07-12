@@ -29,9 +29,6 @@ function(mln_configure_render_dependencies target)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_DRIVER_FILES}")
-    if(NOT MLN_FFI_VULKAN_ICD_FILE)
-      set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_ICD_FILENAMES}")
-    endif()
     if(NOT EXISTS "${MLN_FFI_VULKAN_ICD_FILE}")
       find_file(
         MLN_FFI_VULKAN_ICD_FILE
