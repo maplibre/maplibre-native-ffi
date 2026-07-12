@@ -4,31 +4,20 @@ LABEL org.opencontainers.image.source="https://github.com/maplibre/maplibre-nati
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-RUN apt-get update \
-  && apt-get install --no-install-recommends --yes \
-    bash \
-    build-essential \
+# Project build dependencies come from the same Linux bootstrap config used by
+# contributors and CI. The remaining APT layer contains container-only utilities.
+RUN --mount=type=bind,source=mise.linux.toml,target=/tmp/mise/mise.toml,readonly \
+    MISE_TRUSTED_CONFIG_PATHS=/tmp/mise \
+    mise -C /tmp/mise bootstrap packages apply --manager apt --yes --update
+
+RUN apt-get install --no-install-recommends --yes \
     ca-certificates \
-    clang \
-    clang-tidy \
-    cmake \
     curl \
-    doxygen \
     git \
-    glslang-tools \
-    libclang-dev \
-    libegl1-mesa-dev \
     libgl1-mesa-dri \
-    libgles2-mesa-dev \
-    libicu72 \
-    libuv1-dev \
-    libvulkan-dev \
     mesa-utils \
     mesa-vulkan-drivers \
-    ninja-build \
-    pkg-config \
     sudo \
-    zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 --shell /bin/bash dev \

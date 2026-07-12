@@ -21,7 +21,10 @@ rm -rf mise-oci
 
 if [[ "$(uname -s)" == "Linux" ]]; then
   MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks install --quiet
-  MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks oci build --output mise-oci
+  # OCI packages only portable mise tools; the Dockerfile applies the APT subset.
+  MISE_IGNORED_CONFIG_PATHS="$PWD/../mise.linux.toml" \
+    MISE_JOBS=1 MISE_ENV="$mise_env" \
+    mise --no-hooks oci build --output mise-oci
 else
   docker run --rm \
     --platform "$platform" \
@@ -38,25 +41,25 @@ else
       /root/.local/bin/mise trust -y
       cd .devcontainer
       /root/.local/bin/mise --no-hooks install --quiet
-      /root/.local/bin/mise --no-hooks oci build --output mise-oci
+      MISE_IGNORED_CONFIG_PATHS=/src/mise.linux.toml \
+        /root/.local/bin/mise --no-hooks oci build --output mise-oci
     '
 fi
-
-rm -f mise-oci.tar
-skopeo copy \
-  "oci:mise-oci" \
-  "docker-archive:mise-oci.tar:maplibre-native-ffi-devcontainer-tools:local"
-docker load --input mise-oci.tar
 
 output_arg="--load"
 if [[ "${usage_push:-false}" == "true" ]]; then
   output_arg="--push"
 fi
 
-docker buildx build \
+buildx=(docker buildx)
+if command -v docker-buildx >/dev/null 2>&1; then
+  buildx=(docker-buildx)
+fi
+
+"${buildx[@]}" build \
   --platform "$platform" \
   --file Dockerfile \
-  --build-context "tools=docker-image://maplibre-native-ffi-devcontainer-tools:local" \
+  --build-context "tools=oci-layout://$PWD/mise-oci" \
   --tag "${usage_tag:?}" \
   "$output_arg" \
   ..

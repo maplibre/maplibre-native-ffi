@@ -160,12 +160,6 @@ runs:
       shell: bash
       run: MISE_NO_HOOKS=1 mise install --force rust
 
-    - name: Install Android native SDK packages
-      if: ${{ startsWith(inputs.target, 'android-') }}
-      shell: bash
-      run: |
-        mise exec -- bash -c 'sdkmanager "ndk;$MLN_FFI_ANDROID_NDK_VERSION" "cmake;$MLN_FFI_ANDROID_CMAKE_VERSION"'
-
     - name: Wire sccache into CMake
       shell: bash
       run: |

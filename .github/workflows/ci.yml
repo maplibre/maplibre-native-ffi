@@ -27,7 +27,6 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run ci:generate-workflow --check
-      - run: mise run format-deps
       - run: mise run //docs:install
       - run: dprint output-resolved-config > /dev/null
       - run: hk fix --all

@@ -28,11 +28,15 @@ function(mln_configure_render_dependencies target)
       "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    find_file(
-      MLN_FFI_VULKAN_ICD_FILE
-      NAMES MoltenVK_icd.json
-      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES etc/vulkan/icd.d share/vulkan/icd.d
-      REQUIRED)
+    set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_ICD_FILENAMES}")
+    if(NOT EXISTS "${MLN_FFI_VULKAN_ICD_FILE}")
+      find_file(
+        MLN_FFI_VULKAN_ICD_FILE
+        NAMES MoltenVK_icd.json
+        HINTS
+          "$ENV{VULKAN_SDK}" PATH_SUFFIXES etc/vulkan/icd.d share/vulkan/icd.d
+        REQUIRED)
+    endif()
     set_property(
       TARGET ${target}
       PROPERTY MLN_FFI_VULKAN_ICD_FILE "${MLN_FFI_VULKAN_ICD_FILE}")

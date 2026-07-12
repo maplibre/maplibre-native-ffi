@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-#MISE description="Init only MapLibre Native submodules required for maplibre-native-ffi builds"
 set -euo pipefail
 
 repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
@@ -44,6 +43,16 @@ vendor_paths=(
 # Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
 # zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
 # nested .mason / test fixture / glfw submodules under the paths above.
+
+top_status="$(git submodule status "$mln_path" 2>/dev/null || true)"
+if [[ "$top_status" == " "* ]]; then
+  nested_status="$(git -C "$mln_path" submodule status "${vendor_paths[@]}" 2>/dev/null || true)"
+  nested_count="$(printf '%s\n' "$nested_status" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [[ "$nested_count" == "${#vendor_paths[@]}" ]] &&
+    ! grep -qE '^[+-U]' <<<"$nested_status"; then
+    exit 0
+  fi
+fi
 
 git -c submodule.recurse=false submodule sync "$mln_path"
 git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"

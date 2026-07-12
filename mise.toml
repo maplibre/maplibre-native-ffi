@@ -35,6 +35,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
 "aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
+"conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
 
 # Node.js ecosystem
 "core:node" = "24.11.0"
@@ -50,7 +51,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:astral-sh/uv" = "0.11.11"
 
 # Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["linux"] }
+"core:swift" = { version = "6.3.1", os = ["linux/x64"] }
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
@@ -77,20 +78,19 @@ run = "pnpm install --frozen-lockfile --loglevel warn"
 
 [deps.dotnet-tools]
 auto = true
-sources = ["dotnet-tools.json"]
-run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet"
+sources = ["dotnet-tools.json", "bindings/dotnet/dotnet-tools.json"]
+run = '''
+dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet
+dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet
+'''
 
-[deps.dotnet-binding-tools]
+[deps.submodules]
 auto = true
-sources = ["bindings/dotnet/dotnet-tools.json"]
-run = "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet"
+run = ".mise/bin/sync-submodules"
 
 [hooks]
 postinstall = [
-  { task = "sync-submodules" },
   "hk install --mise --quiet",
-  # Generated docs data is imported by Astro components and checked by vp.
-  { task = "docs:generate-support-matrix" },
 ]
 
 [tasks.configure]

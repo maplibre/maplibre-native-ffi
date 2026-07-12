@@ -208,7 +208,6 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    steps:",
         *setup(),
         "      - run: mise run ci:generate-workflow --check",
-        "      - run: mise run format-deps",
         "      - run: mise run //docs:install",
         "      - run: dprint output-resolved-config > /dev/null",
         "      - run: hk fix --all",
