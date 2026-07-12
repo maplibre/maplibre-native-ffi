@@ -4,7 +4,6 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-rpath,$native_install_dir/lib"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo build \
     -p maplibre-native-sys \

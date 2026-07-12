@@ -63,18 +63,13 @@ swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat",
 "aqua:mvdan/gofumpt" = "0.10.0"
 "core:dotnet" = "10.0.203"
 
-[vars]
-host_native_preset = "{% if os() == 'macos' %}macos-arm64-metal{% elif os() == 'windows' %}windows-{{ arch() }}-vulkan{% else %}linux-{{ arch() }}-vulkan{% endif %}"
-
 [env]
-UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
 
 [deps.uv]
 auto = true
-dir = "bindings/python"
-run = "uv sync --locked --group dev --no-install-project"
+run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
 auto = true

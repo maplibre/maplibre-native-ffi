@@ -40,12 +40,12 @@ local lintSteps = new Mapping<String, Step> {
   ["ruff"] {
     glob = List("**/*.py")
     exclude = List("third_party/**")
-    check = "uv run --project bindings/python --no-sync ruff check {{files}} && uv run --project bindings/python --no-sync ruff format --check {{files}}"
-    fix = "uv run --project bindings/python --no-sync ruff check --fix {{files}} && uv run --project bindings/python --no-sync ruff format {{files}}"
+    check = "uv run --no-sync ruff check {{files}} && uv run --no-sync ruff format --check {{files}}"
+    fix = "uv run --no-sync ruff check --fix {{files}} && uv run --no-sync ruff format {{files}}"
   }
   ["ty"] {
     glob = List("bindings/python/python/**/*.py", "docs/scripts/**/*.py")
-    check = "uv run --project bindings/python --no-sync ty check --error-on-warning --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable {{files}}"
+    check = "uv run --no-sync ty check --error-on-warning --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable {{files}}"
   }
   ["gofumpt"] {
     glob = List("bindings/go/**/*.go")

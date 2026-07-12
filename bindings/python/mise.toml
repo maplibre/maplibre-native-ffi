@@ -14,7 +14,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --no-sync maturin build --out dist --auditwheel skip
-uv pip install --python .venv --reinstall --no-index --find-links dist \
+uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
   "maplibre-native==0.0.0"
 '''
 

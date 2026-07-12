@@ -9,15 +9,26 @@ RUN apt-get update \
     bash \
     build-essential \
     ca-certificates \
+    clang \
+    clang-tidy \
+    cmake \
     curl \
+    doxygen \
     git \
-    libegl-mesa0 \
+    glslang-tools \
+    libclang-dev \
+    libegl1-mesa-dev \
     libgl1-mesa-dri \
+    libgles2-mesa-dev \
     libicu72 \
-    libvulkan1 \
+    libuv1-dev \
+    libvulkan-dev \
     mesa-utils \
     mesa-vulkan-drivers \
+    ninja-build \
+    pkg-config \
     sudo \
+    zlib1g-dev \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 --shell /bin/bash dev \

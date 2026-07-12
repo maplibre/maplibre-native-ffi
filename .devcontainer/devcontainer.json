@@ -7,7 +7,7 @@
     "EGL_PLATFORM": "surfaceless",
     "LIBGL_ALWAYS_SOFTWARE": "true"
   },
-  "postCreateCommand": "mise trust -y && mise bootstrap --yes",
+  "postCreateCommand": "mise trust -y && mise install",
   "customizations": {
     "vscode": {
       "extensions": [

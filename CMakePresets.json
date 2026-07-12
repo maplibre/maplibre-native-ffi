@@ -59,8 +59,7 @@
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
         "ANDROID_STL": "c++_shared",
-        "MLN_FFI_CARGO_TARGET_DIR": "${sourceDir}/build/${presetName}/cargo",
-        "MLN_FFI_ENABLE_CLANG_TIDY": false
+        "MLN_FFI_CARGO_TARGET_DIR": "${sourceDir}/build/${presetName}/cargo"
       }
     },
     {

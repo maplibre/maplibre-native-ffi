@@ -1,3 +1,6 @@
+[vars]
+host_native_preset = "macos-arm64-metal"
+
 [bootstrap.packages]
 "brew:cmake" = "latest"
 "brew:doxygen" = "latest"

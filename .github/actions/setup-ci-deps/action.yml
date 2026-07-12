@@ -154,6 +154,12 @@ runs:
       shell: bash
       run: mise bootstrap --yes
 
+    # The mise action may restore Rust install metadata without the rustup
+    # toolchain, components, or cross targets declared in mise.toml.
+    - name: Repair cached Rust toolchain
+      shell: bash
+      run: MISE_NO_HOOKS=1 mise install --force rust
+
     - name: Install Android native SDK packages
       if: ${{ startsWith(inputs.target, 'android-') }}
       shell: bash

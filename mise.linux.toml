@@ -1,3 +1,6 @@
+[vars]
+host_native_preset = "linux-{{ arch() }}-vulkan"
+
 [bootstrap.packages]
 "apt:build-essential" = "latest"
 "apt:clang" = "latest"
