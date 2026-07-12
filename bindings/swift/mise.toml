@@ -15,7 +15,10 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-swift test --scratch-path ".build/$usage_preset"
+swift test \
+  --scratch-path ".build/$usage_preset" \
+  -Xlinker -rpath \
+  -Xlinker "$native_install_dir/lib"
 swift package describe --type json >/dev/null
 '''
 
@@ -31,6 +34,8 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
     --sdk "$sdk" \
     --triple arm64-apple-ios14.3-simulator \
     -Xswiftc -enable-testing \
+    -Xlinker -rpath \
+    -Xlinker "$native_install_dir/lib" \
     -Xlinker -rpath \
     -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
 '''

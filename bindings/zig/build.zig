@@ -378,9 +378,6 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
                 module.linkSystemLibrary("GLESv2", .{});
             },
             .macos => {
-                if (options.dependency_library_dirs.len == 0) {
-                    @panic("macOS OpenGL builds require native artifact config with a library_dirs entry containing EGL and GLESv2");
-                }
                 addDependencyLibraryPaths(module, options.dependency_library_dirs);
                 module.linkSystemLibrary("EGL", .{});
                 module.linkSystemLibrary("GLESv2", .{});

@@ -32,16 +32,9 @@ function(mln_prepare_macos_angle out_var)
     file(MAKE_DIRECTORY "${angle_extract_dir}")
     file(ARCHIVE_EXTRACT INPUT "${angle_archive}" DESTINATION
          "${angle_extract_dir}")
-    file(GLOB angle_archive_entries "${angle_extract_dir}/*")
-    list(LENGTH angle_archive_entries angle_archive_entry_count)
-    if(NOT angle_archive_entry_count EQUAL 1)
-      message(FATAL_ERROR "The ANGLE archive must contain one root directory")
-    endif()
-    list(GET angle_archive_entries 0 angle_archive_root)
     cmake_path(GET angle_root PARENT_PATH angle_parent)
     file(MAKE_DIRECTORY "${angle_parent}")
-    file(RENAME "${angle_archive_root}" "${angle_root}")
-    file(REMOVE_RECURSE "${angle_extract_dir}")
+    file(RENAME "${angle_extract_dir}" "${angle_root}")
 
     execute_process(
       COMMAND

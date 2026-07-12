@@ -149,7 +149,9 @@ function(mln_configure_install_rpath target)
     set(install_rpath "@loader_path")
     set_target_properties(
       ${target}
-      PROPERTIES BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "@rpath")
+      PROPERTIES
+        BUILD_WITH_INSTALL_NAME_DIR YES BUILD_WITH_INSTALL_RPATH YES
+        INSTALL_NAME_DIR "@rpath")
   elseif(UNIX)
     set(install_rpath "$ORIGIN")
   else()

@@ -30,7 +30,8 @@ function(mln_configure_render_dependencies target)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     find_file(
       MLN_FFI_VULKAN_ICD_FILE
-      NAMES MoltenVK_icd.json PATH_SUFFIXES share/vulkan/icd.d
+      NAMES MoltenVK_icd.json
+      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES etc/vulkan/icd.d share/vulkan/icd.d
       REQUIRED)
     set_property(
       TARGET ${target}

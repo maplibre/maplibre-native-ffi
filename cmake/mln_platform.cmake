@@ -18,13 +18,16 @@ function(mln_validate_platform)
   endif()
 endfunction()
 
+if(APPLE)
+  enable_language(OBJC)
+  enable_language(OBJCXX)
+endif()
+
 function(mln_select_platform)
   add_library(mln_ffi_platform_dependencies INTERFACE)
   add_library(MLN_FFI::PlatformDependencies ALIAS mln_ffi_platform_dependencies)
 
   if(APPLE)
-    enable_language(OBJC)
-    enable_language(OBJCXX)
     include(platform/apple)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     include(platform/linux)
