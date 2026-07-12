@@ -30,11 +30,11 @@ if(MSVC)
   set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
       "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
 
-  # Ninja may run several cl.exe instances for one target at the same time.
-  # /FS serializes PDB writes and avoids fatal error C1041 when those instances
+  # Compile source files in parallel with Visual Studio generators. /FS
+  # serializes PDB writes and avoids fatal error C1041 when compiler processes
   # write to the same target program database.
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:C,MSVC>:/FS>"
-                      "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/FS>")
+  add_compile_options("$<$<COMPILE_LANG_AND_ID:C,MSVC>:/MP;/FS>"
+                      "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MP;/FS>")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")

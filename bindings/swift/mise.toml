@@ -3,7 +3,7 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="../../build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNative "${swift_args[@]}"
@@ -14,7 +14,7 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="../../build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 swift test --scratch-path ".build/$usage_preset"
 swift package describe --type json >/dev/null
 '''
@@ -24,7 +24,7 @@ depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="../../build/ios-simulator-arm64-metal/install"
 sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \
     --product MaplibreNativeIOSSimulatorTests \
     --scratch-path .build/ios-simulator \
@@ -40,7 +40,7 @@ depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="../../build/ios-arm64-metal/install"
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" \
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \
     --product MaplibreNative \
     --scratch-path .build/ios \

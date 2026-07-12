@@ -32,7 +32,7 @@ env -u VIRTUAL_ENV \
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 env -u VIRTUAL_ENV \
   MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   uv run --no-sync python -m pytest
@@ -56,7 +56,7 @@ env -u VIRTUAL_ENV uv run --no-sync python -c 'import importlib.metadata; import
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 env -u VIRTUAL_ENV uv run --no-sync ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python
 env -u VIRTUAL_ENV uv run --no-sync maturin build --auditwheel skip

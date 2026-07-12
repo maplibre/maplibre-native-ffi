@@ -3,12 +3,12 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" go test ./...
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" go test ./...
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" go test ./...
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" go test ./...
 '''
 
 [tasks.test]
@@ -16,12 +16,12 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" go test ./...
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" go test ./...
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}" go test ./...
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" go test ./...
 '''
 
 [tasks.ci]
@@ -34,7 +34,7 @@ if [[ -n "$unformatted" ]]; then
   exit 1
 fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 go test ./...
 go vet ./...
 '''
@@ -45,8 +45,8 @@ if [[ -n "$unformatted" ]]; then
   exit 1
 fi
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
-export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 go test ./...
 go vet ./...
 '''

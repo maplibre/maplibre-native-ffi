@@ -80,7 +80,10 @@
       "name": "_windows",
       "hidden": true,
       "inherits": "_base",
-      "generator": "Visual Studio 17 2022"
+      "generator": "Visual Studio 17 2022",
+      "cacheVariables": {
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      }
     },
     {
       "name": "_metal",

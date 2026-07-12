@@ -27,7 +27,7 @@ cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -
 '''
 run_windows = '''
 native_install_dir="$PWD/build/$usage_preset/install"
-export PATH="$native_install_dir/bin${PATH:+:$PATH}"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
 cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings

@@ -65,6 +65,9 @@ fn waitForRenderedFrame(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.ml
                 c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE => {
                     const render_status = c.mln_render_session_render_update(session);
                     if (render_status == c.MLN_STATUS_INVALID_STATE) continue;
+                    if (render_status != c.MLN_STATUS_OK) {
+                        std.debug.print("render update failed: {s}\n", .{c.mln_thread_last_error_message()});
+                    }
                     try testing.expectEqual(c.MLN_STATUS_OK, render_status);
                     return;
                 },

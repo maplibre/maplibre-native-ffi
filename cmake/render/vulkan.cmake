@@ -2,6 +2,7 @@ function(mln_configure_render_dependencies target)
   find_library(
     MLN_FFI_VULKAN_LOADER_LIBRARY
     NAMES vulkan vulkan-1 vulkan.1
+    HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES Lib Lib32 Lib/arm64
     REQUIRED)
   add_library(mln_ffi_vulkan_loader UNKNOWN IMPORTED GLOBAL)
   set_target_properties(
@@ -35,7 +36,10 @@ function(mln_configure_render_dependencies target)
       TARGET ${target}
       PROPERTY MLN_FFI_VULKAN_ICD_FILE "${MLN_FFI_VULKAN_ICD_FILE}")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    find_file(MLN_FFI_VULKAN_RUNTIME NAMES vulkan-1.dll PATH_SUFFIXES bin)
+    find_file(
+      MLN_FFI_VULKAN_RUNTIME
+      NAMES vulkan-1.dll
+      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES Bin bin)
     if(MLN_FFI_VULKAN_RUNTIME)
       get_filename_component(
         MLN_FFI_VULKAN_RUNTIME_DIR "${MLN_FFI_VULKAN_RUNTIME}"

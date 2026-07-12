@@ -4,6 +4,7 @@ import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.compile.JavaCompile
+import org.gradle.process.CommandLineArgumentProvider
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.catalogVersion
@@ -22,10 +23,13 @@ val androidTargets =
   )
 @Suppress("UNCHECKED_CAST")
 val androidSdkDirectory =
-  (extensions.extraProperties["maplibreAndroidSdkDirectory"] as Provider<Directory>).get().asFile
-val androidNdkDirectory = androidSdkDirectory.resolve("ndk/${catalogVersion("android-ndk")}")
+  extensions.extraProperties["maplibreAndroidSdkDirectory"] as Provider<Directory>
 val androidNdkPrebuilt =
-  androidNdkDirectory.resolve("toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}")
+  androidSdkDirectory.map {
+    it.dir(
+      "ndk/${catalogVersion("android-ndk")}/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}"
+    )
+  }
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
 val javaCppConfigSources =
@@ -101,11 +105,15 @@ androidTargets.forEach { target ->
   val nativeLibrary = installDir.file("lib/libmaplibre-native-c.so")
   val javaCppNativeLibrary = javaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") }
   val ndkCompiler =
-    androidNdkPrebuilt.resolve(
-      "bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}"
-    )
+    androidNdkPrebuilt.map {
+      it.file(
+        "bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}"
+      )
+    }
   val libcxxShared =
-    androidNdkPrebuilt.resolve("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
+    androidNdkPrebuilt.map {
+      it.file("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
+    }
 
   val buildNative =
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
@@ -113,9 +121,9 @@ androidTargets.forEach { target ->
       description = "Builds and installs MapLibre Native C for Android ${target.ndkAbi}."
       doNotTrackState("CMake owns native incremental build state")
       workingDir(repositoryRoot)
-      environment("ANDROID_HOME", androidSdkDirectory.absolutePath)
       executable("cmake")
       args("--workflow", "--preset", cmakePreset)
+      doFirst { environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath) }
     }
 
   val generateJavaCppNativeLibrary =
@@ -125,24 +133,28 @@ androidTargets.forEach { target ->
       dependsOn(buildNative, compileGeneratedJavaCppBindings)
       classpath = files(generatedJavaCppClasses, javaCppConfigClasses) + javaCppToolClasspath
       mainClass = "org.bytedeco.javacpp.tools.Builder"
-      args(
-        "-classpath",
-        classpath.asPath,
-        "-properties",
-        target.javaCppPlatform,
-        "-Dplatform.compiler=${ndkCompiler.absolutePath}",
-        "-Dplatform.includepath=${listOf(checkedInCHeaders.asFile, javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
-        "-Dplatform.linkpath=${installDir.dir("lib").asFile.absolutePath}",
-        "-d",
-        javaCppNativeBuild.get().asFile.absolutePath,
-        "-o",
-        "jniMaplibreNativeC",
-        "-Xcompiler",
-        "-include",
-        "-Xcompiler",
-        javaCppAndroidCompatHeader.asFile.absolutePath,
-        "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
-        "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
+      argumentProviders.add(
+        CommandLineArgumentProvider {
+          listOf(
+            "-classpath",
+            classpath.asPath,
+            "-properties",
+            target.javaCppPlatform,
+            "-Dplatform.compiler=${ndkCompiler.get().asFile.absolutePath}",
+            "-Dplatform.includepath=${listOf(checkedInCHeaders.asFile, javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
+            "-Dplatform.linkpath=${installDir.dir("lib").asFile.absolutePath}",
+            "-d",
+            javaCppNativeBuild.get().asFile.absolutePath,
+            "-o",
+            "jniMaplibreNativeC",
+            "-Xcompiler",
+            "-include",
+            "-Xcompiler",
+            javaCppAndroidCompatHeader.asFile.absolutePath,
+            "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
+            "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
+          )
+        }
       )
       inputs.files(javaCppConfigSources.map(::file))
       inputs.dir(javaCppAndroidIncludes)
