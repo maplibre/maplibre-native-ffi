@@ -1,14 +1,18 @@
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
-../../gradlew :examples:compose-map:build \
-  -PmaplibreNativeCInstallDir="../../build/$usage_preset/install"
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :examples:compose-map:build
 '''
 
 [tasks.run]
 depends = ["//:build"]
+dir = "../.."
 run = '''
-../../gradlew :examples:compose-map:run \
-  -PmaplibreNativeCInstallDir="{{vars.host_native_install_dir}}"
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/{{vars.host_native_preset}}/install" \
+  :examples:compose-map:run
 '''

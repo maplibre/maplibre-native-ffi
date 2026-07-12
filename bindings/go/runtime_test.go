@@ -19,12 +19,14 @@ func TestRuntimeCreateWithOptions(t *testing.T) {
 		t.Fatalf("Close(): %v", err)
 	}
 }
+
 func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 	_, err := NewRuntimeWithOptions(RuntimeOptions{AssetPath: "asset\x00root"})
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("NewRuntimeWithOptions embedded NUL error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *testing.T) {
 	createCalled := false
 	storeCalled := false
@@ -54,6 +56,7 @@ func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *tes
 		t.Fatal("runtime handle store hook was called after ABI mismatch")
 	}
 }
+
 func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -81,6 +84,7 @@ func TestRuntimeAmbientCacheOperationDiscard(t *testing.T) {
 		t.Fatalf("second Discard(): %v", err)
 	}
 }
+
 func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -99,6 +103,7 @@ func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
 		t.Fatalf("StartAmbientCacheOperation(unknown) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -124,6 +129,7 @@ func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 		t.Fatalf("NewMap() after Close error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()

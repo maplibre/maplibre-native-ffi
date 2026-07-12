@@ -1,9 +1,0 @@
-{
-  "name": "@maplibre-native-ffi/openharmony",
-  "private": true,
-  "scripts": { "hvigor": "node node_modules/@ohos/hvigor/bin/hvigor.js" },
-  "devDependencies": {
-    "@ohos/hvigor": "6.24.2",
-    "@ohos/hvigor-ohos-plugin": "6.24.2"
-  }
-}

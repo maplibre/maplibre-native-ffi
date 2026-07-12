@@ -73,8 +73,8 @@ jobs:
               mise run //bindings/swift:test linux-x64-egl &&
               mise run //bindings/dotnet:test linux-x64-egl &&
               mise run //examples/dotnet-map:build linux-x64-egl &&
-              mise run //bindings/go:ci linux-x64-egl &&
-              mise run //bindings/python:ci linux-x64-egl
+              mise run //bindings/go:test linux-x64-egl &&
+              mise run //bindings/python:test linux-x64-egl
           - preset: linux-x64-vulkan
             runner: ubuntu-latest
             package: true
@@ -92,8 +92,8 @@ jobs:
               mise run //bindings/swift:test linux-x64-vulkan &&
               mise run //bindings/dotnet:test linux-x64-vulkan &&
               mise run //examples/dotnet-map:build linux-x64-vulkan &&
-              mise run //bindings/go:ci linux-x64-vulkan &&
-              mise run //bindings/python:ci linux-x64-vulkan
+              mise run //bindings/go:test linux-x64-vulkan &&
+              mise run //bindings/python:test linux-x64-vulkan
           - preset: linux-arm64-egl
             runner: ubuntu-24.04-arm
             package: true
@@ -111,8 +111,8 @@ jobs:
               mise run //bindings/swift:test linux-arm64-egl &&
               mise run //bindings/dotnet:test linux-arm64-egl &&
               mise run //examples/dotnet-map:build linux-arm64-egl &&
-              mise run //bindings/go:ci linux-arm64-egl &&
-              mise run //bindings/python:ci linux-arm64-egl
+              mise run //bindings/go:test linux-arm64-egl &&
+              mise run //bindings/python:test linux-arm64-egl
           - preset: linux-arm64-vulkan
             runner: ubuntu-24.04-arm
             package: true
@@ -130,8 +130,8 @@ jobs:
               mise run //bindings/swift:test linux-arm64-vulkan &&
               mise run //bindings/dotnet:test linux-arm64-vulkan &&
               mise run //examples/dotnet-map:build linux-arm64-vulkan &&
-              mise run //bindings/go:ci linux-arm64-vulkan &&
-              mise run //bindings/python:ci linux-arm64-vulkan
+              mise run //bindings/go:test linux-arm64-vulkan &&
+              mise run //bindings/python:test linux-arm64-vulkan
           - preset: macos-arm64-metal
             runner: macos-26
             package: true
@@ -150,8 +150,8 @@ jobs:
               mise run //examples/swift-map:build macos-arm64-metal &&
               mise run //bindings/dotnet:test macos-arm64-metal &&
               mise run //examples/dotnet-map:build macos-arm64-metal &&
-              mise run //bindings/go:ci macos-arm64-metal &&
-              mise run //bindings/python:ci macos-arm64-metal
+              mise run //bindings/go:test macos-arm64-metal &&
+              mise run //bindings/python:test macos-arm64-metal
           - preset: macos-arm64-vulkan
             runner: macos-26
             package: true
@@ -169,8 +169,8 @@ jobs:
               mise run //bindings/swift:test macos-arm64-vulkan &&
               mise run //bindings/dotnet:test macos-arm64-vulkan &&
               mise run //examples/dotnet-map:build macos-arm64-vulkan &&
-              mise run //bindings/go:ci macos-arm64-vulkan &&
-              mise run //bindings/python:ci macos-arm64-vulkan
+              mise run //bindings/go:test macos-arm64-vulkan &&
+              mise run //bindings/python:test macos-arm64-vulkan
           - preset: macos-arm64-egl
             runner: macos-26
             package: true
@@ -187,8 +187,8 @@ jobs:
               mise run //bindings/swift:test macos-arm64-egl &&
               mise run //bindings/dotnet:test macos-arm64-egl &&
               mise run //examples/dotnet-map:build macos-arm64-egl &&
-              mise run //bindings/go:ci macos-arm64-egl &&
-              mise run //bindings/python:ci macos-arm64-egl
+              mise run //bindings/go:test macos-arm64-egl &&
+              mise run //bindings/python:test macos-arm64-egl
           - preset: ios-arm64-metal
             runner: macos-26
             package: false

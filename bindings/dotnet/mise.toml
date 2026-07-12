@@ -6,10 +6,20 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "../.."
-run = 'MaplibreNativeCInstallDir="$PWD/build/$usage_preset/install" dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"'
+run = '''
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet build \
+    Maplibre.Native.slnx \
+    -p:Platform="Any CPU"
+'''
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
-run = 'MaplibreNativeCInstallDir="$PWD/build/$usage_preset/install" dotnet test bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj -p:Platform="Any CPU"'
+run = '''
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet test \
+    bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj \
+    -p:Platform="Any CPU"
+'''

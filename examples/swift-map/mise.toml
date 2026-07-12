@@ -2,7 +2,7 @@
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-native_install_dir="../../build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
@@ -16,7 +16,10 @@ arg "[render-target]" default="owned-texture" {
   choices "owned-texture" "borrowed-texture" "native-surface"
 }
 '''
-run = 'exec ".build/{{vars.host_native_preset}}/debug/swift-map" "{{ usage.render_target }}"'
+run = '''
+exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
+  "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
@@ -30,7 +33,7 @@ run = [{ task = "run", args = ["native-surface"] }]
 [tasks."build:ios-simulator"]
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
-native_install_dir="../../build/ios-simulator-arm64-metal/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
 sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
 PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \
@@ -43,7 +46,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 [tasks."build:ios"]
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
-native_install_dir="../../build/ios-arm64-metal/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
 PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
   swift build \

@@ -2,63 +2,32 @@
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-env -u VIRTUAL_ENV \
-  MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  uv run --locked --group dev maturin build --auditwheel skip
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync maturin build --auditwheel skip
 '''
 
-[tasks.develop]
+[tasks._install-extension]
+description = "Build and install the Python extension for local tests."
+hide = true
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-env -u VIRTUAL_ENV uv sync --locked --group dev --no-install-project --inexact
-env -u VIRTUAL_ENV \
-  MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  uv run --no-sync maturin build --out dist --auditwheel skip
-env -u VIRTUAL_ENV \
-  uv pip install --python .venv --reinstall --link-mode copy dist/maplibre_native-*.whl
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync maturin build --out dist --auditwheel skip
+uv pip install --python .venv --reinstall --no-index --find-links dist \
+  "maplibre-native==0.0.0"
 '''
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":develop", args = ["{{usage.preset}}"] }]
+depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-env -u VIRTUAL_ENV \
-  MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  uv run --no-sync python -m pytest
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync python -m pytest
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-env -u VIRTUAL_ENV \
-  MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
-  uv run --no-sync python -m pytest
-'''
-
-[tasks.typecheck]
-run = [
-  "env -u VIRTUAL_ENV uv sync --locked --group dev --no-install-project --inexact",
-  "env -u VIRTUAL_ENV uv run --no-sync ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python",
-]
-
-[tasks.ci]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":test", args = ["{{usage.preset}}"] }]
-run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-env -u VIRTUAL_ENV uv run --no-sync ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python
-env -u VIRTUAL_ENV uv run --no-sync maturin build --auditwheel skip
-env -u VIRTUAL_ENV uv run --no-sync python -c 'import importlib.metadata; import maplibre_native; import maplibre_native._native; assert importlib.metadata.version("maplibre-native") == "0.0.0"'
-'''
-run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
-env -u VIRTUAL_ENV uv run --no-sync ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python
-env -u VIRTUAL_ENV uv run --no-sync maturin build --auditwheel skip
-env -u VIRTUAL_ENV uv run --no-sync python -c 'import importlib.metadata; import maplibre_native; import maplibre_native._native; assert importlib.metadata.version("maplibre-native") == "0.0.0"'
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  uv run --project . --no-sync python -m pytest
 '''

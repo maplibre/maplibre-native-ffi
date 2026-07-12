@@ -76,6 +76,7 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 		t.Fatalf("AddCustomGeometrySource(nil fetch) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func drainRuntimeEvents(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
 	for range make([]struct{}, 100) {
@@ -91,6 +92,7 @@ func drainRuntimeEvents(t *testing.T, runtime *RuntimeHandle) {
 		}
 	}
 }
+
 func TestCustomGeometrySourceStateReleasesAfterStyleURLReplacement(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()

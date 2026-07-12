@@ -1,22 +1,42 @@
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:assemble'
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :bindings:kotlin:assemble
+'''
 
 [tasks.test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:check'
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :bindings:kotlin:check
+'''
 
 [tasks.jvmTest]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:jvmTest'
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :bindings:kotlin:jvmTest
+'''
 
 [tasks.nativeTest]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = '../../gradlew -PmaplibreNativeCInstallDir="../../build/$usage_preset/install" :bindings:kotlin:nativeTest'
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :bindings:kotlin:nativeTest
+'''
 
 [tasks.androidBuild]
 description = "Build the Kotlin Android binding."
@@ -28,8 +48,9 @@ arg "[abis]" default="arm64-v8a,x86_64" {
   choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
 }
 '''
+dir = "../.."
 run = '''
-../../gradlew \
+./gradlew \
   -Pmaplibre.android.backend="$usage_backend" \
   -Pmaplibre.android.abis="$usage_abis" \
   :bindings:kotlin:androidBuild

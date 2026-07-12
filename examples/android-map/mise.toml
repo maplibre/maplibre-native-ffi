@@ -8,8 +8,9 @@ arg "[abis]" default="arm64-v8a,x86_64" {
   choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
 }
 '''
+dir = "../.."
 run = '''
-../../gradlew \
+./gradlew \
   -Pmaplibre.android.backend="$usage_backend" \
   -Pmaplibre.android.abis="$usage_abis" \
   :examples:android-map:assembleDebug
@@ -25,8 +26,9 @@ arg "[abis]" default="arm64-v8a,x86_64" {
   choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
 }
 '''
+dir = "../.."
 run = '''
-../../gradlew \
+./gradlew \
   -Pmaplibre.android.backend="$usage_backend" \
   -Pmaplibre.android.abis="$usage_abis" \
   :examples:android-map:runDebug

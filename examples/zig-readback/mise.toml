@@ -2,11 +2,9 @@
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-zig_args=(
-  -Dnative-install-dir="../../build/$usage_preset/install"
-  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
-)
-zig build {{vars.zig_host_args}} "${zig_args[@]}"
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
 [tasks.run]
@@ -14,19 +12,17 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 mkdir -p zig-out
-zig_args=(
-  -Dnative-install-dir="../../build/$usage_preset/install"
-  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
-)
-zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- zig-out/zig-readback.ppm
+zig build run \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback.ppm
 '''
 run_windows = '''
 mkdir -p zig-out
-native_install_dir="../../build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
-zig_args=(
-  -Dnative-install-dir="$native_install_dir"
-  -Ddependency-include-dir="{{vars.vulkan_include_dir}}"
-)
-zig build run {{vars.zig_host_args}} "${zig_args[@]}" -- zig-out/zig-readback.ppm
+zig build run \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback.ppm
 '''

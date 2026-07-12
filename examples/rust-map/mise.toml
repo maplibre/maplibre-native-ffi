@@ -4,8 +4,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 set -euo pipefail
-native_install_dir="$PWD/build/$usage_preset/install"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   cargo build -p rust-map
 '''
 
@@ -15,8 +14,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 set -euo pipefail
-native_install_dir="$PWD/build/$usage_preset/install"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   cargo clippy -p rust-map --all-targets -- -D warnings
 '''
 
@@ -30,13 +28,14 @@ arg "[render-target]" default="owned-texture" {
 '''
 run = '''
 set -euo pipefail
-MAPLIBRE_NATIVE_C_INSTALL_DIR="{{vars.host_native_install_dir}}" \
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
   cargo run -p rust-map -- "{{ usage.render_target }}"
 '''
 run_windows = '''
 set -euo pipefail
-export PATH="$(cygpath -u "{{vars.host_native_install_dir}}/bin")${PATH:+:${PATH}}"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="{{vars.host_native_install_dir}}" \
+native_install_dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo run -p rust-map -- "{{ usage.render_target }}"
 '''
 

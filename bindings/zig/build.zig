@@ -272,6 +272,19 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
     }
 }
 
+fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, dependency_library_dirs: []const std.Build.LazyPath) void {
+    if (!target.query.isNative() or dependency_library_dirs.len != 0) return;
+    if (target.result.os.tag != .windows and target.result.os.tag != .macos) return;
+    const sdk = b.graph.environ_map.get("VULKAN_SDK") orelse
+        if (target.result.os.tag == .windows)
+            @panic("native Windows Vulkan builds require VULKAN_SDK")
+        else
+            return;
+    const library_dir = b.pathJoin(&.{ sdk, if (target.result.os.tag == .windows) "Lib" else "lib" });
+    module.addLibraryPath(.{ .cwd_relative = library_dir });
+    module.addRPath(.{ .cwd_relative = library_dir });
+}
+
 fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget, system_root: ?std.Build.LazyPath) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const root = system_root orelse return;
@@ -376,6 +389,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             else => unreachable,
         },
         .vulkan => {
+            addNativeVulkanSdkPath(b, module, options.target, options.dependency_library_dirs);
             addDependencyLibraryPaths(module, options.dependency_library_dirs);
             module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
         },

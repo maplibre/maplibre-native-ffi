@@ -5,6 +5,7 @@ package callback
 #include "maplibre_native_c.h"
 */
 import "C"
+
 import (
 	stdruntime "runtime"
 	"runtime/cgo"

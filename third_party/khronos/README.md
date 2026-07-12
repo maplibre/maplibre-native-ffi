@@ -23,7 +23,3 @@ MapLibre Native's Windows WGL backend includes `GLES3/gl3.h` and `GL/wgl.h`,
 and uses WGL extension declarations from `GL/wglext.h`. Upstream MapLibre
 Native gets those headers from its vendored vcpkg
 [`opengl-registry`](https://vcpkg.io/en/package/opengl-registry.html) port.
-
-Linux system packages provide the EGL and GLES headers used by Linux EGL
-presets. The Windows SDK provides the base WGL/OpenGL API, but not this Khronos
-registry header set.

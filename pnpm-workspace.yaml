@@ -1,5 +1,4 @@
 packages:
-  - bindings/openharmony
   - docs
 
 allowBuilds:

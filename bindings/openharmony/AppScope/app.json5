@@ -1,8 +1,0 @@
-{
-  app: {
-    bundleName: "org.maplibre.nativeffi",
-    vendor: "MapLibre",
-    versionCode: 1,
-    versionName: "1.0.0",
-  },
-}

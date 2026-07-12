@@ -16,7 +16,6 @@ lockfile_platforms = [
 ]
 pin = true
 experimental = true
-python.uv_venv_auto = "create|source"
 windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
 windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 unix_default_file_shell_args = "bash"
@@ -36,8 +35,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
 "aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
-
-# C/C++ ecosystem
 
 # Node.js ecosystem
 "core:node" = "24.11.0"
@@ -63,18 +60,35 @@ swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat",
 # Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
 "http:zig" = { version = "0.16.0", os = ["windows/arm64"], url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip", checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e", bin_path = "zig-x86_64-windows-0.16.0" }
 "core:go" = "1.26.3"
+"aqua:mvdan/gofumpt" = "0.10.0"
 "core:dotnet" = "10.0.203"
 
 [vars]
 host_native_preset = "{% if os() == 'macos' %}macos-arm64-metal{% elif os() == 'windows' %}windows-{{ arch() }}-vulkan{% else %}linux-{{ arch() }}-vulkan{% endif %}"
-host_native_install_dir = "{{config_root}}/build/{{vars.host_native_preset}}/install"
-vulkan_include_dir = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
-zig_host_args = ""
 
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
+
+[deps.uv]
+auto = true
+dir = "bindings/python"
+run = "uv sync --locked --group dev --no-install-project"
+
+[deps.pnpm]
+auto = true
+run = "pnpm install --frozen-lockfile --loglevel warn"
+
+[deps.dotnet-tools]
+auto = true
+sources = ["dotnet-tools.json"]
+run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet"
+
+[deps.dotnet-binding-tools]
+auto = true
+sources = ["bindings/dotnet/dotnet-tools.json"]
+run = "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet"
 
 [hooks]
 postinstall = [
@@ -97,7 +111,7 @@ run = 'cmake --workflow --preset "$usage_preset"'
 [tasks.clean]
 description = "Remove one native preset build tree."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'rm -rf "{{config_root}}/build/$usage_preset"'
+run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
 
 [tasks.package-native]
 description = "Build and archive a desktop native CMake preset."
@@ -112,16 +126,12 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = 'ctest --preset "$usage_preset"'
 
 [tasks.check]
-depends = ["//:format-deps", "//docs:install"]
+depends = ["//docs:install"]
 run = "hk check --all"
 
 [tasks.fix]
-depends = ["//:format-deps", "//docs:install"]
+depends = ["//docs:install"]
 run = "hk fix --all"
-
-[tasks.format-deps]
-hide = true
-run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet"
 
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."

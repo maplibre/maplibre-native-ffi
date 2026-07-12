@@ -64,7 +64,7 @@ runs:
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/setup-ohos-sdk
-        key: ohos-sdk-v2-v6.1-${{ runner.os }}-${{ runner.arch }}
+        key: ohos-sdk-v3-v6.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
@@ -77,7 +77,7 @@ runs:
 
         mkdir -p "$sdk_root"
         cd "$sdk_root"
-        if [[ ! -f "$sdk_root/linux/ets/oh-uni-package.json" ]]; then
+        if [[ ! -f "$sdk_root/linux/native/build/cmake/ohos.toolchain.cmake" ]]; then
           gh release download v6.1 \
             --repo openharmony-rs/ohos-sdk \
             --pattern "${archive}*"
@@ -90,9 +90,7 @@ runs:
             exit 1
           fi
           tar -xf "$archive"
-          for component in ets js native previewer toolchains; do
-            unzip -q "linux/${component}-"*.zip -d linux
-          done
+          unzip -q linux/native-*.zip -d linux
         fi
 
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"

@@ -79,6 +79,7 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 		t.Fatalf("StyleSourceExists(empty) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -146,6 +147,7 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 		t.Fatalf("AddGeoJSONSourceURL(empty id) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -204,6 +206,7 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		t.Fatalf("AddGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()

@@ -173,6 +173,35 @@ url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellche
 checksum = "sha256:8a4e35ab0b331c85d73567b12f2a444df187f483e5079ceffa6bda1faa2e740e"
 url = "https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.zip"
 
+[[tools."aqua:mvdan/gofumpt"]]
+version = "0.10.0"
+backend = "aqua:mvdan/gofumpt"
+
+[tools."aqua:mvdan/gofumpt"."platforms.linux-arm64"]
+checksum = "sha256:5d239f93b1ed2dfe74d39b25112bb770a04f6581f986d4b4f5d380521e12ca61"
+url = "https://github.com/mvdan/gofumpt/releases/download/v0.10.0/gofumpt_v0.10.0_linux_arm64"
+url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/411914558"
+
+[tools."aqua:mvdan/gofumpt"."platforms.linux-x64"]
+checksum = "sha256:48ee398ec72afdaca6accb70f5ed741349d5dcccb52c5bb4c4469d698980b186"
+url = "https://github.com/mvdan/gofumpt/releases/download/v0.10.0/gofumpt_v0.10.0_linux_amd64"
+url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/411914544"
+
+[tools."aqua:mvdan/gofumpt"."platforms.macos-arm64"]
+checksum = "sha256:ba4b348e729cba915d5c7dc515774e2f2c7cc5c5ad011de20d34be10e5a2f906"
+url = "https://github.com/mvdan/gofumpt/releases/download/v0.10.0/gofumpt_v0.10.0_darwin_arm64"
+url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/411914528"
+
+[tools."aqua:mvdan/gofumpt"."platforms.windows-arm64"]
+checksum = "sha256:20872b464435512b74678b1155b75bd75220de5737ad8c075b9151c846543697"
+url = "https://github.com/mvdan/gofumpt/releases/download/v0.10.0/gofumpt_v0.10.0_windows_amd64.exe"
+url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/411914169"
+
+[tools."aqua:mvdan/gofumpt"."platforms.windows-x64"]
+checksum = "sha256:20872b464435512b74678b1155b75bd75220de5737ad8c075b9151c846543697"
+url = "https://github.com/mvdan/gofumpt/releases/download/v0.10.0/gofumpt_v0.10.0_windows_amd64.exe"
+url_api = "https://api.github.com/repos/mvdan/gofumpt/releases/assets/411914169"
+
 [[tools."aqua:pnpm/pnpm"]]
 version = "10.33.2"
 backend = "aqua:pnpm/pnpm"

@@ -20,13 +20,14 @@ interop or the popular MapLibre Android/iOS SDKs.
 ## Workflow
 
 ```bash
-# Install/refresh system packages, tools, and repository hooks
-mise bootstrap
+# Install/refresh system packages, tools, and repository hooks.
+# On Linux this uses sudo; --yes accepts package-manager prompts.
+mise bootstrap --yes
 
 # List available tasks across the workspace
 mise tasks --all
 
-# Build the host native library (also installs native dependencies)
+# Configure, build, and install the host native library
 mise run build
 
 # Build and run C API tests (also runs build)
@@ -57,11 +58,9 @@ mise run fix
 hk fix [FILES...]
 ```
 
-Native CMake presets cover Linux (`x64`/`arm64`, EGL/Vulkan), macOS ARM64
-(Metal/EGL/Vulkan), Windows (`x64`/`arm64`, WGL/Vulkan), Android (`x64`/`arm64`,
-EGL/Vulkan), iOS device/simulator, and OpenHarmony ARM64. Gradle and Hvigor
-select the Android and OpenHarmony presets when building platform packages. Host
-workflows use the host's default CMake preset.
+Native targets and render backends are defined in `CMakePresets.json`. Gradle
+selects the Android presets when building platform packages; OpenHarmony and
+host workflows use the presets directly.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.

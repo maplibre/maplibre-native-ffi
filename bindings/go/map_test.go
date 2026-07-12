@@ -180,6 +180,7 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 }
+
 func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -225,6 +226,7 @@ func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 		t.Fatalf("DumpDebugLogs(): %v", err)
 	}
 }
+
 func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -250,6 +252,7 @@ func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 		t.Fatalf("SetDebugOptions(unknown) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	lockOSThreadForTest(t)
 

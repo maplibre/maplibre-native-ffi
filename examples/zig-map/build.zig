@@ -31,12 +31,12 @@ fn sdlLibrary(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     });
     const library = sdl.artifact("SDL3");
     if (options.target.result.os.tag == .macos) {
-        const system_root = options.system_root orelse
-            @panic("macOS builds require -Dsystem-root=<path-to-macOS-SDK>");
-        const system_root_path = system_root.getPath(b);
-        library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
-        library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
-        library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
+        if (options.system_root) |system_root| {
+            const system_root_path = system_root.getPath(b);
+            library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
+            library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
+            library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
+        }
     }
     return library;
 }

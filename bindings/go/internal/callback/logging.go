@@ -9,6 +9,7 @@ package callback
 extern uint32_t goMaplibreLogCallback(void* user_data, uint32_t severity, uint32_t event, int64_t code, const char* message);
 */
 import "C"
+
 import (
 	"sync"
 	"unsafe"
@@ -28,7 +29,7 @@ var logInstallMu sync.Mutex
 var (
 	setNativeLogCallback = func() int32 {
 		return int32(C.mln_log_set_callback(
-			(C.mln_log_callback)(C.goMaplibreLogCallback),
+			C.mln_log_callback(C.goMaplibreLogCallback),
 			nil,
 		))
 	}

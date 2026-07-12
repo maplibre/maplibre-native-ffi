@@ -24,6 +24,7 @@ func waitForRuntimeEvent(t *testing.T, runtime *RuntimeHandle, eventType Runtime
 	t.Fatalf("timed out waiting for runtime event %v", eventType)
 	return nil
 }
+
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -87,6 +88,7 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 	lockOSThreadForTest(t)
 

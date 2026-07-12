@@ -12,7 +12,8 @@ dir = ".."
 run = '''
 rm -rf docs/public/reference/rust
 mkdir -p docs/public/reference
-MAPLIBRE_NATIVE_C_INSTALL_DIR="{{vars.host_native_install_dir}}" cargo doc -p maplibre-native --no-deps
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+  cargo doc -p maplibre-native --no-deps
 cp -a target/doc/. docs/public/reference/rust/
 '''
 
@@ -32,10 +33,7 @@ run = [
 ]
 
 [tasks.install]
-run = [
-  "pnpm install --frozen-lockfile --loglevel warn",
-  "pnpm exec astro sync",
-]
+run = "pnpm exec astro sync"
 
 [tasks.dev]
 depends = ["api", "install", "generate-support-matrix"]

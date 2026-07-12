@@ -1,21 +1,25 @@
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
-../../gradlew :examples:lwjgl-map:build \
-  -PmaplibreNativeCInstallDir="../../build/$usage_preset/install"
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :examples:lwjgl-map:build
 '''
 
 [tasks.run]
 depends = ["//:build"]
+dir = "../.."
 usage = '''
 arg "[render-target]" default="owned-texture" {
   choices "owned-texture" "borrowed-texture" "native-surface"
 }
 '''
 run = '''
-../../gradlew :examples:lwjgl-map:run \
-  -PmaplibreNativeCInstallDir="{{vars.host_native_install_dir}}" \
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/{{vars.host_native_preset}}/install" \
+  :examples:lwjgl-map:run \
   --args="{{ usage.render_target }}"
 '''
 

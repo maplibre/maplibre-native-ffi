@@ -8,5 +8,5 @@
 "brew:pkgconf" = "latest"
 "brew:vulkan-loader" = "latest"
 
-[vars]
-zig_host_args = "-Ddependency-library-dir=/opt/homebrew/lib -Dsystem-root=\"{{ exec(command='xcrun --sdk macosx --show-sdk-path') }}\""
+[env]
+VULKAN_SDK = "/opt/homebrew/opt/vulkan-loader"
