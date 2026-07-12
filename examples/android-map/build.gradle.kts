@@ -1,5 +1,6 @@
 import org.gradle.api.tasks.Exec
 import org.maplibre.nativeffi.gradle.AndroidTarget
+import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 plugins { alias(libs.plugins.android.application) }
 
@@ -11,11 +12,13 @@ val androidTargets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
   )
+val androidCmakeVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_CMAKE_VERSION")
+val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
 
 android {
   namespace = "org.maplibre.nativeffi.examples.androidmap"
   compileSdk = libs.versions.android.compileSdk.get().toInt()
-  ndkVersion = libs.versions.android.ndk.get()
+  ndkVersion = androidNdkVersion
 
   defaultConfig {
     applicationId = "org.maplibre.nativeffi.examples.androidmap"
@@ -39,7 +42,7 @@ android {
     externalNativeBuild {
       cmake {
         path = file("src/main/cpp/CMakeLists.txt")
-        version = libs.versions.android.cmake.get()
+        version = androidCmakeVersion
       }
     }
   }

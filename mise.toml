@@ -73,6 +73,8 @@ zig_host_args = ""
 
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
+MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
+MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
 
 [hooks]
 postinstall = [

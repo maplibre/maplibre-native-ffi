@@ -7,12 +7,13 @@ import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.process.CommandLineArgumentProvider
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
-import org.maplibre.nativeffi.gradle.catalogVersion
 import org.maplibre.nativeffi.gradle.catalogVersionInt
+import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 val hostPlatform = HostPlatform.current()
 val javaCppToolClasspath = configurations.getByName("javaCppTool")
 val androidApiLevel = catalogVersionInt("android-minSdk")
+val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
 val androidBackend =
   AndroidTarget.parseBackend(
     providers.gradleProperty("maplibre.android.backend").getOrElse(AndroidTarget.DEFAULT_BACKEND)
@@ -24,12 +25,9 @@ val androidTargets =
 @Suppress("UNCHECKED_CAST")
 val androidSdkDirectory =
   extensions.extraProperties["maplibreAndroidSdkDirectory"] as Provider<Directory>
-val androidNdkPrebuilt =
-  androidSdkDirectory.map {
-    it.dir(
-      "ndk/${catalogVersion("android-ndk")}/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}"
-    )
-  }
+val androidNdkPrebuilt = androidSdkDirectory.map {
+  it.dir("ndk/$androidNdkVersion/toolchains/llvm/prebuilt/${hostPlatform.androidNdkPrebuiltTag}")
+}
 val repositoryRoot = rootProject.layout.projectDirectory.asFile
 
 val javaCppConfigSources =
@@ -104,16 +102,12 @@ androidTargets.forEach { target ->
   val packageDir = packagedAndroidNativeLibs.map { it.dir("$androidBackend/${target.cargoTarget}") }
   val nativeLibrary = installDir.file("lib/libmaplibre-native-c.so")
   val javaCppNativeLibrary = javaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") }
-  val ndkCompiler =
-    androidNdkPrebuilt.map {
-      it.file(
-        "bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}"
-      )
-    }
-  val libcxxShared =
-    androidNdkPrebuilt.map {
-      it.file("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
-    }
+  val ndkCompiler = androidNdkPrebuilt.map {
+    it.file("bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}")
+  }
+  val libcxxShared = androidNdkPrebuilt.map {
+    it.file("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
+  }
 
   val buildNative =
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {

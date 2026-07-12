@@ -114,8 +114,16 @@ pub fn renderBackend(b: *std.Build, install_dir: std.Build.LazyPath) RenderBacke
 
 pub fn nativeTarget(b: *std.Build, install_dir: std.Build.LazyPath) std.Build.ResolvedTarget {
     const descriptor = installedArtifactDescriptor(b, install_dir);
-    const default_target = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
+    const artifact_query = std.Target.Query.parse(.{ .arch_os_abi = descriptor.zigTarget }) catch
         std.debug.panic("invalid Zig target in native artifact descriptor: {s}", .{descriptor.zigTarget});
+    const artifact_target = b.resolveTargetQuery(artifact_query);
+    const host_target = b.graph.host.result;
+    const default_target: std.Target.Query = if (artifact_target.result.cpu.arch == host_target.cpu.arch and
+        artifact_target.result.os.tag == host_target.os.tag and
+        artifact_target.result.abi == host_target.abi)
+        .{}
+    else
+        artifact_query;
     return b.standardTargetOptions(.{ .default_target = default_target });
 }
 

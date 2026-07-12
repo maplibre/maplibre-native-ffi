@@ -20,8 +20,18 @@
       "inherits": "_base",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
     },
-    { "name": "_linux-x64", "hidden": true, "inherits": "_single-config" },
-    { "name": "_linux-arm64", "hidden": true, "inherits": "_single-config" },
+    {
+      "name": "_linux-x64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "x64" }
+    },
+    {
+      "name": "_linux-arm64",
+      "hidden": true,
+      "inherits": "_single-config",
+      "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "arm64" }
+    },
     {
       "name": "_macos-arm64",
       "hidden": true,
@@ -45,7 +55,7 @@
       "name": "_android",
       "hidden": true,
       "inherits": "_single-config",
-      "toolchainFile": "$env{ANDROID_HOME}/ndk/28.2.13676358/build/cmake/android.toolchain.cmake",
+      "toolchainFile": "$env{ANDROID_HOME}/ndk/$env{MLN_FFI_ANDROID_NDK_VERSION}/build/cmake/android.toolchain.cmake",
       "cacheVariables": {
         "ANDROID_PLATFORM": "android-24",
         "ANDROID_STL": "c++_shared",

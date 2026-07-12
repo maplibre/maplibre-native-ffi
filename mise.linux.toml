@@ -30,6 +30,3 @@
 "dnf:vulkan-loader-devel" = "latest"
 "dnf:zlib-ng-compat-devel" = "latest"
 "dnf:zlib-ng-compat-static" = "latest"
-
-[vars]
-zig_host_args = "-Ddependency-library-dir={{ exec(command='pkg-config --variable=libdir vulkan') }}"

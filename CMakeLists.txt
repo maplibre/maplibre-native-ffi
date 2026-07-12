@@ -45,6 +45,7 @@ include(mln_target)
 include(mln_install)
 
 mln_configure_options()
+mln_validate_platform()
 mln_add_maplibre_native()
 mln_select_platform()
 mln_select_render_backend()

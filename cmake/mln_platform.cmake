@@ -1,3 +1,23 @@
+function(mln_validate_platform)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    return()
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+    set(MLN_FFI_DETECTED_ARCHITECTURE x64)
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(MLN_FFI_DETECTED_ARCHITECTURE arm64)
+  else()
+    message(
+      FATAL_ERROR "Unsupported Linux architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  if(NOT MLN_FFI_TARGET_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
+    message(
+      FATAL_ERROR
+        "Linux preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+  endif()
+endfunction()
+
 function(mln_select_platform)
   add_library(mln_ffi_platform_dependencies INTERFACE)
   add_library(MLN_FFI::PlatformDependencies ALIAS mln_ffi_platform_dependencies)

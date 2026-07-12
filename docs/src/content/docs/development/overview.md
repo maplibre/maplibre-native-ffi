@@ -36,8 +36,7 @@ Install the platform prerequisites:
 - On Windows, install Visual Studio Build Tools 2022 with the
   `Desktop development with C++` workload and C++ Clang tools component, Git for
   Windows, and the Vulkan SDK. We rely on Git Bash to run project scripts.
-- For Android, install the Android SDK packages pinned in
-  `gradle/libs.versions.toml`.
+- For Android, install the Android SDK packages pinned in `mise.toml`.
 - For OpenHarmony, install an API 24 SDK.
 
 Install [`mise`](https://mise.jdx.dev/), then bootstrap system packages, install
@@ -58,9 +57,10 @@ ANDROID_HOME = "/home/you/Android/Sdk"
 OHOS_SDK_NATIVE = "/home/you/HarmonyOS/command-line-tools/sdk/default/openharmony/native"
 ```
 
-Use the Android SDK package versions pinned in `gradle/libs.versions.toml`. Only
-define the Android variable when building Android targets and `OHOS_SDK_NATIVE`
-when building OpenHarmony targets. Mise loads `mise.local.toml` automatically.
+Use the Android SDK package versions pinned in `mise.toml`. Override them in
+`mise.local.toml` when testing another toolchain version. Only define the
+Android variable when building Android targets and `OHOS_SDK_NATIVE` when
+building OpenHarmony targets. Mise loads `mise.local.toml` automatically.
 
 The setup hooks install repository hooks, initialize the MapLibre Native
 submodule at `third_party/maplibre-native`, and refresh generated support data.
