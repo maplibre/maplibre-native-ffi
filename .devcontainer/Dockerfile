@@ -4,13 +4,10 @@ LABEL org.opencontainers.image.source="https://github.com/maplibre/maplibre-nati
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-# Project build dependencies come from the same Linux bootstrap config used by
-# contributors and CI. The remaining APT layer contains container-only utilities.
-RUN --mount=type=bind,source=mise.linux.toml,target=/tmp/mise/mise.toml,readonly \
-    MISE_TRUSTED_CONFIG_PATHS=/tmp/mise \
-    mise -C /tmp/mise bootstrap packages apply --manager apt --yes --update
-
-RUN apt-get install --no-install-recommends --yes \
+# Project build dependencies come from mise.linux.toml through the tools image.
+# This layer contains only container-specific utilities.
+RUN apt-get update \
+  && apt-get install --no-install-recommends --yes \
     ca-certificates \
     curl \
     git \
