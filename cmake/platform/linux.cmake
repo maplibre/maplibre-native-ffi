@@ -5,7 +5,7 @@ function(mln_configure_platform_dependencies target)
   find_library(MLN_FFI_ZLIB_LIBRARY NAMES z REQUIRED)
   find_library(MLN_FFI_LIBUV_LIBRARY NAMES uv REQUIRED)
   find_library(MLN_FFI_ZLIB_STATIC_LIBRARY NAMES libz.a REQUIRED)
-  find_library(MLN_FFI_LIBUV_STATIC_LIBRARY NAMES libuv.a REQUIRED)
+  find_library(MLN_FFI_LIBUV_STATIC_LIBRARY NAMES uv_a libuv.a REQUIRED)
 
   add_library(mln_ffi_zlib STATIC IMPORTED GLOBAL)
   set_target_properties(

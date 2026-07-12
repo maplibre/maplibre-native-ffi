@@ -2,7 +2,6 @@
 host_native_preset = "macos-arm64-metal"
 
 [bootstrap.packages]
-"brew:cmake" = "latest"
 "brew:docker-buildx" = "latest"
 "brew:glslang" = "latest"
 "brew:molten-vk" = "latest"

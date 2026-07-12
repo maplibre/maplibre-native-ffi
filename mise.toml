@@ -19,7 +19,7 @@ experimental = true
 windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
 windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "bash -e -lc"
+unix_default_inline_shell_args = "bash -e -c"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -35,6 +35,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "github:sargunv/jvl" = "2026.05.03" # JSON validator
 "aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
+"aqua:Kitware/CMake" = { version = "4.3.3", os = ["linux", "macos"] }
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
 
 # Node.js ecosystem

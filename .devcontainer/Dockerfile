@@ -31,3 +31,8 @@ RUN mkdir -p /mise/migrations \
   && chown -R dev:dev /mise
 
 USER dev
+
+# Rustup stores toolchains outside MISE_DATA_DIR. The OCI tool layer is built
+# as root, so let the runtime user materialize its own writable toolchain.
+ENV CARGO_HOME=/home/dev/.cargo \
+  RUSTUP_HOME=/home/dev/.rustup

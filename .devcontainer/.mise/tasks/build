@@ -22,7 +22,7 @@ rm -rf mise-oci
 if [[ "$(uname -s)" == "Linux" ]]; then
   MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks install --quiet
   # OCI packages only portable mise tools; the Dockerfile applies the APT subset.
-  MISE_IGNORED_CONFIG_PATHS="$PWD/../mise.linux.toml" \
+  MISE_IGNORED_CONFIG_PATHS="$MISE_MONOREPO_ROOT/mise.linux.toml:$MISE_MONOREPO_ROOT/mise.local.toml" \
     MISE_JOBS=1 MISE_ENV="$mise_env" \
     mise --no-hooks oci build --output mise-oci
 else
@@ -41,7 +41,7 @@ else
       /root/.local/bin/mise trust -y
       cd .devcontainer
       /root/.local/bin/mise --no-hooks install --quiet
-      MISE_IGNORED_CONFIG_PATHS=/src/mise.linux.toml \
+      MISE_IGNORED_CONFIG_PATHS=/src/mise.linux.toml:/src/mise.local.toml \
         /root/.local/bin/mise --no-hooks oci build --output mise-oci
     '
 fi
