@@ -17,7 +17,8 @@ RUN apt-get update \
     sudo \
   && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --uid 1000 --shell /bin/bash dev \
+RUN groupmod --new-name dev ubuntu \
+  && usermod --login dev --home /home/dev --move-home --shell /bin/bash ubuntu \
   && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
   && chmod 0440 /etc/sudoers.d/dev
 

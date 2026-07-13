@@ -50,13 +50,13 @@ function(mln_configure_platform_dependencies target)
       ${target}
       PROPERTIES
         MLN_FFI_ZIG_TARGET aarch64-linux-gnu MLN_FFI_ZIG_TEST_TARGET
-        aarch64-linux-gnu.2.36)
+        aarch64-linux-gnu.2.39)
   else()
     set_target_properties(
       ${target}
       PROPERTIES
         MLN_FFI_ZIG_TARGET x86_64-linux-gnu MLN_FFI_ZIG_TEST_TARGET
-        x86_64-linux-gnu.2.36)
+        x86_64-linux-gnu.2.39)
   endif()
 endfunction()
 

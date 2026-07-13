@@ -26,10 +26,10 @@ docker run --rm \
   --env MISE_ENV="$mise_env" \
   --env OUTPUT_GID="$(id -g)" \
   --env OUTPUT_UID="$(id -u)" \
-  debian:bookworm-slim \
+  ubuntu:24.04 \
   bash -euo pipefail -c '
     apt-get update
-    apt-get install --no-install-recommends --yes ca-certificates curl git libicu72
+    apt-get install --no-install-recommends --yes ca-certificates curl git libicu74
     curl https://mise.run | sh
     /root/.local/bin/mise trust -y
     cd .devcontainer
@@ -51,7 +51,15 @@ if command -v docker-buildx >/dev/null 2>&1; then
   buildx=(docker-buildx)
 fi
 
+builder="maplibre-native-ffi-$$"
+"${buildx[@]}" create --name "$builder" --driver docker-container >/dev/null
+cleanup_builder() {
+  "${buildx[@]}" rm "$builder" >/dev/null 2>&1 || true
+}
+trap cleanup_builder EXIT
+
 "${buildx[@]}" build \
+  --builder "$builder" \
   --platform "$platform" \
   --file Dockerfile \
   --build-context "tools=oci-layout://$PWD/mise-oci" \

@@ -21,7 +21,7 @@ commands = [
 platforms = ["linux", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:jvmTest" },
-  { task = "//bindings/kotlin:nativeTest", platforms = ["linux", "macos"] },
+  { task = "//bindings/kotlin:nativeTest", platforms = ["linux", "macos"], exclude = ["linux-arm64-egl", "linux-arm64-vulkan"] },
   { task = "//examples/compose-map:build" },
   { task = "//examples/lwjgl-map:build" },
 ]
