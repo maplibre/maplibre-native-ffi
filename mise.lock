@@ -20,6 +20,26 @@ checksum = "sha256:1473451cd282b48d24515795a595801c9b65b567fe399d7e12d50b2d6cdb0
 url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libstdcxx-15.2.0-hef695bb_19.conda"
 checksum = "sha256:1dadc45e599f510dd5f97141dddcdbb9844d9f1430c1f3a38075cf1c58f87b4e"
 
+[conda-packages.linux-x64."_openmp_mutex-4.5-20_gnu"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda"
+checksum = "sha256:1dd3fffd892081df9726d7eb7e0dea6198962ba775bd88842135a4ddb4deb3c9"
+
+[conda-packages.linux-x64."libgcc-15.2.0-he0feb66_19"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-he0feb66_19.conda"
+checksum = "sha256:8e0a3b5e41272e5678499b5dfc4cddb673f9e935de01eb0767ce857001229f46"
+
+[conda-packages.linux-x64."libgomp-15.2.0-he0feb66_19"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_19.conda"
+checksum = "sha256:5abe4ab9d93f6c9757d654f1969ae2267d4505315c1f2f8fe705fd60af084f1b"
+
+[conda-packages.linux-x64."libiconv-1.18-h3b78370_2"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libiconv-1.18-h3b78370_2.conda"
+checksum = "sha256:c467851a7312765447155e071752d7bf9bf44d610a5687e32706f480aad2833f"
+
+[conda-packages.linux-x64."libstdcxx-15.2.0-h934c35e_19"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_19.conda"
+checksum = "sha256:dff1058c76ec6b8759e41cefa2508162d00e4a5e6721aa68ec3fd10094e702dc"
+
 [conda-packages.macos-arm64."libcxx-22.1.8-h55c6f16_0"]
 url = "https://conda.anaconda.org/conda-forge/osx-arm64/libcxx-22.1.8-h55c6f16_0.conda"
 checksum = "sha256:a2e7abab5add9750fab064c024394de48e49f97631c605ad5db5c8ac3fc769ef"
@@ -393,6 +413,13 @@ conda_deps = [
 [tools."conda:doxygen"."platforms.linux-x64"]
 checksum = "sha256:349c4c872357b4a533e127b2ade8533796e8e062abc2cd685756a1a063ae1e35"
 url = "https://conda.anaconda.org/conda-forge/linux-64/doxygen-1.13.2-h8e693c7_0.conda"
+conda_deps = [
+    "libgcc-15.2.0-he0feb66_19",
+    "libstdcxx-15.2.0-h934c35e_19",
+    "libiconv-1.18-h3b78370_2",
+    "_openmp_mutex-4.5-20_gnu",
+    "libgomp-15.2.0-he0feb66_19",
+]
 
 [tools."conda:doxygen"."platforms.macos-arm64"]
 checksum = "sha256:2327ad4e6214accc1e71aea371aee9b9fed864ec36c20f829fd1cb71d4c85202"

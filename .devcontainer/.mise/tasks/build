@@ -17,35 +17,29 @@ case "$host_arch" in
   *) echo "unsupported host architecture: $host_arch" >&2; exit 1 ;;
 esac
 
-rm -rf mise-oci
-
-if [[ "$(uname -s)" == "Linux" ]]; then
-  MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks install --quiet
-  MISE_IGNORED_CONFIG_PATHS="$MISE_MONOREPO_ROOT/mise.local.toml" \
-    MISE_JOBS=1 MISE_ENV="$mise_env" \
-    MISE_SYSTEM_PACKAGES_MANAGERS=apt \
-    mise --no-hooks oci build --output mise-oci
-else
-  docker run --rm \
-    --platform "$platform" \
-    --volume "$PWD/..:/src" \
-    --workdir /src \
-    --env MISE_EXPERIMENTAL=1 \
-    --env MISE_JOBS=1 \
-    --env MISE_ENV="$mise_env" \
-    debian:bookworm-slim \
-    bash -euo pipefail -c '
-      apt-get update
-      apt-get install --no-install-recommends --yes ca-certificates curl git libicu72
-      curl https://mise.run | sh
-      /root/.local/bin/mise trust -y
-      cd .devcontainer
-      /root/.local/bin/mise --no-hooks install --quiet
-      MISE_IGNORED_CONFIG_PATHS=/src/mise.local.toml \
-        MISE_SYSTEM_PACKAGES_MANAGERS=apt \
-        /root/.local/bin/mise --no-hooks oci build --output mise-oci
-    '
-fi
+docker run --rm \
+  --platform "$platform" \
+  --volume "$PWD/..:/src" \
+  --workdir /src \
+  --env MISE_EXPERIMENTAL=1 \
+  --env MISE_JOBS=1 \
+  --env MISE_ENV="$mise_env" \
+  --env OUTPUT_GID="$(id -g)" \
+  --env OUTPUT_UID="$(id -u)" \
+  debian:bookworm-slim \
+  bash -euo pipefail -c '
+    apt-get update
+    apt-get install --no-install-recommends --yes ca-certificates curl git libicu72
+    curl https://mise.run | sh
+    /root/.local/bin/mise trust -y
+    cd .devcontainer
+    rm -rf mise-oci
+    /root/.local/bin/mise --no-hooks install --quiet
+    MISE_IGNORED_CONFIG_PATHS=/src/mise.local.toml \
+      MISE_SYSTEM_PACKAGES_MANAGERS=apt \
+      /root/.local/bin/mise --no-hooks oci build --output mise-oci
+    chown -R "$OUTPUT_UID:$OUTPUT_GID" mise-oci
+  '
 
 output_arg="--load"
 if [[ "${usage_push:-false}" == "true" ]]; then
