@@ -44,7 +44,9 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_PKG_CONFIG_LIBS
       -ldl
       MLN_FFI_TEST_SUPPORTED
-      TRUE)
+      TRUE
+      MLN_FFI_ZIG_TEST_TARGET
+      native)
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     set_property(TARGET ${target} PROPERTY MLN_FFI_ZIG_TARGET aarch64-linux-gnu)
   else()

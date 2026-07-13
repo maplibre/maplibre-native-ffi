@@ -5,7 +5,11 @@ function(mln_add_c_api_test)
     return()
   endif()
   get_target_property(zig_target mln_ffi_platform_dependencies
-                      MLN_FFI_ZIG_TARGET)
+                      MLN_FFI_ZIG_TEST_TARGET)
+  if(NOT zig_target)
+    get_target_property(zig_target mln_ffi_platform_dependencies
+                        MLN_FFI_ZIG_TARGET)
+  endif()
 
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
                       MLN_FFI_INCLUDE_DIRS)
