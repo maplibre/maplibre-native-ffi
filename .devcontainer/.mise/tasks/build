@@ -29,12 +29,14 @@ docker run --rm \
   ubuntu:24.04 \
   bash -euo pipefail -c '
     apt-get update
-    apt-get install --no-install-recommends --yes ca-certificates curl git libicu74
+    apt-get install --no-install-recommends --yes ca-certificates curl git
     curl https://mise.run | sh
     /root/.local/bin/mise trust -y
     cd .devcontainer
     rm -rf mise-oci
-    /root/.local/bin/mise --no-hooks install --quiet
+    MISE_IGNORED_CONFIG_PATHS=/src/mise.local.toml \
+      MISE_SYSTEM_PACKAGES_MANAGERS=apt \
+      /root/.local/bin/mise --no-hooks bootstrap --yes
     MISE_IGNORED_CONFIG_PATHS=/src/mise.local.toml \
       MISE_SYSTEM_PACKAGES_MANAGERS=apt \
       /root/.local/bin/mise --no-hooks oci build --output mise-oci
