@@ -119,7 +119,12 @@ run = 'cpack --preset "$usage_preset"'
 description = "Build and run C API tests for a CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = 'ctest --preset "$usage_preset"'
+run = '''
+if [[ "$usage_preset" == ios-simulator-* ]]; then
+  mise run //:ios-simulator:boot
+fi
+ctest --preset "$usage_preset"
+'''
 
 [tasks.check]
 depends = ["//docs:install"]

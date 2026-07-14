@@ -15,17 +15,11 @@ fi
 
 device=$(
   xcrun simctl list devices available iOS |
-    awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }'
+    awk -F '[()]' '/ iPhone / && /Booted/ { print $2; exit }'
 )
 if [[ -z "$device" ]]; then
-  echo "No available iOS simulator device found." >&2
+  echo "No booted iOS simulator device found. Run 'mise run //:ios-simulator:boot' first." >&2
   exit 2
-fi
-
-state=$(xcrun simctl list devices "$device" | awk -F '[()]' -v id="$device" '$0 ~ id { print $4; exit }')
-if [[ "$state" != "Booted" ]]; then
-  xcrun simctl boot "$device" >/dev/null 2>&1 || true
-  xcrun simctl bootstatus "$device" -b
 fi
 
 if [[ ! "$timeout_seconds" =~ ^[0-9]+$ ]]; then

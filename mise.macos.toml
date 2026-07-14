@@ -13,3 +13,15 @@ host_native_preset = "macos-arm64-metal"
 JDK_JAVA_OPTIONS = "-Djava.library.path=/opt/homebrew/opt/vulkan-loader/lib -Dorg.lwjgl.vulkan.libname=libvulkan.1.dylib"
 MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
 VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
+
+[tasks."ios-simulator:boot"]
+description = "Boot an available iPhone simulator and wait until it is ready."
+run = '''
+device=$(xcrun simctl list devices available iOS | awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }')
+[[ -n "$device" ]] || { echo "No available iOS simulator device found." >&2; exit 2; }
+state=$(xcrun simctl list devices "$device" | awk -F '[()]' -v id="$device" '$0 ~ id { print $4; exit }')
+if [[ "$state" != "Booted" ]]; then
+  xcrun simctl boot "$device"
+  xcrun simctl bootstatus "$device" -b
+fi
+'''
