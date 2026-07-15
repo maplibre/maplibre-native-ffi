@@ -273,7 +273,7 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
 }
 
 fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, dependency_library_dirs: []const std.Build.LazyPath) void {
-    if (!target.query.isNative() or dependency_library_dirs.len != 0) return;
+    if (dependency_library_dirs.len != 0) return;
     if (target.result.os.tag != .windows and target.result.os.tag != .macos) return;
     const sdk = b.graph.environ_map.get("VULKAN_SDK") orelse
         if (target.result.os.tag == .windows)
