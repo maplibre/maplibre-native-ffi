@@ -22,12 +22,10 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
-// PRUNING REVIEW: MIXED.
-// Keep null inputs, undersized options, preinitialized outputs, and null destroy calls hidden by safe bindings.
-// Prune generic diagnostic-presence assertions because dedicated diagnostic tests own that contract.
+// PRUNING REVIEW: KEEP.
+// This verifies null inputs, undersized options, preinitialized outputs, and null destroy calls hidden by safe bindings.
 test "runtime rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_create(null, null));
-    try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
 
     var small_options = c.mln_runtime_options_default();
     small_options.size = @sizeOf(c.mln_runtime_options) - 1;
@@ -40,7 +38,6 @@ test "runtime rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_create(&options, &runtime));
 
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_destroy(null));
-    try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
 }
 
 // PRUNING REVIEW: KEEP.
@@ -123,8 +120,8 @@ test "map lifecycle rejects invalid state and stale handles" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_destroy(runtime));
 }
 
-// PRUNING REVIEW: MIXED.
-// Keep null C-string validation hidden by binding strings; prune diagnostic-presence assertions covered below.
+// PRUNING REVIEW: KEEP.
+// This verifies null C-string validation hidden by binding strings.
 test "style functions reject null inputs" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -133,10 +130,7 @@ test "style functions reject null inputs" {
     defer support.destroyMap(map);
 
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_style_json(map, null));
-    try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
-
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_style_url(map, null));
-    try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
 }
 
 // PRUNING REVIEW: KEEP.

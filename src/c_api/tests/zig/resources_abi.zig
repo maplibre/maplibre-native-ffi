@@ -6,20 +6,6 @@ const support = @import("support.zig");
 const c = support.c;
 
 const offline_style_url = "http://example.com/offline-style.json";
-const transform_style_json =
-    \\{
-    \\  "version": 8,
-    \\  "name": "zig-transform-style-abi-test",
-    \\  "sources": {},
-    \\  "layers": []
-    \\}
-;
-
-const HttpServerState = struct {
-    server: *std.Io.net.Server,
-    served: bool = false,
-    err: ?anyerror = null,
-};
 
 fn sleepOneMillisecond() !void {
     try testing.io.sleep(.fromMilliseconds(1), .awake);
@@ -40,26 +26,7 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
-fn waitForMapEventAttempts(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32, attempts: usize) !bool {
-    for (0..attempts) |_| {
-        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
-        while (true) {
-            var event = emptyEvent();
-            var has_event = false;
-            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
-            if (!has_event) break;
-            if (event.type == event_type and event.source_type == c.MLN_RUNTIME_EVENT_SOURCE_MAP and event.source == @as(?*anyopaque, @ptrCast(map))) return true;
-        }
-        try sleepOneMillisecond();
-    }
-    return false;
-}
-
-fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !bool {
-    return waitForMapEventAttempts(runtime, map, event_type, 1000);
-}
-
-fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_operation_id) !c.mln_runtime_event_offline_operation_completed {
+fn waitForOfflineOperationCompletion(runtime: *c.mln_runtime, operation_id: c.mln_offline_operation_id) !void {
     for (0..5000) |_| {
         try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
         while (true) {
@@ -69,7 +36,7 @@ fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_
             if (!has_event) break;
             if (event.type != c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED or event.payload_type != c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED) continue;
             const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
-            if (payload.operation_id == operation_id) return payload.*;
+            if (payload.operation_id == operation_id) return;
         }
         try sleepOneMillisecond();
     }
@@ -138,55 +105,6 @@ fn resourceTransformStub(_: ?*anyopaque, _: u32, _: [*c]const u8, out_response: 
     if (out_response == null) return c.MLN_STATUS_INVALID_ARGUMENT;
     out_response.*.url = null;
     return c.MLN_STATUS_OK;
-}
-
-const TransformCopyState = struct {
-    replacement_url: []const u8,
-    transform_calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
-};
-
-fn resourceTransformWithTemporaryReplacement(
-    user_data: ?*anyopaque,
-    _: u32,
-    _: [*c]const u8,
-    out_response: [*c]c.mln_resource_transform_response,
-) callconv(.c) c.mln_status {
-    const state: *TransformCopyState = @ptrCast(@alignCast(user_data.?));
-    _ = state.transform_calls.fetchAdd(1, .seq_cst);
-    var scratch: [128]u8 = undefined;
-    if (state.replacement_url.len > scratch.len) return c.MLN_STATUS_INVALID_ARGUMENT;
-    @memcpy(scratch[0..state.replacement_url.len], state.replacement_url);
-    const status = c.mln_resource_transform_response_set_url(out_response, scratch[0..state.replacement_url.len].ptr, state.replacement_url.len);
-    @memset(scratch[0..state.replacement_url.len], 'x');
-    return status;
-}
-
-fn serveOneHttpStyleInner(state: *HttpServerState) !void {
-    var stream = try state.server.accept(testing.io);
-    defer stream.close(testing.io);
-
-    var request_buffer: [1024]u8 = undefined;
-    var reader = stream.reader(testing.io, &request_buffer);
-    _ = try reader.interface.discardDelimiterInclusive('\n');
-
-    var header_buffer: [256]u8 = undefined;
-    const header = try std.fmt.bufPrint(
-        &header_buffer,
-        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
-        .{transform_style_json.len},
-    );
-    var response_buffer: [1024]u8 = undefined;
-    var writer = stream.writer(testing.io, &response_buffer);
-    try writer.interface.writeAll(header);
-    try writer.interface.writeAll(transform_style_json);
-    try writer.interface.flush();
-    state.served = true;
-}
-
-fn serveOneHttpStyle(state: *HttpServerState) void {
-    serveOneHttpStyleInner(state) catch |err| {
-        state.err = err;
-    };
 }
 
 // PRUNING REVIEW: KEEP.
@@ -274,10 +192,9 @@ test "offline database merge rejects raw null path" {
     try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
-// PRUNING REVIEW: MIXED.
-// Keep wrong-result-kind rejection because typed binding operation variants prevent requesting a mismatched result.
-// Prune successful operation, event payload, and snapshot conversion coverage because binding suites own those workflows.
-test "offline operations complete through runtime events and typed take results" {
+// PRUNING REVIEW: KEEP.
+// This verifies wrong-result-kind rejection because typed binding operation variants prevent requesting a mismatched result.
+test "offline take rejects mismatched result kind" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
 
@@ -287,116 +204,12 @@ test "offline operations complete through runtime events and typed take results"
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &create_id));
     try testing.expect(create_id != 0);
 
-    const create_payload = try waitForOfflineOperation(runtime, create_id);
-    try testing.expectEqual(create_id, create_payload.operation_id);
-    try testing.expectEqual(c.MLN_OFFLINE_OPERATION_REGION_CREATE, create_payload.operation_kind);
-    try testing.expectEqual(c.MLN_OFFLINE_OPERATION_RESULT_REGION, create_payload.result_kind);
-    try testing.expectEqual(@as(i32, c.MLN_STATUS_OK), create_payload.result_status);
+    try waitForOfflineOperationCompletion(runtime, create_id);
 
     var wrong_list: ?*c.mln_offline_region_list = null;
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_runtime_offline_regions_list_take_result(runtime, create_id, &wrong_list));
     try testing.expectEqual(@as(?*c.mln_offline_region_list, null), wrong_list);
-
-    var snapshot: ?*c.mln_offline_region_snapshot = null;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_take_result(runtime, create_id, &snapshot));
-    const snapshot_handle = snapshot orelse return error.MissingSnapshot;
-    defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
-
-    var info: c.mln_offline_region_info = undefined;
-    info.size = @sizeOf(c.mln_offline_region_info);
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_offline_region_snapshot_get(snapshot_handle, &info));
-    try testing.expect(info.id > 0);
-    try testing.expectEqualSlices(u8, metadata[0..], info.metadata[0..info.metadata_size]);
-}
-
-// PRUNING REVIEW: PRUNE.
-// Queued-event erasure after take is an undocumented implementation detail, not a promised C operation contract.
-test "offline take result before polling removes queued completion event" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const metadata = [_]u8{ 4, 5, 6 };
-    var definition = offlineTileDefinition();
-    var create_id: c.mln_offline_operation_id = 0;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &create_id));
-    try testing.expect(create_id != 0);
-
-    var snapshot: ?*c.mln_offline_region_snapshot = null;
-    var took_result = false;
-    for (0..5000) |_| {
-        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
-        const take_status = c.mln_runtime_offline_region_create_take_result(runtime, create_id, &snapshot);
-        if (take_status == c.MLN_STATUS_OK) {
-            took_result = true;
-            break;
-        }
-        try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, take_status);
-        try sleepOneMillisecond();
-    }
-    try testing.expect(took_result);
-    const snapshot_handle = snapshot orelse return error.MissingSnapshot;
-    defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
-
-    while (true) {
-        var event = emptyEvent();
-        var has_event = false;
-        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
-        if (!has_event) break;
-        if (event.type != c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED or event.payload_type != c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED) continue;
-        const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
-        try testing.expect(payload.operation_id != create_id);
-    }
-}
-
-// PRUNING REVIEW: PRUNE.
-// Go and Swift callback-adapter tests already invoke the C helper outside callback context and require INVALID_STATE.
-test "resource transform response helper is callback scoped" {
-    var response = c.mln_resource_transform_response{ .size = @sizeOf(c.mln_resource_transform_response), .url = null, .context = null };
-    const url = "https://example.test/style.json";
-
-    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_resource_transform_response_set_url(&response, url, url.len));
-    try testing.expect(response.url == null);
-}
-
-// PRUNING REVIEW: PRUNE.
-// Binding transform tests return temporary host strings and observe the rewritten request after callback return.
-test "resource transform helper copies temporary replacement URL through native load" {
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE));
-    defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE)) catch @panic("network status restore failed");
-
-    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
-    var server = try address.listen(testing.io, .{ .reuse_address = true });
-    var server_state = HttpServerState{ .server = &server };
-    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
-    var server_thread_joined = false;
-    defer {
-        server.deinit(testing.io);
-        if (!server_thread_joined) server_thread.join();
-    }
-    const replacement_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
-    defer testing.allocator.free(replacement_url);
-
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    var state = TransformCopyState{ .replacement_url = replacement_url };
-    var transform = c.mln_resource_transform{
-        .size = @sizeOf(c.mln_resource_transform),
-        .callback = resourceTransformWithTemporaryReplacement,
-        .user_data = &state,
-    };
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_url(map, "http://original.invalid/style.json"));
-    try testing.expect(try waitForMapEventAttempts(runtime, map, c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, 5000));
-    server_thread.join();
-    server_thread_joined = true;
-    try testing.expect(server_state.served);
-    try testing.expectEqual(@as(?anyerror, null), server_state.err);
-    try testing.expect(state.transform_calls.load(.seq_cst) > 0);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_operation_discard(runtime, create_id));
 }
 
 // PRUNING REVIEW: KEEP.
@@ -412,22 +225,6 @@ test "resource transform rejects raw invalid descriptors" {
     transform.size = @sizeOf(c.mln_resource_transform);
     transform.callback = null;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_set_resource_transform(runtime, &transform));
-}
-
-// PRUNING REVIEW: PRUNE.
-// Successful transform replacement and clearing are public semantic workflows already covered by binding suites.
-test "resource transform updates and clears after map creation" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    var transform = c.mln_resource_transform{ .size = @sizeOf(c.mln_resource_transform), .callback = resourceTransformStub, .user_data = null };
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_clear_resource_transform(runtime));
 }
 
 // PRUNING REVIEW: KEEP.

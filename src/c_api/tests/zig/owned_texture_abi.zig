@@ -1,39 +1,8 @@
-// Raw C ABI coverage: owned texture null/out-pointer and undersized descriptor validation are hidden by public Zig descriptors.
+// Raw C ABI coverage: render-session null and stale handles are hidden by public Zig handle state.
 
-const std = @import("std");
-const testing = std.testing;
+const testing = @import("std").testing;
 const support = @import("support.zig");
 const c = support.c;
-
-// PRUNING REVIEW: PRUNE.
-// Backend-specific owned-texture tests cover the same raw pointers, output handle, and nested sizes without this alias.
-test "owned texture attach rejects invalid arguments" {
-    var texture: ?*c.mln_render_session = null;
-    var descriptor = support.defaultOwnedTextureDescriptor();
-
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(null, &descriptor, &texture));
-    try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
-
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, null, &texture));
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, &descriptor, null));
-
-    texture = @ptrFromInt(1);
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, &descriptor, &texture));
-
-    texture = null;
-    var small_descriptor = descriptor;
-    small_descriptor.size = @sizeOf(support.OwnedTextureDescriptor) - 1;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, &small_descriptor, &texture));
-
-    var invalid_descriptor = descriptor;
-    invalid_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, &invalid_descriptor, &texture));
-}
 
 // PRUNING REVIEW: KEEP.
 // This verifies maintenance entry points reject null session handles that bindings prevent.
