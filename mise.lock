@@ -473,6 +473,35 @@ checksum = "sha256:adf29d4f9ff98b21492590d8887689093ea521792dbbbe80e032eb6ec3714
 url = "https://github.com/sargunv/jvl/releases/download/v2026.05.03/jvl-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/sargunv/jvl/releases/assets/411400578"
 
+[[tools."github:xtool-org/xtool"]]
+version = "1.17.0"
+backend = "github:xtool-org/xtool"
+
+[tools."github:xtool-org/xtool"."platforms.linux-arm64"]
+checksum = "sha256:9a8c47f7b2ee9b452bccee7ce723c0fc8746ac50d4a525a36da0358486bc375e"
+url = "https://github.com/xtool-org/xtool/releases/download/1.17.0/xtool-aarch64.AppImage"
+url_api = "https://api.github.com/repos/xtool-org/xtool/releases/assets/422189847"
+
+[tools."github:xtool-org/xtool"."platforms.linux-x64"]
+checksum = "sha256:7566d62b829a4deadb01b5389c94f45763d851f204c5d22fa36e9f9d1c88d57b"
+url = "https://github.com/xtool-org/xtool/releases/download/1.17.0/xtool-x86_64.AppImage"
+url_api = "https://api.github.com/repos/xtool-org/xtool/releases/assets/422189849"
+
+[tools."github:xtool-org/xtool"."platforms.macos-arm64"]
+checksum = "sha256:9a8c47f7b2ee9b452bccee7ce723c0fc8746ac50d4a525a36da0358486bc375e"
+url = "https://github.com/xtool-org/xtool/releases/download/1.17.0/xtool-aarch64.AppImage"
+url_api = "https://api.github.com/repos/xtool-org/xtool/releases/assets/422189847"
+
+[tools."github:xtool-org/xtool"."platforms.windows-arm64"]
+checksum = "sha256:9a8c47f7b2ee9b452bccee7ce723c0fc8746ac50d4a525a36da0358486bc375e"
+url = "https://github.com/xtool-org/xtool/releases/download/1.17.0/xtool-aarch64.AppImage"
+url_api = "https://api.github.com/repos/xtool-org/xtool/releases/assets/422189847"
+
+[tools."github:xtool-org/xtool"."platforms.windows-x64"]
+checksum = "sha256:7566d62b829a4deadb01b5389c94f45763d851f204c5d22fa36e9f9d1c88d57b"
+url = "https://github.com/xtool-org/xtool/releases/download/1.17.0/xtool-x86_64.AppImage"
+url_api = "https://api.github.com/repos/xtool-org/xtool/releases/assets/422189849"
+
 [[tools.go]]
 version = "1.26.3"
 backend = "core:go"

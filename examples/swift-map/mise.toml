@@ -34,24 +34,40 @@ run = [{ task = "run", args = ["native-surface"] }]
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
-sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  swift build \
-    --product swift-map-ios \
-    --scratch-path .build/ios-simulator \
-    --sdk "$sdk" \
-    --triple arm64-apple-ios14.3-simulator
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+swift build \
+  --product swift-map-ios \
+  --scratch-path .build/ios-simulator \
+  {{ "--swift-sdk arm64-apple-ios-simulator" if os() == "linux" else "--sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" }} \
+  --triple arm64-apple-ios14.3-simulator
 '''
 
 [tasks."build:ios"]
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
-sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
-PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
-  swift build \
-    --product swift-map-ios \
-    --scratch-path .build/ios \
-    --sdk "$sdk" \
-    --triple arm64-apple-ios14.3
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+{% if os() == "linux" %}
+MLN_FFI_XTOOL_BUILD=1 xtool.AppImage dev build
+{% elif os() == "macos" %}
+swift build \
+  --product swift-map-ios \
+  --scratch-path .build/ios \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --triple arm64-apple-ios14.3
+{% endif %}
+'''
+
+[tasks."run:ios"]
+depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
+run = '''
+{% if os() == "linux" %}
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export MLN_FFI_XTOOL_BUILD=1
+exec xtool.AppImage dev run --usb
+{% else %}
+echo "run:ios is currently implemented by xtool on Linux" >&2
+exit 1
+{% endif %}
 '''

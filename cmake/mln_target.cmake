@@ -66,25 +66,14 @@ function(mln_configure_complete_static_archive target)
   elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "apple")
     get_target_property(MLN_FFI_ARCHIVE_TOOL mln_ffi_platform_dependencies
                         MLN_FFI_ARCHIVE_TOOL)
-    get_target_property(
-      MLN_FFI_RELOCATABLE_LINK_OPTIONS mln_ffi_platform_dependencies
-      MLN_FFI_RELOCATABLE_LINK_OPTIONS)
     add_custom_command(
       OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
       COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
       COMMAND
         "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
       COMMAND
-        "${CMAKE_LINKER}"
-        -r
-        ${MLN_FFI_RELOCATABLE_LINK_OPTIONS}
-        -o
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
-        -all_load
-        ${MLN_FFI_INPUT_ARCHIVES}
-      COMMAND
         "${MLN_FFI_ARCHIVE_TOOL}" -static -o
-        "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" ${MLN_FFI_INPUT_ARCHIVES}
       DEPENDS ${MLN_FFI_INPUT_TARGETS}
       VERBATIM)
   elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "elf")
