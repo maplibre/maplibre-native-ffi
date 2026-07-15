@@ -116,6 +116,7 @@ runs:
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
+          "C:\Program Files\LLVM\bin",
           "C:\Program Files\Git\bin",
           "C:\Program Files\Git\usr\bin",
           "$env:SystemRoot\System32",
@@ -127,6 +128,9 @@ runs:
         ) | Where-Object { $_ -and (Test-Path $_) }
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
+        if (Test-Path "C:\Program Files\LLVM\bin\libclang.dll") {
+          "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+        }
 
         $gradleTemp = $env:RUNNER_TEMP -replace '\\', '/'
         $gradleOptions = "-Djava.io.tmpdir=$gradleTemp"
@@ -134,13 +138,6 @@ runs:
           $gradleOptions = "$gradleOptions $env:GRADLE_OPTS"
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
-
-    - name: Install Windows ARM64 LLVM
-      if: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' }}
-      shell: pwsh
-      run: |
-        winget install --exact --id LLVM.LLVM --accept-package-agreements --accept-source-agreements --disable-interactivity
-        "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
 
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
