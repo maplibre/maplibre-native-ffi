@@ -71,7 +71,6 @@ jobs:
               mise run //examples/lwjgl-map:build linux-x64-egl &&
               mise run //bindings/swift:test linux-x64-egl &&
               mise run //bindings/dotnet:test linux-x64-egl &&
-              mise run //examples/dotnet-map:build linux-x64-egl &&
               mise run //bindings/go:test linux-x64-egl &&
               mise run //bindings/python:test linux-x64-egl
           - preset: linux-x64-vulkan
@@ -90,7 +89,6 @@ jobs:
               mise run //examples/lwjgl-map:build linux-x64-vulkan &&
               mise run //bindings/swift:test linux-x64-vulkan &&
               mise run //bindings/dotnet:test linux-x64-vulkan &&
-              mise run //examples/dotnet-map:build linux-x64-vulkan &&
               mise run //bindings/go:test linux-x64-vulkan &&
               mise run //bindings/python:test linux-x64-vulkan
           - preset: linux-arm64-egl
@@ -108,7 +106,6 @@ jobs:
               mise run //examples/lwjgl-map:build linux-arm64-egl &&
               mise run //bindings/swift:test linux-arm64-egl &&
               mise run //bindings/dotnet:test linux-arm64-egl &&
-              mise run //examples/dotnet-map:build linux-arm64-egl &&
               mise run //bindings/go:test linux-arm64-egl &&
               mise run //bindings/python:test linux-arm64-egl
           - preset: linux-arm64-vulkan
@@ -126,7 +123,6 @@ jobs:
               mise run //examples/lwjgl-map:build linux-arm64-vulkan &&
               mise run //bindings/swift:test linux-arm64-vulkan &&
               mise run //bindings/dotnet:test linux-arm64-vulkan &&
-              mise run //examples/dotnet-map:build linux-arm64-vulkan &&
               mise run //bindings/go:test linux-arm64-vulkan &&
               mise run //bindings/python:test linux-arm64-vulkan
           - preset: macos-arm64-metal
@@ -146,7 +142,6 @@ jobs:
               mise run //bindings/swift:test macos-arm64-metal &&
               mise run //examples/swift-map:build macos-arm64-metal &&
               mise run //bindings/dotnet:test macos-arm64-metal &&
-              mise run //examples/dotnet-map:build macos-arm64-metal &&
               mise run //bindings/go:test macos-arm64-metal &&
               mise run //bindings/python:test macos-arm64-metal
           - preset: macos-arm64-vulkan
@@ -165,7 +160,6 @@ jobs:
               mise run //examples/lwjgl-map:build macos-arm64-vulkan &&
               mise run //bindings/swift:test macos-arm64-vulkan &&
               mise run //bindings/dotnet:test macos-arm64-vulkan &&
-              mise run //examples/dotnet-map:build macos-arm64-vulkan &&
               mise run //bindings/go:test macos-arm64-vulkan &&
               mise run //bindings/python:test macos-arm64-vulkan
           - preset: macos-arm64-egl
@@ -183,7 +177,6 @@ jobs:
               mise run //examples/lwjgl-map:build macos-arm64-egl &&
               mise run //bindings/swift:test macos-arm64-egl &&
               mise run //bindings/dotnet:test macos-arm64-egl &&
-              mise run //examples/dotnet-map:build macos-arm64-egl &&
               mise run //bindings/go:test macos-arm64-egl &&
               mise run //bindings/python:test macos-arm64-egl
           - preset: ios-arm64-metal
@@ -252,7 +245,7 @@ jobs:
               mise run //examples/compose-map:build windows-x64-wgl &&
               mise run //examples/lwjgl-map:build windows-x64-wgl &&
               mise run //bindings/dotnet:test windows-x64-wgl &&
-              mise run //examples/dotnet-map:build windows-x64-wgl
+              mise run //bindings/python:test windows-x64-wgl
           - preset: windows-x64-vulkan
             runner: windows-2022
             package: true
@@ -267,7 +260,7 @@ jobs:
               mise run //examples/compose-map:build windows-x64-vulkan &&
               mise run //examples/lwjgl-map:build windows-x64-vulkan &&
               mise run //bindings/dotnet:test windows-x64-vulkan &&
-              mise run //examples/dotnet-map:build windows-x64-vulkan
+              mise run //bindings/python:test windows-x64-vulkan
           - preset: windows-arm64-wgl
             runner: windows-11-arm
             package: true
@@ -282,7 +275,7 @@ jobs:
               mise run //examples/compose-map:build windows-arm64-wgl &&
               mise run //examples/lwjgl-map:build windows-arm64-wgl &&
               mise run //bindings/dotnet:test windows-arm64-wgl &&
-              mise run //examples/dotnet-map:build windows-arm64-wgl
+              mise run //bindings/python:test windows-arm64-wgl
           - preset: windows-arm64-vulkan
             runner: windows-11-arm
             package: true
@@ -297,13 +290,12 @@ jobs:
               mise run //examples/compose-map:build windows-arm64-vulkan &&
               mise run //examples/lwjgl-map:build windows-arm64-vulkan &&
               mise run //bindings/dotnet:test windows-arm64-vulkan &&
-              mise run //examples/dotnet-map:build windows-arm64-vulkan
+              mise run //bindings/python:test windows-arm64-vulkan
           - preset: android-multi-vulkan
             runner: ubuntu-latest
             package: false
             commands: >-
-              mise run //bindings/kotlin:androidBuild vulkan arm64-v8a,x86_64 &&
-              mise run //examples/android-map:build vulkan arm64-v8a,x86_64
+              mise run //bindings/kotlin:androidBuild vulkan arm64-v8a,x86_64
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.1
         with:

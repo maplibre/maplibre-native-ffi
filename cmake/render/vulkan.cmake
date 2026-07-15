@@ -1,8 +1,13 @@
 function(mln_configure_render_dependencies target)
+  set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
+  if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64"
+     OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib/arm64 Lib Lib32)
+  endif()
   find_library(
     MLN_FFI_VULKAN_LOADER_LIBRARY
     NAMES vulkan vulkan-1 vulkan.1
-    HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES Lib Lib32 Lib/arm64
+    HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES ${MLN_FFI_VULKAN_LIBRARY_SUFFIXES}
     REQUIRED)
   add_library(mln_ffi_vulkan_loader UNKNOWN IMPORTED GLOBAL)
   set_target_properties(

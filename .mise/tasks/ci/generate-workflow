@@ -3,111 +3,17 @@
 
 import argparse
 import difflib
-import json
 import pathlib
 import sys
-import tomllib
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-SOURCE = ROOT / "ci" / "workflow.toml"
-PRESETS = ROOT / "CMakePresets.json"
 OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
 CHECKOUT = "actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.1"
 UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
-DESKTOP = {"linux", "macos", "windows"}
+sys.path.insert(0, str(ROOT))
 
-
-def platform(preset: str) -> str:
-    if preset.startswith("ios-simulator-"):
-        return "ios-simulator"
-    return preset.split("-", 1)[0]
-
-
-def architecture(preset: str) -> str:
-    parts = preset.split("-")
-    for candidate in ("x64", "arm64"):
-        if candidate in parts:
-            return candidate
-    raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
-
-
-def backend(preset: str) -> str:
-    value = preset.rsplit("-", 1)[-1]
-    if value not in {"egl", "metal", "vulkan", "wgl"}:
-        raise SystemExit(f"error: cannot determine backend from preset {preset!r}")
-    return value
-
-
-def runner(preset: str) -> str:
-    target_platform = platform(preset)
-    target_architecture = architecture(preset)
-    if target_platform == "linux":
-        return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-latest"
-    if target_platform in {"macos", "ios", "ios-simulator"}:
-        return "macos-26"
-    if target_platform == "windows":
-        return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
-    if target_platform in {"android", "ohos"}:
-        return "ubuntu-latest"
-    raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
-
-
-def suite_commands(source: dict[str, object], preset: str) -> list[str]:
-    commands = []
-    for suite in source["suites"]:
-        if platform(preset) not in suite["platforms"]:
-            continue
-        for command in suite["commands"]:
-            if command.get("platforms") and platform(preset) not in command["platforms"]:
-                continue
-            if command.get("include") and preset not in command["include"]:
-                continue
-            if preset in command.get("exclude", []):
-                continue
-            commands.append(f"mise run {command['task']} {preset}")
-    return commands
-
-
-def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
-    render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
-    arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:androidBuild {arguments}"]
-    if build_map:
-        commands.append(f"mise run //examples/android-map:build {arguments}")
-    return commands
-
-
-def target_commands(
-    source: dict[str, object], preset: str, tested: set[str]
-) -> list[str]:
-    target_platform = platform(preset)
-    if target_platform == "ohos":
-        return [f"mise run //bindings/rust:build:ohos {preset}"]
-
-    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
-    if target_platform == "android":
-        abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
-        commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
-    elif target_platform == "ios":
-        commands.extend(
-            [
-                "mise run //bindings/swift:build:ios",
-                "mise run //examples/swift-map:build:ios",
-            ]
-        )
-    elif target_platform == "ios-simulator":
-        commands.extend(
-            [
-                "mise run //bindings/swift:build:ios-simulator",
-                "mise run //bindings/zig:test:ios-simulator",
-                "bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120",
-                "mise run //examples/swift-map:build:ios-simulator",
-            ]
-        )
-    elif target_platform in DESKTOP:
-        commands.extend(suite_commands(source, preset))
-    return commands
+from ci.workflow import load_configuration, target_rows  # noqa: E402
 
 
 def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
@@ -145,41 +51,7 @@ def setup(target: str | None = None) -> list[str]:
 
 
 def render(source: dict[str, object], presets: dict[str, object]) -> str:
-    configured = [
-        preset["name"]
-        for preset in presets["configurePresets"]
-        if not preset.get("hidden", False)
-    ]
-    built = {preset["name"] for preset in presets.get("buildPresets", [])}
-    tested = {preset["name"] for preset in presets.get("testPresets", [])}
-    packaged = {preset["name"] for preset in presets.get("packagePresets", [])}
-    if set(configured) != built:
-        raise SystemExit(
-            "error: configure and build presets differ: "
-            f"missing={sorted(set(configured) - built)}, extra={sorted(built - set(configured))}"
-        )
-    if not tested <= set(configured) or not packaged <= set(configured):
-        raise SystemExit("error: test and package presets must reference configure presets")
-
-    rows = [
-        {
-            "preset": preset,
-            "runner": runner(preset),
-            "package": preset in packaged,
-            "commands": target_commands(source, preset, tested),
-        }
-        for preset in configured
-    ]
-    android_multi = source["android_multi"]
-    multi_preset = android_multi["preset"]
-    rows.append(
-        {
-            "preset": multi_preset,
-            "runner": "ubuntu-latest",
-            "package": False,
-            "commands": android_commands(multi_preset, android_multi["abis"], True),
-        }
-    )
+    rows = target_rows(source, presets)
 
     lines = [
         "# Generated by `mise run ci:generate-workflow`. Do not edit directly.",
@@ -273,9 +145,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    with SOURCE.open("rb") as file:
-        source = tomllib.load(file)
-    presets = json.loads(PRESETS.read_text())
+    source, presets = load_configuration(ROOT)
     expected = render(source, presets)
     actual = OUTPUT.read_text() if OUTPUT.exists() else ""
     if args.check:

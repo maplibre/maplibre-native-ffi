@@ -8,6 +8,7 @@ on:
       - .mise/**
       - .miserc.toml
       - .github/workflows/devcontainer-image.yml
+      - mise.linux.toml
       - mise.lock
       - mise.toml
   pull_request:
@@ -17,6 +18,7 @@ on:
       - .mise/**
       - .miserc.toml
       - .github/workflows/devcontainer-image.yml
+      - mise.linux.toml
       - mise.lock
       - mise.toml
   workflow_dispatch:

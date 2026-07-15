@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import json
 import pathlib
+import re
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any
@@ -8,7 +10,18 @@ from typing import Any
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
-SUPPORT_SOURCE = "docs/scripts/generate-support-matrix.py"
+SUPPORT_SOURCE = "ci/workflow.toml"
+sys.path.insert(0, str(REPO_ROOT))
+
+from ci.workflow import (  # noqa: E402
+    architecture,
+    backend,
+    load_configuration,
+    platform,
+    preset_sets,
+    target_commands,
+)
+
 
 PLATFORM_LABELS = {
     "android": "Android",
@@ -33,6 +46,12 @@ ENVIRONMENT_ORDER = [
     "ohos-arm64",
 ]
 STATUS_LABELS = {"tested": "Tested in CI", "build-only": "Built only"}
+PROJECT_LABELS = {
+    "bindings-dotnet": "C#",
+    "bindings-kotlin-android": "Kotlin/Android",
+    "bindings-kotlin-jvm": "Kotlin/JVM",
+    "bindings-kotlin-native": "Kotlin/Native",
+}
 
 
 @dataclass(frozen=True)
@@ -50,135 +69,61 @@ class Coverage:
         return f"{self.platform}-{self.arch}"
 
 
-def coverage(
-    platform: str, arch: str, backend: str, status: str = "tested"
-) -> Coverage:
-    return Coverage(platform, arch, backend, status)
+def coverage_from_preset(preset: str, status: str) -> Coverage:
+    target_platform = platform(preset)
+    return Coverage(
+        platform="ios" if target_platform == "ios-simulator" else target_platform,
+        arch=architecture(preset),
+        backend={"egl": "opengl", "wgl": "opengl"}.get(
+            backend(preset), backend(preset)
+        ),
+        status=status,
+        simulator=target_platform == "ios-simulator",
+    )
 
 
-def entry_with_status(entry: Coverage, status: str) -> Coverage:
-    return Coverage(entry.platform, entry.arch, entry.backend, status, entry.simulator)
+def command_support(command: str) -> tuple[str, str] | None:
+    if command.startswith("bash scripts/run-ios-simulator-test.sh "):
+        return "bindings-swift", "tested"
+
+    match = re.search(r"mise run //(bindings|examples)/([^: ]+):([^ ]+)", command)
+    if match is None:
+        return None
+    kind, name, action = match.groups()
+
+    if kind == "bindings" and name == "swift" and action == "build:ios-simulator":
+        return None
+    if kind == "bindings" and name == "kotlin":
+        project_id = {
+            "androidBuild": "bindings-kotlin-android",
+            "jvmTest": "bindings-kotlin-jvm",
+            "nativeTest": "bindings-kotlin-native",
+        }.get(action)
+        if project_id is None:
+            return None
+    else:
+        project_id = f"{kind}-{name}"
+
+    status = (
+        "tested"
+        if action in {"test", "jvmTest", "nativeTest", "run", "test:ios-simulator"}
+        else "build-only"
+    )
+    return project_id, status
 
 
-LINUX_X64 = coverage("linux", "x64", "vulkan")
-MACOS_ARM64 = coverage("macos", "arm64", "metal")
-WINDOWS_X64 = coverage("windows", "x64", "vulkan")
-IOS_DEVICE = coverage("ios", "arm64", "metal", "build-only")
-IOS_SIMULATOR = Coverage("ios", "arm64", "metal", "tested", simulator=True)
-HOST_DESKTOP = [LINUX_X64, MACOS_ARM64, WINDOWS_X64]
+def project_label(project_id: str) -> str:
+    if project_id in PROJECT_LABELS:
+        return PROJECT_LABELS[project_id]
+    kind, name = project_id.split("-", 1)
+    return name if kind == "examples" else name.capitalize()
 
-NATIVE_COVERAGE = [
-    coverage("linux", "x64", "vulkan"),
-    coverage("linux", "x64", "opengl"),
-    coverage("linux", "arm64", "vulkan"),
-    coverage("linux", "arm64", "opengl"),
-    coverage("macos", "arm64", "metal"),
-    coverage("macos", "arm64", "vulkan"),
-    coverage("macos", "arm64", "opengl"),
-    coverage("windows", "x64", "vulkan"),
-    coverage("windows", "x64", "opengl"),
-    coverage("windows", "arm64", "vulkan"),
-    coverage("windows", "arm64", "opengl"),
-    coverage("android", "arm64", "vulkan", "build-only"),
-    coverage("android", "arm64", "opengl", "build-only"),
-    coverage("android", "x64", "vulkan", "build-only"),
-    coverage("android", "x64", "opengl", "build-only"),
-    coverage("ios", "arm64", "metal", "build-only"),
-    IOS_SIMULATOR,
-    coverage("ohos", "arm64", "vulkan", "build-only"),
-    coverage("ohos", "arm64", "opengl", "build-only"),
-]
 
-ANDROID_BINDING = [
-    coverage("android", arch, backend, "build-only")
-    for arch in ("arm64", "x64")
-    for backend in ("vulkan", "opengl")
-]
-ANDROID_MAP = [
-    coverage("android", arch, "opengl", "build-only") for arch in ("arm64", "x64")
-]
-
-BINDINGS = [
-    ("bindings-dotnet", "C#", "bindings/dotnet", HOST_DESKTOP),
-    (
-        "bindings-kotlin-android",
-        "Kotlin/Android",
-        "bindings/kotlin",
-        ANDROID_BINDING,
-    ),
-    (
-        "bindings-kotlin-jvm",
-        "Kotlin/JVM",
-        "bindings/kotlin",
-        HOST_DESKTOP,
-    ),
-    (
-        "bindings-kotlin-native",
-        "Kotlin/Native",
-        "bindings/kotlin",
-        [LINUX_X64, MACOS_ARM64],
-    ),
-    ("bindings-go", "Go", "bindings/go", [LINUX_X64, MACOS_ARM64]),
-    ("bindings-python", "Python", "bindings/python", [LINUX_X64, MACOS_ARM64]),
-    (
-        "bindings-rust",
-        "Rust",
-        "bindings/rust",
-        HOST_DESKTOP
-        + [
-            coverage("ohos", "arm64", "vulkan", "build-only"),
-            coverage("ohos", "arm64", "opengl", "build-only"),
-        ],
-    ),
-    (
-        "bindings-swift",
-        "Swift",
-        "bindings/swift",
-        [LINUX_X64, MACOS_ARM64, IOS_DEVICE, IOS_SIMULATOR],
-    ),
-    ("bindings-zig", "Zig", "bindings/zig", HOST_DESKTOP + [IOS_SIMULATOR]),
-]
-
-EXAMPLES = [
-    ("examples-android-map", "android-map", "examples/android-map", ANDROID_MAP),
-    (
-        "examples-compose-map",
-        "compose-map",
-        "examples/compose-map",
-        [entry_with_status(item, "build-only") for item in HOST_DESKTOP],
-    ),
-    (
-        "examples-dotnet-map",
-        "dotnet-map",
-        "examples/dotnet-map",
-        [entry_with_status(item, "build-only") for item in HOST_DESKTOP],
-    ),
-    (
-        "examples-lwjgl-map",
-        "lwjgl-map",
-        "examples/lwjgl-map",
-        [entry_with_status(item, "build-only") for item in HOST_DESKTOP],
-    ),
-    (
-        "examples-rust-map",
-        "rust-map",
-        "examples/rust-map",
-        [entry_with_status(item, "build-only") for item in HOST_DESKTOP],
-    ),
-    (
-        "examples-swift-map",
-        "swift-map",
-        "examples/swift-map",
-        [entry_with_status(MACOS_ARM64, "build-only"), IOS_DEVICE, IOS_SIMULATOR],
-    ),
-    (
-        "examples-zig-map",
-        "zig-map",
-        "examples/zig-map",
-        [entry_with_status(item, "build-only") for item in HOST_DESKTOP],
-    ),
-    ("examples-zig-readback", "zig-readback", "examples/zig-readback", HOST_DESKTOP),
-]
+def source_directory(project_id: str) -> str:
+    if project_id.startswith("bindings-kotlin-"):
+        return "bindings/kotlin"
+    kind, name = project_id.split("-", 1)
+    return f"{kind}/{name}"
 
 
 def environment_sort_key(environment: str) -> tuple[int, str]:
@@ -188,11 +133,11 @@ def environment_sort_key(environment: str) -> tuple[int, str]:
         return (len(ENVIRONMENT_ORDER), environment)
 
 
-def backend_sort_key(backend: str) -> tuple[int, str]:
+def backend_sort_key(value: str) -> tuple[int, str]:
     try:
-        return (BACKEND_ORDER.index(backend), backend)
+        return (BACKEND_ORDER.index(value), value)
     except ValueError:
-        return (len(BACKEND_ORDER), backend)
+        return (len(BACKEND_ORDER), value)
 
 
 def environment_label(entry: Coverage) -> str:
@@ -209,11 +154,11 @@ def backend_rows(entries: list[Coverage]) -> list[dict[str, str]]:
         statuses[entry.backend].add(entry.status)
     return [
         {
-            "backend": backend,
-            "backendLabel": BACKEND_LABELS[backend],
-            "status": "build-only" if "build-only" in statuses[backend] else "tested",
+            "backend": value,
+            "backendLabel": BACKEND_LABELS[value],
+            "status": "tested" if "tested" in statuses[value] else "build-only",
         }
-        for backend in sorted(statuses, key=backend_sort_key)
+        for value in sorted(statuses, key=backend_sort_key)
     ]
 
 
@@ -236,25 +181,48 @@ def environment_rows(entries: list[Coverage]) -> list[dict[str, Any]]:
 
 
 def project_rows(
-    projects: list[tuple[str, str, str, list[Coverage]]], kind: str
+    projects: dict[str, list[Coverage]], kind: str
 ) -> list[dict[str, Any]]:
+    matching = {
+        project_id: entries
+        for project_id, entries in projects.items()
+        if project_id.startswith(f"{kind}-")
+    }
     return [
         {
             "id": project_id,
-            "kind": kind,
-            "label": label,
+            "kind": "binding" if kind == "bindings" else "example",
+            "label": project_label(project_id),
             "source": SUPPORT_SOURCE,
-            "sourceDirectory": source_directory,
+            "sourceDirectory": source_directory(project_id),
             "environments": environment_rows(entries),
         }
-        for project_id, label, source_directory, entries in sorted(
-            projects, key=lambda project: (project[1].casefold(), project[0])
+        for project_id, entries in sorted(
+            matching.items(),
+            key=lambda item: (project_label(item[0]).casefold(), item[0]),
         )
     ]
 
 
 def support_matrix() -> dict[str, Any]:
-    native = environment_rows(NATIVE_COVERAGE)
+    source, presets = load_configuration(REPO_ROOT)
+    configured, _, tested, _ = preset_sets(presets)
+    native = environment_rows(
+        [
+            coverage_from_preset(preset, "tested" if preset in tested else "build-only")
+            for preset in configured
+        ]
+    )
+
+    projects: dict[str, list[Coverage]] = defaultdict(list)
+    for preset in configured:
+        for command in target_commands(source, preset, tested):
+            support = command_support(command)
+            if support is None:
+                continue
+            project_id, status = support
+            projects[project_id].append(coverage_from_preset(preset, status))
+
     return {
         "statuses": [
             {"status": status, "statusLabel": STATUS_LABELS[status]}
@@ -268,8 +236,8 @@ def support_matrix() -> dict[str, Any]:
             for row in native
         ],
         "native": native,
-        "bindings": project_rows(BINDINGS, "binding"),
-        "examples": project_rows(EXAMPLES, "example"),
+        "bindings": project_rows(projects, "bindings"),
+        "examples": project_rows(projects, "examples"),
     }
 
 

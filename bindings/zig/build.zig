@@ -275,12 +275,13 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
 fn addNativeVulkanSdkPath(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, dependency_library_dirs: []const std.Build.LazyPath) void {
     if (dependency_library_dirs.len != 0) return;
     if (target.result.os.tag != .windows and target.result.os.tag != .macos) return;
-    const sdk = b.graph.environ_map.get("VULKAN_SDK") orelse
-        if (target.result.os.tag == .windows)
-            @panic("native Windows Vulkan builds require VULKAN_SDK")
-        else
-            return;
-    const library_dir = b.pathJoin(&.{ sdk, if (target.result.os.tag == .windows) "Lib" else "lib" });
+    const library_dir = if (target.result.os.tag == .macos)
+        b.graph.environ_map.get("MLN_FFI_VULKAN_LOADER_DIR") orelse
+            if (b.graph.environ_map.get("VULKAN_SDK")) |sdk| b.pathJoin(&.{ sdk, "lib" }) else return
+    else if (b.graph.environ_map.get("VULKAN_SDK")) |sdk|
+        b.pathJoin(&.{ sdk, "Lib" })
+    else
+        @panic("native Windows Vulkan builds require VULKAN_SDK");
     module.addLibraryPath(.{ .cwd_relative = library_dir });
     module.addRPath(.{ .cwd_relative = library_dir });
 }

@@ -428,6 +428,7 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
     }
 
     private fun resolveAngleRoot(): Path {
+      // CMake installs the ANGLE dylibs beside libmaplibre-native-c.dylib.
       val angleRoot =
         System.getProperty("org.maplibre.nativeffi.library.path")?.let { Path(it).parent }
           ?: throw NativeSurfaceBridgeException(
