@@ -201,6 +201,8 @@ fn wglContextDescriptor(context: *const WglContext) c.mln_opengl_context_descrip
     };
 }
 
+// PRUNING REVIEW: PRUNE.
+// Default-field and size initialization is structural coverage better owned by generated layout or binding tests.
 test "OpenGL default descriptors initialize ABI sizes" {
     const owned = c.mln_opengl_owned_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_opengl_owned_texture_descriptor)), owned.size);
@@ -218,6 +220,8 @@ test "OpenGL default descriptors initialize ABI sizes" {
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_opengl_context_descriptor)), surface.context.size);
 }
 
+// PRUNING REVIEW: PRUNE.
+// Backend capability reporting is a public semantic query already exercised by binding suites on each target.
 test "OpenGL provider mask matches OpenGL build platform" {
     const mask = c.mln_opengl_supported_context_provider_mask();
     if (!build_options.supports_opengl) {
@@ -229,6 +233,8 @@ test "OpenGL provider mask matches OpenGL build platform" {
     }
 }
 
+// PRUNING REVIEW: PRUNE.
+// Unsupported-backend behavior is exposed by binding attach APIs and belongs in their cross-backend coverage.
 test "OpenGL attach reports unsupported when backend is unavailable" {
     if (build_options.supports_opengl) return error.SkipZigTest;
 
@@ -258,14 +264,20 @@ test "OpenGL attach reports unsupported when backend is unavailable" {
     try testing.expectEqual(@as(?*c.mln_render_session, null), session);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required OpenGL texture handles.
 test "OpenGL owned texture attach rejects unsafe raw inputs" {
     try common.expectAttachRejectsUnsafeInputs(OpenGLOwnedTexture);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required OpenGL surface handles.
 test "OpenGL surface attach rejects unsafe raw inputs" {
     try common.expectAttachRejectsUnsafeInputs(OpenGLSurface);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nested sizes and required raw texture values that typed OpenGL descriptors prevent.
 test "OpenGL borrowed texture rejects unsafe raw descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -294,6 +306,8 @@ test "OpenGL borrowed texture rejects unsafe raw descriptors" {
     try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
 }
 
+// PRUNING REVIEW: PRUNE.
+// Successful EGL rendering, readback, and frame access are semantic workflows covered by binding render suites.
 test "OpenGL EGL owned texture renders through raw C ABI" {
     if (!supports_egl) return error.SkipZigTest;
 
@@ -343,6 +357,8 @@ test "OpenGL EGL owned texture renders through raw C ABI" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
 }
 
+// PRUNING REVIEW: PRUNE.
+// WGL rendering, readback, and frame lifecycle belong in binding render suites; missing readback coverage moves there.
 test "OpenGL WGL owned texture renders through raw C ABI" {
     if (!supports_wgl) return error.SkipZigTest;
 
@@ -424,6 +440,8 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
 }
 
+// PRUNING REVIEW: PRUNE.
+// Borrowed-texture rendering and host readback are integration behavior already exercised by binding suites.
 test "OpenGL WGL borrowed texture renders through raw C ABI" {
     if (!supports_wgl) return error.SkipZigTest;
 
@@ -474,6 +492,8 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
     try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
 }
 
+// PRUNING REVIEW: PRUNE.
+// Surface rendering and host readback belong in binding render suites; missing WGL pixel coverage moves there.
 test "OpenGL WGL surface renders through raw C ABI" {
     if (!supports_wgl) return error.SkipZigTest;
 

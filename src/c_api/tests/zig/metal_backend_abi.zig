@@ -52,16 +52,22 @@ const MetalOwnedTexture = struct {
     }
 };
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required Metal surface handles.
 test "Metal surface attach rejects unsafe raw inputs" {
     if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectAttachRejectsUnsafeInputs(MetalSurface);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required Metal texture handles.
 test "Metal owned texture attach rejects unsafe raw inputs" {
     if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectAttachRejectsUnsafeInputs(MetalOwnedTexture);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nested extent sizing and required borrowed Metal texture handles hidden by binding descriptors.
 test "Metal borrowed texture rejects unsafe raw descriptors" {
     if (!build_options.supports_metal) return error.SkipZigTest;
 

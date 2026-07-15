@@ -16,6 +16,8 @@ fn testCamera() c.mln_camera_options {
     return camera;
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null, undersized, and unknown-mask camera descriptors that typed bindings cannot construct.
 test "camera rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -51,6 +53,8 @@ test "camera rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_fly_to(map, &camera, &animation));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw null arrays, null outputs, and undersized fit descriptors hidden by binding collections.
 test "camera fitting rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -75,6 +79,8 @@ test "camera fitting rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_lat_lng_bounds_for_camera(map, null, null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null, undersized, and unknown-mask bound descriptors before binding validation applies.
 test "camera bounds constraints reject invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -95,6 +101,8 @@ test "camera bounds constraints reject invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_bounds(map, &options));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw free-camera output storage, struct-size, and field-mask validation.
 test "free camera options reject raw invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -117,6 +125,8 @@ test "free camera options reject raw invalid arguments" {
 
 const center = c.mln_lat_lng{ .latitude = 37.7749, .longitude = -122.4194 };
 
+// PRUNING REVIEW: KEEP.
+// This verifies null, undersized, and unknown-mask projection-mode descriptors hidden by binding types.
 test "map projection mode rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -141,6 +151,8 @@ test "map projection mode rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_projection_mode(map, &mode));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw null scalar and array outputs for coordinate conversion entry points.
 test "map coordinate conversion rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -158,6 +170,8 @@ test "map coordinate conversion rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_lat_lngs_for_pixels(map, null, 1, &coordinate));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw projection ownership, preinitialized outputs, and null or undersized descriptor handling.
 test "standalone projection rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -189,11 +203,15 @@ test "standalone projection rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_projection_lat_lng_for_pixel(helper, .{ .x = 0.0, .y = 0.0 }, null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies the free conversion functions reject null output pointers that bindings never pass.
 test "projected meters reject invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_projected_meters_for_lat_lng(center, null));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_lat_lng_for_projected_meters(.{ .northing = 0.0, .easting = 0.0 }, null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw null handles, null outputs, and unknown debug-mask bits across the debug entry points.
 test "map debug options reject raw invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -215,6 +233,8 @@ test "map debug options reject raw invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_dump_debug_logs(null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw viewport struct sizes, masks, enum discriminants, and output pointers.
 test "map viewport options reject invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -250,6 +270,8 @@ test "map viewport options reject invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_viewport_options(map, &options));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw tile-option struct sizes, enum discriminants, and output pointers.
 test "map tile options reject invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

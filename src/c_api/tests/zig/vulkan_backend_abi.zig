@@ -59,16 +59,22 @@ const VulkanOwnedTexture = struct {
     }
 };
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required Vulkan surface handles.
 test "Vulkan surface attach rejects unsafe raw inputs" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
     try common.expectAttachRejectsUnsafeInputs(VulkanSurface);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nulls, a non-null output handle, undersized descriptors, and missing required Vulkan texture handles.
 test "Vulkan owned texture attach rejects unsafe raw inputs" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
     try common.expectAttachRejectsUnsafeInputs(VulkanOwnedTexture);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies nested descriptor sizes and required borrowed Vulkan image handles hidden by bindings.
 test "Vulkan borrowed texture rejects unsafe raw descriptors" {
     if (!build_options.supports_vulkan) return error.SkipZigTest;
 

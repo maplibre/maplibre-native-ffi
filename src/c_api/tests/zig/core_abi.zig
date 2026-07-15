@@ -22,6 +22,9 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
+// PRUNING REVIEW: MIXED.
+// Keep null inputs, undersized options, preinitialized outputs, and null destroy calls hidden by safe bindings.
+// Prune generic diagnostic-presence assertions because dedicated diagnostic tests own that contract.
 test "runtime rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_create(null, null));
     try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
@@ -40,6 +43,8 @@ test "runtime rejects invalid arguments" {
     try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies rejection of unknown raw flag bits that typed binding option sets cannot represent.
 test "runtime rejects unknown flags" {
     var options = c.mln_runtime_options_default();
     options.flags = 1 << 31;
@@ -49,6 +54,8 @@ test "runtime rejects unknown flags" {
     try testing.expectEqual(@as(?*c.mln_runtime, null), runtime);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies the raw handle registry rejects use-after-destroy calls that binding-owned handle state prevents.
 test "runtime rejects stale handles" {
     const runtime = try support.createRuntime();
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_destroy(runtime));
@@ -56,16 +63,22 @@ test "runtime rejects stale handles" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_run_once(runtime));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies the public null-handle contract for a raw entry point that bindings do not call with null.
 test "runtime run once rejects null runtime" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_run_once(null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw event polling rejects a null runtime handle that binding handle-state checks prevent.
 test "runtime event polling rejects null runtime" {
     var event = emptyEvent();
     var has_event = false;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_poll_event(null, &event, &has_event));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw runtime, output-handle, struct-size, and enum validation hidden by binding constructors.
 test "map create rejects invalid arguments" {
     var map: ?*c.mln_map = null;
     var options = c.mln_map_options_default();
@@ -91,6 +104,8 @@ test "map create rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &invalid_options, &map));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies destroyed raw map pointers remain invalid across multiple C entry points.
 test "map lifecycle rejects invalid state and stale handles" {
     const runtime = try support.createRuntime();
 
@@ -108,6 +123,8 @@ test "map lifecycle rejects invalid state and stale handles" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_destroy(runtime));
 }
 
+// PRUNING REVIEW: MIXED.
+// Keep null C-string validation hidden by binding strings; prune diagnostic-presence assertions covered below.
 test "style functions reject null inputs" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -122,6 +139,8 @@ test "style functions reject null inputs" {
     try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null and undersized raw output storage is rejected without writes through invalid pointers.
 test "runtime event polling rejects invalid outputs" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -141,6 +160,8 @@ fn failOnThread(out_len: *usize) void {
     out_len.* = std.mem.len(c.mln_thread_last_error_message());
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies the C boundary's per-call diagnostic set-and-clear contract independently of binding error copying.
 test "failing status sets and successful status clears diagnostics" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_destroy(null));
     try testing.expect(std.mem.len(c.mln_thread_last_error_message()) > 0);
@@ -150,6 +171,8 @@ test "failing status sets and successful status clears diagnostics" {
     try testing.expectEqual(@as(usize, 0), std.mem.len(c.mln_thread_last_error_message()));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies native diagnostic storage isolation across host threads, below binding-owned thread checks.
 test "diagnostics are thread local" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_destroy(null));
     const main_message = std.mem.span(c.mln_thread_last_error_message());

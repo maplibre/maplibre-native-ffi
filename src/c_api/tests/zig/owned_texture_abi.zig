@@ -5,6 +5,8 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
+// PRUNING REVIEW: PRUNE.
+// Backend-specific owned-texture tests cover the same raw pointers, output handle, and nested sizes without this alias.
 test "owned texture attach rejects invalid arguments" {
     var texture: ?*c.mln_render_session = null;
     var descriptor = support.defaultOwnedTextureDescriptor();
@@ -33,12 +35,16 @@ test "owned texture attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, support.callOwnedTextureAttach(map, &invalid_descriptor, &texture));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies maintenance entry points reject null session handles that bindings prevent.
 test "render session maintenance rejects null raw handles" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_reduce_memory_use(null));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_clear_data(null));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_dump_debug_logs(null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies use-after-destroy protection in the native session handle registry.
 test "render session rejects stale raw handles" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

@@ -189,6 +189,8 @@ fn serveOneHttpStyle(state: *HttpServerState) void {
     };
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null request-handle behavior for release, cancellation, and completion below binding wrappers.
 test "custom provider request handles reject raw null handles" {
     c.mln_resource_request_release(null);
 
@@ -198,10 +200,14 @@ test "custom provider request handles reject raw null handles" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_resource_request_complete(null, &response));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies the process-global getter rejects a null C output pointer that binding APIs hide.
 test "network status get rejects raw null output" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_network_status_get(null));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies unknown raw operation discriminants and failure-time output initialization.
 test "ambient cache operations validate raw operation values" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -211,6 +217,8 @@ test "ambient cache operations validate raw operation values" {
     try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies raw union discriminants, required nested pointers, and failure-time output initialization.
 test "offline regions reject raw invalid descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -255,6 +263,8 @@ test "offline regions reject raw invalid descriptors" {
     try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies a null borrowed database path is rejected before any asynchronous operation is created.
 test "offline database merge rejects raw null path" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -264,6 +274,9 @@ test "offline database merge rejects raw null path" {
     try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
+// PRUNING REVIEW: MIXED.
+// Keep wrong-result-kind rejection because typed binding operation variants prevent requesting a mismatched result.
+// Prune successful operation, event payload, and snapshot conversion coverage because binding suites own those workflows.
 test "offline operations complete through runtime events and typed take results" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -296,6 +309,8 @@ test "offline operations complete through runtime events and typed take results"
     try testing.expectEqualSlices(u8, metadata[0..], info.metadata[0..info.metadata_size]);
 }
 
+// PRUNING REVIEW: PRUNE.
+// Queued-event erasure after take is an undocumented implementation detail, not a promised C operation contract.
 test "offline take result before polling removes queued completion event" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -333,6 +348,8 @@ test "offline take result before polling removes queued completion event" {
     }
 }
 
+// PRUNING REVIEW: PRUNE.
+// Go and Swift callback-adapter tests already invoke the C helper outside callback context and require INVALID_STATE.
 test "resource transform response helper is callback scoped" {
     var response = c.mln_resource_transform_response{ .size = @sizeOf(c.mln_resource_transform_response), .url = null, .context = null };
     const url = "https://example.test/style.json";
@@ -341,6 +358,8 @@ test "resource transform response helper is callback scoped" {
     try testing.expect(response.url == null);
 }
 
+// PRUNING REVIEW: PRUNE.
+// Binding transform tests return temporary host strings and observe the rewritten request after callback return.
 test "resource transform helper copies temporary replacement URL through native load" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE));
     defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE)) catch @panic("network status restore failed");
@@ -380,6 +399,8 @@ test "resource transform helper copies temporary replacement URL through native 
     try testing.expect(state.transform_calls.load(.seq_cst) > 0);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null, undersized, and missing-callback descriptors that binding constructors cannot produce.
 test "resource transform rejects raw invalid descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -393,6 +414,8 @@ test "resource transform rejects raw invalid descriptors" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_set_resource_transform(runtime, &transform));
 }
 
+// PRUNING REVIEW: PRUNE.
+// Successful transform replacement and clearing are public semantic workflows already covered by binding suites.
 test "resource transform updates and clears after map creation" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -407,6 +430,8 @@ test "resource transform updates and clears after map creation" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_clear_resource_transform(runtime));
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies null, undersized, and missing-callback provider descriptors below binding-owned validation.
 test "resource provider rejects raw invalid descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

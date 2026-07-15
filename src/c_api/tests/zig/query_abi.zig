@@ -13,6 +13,8 @@ fn attachTextureSession(map: *c.mln_map, context: *const support.OwnedTextureAtt
     return support.attachOwnedTextureSession(map, &descriptor);
 }
 
+// PRUNING REVIEW: KEEP.
+// This verifies undersized query geometry, unknown masks, and invalid string views hidden by binding values.
 test "feature query validation rejects raw descriptor shapes" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

@@ -54,6 +54,9 @@ fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !b
     return false;
 }
 
+// PRUNING REVIEW: MIXED.
+// Keep malformed coordinate counts and unknown raster encoding that typed bindings prevent before calling C.
+// Prune capacity probes covered by copy/read tests and the invalid location-image kind covered by the Go binding.
 test "style value helpers reject unsafe raw descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
