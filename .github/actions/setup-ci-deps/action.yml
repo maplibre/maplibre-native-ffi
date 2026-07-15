@@ -135,6 +135,13 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
+    - name: Install Windows ARM64 LLVM
+      if: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' }}
+      shell: pwsh
+      run: |
+        winget install --exact --id LLVM.LLVM --accept-package-agreements --accept-source-agreements --disable-interactivity
+        "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5

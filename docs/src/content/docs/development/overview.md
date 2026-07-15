@@ -42,12 +42,13 @@ On Windows, run these commands from PowerShell:
 ```powershell
 winget install --exact --id Git.Git
 winget install --exact --id KhronosGroup.VulkanSDK
-winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Llvm.Clang --add Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+winget install --exact --id LLVM.LLVM
+winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Tools.ARM64"
 ```
 
 The Visual Studio command installs the Desktop development with C++ workload,
-the recommended x64 tools and Windows SDK, Clang, and the ARM64 build tools.
-Project tasks run in Git Bash.
+the recommended x64 tools and Windows SDK, and the ARM64 build tools. Project
+tasks run in Git Bash.
 
 Install [`mise`](https://mise.jdx.dev/), then bootstrap system packages, install
 pinned project tools, and run repository setup hooks:

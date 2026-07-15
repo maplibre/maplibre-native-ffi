@@ -24,11 +24,10 @@ if [[ -z "$vs_install" ]]; then
   return 1
 fi
 
-windows_host_arch="${MLN_WINDOWS_HOST_ARCH:-$(uname -m)}"
-case "$windows_host_arch" in
+case "$(uname -m)" in
   aarch64 | arm64) msvc_arch=arm64; llvm_arch=ARM64 ;;
   x86_64 | amd64) msvc_arch=x64; llvm_arch=x64 ;;
-  *) echo "Unsupported Windows host architecture: $windows_host_arch" >&2; return 1 ;;
+  *) echo "Unsupported Windows host architecture: $(uname -m)" >&2; return 1 ;;
 esac
 
 vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
@@ -56,17 +55,11 @@ while IFS='=' read -r name value; do
 done < <(tr -d '\r' <<< "$environment")
 
 llvm_bin="$(cygpath -u "${vs_install}\\VC\\Tools\\Llvm\\${llvm_arch}\\bin")"
-if [[ -f "$llvm_bin/libclang.dll" ]]; then
+winget_llvm_bin='/c/Program Files/LLVM/bin'
+if [[ -f "$winget_llvm_bin/libclang.dll" ]]; then
+  export LIBCLANG_PATH="$winget_llvm_bin"
+elif [[ -f "$llvm_bin/libclang.dll" ]]; then
   export LIBCLANG_PATH="$llvm_bin"
-else
-  clangsharp_rid="win-$msvc_arch"
-  nuget_packages="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
-  clangsharp_libclang="$(find "$nuget_packages/clangsharppinvokegenerator.$clangsharp_rid" \
-    -path "*/tools/any/$clangsharp_rid/libclang.dll" -print 2>/dev/null | sort -V | tail -n 1)"
-  if [[ -n "$clangsharp_libclang" ]]; then
-    LIBCLANG_PATH="$(dirname "$clangsharp_libclang")"
-    export LIBCLANG_PATH
-  fi
 fi
 
 redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
