@@ -121,8 +121,8 @@ For specification writing:
 
 - The bindings tests include broad integration coverage for the C/C++ layer on
   targets where they run.
-- For tests that _must_ reach below the bindings, there are dedicated Zig tests
-  in src/c_api/tests.
+- For tests that _must_ reach below the bindings, there are dedicated C tests in
+  `src/c_api/tests`.
 - Each binding's test suite should stand on its own for the C API domains and
   targets it supports, using public binding APIs to validate both native
   workflows and binding-owned safety behavior.

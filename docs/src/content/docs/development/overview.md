@@ -134,8 +134,9 @@ build the documentation site. Generated API reference HTML is installed into
 ## Tests And Examples
 
 Every feature needs automated CI coverage when practical. The root
-`mise run test` command builds the native library and runs the direct Zig C API
-suite. Language binding suites run through their binding-specific CI tasks.
+`mise run test` command builds the native library and runs the direct C API
+suite through CTest and Unity. Language binding suites run through their
+binding-specific CI tasks.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.

@@ -23,13 +23,8 @@ function(mln_configure_render_dependencies target)
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_INCLUDE_DIRS
-      "${MLN_FFI_VULKAN_INCLUDE_DIRS}"
-      MLN_FFI_LIBRARY_DIRS
-      "${MLN_FFI_VULKAN_LOADER_DIR}"
-      MLN_FFI_RUNTIME_DIRS
-      "${MLN_FFI_VULKAN_LOADER_DIR}"
-      MLN_FFI_STATIC_ARCHIVES
+      MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}" MLN_FFI_RUNTIME_DIRS
+      "${MLN_FFI_VULKAN_LOADER_DIR}" MLN_FFI_STATIC_ARCHIVES
       "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

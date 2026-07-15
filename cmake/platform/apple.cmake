@@ -65,9 +65,7 @@ function(mln_configure_platform_dependencies target)
         MLN_FFI_ZIG_LIBC_SYSROOT "${MLN_FFI_ZIG_LIBC_SYSROOT}"
         MLN_FFI_ZIG_LIBC_INCLUDE_DIR "${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/include"
         MLN_FFI_ZIG_LIBC_CRT_DIR "")
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_TEST_SYSTEM_ROOT "${MLN_FFI_ZIG_LIBC_SYSROOT}")
+    set(MLN_FFI_APPLE_SDK "${MLN_FFI_ZIG_LIBC_SYSROOT}")
   else()
     set(MLN_FFI_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
     if(NOT MLN_FFI_APPLE_SDK)
@@ -79,14 +77,10 @@ function(mln_configure_platform_dependencies target)
         OUTPUT_VARIABLE MLN_FFI_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
         COMMAND_ERROR_IS_FATAL ANY)
     endif()
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_TEST_SYSTEM_ROOT "${MLN_FFI_APPLE_SDK}")
   endif()
 
   find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
   list(GET CMAKE_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
-  get_target_property(MLN_FFI_APPLE_SDK ${target} MLN_FFI_TEST_SYSTEM_ROOT)
   set(MLN_FFI_RELOCATABLE_LINK_OPTIONS -arch "${MLN_FFI_OSX_ARCHITECTURE}"
       -syslibroot "${MLN_FFI_APPLE_SDK}")
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")

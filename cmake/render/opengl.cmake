@@ -17,8 +17,7 @@ function(mln_configure_render_dependencies target)
         ${target}
         PROPERTIES
           MLN_FFI_INCLUDE_DIRS "${MLN_FFI_EGL_INCLUDE_DIRS}"
-          MLN_FFI_LIBRARY_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}" MLN_FFI_RUNTIME_DIRS
-          "${MLN_FFI_EGL_LIBRARY_DIR}")
+          MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         set_target_properties(
           ${target}
@@ -48,8 +47,7 @@ function(mln_configure_render_dependencies target)
         PROPERTIES
           MLN_FFI_INCLUDE_DIRS
           "${OPENGL_EGL_INCLUDE_DIR};${OPENGL_GLES3_INCLUDE_DIR}"
-          MLN_FFI_LIBRARY_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}" MLN_FFI_RUNTIME_DIRS
-          "${MLN_FFI_EGL_LIBRARY_DIR}")
+          MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
     endif()
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
