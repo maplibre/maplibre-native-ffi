@@ -35,7 +35,6 @@ static mln_camera_options test_camera(void) {
   return camera;
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null, undersized, and unknown-mask camera descriptors that
 // typed bindings cannot construct.
 static void camera_rejects_invalid_arguments(void) {
@@ -80,7 +79,6 @@ static void camera_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw null arrays, null outputs, and undersized fit descriptors
 // hidden by binding collections.
 static void camera_fitting_rejects_invalid_arguments(void) {
@@ -116,7 +114,6 @@ static void camera_fitting_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null, undersized, and unknown-mask bound descriptors before
 // binding validation applies.
 static void camera_bounds_constraints_reject_invalid_arguments(void) {
@@ -143,7 +140,6 @@ static void camera_bounds_constraints_reject_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw free-camera output storage, struct-size, and field-mask
 // validation.
 static void free_camera_options_reject_raw_invalid_arguments(void) {
@@ -175,7 +171,6 @@ static void free_camera_options_reject_raw_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null, undersized, and unknown-mask projection-mode descriptors
 // hidden by binding types.
 static void map_projection_mode_rejects_invalid_arguments(void) {
@@ -207,7 +202,6 @@ static void map_projection_mode_rejects_invalid_arguments(void) {
 
 static const mln_lat_lng center = {.latitude = 37.7749, .longitude = -122.4194};
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw null scalar and array outputs for coordinate conversion
 // entry points.
 static void map_coordinate_conversion_rejects_invalid_arguments(void) {
@@ -235,7 +229,6 @@ static void map_coordinate_conversion_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw projection ownership, preinitialized outputs, and null or
 // undersized descriptor handling.
 static void standalone_projection_rejects_invalid_arguments(void) {
@@ -287,7 +280,6 @@ static void standalone_projection_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies the free conversion functions reject null output pointers that
 // bindings never pass.
 static void projected_meters_reject_invalid_arguments(void) {
@@ -300,7 +292,6 @@ static void projected_meters_reject_invalid_arguments(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw null handles, null outputs, and unknown debug-mask bits
 // across the debug entry points.
 static void map_debug_options_reject_raw_invalid_arguments(void) {
@@ -344,7 +335,6 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw viewport struct sizes, masks, enum discriminants, and
 // output pointers.
 static void map_viewport_options_reject_invalid_arguments(void) {
@@ -395,7 +385,6 @@ static void map_viewport_options_reject_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw tile-option struct sizes, enum discriminants, and output
 // pointers.
 static void map_tile_options_reject_invalid_arguments(void) {

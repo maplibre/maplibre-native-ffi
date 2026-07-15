@@ -130,7 +130,6 @@ static mln_status resource_transform_stub(
   return MLN_STATUS_OK;
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null request-handle behavior for release, cancellation, and
 // completion below binding wrappers.
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
@@ -146,7 +145,6 @@ static void custom_provider_request_handles_reject_raw_null_handles(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies the process-global getter rejects a null C output pointer that
 // binding APIs hide.
 static void network_status_get_rejects_raw_null_output(void) {
@@ -155,7 +153,6 @@ static void network_status_get_rejects_raw_null_output(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies unknown raw operation discriminants and failure-time output
 // initialization.
 static void ambient_cache_operations_validate_raw_operation_values(void) {
@@ -171,7 +168,6 @@ static void ambient_cache_operations_validate_raw_operation_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies raw union discriminants, required nested pointers, and
 // failure-time output initialization.
 static void offline_regions_reject_raw_invalid_descriptors(void) {
@@ -246,7 +242,6 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies a null borrowed database path is rejected before any
 // asynchronous operation is created.
 static void offline_database_merge_rejects_raw_null_path(void) {
@@ -262,7 +257,6 @@ static void offline_database_merge_rejects_raw_null_path(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies wrong-result-kind rejection because typed binding operation
 // variants prevent requesting a mismatched result.
 static void offline_take_rejects_mismatched_result_kind(void) {
@@ -291,7 +285,6 @@ static void offline_take_rejects_mismatched_result_kind(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null, undersized, and missing-callback descriptors that binding
 // constructors cannot produce.
 static void resource_transform_rejects_raw_invalid_descriptors(void) {
@@ -319,7 +312,6 @@ static void resource_transform_rejects_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies null, undersized, and missing-callback provider descriptors
 // below binding-owned validation.
 static void resource_provider_rejects_raw_invalid_descriptors(void) {

@@ -4,7 +4,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-// PRUNING REVIEW: KEEP.
 // This verifies null render-session handles across backend-neutral maintenance
 // entry points.
 static void render_session_maintenance_rejects_null_raw_handles(void) {
@@ -19,7 +18,6 @@ static void render_session_maintenance_rejects_null_raw_handles(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies the raw registry rejects destroyed render-session handles after
 // binding handle state would intervene.
 static void render_session_rejects_stale_raw_handles(void) {

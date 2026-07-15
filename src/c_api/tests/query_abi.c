@@ -6,7 +6,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-// PRUNING REVIEW: KEEP.
 // This verifies undersized query geometry, unknown masks, and invalid string
 // views hidden by binding values.
 static void feature_query_validation_rejects_raw_descriptor_shapes(void) {

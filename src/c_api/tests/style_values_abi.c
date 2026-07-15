@@ -4,7 +4,6 @@
 #include "test_support.h"
 #include "unity.h"
 
-// PRUNING REVIEW: KEEP.
 // This verifies malformed coordinate counts and unknown rasterization enum
 // values hidden by binding value types.
 static void style_value_helpers_reject_unsafe_raw_descriptors(void) {

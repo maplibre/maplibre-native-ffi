@@ -81,7 +81,6 @@ static void shrink_metal_owned(mln_metal_owned_texture_descriptor* descriptor) {
   descriptor->context.size = sizeof(mln_metal_context_descriptor) - 1;
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required Metal surface handles.
 static void metal_surface_attach_rejects_unsafe_raw_inputs(void) {
@@ -91,7 +90,6 @@ static void metal_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required Metal texture handles.
 static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
@@ -101,7 +99,6 @@ static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nested extent sizing and required borrowed Metal texture
 // handles hidden by binding descriptors.
 static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
@@ -192,7 +189,6 @@ static void shrink_opengl_owned(
   shrink_opengl_context(&descriptor->context);
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required OpenGL texture handles.
 static void opengl_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
@@ -202,7 +198,6 @@ static void opengl_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required OpenGL surface handles.
 static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
@@ -212,7 +207,6 @@ static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nested sizes and required raw texture values that typed OpenGL
 // descriptors prevent.
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
@@ -289,7 +283,6 @@ static void shrink_vulkan_owned(
   descriptor->context.size = sizeof(mln_vulkan_context_descriptor) - 1;
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required Vulkan surface handles.
 static void vulkan_surface_attach_rejects_unsafe_raw_inputs(void) {
@@ -299,7 +292,6 @@ static void vulkan_surface_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nulls, a non-null output handle, undersized descriptors, and
 // missing required Vulkan texture handles.
 static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
@@ -309,7 +301,6 @@ static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
   );
 }
 
-// PRUNING REVIEW: KEEP.
 // This verifies nested descriptor sizes and required borrowed Vulkan image
 // handles hidden by bindings.
 static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
