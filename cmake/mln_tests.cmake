@@ -4,63 +4,78 @@ function(mln_add_c_api_test)
   if(NOT test_supported)
     return()
   endif()
-  get_target_property(zig_target mln_ffi_platform_dependencies
-                      MLN_FFI_ZIG_TEST_TARGET)
-  if(NOT zig_target)
-    get_target_property(zig_target mln_ffi_platform_dependencies
-                        MLN_FFI_ZIG_TARGET)
-  endif()
-
-  get_target_property(dependency_include_dirs mln_ffi_render_dependencies
-                      MLN_FFI_INCLUDE_DIRS)
-  get_target_property(dependency_library_dirs mln_ffi_render_dependencies
-                      MLN_FFI_LIBRARY_DIRS)
   get_target_property(dependency_runtime_dirs mln_ffi_render_dependencies
                       MLN_FFI_RUNTIME_DIRS)
+  get_target_property(dependency_include_dirs mln_ffi_render_dependencies
+                      MLN_FFI_INCLUDE_DIRS)
+  if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
+    set(dependency_runtime_dirs "")
+  endif()
+  if("${dependency_include_dirs}" MATCHES "-NOTFOUND$")
+    set(dependency_include_dirs "")
+  endif()
 
-  foreach(variable IN ITEMS dependency_include_dirs dependency_library_dirs
-          dependency_runtime_dirs)
-    if("${${variable}}" MATCHES "-NOTFOUND$")
-      set(${variable} "")
+  include(FetchContent)
+  fetchcontent_declare(
+    unity
+    URL https://github.com/ThrowTheSwitch/Unity/archive/refs/tags/v2.6.1.tar.gz
+    URL_HASH
+      SHA256=b41a66d45a6b99758fb3202ace6178177014d52fc524bf1f72687d93e9867292
+    EXCLUDE_FROM_ALL)
+  fetchcontent_makeavailable(unity)
+
+  set(test_sources
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/core_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/map_options_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/render_backend_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/owned_texture_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/query_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/resources_abi.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/style_values_abi.c)
+  add_executable(mln_c_api_tests ${test_sources})
+  set_target_properties(
+    mln_c_api_tests
+    PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
+  target_link_libraries(
+    mln_c_api_tests
+    PRIVATE maplibre_native_c unity::framework MLN_FFI::RenderDependencies)
+  target_include_directories(
+    mln_c_api_tests
+    PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})
+
+  if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+    target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_BACKEND_METAL=1)
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
+    target_compile_definitions(
+      mln_c_api_tests
+      PRIVATE MLN_TEST_BACKEND_OPENGL=1)
+    if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
+      target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_OPENGL_WGL=1)
+    else()
+      target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_OPENGL_EGL=1)
     endif()
-  endforeach()
-
-  set(zig_args
-      build test "-Dtarget=${zig_target}"
-      "-Dnative-install-dir=${CMAKE_INSTALL_PREFIX}"
-      "-Drender-backend=${MLN_FFI_RENDER_BACKEND}")
-  foreach(dependency_include_dir IN LISTS dependency_include_dirs)
-    list(APPEND zig_args "-Ddependency-include-dir=${dependency_include_dir}")
-  endforeach()
-  foreach(dependency_library_dir IN LISTS dependency_library_dirs)
-    list(APPEND zig_args "-Ddependency-library-dir=${dependency_library_dir}")
-  endforeach()
-
-  get_target_property(test_system_root mln_ffi_platform_dependencies
-                      MLN_FFI_TEST_SYSTEM_ROOT)
-  if(test_system_root)
-    list(APPEND zig_args "-Dsystem-root=${test_system_root}")
+  elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+    target_compile_definitions(
+      mln_c_api_tests
+      PRIVATE MLN_TEST_BACKEND_VULKAN=1)
   endif()
-  get_target_property(zig_libc_sysroot mln_ffi_platform_dependencies
-                      MLN_FFI_ZIG_LIBC_SYSROOT)
-  if(zig_libc_sysroot)
-    list(APPEND zig_args --libc
-         "${CMAKE_INSTALL_PREFIX}/share/maplibre-native-c/zig-libc")
-  endif()
-  list(
-    APPEND
-    zig_args
-    --test-timeout
-    120s
-    --summary
-    all
-    --verbose)
 
-  add_test(
-    NAME c-api
-    COMMAND zig ${zig_args}
-    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/src/c_api/tests/zig")
-  set_tests_properties(c-api PROPERTIES TIMEOUT 180)
+  if(NOT WIN32)
+    find_package(Threads REQUIRED)
+    target_link_libraries(mln_c_api_tests PRIVATE Threads::Threads)
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_test(
+      NAME c-api
+      COMMAND
+        bash ${PROJECT_SOURCE_DIR}/scripts/run-ios-simulator-test.sh
+        $<TARGET_FILE:mln_c_api_tests>)
+  else()
+    add_test(NAME c-api COMMAND mln_c_api_tests)
+  endif()
 
   get_target_property(test_library_path_variable mln_ffi_platform_dependencies
                       MLN_FFI_TEST_LIBRARY_PATH_VARIABLE)
