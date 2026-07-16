@@ -5,11 +5,41 @@ case "$(uname -s)" in
   *) return 0 ;;
 esac
 
-if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" ]]; then
+case "$(uname -m)" in
+  aarch64 | arm64) msvc_arch=arm64 ;;
+  x86_64 | amd64) msvc_arch=x64 ;;
+  *) echo "Unsupported Windows host architecture: $(uname -m)" >&2; return 1 ;;
+esac
+
+standalone_llvm_bin='/c/Program Files/LLVM/bin'
+prefer_standalone_llvm() {
+  if [[ ! -x "$standalone_llvm_bin/clang-cl.exe" ]]; then
+    echo "Standalone LLVM's clang-cl.exe was not found in $standalone_llvm_bin" >&2
+    return 1
+  fi
+
+  IFS=: read -r -a path_entries <<< "$PATH"
+  filtered_path=
+  for entry in "${path_entries[@]}"; do
+    [[ "$entry" == "$standalone_llvm_bin" ]] && continue
+    filtered_path="${filtered_path:+$filtered_path:}$entry"
+  done
+  export PATH="$standalone_llvm_bin${filtered_path:+:$filtered_path}"
+
+  if [[ -f "$standalone_llvm_bin/libclang.dll" ]]; then
+    export LIBCLANG_PATH="$standalone_llvm_bin"
+  fi
+}
+
+original_path="$PATH"
+prefer_standalone_llvm || return 1
+
+current_vscmd_arch="${VSCMD_ARG_TGT_ARCH:-}"
+if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" &&
+  "${current_vscmd_arch,,}" == "$msvc_arch" ]]; then
   return 0
 fi
 
-original_path="$PATH"
 vswhere='/c/Program Files (x86)/Microsoft Visual Studio/Installer/vswhere.exe'
 if [[ ! -x "$vswhere" ]]; then
   echo "Visual Studio Installer's vswhere.exe was not found" >&2
@@ -23,12 +53,6 @@ if [[ -z "$vs_install" ]]; then
   echo "Visual Studio 2022 with the Desktop development with C++ workload was not found" >&2
   return 1
 fi
-
-case "$(uname -m)" in
-  aarch64 | arm64) msvc_arch=arm64; llvm_arch=ARM64 ;;
-  x86_64 | amd64) msvc_arch=x64; llvm_arch=x64 ;;
-  *) echo "Unsupported Windows host architecture: $(uname -m)" >&2; return 1 ;;
-esac
 
 vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
 loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
@@ -54,20 +78,10 @@ while IFS='=' read -r name value; do
   esac
 done < <(tr -d '\r' <<< "$environment")
 
-llvm_bin="$(cygpath -u "${vs_install}\\VC\\Tools\\Llvm\\${llvm_arch}\\bin")"
-winget_llvm_bin='/c/Program Files/LLVM/bin'
-if [[ -f "$winget_llvm_bin/libclang.dll" ]]; then
-  export LIBCLANG_PATH="$winget_llvm_bin"
-  clang_path="$winget_llvm_bin"
-elif [[ -f "$llvm_bin/libclang.dll" ]]; then
-  export LIBCLANG_PATH="$llvm_bin"
-  clang_path="$llvm_bin"
-fi
-
 redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
 crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
 if [[ -n "$crt_path" ]]; then
   crt_path="$(dirname "$crt_path")"
 fi
 
-export PATH="${crt_path:+$crt_path:}${msvc_path:+$msvc_path:}${clang_path:+$clang_path:}$original_path"
+export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${msvc_path:+$msvc_path:}$original_path"
