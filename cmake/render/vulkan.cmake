@@ -1,6 +1,6 @@
 function(mln_configure_render_dependencies target)
   set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
-  if(CMAKE_GENERATOR_PLATFORM STREQUAL "ARM64"
+  if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"
      OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
     set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib/arm64 Lib Lib32)
   endif()

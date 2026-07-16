@@ -89,10 +89,31 @@
     {
       "name": "_windows",
       "hidden": true,
-      "inherits": "_base",
-      "generator": "Visual Studio 17 2022",
+      "inherits": "_single-config",
       "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
         "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+      }
+    },
+    {
+      "name": "_windows-x64",
+      "hidden": true,
+      "inherits": "_windows",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_TARGET": "x86_64-pc-windows-msvc",
+        "CMAKE_CXX_COMPILER_TARGET": "x86_64-pc-windows-msvc",
+        "MLN_FFI_TARGET_ARCHITECTURE": "x64"
+      }
+    },
+    {
+      "name": "_windows-arm64",
+      "hidden": true,
+      "inherits": "_windows",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER_TARGET": "aarch64-pc-windows-msvc",
+        "CMAKE_CXX_COMPILER_TARGET": "aarch64-pc-windows-msvc",
+        "MLN_FFI_TARGET_ARCHITECTURE": "arm64"
       }
     },
     {
@@ -201,26 +222,22 @@
     {
       "name": "windows-x64-wgl",
       "displayName": "Windows x64 WGL",
-      "inherits": ["_windows", "_wgl"],
-      "architecture": "x64"
+      "inherits": ["_windows-x64", "_wgl"]
     },
     {
       "name": "windows-x64-vulkan",
       "displayName": "Windows x64 Vulkan",
-      "inherits": ["_windows", "_vulkan"],
-      "architecture": "x64"
+      "inherits": ["_windows-x64", "_vulkan"]
     },
     {
       "name": "windows-arm64-wgl",
       "displayName": "Windows ARM64 WGL",
-      "inherits": ["_windows", "_wgl"],
-      "architecture": "ARM64"
+      "inherits": ["_windows-arm64", "_wgl"]
     },
     {
       "name": "windows-arm64-vulkan",
       "displayName": "Windows ARM64 Vulkan",
-      "inherits": ["_windows", "_vulkan"],
-      "architecture": "ARM64"
+      "inherits": ["_windows-arm64", "_vulkan"]
     }
   ],
   "buildPresets": [

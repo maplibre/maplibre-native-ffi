@@ -191,13 +191,20 @@ function(mln_set_c_api_output_properties target)
 endfunction()
 
 function(mln_configure_c_api_compile_options target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/GR->)
+    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+      target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX>:/MP>)
+    endif()
+  else()
+    target_compile_options(
+      ${target}
+      PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-fno-rtti>)
+  endif()
+
   target_compile_options(
     ${target}
-    PRIVATE
-      $<$<AND:$<COMPILE_LANGUAGE:CXX,OBJCXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
-      $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<CXX_COMPILER_ID:MSVC>>:/MP>
-      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
-      $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
+    PRIVATE $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 endfunction()
 
 function(mln_configure_c_api_implementation target)

@@ -23,6 +23,11 @@ function(mln_add_c_api_test)
       SHA256=b41a66d45a6b99758fb3202ace6178177014d52fc524bf1f72687d93e9867292
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(unity)
+  if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+    # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
+    # match the framework's MSVC warning behavior.
+    target_compile_options(unity PRIVATE -Wno-everything)
+  endif()
 
   set(test_sources
       ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c

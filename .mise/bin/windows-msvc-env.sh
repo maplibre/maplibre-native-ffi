@@ -58,8 +58,10 @@ llvm_bin="$(cygpath -u "${vs_install}\\VC\\Tools\\Llvm\\${llvm_arch}\\bin")"
 winget_llvm_bin='/c/Program Files/LLVM/bin'
 if [[ -f "$winget_llvm_bin/libclang.dll" ]]; then
   export LIBCLANG_PATH="$winget_llvm_bin"
+  clang_path="$winget_llvm_bin"
 elif [[ -f "$llvm_bin/libclang.dll" ]]; then
   export LIBCLANG_PATH="$llvm_bin"
+  clang_path="$llvm_bin"
 fi
 
 redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
@@ -68,4 +70,4 @@ if [[ -n "$crt_path" ]]; then
   crt_path="$(dirname "$crt_path")"
 fi
 
-export PATH="${crt_path:+$crt_path:}${msvc_path:+$msvc_path:}$original_path"
+export PATH="${crt_path:+$crt_path:}${msvc_path:+$msvc_path:}${clang_path:+$clang_path:}$original_path"
