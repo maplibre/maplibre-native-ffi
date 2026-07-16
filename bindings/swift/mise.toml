@@ -1,34 +1,54 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-set -euo pipefail
-if [[ "$MISE_ENV" == ios-simulator-* ]]; then
-  swift build \
-    --product MaplibreNativeIOSSimulatorTests \
-    --scratch-path ".build/$MISE_ENV" \
-    --sdk "$MLN_FFI_SYSTEM_ROOT" \
-    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE" \
-    -Xswiftc -enable-testing \
-    -Xlinker -rpath \
-    -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
-elif [[ "$MISE_ENV" == ios-* ]]; then
-  swift build \
-    --scratch-path ".build/$MISE_ENV" \
-    --sdk "$MLN_FFI_SYSTEM_ROOT" \
-    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE"
-else
-  swift build --scratch-path ".build/$MISE_ENV"
-fi
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+swift_args=(--scratch-path ".build/$usage_preset")
+swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+swift build --target MaplibreNative "${swift_args[@]}"
 '''
 
 [tasks.test]
-depends = [":build"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
-if [[ "$MISE_ENV" == ios-simulator-* ]]; then
-  bash "$MLN_FFI_REPO_ROOT/scripts/run-ios-simulator-test.sh" \
-    ".build/$MISE_ENV/$MLN_FFI_SWIFT_TARGET_BIN_DIR/debug/MaplibreNativeIOSSimulatorTests"
-else
-  swift test --scratch-path ".build/$MISE_ENV"
-fi
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+swift test \
+  --scratch-path ".build/$usage_preset" \
+  -Xlinker -rpath \
+  -Xlinker "$native_install_dir/lib"
 swift package describe --type json >/dev/null
+'''
+
+[tasks."build:ios-simulator"]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
+sdk="$(xcrun --sdk iphonesimulator --show-sdk-path)"
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
+  swift build \
+    --product MaplibreNativeIOSSimulatorTests \
+    --scratch-path .build/ios-simulator \
+    --sdk "$sdk" \
+    --triple arm64-apple-ios14.3-simulator \
+    -Xswiftc -enable-testing \
+    -Xlinker -rpath \
+    -Xlinker "$native_install_dir/lib" \
+    -Xlinker -rpath \
+    -Xlinker "$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
+'''
+
+[tasks."build:ios"]
+depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
+sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
+  swift build \
+    --product MaplibreNative \
+    --scratch-path .build/ios \
+    --sdk "$sdk" \
+    --triple arm64-apple-ios14.3
 '''

@@ -1,0 +1,4 @@
+{
+  "renderBackend": "@MLN_FFI_RENDER_BACKEND@",
+  "zigTarget": "@MLN_FFI_ZIG_TARGET@"
+}

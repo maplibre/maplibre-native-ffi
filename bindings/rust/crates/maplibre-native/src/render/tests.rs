@@ -860,6 +860,30 @@ impl OpenGLTestContext {
             Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
         }
     }
+
+    #[cfg(target_os = "windows")]
+    fn read_surface_rgba(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
+        self.make_current()?;
+        let mut pixels = vec![0_u8; width as usize * height as usize * 4];
+        unsafe {
+            self.gl.read_buffer(glow::FRONT);
+            self.gl.read_pixels(
+                0,
+                0,
+                width as i32,
+                height as i32,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(Some(&mut pixels)),
+            );
+        }
+        self.check_gl_error("read OpenGL surface")?;
+        Ok(pixels)
+    }
 }
 
 struct OpenGLBorrowedTexture {
@@ -1095,15 +1119,20 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    if let Ok(library_dir) = std::env::var("MLN_FFI_DEPENDENCY_LIBRARY_DIR") {
+    if let Ok(install_dir) = std::env::var("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
+        let library_dir = std::path::Path::new(&install_dir).join(if cfg!(target_os = "windows") {
+            "bin"
+        } else {
+            "lib"
+        });
         let library_name = if cfg!(target_os = "macos") {
-            "libvulkan.dylib"
+            "libvulkan.1.dylib"
         } else if cfg!(target_os = "windows") {
             "vulkan-1.dll"
         } else {
             "libvulkan.so.1"
         };
-        let library_path = std::path::Path::new(&library_dir).join(library_name);
+        let library_path = library_dir.join(library_name);
         if library_path.exists() {
             // SAFETY: Loading the Vulkan loader is delegated to ash.
             return unsafe { ash::Entry::load_from(&library_path) }.map_err(Into::into);
@@ -1362,6 +1391,27 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     assert!(!frame.texture().unwrap().is_zero());
     frame.close().unwrap();
 
+    #[cfg(target_os = "windows")]
+    {
+        let info = session.texture_image_info().unwrap();
+        assert_eq!((info.width, info.height), (32, 16));
+        assert!(info.stride >= info.width * 4);
+        assert!(info.byte_length >= info.stride as usize * info.height as usize);
+
+        let mut undersized = vec![0x7f; info.byte_length - 1];
+        let error = session
+            .read_premultiplied_rgba8_into(&mut undersized)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+        assert!(undersized.iter().all(|byte| *byte == 0x7f));
+
+        let mut pixels = vec![0; info.byte_length];
+        let copied_info = session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+        assert_eq!(copied_info, info);
+        assert!(pixels.iter().any(|byte| *byte != 0));
+    }
+
     session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
@@ -1386,6 +1436,12 @@ fn opengl_surface_session_renders_with_platform_context() {
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     session.render_update().unwrap();
+
+    #[cfg(target_os = "windows")]
+    {
+        let pixels = _context.read_surface_rgba(32, 16).unwrap();
+        assert!(pixels.iter().any(|byte| *byte != 0));
+    }
 
     session.close().unwrap();
     map.close().unwrap();

@@ -10,6 +10,7 @@ extern void goMaplibreCustomGeometryFetchTile(void* user_data, mln_canonical_til
 extern void goMaplibreCustomGeometryCancelTile(void* user_data, mln_canonical_tile_id tile_id);
 */
 import "C"
+
 import (
 	"runtime/cgo"
 	"sync"
@@ -72,9 +73,9 @@ func AddCustomGeometrySource(m unsafe.Pointer, sourceID string, options CustomGe
 
 	raw := C.mln_custom_geometry_source_options_default()
 	raw.fields = C.uint32_t(options.Fields)
-	raw.fetch_tile = (C.mln_custom_geometry_source_tile_callback)(C.goMaplibreCustomGeometryFetchTile)
+	raw.fetch_tile = C.mln_custom_geometry_source_tile_callback(C.goMaplibreCustomGeometryFetchTile)
 	if options.CancelTile != nil {
-		raw.cancel_tile = (C.mln_custom_geometry_source_tile_callback)(C.goMaplibreCustomGeometryCancelTile)
+		raw.cancel_tile = C.mln_custom_geometry_source_tile_callback(C.goMaplibreCustomGeometryCancelTile)
 	}
 	raw.user_data = C.mln_go_handle_to_pointer(C.uintptr_t(state.handle))
 	raw.min_zoom = C.double(options.MinZoom)

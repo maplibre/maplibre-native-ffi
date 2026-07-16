@@ -2,12 +2,24 @@
 run = "scripts/generate-clangsharp.sh"
 
 [tasks.build]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = 'dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"'
+dir = "../.."
+run = '''
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet build \
+    Maplibre.Native.slnx \
+    -p:Platform="Any CPU"
+'''
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = 'dotnet test bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj -p:Platform="Any CPU"'
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  dotnet test \
+    bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj \
+    -p:Platform="Any CPU"
+'''

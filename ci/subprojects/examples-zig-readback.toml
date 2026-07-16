@@ -1,5 +1,0 @@
-[requires]
-os = ["linux", "macos", "windows"]
-
-[ci]
-run = "//examples/zig-readback:run"

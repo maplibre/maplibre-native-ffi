@@ -16,4 +16,4 @@ docker run --rm \
   --env EGL_PLATFORM=surfaceless \
   --env LIBGL_ALWAYS_SOFTWARE=true \
   maplibre-native-ffi-devcontainer:local \
-  bash -lc 'mise --version && eval "$(mise activate bash)" && pixi --version && zig version && node --version'
+  bash -lc 'mise --version && eval "$(mise activate bash)" && cc --version && zig version && node --version'

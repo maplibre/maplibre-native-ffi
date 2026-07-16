@@ -58,6 +58,7 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 		t.Fatalf("CancelTransitions(): %v", err)
 	}
 }
+
 func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -110,6 +111,7 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 		t.Fatalf("PitchByAnimated(): %v", err)
 	}
 }
+
 func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -178,6 +180,7 @@ func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 		t.Fatalf("Bounds().Bounds = %#v, want %#v", gotConstraints.Bounds, bounds)
 	}
 }
+
 func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -212,6 +215,7 @@ func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
 		t.Fatalf("SetFreeCameraOptions(current values): %v", err)
 	}
 }
+
 func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -252,6 +256,7 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 		t.Fatalf("SetFreeCameraOptions(invalid orientation) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -320,6 +325,7 @@ func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 		t.Fatalf("ProjectionMode().Axonometric = %v", gotProjectionMode.Axonometric)
 	}
 }
+
 func TestTileOptionsRejectInvalidPrefetchZoomDelta(t *testing.T) {
 	lockOSThreadForTest(t)
 

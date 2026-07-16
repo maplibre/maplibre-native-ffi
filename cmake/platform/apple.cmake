@@ -22,7 +22,88 @@ function(mln_configure_apple_toolchain_defaults)
   endif()
 endfunction()
 
-function(mln_configure_apple_platform target)
+function(mln_configure_platform_dependencies target)
+  target_link_libraries(
+    ${target}
+    INTERFACE
+      "-framework CoreFoundation" "-framework CoreGraphics"
+      "-framework CoreText" "-framework Foundation" "-framework ImageIO" z)
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_DEFAULT_LOGGING_STDERR TRUE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
+      MLN_FFI_SHARED_SUPPORTED TRUE)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set_property(TARGET ${target} PROPERTY MLN_FFI_ZIG_TARGET aarch64-ios)
+    if(CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+      set_target_properties(
+        ${target}
+        PROPERTIES
+          MLN_FFI_ZIG_TARGET aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
+    else()
+      set_target_properties(
+        ${target}
+        PROPERTIES MLN_FFI_SHARED_SUPPORTED FALSE MLN_FFI_TEST_SUPPORTED FALSE)
+    endif()
+  else()
+    set_target_properties(
+      ${target}
+      PROPERTIES MLN_FFI_ZIG_TARGET aarch64-macos MLN_FFI_TEST_SUPPORTED TRUE)
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(MLN_FFI_ZIG_LIBC_SYSROOT "${CMAKE_OSX_SYSROOT}")
+    if(NOT IS_ABSOLUTE "${MLN_FFI_ZIG_LIBC_SYSROOT}")
+      execute_process(
+        COMMAND xcrun --sdk "${MLN_FFI_ZIG_LIBC_SYSROOT}" --show-sdk-path
+        OUTPUT_VARIABLE
+          MLN_FFI_ZIG_LIBC_SYSROOT OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_ZIG_LIBC_SYSROOT "${MLN_FFI_ZIG_LIBC_SYSROOT}"
+        MLN_FFI_ZIG_LIBC_INCLUDE_DIR "${MLN_FFI_ZIG_LIBC_SYSROOT}/usr/include"
+        MLN_FFI_ZIG_LIBC_CRT_DIR "")
+    set(MLN_FFI_APPLE_SDK "${MLN_FFI_ZIG_LIBC_SYSROOT}")
+  else()
+    set(MLN_FFI_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
+    if(NOT MLN_FFI_APPLE_SDK)
+      set(MLN_FFI_APPLE_SDK macosx)
+    endif()
+    if(NOT IS_ABSOLUTE "${MLN_FFI_APPLE_SDK}")
+      execute_process(
+        COMMAND xcrun --sdk "${MLN_FFI_APPLE_SDK}" --show-sdk-path
+        OUTPUT_VARIABLE MLN_FFI_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
+        COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+  endif()
+
+  find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
+  list(GET CMAKE_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
+  set(MLN_FFI_RELOCATABLE_LINK_OPTIONS -arch "${MLN_FFI_OSX_ARCHITECTURE}"
+      -syslibroot "${MLN_FFI_APPLE_SDK}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if(CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+      set(MLN_FFI_APPLE_PLATFORM ios-simulator)
+    else()
+      set(MLN_FFI_APPLE_PLATFORM ios)
+    endif()
+  else()
+    set(MLN_FFI_APPLE_PLATFORM macos)
+  endif()
+  list(
+    APPEND MLN_FFI_RELOCATABLE_LINK_OPTIONS -platform_version
+    "${MLN_FFI_APPLE_PLATFORM}" "${CMAKE_OSX_DEPLOYMENT_TARGET}"
+    "${CMAKE_OSX_DEPLOYMENT_TARGET}")
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_ARCHIVE_FORMAT apple MLN_FFI_ARCHIVE_TOOL "${MLN_FFI_LIBTOOL}"
+      MLN_FFI_RELOCATABLE_LINK_OPTIONS "${MLN_FFI_RELOCATABLE_LINK_OPTIONS}")
+endfunction()
+
+function(mln_configure_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
       ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
@@ -49,14 +130,7 @@ function(mln_configure_apple_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE
-      mbgl-vendor-metal-cpp
-      "-framework CoreFoundation"
-      "-framework CoreGraphics"
-      "-framework CoreText"
-      "-framework Foundation"
-      "-framework ImageIO"
-      z)
+    PRIVATE mbgl-vendor-metal-cpp MLN_FFI::PlatformDependencies)
 
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_target_properties(

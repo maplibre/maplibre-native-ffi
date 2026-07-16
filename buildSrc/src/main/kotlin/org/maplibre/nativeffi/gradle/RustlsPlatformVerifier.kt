@@ -6,19 +6,27 @@ import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 
 object RustlsPlatformVerifier {
+  private val ignoredEnvironmentVariables =
+    setOf(
+      "MISE_ENV",
+      "CARGO_BUILD_TARGET",
+      "MLN_FFI_RENDER_BACKEND",
+      "MLN_FFI_NATIVE_INSTALL_DIR",
+      "MLN_FFI_HOST_LIBRARY_DIRS",
+      "ANDROID_NDK_HOME",
+    )
+
   fun mavenDir(project: Project): Provider<File> =
     project.providers
       .exec {
         workingDir = project.rootProject.projectDir
-        val androidTarget = AndroidTarget.rustlsMetadataCargoTarget()
+        environment.keys.removeAll(ignoredEnvironmentVariables)
         commandLine(
           "cargo",
           "metadata",
           "--locked",
           "--format-version",
           "1",
-          "--filter-platform",
-          androidTarget,
           "--manifest-path",
           "src/platform/rust/Cargo.toml",
         )

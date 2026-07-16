@@ -1,5 +1,7 @@
 package maplibre
 
-type nativeRuntime struct{ _ byte }
-type nativeMap struct{ _ byte }
-type nativeRenderSession struct{ _ byte }
+type (
+	nativeRuntime       struct{ _ byte }
+	nativeMap           struct{ _ byte }
+	nativeRenderSession struct{ _ byte }
+)

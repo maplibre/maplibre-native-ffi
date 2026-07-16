@@ -1,7 +1,55 @@
-function(mln_configure_ohos_platform target)
-  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
+function(mln_configure_platform_dependencies target)
+  target_compile_definitions(${target} INTERFACE VK_USE_PLATFORM_OHOS=1)
+  if(NOT CMAKE_SYSROOT)
+    message(FATAL_ERROR "The OHOS toolchain must define CMAKE_SYSROOT")
+  endif()
+  if(NOT CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    message(
+      FATAL_ERROR "Unsupported OHOS architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  foreach(
+    library
+    IN
+    ITEMS
+    image_source
+    pixelmap
+    hilog_ndk.z
+    net_http
+    uv
+    z)
+    string(MAKE_C_IDENTIFIER "${library}" identifier)
+    find_library(MLN_FFI_OHOS_${identifier}_LIBRARY NAMES "${library}" REQUIRED)
+    target_link_libraries(
+      ${target}
+      INTERFACE "${MLN_FFI_OHOS_${identifier}_LIBRARY}")
+  endforeach()
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_DEFAULT_LOGGING_STDERR
+      FALSE
+      MLN_FFI_DEFAULT_THREAD_LOCAL
+      TRUE
+      MLN_FFI_SHARED_SUPPORTED
+      TRUE
+      MLN_FFI_ARCHIVE_FORMAT
+      elf
+      MLN_FFI_STATIC_ARCHIVES
+      mbgl-vendor-icu
+      MLN_FFI_TEST_SUPPORTED
+      FALSE
+      MLN_FFI_ZIG_TARGET
+      aarch64-linux-ohos
+      MLN_FFI_ZIG_LIBC_SYSROOT
+      "${CMAKE_SYSROOT}"
+      MLN_FFI_ZIG_LIBC_INCLUDE_DIR
+      "${CMAKE_SYSROOT}/usr/include/aarch64-linux-ohos"
+      MLN_FFI_ZIG_LIBC_CRT_DIR
+      "${CMAKE_SYSROOT}/usr/lib/aarch64-linux-ohos")
+endfunction()
 
-  find_library(MLN_FFI_OHOS_NET_HTTP_LIBRARY NAMES net_http REQUIRED)
+function(mln_configure_platform target)
+  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
   set_source_files_properties(
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
@@ -42,12 +90,5 @@ function(mln_configure_ohos_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE
-      image_source
-      mbgl-vendor-icu
-      pixelmap
-      hilog_ndk.z
-      ${MLN_FFI_OHOS_NET_HTTP_LIBRARY}
-      uv
-      z)
+    PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
 endfunction()

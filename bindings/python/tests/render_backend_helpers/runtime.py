@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import time
 
 import pytest
@@ -16,14 +15,20 @@ def is_configured_render_backend(
     *,
     context_provider: str | None = None,
 ) -> bool:
-    if os.environ.get("MLN_FFI_RENDER_BACKEND", "").lower() != backend:
+    backend_flag = {
+        "metal": mln.RenderBackend.METAL,
+        "opengl": mln.RenderBackend.OPENGL,
+        "vulkan": mln.RenderBackend.VULKAN,
+    }[backend]
+    if not mln.supported_render_backends() & backend_flag:
         return False
     if context_provider is None:
         return True
-    return (
-        os.environ.get("MLN_FFI_OPENGL_CONTEXT_PROVIDER", "").lower()
-        == context_provider
-    )
+    context_provider_flag = {
+        "egl": mln.OpenGLContextProvider.EGL,
+        "wgl": mln.OpenGLContextProvider.WGL,
+    }[context_provider]
+    return bool(mln.supported_opengl_context_providers() & context_provider_flag)
 
 
 def skip_or_fail_fixture_setup(

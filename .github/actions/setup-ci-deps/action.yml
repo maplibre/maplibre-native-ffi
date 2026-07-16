@@ -1,6 +1,11 @@
 name: Setup CI deps
-description: Install sccache and mise toolchain
+description: Install the toolchain and target-specific CI prerequisites
 
+inputs:
+  target:
+    description: Native target name
+    required: false
+    default: host
 runs:
   using: composite
   steps:
@@ -21,7 +26,7 @@ runs:
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
     - name: Use Linux software graphics drivers
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
       shell: bash
       run: |
         sudo apt-get update
@@ -38,11 +43,11 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Use Windows Vulkan software driver
-      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-vulkan') }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
       uses: ./.github/actions/setup-windows-vulkan-software
 
     - name: Use Windows OpenGL software driver
-      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-wgl') }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
@@ -55,14 +60,14 @@ runs:
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Cache OpenHarmony SDK
-      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      if: ${{ startsWith(inputs.target, 'ohos-') }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/setup-ohos-sdk
-        key: ohos-sdk-v1-v6.1-${{ runner.os }}-${{ runner.arch }}
+        key: ohos-sdk-v3-v6.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Setup OpenHarmony SDK
-      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -78,7 +83,7 @@ runs:
             --pattern "${archive}*"
 
           cat "${archive}".a* > "$archive"
-          expected_sha="$(tr -d '[:space:]' < "${archive}.sha256")"
+          expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
           actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
           if [[ "$actual_sha" != "$expected_sha" ]]; then
             echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
@@ -105,12 +110,13 @@ runs:
       shell: pwsh
       run: |
         $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
-        # Git Bash maps /tmp to the checkout drive; create it before mise hooks run.
+        # Git Bash maps /tmp to the checkout drive; create it before mise tasks run.
         New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
 
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
+          "C:\Program Files\LLVM\bin",
           "C:\Program Files\Git\bin",
           "C:\Program Files\Git\usr\bin",
           "$env:SystemRoot\System32",
@@ -122,6 +128,9 @@ runs:
         ) | Where-Object { $_ -and (Test-Path $_) }
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
+        if (Test-Path "C:\Program Files\LLVM\bin\libclang.dll") {
+          "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+        }
 
         $gradleTemp = $env:RUNNER_TEMP -replace '\\', '/'
         $gradleOptions = "-Djava.io.tmpdir=$gradleTemp"
@@ -130,38 +139,34 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
-    # Windows ARM64 gets Vulkan libraries through mise/pixi, but glslangValidator
-    # is not available there yet; the Vulkan examples need it to precompile shaders.
-    - name: Install Windows ARM64 Vulkan SDK
-      if: ${{ env.MISE_ENV == 'windows-arm64-vulkan' }}
+    - name: Install Windows Vulkan SDK
+      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
       with:
         vulkan_version: 1.4.341.0
         cache: true
         stripdown: true
 
-    - name: Install mise toolchain
-      uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+    - name: Bootstrap repository
+      uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
       with:
         cache: true
-        cache_key_prefix: mise-v2
-        install: true
+        cache_key_prefix: mise-v4
+        bootstrap: true
+
+    # The mise action may restore Rust install metadata without the rustup
+    # toolchain, components, or cross targets declared in mise.toml.
+    - name: Repair cached Rust toolchain
+      shell: bash
+      run: MISE_NO_HOOKS=1 mise install --force rust
 
     - name: Wire sccache into CMake
       shell: bash
       run: |
-        mise_env="${MISE_ENV:-$(mise exec -- printenv MISE_ENV)}"
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=${mise_env%-*}"
+          echo "SCCACHE_GHA_VERSION=${{ inputs.target }}"
           echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
-
-    # The mise action may restore Rust install metadata without the rustup
-    # toolchain, components, or cross targets from mise.toml. Reinstall rust
-    # from mise config instead of redeclaring components/targets here.
-    - name: Ensure Rust toolchain
-      shell: bash
-      run: MISE_NO_HOOKS=1 mise install --force rust

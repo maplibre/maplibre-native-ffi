@@ -1,10 +1,28 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+'''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 mkdir -p zig-out
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" -- zig-out/zig-readback.ppm
+zig build run \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback.ppm
+'''
+run_windows = '''
+mkdir -p zig-out
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+zig build run \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- zig-out/zig-readback.ppm
 '''

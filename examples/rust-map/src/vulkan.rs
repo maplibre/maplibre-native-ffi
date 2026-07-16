@@ -330,8 +330,7 @@ impl Drop for BorrowedImage {
 }
 
 fn load_vulkan_entry() -> Result<ash::Entry, Box<dyn Error>> {
-    // SAFETY: Loading the Vulkan loader is delegated to ash. Repository tasks
-    // run through Pixi and expose the native library directory to this process.
+    // SAFETY: Loading the host Vulkan loader is delegated to ash.
     unsafe { ash::Entry::load() }.map_err(Into::into)
 }
 

@@ -10,9 +10,12 @@ internal static class NativeLibraryLoader
     internal const uint ExpectedAbiVersion = 0;
 
     private const string LibraryPathSwitch = "Maplibre.Native.LibraryPath";
+    private const string LibraryDirsSwitch = "Maplibre.Native.LibraryDirs";
     private const string LibraryPathEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH";
+    private const string LibraryDirsEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_DIRS";
 
     private static readonly object Gate = new();
+    private static readonly HashSet<string> LoadedRuntimeDependencies = new(StringComparer.Ordinal);
     private static bool installed;
     private static bool abiValidated;
     private static nint resolvedHandle;
@@ -39,6 +42,7 @@ internal static class NativeLibraryLoader
             nint handle;
             try
             {
+                LoadRuntimeDependenciesForPath(libraryPath);
                 handle = NativeLibrary.Load(libraryPath);
             }
             catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
@@ -94,12 +98,14 @@ internal static class NativeLibraryLoader
 
             foreach (var path in CandidatePaths())
             {
+                LoadRuntimeDependenciesForPath(path);
                 if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
                 {
                     return ValidateAndCacheResolvedHandle(handle);
                 }
             }
 
+            LoadRuntimeDependencies();
             if (NativeLibrary.TryLoad(libraryName, assembly, searchPath, out var standardHandle))
             {
                 return ValidateAndCacheResolvedHandle(standardHandle);
@@ -225,5 +231,115 @@ internal static class NativeLibraryLoader
         {
             yield return environmentPath;
         }
+    }
+
+    private static void LoadRuntimeDependencies()
+    {
+        foreach (var directory in CandidateLibraryDirs())
+        {
+            LoadRuntimeDependencies(directory);
+        }
+    }
+
+    private static void LoadRuntimeDependenciesForPath(string libraryPath)
+    {
+        var directory = Path.GetDirectoryName(libraryPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            LoadRuntimeDependencies(directory);
+        }
+
+        LoadRuntimeDependencies();
+    }
+
+    private static void LoadRuntimeDependencies(string directory)
+    {
+        foreach (var fileName in RuntimeDependencyFileNames())
+        {
+            var path = Path.Combine(directory, fileName);
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
+            var fullPath = Path.GetFullPath(path);
+            if (!LoadedRuntimeDependencies.Add(fullPath))
+            {
+                continue;
+            }
+
+            try
+            {
+                NativeLibrary.Load(fullPath);
+            }
+            catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
+            {
+                LoadedRuntimeDependencies.Remove(fullPath);
+                throw new UnsupportedFeatureException(
+                    MaplibreStatus.Unsupported,
+                    null,
+                    $"MapLibre Native runtime dependency could not be loaded from '{fullPath}'.",
+                    error
+                );
+            }
+        }
+    }
+
+    private static IEnumerable<string> CandidateLibraryDirs()
+    {
+        foreach (var directory in SplitLibraryDirs(AppContext.GetData(LibraryDirsSwitch) as string))
+        {
+            yield return directory;
+        }
+
+        foreach (
+            var directory in SplitLibraryDirs(
+                Environment.GetEnvironmentVariable(LibraryDirsEnvironment)
+            )
+        )
+        {
+            yield return directory;
+        }
+    }
+
+    private static IEnumerable<string> SplitLibraryDirs(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            yield break;
+        }
+
+        foreach (
+            var directory in value.Split(
+                Path.PathSeparator,
+                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+            )
+        )
+        {
+            yield return directory;
+        }
+    }
+
+    private static string[] RuntimeDependencyFileNames()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return ["vulkan-1.dll", "libEGL.dll", "libGLESv2.dll", "EGL.dll", "GLESv2.dll"];
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return ["libvulkan.1.dylib", "libvulkan.dylib", "libEGL.dylib", "libGLESv2.dylib"];
+        }
+
+        return
+        [
+            "libvulkan.so.1",
+            "libvulkan.so",
+            "libEGL.so.1",
+            "libEGL.so",
+            "libGLESv2.so.2",
+            "libGLESv2.so",
+        ];
     }
 }

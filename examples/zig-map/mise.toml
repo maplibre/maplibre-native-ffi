@@ -1,22 +1,33 @@
-[tasks.compile-shaders]
-hide = true
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-set -euo pipefail
-
-if [[ "$MLN_FFI_RENDER_BACKEND" == "vulkan" ]]; then
-  glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv
-  glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/sample.frag.spv
-fi
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
-[tasks.build]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
-
 [tasks.run]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-usage = 'arg "render-target"'
-run = 'zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" -- "{{ usage.render_target }}"'
+depends = ["//:build"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
+run = '''
+zig build run \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- "{{ usage.render_target }}"
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+zig build run \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -- "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

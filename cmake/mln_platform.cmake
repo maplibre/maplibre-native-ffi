@@ -1,7 +1,48 @@
+function(mln_validate_platform)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    return()
+  endif()
+
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+    set(MLN_FFI_DETECTED_ARCHITECTURE x64)
+  elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set(MLN_FFI_DETECTED_ARCHITECTURE arm64)
+  else()
+    message(
+      FATAL_ERROR "Unsupported Linux architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+  endif()
+  if(NOT MLN_FFI_TARGET_ARCHITECTURE STREQUAL MLN_FFI_DETECTED_ARCHITECTURE)
+    message(
+      FATAL_ERROR
+        "Linux preset targets ${MLN_FFI_TARGET_ARCHITECTURE}, but the compiler targets ${MLN_FFI_DETECTED_ARCHITECTURE} (${CMAKE_SYSTEM_PROCESSOR})")
+  endif()
+endfunction()
+
 if(APPLE)
   enable_language(OBJC)
   enable_language(OBJCXX)
 endif()
+
+function(mln_select_platform)
+  add_library(mln_ffi_platform_dependencies INTERFACE)
+  add_library(MLN_FFI::PlatformDependencies ALIAS mln_ffi_platform_dependencies)
+
+  if(APPLE)
+    include(platform/apple)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    include(platform/linux)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    include(platform/android)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    include(platform/ohos)
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    include(platform/windows)
+  else()
+    message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
+  endif()
+
+  mln_configure_platform_dependencies(mln_ffi_platform_dependencies)
+endfunction()
 
 function(mln_configure_platform_support target)
   set(MLN_FFI_VENDOR_PLATFORM_SOURCES
@@ -23,29 +64,19 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/platform/time.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/filesystem.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/utf.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/background_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/circle_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/color_relief_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/custom_drawable_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/custom_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/fill_extrusion_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/fill_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/heatmap_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/hillshade_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/layer_manager.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/line_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/location_indicator_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/raster_layer_factory.cpp
-      ${MLN_SOURCE_DIR}/src/mbgl/layermanager/symbol_layer_factory.cpp)
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/utf.cpp)
 
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  get_target_property(
+    MLN_FFI_DEFAULT_LOGGING_STDERR mln_ffi_platform_dependencies
+    MLN_FFI_DEFAULT_LOGGING_STDERR)
+  if(MLN_FFI_DEFAULT_LOGGING_STDERR)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp)
   endif()
 
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  get_target_property(MLN_FFI_DEFAULT_THREAD_LOCAL mln_ffi_platform_dependencies
+                      MLN_FFI_DEFAULT_THREAD_LOCAL)
+  if(MLN_FFI_DEFAULT_THREAD_LOCAL)
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
   endif()
@@ -68,22 +99,5 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/vendor/PMTiles/cpp
       ${MLN_SOURCE_DIR}/vendor/boost/include)
 
-  if(APPLE)
-    include(platform/apple)
-    mln_configure_apple_platform(${target})
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    include(platform/linux)
-    mln_configure_linux_platform(${target})
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-    include(platform/android)
-    mln_configure_android_platform(${target})
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-    include(platform/ohos)
-    mln_configure_ohos_platform(${target})
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-    include(platform/windows)
-    mln_configure_windows_platform(${target})
-  else()
-    message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
-  endif()
+  mln_configure_platform(${target})
 endfunction()

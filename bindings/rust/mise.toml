@@ -1,16 +1,84 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
-source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
-cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  cargo build \
+    -p maplibre-native-sys \
+    -p maplibre-native-core \
+    -p maplibre-native
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  cargo build \
+    -p maplibre-native-sys \
+    -p maplibre-native-core \
+    -p maplibre-native
 '''
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
-source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
-env LD_LIBRARY_PATH="$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
-cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-rpath,$native_install_dir/lib"
+if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
+  export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,-rpath,$MLN_FFI_VULKAN_LOADER_DIR"
+fi
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo test \
+  -p maplibre-native-sys \
+  -p maplibre-native-core \
+  -p maplibre-native \
+  -- --test-threads=1
+cargo clippy \
+  -p maplibre-native-sys \
+  -p maplibre-native-core \
+  -p maplibre-native \
+  --all-targets -- -D warnings
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+cargo test \
+  -p maplibre-native-sys \
+  -p maplibre-native-core \
+  -p maplibre-native \
+  -- --test-threads=1
+cargo clippy \
+  -p maplibre-native-sys \
+  -p maplibre-native-core \
+  -p maplibre-native \
+  --all-targets -- -D warnings
+'''
+
+[tasks."build:ohos"]
+usage = '''
+arg "<preset>" {
+  choices "ohos-arm64-egl" "ohos-arm64-vulkan"
+}
+'''
+depends = [
+  { task = "//:build", args = ["{{usage.preset}}"] },
+]
+dir = "../.."
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sysroot="$OHOS_SDK_NATIVE/sysroot"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos="--target=aarch64-linux-ohos --sysroot=$sysroot -I$sysroot/usr/include/aarch64-linux-ohos" \
+CC_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang --target=aarch64-linux-ohos --sysroot=$sysroot" \
+CXX_aarch64_unknown_linux_ohos="$OHOS_SDK_NATIVE/llvm/bin/clang++ --target=aarch64-linux-ohos --sysroot=$sysroot" \
+CARGO_TARGET_AARCH64_UNKNOWN_LINUX_OHOS_LINKER="$OHOS_SDK_NATIVE/llvm/bin/clang" \
+RUSTFLAGS="-C link-arg=--target=aarch64-linux-ohos -C link-arg=--sysroot=$sysroot -C link-arg=-fuse-ld=lld" \
+cargo build \
+  -p maplibre-native-sys \
+  -p maplibre-native-core \
+  -p maplibre-native \
+  --target aarch64-unknown-linux-ohos
 '''
