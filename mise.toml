@@ -87,10 +87,6 @@ dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosit
 
 [deps.submodules]
 auto = true
-# Sources/outputs let mise cache freshness so the sync runs on a fresh checkout
-# (outputs missing) or when the submodule set changes (.gitmodules edited), and
-# is skipped once the tree is populated. The outputs span the top submodule and
-# nested vendor submodules so an incomplete checkout is still detected as stale.
 sources = [".gitmodules"]
 outputs = [
   "third_party/maplibre-native/CMakeLists.txt",
