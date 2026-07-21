@@ -80,27 +80,10 @@ function(mln_configure_platform_dependencies target)
   endif()
 
   find_program(MLN_FFI_LIBTOOL NAMES libtool REQUIRED)
-  list(GET CMAKE_OSX_ARCHITECTURES 0 MLN_FFI_OSX_ARCHITECTURE)
-  set(MLN_FFI_RELOCATABLE_LINK_OPTIONS -arch "${MLN_FFI_OSX_ARCHITECTURE}"
-      -syslibroot "${MLN_FFI_APPLE_SDK}")
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    if(CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
-      set(MLN_FFI_APPLE_PLATFORM ios-simulator)
-    else()
-      set(MLN_FFI_APPLE_PLATFORM ios)
-    endif()
-  else()
-    set(MLN_FFI_APPLE_PLATFORM macos)
-  endif()
-  list(
-    APPEND MLN_FFI_RELOCATABLE_LINK_OPTIONS -platform_version
-    "${MLN_FFI_APPLE_PLATFORM}" "${CMAKE_OSX_DEPLOYMENT_TARGET}"
-    "${CMAKE_OSX_DEPLOYMENT_TARGET}")
   set_target_properties(
     ${target}
     PROPERTIES
-      MLN_FFI_ARCHIVE_FORMAT apple MLN_FFI_ARCHIVE_TOOL "${MLN_FFI_LIBTOOL}"
-      MLN_FFI_RELOCATABLE_LINK_OPTIONS "${MLN_FFI_RELOCATABLE_LINK_OPTIONS}")
+      MLN_FFI_ARCHIVE_FORMAT apple MLN_FFI_ARCHIVE_TOOL "${MLN_FFI_LIBTOOL}")
 endfunction()
 
 function(mln_configure_platform target)

@@ -54,6 +54,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 # Swift ecosystem
 "core:swift" = { version = "6.3.1", os = ["linux/x64"] }
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
+"github:xtool-org/xtool" = { version = "1.17.0", os = ["linux"] }
 
 # Other ecosystems
 "core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
