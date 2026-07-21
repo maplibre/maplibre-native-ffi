@@ -178,3 +178,25 @@ Read these docs whenever relevant:
   - <https://viteplus.dev/guide/monorepo>
   - <https://viteplus.dev/guide/lint>
   - <https://viteplus.dev/guide/run>
+
+## Cursor Cloud specific instructions
+
+The startup update script keeps the environment fresh; the notes below cover
+non-obvious gotchas for working on this codebase in a headless Linux x64 cloud
+VM. Standard commands live in the Workflow section above.
+
+- The host preset is `linux-x64-vulkan`, and rendering runs on a software
+  Vulkan backend, so `mise run //examples/zig-readback:run` renders a real map
+  to `examples/zig-readback/zig-out/zig-readback.ppm` with no display server.
+  Use it as the headless end-to-end smoke test.
+- The `third_party/maplibre-native` submodule (and its nested vendored
+  submodules) must be checked out before any native build. `mise install` does
+  not reliably trigger this, so run `.mise/bin/sync-submodules` if
+  `third_party/maplibre-native` is empty. The startup update script runs it.
+- The first `mise run build` compiles MapLibre Native from source and takes
+  several minutes; later builds are incremental and fast.
+- GUI desktop examples (`zig-map`, `rust-map`, `lwjgl-map`, `swift-map`,
+  `dotnet-map`) open a host window and need a display, and Android/iOS targets
+  need an emulator/simulator, so they are not runnable in this headless VM.
+- The `experimental_monorepo_root` deprecation warning mise prints on every
+  invocation is harmless.
