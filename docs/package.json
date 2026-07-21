@@ -13,7 +13,7 @@
   "dependencies": {
     "@astrojs/starlight": "^0.38.4",
     "@fontsource/alata": "^5.2.8",
-    "astro": "^6.4.6",
+    "astro": "^7.1.0",
     "sharp": "^0.34.5",
     "starlight-copy-button": "github:dionysuzx/starlight-copy-button",
     "starlight-links-validator": "^0.24.0",
