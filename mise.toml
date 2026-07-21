@@ -87,12 +87,6 @@ dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosit
 
 [deps.submodules]
 auto = true
-sources = [".gitmodules"]
-outputs = [
-  "third_party/maplibre-native/CMakeLists.txt",
-  "third_party/maplibre-native/vendor/Vulkan-Headers/CMakeLists.txt",
-  "third_party/maplibre-native/vendor/maplibre-native-base/deps/variant/README.md",
-]
 run = ".mise/bin/sync-submodules"
 
 [hooks]
