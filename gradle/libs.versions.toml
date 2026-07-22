@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.2.21"
+kotlin = "2.4.10"
 agp = "9.1.1"
 javacpp = "1.5.11"
 lwjgl = "3.4.1"
