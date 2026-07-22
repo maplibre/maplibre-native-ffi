@@ -21,7 +21,7 @@ public value class LogSeverity(public val nativeValue: Int) {
       Status.requireArgument(isKnown) {
         "Unknown log severity cannot be used as an input: $nativeValue"
       }
-      return 1 shl nativeValue.toInt()
+      return 1 shl nativeValue
     }
 
   internal val isKnown: Boolean
