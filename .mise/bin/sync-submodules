@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Git hooks export GIT_DIR / GIT_INDEX_FILE; clear them so submodule
+# operations resolve the worktree normally when mise deps runs from a hook.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_PREFIX GIT_COMMON_DIR
+
 repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
 mln_path="third_party/maplibre-native"
 
