@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+#MISE description="Publish Kotlin Multiplatform snapshots to Maven Central."
+
+set -euo pipefail
+
+input_root="${MISE_MONOREPO_ROOT}/build/packages/native/maven-input"
+install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
+staging_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/maven-staging"
+
+rm -rf "$install_root" "$staging_root"
+
+extract_preset() {
+  local preset="$1"
+  local expected_backend="$2"
+  local archive
+  local destination="${install_root}/${preset}"
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  if [[ -z "$archive" ]]; then
+    echo "Missing native package for ${preset} under ${input_root}" >&2
+    return 1
+  fi
+
+  mkdir -p "$destination"
+  tar -xzf "$archive" -C "$destination" --strip-components=1
+  if ! grep -Fq \
+    "\"renderBackend\": \"${expected_backend}\"" \
+    "$destination/share/maplibre-native-c/artifact.json"; then
+    echo "Native package ${preset} does not declare the ${expected_backend} backend" >&2
+    return 1
+  fi
+}
+
+presets=(
+  linux-x64-egl:opengl
+  linux-arm64-egl:opengl
+  linux-x64-vulkan:vulkan
+  linux-arm64-vulkan:vulkan
+  macos-arm64-egl:opengl
+  macos-arm64-vulkan:vulkan
+  macos-arm64-metal:metal
+  windows-x64-wgl:opengl
+  windows-arm64-wgl:opengl
+  windows-x64-vulkan:vulkan
+  windows-arm64-vulkan:vulkan
+)
+for entry in "${presets[@]}"; do
+  extract_preset "${entry%%:*}" "${entry##*:}"
+done
+
+common=(
+  -Pmaplibre.publish=true
+  -Pmaplibre.maven.localRepository="$staging_root"
+)
+
+opengl=(
+  -Pmaplibre.android.backend=opengl
+  -Pmaplibre.android.abis=arm64-v8a,x86_64
+  -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+  -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+  -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-x64-egl"
+  -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-egl"
+  -Pmaplibre.runtime.opengl.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-egl"
+  -Pmaplibre.runtime.opengl.jvm.natives-windows-x64.installDir="$install_root/windows-x64-wgl"
+  -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
+)
+
+vulkan=(
+  -Pmaplibre.android.backend=vulkan
+  -Pmaplibre.android.abis=arm64-v8a,x86_64
+  -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+  -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+  -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-x64-vulkan"
+  -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-vulkan"
+  -Pmaplibre.runtime.vulkan.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-vulkan"
+  -Pmaplibre.runtime.vulkan.jvm.natives-windows-x64.installDir="$install_root/windows-x64-vulkan"
+  -Pmaplibre.runtime.vulkan.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-vulkan"
+)
+
+metal=(
+  -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
+  -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
+)
+
+./gradlew \
+  :bindings:kotlin:publishToSnapshotStagingRepository \
+  "${common[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-opengl:publishToSnapshotStagingRepository \
+  "${common[@]}" \
+  "${opengl[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-vulkan:publishToSnapshotStagingRepository \
+  "${common[@]}" \
+  "${vulkan[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-metal:publishToSnapshotStagingRepository \
+  "${common[@]}" \
+  "${metal[@]}"
+
+mise run //:kotlin:verify-staging "$staging_root"
+
+./gradlew \
+  :examples:compose-map:classes \
+  :examples:lwjgl-map:classes \
+  -Pmaplibre.usePublishedKotlin=true \
+  -Pmaplibre.runtime.backend=metal \
+  -Pmaplibre.maven.localRepository="$staging_root"
+
+./gradlew \
+  :examples:android-map:assembleDebug \
+  -Pmaplibre.usePublishedKotlin=true \
+  -Pmaplibre.android.backend=opengl \
+  -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+  -Pmaplibre.maven.localRepository="$staging_root"
+
+./gradlew \
+  :bindings:kotlin:publishToMavenCentral \
+  "${common[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-opengl:publishToMavenCentral \
+  "${common[@]}" \
+  "${opengl[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-vulkan:publishToMavenCentral \
+  "${common[@]}" \
+  "${vulkan[@]}"
+
+./gradlew \
+  :bindings:kotlin-runtime-metal:publishToMavenCentral \
+  "${common[@]}" \
+  "${metal[@]}"

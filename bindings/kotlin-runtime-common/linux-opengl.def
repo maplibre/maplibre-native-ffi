@@ -1,0 +1,4 @@
+headers = maplibreNativeRuntime.h
+headerFilter = maplibreNativeRuntime.h
+package = org.maplibre.nativeffi.internal.runtime
+linkerOpts = -lEGL -lGLESv2 -ldl -lpthread -lm -lstdc++

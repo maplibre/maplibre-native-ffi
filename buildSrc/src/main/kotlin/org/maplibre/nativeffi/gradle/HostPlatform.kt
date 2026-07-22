@@ -30,6 +30,18 @@ class HostPlatform private constructor(osName: String, arch: String) {
         else -> throw IllegalStateException("Unsupported LWJGL native platform: $osName/$arch")
       }
 
+  val maplibreNativeClassifier: String
+    get() =
+      when {
+        isMac && isArm64 -> "natives-macos-arm64"
+        isMac -> "natives-macos-x64"
+        isLinux && isArm64 -> "natives-linux-arm64"
+        isLinux -> "natives-linux-x64"
+        isWindows && isArm64 -> "natives-windows-arm64"
+        isWindows -> "natives-windows-x64"
+        else -> throw IllegalStateException("Unsupported MapLibre native platform: $osName/$arch")
+      }
+
   val jextractDistribution: JextractDistribution
     get() =
       when {

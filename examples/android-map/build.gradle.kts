@@ -14,6 +14,15 @@ val androidTargets =
   )
 val androidCmakeVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_CMAKE_VERSION")
 val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
+val usePublishedKotlin =
+  providers.gradleProperty("maplibre.usePublishedKotlin").map(String::toBoolean).getOrElse(false)
+val maplibrePublicationVersion = providers.gradleProperty("maplibre.maven.version").get()
+
+repositories {
+  providers.gradleProperty("maplibre.maven.localRepository").orNull?.let {
+    maven { url = rootProject.uri(it) }
+  }
+}
 
 android {
   namespace = "org.maplibre.nativeffi.examples.androidmap"
@@ -48,7 +57,16 @@ android {
   }
 }
 
-dependencies { implementation(project(":bindings:kotlin")) }
+dependencies {
+  if (usePublishedKotlin) {
+    implementation(
+      "org.maplibre.nativeffi:maplibre-native-ffi-runtime-$androidBackend:" +
+        maplibrePublicationVersion
+    )
+  } else {
+    implementation(project(":bindings:kotlin-runtime-$androidBackend"))
+  }
+}
 
 tasks.register<Exec>("runDebug") {
   group = "application"

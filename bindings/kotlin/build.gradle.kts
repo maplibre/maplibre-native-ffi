@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 plugins {
   alias(libs.plugins.kotlin.multiplatform)
   alias(libs.plugins.android.kotlin.multiplatform.library)
+  alias(libs.plugins.maven.publish)
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
@@ -27,14 +28,21 @@ val androidTargets =
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
-val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
+val publishingSnapshot =
+  providers.gradleProperty("maplibre.publish").map(String::toBoolean).getOrElse(false)
 
 kotlin {
-  when (hostPlatform.kotlinNativeTargetPresetName) {
-    "macosArm64" -> macosArm64()
-    "macosX64" -> macosX64()
-    "linuxArm64" -> linuxArm64()
-    "linuxX64" -> linuxX64()
+  if (publishingSnapshot) {
+    linuxX64()
+    linuxArm64()
+    macosArm64()
+  } else {
+    when (hostPlatform.kotlinNativeTargetPresetName) {
+      "macosArm64" -> macosArm64()
+      "macosX64" -> macosX64()
+      "linuxArm64" -> linuxArm64()
+      "linuxX64" -> linuxX64()
+    }
   }
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
@@ -49,6 +57,13 @@ kotlin {
     minSdk = libs.versions.android.minSdk.get().toInt()
 
     withJava()
+
+    optimization {
+      consumerKeepRules.file(
+        "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-rustls.pro"
+      )
+      consumerKeepRules.publish = true
+    }
 
     compilerOptions {
       jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.android.release.get()))
@@ -79,12 +94,22 @@ kotlin {
   }
 
   sourceSets {
-    androidMain.dependencies {
-      implementation(libs.javacpp)
-      implementation(libs.rustls.platform.verifier)
-    }
+    androidMain.dependencies { implementation(libs.javacpp) }
 
     commonTest.dependencies { implementation(kotlin("test")) }
+  }
+}
+
+mavenPublishing {
+  coordinates(
+    groupId = providers.gradleProperty("maplibre.maven.group").get(),
+    artifactId = "maplibre-native-ffi",
+    version = providers.gradleProperty("maplibre.maven.version").get(),
+  )
+  publishToMavenCentral()
+  pom {
+    name.set("MapLibre Native FFI Kotlin binding")
+    description.set("Low-level Kotlin Multiplatform bindings for the MapLibre Native C API.")
   }
 }
 
@@ -114,15 +139,6 @@ androidComponents {
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
     )
-    androidTargets.forEach { target ->
-      variant.sources.jniLibs?.addStaticSourceDirectory(
-        packagedAndroidNativeLibs
-          .get()
-          .dir("$androidBackend/${target.cargoTarget}")
-          .asFile
-          .absolutePath
-      )
-    }
   }
 }
 
@@ -131,10 +147,6 @@ tasks.configureEach {
     "compileAndroidMainJavaWithJavac",
     "compileAndroidMain",
     "extractAndroidMainAnnotations" -> dependsOn("generateAndroidJavaCppBindings")
-    "preAndroidMainBuild",
-    "mergeAndroidMainJniLibFolders" -> {
-      dependsOn("packageAndroidNativeLibraries")
-    }
   }
 }
 
@@ -164,6 +176,10 @@ tasks.register("nativeTest") {
 
 tasks.register("androidBuild") {
   group = "build"
-  description = "Builds the Android variant of the Kotlin Multiplatform binding."
-  dependsOn("packageAndroidNativeLibraries", "assembleAndroidMain")
+  description = "Builds the Android binding and selected native runtime AAR."
+  dependsOn(
+    "packageAndroidNativeLibraries",
+    "assembleAndroidMain",
+    ":bindings:kotlin-runtime-$androidBackend:assembleAndroidMain",
+  )
 }
