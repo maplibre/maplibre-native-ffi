@@ -6,7 +6,8 @@ function(mln_configure_platform_dependencies target)
   set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
   fetchcontent_declare(
     mln_ffi_zlib_source
-    URL "https://zlib.net/fossils/zlib-1.3.1.tar.gz"
+    URL
+      "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
     URL_HASH
       "SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
     EXCLUDE_FROM_ALL)
