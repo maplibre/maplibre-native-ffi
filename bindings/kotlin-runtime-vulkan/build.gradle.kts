@@ -7,6 +7,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
+import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 
 plugins {
   alias(libs.plugins.kotlin.multiplatform)
@@ -66,18 +67,11 @@ androidComponents {
 }
 
 val verifyAndroidRuntimeBackend =
-  tasks.register("verifyAndroidRuntimeBackend") {
-    doLast {
-      val selectedBackend =
-        AndroidTarget.parseBackend(
-          providers
-            .gradleProperty("maplibre.android.backend")
-            .getOrElse(AndroidTarget.DEFAULT_BACKEND)
-        )
-      require(selectedBackend == "vulkan") {
-        "Publishing the vulkan Android runtime requires -Pmaplibre.android.backend=vulkan"
-      }
-    }
+  tasks.register<VerifyAndroidRuntimeBackend>("verifyAndroidRuntimeBackend") {
+    selectedBackend.set(
+      providers.gradleProperty("maplibre.android.backend").orElse(AndroidTarget.DEFAULT_BACKEND)
+    )
+    expectedBackend.set("vulkan")
   }
 
 tasks.configureEach {
