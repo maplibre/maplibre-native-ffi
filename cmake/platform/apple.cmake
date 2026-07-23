@@ -34,12 +34,16 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_DEFAULT_LOGGING_STDERR TRUE MLN_FFI_DEFAULT_THREAD_LOCAL TRUE
       MLN_FFI_SHARED_SUPPORTED TRUE)
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set_property(TARGET ${target} PROPERTY MLN_FFI_ZIG_TARGET aarch64-ios)
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM ios-arm64 MLN_FFI_ZIG_TARGET aarch64-ios)
     if(CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
       set_target_properties(
         ${target}
         PROPERTIES
-          MLN_FFI_ZIG_TARGET aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
+          MLN_FFI_TARGET_PLATFORM ios-simulator-arm64 MLN_FFI_ZIG_TARGET
+          aarch64-ios-simulator MLN_FFI_TEST_SUPPORTED TRUE)
     else()
       set_target_properties(
         ${target}
@@ -48,7 +52,9 @@ function(mln_configure_platform_dependencies target)
   else()
     set_target_properties(
       ${target}
-      PROPERTIES MLN_FFI_ZIG_TARGET aarch64-macos MLN_FFI_TEST_SUPPORTED TRUE)
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM macos-arm64 MLN_FFI_ZIG_TARGET aarch64-macos
+        MLN_FFI_TEST_SUPPORTED TRUE)
   endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(MLN_FFI_ZIG_LIBC_SYSROOT "${CMAKE_OSX_SYSROOT}")

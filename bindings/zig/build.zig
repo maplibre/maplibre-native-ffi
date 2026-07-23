@@ -44,7 +44,7 @@ fn installedArtifactDescriptor(b: *std.Build, install_dir: std.Build.LazyPath) A
         ArtifactDescriptor,
         b.allocator,
         descriptor,
-        .{},
+        .{ .ignore_unknown_fields = true },
     ) catch std.debug.panic("invalid native artifact descriptor: {s}", .{descriptor_path});
     return parsed.value;
 }

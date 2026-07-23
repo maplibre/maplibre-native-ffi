@@ -1,0 +1,358 @@
+#!/usr/bin/env bash
+#MISE description="Stage, verify, or publish Kotlin Multiplatform snapshots."
+
+set -euo pipefail
+
+input_root="${MISE_MONOREPO_ROOT}/build/packages/native/maven-input"
+install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
+staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
+
+usage() {
+  echo "usage: $(basename "$0") stage <linux-x64|linux-arm64|apple>" >&2
+  echo "       $(basename "$0") publish-leaves <linux-x64|linux-arm64|apple>" >&2
+  echo "       $(basename "$0") publish-roots apple" >&2
+  echo "       $(basename "$0") verify <maven-staging>" >&2
+}
+
+extract_preset() {
+  local preset="$1"
+  local archive
+  local destination="${install_root}/${preset}"
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  if [[ -z "$archive" ]]; then
+    echo "Missing native package for ${preset} under ${input_root}" >&2
+    return 1
+  fi
+
+  mkdir -p "$destination"
+  tar -xzf "$archive" -C "$destination" --strip-components=1
+}
+
+prepare_native_inputs() {
+  local partition="$1"
+  local presets=()
+
+  case "$partition" in
+    linux-x64)
+      presets=(
+        linux-x64-egl
+        linux-x64-vulkan
+        android-arm64-egl
+        android-arm64-vulkan
+        android-x64-egl
+        android-x64-vulkan
+      )
+      ;;
+    linux-arm64)
+      presets=(
+        linux-arm64-egl
+        linux-arm64-vulkan
+      )
+      ;;
+    apple)
+      presets=(
+        linux-x64-egl
+        linux-arm64-egl
+        linux-x64-vulkan
+        linux-arm64-vulkan
+        macos-arm64-egl
+        macos-arm64-vulkan
+        macos-arm64-metal
+        ios-arm64-metal
+        ios-simulator-arm64-metal
+        windows-x64-wgl
+        windows-arm64-wgl
+        windows-x64-vulkan
+        windows-arm64-vulkan
+      )
+      ;;
+    *)
+      usage
+      return 2
+      ;;
+  esac
+
+  rm -rf "$install_root"
+  for preset in "${presets[@]}"; do
+    extract_preset "$preset"
+  done
+}
+
+prepare_apple_root_inputs() {
+  local presets=(
+    macos-arm64-metal
+    ios-arm64-metal
+    ios-simulator-arm64-metal
+  )
+
+  rm -rf "$install_root"
+  for preset in "${presets[@]}"; do
+    extract_preset "$preset"
+  done
+}
+
+publish_tasks() {
+  local project="$1"
+  local repository="$2"
+  shift 2
+
+  local tasks=()
+  while [[ "$1" != "--" ]]; do
+    tasks+=("${project}:publish${1}PublicationTo${repository}")
+    shift
+  done
+  shift
+
+  ./gradlew "${tasks[@]}" "$@"
+}
+
+publish_linux_x64_leaves() {
+  local repository="$1"
+  shift
+  local repository_args=("$@")
+  local common=(
+    -Pmaplibre.android.prebuiltInstallRoot="$install_root"
+    "-Pmaplibre.android.abis=arm64-v8a,x86_64"
+  )
+  local opengl=(
+    -Pmaplibre.android.backend=opengl
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+  )
+  local vulkan=(
+    -Pmaplibre.android.backend=vulkan
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+  )
+
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    LinuxX64 Android -- \
+    "${repository_args[@]}" \
+    "${common[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    LinuxX64 Android -- \
+    "${repository_args[@]}" \
+    "${common[@]}" \
+    "${opengl[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-vulkan \
+    "$repository" \
+    LinuxX64 Android -- \
+    "${repository_args[@]}" \
+    "${common[@]}" \
+    "${vulkan[@]}"
+}
+
+publish_linux_arm64_leaves() {
+  local repository="$1"
+  shift
+  local repository_args=("$@")
+
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    LinuxArm64 -- \
+    "${repository_args[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    LinuxArm64 -- \
+    "${repository_args[@]}" \
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-vulkan \
+    "$repository" \
+    LinuxArm64 -- \
+    "${repository_args[@]}" \
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+}
+
+publish_apple_leaves() {
+  local repository="$1"
+  shift
+  local repository_args=("$@")
+  local opengl=(
+    -Pmaplibre.runtime.opengl.jvm.natives-linux-x64.installDir="$install_root/linux-x64-egl"
+    -Pmaplibre.runtime.opengl.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-egl"
+    -Pmaplibre.runtime.opengl.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-egl"
+    -Pmaplibre.runtime.opengl.jvm.natives-windows-x64.installDir="$install_root/windows-x64-wgl"
+    -Pmaplibre.runtime.opengl.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-wgl"
+  )
+  local vulkan=(
+    -Pmaplibre.runtime.vulkan.jvm.natives-linux-x64.installDir="$install_root/linux-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-linux-arm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-windows-x64.installDir="$install_root/windows-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.jvm.natives-windows-arm64.installDir="$install_root/windows-arm64-vulkan"
+  )
+  local metal=(
+    -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
+    -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
+    -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
+  )
+
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    "${repository_args[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    Jvm -- \
+    "${repository_args[@]}" \
+    "${opengl[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-vulkan \
+    "$repository" \
+    Jvm -- \
+    "${repository_args[@]}" \
+    "${vulkan[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-metal \
+    "$repository" \
+    Jvm MacosArm64 IosArm64 IosSimulatorArm64 -- \
+    "${repository_args[@]}" \
+    "${metal[@]}"
+}
+
+publish_apple_roots() {
+  local repository="$1"
+  shift
+  local repository_args=("$@")
+  local metal=(
+    -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
+    -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
+    -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
+  )
+
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    KotlinMultiplatform -- \
+    "${repository_args[@]}"
+
+  for backend in opengl vulkan; do
+    publish_tasks \
+      ":bindings:kotlin-runtime-${backend}" \
+      "$repository" \
+      KotlinMultiplatform -- \
+      "${repository_args[@]}"
+  done
+
+  publish_tasks \
+    :bindings:kotlin-runtime-metal \
+    "$repository" \
+    KotlinMultiplatform -- \
+    "${repository_args[@]}" \
+    "${metal[@]}"
+}
+
+publish_leaf_partition() {
+  local partition="$1"
+  local repository="$2"
+  shift 2
+
+  case "$partition" in
+    linux-x64)
+      publish_linux_x64_leaves "$repository" "$@"
+      ;;
+    linux-arm64)
+      publish_linux_arm64_leaves "$repository" "$@"
+      ;;
+    apple)
+      publish_apple_leaves "$repository" "$@"
+      ;;
+    *)
+      usage
+      return 2
+      ;;
+  esac
+}
+
+publish_partition() {
+  local partition="$1"
+  local repository="$2"
+  shift 2
+
+  publish_leaf_partition "$partition" "$repository" "$@"
+  if [[ "$partition" == "apple" ]]; then
+    publish_apple_roots "$repository" "$@"
+  fi
+}
+
+operation="${1:-}"
+partition="${2:-}"
+
+case "$operation" in
+  stage)
+    case "$partition" in
+      linux-x64 | linux-arm64 | apple) ;;
+      *)
+        usage
+        exit 2
+        ;;
+    esac
+    staging_root="${staging_base}/maven-staging-${partition}"
+    rm -rf "$staging_root"
+    prepare_native_inputs "$partition"
+    publish_partition \
+      "$partition" \
+      SnapshotStagingRepository \
+      -Pmaplibre.maven.localRepository="$staging_root"
+    ;;
+  publish-leaves)
+    case "$partition" in
+      linux-x64 | linux-arm64 | apple) ;;
+      *)
+        usage
+        exit 2
+        ;;
+    esac
+    prepare_native_inputs "$partition"
+    publish_leaf_partition "$partition" MavenCentralRepository
+    ;;
+  publish-roots)
+    if [[ "$partition" != "apple" ]]; then
+      usage
+      exit 2
+    fi
+    prepare_apple_root_inputs
+    publish_apple_roots MavenCentralRepository
+    ;;
+  verify)
+    if [[ -z "$partition" || "$#" -ne 2 ]]; then
+      usage
+      exit 2
+    fi
+    mise run //:kotlin:verify-staging "$partition"
+
+    ./gradlew \
+      :examples:compose-map:packageUberJarForCurrentOS \
+      :examples:lwjgl-map:installDist \
+      -Pmaplibre.usePublishedKotlin=true \
+      -Pmaplibre.runtime.backend=metal \
+      -Pmaplibre.maven.localRepository="$partition"
+
+    ./gradlew \
+      :examples:android-map:assembleDebug \
+      -Pmaplibre.usePublishedKotlin=true \
+      -Pmaplibre.android.backend=opengl \
+      -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+      -Pmaplibre.maven.localRepository="$partition"
+    ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac

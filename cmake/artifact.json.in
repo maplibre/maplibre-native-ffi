@@ -1,4 +1,5 @@
 {
   "renderBackend": "@MLN_FFI_RENDER_BACKEND@",
+  "targetPlatform": "@MLN_FFI_TARGET_PLATFORM@",
   "zigTarget": "@MLN_FFI_ZIG_TARGET@"
 }

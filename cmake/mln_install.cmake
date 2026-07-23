@@ -69,6 +69,8 @@ function(mln_install_c_api_library target)
   endif()
   get_target_property(MLN_FFI_ZIG_TARGET mln_ffi_platform_dependencies
                       MLN_FFI_ZIG_TARGET)
+  get_target_property(MLN_FFI_TARGET_PLATFORM mln_ffi_platform_dependencies
+                      MLN_FFI_TARGET_PLATFORM)
 
   set(pc_file "${CMAKE_CURRENT_BINARY_DIR}/maplibre-native-c.pc")
   set(artifact_file

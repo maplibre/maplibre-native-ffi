@@ -5,7 +5,7 @@ import java.io.File
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 
-object RustlsPlatformVerifier {
+object CargoPackage {
   private val ignoredEnvironmentVariables =
     setOf(
       "MISE_ENV",
@@ -16,7 +16,7 @@ object RustlsPlatformVerifier {
       "ANDROID_NDK_HOME",
     )
 
-  fun mavenDir(project: Project): Provider<File> =
+  fun directory(project: Project, packageName: String): Provider<File> =
     project.providers
       .exec {
         workingDir = project.rootProject.projectDir
@@ -38,9 +38,7 @@ object RustlsPlatformVerifier {
         val packages =
           (JsonSlurper().parseText(metadata) as Map<String, Any>)["packages"]
             as List<Map<String, Any>>
-        val manifestPath =
-          packages.first { it["name"] == "rustls-platform-verifier-android" }["manifest_path"]
-            as String
-        File(File(manifestPath).parentFile, "maven")
+        val manifestPath = packages.single { it["name"] == packageName }["manifest_path"] as String
+        File(manifestPath).parentFile
       }
 }

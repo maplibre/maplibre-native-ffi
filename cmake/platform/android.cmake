@@ -16,13 +16,17 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_TEST_SUPPORTED
       FALSE)
   if(ANDROID_ABI STREQUAL "arm64-v8a")
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_ZIG_TARGET aarch64-linux-android)
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM android-arm64 MLN_FFI_ZIG_TARGET
+        aarch64-linux-android)
   else()
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_ZIG_TARGET x86_64-linux-android)
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM android-x64 MLN_FFI_ZIG_TARGET
+        x86_64-linux-android)
   endif()
 endfunction()
 

@@ -181,43 +181,45 @@ jobs:
               mise run //bindings/python:test macos-arm64-egl
           - preset: ios-arm64-metal
             runner: macos-26
-            package: false
+            package: true
             commands: >-
               mise run build ios-arm64-metal &&
+              mise run //bindings/kotlin:iosBuild ios-arm64-metal &&
               mise run //bindings/swift:build:ios &&
               mise run //examples/swift-map:build:ios
           - preset: ios-simulator-arm64-metal
             runner: macos-26
-            package: false
+            package: true
             commands: >-
               mise run test ios-simulator-arm64-metal &&
+              mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal &&
               mise run //bindings/swift:build:ios-simulator &&
               mise run //bindings/zig:test:ios-simulator &&
               bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120 &&
               mise run //examples/swift-map:build:ios-simulator
           - preset: android-arm64-egl
             runner: ubuntu-latest
-            package: false
+            package: true
             commands: >-
               mise run build android-arm64-egl &&
               mise run //bindings/kotlin:androidBuild opengl arm64-v8a &&
               mise run //examples/android-map:build opengl arm64-v8a
           - preset: android-arm64-vulkan
             runner: ubuntu-latest
-            package: false
+            package: true
             commands: >-
               mise run build android-arm64-vulkan &&
               mise run //bindings/kotlin:androidBuild vulkan arm64-v8a
           - preset: android-x64-egl
             runner: ubuntu-latest
-            package: false
+            package: true
             commands: >-
               mise run build android-x64-egl &&
               mise run //bindings/kotlin:androidBuild opengl x86_64 &&
               mise run //examples/android-map:build opengl x86_64
           - preset: android-x64-vulkan
             runner: ubuntu-latest
-            package: false
+            package: true
             commands: >-
               mise run build android-x64-vulkan &&
               mise run //bindings/kotlin:androidBuild vulkan x86_64

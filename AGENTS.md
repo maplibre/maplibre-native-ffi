@@ -45,7 +45,7 @@ mise run //examples/zig-map:run:owned-texture
 # Build a different native target/backend
 mise run build linux-x64-egl
 
-# Package a desktop native artifact with CPack
+# Package a native artifact with CPack
 mise run package-native linux-x64-egl
 
 # Build the Android binding for one ABI/backend
