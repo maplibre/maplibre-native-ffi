@@ -1,6 +1,3 @@
-# This Gradle build has no corresponding single-ABI CMake preset.
-android_multi = { preset = "android-multi-vulkan", abis = "arm64-v8a,x86_64" }
-
 # Desktop suites run in the matching native target job and reuse its build tree.
 [[suites]]
 platforms = ["linux", "macos", "windows"]
