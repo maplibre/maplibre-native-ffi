@@ -5,6 +5,7 @@ import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.PosixFilePermissions
 import java.security.MessageDigest
 import java.util.Optional
 
@@ -19,6 +20,7 @@ internal object NativeLibrary {
 
   private val lock = Any()
   private val loadedRuntimeDependencies = mutableSetOf<Path>()
+  private val extractionRoot: Path by lazy { createPrivateExtractionRoot() }
 
   @Volatile private var loadedLibrary: LoadedLibrary? = null
 
@@ -144,8 +146,7 @@ internal object NativeLibrary {
         }
         digest().joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
       }
-    val extractionDirectory =
-      Path.of(System.getProperty("java.io.tmpdir"), "maplibre-native-ffi", classifier, digest)
+    val extractionDirectory = extractionRoot.resolve(classifier).resolve(digest)
     Files.createDirectories(extractionDirectory)
 
     val extracted = resources.associateWith { resource ->
@@ -188,6 +189,19 @@ internal object NativeLibrary {
       Files.deleteIfExists(temporary)
     }
     return destination
+  }
+
+  private fun createPrivateExtractionRoot(): Path {
+    val temporaryDirectory = Path.of(System.getProperty("java.io.tmpdir"))
+    return if (Files.getFileStore(temporaryDirectory).supportsFileAttributeView("posix")) {
+      Files.createTempDirectory(
+        temporaryDirectory,
+        "maplibre-native-ffi-",
+        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------")),
+      )
+    } else {
+      Files.createTempDirectory(temporaryDirectory, "maplibre-native-ffi-")
+    }
   }
 
   private fun sha256(path: Path): ByteArray {
