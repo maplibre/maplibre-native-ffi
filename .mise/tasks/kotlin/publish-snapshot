@@ -80,6 +80,10 @@ prepare_native_inputs() {
 
 prepare_apple_root_inputs() {
   local presets=(
+    linux-x64-egl
+    linux-arm64-egl
+    linux-x64-vulkan
+    linux-arm64-vulkan
     macos-arm64-metal
     ios-arm64-metal
     ios-simulator-arm64-metal
@@ -230,6 +234,14 @@ publish_apple_roots() {
   local repository="$1"
   shift
   local repository_args=("$@")
+  local opengl=(
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
+  )
+  local vulkan=(
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
+    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+  )
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
@@ -242,13 +254,19 @@ publish_apple_roots() {
     KotlinMultiplatform -- \
     "${repository_args[@]}"
 
-  for backend in opengl vulkan; do
-    publish_tasks \
-      ":bindings:kotlin-runtime-${backend}" \
-      "$repository" \
-      KotlinMultiplatform -- \
-      "${repository_args[@]}"
-  done
+  publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    KotlinMultiplatform -- \
+    "${repository_args[@]}" \
+    "${opengl[@]}"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-vulkan \
+    "$repository" \
+    KotlinMultiplatform -- \
+    "${repository_args[@]}" \
+    "${vulkan[@]}"
 
   publish_tasks \
     :bindings:kotlin-runtime-metal \
