@@ -141,7 +141,7 @@ def target_rows(
     source: dict[str, object], presets: dict[str, object]
 ) -> list[dict[str, object]]:
     configured, _, tested, packaged = preset_sets(presets)
-    rows = [
+    return [
         {
             "preset": preset,
             "runner": runner(preset),
@@ -150,17 +150,3 @@ def target_rows(
         }
         for preset in configured
     ]
-    android_multi = source["android_multi"]
-    rows.append(
-        {
-            "preset": android_multi["preset"],
-            "runner": "ubuntu-latest",
-            "package": False,
-            "commands": android_commands(
-                android_multi["preset"],
-                android_multi["abis"],
-                backend(android_multi["preset"]) == "egl",
-            ),
-        }
-    )
-    return rows
