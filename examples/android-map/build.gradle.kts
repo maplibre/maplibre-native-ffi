@@ -2,7 +2,7 @@ import org.gradle.api.tasks.Exec
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
-plugins { alias(libs.plugins.android.application) }
+plugins { id("com.android.application") }
 
 val androidBackend =
   AndroidTarget.parseBackend(

@@ -47,28 +47,28 @@ class HostPlatform private constructor(osName: String, arch: String) {
       when {
         isMac && isArm64 ->
           JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_macos-aarch64_bin.tar.gz",
-            "6783d2ba7f686ee636b9542525ee06b7bd096dfca294538613b877a4b5a057da",
+            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_macos-aarch64_bin.tar.gz",
+            "3dd1dd1bde059d271739e2cc2290c64f93f85488c86c01e566c0e374eece798f",
           )
         isMac ->
           JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_macos-x64_bin.tar.gz",
-            "62fd0453349b8eb48f083d2fb9c5f2ab255f894eaa8c658221366f363c7e91b9",
+            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_macos-x64_bin.tar.gz",
+            "6ae7a46e7e7b56f077ab72623c0a894a8d525d5b698c90785b97c241f95a99b1",
           )
         isLinux && isArm64 ->
           JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_linux-aarch64_bin.tar.gz",
-            "75a199a05e5edade798600a175f8897e711330338f7d8d2da5fff18d707d665e",
+            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_linux-aarch64_bin.tar.gz",
+            "0e25e6f6efa042f8758eaec65a873887fd2247fcf2e3e22dcfd7e4179fc8b0ae",
           )
         isLinux ->
           JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_linux-x64_bin.tar.gz",
-            "d826d366b5db8edbed9cfef3779e45e43ba496ca2166b8f70cdaf81ee90c0b1e",
+            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_linux-x64_bin.tar.gz",
+            "d0cc481abc1adb16fb9514e1c5e0bfc08d38c29228bece667fb5054ceaffaa42",
           )
         isWindows ->
           JextractDistribution(
-            "https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_windows-x64_bin.tar.gz",
-            "22a853168512d5909c4dfccb1b9e8b2bffb1187b0cf98458aef989d41de995ac",
+            "https://download.java.net/java/early_access/jextract/25/2/openjdk-25-jextract+2-4_windows-x64_bin.tar.gz",
+            "b03533eb6b249a154752b7c7bf93cdb8c147cf2f9699422e615e84b7fb652872",
           )
         else -> throw IllegalStateException("Unsupported jextract platform: $osName/$arch")
       }

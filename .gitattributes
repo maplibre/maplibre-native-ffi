@@ -2,5 +2,4 @@
 *.bat       text eol=crlf
 *.jar       binary
 third_party/** linguist-vendored
-bindings/kotlin/src/androidMain/kotlin/org/rustls/platformverifier/CertificateVerifier.kt linguist-vendored
 .github/workflows/ci.yml linguist-generated=true

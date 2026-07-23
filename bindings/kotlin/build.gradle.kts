@@ -5,13 +5,15 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.CargoPackage
+import org.maplibre.nativeffi.gradle.ExtractAarClassesJar
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
+import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
 
 plugins {
-  alias(libs.plugins.kotlin.multiplatform)
-  alias(libs.plugins.android.kotlin.multiplatform.library)
-  alias(libs.plugins.maven.publish)
+  id("org.jetbrains.kotlin.multiplatform")
+  id("com.android.kotlin.multiplatform.library")
+  id("com.vanniktech.maven.publish")
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
@@ -30,7 +32,25 @@ val androidTargets =
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
+val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
+val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
+val mavenArtifact = "maplibre-native-ffi"
 val rustlsPlatformVerifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
+val rustlsPlatformVerifierAndroidPackage =
+  CargoPackage.directory(project, "rustls-platform-verifier-android")
+val rustlsPlatformVerifierAndroidAar =
+  rustlsPlatformVerifierAndroidPackage.map { packageDirectory ->
+    packageDirectory.resolve("maven").walkTopDown().single { it.isFile && it.extension == "aar" }
+  }
+val rustlsPlatformVerifierAndroidJar =
+  layout.buildDirectory.file(
+    "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar"
+  )
+val extractRustlsPlatformVerifierAndroidJar =
+  tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
+    aarFile.set(layout.file(rustlsPlatformVerifierAndroidAar))
+    outputJar.set(rustlsPlatformVerifierAndroidJar)
+  }
 val generateRustlsPlatformVerifierLicenses =
   tasks.register<Sync>("generateRustlsPlatformVerifierLicenses") {
     val packageDirectory = rustlsPlatformVerifierPackage
@@ -101,7 +121,12 @@ kotlin {
   sourceSets {
     androidMain {
       resources.srcDir(generateRustlsPlatformVerifierLicenses)
-      dependencies { implementation(libs.javacpp) }
+      dependencies {
+        implementation(libs.javacpp)
+        implementation(
+          files(rustlsPlatformVerifierAndroidJar).builtBy(extractRustlsPlatformVerifierAndroidJar)
+        )
+      }
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
@@ -109,17 +134,29 @@ kotlin {
 }
 
 mavenPublishing {
-  coordinates(
-    groupId = providers.gradleProperty("maplibre.maven.group").get(),
-    artifactId = "maplibre-native-ffi",
-    version = providers.gradleProperty("maplibre.maven.version").get(),
-  )
+  coordinates(groupId = mavenGroup, artifactId = mavenArtifact, version = mavenVersion)
   publishToMavenCentral()
   pom {
     name.set("MapLibre Native FFI Kotlin binding")
     description.set("Low-level Kotlin Multiplatform bindings for the MapLibre Native C API.")
   }
 }
+
+canonicalizeKmpRootMetadata(
+  group = mavenGroup,
+  rootModule = mavenArtifact,
+  version = mavenVersion,
+  targetModules =
+    mapOf(
+      "android" to "$mavenArtifact-android",
+      "iosArm64" to "$mavenArtifact-iosarm64",
+      "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
+      "jvm" to "$mavenArtifact-jvm",
+      "linuxArm64" to "$mavenArtifact-linuxarm64",
+      "linuxX64" to "$mavenArtifact-linuxx64",
+      "macosArm64" to "$mavenArtifact-macosarm64",
+    ),
+)
 
 configurations.register("javaCppTool") {
   isCanBeConsumed = false

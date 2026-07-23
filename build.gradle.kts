@@ -3,11 +3,13 @@ import org.gradle.api.publish.PublishingExtension
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 
 plugins {
-  alias(libs.plugins.kotlin.jvm) apply false
-  alias(libs.plugins.kotlin.multiplatform) apply false
-  alias(libs.plugins.android.application) apply false
-  alias(libs.plugins.android.kotlin.multiplatform.library) apply false
-  alias(libs.plugins.maven.publish) apply false
+  // The typed runtime convention compiles against these plugins in buildSrc, so their versions
+  // come from that classpath and the project applies them by ID.
+  id("org.jetbrains.kotlin.jvm") apply false
+  id("org.jetbrains.kotlin.multiplatform") apply false
+  id("com.android.application") apply false
+  id("com.android.kotlin.multiplatform.library") apply false
+  id("com.vanniktech.maven.publish") apply false
 }
 
 allprojects {

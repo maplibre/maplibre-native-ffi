@@ -5,10 +5,10 @@ sidebar:
   order: 5
 ---
 
-The Kotlin Multiplatform binding publishes snapshot and release builds through
-Maven. Consumers obtain every MapLibre Native FFI component through Gradle; the
-host operating system continues to provide its graphics frameworks, loaders, and
-drivers.
+The Kotlin Multiplatform binding publishes snapshot builds through Maven. Stable
+releases will use the finalization design below. Consumers obtain every MapLibre
+Native FFI component through Gradle; the host operating system continues to
+provide its graphics frameworks, loaders, and drivers.
 
 ## Coordinates
 
@@ -84,12 +84,11 @@ Each Android runtime AAR contains its backend-specific JNI libraries under
 `jni/<abi>`. OpenGL and Vulkan use separate runtime publications because the
 native library is compiled for one render backend.
 
-The Android target of `maplibre-native-ffi` directly includes the Kotlin helper
-required by `rustls-platform-verifier`. It also includes the helper's consumer
-R8 rule and upstream licenses. Gradle copies the license texts from the exact
-`rustls-platform-verifier` package selected by Cargo.lock. The helper version is
-updated with the Rust dependency. Consumers do not add a Rustls-specific Maven
-dependency.
+The Android target of `maplibre-native-ffi` directly includes the JVM helper
+from the exact `rustls-platform-verifier-android` package selected by
+Cargo.lock. It also includes the helper's consumer R8 rule and upstream
+licenses, which Gradle copies from the locked `rustls-platform-verifier`
+package. Consumers do not add a Rustls-specific Maven dependency.
 
 ### JVM
 
@@ -105,10 +104,12 @@ runtimeOnly(
 
 Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
 `natives-macos-arm64`, and `natives-windows-x64`. The runtime JAR contains the
-MapLibre Native FFI shared library and its redistributable runtime dependencies.
-The JVM binding extracts the complete runtime set to a versioned directory and
-loads dependencies before the C API library. Explicit native-library path
-configuration remains available as an override.
+MapLibre Native FFI shared library and the runtime dependencies that the project
+redistributes. The JVM binding extracts that packaged set to a versioned
+directory and loads packaged dependencies before the C API library. Linux hosts
+currently provide zlib and libuv, in addition to the selected graphics loader
+and driver. Explicit native-library path configuration remains available as an
+override.
 
 ## Snapshot publication
 
@@ -128,8 +129,11 @@ Each host first stages its publications in a local Maven repository. CI merges
 the Linux and Apple repositories, then inspects the published AAR, JAR, and KLIB
 payloads and compiles the example consumers against the merged repository. After
 every local check succeeds, each host publishes its own target artifacts to the
-Central Portal. Publication jobs reuse the CI-produced native archives; they do
-not rebuild MapLibre Native.
+Central Portal. Linux and Apple leaf modules publish first; the canonical
+multiplatform root modules publish last, after every leaf upload succeeds.
+Snapshot workflows are serialized so two commits cannot interleave those
+uploads. Publication jobs reuse the CI-produced native archives; they do not
+rebuild MapLibre Native.
 
 The initial snapshot workflow validates:
 
@@ -143,3 +147,27 @@ The initial snapshot workflow validates:
 Existing binding tests continue to cover Kotlin/Native behavior. An iOS target
 for the Compose map example is a separate follow-up and is not required for the
 initial snapshot publication.
+
+## Stable release finalization
+
+Stable releases use the same host build and staging partitions as snapshots.
+Host jobs have no publishing credentials: they upload their local Maven
+repositories as workflow artifacts. A single finalizer then:
+
+1. merges the partitions and rejects missing modules or conflicting paths;
+2. runs the same semantic payload and coordinate verification used for
+   snapshots;
+3. signs every publishable file and writes the required checksums;
+4. creates one ZIP whose root is the Maven repository layout; and
+5. uploads that ZIP once through the Central Publisher API.
+
+The first stable release should use a user-managed Central deployment so the
+validated bundle can be inspected before it is published. Switching to automatic
+publication changes only the final API request, not target builds, staging,
+merging, signing, or bundle assembly.
+
+This makes the merged, verified repository the release source of truth and gives
+stable releases one Central deployment boundary. Snapshot uploads use Central's
+mutable Maven snapshot endpoint, so their finalizer instead preserves
+leaf-first/root-last ordering; it cannot provide the same atomic deployment
+semantics.

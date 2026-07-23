@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
   application
-  alias(libs.plugins.kotlin.jvm)
+  id("org.jetbrains.kotlin.jvm")
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
