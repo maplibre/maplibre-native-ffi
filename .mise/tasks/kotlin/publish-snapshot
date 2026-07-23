@@ -55,7 +55,7 @@ done
 
 common=(
   -Pmaplibre.publish=true
-  -Pmaplibre.android.nativeInstallRoot="$install_root"
+  -Pmaplibre.android.prebuiltInstallRoot="$install_root"
   -Pmaplibre.maven.localRepository="$staging_root"
 )
 

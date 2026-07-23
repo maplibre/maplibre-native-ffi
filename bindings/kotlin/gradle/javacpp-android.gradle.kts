@@ -42,9 +42,10 @@ val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val javaCppAndroidIncludes = layout.projectDirectory.dir("src/androidMain/javacpp")
 val javaCppAndroidCompatHeader = javaCppAndroidIncludes.file("javacpp_android_compat.h")
 val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
-val packagedAndroidInstallRoot =
-  providers.gradleProperty("maplibre.android.nativeInstallRoot").map(rootProject::file)
-val usePackagedAndroidInstalls = packagedAndroidInstallRoot.isPresent
+// Snapshot publishing extracts the Android CMake packages produced by target CI here,
+// allowing the publication job to reuse them instead of rebuilding MapLibre Native.
+val prebuiltAndroidInstallRoot =
+  providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileAndroidJavaCppConfig") {
@@ -101,7 +102,7 @@ androidTargets.forEach { target ->
   val cmakePreset = target.cmakePreset(androidBackend)
   val installDir =
     rootProject.layout
-      .dir(packagedAndroidInstallRoot.map { it.resolve(cmakePreset) })
+      .dir(prebuiltAndroidInstallRoot.map { it.resolve(cmakePreset) })
       .orElse(rootProject.layout.projectDirectory.dir("build/$cmakePreset/install"))
       .get()
   val javaCppNativeBuild = targetRoot.map { it.dir("javacpp") }
@@ -124,7 +125,7 @@ androidTargets.forEach { target ->
       executable("cmake")
       args("--workflow", "--preset", cmakePreset)
       environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath)
-      enabled = !usePackagedAndroidInstalls
+      enabled = !prebuiltAndroidInstallRoot.isPresent
     }
 
   val generateJavaCppNativeLibrary =
