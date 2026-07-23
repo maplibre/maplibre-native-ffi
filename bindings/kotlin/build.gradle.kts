@@ -30,8 +30,6 @@ val androidTargets =
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
-val publishingSnapshot =
-  providers.gradleProperty("maplibre.publish").map(String::toBoolean).getOrElse(false)
 val rustlsPlatformVerifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
 val generateRustlsPlatformVerifierLicenses =
   tasks.register<Sync>("generateRustlsPlatformVerifierLicenses") {
@@ -46,20 +44,11 @@ val generateRustlsPlatformVerifierLicenses =
   }
 
 kotlin {
-  if (publishingSnapshot) {
-    iosArm64()
-    iosSimulatorArm64()
-    linuxX64()
-    linuxArm64()
-    macosArm64()
-  } else {
-    when (hostPlatform.kotlinNativeTargetPresetName) {
-      "macosArm64" -> macosArm64()
-      "macosX64" -> macosX64()
-      "linuxArm64" -> linuxArm64()
-      "linuxX64" -> linuxX64()
-    }
-  }
+  iosArm64()
+  iosSimulatorArm64()
+  linuxX64()
+  linuxArm64()
+  macosArm64()
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
 
@@ -185,12 +174,6 @@ tasks.named<Test>("jvmTest") {
       .withPropertyName("maplibreNativeCLoaderLibraryDirs")
     inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
   }
-}
-
-tasks.register("nativeTest") {
-  group = "verification"
-  description = "Runs tests for the host Kotlin/Native target."
-  dependsOn(kotlin.targets.withType<KotlinNativeTarget>().map { "${it.name}Test" })
 }
 
 tasks.register("androidBuild") {

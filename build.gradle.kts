@@ -11,6 +11,8 @@ plugins {
 }
 
 allprojects {
+  repositories.mavenCentral()
+
   pluginManager.withPlugin("com.android.application") { repositories.android() }
 
   pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.android() }
@@ -38,5 +40,4 @@ allprojects {
 
 fun RepositoryHandler.android() {
   google()
-  mavenCentral()
 }

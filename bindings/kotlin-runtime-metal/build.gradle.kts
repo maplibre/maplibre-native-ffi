@@ -17,19 +17,13 @@ extensions.extraProperties["maplibreRuntimeBackend"] = "metal"
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 val hostPlatform = HostPlatform.current()
-val publishingSnapshot =
-  providers.gradleProperty("maplibre.publish").map(String::toBoolean).getOrElse(false)
 
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
-  if (publishingSnapshot) {
-    iosArm64()
-    iosSimulatorArm64()
-    macosArm64()
-  } else if (hostPlatform.kotlinNativeTargetPresetName == "macosArm64") {
-    macosArm64()
-  }
+  iosArm64()
+  iosSimulatorArm64()
+  macosArm64()
 
   sourceSets {
     commonMain {

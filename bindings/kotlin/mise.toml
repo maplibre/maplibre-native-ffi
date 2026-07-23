@@ -3,9 +3,23 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  linux-x64-*) kotlin_target=linuxX64 ;;
+  linux-arm64-*) kotlin_target=linuxArm64 ;;
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  windows-*) kotlin_target= ;;
+  *)
+    echo "Unsupported Kotlin build preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+tasks=(:bindings:kotlin:jvmJar)
+if [[ -n "$kotlin_target" ]]; then
+  tasks+=(":bindings:kotlin:${kotlin_target}Klib")
+fi
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  :bindings:kotlin:assemble
+  "${tasks[@]}"
 '''
 
 [tasks.test]
@@ -13,9 +27,23 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  linux-x64-*) kotlin_target=linuxX64 ;;
+  linux-arm64-*) kotlin_target=linuxArm64 ;;
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  windows-*) kotlin_target= ;;
+  *)
+    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+tasks=(:bindings:kotlin:jvmTest)
+if [[ -n "$kotlin_target" ]]; then
+  tasks+=(":bindings:kotlin:${kotlin_target}Test")
+fi
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  :bindings:kotlin:check
+  "${tasks[@]}"
 '''
 
 [tasks.jvmTest]
@@ -33,9 +61,18 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
+case "$usage_preset" in
+  linux-x64-*) kotlin_target=linuxX64 ;;
+  linux-arm64-*) kotlin_target=linuxArm64 ;;
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  *)
+    echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
 ./gradlew \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  :bindings:kotlin:nativeTest
+  ":bindings:kotlin:${kotlin_target}Test"
 '''
 
 [tasks.iosBuild]
@@ -49,7 +86,6 @@ case "$usage_preset" in
   ios-simulator-arm64-metal) kotlin_target=iosSimulatorArm64 ;;
 esac
 ./gradlew \
-  -Pmaplibre.publish=true \
   -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
   -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
   ":bindings:kotlin:${kotlin_target}Klib" \

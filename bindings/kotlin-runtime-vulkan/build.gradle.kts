@@ -20,8 +20,6 @@ extensions.extraProperties["maplibreRuntimeBackend"] = "vulkan"
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 val hostPlatform = HostPlatform.current()
-val publishingSnapshot =
-  providers.gradleProperty("maplibre.publish").map(String::toBoolean).getOrElse(false)
 val androidTargets =
   AndroidTarget.parseAbis(
     providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
@@ -32,15 +30,8 @@ val packagedAndroidNativeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
-  if (publishingSnapshot) {
-    linuxX64()
-    linuxArm64()
-  } else {
-    when (hostPlatform.kotlinNativeTargetPresetName) {
-      "linuxArm64" -> linuxArm64()
-      "linuxX64" -> linuxX64()
-    }
-  }
+  linuxX64()
+  linuxArm64()
 
   android {
     namespace = "org.maplibre.nativeffi.runtime.vulkan"

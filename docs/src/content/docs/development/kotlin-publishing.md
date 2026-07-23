@@ -70,6 +70,10 @@ The initial native runtime publications are OpenGL and Vulkan for Linux x64 and
 arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each
 published Kotlin/Native target has a matching runtime variant.
 
+Gradle registers this target set consistently on every host. Local and CI
+workflows invoke target-specific KLIB and test tasks, leaving targets
+unavailable on the current host idle.
+
 System graphics components remain platform dependencies. Examples include Metal
 frameworks from the Apple SDK and EGL, OpenGL, and Vulkan loaders supplied by
 the Linux system.

@@ -92,16 +92,6 @@ class HostPlatform private constructor(osName: String, arch: String) {
   val androidNdkCommandSuffix: String
     get() = if (isWindows) ".cmd" else ""
 
-  val kotlinNativeTargetPresetName: String?
-    get() =
-      when {
-        isMac && isArm64 -> "macosArm64"
-        isMac -> "macosX64"
-        isLinux && isArm64 -> "linuxArm64"
-        isLinux -> "linuxX64"
-        else -> null
-      }
-
   companion object {
     fun current(): HostPlatform =
       HostPlatform(

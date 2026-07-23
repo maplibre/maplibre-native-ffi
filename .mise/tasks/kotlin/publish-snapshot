@@ -54,7 +54,6 @@ for entry in "${presets[@]}"; do
 done
 
 common=(
-  -Pmaplibre.publish=true
   -Pmaplibre.android.prebuiltInstallRoot="$install_root"
   -Pmaplibre.maven.localRepository="$staging_root"
 )
@@ -91,21 +90,21 @@ metal=(
 )
 
 ./gradlew \
-  :bindings:kotlin:publishToSnapshotStagingRepository \
+  :bindings:kotlin:publishAllPublicationsToSnapshotStagingRepository \
   "${common[@]}"
 
 ./gradlew \
-  :bindings:kotlin-runtime-opengl:publishToSnapshotStagingRepository \
+  :bindings:kotlin-runtime-opengl:publishAllPublicationsToSnapshotStagingRepository \
   "${common[@]}" \
   "${opengl[@]}"
 
 ./gradlew \
-  :bindings:kotlin-runtime-vulkan:publishToSnapshotStagingRepository \
+  :bindings:kotlin-runtime-vulkan:publishAllPublicationsToSnapshotStagingRepository \
   "${common[@]}" \
   "${vulkan[@]}"
 
 ./gradlew \
-  :bindings:kotlin-runtime-metal:publishToSnapshotStagingRepository \
+  :bindings:kotlin-runtime-metal:publishAllPublicationsToSnapshotStagingRepository \
   "${common[@]}" \
   "${metal[@]}"
 
