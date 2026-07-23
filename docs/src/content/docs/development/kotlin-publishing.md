@@ -114,11 +114,12 @@ override.
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. Linux runners build the Linux Kotlin/Native
-publications, while macOS runners build the macOS and iOS publications. Both
-consume native build artifacts produced by the platform and backend CI matrix.
-Android publication runs with the Linux partition; it reuses the matrix's CMake
-install archives and builds only the JNI bridge and final AARs.
+passed the main CI workflow. Linux x64 and ARM64 runners build their matching
+Kotlin/Native publications, while macOS runners build the macOS and iOS
+publications. Each consumes native build artifacts produced by the platform and
+backend CI matrix. Android publication runs with the Linux x64 partition; it
+reuses the matrix's CMake install archives and builds only the JNI bridge and
+final AARs.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central
@@ -126,14 +127,14 @@ Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`
 GitHub Actions secrets. Snapshot publication does not require signing.
 
 Each host first stages its publications in a local Maven repository. CI merges
-the Linux and Apple repositories, then inspects the published AAR, JAR, and KLIB
-payloads and compiles the example consumers against the merged repository. After
-every local check succeeds, each host publishes its own target artifacts to the
-Central Portal. Linux and Apple leaf modules publish first; the canonical
-multiplatform root modules publish last, after every leaf upload succeeds.
-Snapshot workflows are serialized so two commits cannot interleave those
-uploads. Publication jobs reuse the CI-produced native archives; they do not
-rebuild MapLibre Native.
+the Linux x64, Linux ARM64, and Apple repositories, then inspects the published
+AAR, JAR, and KLIB payloads and compiles the example consumers against the
+merged repository. After every local check succeeds, each host publishes its own
+target artifacts to the Central Portal. Linux and Apple leaf modules publish
+first; the canonical multiplatform root modules publish last, after every leaf
+upload succeeds. Snapshot workflows are serialized so two commits cannot
+interleave those uploads. Publication jobs reuse the CI-produced native
+archives; they do not rebuild MapLibre Native.
 
 The initial snapshot workflow validates:
 

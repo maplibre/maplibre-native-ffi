@@ -99,17 +99,23 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
     // output therefore uses C_LONG even though every such value in our 64-bit C ABI is 64 bits,
     // while C_LONG itself becomes 32 bits when the same JVM artifact runs on Windows.
     // The public API has no plain C long, so every generated C_LONG use is a fixed-width value.
+    // TODO: Replace this textual normalization with an AST-based rewrite.
+    val hostLongLayout =
+      Regex(
+        """public static final ValueLayout\.Of(?:Int|Long) C_LONG\s*=\s*""" +
+          """\(ValueLayout\.Of(?:Int|Long)\)\s*""" +
+          """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);"""
+      )
+    val generatedSource = sharedBindings.readText()
+    val matchCount = hostLongLayout.findAll(generatedSource).count()
+    check(matchCount == 1) {
+      "Expected one host-derived C_LONG declaration in $sharedBindings, found $matchCount"
+    }
     sharedBindings.writeText(
-      sharedBindings
-        .readText()
-        .replace(
-          Regex(
-            """public static final ValueLayout\.Of(?:Int|Long) C_LONG\s*=\s*""" +
-              """\(ValueLayout\.Of(?:Int|Long)\)\s*""" +
-              """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);"""
-          ),
-          "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
-        )
+      hostLongLayout.replaceFirst(
+        generatedSource,
+        "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
+      )
     )
   }
 }
