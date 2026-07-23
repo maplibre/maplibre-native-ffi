@@ -86,10 +86,10 @@ native library is compiled for one render backend.
 
 The Android target of `maplibre-native-ffi` directly includes the Kotlin helper
 required by `rustls-platform-verifier`. It also includes the helper's consumer
-R8 rule, upstream licenses, and provenance. Gradle copies the license texts from
-the exact `rustls-platform-verifier` package selected by Cargo.lock. The helper
-version is updated with the Rust dependency. Consumers do not add a
-Rustls-specific Maven dependency.
+R8 rule and upstream licenses. Gradle copies the license texts from the exact
+`rustls-platform-verifier` package selected by Cargo.lock. The helper version is
+updated with the Rust dependency. Consumers do not add a Rustls-specific Maven
+dependency.
 
 ### JVM
 
@@ -113,21 +113,23 @@ configuration remains available as an override.
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. One macOS runner coordinates Maven publication and
-Apple Kotlin/Native compilation. It consumes native build artifacts produced by
-the platform and backend CI matrix. Android publication reuses the matrix's
-CMake install archives and builds only the JNI bridge and final AARs in the
-publication job.
+passed the main CI workflow. Linux runners build the Linux Kotlin/Native
+publications, while macOS runners build the macOS and iOS publications. Both
+consume native build artifacts produced by the platform and backend CI matrix.
+Android publication runs with the Linux partition; it reuses the matrix's CMake
+install archives and builds only the JNI bridge and final AARs.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central
 Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`
 GitHub Actions secrets. Snapshot publication does not require signing.
 
-The publish task first stages all publications in a local Maven repository. It
-then inspects the published AAR, JAR, and KLIB payloads and compiles the example
-consumers against that repository. Upload to the Central Portal begins only
-after every local check succeeds.
+Each host first stages its publications in a local Maven repository. CI merges
+the Linux and Apple repositories, then inspects the published AAR, JAR, and KLIB
+payloads and compiles the example consumers against the merged repository. After
+every local check succeeds, each host publishes its own target artifacts to the
+Central Portal. Publication jobs reuse the CI-produced native archives; they do
+not rebuild MapLibre Native.
 
 The initial snapshot workflow validates:
 

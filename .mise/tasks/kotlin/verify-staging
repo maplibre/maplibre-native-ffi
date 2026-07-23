@@ -79,7 +79,7 @@ def verify_android(root: pathlib.Path) -> None:
             b"org.rustls.platformverifier" in aar.read(name) for name in rules
         ):
             raise SystemExit("the core Android AAR is missing the Rustls consumer keep rule")
-        for license_name in ("LICENSE-APACHE", "LICENSE-MIT", "PROVENANCE.md"):
+        for license_name in ("LICENSE-APACHE", "LICENSE-MIT"):
             expected = (
                 "META-INF/licenses/rustls-platform-verifier/" + license_name
             )
