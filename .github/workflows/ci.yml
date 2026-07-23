@@ -181,16 +181,18 @@ jobs:
               mise run //bindings/python:test macos-arm64-egl
           - preset: ios-arm64-metal
             runner: macos-26
-            package: false
+            package: true
             commands: >-
               mise run build ios-arm64-metal &&
+              mise run //bindings/kotlin:iosBuild ios-arm64-metal &&
               mise run //bindings/swift:build:ios &&
               mise run //examples/swift-map:build:ios
           - preset: ios-simulator-arm64-metal
             runner: macos-26
-            package: false
+            package: true
             commands: >-
               mise run test ios-simulator-arm64-metal &&
+              mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal &&
               mise run //bindings/swift:build:ios-simulator &&
               mise run //bindings/zig:test:ios-simulator &&
               bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120 &&

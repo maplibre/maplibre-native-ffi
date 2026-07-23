@@ -94,6 +94,7 @@ def target_commands(
     elif target_platform == "ios":
         commands.extend(
             [
+                f"mise run //bindings/kotlin:iosBuild {preset}",
                 "mise run //bindings/swift:build:ios",
                 "mise run //examples/swift-map:build:ios",
             ]
@@ -101,6 +102,7 @@ def target_commands(
     elif target_platform == "ios-simulator":
         commands.extend(
             [
+                f"mise run //bindings/kotlin:iosBuild {preset}",
                 "mise run //bindings/swift:build:ios-simulator",
                 "mise run //bindings/zig:test:ios-simulator",
                 "bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120",

@@ -1,8 +1,10 @@
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.AndroidTarget
+import org.maplibre.nativeffi.gradle.CargoPackage
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
@@ -30,9 +32,23 @@ val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
 val publishingSnapshot =
   providers.gradleProperty("maplibre.publish").map(String::toBoolean).getOrElse(false)
+val rustlsPlatformVerifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
+val generateRustlsPlatformVerifierLicenses =
+  tasks.register<Sync>("generateRustlsPlatformVerifierLicenses") {
+    val packageDirectory = rustlsPlatformVerifierPackage
+    from(packageDirectory.map { it.resolve("LICENSE-APACHE") }) {
+      into("META-INF/licenses/rustls-platform-verifier")
+    }
+    from(packageDirectory.map { it.resolve("LICENSE-MIT") }) {
+      into("META-INF/licenses/rustls-platform-verifier")
+    }
+    into(layout.buildDirectory.dir("generated/resources/rustlsPlatformVerifier/androidMain"))
+  }
 
 kotlin {
   if (publishingSnapshot) {
+    iosArm64()
+    iosSimulatorArm64()
     linuxX64()
     linuxArm64()
     macosArm64()
@@ -94,7 +110,10 @@ kotlin {
   }
 
   sourceSets {
-    androidMain.dependencies { implementation(libs.javacpp) }
+    androidMain {
+      resources.srcDir(generateRustlsPlatformVerifierLicenses)
+      dependencies { implementation(libs.javacpp) }
+    }
 
     commonTest.dependencies { implementation(kotlin("test")) }
   }

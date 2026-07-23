@@ -1,0 +1,4 @@
+headers = maplibreNativeRuntime.h
+headerFilter = maplibreNativeRuntime.h
+package = org.maplibre.nativeffi.internal.runtime
+linkerOpts = -lc++ -lz -framework CoreFoundation -framework CoreGraphics -framework CoreText -framework Foundation -framework ImageIO -framework Metal -framework QuartzCore

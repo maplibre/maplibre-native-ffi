@@ -110,7 +110,7 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
 
 [tasks.package-native]
-description = "Build and archive a desktop native CMake preset."
+description = "Build and archive a native CMake preset."
 usage = 'arg "<preset>"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = 'cpack --preset "$usage_preset"'

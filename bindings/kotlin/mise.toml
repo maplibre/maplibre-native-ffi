@@ -38,6 +38,24 @@ run = '''
   :bindings:kotlin:nativeTest
 '''
 
+[tasks.iosBuild]
+description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
+usage = 'arg "<preset>" choices="ios-arm64-metal" "ios-simulator-arm64-metal"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+case "$usage_preset" in
+  ios-arm64-metal) kotlin_target=iosArm64 ;;
+  ios-simulator-arm64-metal) kotlin_target=iosSimulatorArm64 ;;
+esac
+./gradlew \
+  -Pmaplibre.publish=true \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
+  ":bindings:kotlin:${kotlin_target}Klib" \
+  ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
+'''
+
 [tasks.androidBuild]
 description = "Build the Kotlin Android binding."
 usage = '''

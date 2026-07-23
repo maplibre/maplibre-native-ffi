@@ -23,7 +23,11 @@ val publishingSnapshot =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
-  if (publishingSnapshot || hostPlatform.kotlinNativeTargetPresetName == "macosArm64") {
+  if (publishingSnapshot) {
+    iosArm64()
+    iosSimulatorArm64()
+    macosArm64()
+  } else if (hostPlatform.kotlinNativeTargetPresetName == "macosArm64") {
     macosArm64()
   }
 
@@ -62,10 +66,17 @@ extensions.configure<KotlinMultiplatformExtension> {
         .map(rootProject::file)
         .getOrElse(maplibreNativeC.installDir)
     val runtimeLibraryDirectory = runtimeInstallDir.resolve("lib")
+    val runtimeDefinition =
+      when (nativeTargetName) {
+        "iosArm64",
+        "iosSimulatorArm64" -> "ios-metal.def"
+        "macosArm64" -> "macos-metal.def"
+        else -> error("Unsupported Metal Kotlin/Native target: $nativeTargetName")
+      }
 
     compilations.getByName("main") {
       cinterops.create("maplibreNativeRuntime") {
-        defFile(runtimeInteropDirectory.file("macos-metal.def"))
+        defFile(runtimeInteropDirectory.file(runtimeDefinition))
         includeDirs.headerFilterOnly(runtimeInteropDirectory.asFile)
         compilerOpts("-I${runtimeInteropDirectory.asFile}")
         extraOpts(

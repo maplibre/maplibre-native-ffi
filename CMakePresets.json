@@ -474,6 +474,18 @@
       "configurations": ["RelWithDebInfo"]
     },
     {
+      "name": "ios-arm64-metal",
+      "configurePreset": "ios-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
+      "name": "ios-simulator-arm64-metal",
+      "configurePreset": "ios-simulator-arm64-metal",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "generators": ["TGZ"],

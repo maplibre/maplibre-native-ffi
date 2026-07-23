@@ -67,8 +67,8 @@ archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
 The initial native runtime publications are OpenGL and Vulkan for Linux x64 and
-arm64, plus Metal for macOS arm64. Other native targets can be added when their
-consumer path is implemented.
+arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each
+published Kotlin/Native target has a matching runtime variant.
 
 System graphics components remain platform dependencies. Examples include Metal
 frameworks from the Apple SDK and EGL, OpenGL, and Vulkan loaders supplied by
@@ -82,8 +82,10 @@ native library is compiled for one render backend.
 
 The Android target of `maplibre-native-ffi` directly includes the Kotlin helper
 required by `rustls-platform-verifier`. It also includes the helper's consumer
-R8 rule, upstream license, and provenance. The helper version is updated with
-the Rust dependency. Consumers do not add a Rustls-specific Maven dependency.
+R8 rule, upstream licenses, and provenance. Gradle copies the license texts from
+the exact `rustls-platform-verifier` package selected by Cargo.lock. The helper
+version is updated with the Rust dependency. Consumers do not add a
+Rustls-specific Maven dependency.
 
 ### JVM
 

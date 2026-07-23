@@ -38,6 +38,8 @@ presets=(
   macos-arm64-egl:opengl
   macos-arm64-vulkan:vulkan
   macos-arm64-metal:metal
+  ios-arm64-metal:metal
+  ios-simulator-arm64-metal:metal
   windows-x64-wgl:opengl
   windows-arm64-wgl:opengl
   windows-x64-vulkan:vulkan
@@ -77,6 +79,8 @@ vulkan=(
 )
 
 metal=(
+  -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
+  -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
   -Pmaplibre.runtime.metal.macosArm64.installDir="$install_root/macos-arm64-metal"
   -Pmaplibre.runtime.metal.jvm.natives-macos-arm64.installDir="$install_root/macos-arm64-metal"
 )
