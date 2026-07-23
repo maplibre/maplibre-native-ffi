@@ -20,7 +20,7 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
 
   @get:Input abstract val expectedBackend: Property<String>
 
-  @get:Input abstract val expectedZigTarget: Property<String>
+  @get:Input abstract val expectedTargetPlatform: Property<String>
 
   @TaskAction
   fun verify() {
@@ -39,14 +39,14 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
 
     @Suppress("UNCHECKED_CAST") val metadata = JsonSlurper().parse(descriptor) as Map<String, Any?>
     val actualBackend = metadata["renderBackend"]
-    val actualZigTarget = metadata["zigTarget"]
+    val actualTargetPlatform = metadata["targetPlatform"]
     require(actualBackend == expectedBackend.get()) {
       "Native runtime install ${installDirectory.absolutePath} uses backend " +
         "'$actualBackend'; expected '${expectedBackend.get()}'"
     }
-    require(actualZigTarget == expectedZigTarget.get()) {
+    require(actualTargetPlatform == expectedTargetPlatform.get()) {
       "Native runtime install ${installDirectory.absolutePath} targets " +
-        "'$actualZigTarget'; expected '${expectedZigTarget.get()}'"
+        "'$actualTargetPlatform'; expected '${expectedTargetPlatform.get()}'"
     }
   }
 }

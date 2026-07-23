@@ -16,7 +16,7 @@ import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
 
-data class NativeTargetConfiguration(val definitionFileName: String, val zigTarget: String)
+data class NativeTargetConfiguration(val definitionFileName: String, val targetPlatform: String)
 
 data class JvmRuntimeInstall(
   val classifier: String,
@@ -25,13 +25,13 @@ data class JvmRuntimeInstall(
   val explicitlyConfigured: Boolean,
 )
 
-val jvmZigTargets =
+val jvmTargetPlatforms =
   linkedMapOf(
-    "natives-linux-x64" to "x86_64-linux-gnu",
-    "natives-linux-arm64" to "aarch64-linux-gnu",
-    "natives-macos-arm64" to "aarch64-macos",
-    "natives-windows-x64" to "x86_64-windows-msvc",
-    "natives-windows-arm64" to "aarch64-windows-msvc",
+    "natives-linux-x64" to "linux-x64",
+    "natives-linux-arm64" to "linux-arm64",
+    "natives-macos-arm64" to "macos-arm64",
+    "natives-windows-x64" to "windows-x64",
+    "natives-windows-arm64" to "windows-arm64",
   )
 
 fun String.capitalized(): String = replaceFirstChar(Char::uppercaseChar)
@@ -49,8 +49,8 @@ fun nativeTargets(
         "Metal does not support Linux Kotlin/Native targets"
       }
       mapOf(
-        "linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "x86_64-linux-gnu"),
-        "linuxArm64" to NativeTargetConfiguration("linux-${backend.id}.def", "aarch64-linux-gnu"),
+        "linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-x64"),
+        "linuxArm64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-arm64"),
       )
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
@@ -58,9 +58,9 @@ fun nativeTargets(
         "Only Metal supports Apple Kotlin/Native targets"
       }
       mapOf(
-        "iosArm64" to NativeTargetConfiguration("ios-metal.def", "aarch64-ios"),
-        "iosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def", "aarch64-ios-simulator"),
-        "macosArm64" to NativeTargetConfiguration("macos-metal.def", "aarch64-macos"),
+        "iosArm64" to NativeTargetConfiguration("ios-metal.def", "ios-arm64"),
+        "iosSimulatorArm64" to NativeTargetConfiguration("ios-metal.def", "ios-simulator-arm64"),
+        "macosArm64" to NativeTargetConfiguration("macos-metal.def", "macos-arm64"),
       )
     }
   }
@@ -72,7 +72,7 @@ fun registerRuntimeInstallVerification(
   explicitlyConfigured: Boolean,
   requireExplicitInput: Boolean,
   backend: String,
-  zigTarget: String,
+  targetPlatform: String,
 ) =
   tasks.register<VerifyMaplibreRuntimeInstall>(taskName) {
     installDirectoryPath.set(installDirectory.map(File::getAbsolutePath))
@@ -80,23 +80,23 @@ fun registerRuntimeInstallVerification(
     this.explicitlyConfigured.set(explicitlyConfigured)
     this.requireExplicitInput.set(requireExplicitInput)
     expectedBackend.set(backend)
-    expectedZigTarget.set(zigTarget)
+    expectedTargetPlatform.set(targetPlatform)
   }
 
 fun configureJvmRuntimeArtifacts(
   backend: String,
-  classifierZigTargets: Map<String, String>,
+  classifierTargetPlatforms: Map<String, String>,
   maplibreNativeC: MaplibreNativeCArtifact,
 ) {
   val hostClassifier = HostPlatform.current().maplibreNativeClassifier
-  val configuredInstalls = classifierZigTargets.mapNotNull { (classifier, _) ->
+  val configuredInstalls = classifierTargetPlatforms.mapNotNull { (classifier, _) ->
     val propertyName = "maplibre.runtime.$backend.jvm.$classifier.installDir"
     providers.gradleProperty(propertyName).orNull?.let {
       JvmRuntimeInstall(classifier, propertyName, rootProject.file(it), true)
     }
   }
   val runtimeInstalls = configuredInstalls.ifEmpty {
-    if (hostClassifier in classifierZigTargets) {
+    if (hostClassifier in classifierTargetPlatforms) {
       listOf(
         JvmRuntimeInstall(
           hostClassifier,
@@ -120,7 +120,7 @@ fun configureJvmRuntimeArtifacts(
         explicitlyConfigured = runtimeInstall.explicitlyConfigured,
         requireExplicitInput = false,
         backend = backend,
-        zigTarget = classifierZigTargets.getValue(runtimeInstall.classifier),
+        targetPlatform = classifierTargetPlatforms.getValue(runtimeInstall.classifier),
       )
 
     tasks.register<Jar>("jvm${taskSuffix}RuntimeJar") {
@@ -144,7 +144,7 @@ fun configureJvmRuntimeArtifacts(
   }
 
   val verifyPublicationInputs = tasks.register("verifyJvmRuntimePublicationInputs")
-  classifierZigTargets.forEach { (classifier, zigTarget) ->
+  classifierTargetPlatforms.forEach { (classifier, targetPlatform) ->
     val propertyName = "maplibre.runtime.$backend.jvm.$classifier.installDir"
     val configuredInstall = providers.gradleProperty(propertyName)
     val selectedInstall =
@@ -157,7 +157,7 @@ fun configureJvmRuntimeArtifacts(
         explicitlyConfigured = configuredInstall.isPresent,
         requireExplicitInput = true,
         backend = backend,
-        zigTarget = zigTarget,
+        targetPlatform = targetPlatform,
       )
     verifyPublicationInputs.configure { dependsOn(verifyInput) }
   }
@@ -215,7 +215,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         explicitlyConfigured = prebuiltInstallRoot.isPresent,
         requireExplicitInput = true,
         backend = backend.id,
-        zigTarget = target.cargoTarget,
+        targetPlatform = target.targetPlatform,
       )
     verifyPublicationInputs.configure { dependsOn(verifyInput) }
   }
@@ -241,11 +241,11 @@ val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val runtimeInteropDirectory =
   rootProject.layout.projectDirectory.dir("bindings/kotlin-runtime-common")
 val configuredNativeTargets = nativeTargets(backend, targetFamily)
-val configuredJvmZigTargets =
+val configuredJvmTargetPlatforms =
   if (targetFamily == MaplibreRuntimeTargetFamily.APPLE) {
-    jvmZigTargets.filterKeys { it == "natives-macos-arm64" }
+    jvmTargetPlatforms.filterKeys { it == "natives-macos-arm64" }
   } else {
-    jvmZigTargets
+    jvmTargetPlatforms
   }
 
 extensions.configure<KotlinMultiplatformExtension> {
@@ -287,7 +287,7 @@ extensions.configure<KotlinMultiplatformExtension> {
         explicitlyConfigured = configuredInstall.isPresent,
         requireExplicitInput = true,
         backend = runtimeBackend,
-        zigTarget = targetConfiguration.zigTarget,
+        targetPlatform = targetConfiguration.targetPlatform,
       )
     tasks.configureEach {
       if (name.startsWith("publish${nativeTargetName.capitalized()}PublicationTo")) {
@@ -297,7 +297,7 @@ extensions.configure<KotlinMultiplatformExtension> {
   }
 }
 
-configureJvmRuntimeArtifacts(runtimeBackend, configuredJvmZigTargets, maplibreNativeC)
+configureJvmRuntimeArtifacts(runtimeBackend, configuredJvmTargetPlatforms, maplibreNativeC)
 
 if (targetFamily == MaplibreRuntimeTargetFamily.LINUX) {
   configureAndroidRuntimePublication(backend)

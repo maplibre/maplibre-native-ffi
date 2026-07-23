@@ -38,6 +38,8 @@ function(mln_configure_platform_dependencies target)
       mbgl-vendor-icu
       MLN_FFI_TEST_SUPPORTED
       FALSE
+      MLN_FFI_TARGET_PLATFORM
+      ohos-arm64
       MLN_FFI_ZIG_TARGET
       aarch64-linux-ohos
       MLN_FFI_ZIG_LIBC_SYSROOT

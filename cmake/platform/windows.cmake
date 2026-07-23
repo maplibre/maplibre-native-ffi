@@ -42,13 +42,17 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_TEST_RUNTIME_DIRS
       "${CMAKE_INSTALL_PREFIX}/bin")
   if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64")
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_ZIG_TARGET aarch64-windows-msvc)
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM windows-arm64 MLN_FFI_ZIG_TARGET
+        aarch64-windows-msvc)
   else()
-    set_property(
-      TARGET ${target}
-      PROPERTY MLN_FFI_ZIG_TARGET x86_64-windows-msvc)
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM windows-x64 MLN_FFI_ZIG_TARGET
+        x86_64-windows-msvc)
   endif()
 endfunction()
 

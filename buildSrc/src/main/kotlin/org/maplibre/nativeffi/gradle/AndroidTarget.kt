@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.gradle
 
 enum class AndroidTarget(
   val cargoTarget: String,
+  val targetPlatform: String,
   val cmakeArchitecture: String,
   val ndkAbi: String,
   val javaCppPlatform: String,
@@ -10,6 +11,7 @@ enum class AndroidTarget(
 ) {
   ARM64(
     cargoTarget = "aarch64-linux-android",
+    targetPlatform = "android-arm64",
     cmakeArchitecture = "arm64",
     ndkAbi = "arm64-v8a",
     javaCppPlatform = "android-arm64",
@@ -18,6 +20,7 @@ enum class AndroidTarget(
   ),
   X64(
     cargoTarget = "x86_64-linux-android",
+    targetPlatform = "android-x64",
     cmakeArchitecture = "x64",
     ndkAbi = "x86_64",
     javaCppPlatform = "android-x86_64",
