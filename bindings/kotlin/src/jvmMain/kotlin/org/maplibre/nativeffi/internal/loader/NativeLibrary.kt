@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.internal.loader
 
 import java.net.URL
 import java.nio.file.AtomicMoveNotSupportedException
-import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -164,25 +163,45 @@ internal object NativeLibrary {
   private fun extractResource(resource: RuntimeResource, directory: Path): Path {
     val destination = directory.resolve(resource.name)
     if (
-      Files.isRegularFile(destination) && Files.size(destination) == resource.bytes.size.toLong()
+      Files.isRegularFile(destination) &&
+        Files.size(destination) == resource.bytes.size.toLong() &&
+        MessageDigest.isEqual(sha256(destination), resource.sha256)
     ) {
       return destination
     }
 
     val temporary = Files.createTempFile(directory, ".${resource.name}.", ".tmp")
-    Files.write(temporary, resource.bytes)
     try {
-      Files.move(temporary, destination, StandardCopyOption.ATOMIC_MOVE)
-    } catch (_: AtomicMoveNotSupportedException) {
+      Files.write(temporary, resource.bytes)
       try {
-        Files.move(temporary, destination)
-      } catch (_: FileAlreadyExistsException) {
-        Files.deleteIfExists(temporary)
+        Files.move(
+          temporary,
+          destination,
+          StandardCopyOption.ATOMIC_MOVE,
+          StandardCopyOption.REPLACE_EXISTING,
+        )
+      } catch (_: AtomicMoveNotSupportedException) {
+        Files.move(temporary, destination, StandardCopyOption.REPLACE_EXISTING)
       }
-    } catch (_: FileAlreadyExistsException) {
+    } finally {
       Files.deleteIfExists(temporary)
     }
     return destination
+  }
+
+  private fun sha256(path: Path): ByteArray {
+    val digest = MessageDigest.getInstance("SHA-256")
+    Files.newInputStream(path).use { input ->
+      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+      while (true) {
+        val byteCount = input.read(buffer)
+        if (byteCount < 0) {
+          break
+        }
+        digest.update(buffer, 0, byteCount)
+      }
+    }
+    return digest.digest()
   }
 
   private fun resourceContainer(resource: URL): String {
@@ -282,5 +301,7 @@ internal object NativeLibrary {
 
   private data class LoadedLibrary(val path: Path?, val source: String)
 
-  private data class RuntimeResource(val name: String, val bytes: ByteArray)
+  private data class RuntimeResource(val name: String, val bytes: ByteArray) {
+    val sha256: ByteArray = MessageDigest.getInstance("SHA-256").digest(bytes)
+  }
 }

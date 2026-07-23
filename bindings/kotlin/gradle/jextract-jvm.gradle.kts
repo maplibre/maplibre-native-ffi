@@ -95,8 +95,10 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
 
     val sharedBindings =
       output.resolve("org/maplibre/nativeffi/internal/c/MapLibreNativeC\$shared.java")
-    // This JVM artifact is shared across 64-bit hosts, while jextract derives C_LONG from the
-    // build host and initializes it when the generated class loads.
+    // jextract lowers size_t, int64_t, and uint64_t through the build host's typedefs. Unix
+    // output therefore uses C_LONG even though every such value in our 64-bit C ABI is 64 bits,
+    // while C_LONG itself becomes 32 bits when the same JVM artifact runs on Windows.
+    // The public API has no plain C long, so every generated C_LONG use is a fixed-width value.
     sharedBindings.writeText(
       sharedBindings
         .readText()
