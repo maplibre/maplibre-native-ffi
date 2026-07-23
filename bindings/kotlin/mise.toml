@@ -77,7 +77,11 @@ esac
 
 [tasks.iosBuild]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
-usage = 'arg "<preset>" choices="ios-arm64-metal" "ios-simulator-arm64-metal"'
+usage = '''
+arg "<preset>" {
+  choices "ios-arm64-metal" "ios-simulator-arm64-metal"
+}
+'''
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
