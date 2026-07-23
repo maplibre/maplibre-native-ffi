@@ -111,7 +111,9 @@ configuration remains available as an override.
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
 passed the main CI workflow. One macOS runner coordinates Maven publication and
 Apple Kotlin/Native compilation. It consumes native build artifacts produced by
-the platform and backend CI matrix.
+the platform and backend CI matrix. Android publication reuses the matrix's
+CMake install archives and builds only the JNI bridge and final AARs in the
+publication job.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

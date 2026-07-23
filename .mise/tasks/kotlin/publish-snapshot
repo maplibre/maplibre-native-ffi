@@ -40,6 +40,10 @@ presets=(
   macos-arm64-metal:metal
   ios-arm64-metal:metal
   ios-simulator-arm64-metal:metal
+  android-arm64-egl:opengl
+  android-arm64-vulkan:vulkan
+  android-x64-egl:opengl
+  android-x64-vulkan:vulkan
   windows-x64-wgl:opengl
   windows-arm64-wgl:opengl
   windows-x64-vulkan:vulkan
@@ -51,6 +55,7 @@ done
 
 common=(
   -Pmaplibre.publish=true
+  -Pmaplibre.android.nativeInstallRoot="$install_root"
   -Pmaplibre.maven.localRepository="$staging_root"
 )
 

@@ -486,6 +486,30 @@
       "configurations": ["RelWithDebInfo"]
     },
     {
+      "name": "android-arm64-egl",
+      "configurePreset": "android-arm64-egl",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
+      "name": "android-arm64-vulkan",
+      "configurePreset": "android-arm64-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
+      "name": "android-x64-egl",
+      "configurePreset": "android-x64-egl",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
+      "name": "android-x64-vulkan",
+      "configurePreset": "android-x64-vulkan",
+      "generators": ["TGZ"],
+      "configurations": ["RelWithDebInfo"]
+    },
+    {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "generators": ["TGZ"],
