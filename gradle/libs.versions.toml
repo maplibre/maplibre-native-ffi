@@ -1,5 +1,6 @@
 [versions]
-kotlin = "2.2.21"
+kotlin = "2.4.10"
+compose = "1.11.1"
 agp = "9.1.1"
 maven-publish = "0.37.0"
 javacpp = "1.5.11"
@@ -23,8 +24,5 @@ lwjgl-vulkan = { module = "org.lwjgl:lwjgl-vulkan" }
 lwjgl-shaderc = { module = "org.lwjgl:lwjgl-shaderc" }
 
 [plugins]
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
-kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-android-application = { id = "com.android.application", version.ref = "agp" }
-android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
-maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

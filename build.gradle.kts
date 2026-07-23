@@ -7,6 +7,8 @@ plugins {
   // come from that classpath and the project applies them by ID.
   id("org.jetbrains.kotlin.jvm") apply false
   id("org.jetbrains.kotlin.multiplatform") apply false
+  alias(libs.plugins.compose.multiplatform) apply false
+  alias(libs.plugins.compose.compiler) apply false
   id("com.android.application") apply false
   id("com.android.kotlin.multiplatform.library") apply false
   id("com.vanniktech.maven.publish") apply false
