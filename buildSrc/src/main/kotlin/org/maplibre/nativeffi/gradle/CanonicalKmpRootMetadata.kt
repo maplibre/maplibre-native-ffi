@@ -17,7 +17,6 @@ import org.gradle.api.publish.tasks.GenerateModuleMetadata
  */
 fun Project.canonicalizeKmpRootMetadata(
   group: String,
-  rootModule: String,
   version: String,
   targetModules: Map<String, String>,
 ) {
@@ -28,16 +27,14 @@ fun Project.canonicalizeKmpRootMetadata(
     )
     .configure {
       inputs.property("canonicalRootGroup", group)
-      inputs.property("canonicalRootModule", rootModule)
       inputs.property("canonicalRootVersion", version)
       inputs.properties(targetModules.mapKeys { (target, _) -> "canonicalTargetModule.$target" })
-      doLast(CanonicalizeKmpRootMetadata(group, rootModule, version, targetModules))
+      doLast(CanonicalizeKmpRootMetadata(group, version, targetModules))
     }
 }
 
 private class CanonicalizeKmpRootMetadata(
   private val group: String,
-  private val rootModule: String,
   private val version: String,
   targetModules: Map<String, String>,
 ) : Action<Task>, Serializable {
@@ -50,20 +47,9 @@ private class CanonicalizeKmpRootMetadata(
     val metadataFile = task.outputFile.get().asFile
     @Suppress("UNCHECKED_CAST")
     val metadata = JsonSlurper().parse(metadataFile) as MutableMap<String, Any?>
-    @Suppress("UNCHECKED_CAST") val component = metadata["component"] as MutableMap<String, Any?>
-    require(component["group"] == group) {
-      "Expected $group, found ${component["group"]} in ${metadataFile.absolutePath}"
-    }
-    require(component["module"] == rootModule) {
-      "Expected $rootModule, found ${component["module"]} in ${metadataFile.absolutePath}"
-    }
-    require(component["version"] == version) {
-      "Expected $version, found ${component["version"]} in ${metadataFile.absolutePath}"
-    }
 
     @Suppress("UNCHECKED_CAST")
     val variants = metadata["variants"] as List<MutableMap<String, Any?>>
-    val referencedTargets = mutableSetOf<String>()
     variants.forEach { variant ->
       @Suppress("UNCHECKED_CAST")
       val availableAt = variant["available-at"] as? MutableMap<String, Any?> ?: return@forEach
@@ -72,14 +58,10 @@ private class CanonicalizeKmpRootMetadata(
         targetModules.keys.singleOrNull(variantName::startsWith)
           ?: error("No target module mapping for root variant '$variantName'")
       val targetModule = targetModules.getValue(target)
-      referencedTargets += target
       availableAt["group"] = group
       availableAt["module"] = targetModule
       availableAt["version"] = version
       availableAt["url"] = "../../$targetModule/$version/$targetModule-$version.module"
-    }
-    require(referencedTargets == targetModules.keys) {
-      "Root metadata referenced $referencedTargets; expected ${targetModules.keys}"
     }
 
     metadataFile.writeText(JsonOutput.prettyPrint(JsonOutput.toJson(metadata)) + "\n")

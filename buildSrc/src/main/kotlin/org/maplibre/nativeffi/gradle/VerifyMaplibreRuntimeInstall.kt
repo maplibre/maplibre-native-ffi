@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.gradle
 
+import groovy.json.JsonSlurper
 import java.io.File
 import org.gradle.api.DefaultTask
 import org.gradle.api.provider.Property
@@ -36,9 +37,9 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
         "share/maplibre-native-c/artifact.json"
     }
 
-    val descriptorText = descriptor.readText()
-    val actualBackend = descriptorText.jsonString("renderBackend")
-    val actualZigTarget = descriptorText.jsonString("zigTarget")
+    @Suppress("UNCHECKED_CAST") val metadata = JsonSlurper().parse(descriptor) as Map<String, Any?>
+    val actualBackend = metadata["renderBackend"]
+    val actualZigTarget = metadata["zigTarget"]
     require(actualBackend == expectedBackend.get()) {
       "Native runtime install ${installDirectory.absolutePath} uses backend " +
         "'$actualBackend'; expected '${expectedBackend.get()}'"
@@ -48,8 +49,4 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
         "'$actualZigTarget'; expected '${expectedZigTarget.get()}'"
     }
   }
-
-  private fun String.jsonString(name: String): String =
-    Regex(""""${Regex.escape(name)}"\s*:\s*"([^"]+)"""").find(this)?.groupValues?.get(1)
-      ?: error("Native runtime artifact descriptor is missing '$name'")
 }

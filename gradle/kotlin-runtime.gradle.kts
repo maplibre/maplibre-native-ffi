@@ -139,9 +139,6 @@ fun configureJvmRuntimeArtifacts(
         include("*.dll")
         into(resourcePath)
       }
-      from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/artifact.json")) {
-        into(resourcePath)
-      }
       from(rootProject.file("LICENSE")) { into("META-INF") }
     }
   }
@@ -319,7 +316,6 @@ extensions.configure<MavenPublishBaseExtension> {
 
 canonicalizeKmpRootMetadata(
   group = mavenGroup,
-  rootModule = mavenArtifact,
   version = mavenVersion,
   targetModules =
     when (targetFamily) {

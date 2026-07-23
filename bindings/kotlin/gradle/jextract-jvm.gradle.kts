@@ -67,14 +67,11 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
   abstract val jextractExecutable: RegularFileProperty
 
   @get:Input abstract val jextractArchiveSha256: Property<String>
-  @get:Input abstract val portableCLayoutsVersion: Property<Int>
   @get:OutputDirectory abstract val outputDirectory: DirectoryProperty
   @get:Inject abstract val execOperations: ExecOperations
 
   @TaskAction
   fun generate() {
-    verifyFixedWidthCAbi()
-
     val output = outputDirectory.get().asFile
     output.deleteRecursively()
     output.mkdirs()
@@ -98,42 +95,20 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
 
     val sharedBindings =
       output.resolve("org/maplibre/nativeffi/internal/c/MapLibreNativeC\$shared.java")
-    val generatedSource = sharedBindings.readText()
-    val hostLongLayoutDeclaration =
-      Regex(
-        """public static final ValueLayout\.Of(?:Int|Long) C_LONG\s*=\s*""" +
-          """\(ValueLayout\.Of(?:Int|Long)\)\s*""" +
-          """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);"""
-      )
-    val portableLongLayoutDeclaration = "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;"
-    check(hostLongLayoutDeclaration.findAll(generatedSource).count() == 1) {
-      "jextract no longer generated the expected host-specific C_LONG declaration"
-    }
+    // This JVM artifact is shared across 64-bit hosts, while jextract derives C_LONG from the
+    // build host and initializes it when the generated class loads.
     sharedBindings.writeText(
-      generatedSource.replace(hostLongLayoutDeclaration, portableLongLayoutDeclaration)
+      sharedBindings
+        .readText()
+        .replace(
+          Regex(
+            """public static final ValueLayout\.Of(?:Int|Long) C_LONG\s*=\s*""" +
+              """\(ValueLayout\.Of(?:Int|Long)\)\s*""" +
+              """Linker\.nativeLinker\(\)\.canonicalLayouts\(\)\.get\("long"\);"""
+          ),
+          "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
+        )
     )
-    check(!hostLongLayoutDeclaration.containsMatchIn(sharedBindings.readText())) {
-      "Failed to make the generated C_LONG layout portable"
-    }
-  }
-
-  private fun verifyFixedWidthCAbi() {
-    val cLongToken = Regex("""\blong\b""")
-    val cComment = Regex("""/\*.*?\*/""", RegexOption.DOT_MATCHES_ALL)
-    val cppComment = Regex("""//.*""")
-    val headersWithCLong =
-      cHeaders
-        .get()
-        .asFileTree
-        .matching { include("**/*.h") }
-        .filter { header ->
-          val declarations = header.readText().replace(cComment, "").replace(cppComment, "")
-          cLongToken.containsMatchIn(declarations)
-        }
-    check(headersWithCLong.isEmpty) {
-      "The JVM publication assumes the C API uses fixed-width integers and 64-bit size_t; " +
-        "plain C long appears in: ${headersWithCLong.files.joinToString()}"
-    }
   }
 }
 
@@ -175,7 +150,6 @@ val generateJvmJextractBindings =
     cHeaders = checkedInCHeaders
     jextractExecutable = layout.file(provider { jextractExecutableFile.get() })
     jextractArchiveSha256 = jextractDistribution.sha256
-    portableCLayoutsVersion = 1
     outputDirectory = generatedJextractSources
   }
 

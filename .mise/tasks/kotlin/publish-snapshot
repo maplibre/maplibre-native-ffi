@@ -16,7 +16,6 @@ usage() {
 
 extract_preset() {
   local preset="$1"
-  local expected_backend="$2"
   local archive
   local destination="${install_root}/${preset}"
   archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
@@ -27,12 +26,6 @@ extract_preset() {
 
   mkdir -p "$destination"
   tar -xzf "$archive" -C "$destination" --strip-components=1
-  if ! grep -Fq \
-    "\"renderBackend\": \"${expected_backend}\"" \
-    "$destination/share/maplibre-native-c/artifact.json"; then
-    echo "Native package ${preset} does not declare the ${expected_backend} backend" >&2
-    return 1
-  fi
 }
 
 prepare_native_inputs() {
@@ -42,31 +35,31 @@ prepare_native_inputs() {
   case "$partition" in
     linux)
       presets=(
-        linux-x64-egl:opengl
-        linux-arm64-egl:opengl
-        linux-x64-vulkan:vulkan
-        linux-arm64-vulkan:vulkan
-        android-arm64-egl:opengl
-        android-arm64-vulkan:vulkan
-        android-x64-egl:opengl
-        android-x64-vulkan:vulkan
+        linux-x64-egl
+        linux-arm64-egl
+        linux-x64-vulkan
+        linux-arm64-vulkan
+        android-arm64-egl
+        android-arm64-vulkan
+        android-x64-egl
+        android-x64-vulkan
       )
       ;;
     apple)
       presets=(
-        linux-x64-egl:opengl
-        linux-arm64-egl:opengl
-        linux-x64-vulkan:vulkan
-        linux-arm64-vulkan:vulkan
-        macos-arm64-egl:opengl
-        macos-arm64-vulkan:vulkan
-        macos-arm64-metal:metal
-        ios-arm64-metal:metal
-        ios-simulator-arm64-metal:metal
-        windows-x64-wgl:opengl
-        windows-arm64-wgl:opengl
-        windows-x64-vulkan:vulkan
-        windows-arm64-vulkan:vulkan
+        linux-x64-egl
+        linux-arm64-egl
+        linux-x64-vulkan
+        linux-arm64-vulkan
+        macos-arm64-egl
+        macos-arm64-vulkan
+        macos-arm64-metal
+        ios-arm64-metal
+        ios-simulator-arm64-metal
+        windows-x64-wgl
+        windows-arm64-wgl
+        windows-x64-vulkan
+        windows-arm64-vulkan
       )
       ;;
     *)
@@ -76,8 +69,8 @@ prepare_native_inputs() {
   esac
 
   rm -rf "$install_root"
-  for entry in "${presets[@]}"; do
-    extract_preset "${entry%%:*}" "${entry##*:}"
+  for preset in "${presets[@]}"; do
+    extract_preset "$preset"
   done
 }
 

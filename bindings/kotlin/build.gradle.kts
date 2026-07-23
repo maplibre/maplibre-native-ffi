@@ -144,7 +144,6 @@ mavenPublishing {
 
 canonicalizeKmpRootMetadata(
   group = mavenGroup,
-  rootModule = mavenArtifact,
   version = mavenVersion,
   targetModules =
     mapOf(
