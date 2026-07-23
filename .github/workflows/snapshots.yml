@@ -120,6 +120,9 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
     if: ${{ needs.verify-kotlin.outputs.publish == 'true' }}
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/
     permissions:
       actions: read
       contents: read
@@ -143,6 +146,9 @@ jobs:
       SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
       ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
       ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      ORG_GRADLE_PROJECT_signAllPublications: "true"
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.1
         with:
@@ -185,6 +191,9 @@ jobs:
       - publish-kotlin-leaves
     runs-on: macos-26
     timeout-minutes: 60
+    environment:
+      name: maven-central
+      url: https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/
     permissions:
       actions: read
       contents: read
@@ -192,6 +201,9 @@ jobs:
       SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
       ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
       ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+      ORG_GRADLE_PROJECT_signAllPublications: "true"
+      ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+      ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.1
         with:
