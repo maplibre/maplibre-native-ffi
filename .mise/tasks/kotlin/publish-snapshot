@@ -74,6 +74,19 @@ prepare_native_inputs() {
   done
 }
 
+prepare_apple_root_inputs() {
+  local presets=(
+    macos-arm64-metal
+    ios-arm64-metal
+    ios-simulator-arm64-metal
+  )
+
+  rm -rf "$install_root"
+  for preset in "${presets[@]}"; do
+    extract_preset "$preset"
+  done
+}
+
 publish_tasks() {
   local project="$1"
   local repository="$2"
@@ -258,7 +271,7 @@ case "$operation" in
       usage
       exit 2
     fi
-    prepare_native_inputs "$partition"
+    prepare_apple_root_inputs
     publish_apple_roots MavenCentralRepository
     ;;
   verify)
@@ -269,8 +282,8 @@ case "$operation" in
     mise run //:kotlin:verify-staging "$partition"
 
     ./gradlew \
-      :examples:compose-map:classes \
-      :examples:lwjgl-map:classes \
+      :examples:compose-map:packageUberJarForCurrentOS \
+      :examples:lwjgl-map:installDist \
       -Pmaplibre.usePublishedKotlin=true \
       -Pmaplibre.runtime.backend=metal \
       -Pmaplibre.maven.localRepository="$partition"

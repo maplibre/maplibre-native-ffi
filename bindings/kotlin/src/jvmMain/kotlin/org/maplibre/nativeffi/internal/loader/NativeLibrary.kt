@@ -151,6 +151,7 @@ internal object NativeLibrary {
     val extracted = resources.associateWith { resource ->
       extractResource(resource, extractionDirectory)
     }
+    loadRuntimeDependencies(configuredRuntimeDependencyDirs())
     resources.dropLast(1).forEach { resource ->
       System.load(extracted.getValue(resource).toString())
     }

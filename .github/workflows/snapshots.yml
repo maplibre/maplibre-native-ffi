@@ -178,7 +178,7 @@ jobs:
         with:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
-          pattern: native-package-*-${{ env.SNAPSHOT_SHA }}
+          pattern: native-package-*-metal-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       - name: Check snapshot is still current
         id: current
