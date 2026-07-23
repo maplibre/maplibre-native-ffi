@@ -188,6 +188,7 @@ androidComponents {
 
 tasks.configureEach {
   when (name) {
+    "androidSourcesJar",
     "compileAndroidMainJavaWithJavac",
     "compileAndroidMain",
     "extractAndroidMainAnnotations" -> dependsOn("generateAndroidJavaCppBindings")
