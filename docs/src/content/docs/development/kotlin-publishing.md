@@ -114,12 +114,12 @@ override.
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. Linux x64 and ARM64 runners build their matching
-Kotlin/Native publications, while macOS runners build the macOS and iOS
-publications. Each consumes native build artifacts produced by the platform and
-backend CI matrix. Android publication runs with the Linux x64 partition; it
-reuses the matrix's CMake install archives and builds only the JNI bridge and
-final AARs.
+passed the main CI workflow. A Linux x64 runner builds the Linux x64 publication
+and cross-compiles the Linux ARM64 publication, while macOS runners build the
+macOS and iOS publications. Each consumes native build artifacts produced by the
+platform and backend CI matrix. Android publication runs with the Linux x64
+partition; it reuses the matrix's CMake install archives and builds only the JNI
+bridge and final AARs.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

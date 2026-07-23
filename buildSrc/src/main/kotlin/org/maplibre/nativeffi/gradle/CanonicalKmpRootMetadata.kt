@@ -21,11 +21,9 @@ fun Project.canonicalizeKmpRootMetadata(
   targetModules: Map<String, String>,
 ) {
   tasks
-    .named(
-      "generateMetadataFileForKotlinMultiplatformPublication",
-      GenerateModuleMetadata::class.java,
-    )
-    .configure {
+    .withType(GenerateModuleMetadata::class.java)
+    .matching { it.name == "generateMetadataFileForKotlinMultiplatformPublication" }
+    .configureEach {
       inputs.property("canonicalRootGroup", group)
       inputs.property("canonicalRootVersion", version)
       inputs.properties(targetModules.mapKeys { (target, _) -> "canonicalTargetModule.$target" })
