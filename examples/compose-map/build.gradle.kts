@@ -4,9 +4,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
-  kotlin("jvm")
-  id("org.jetbrains.compose") version "1.11.1"
-  id("org.jetbrains.kotlin.plugin.compose") version "2.2.21"
+  alias(libs.plugins.kotlin.jvm)
+  alias(libs.plugins.compose.multiplatform)
+  alias(libs.plugins.compose.compiler)
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
@@ -17,7 +17,6 @@ repositories {
 }
 
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
-val lwjglVersion = "3.4.1"
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -47,17 +46,17 @@ compose.desktop {
 dependencies {
   implementation(project(":bindings:kotlin"))
   implementation(compose.desktop.currentOs)
-  implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
-  implementation("org.lwjgl:lwjgl")
-  implementation("org.lwjgl:lwjgl-egl")
-  implementation("org.lwjgl:lwjgl-glfw")
-  implementation("org.lwjgl:lwjgl-opengl")
-  implementation("org.lwjgl:lwjgl-opengles")
-  implementation("org.lwjgl:lwjgl-vulkan")
-  runtimeOnly("org.lwjgl:lwjgl::${lwjglNativeClassifier()}")
-  runtimeOnly("org.lwjgl:lwjgl-glfw::${lwjglNativeClassifier()}")
-  runtimeOnly("org.lwjgl:lwjgl-opengl::${lwjglNativeClassifier()}")
-  runtimeOnly("org.lwjgl:lwjgl-opengles::${lwjglNativeClassifier()}")
+  implementation(platform(libs.lwjgl.bom))
+  implementation(libs.lwjgl)
+  implementation(libs.lwjgl.egl)
+  implementation(libs.lwjgl.glfw)
+  implementation(libs.lwjgl.opengl)
+  implementation(libs.lwjgl.opengles)
+  implementation(libs.lwjgl.vulkan)
+  runtimeOnly(variantOf(libs.lwjgl) { classifier(lwjglNativeClassifier()) })
+  runtimeOnly(variantOf(libs.lwjgl.glfw) { classifier(lwjglNativeClassifier()) })
+  runtimeOnly(variantOf(libs.lwjgl.opengl) { classifier(lwjglNativeClassifier()) })
+  runtimeOnly(variantOf(libs.lwjgl.opengles) { classifier(lwjglNativeClassifier()) })
 }
 
 tasks.withType<JavaCompile>().configureEach { options.release = 24 }
