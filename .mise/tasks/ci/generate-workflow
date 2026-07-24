@@ -35,6 +35,13 @@ def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
     return lines
 
 
+# Environment secrets for R2 writes live in the GitHub Environment `sccache`
+# (main only). PRs omit the environment and fall back to public read-only.
+SCCACHE_ENVIRONMENT = (
+    "    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}"
+)
+
+
 def setup(target: str | None = None) -> list[str]:
     lines = [
         f"      - uses: {CHECKOUT}",
@@ -81,6 +88,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    name: hygiene",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
+        SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(),
         "      - run: mise run ci:generate-workflow --check",
@@ -97,6 +105,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    name: docs",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 60",
+        SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(),
         "      - run: mise run //docs:build",
@@ -105,6 +114,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    name: target / ${{ matrix.preset }}",
         "    runs-on: ${{ matrix.runner }}",
         "    timeout-minutes: 120",
+        SCCACHE_ENVIRONMENT,
         "    strategy:",
         "      fail-fast: false",
         "      matrix:",
@@ -128,6 +138,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    name: Android multi-ABI packaging",
         "    runs-on: ubuntu-latest",
         "    timeout-minutes: 30",
+        SCCACHE_ENVIRONMENT,
         "    needs:",
         "      - target",
         "    steps:",
