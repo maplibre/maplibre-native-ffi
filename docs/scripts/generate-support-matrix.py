@@ -16,10 +16,11 @@ sys.path.insert(0, str(REPO_ROOT))
 from ci.workflow import (  # noqa: E402
     architecture,
     backend,
+    consumer_commands,
     load_configuration,
+    native_commands,
     platform,
     preset_sets,
-    target_commands,
 )
 
 
@@ -216,7 +217,8 @@ def support_matrix() -> dict[str, Any]:
 
     projects: dict[str, list[Coverage]] = defaultdict(list)
     for preset in configured:
-        for command in target_commands(source, preset, tested):
+        commands = native_commands(preset, tested) + consumer_commands(source, preset)
+        for command in commands:
             support = command_support(command)
             if support is None:
                 continue

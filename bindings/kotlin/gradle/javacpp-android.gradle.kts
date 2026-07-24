@@ -46,6 +46,13 @@ val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/and
 // allowing the publication job to reuse them instead of rebuilding MapLibre Native.
 val prebuiltAndroidInstallRoot =
   providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
+// Target CI round-trips packages into each CMake preset's install directory.
+val prebuiltAndroidBuildRoot =
+  providers.gradleProperty("maplibre.android.prebuiltBuildRoot").map(rootProject::file)
+
+check(!(prebuiltAndroidInstallRoot.isPresent && prebuiltAndroidBuildRoot.isPresent)) {
+  "Configure only one of maplibre.android.prebuiltInstallRoot and maplibre.android.prebuiltBuildRoot"
+}
 
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileAndroidJavaCppConfig") {
@@ -100,9 +107,13 @@ val packageAndroidNativeLibraries =
 androidTargets.forEach { target ->
   val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
   val cmakePreset = target.cmakePreset(androidBackend)
+  val configuredInstallDir =
+    prebuiltAndroidBuildRoot
+      .map { it.resolve(cmakePreset).resolve("install") }
+      .orElse(prebuiltAndroidInstallRoot.map { it.resolve(cmakePreset) })
   val installDir =
     rootProject.layout
-      .dir(prebuiltAndroidInstallRoot.map { it.resolve(cmakePreset) })
+      .dir(configuredInstallDir)
       .orElse(rootProject.layout.projectDirectory.dir("build/$cmakePreset/install"))
       .get()
   val javaCppNativeBuild = targetRoot.map { it.dir("javacpp") }
@@ -125,7 +136,7 @@ androidTargets.forEach { target ->
       executable("cmake")
       args("--workflow", "--preset", cmakePreset)
       environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath)
-      enabled = !prebuiltAndroidInstallRoot.isPresent
+      enabled = !configuredInstallDir.isPresent
     }
 
   val generateJavaCppNativeLibrary =
