@@ -84,6 +84,14 @@ Pass another preset to select a different native target or backend:
 mise run build linux-x64-egl
 ```
 
+## Compiler Cache
+
+Native builds use [`sccache`](https://github.com/mozilla/sccache) through mise.
+`mise.toml` pins the tool and sets the public read-only R2 backend plus CMake
+compiler-launcher env, so `mise run build` and other mise tasks pick up the
+shared cache automatically. CI overrides those settings with write credentials
+when available.
+
 ## Common Commands
 
 ```bash
