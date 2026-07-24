@@ -77,10 +77,10 @@ MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
 # Public sccache reads via the R2 custom domain (no credentials). CI pushes
 # override these with write credentials in .github/actions/setup-ci-deps.
 SCCACHE_BUCKET = "maplibre-native-ffi-sccache"
-SCCACHE_ENDPOINT = "https://sccache.sargunv.dev"
+SCCACHE_ENDPOINT = { default = "https://sccache.sargunv.dev" }
 SCCACHE_REGION = "auto"
 SCCACHE_S3_USE_SSL = "true"
-SCCACHE_S3_NO_CREDENTIALS = "1"
+SCCACHE_S3_NO_CREDENTIALS = { default = "1" }
 CMAKE_C_COMPILER_LAUNCHER = "sccache"
 CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
 
