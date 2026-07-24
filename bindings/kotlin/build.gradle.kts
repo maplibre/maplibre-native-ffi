@@ -1,4 +1,4 @@
-import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
@@ -50,17 +50,6 @@ val extractRustlsPlatformVerifierAndroidJar =
   tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
     aarFile.set(layout.file(rustlsPlatformVerifierAndroidAar))
     outputJar.set(rustlsPlatformVerifierAndroidJar)
-  }
-val generateRustlsPlatformVerifierLicenses =
-  tasks.register<Sync>("generateRustlsPlatformVerifierLicenses") {
-    val packageDirectory = rustlsPlatformVerifierPackage
-    from(packageDirectory.map { it.resolve("LICENSE-APACHE") }) {
-      into("META-INF/licenses/rustls-platform-verifier")
-    }
-    from(packageDirectory.map { it.resolve("LICENSE-MIT") }) {
-      into("META-INF/licenses/rustls-platform-verifier")
-    }
-    into(layout.buildDirectory.dir("generated/resources/rustlsPlatformVerifier/androidMain"))
   }
 
 kotlin {
@@ -120,7 +109,6 @@ kotlin {
 
   sourceSets {
     androidMain {
-      resources.srcDir(generateRustlsPlatformVerifierLicenses)
       dependencies {
         implementation(libs.javacpp)
         implementation(
@@ -130,6 +118,16 @@ kotlin {
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
+  }
+}
+
+tasks.withType<Zip>().configureEach {
+  if (name == "bundleAndroidMainAar") {
+    val licenseDirectory = "META-INF/licenses/rustls-platform-verifier"
+    from(rustlsPlatformVerifierPackage.map { it.resolve("LICENSE-APACHE") }) {
+      into(licenseDirectory)
+    }
+    from(rustlsPlatformVerifierPackage.map { it.resolve("LICENSE-MIT") }) { into(licenseDirectory) }
   }
 }
 
