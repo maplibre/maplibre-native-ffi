@@ -7,6 +7,9 @@ min_version = "2026.7.10"
 
 [settings]
 lockfile = true
+# The submodules provider checks Git state directly and intentionally runs on
+# every dependency pass, so suppress its perpetual shell stale warning.
+status.show_deps_stale = false
 lockfile_platforms = [
   "linux-x64",
   "linux-arm64",
