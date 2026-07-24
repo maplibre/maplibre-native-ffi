@@ -15,6 +15,11 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# Keep optimized release archives lean when toolchains add debug information.
+if(NOT MSVC)
+  add_compile_options("$<$<CONFIG:Release>:-g0>")
+endif()
+
 # This project uses C++20 language features, but not C++20 modules. Keep CMake
 # from generating compiler-specific module dependency scanner steps for every
 # C++ source file.
@@ -65,7 +70,7 @@ if(MLN_FFI_ARTIFACT_NAME)
   set(CPACK_PACKAGE_DIRECTORY "${PROJECT_SOURCE_DIR}/build/packages/native/dist")
   set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
   set(CPACK_MONOLITHIC_INSTALL ON)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  if(CMAKE_SYSTEM_NAME MATCHES "^(Android|Linux)$")
     set(CPACK_STRIP_FILES ON)
   endif()
   include(CPack)
