@@ -67,8 +67,9 @@ jobs:
           - preset: linux-x64-egl
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run test linux-x64-egl &&
+            native_commands: >-
+              mise run test linux-x64-egl
+            consumer_commands: >-
               mise run //bindings/rust:test linux-x64-egl &&
               mise run //examples/rust-map:check linux-x64-egl &&
               mise run //bindings/zig:test linux-x64-egl &&
@@ -85,8 +86,9 @@ jobs:
           - preset: linux-x64-vulkan
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run test linux-x64-vulkan &&
+            native_commands: >-
+              mise run test linux-x64-vulkan
+            consumer_commands: >-
               mise run //bindings/rust:test linux-x64-vulkan &&
               mise run //examples/rust-map:check linux-x64-vulkan &&
               mise run //bindings/zig:test linux-x64-vulkan &&
@@ -103,8 +105,9 @@ jobs:
           - preset: linux-arm64-egl
             runner: ubuntu-24.04-arm
             package: true
-            commands: >-
-              mise run test linux-arm64-egl &&
+            native_commands: >-
+              mise run test linux-arm64-egl
+            consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-egl &&
               mise run //examples/rust-map:check linux-arm64-egl &&
               mise run //bindings/zig:test linux-arm64-egl &&
@@ -120,8 +123,9 @@ jobs:
           - preset: linux-arm64-vulkan
             runner: ubuntu-24.04-arm
             package: true
-            commands: >-
-              mise run test linux-arm64-vulkan &&
+            native_commands: >-
+              mise run test linux-arm64-vulkan
+            consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-vulkan &&
               mise run //examples/rust-map:check linux-arm64-vulkan &&
               mise run //bindings/zig:test linux-arm64-vulkan &&
@@ -137,8 +141,9 @@ jobs:
           - preset: macos-arm64-metal
             runner: macos-26
             package: true
-            commands: >-
-              mise run test macos-arm64-metal &&
+            native_commands: >-
+              mise run test macos-arm64-metal
+            consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-metal &&
               mise run //examples/rust-map:check macos-arm64-metal &&
               mise run //bindings/zig:test macos-arm64-metal &&
@@ -156,8 +161,9 @@ jobs:
           - preset: macos-arm64-vulkan
             runner: macos-26
             package: true
-            commands: >-
-              mise run test macos-arm64-vulkan &&
+            native_commands: >-
+              mise run test macos-arm64-vulkan
+            consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-vulkan &&
               mise run //examples/rust-map:check macos-arm64-vulkan &&
               mise run //bindings/zig:test macos-arm64-vulkan &&
@@ -174,8 +180,9 @@ jobs:
           - preset: macos-arm64-egl
             runner: macos-26
             package: true
-            commands: >-
-              mise run test macos-arm64-egl &&
+            native_commands: >-
+              mise run test macos-arm64-egl
+            consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-egl &&
               mise run //bindings/zig:test macos-arm64-egl &&
               mise run //examples/zig-map:build macos-arm64-egl &&
@@ -191,16 +198,18 @@ jobs:
           - preset: ios-arm64-metal
             runner: macos-26
             package: true
-            commands: >-
-              mise run build ios-arm64-metal &&
+            native_commands: >-
+              mise run build ios-arm64-metal
+            consumer_commands: >-
               mise run //bindings/kotlin:iosBuild ios-arm64-metal &&
               mise run //bindings/swift:build:ios &&
               mise run //examples/swift-map:build:ios
           - preset: ios-simulator-arm64-metal
             runner: macos-26
             package: true
-            commands: >-
-              mise run test ios-simulator-arm64-metal &&
+            native_commands: >-
+              mise run test ios-simulator-arm64-metal
+            consumer_commands: >-
               mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal &&
               mise run //bindings/swift:build:ios-simulator &&
               mise run //bindings/zig:test:ios-simulator &&
@@ -209,44 +218,49 @@ jobs:
           - preset: android-arm64-egl
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run build android-arm64-egl &&
-              mise run //bindings/kotlin:androidBuild opengl arm64-v8a &&
-              mise run //examples/android-map:build opengl arm64-v8a
+            native_commands: >-
+              mise run build android-arm64-egl
+            consumer_commands: >-
+              mise run //bindings/kotlin:androidBuild opengl arm64-v8a --prebuilt &&
+              mise run //examples/android-map:build opengl arm64-v8a --prebuilt
           - preset: android-arm64-vulkan
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run build android-arm64-vulkan &&
-              mise run //bindings/kotlin:androidBuild vulkan arm64-v8a
+            native_commands: >-
+              mise run build android-arm64-vulkan
+            consumer_commands: >-
+              mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
           - preset: android-x64-egl
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run build android-x64-egl &&
-              mise run //bindings/kotlin:androidBuild opengl x86_64 &&
-              mise run //examples/android-map:build opengl x86_64
+            native_commands: >-
+              mise run build android-x64-egl
+            consumer_commands: >-
+              mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt &&
+              mise run //examples/android-map:build opengl x86_64 --prebuilt
           - preset: android-x64-vulkan
             runner: ubuntu-latest
             package: true
-            commands: >-
-              mise run build android-x64-vulkan &&
-              mise run //bindings/kotlin:androidBuild vulkan x86_64
+            native_commands: >-
+              mise run build android-x64-vulkan
+            consumer_commands: >-
+              mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
           - preset: ohos-arm64-egl
             runner: ubuntu-latest
             package: false
-            commands: >-
+            native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-egl
           - preset: ohos-arm64-vulkan
             runner: ubuntu-latest
             package: false
-            commands: >-
+            native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-vulkan
           - preset: windows-x64-wgl
             runner: windows-2022
             package: true
-            commands: >-
-              mise run test windows-x64-wgl &&
+            native_commands: >-
+              mise run test windows-x64-wgl
+            consumer_commands: >-
               mise run //bindings/rust:test windows-x64-wgl &&
               mise run //examples/rust-map:check windows-x64-wgl &&
               mise run //bindings/zig:test windows-x64-wgl &&
@@ -260,8 +274,9 @@ jobs:
           - preset: windows-x64-vulkan
             runner: windows-2022
             package: true
-            commands: >-
-              mise run test windows-x64-vulkan &&
+            native_commands: >-
+              mise run test windows-x64-vulkan
+            consumer_commands: >-
               mise run //bindings/rust:test windows-x64-vulkan &&
               mise run //examples/rust-map:check windows-x64-vulkan &&
               mise run //bindings/zig:test windows-x64-vulkan &&
@@ -275,8 +290,9 @@ jobs:
           - preset: windows-arm64-wgl
             runner: windows-11-arm
             package: true
-            commands: >-
-              mise run test windows-arm64-wgl &&
+            native_commands: >-
+              mise run test windows-arm64-wgl
+            consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-wgl &&
               mise run //examples/rust-map:check windows-arm64-wgl &&
               mise run //bindings/zig:test windows-arm64-wgl &&
@@ -290,8 +306,9 @@ jobs:
           - preset: windows-arm64-vulkan
             runner: windows-11-arm
             package: true
-            commands: >-
-              mise run test windows-arm64-vulkan &&
+            native_commands: >-
+              mise run test windows-arm64-vulkan
+            consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-vulkan &&
               mise run //examples/rust-map:check windows-arm64-vulkan &&
               mise run //bindings/zig:test windows-arm64-vulkan &&
@@ -311,11 +328,22 @@ jobs:
           target: ${{ matrix.preset }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - name: Run target checks
-        run: ${{ matrix.commands }}
-      - name: Package native artifact
+      - name: Run native checks
+        run: ${{ matrix.native_commands }}
+      - name: Archive native artifact
         if: ${{ matrix.package }}
-        run: mise run package-native ${{ matrix.preset }}
+        run: mise run archive-native ${{ matrix.preset }}
+      - name: Install packaged native artifact
+        if: ${{ matrix.package }}
+        run: >-
+          mise run install-native-package
+          ${{ matrix.preset }}
+          build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz
+      - name: Run binding and example checks
+        if: ${{ matrix.package }}
+        env:
+          MISE_TASK_SKIP: "//:build"
+        run: ${{ matrix.consumer_commands }}
       - name: Upload native artifact
         if: ${{ matrix.package }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

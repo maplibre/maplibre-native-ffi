@@ -7,6 +7,9 @@ min_version = "2026.7.10"
 
 [settings]
 lockfile = true
+# The submodules provider checks Git state directly and intentionally runs on
+# every dependency pass, so suppress its perpetual shell stale warning.
+status.show_deps_stale = false
 lockfile_platforms = [
   "linux-x64",
   "linux-arm64",
@@ -119,6 +122,7 @@ sources = [
   "Cargo.lock",
   "Cargo.toml",
   "LICENSE",
+  "build/*/.native-package-install",
   "cmake/**/*",
   "include/**/*",
   "src/**/*",
@@ -136,6 +140,11 @@ run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
 description = "Build and archive a native CMake preset."
 usage = 'arg "<preset>"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
+
+[tasks.archive-native]
+description = "Archive an already-built native CMake preset."
+usage = 'arg "<preset>"'
 run = 'cpack --preset "$usage_preset"'
 
 [tasks.test]
