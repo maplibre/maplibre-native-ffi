@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: kotlin-snapshots
+  group: snapshots
   cancel-in-progress: false
 
 jobs:
@@ -83,8 +83,6 @@ jobs:
       contents: read
     env:
       SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
-    outputs:
-      publish: ${{ steps.current.outputs.publish }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v4.3.1
         with:
@@ -98,20 +96,7 @@ jobs:
           pattern: kotlin-maven-staging-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/kotlin/maven-staging
           merge-multiple: true
-      - name: Check snapshot is current
-        id: current
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          if [[ "$main_sha" != "$SNAPSHOT_SHA" ]]; then
-            echo "Skipping Kotlin snapshot because main advanced to $main_sha"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-      - if: ${{ steps.current.outputs.publish == 'true' }}
-        run: mise run //:kotlin:publish-snapshot verify build/packages/kotlin/maven-staging
+      - run: mise run //:kotlin:publish-snapshot verify build/packages/kotlin/maven-staging
 
   publish-kotlin-leaves:
     name: Kotlin Maven leaf snapshots / ${{ matrix.partition }}
@@ -119,7 +104,6 @@ jobs:
       - verify-kotlin
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
-    if: ${{ needs.verify-kotlin.outputs.publish == 'true' }}
     environment:
       name: maven-central
       url: https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/
@@ -170,20 +154,7 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           pattern: native-package-android-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
-      - name: Check snapshot is still current
-        id: current
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          if [[ "$main_sha" != "$SNAPSHOT_SHA" ]]; then
-            echo "Skipping Kotlin snapshot because main advanced to $main_sha"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-      - if: ${{ steps.current.outputs.publish == 'true' }}
-        run: mise run //:kotlin:publish-snapshot publish-leaves ${{ matrix.partition }}
+      - run: mise run //:kotlin:publish-snapshot publish-leaves ${{ matrix.partition }}
 
   publish-kotlin-roots:
     name: Kotlin Maven root snapshots
@@ -224,32 +195,17 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           pattern: native-package-linux-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
-      - name: Check snapshot is still current
-        id: current
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          if [[ "$main_sha" != "$SNAPSHOT_SHA" ]]; then
-            echo "Skipping Kotlin snapshot roots because main advanced to $main_sha"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-      - if: ${{ steps.current.outputs.publish == 'true' }}
-        run: mise run //:kotlin:publish-snapshot publish-roots apple
+      - run: mise run //:kotlin:publish-snapshot publish-roots apple
 
   publish:
     name: native package
+    needs:
+      - publish-kotlin-roots
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     permissions:
       actions: read
       contents: write
-    concurrency:
-      group: snapshot-releases
-      cancel-in-progress: false
     env:
       CI_RUN_URL: ${{ github.event.workflow_run.html_url }}
       SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
@@ -299,18 +255,10 @@ jobs:
           )
           PY
       - name: Move snapshot tag
-        id: move_snapshot_tag
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-
-          main_sha="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq .object.sha)"
-          if [[ "$main_sha" != "$SNAPSHOT_SHA" ]]; then
-            echo "Skipping snapshot publish because main advanced to $main_sha"
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
 
           if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${SNAPSHOT_TAG}" >/dev/null 2>&1; then
             gh api \
@@ -325,9 +273,7 @@ jobs:
               -f ref="refs/tags/${SNAPSHOT_TAG}" \
               -f sha="$SNAPSHOT_SHA" >/dev/null
           fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
       - name: Publish floating release
-        if: ${{ steps.move_snapshot_tag.outputs.publish == 'true' }}
         uses: softprops/action-gh-release@2bb465e97f322d3cb2a965294d483e0d26a67aa9 # v3.0.1
         with:
           tag_name: ${{ env.SNAPSHOT_TAG }}
