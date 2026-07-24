@@ -18,7 +18,7 @@
       "name": "_single-config",
       "hidden": true,
       "inherits": "_base",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
     },
     {
       "name": "_linux-x64",
@@ -289,14 +289,14 @@
       "name": "ios-arm64-metal",
       "configurePreset": "ios-arm64-metal",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     },
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     },
     {
@@ -339,28 +339,28 @@
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     },
     {
       "name": "windows-x64-vulkan",
       "configurePreset": "windows-x64-vulkan",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     },
     {
       "name": "windows-arm64-wgl",
       "configurePreset": "windows-arm64-wgl",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     },
     {
       "name": "windows-arm64-vulkan",
       "configurePreset": "windows-arm64-vulkan",
       "targets": ["install"],
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "jobs": 0
     }
   ],
@@ -408,25 +408,25 @@
     {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "output": { "outputOnFailure": true }
     },
     {
       "name": "windows-x64-vulkan",
       "configurePreset": "windows-x64-vulkan",
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "output": { "outputOnFailure": true }
     },
     {
       "name": "windows-arm64-wgl",
       "configurePreset": "windows-arm64-wgl",
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "output": { "outputOnFailure": true }
     },
     {
       "name": "windows-arm64-vulkan",
       "configurePreset": "windows-arm64-vulkan",
-      "configuration": "RelWithDebInfo",
+      "configuration": "Release",
       "output": { "outputOnFailure": true }
     }
   ],
@@ -435,103 +435,103 @@
       "name": "linux-x64-egl",
       "configurePreset": "linux-x64-egl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "linux-x64-vulkan",
       "configurePreset": "linux-x64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "linux-arm64-egl",
       "configurePreset": "linux-arm64-egl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "linux-arm64-vulkan",
       "configurePreset": "linux-arm64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "macos-arm64-metal",
       "configurePreset": "macos-arm64-metal",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "macos-arm64-vulkan",
       "configurePreset": "macos-arm64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "macos-arm64-egl",
       "configurePreset": "macos-arm64-egl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "ios-arm64-metal",
       "configurePreset": "ios-arm64-metal",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "android-arm64-egl",
       "configurePreset": "android-arm64-egl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "android-arm64-vulkan",
       "configurePreset": "android-arm64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "android-x64-egl",
       "configurePreset": "android-x64-egl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "android-x64-vulkan",
       "configurePreset": "android-x64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "windows-x64-vulkan",
       "configurePreset": "windows-x64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "windows-arm64-wgl",
       "configurePreset": "windows-arm64-wgl",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     },
     {
       "name": "windows-arm64-vulkan",
       "configurePreset": "windows-arm64-vulkan",
       "generators": ["TGZ"],
-      "configurations": ["RelWithDebInfo"]
+      "configurations": ["Release"]
     }
   ],
   "workflowPresets": [
