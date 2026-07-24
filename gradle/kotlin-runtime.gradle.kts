@@ -194,6 +194,10 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   }
 
   val prebuiltInstallRoot = providers.gradleProperty("maplibre.android.prebuiltInstallRoot")
+  val prebuiltBuildRoot = providers.gradleProperty("maplibre.android.prebuiltBuildRoot")
+  check(!(prebuiltInstallRoot.isPresent && prebuiltBuildRoot.isPresent)) {
+    "Configure only one of maplibre.android.prebuiltInstallRoot and maplibre.android.prebuiltBuildRoot"
+  }
   val verifyPublicationInputs =
     tasks.register("verifyAndroidRuntimePublicationInputs") { dependsOn(verifyBackend) }
   val androidTargets =
@@ -202,17 +206,23 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     )
   androidTargets.forEach { target ->
     val preset = target.cmakePreset(backend.id)
-    val propertyName = "maplibre.android.prebuiltInstallRoot"
+    val propertyName =
+      if (prebuiltBuildRoot.isPresent) {
+        "maplibre.android.prebuiltBuildRoot"
+      } else {
+        "maplibre.android.prebuiltInstallRoot"
+      }
     val selectedInstall =
-      prebuiltInstallRoot
-        .map { rootProject.file(it).resolve(preset) }
+      prebuiltBuildRoot
+        .map { rootProject.file(it).resolve(preset).resolve("install") }
+        .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(preset) })
         .getOrElse(rootProject.file("build/$preset/install"))
     val verifyInput =
       registerRuntimeInstallVerification(
         taskName = "verifyAndroid${target.taskSuffix}RuntimePublicationInput",
         installDirectory = providers.provider { selectedInstall },
         installPropertyName = propertyName,
-        explicitlyConfigured = prebuiltInstallRoot.isPresent,
+        explicitlyConfigured = prebuiltInstallRoot.isPresent || prebuiltBuildRoot.isPresent,
         requireExplicitInput = true,
         backend = backend.id,
         targetPlatform = target.targetPlatform,

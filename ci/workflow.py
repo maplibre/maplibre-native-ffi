@@ -74,20 +74,22 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:androidBuild {arguments}"]
+    commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
     if build_map:
-        commands.append(f"mise run //examples/android-map:build {arguments}")
+        commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
     return commands
 
 
-def target_commands(
-    source: dict[str, object], preset: str, tested: set[str]
-) -> list[str]:
+def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
         return [f"mise run //bindings/rust:build:ohos {preset}"]
+    return [f"mise run {'test' if preset in tested else 'build'} {preset}"]
 
-    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+
+def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
+    target_platform = platform(preset)
+    commands = []
     if target_platform == "android":
         abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
         commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
@@ -141,12 +143,17 @@ def target_rows(
     source: dict[str, object], presets: dict[str, object]
 ) -> list[dict[str, object]]:
     configured, _, tested, packaged = preset_sets(presets)
-    return [
-        {
+    rows = []
+    for preset in configured:
+        native = native_commands(preset, tested)
+        consumers = consumer_commands(source, preset)
+        row = {
             "preset": preset,
             "runner": runner(preset),
             "package": preset in packaged,
-            "commands": target_commands(source, preset, tested),
+            "native_commands": native if preset in packaged else native + consumers,
         }
-        for preset in configured
-    ]
+        if preset in packaged:
+            row["consumer_commands"] = consumers
+        rows.append(row)
+    return rows
