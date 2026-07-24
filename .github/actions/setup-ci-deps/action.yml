@@ -195,6 +195,9 @@ runs:
           {
             echo "SCCACHE_ENDPOINT=${write_endpoint}"
             echo "SCCACHE_S3_KEY_PREFIX=${bucket}/"
+            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
+            # clear it so authenticated writes are not rejected by sccache.
+            echo "SCCACHE_S3_NO_CREDENTIALS=0"
             echo "AWS_ACCESS_KEY_ID=${SCCACHE_ACCESS_KEY_ID}"
             echo "AWS_SECRET_ACCESS_KEY=${SCCACHE_SECRET_ACCESS_KEY}"
           } >> "$GITHUB_ENV"
