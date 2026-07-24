@@ -102,6 +102,18 @@ run = 'cmake --preset "$usage_preset"'
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+sources = [
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "Cargo.lock",
+  "Cargo.toml",
+  "LICENSE",
+  "cmake/**/*",
+  "include/**/*",
+  "src/**/*",
+  "third_party/**/*",
+]
+outputs = { auto = true }
 run = 'cmake --workflow --preset "$usage_preset"'
 
 [tasks.clean]
