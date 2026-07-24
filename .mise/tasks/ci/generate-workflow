@@ -41,13 +41,16 @@ def setup(target: str | None = None) -> list[str]:
         "        with:",
         "          persist-credentials: false",
         "      - uses: ./.github/actions/setup-ci-deps",
+        "        with:",
     ]
-    inputs = []
     if target:
-        inputs.append(f"          target: {target}")
-    if inputs:
-        lines.append("        with:")
-        lines.extend(inputs)
+        lines.append(f"          target: {target}")
+    lines.extend(
+        [
+            "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
+            "          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}",
+        ]
+    )
     return lines
 
 

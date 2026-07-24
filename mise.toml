@@ -37,6 +37,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "4.3.3"
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
+sccache = "0.16.0"
 
 # Node.js ecosystem
 "core:node" = "24.11.0"
@@ -69,6 +70,16 @@ swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat",
 [env]
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
+
+# Public sccache reads via the R2 custom domain (no credentials). CI pushes
+# override these with write credentials in .github/actions/setup-ci-deps.
+SCCACHE_BUCKET = "maplibre-native-ffi-sccache"
+SCCACHE_ENDPOINT = "https://sccache.sargunv.dev"
+SCCACHE_REGION = "auto"
+SCCACHE_S3_USE_SSL = "true"
+SCCACHE_S3_NO_CREDENTIALS = "1"
+CMAKE_C_COMPILER_LAUNCHER = "sccache"
+CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
 
 [deps.uv]
 auto = true

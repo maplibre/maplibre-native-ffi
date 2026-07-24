@@ -6,6 +6,14 @@ inputs:
     description: Native target name
     required: false
     default: host
+  sccache-access-key-id:
+    description: R2 S3 access key ID with Object Read & Write (push jobs only)
+    required: false
+    default: ""
+  sccache-secret-access-key:
+    description: R2 S3 secret access key with Object Read & Write (push jobs only)
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -160,14 +168,41 @@ runs:
       shell: bash
       run: MISE_NO_HOOKS=1 mise install --force rust
 
+    # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
+    # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
+    # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>
     - name: Wire sccache into CMake
       shell: bash
+      env:
+        SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
       run: |
+        bucket="maplibre-native-ffi-sccache"
+        account_id="6cda5be3bf367f2885f3696d3c9b2653"
+        public_endpoint="https://sccache.sargunv.dev"
+        write_endpoint="https://${account_id}.r2.cloudflarestorage.com"
+
         {
-          echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=native-v1"
-          echo "SCCACHE_GHA_RW_MODE=${{ github.event_name == 'pull_request' && 'READ_ONLY' || 'READ_WRITE' }}"
+          echo "SCCACHE_BUCKET=${bucket}"
+          echo "SCCACHE_REGION=auto"
+          echo "SCCACHE_S3_USE_SSL=true"
           echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
+
+        if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${SCCACHE_ACCESS_KEY_ID}" && -n "${SCCACHE_SECRET_ACCESS_KEY}" ]]; then
+          {
+            echo "SCCACHE_ENDPOINT=${write_endpoint}"
+            echo "SCCACHE_S3_KEY_PREFIX=${bucket}/"
+            echo "AWS_ACCESS_KEY_ID=${SCCACHE_ACCESS_KEY_ID}"
+            echo "AWS_SECRET_ACCESS_KEY=${SCCACHE_SECRET_ACCESS_KEY}"
+          } >> "$GITHUB_ENV"
+          echo "Configured sccache R2 backend (read-write)"
+        else
+          {
+            echo "SCCACHE_ENDPOINT=${public_endpoint}"
+            echo "SCCACHE_S3_NO_CREDENTIALS=1"
+          } >> "$GITHUB_ENV"
+          echo "Configured sccache R2 backend (public read-only)"
+        fi
