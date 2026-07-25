@@ -68,6 +68,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test linux-x64-egl
             consumer_commands: >-
@@ -88,6 +89,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test linux-x64-vulkan
             consumer_commands: >-
@@ -108,6 +110,7 @@ jobs:
             runner: ubuntu-24.04-arm
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test linux-arm64-egl
             consumer_commands: >-
@@ -127,6 +130,7 @@ jobs:
             runner: ubuntu-24.04-arm
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test linux-arm64-vulkan
             consumer_commands: >-
@@ -146,6 +150,7 @@ jobs:
             runner: macos-26
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test macos-arm64-metal
             consumer_commands: >-
@@ -167,6 +172,7 @@ jobs:
             runner: macos-26
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test macos-arm64-vulkan
             consumer_commands: >-
@@ -187,6 +193,7 @@ jobs:
             runner: macos-26
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test macos-arm64-egl
             consumer_commands: >-
@@ -206,6 +213,7 @@ jobs:
             runner: macos-26
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run build ios-arm64-metal
             consumer_commands: >-
@@ -216,6 +224,7 @@ jobs:
             runner: macos-26
             package: true
             zig: true
+            zig_save: false
             native_commands: >-
               mise run test ios-simulator-arm64-metal
             consumer_commands: >-
@@ -228,6 +237,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run build android-arm64-egl
             consumer_commands: >-
@@ -237,6 +247,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run build android-arm64-vulkan
             consumer_commands: >-
@@ -245,6 +256,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run build android-x64-egl
             consumer_commands: >-
@@ -254,6 +266,7 @@ jobs:
             runner: ubuntu-latest
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run build android-x64-vulkan
             consumer_commands: >-
@@ -262,18 +275,21 @@ jobs:
             runner: ubuntu-latest
             package: false
             zig: false
+            zig_save: false
             native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-egl
           - preset: ohos-arm64-vulkan
             runner: ubuntu-latest
             package: false
             zig: false
+            zig_save: false
             native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-vulkan
           - preset: windows-x64-wgl
             runner: windows-2022
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test windows-x64-wgl
             consumer_commands: >-
@@ -291,6 +307,7 @@ jobs:
             runner: windows-2022
             package: true
             zig: true
+            zig_save: true
             native_commands: >-
               mise run test windows-x64-vulkan
             consumer_commands: >-
@@ -308,6 +325,7 @@ jobs:
             runner: windows-11-arm
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run test windows-arm64-wgl
             consumer_commands: >-
@@ -322,6 +340,7 @@ jobs:
             runner: windows-11-arm
             package: true
             zig: false
+            zig_save: false
             native_commands: >-
               mise run test windows-arm64-vulkan
             consumer_commands: >-
@@ -360,7 +379,7 @@ jobs:
           MISE_TASK_SKIP: "//:build"
         run: ${{ matrix.consumer_commands }}
       - name: Save Zig packages
-        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}
+        if: ${{ matrix.zig_save && steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
