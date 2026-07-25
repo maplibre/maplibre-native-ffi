@@ -4,6 +4,7 @@ package callback
 #include "maplibre_native_c.h"
 */
 import "C"
+
 import (
 	"runtime/cgo"
 	"unsafe"

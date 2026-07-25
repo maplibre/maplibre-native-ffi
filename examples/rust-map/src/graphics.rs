@@ -5,37 +5,37 @@ use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
 use winit::window::WindowAttributes;
 
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 use crate::metal::MetalContext;
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 use crate::opengl::OpenGLContext;
 use crate::viewport::Viewport;
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 use crate::vulkan::VulkanContext;
 
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 pub struct GraphicsContext(MetalContext);
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 pub struct GraphicsContext(Box<OpenGLContext>);
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 pub struct GraphicsContext(Box<VulkanContext>);
 
 pub fn required_backend() -> RenderBackendMask {
-    #[cfg(feature = "metal")]
+    #[cfg(maplibre_render_backend = "metal")]
     {
         RenderBackendMask::METAL
     }
-    #[cfg(feature = "opengl")]
+    #[cfg(maplibre_render_backend = "opengl")]
     {
         RenderBackendMask::OPENGL
     }
-    #[cfg(feature = "vulkan")]
+    #[cfg(maplibre_render_backend = "vulkan")]
     {
         RenderBackendMask::VULKAN
     }
 }
 
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
@@ -71,7 +71,7 @@ impl GraphicsContext {
     }
 }
 
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,
@@ -105,7 +105,7 @@ impl GraphicsContext {
     }
 }
 
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 impl GraphicsContext {
     pub fn create_window(
         event_loop: &ActiveEventLoop,

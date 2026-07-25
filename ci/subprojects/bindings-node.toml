@@ -1,5 +1,0 @@
-[requires]
-os = ["linux", "macos", "windows"]
-
-[ci]
-test = "//bindings/node:ci"

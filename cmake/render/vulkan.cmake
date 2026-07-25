@@ -1,9 +1,62 @@
-function(mln_configure_vulkan_backend target)
+function(mln_configure_render_dependencies target)
+  set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
+  if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"
+     OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+    set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib/arm64 Lib Lib32)
+  endif()
   find_library(
-    MLN_VULKAN_LOADER_LIBRARY
+    MLN_FFI_VULKAN_LOADER_LIBRARY
     NAMES vulkan vulkan-1 vulkan.1
+    HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES ${MLN_FFI_VULKAN_LIBRARY_SUFFIXES}
     REQUIRED)
+  add_library(mln_ffi_vulkan_loader UNKNOWN IMPORTED GLOBAL)
+  set_target_properties(
+    mln_ffi_vulkan_loader
+    PROPERTIES IMPORTED_LOCATION "${MLN_FFI_VULKAN_LOADER_LIBRARY}")
+  target_link_libraries(${target} INTERFACE mln_ffi_vulkan_loader)
 
+  get_filename_component(
+    MLN_FFI_VULKAN_LOADER_DIR "${MLN_FFI_VULKAN_LOADER_LIBRARY}"
+    DIRECTORY)
+  get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
+                      INTERFACE_INCLUDE_DIRECTORIES)
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}" MLN_FFI_RUNTIME_DIRS
+      "${MLN_FFI_VULKAN_LOADER_DIR}" MLN_FFI_STATIC_ARCHIVES
+      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_DRIVER_FILES}")
+    if(NOT EXISTS "${MLN_FFI_VULKAN_ICD_FILE}")
+      find_file(
+        MLN_FFI_VULKAN_ICD_FILE
+        NAMES MoltenVK_icd.json
+        HINTS
+          "$ENV{VULKAN_SDK}" PATH_SUFFIXES etc/vulkan/icd.d share/vulkan/icd.d
+        REQUIRED)
+    endif()
+    set_property(
+      TARGET ${target}
+      PROPERTY MLN_FFI_VULKAN_ICD_FILE "${MLN_FFI_VULKAN_ICD_FILE}")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    find_file(
+      MLN_FFI_VULKAN_RUNTIME
+      NAMES vulkan-1.dll
+      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES Bin bin)
+    if(MLN_FFI_VULKAN_RUNTIME)
+      get_filename_component(
+        MLN_FFI_VULKAN_RUNTIME_DIR "${MLN_FFI_VULKAN_RUNTIME}"
+        DIRECTORY)
+      set_property(
+        TARGET ${target}
+        PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_RUNTIME_DIR}")
+    endif()
+  endif()
+endfunction()
+
+function(mln_configure_renderer target)
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES
@@ -14,9 +67,5 @@ function(mln_configure_vulkan_backend target)
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-    target_compile_definitions(${target} PUBLIC VK_USE_PLATFORM_OHOS=1)
-  endif()
-
-  target_link_libraries(${target} PRIVATE ${MLN_VULKAN_LOADER_LIBRARY})
+  target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
 endfunction()

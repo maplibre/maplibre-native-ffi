@@ -2,6 +2,7 @@ package callback
 
 /*
 #cgo CFLAGS: -std=c2x
+#cgo pkg-config: maplibre-native-c
 #include <stdlib.h>
 #include <stdint.h>
 #include "../cgo_shim.h"
@@ -10,6 +11,7 @@ extern mln_status goMaplibreResourceTransform(void* user_data, uint32_t kind, co
 extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_request* request, mln_resource_request_handle* handle);
 */
 import "C"
+
 import (
 	"errors"
 	"runtime/cgo"
@@ -43,7 +45,7 @@ func SetResourceTransform(runtime unsafe.Pointer, callback ResourceTransformCall
 	state := newResourceTransformState(callback)
 	descriptor := C.mln_resource_transform{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_transform{})),
-		callback:  (C.mln_resource_transform_callback)(C.goMaplibreResourceTransform),
+		callback:  C.mln_resource_transform_callback(C.goMaplibreResourceTransform),
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
 	status := int32(C.mln_runtime_set_resource_transform(
@@ -190,7 +192,7 @@ func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallba
 	state.handle = cgo.NewHandle(state)
 	descriptor := C.mln_resource_provider{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_provider{})),
-		callback:  (C.mln_resource_provider_callback)(C.goMaplibreResourceProvider),
+		callback:  C.mln_resource_provider_callback(C.goMaplibreResourceProvider),
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
 	status := int32(C.mln_runtime_set_resource_provider(

@@ -28,6 +28,7 @@ func TestRuntimeResourceProviderLifecycle(t *testing.T) {
 		t.Fatalf("Close(): %v", err)
 	}
 }
+
 func TestResourceResponseRejectsEmbeddedNULStrings(t *testing.T) {
 	if err := validateResourceResponse(ResourceResponse{ErrorMessage: "bad\x00tail"}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ErrorMessage embedded NUL error = %v, want ErrInvalidArgument", err)
@@ -39,6 +40,7 @@ func TestResourceResponseRejectsEmbeddedNULStrings(t *testing.T) {
 		t.Fatalf("valid resource response error = %v", err)
 	}
 }
+
 func TestResourceResponseAllowsUnknownEnumsForNativeValidation(t *testing.T) {
 	if err := validateResourceResponse(ResourceResponse{Status: ResourceResponseStatus(99)}); err != nil {
 		t.Fatalf("unknown status error = %v, want nil", err)
@@ -47,6 +49,7 @@ func TestResourceResponseAllowsUnknownEnumsForNativeValidation(t *testing.T) {
 		t.Fatalf("unknown error reason error = %v, want nil", err)
 	}
 }
+
 func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
 	statuses := []ResourceResponseStatus{
 		ResourceResponseStatusOK,
@@ -70,6 +73,7 @@ func TestResourceResponseAcceptsKnownEnums(t *testing.T) {
 		}
 	}
 }
+
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -87,6 +91,7 @@ func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 		t.Fatalf("SetResourceProvider(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestRuntimeResourceProviderRequiresNoLiveMaps(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -114,6 +119,7 @@ func TestRuntimeResourceProviderRequiresNoLiveMaps(t *testing.T) {
 		t.Fatalf("SetResourceProvider() with live map error = %v, want ErrInvalidState", err)
 	}
 }
+
 func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -145,6 +151,7 @@ func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 		t.Fatalf("Close(): %v", err)
 	}
 }
+
 func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
 	lockOSThreadForTest(t)
 

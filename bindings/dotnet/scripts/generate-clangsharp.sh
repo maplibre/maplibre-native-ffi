@@ -8,29 +8,42 @@ output_dir="$binding_dir/src/Maplibre.Native/Generated"
 tmp_output_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_output_dir"' EXIT
 
-rid=""
 case "$(uname -s)-$(uname -m)" in
   Darwin-arm64) rid="osx-arm64" ;;
   Darwin-x86_64) rid="osx-x64" ;;
   Linux-x86_64) rid="linux-x64" ;;
   Linux-aarch64) rid="linux-arm64" ;;
-  MINGW*|MSYS*|CYGWIN*) rid="win-x64" ;;
-  *) rid="" ;;
+  MINGW*-x86_64 | MSYS*-x86_64 | CYGWIN*-x86_64) rid="win-x64" ;;
+  MINGW*-aarch64 | MSYS*-aarch64 | CYGWIN*-aarch64) rid="win-arm64" ;;
+  *)
+    echo "Unsupported ClangSharp generator host: $(uname -s)-$(uname -m)" >&2
+    exit 1
+    ;;
 esac
 
-if [[ -n "$rid" ]]; then
-  libclang_dir="$(find "$HOME/.nuget/packages" -path "*/clangsharppinvokegenerator.$rid/*/tools/any/$rid" -type d 2>/dev/null | sort | tail -n 1 || true)"
-  if [[ -n "$libclang_dir" ]]; then
-    export DYLD_LIBRARY_PATH="$libclang_dir:${DYLD_LIBRARY_PATH:-}"
-    export LD_LIBRARY_PATH="$libclang_dir:${LD_LIBRARY_PATH:-}"
-    export PATH="$libclang_dir:$PATH"
-  fi
-fi
+clangsharp_version="21.1.8.3" # Keep in sync with dotnet-tools.json.
+nuget_packages="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
+clangsharp_native_dir="$nuget_packages/clangsharppinvokegenerator.$rid/$clangsharp_version/tools/any/$rid"
 
 clang_include=""
-resource_dir="$(clang -print-resource-dir)"
-if [[ -d "$resource_dir/include" ]]; then
-  clang_include="$resource_dir/include"
+if command -v clang >/dev/null 2>&1; then
+  resource_dir="$(clang -print-resource-dir)"
+  if [[ -d "$resource_dir/include" ]]; then
+    clang_include="$resource_dir/include"
+  fi
+fi
+if [[ -z "$clang_include" ]]; then
+  clang_major="${clangsharp_version%%.*}"
+  for resource_dir in "/usr/lib/clang/$clang_major" "/usr/lib64/clang/$clang_major"; do
+    if [[ -d "$resource_dir/include" ]]; then
+      clang_include="$resource_dir/include"
+      break
+    fi
+  done
+fi
+if [[ -z "$clang_include" ]]; then
+  echo "Clang resource headers are unavailable; install the host Clang package" >&2
+  exit 1
 fi
 
 headers=(
@@ -57,21 +70,38 @@ mkdir -p "$output_dir"
   dotnet tool restore
 )
 
+case "$rid" in
+  linux-*) native_libraries=(libclang.so libClangSharp.so) ;;
+  osx-*) native_libraries=(libclang.dylib libClangSharp.dylib) ;;
+  win-*) native_libraries=(libclang.dll libClangSharp.dll) ;;
+esac
+for native_library in "${native_libraries[@]}"; do
+  if [[ ! -f "$clangsharp_native_dir/$native_library" ]]; then
+    echo "Missing ClangSharp native library: $clangsharp_native_dir/$native_library" >&2
+    exit 1
+  fi
+done
+
+generator_environment=(env)
+case "$rid" in
+  linux-*)
+    generator_environment+=("LD_LIBRARY_PATH=$clangsharp_native_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}")
+    ;;
+  osx-*)
+    generator_environment+=("DYLD_LIBRARY_PATH=$clangsharp_native_dir${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}")
+    ;;
+  win-*)
+    generator_environment+=("PATH=$clangsharp_native_dir:$PATH")
+    ;;
+esac
+
 for header in "${headers[@]}"; do
   args=(
     tool run ClangSharpPInvokeGenerator --
+    @scripts/generate-clangsharp.rsp
     -f "$repo_root/include/maplibre_native_c/$header.h"
     -t "$repo_root/include/maplibre_native_c/$header.h"
-    -I "$repo_root/include/maplibre_native_c"
-    -x c
-    -std c2x
-    -D "__attribute__(x)="
-    -n Maplibre.Native.Internal.C
-    -m NativeMethods
-    -l maplibre-native-c
     -o "$tmp_output_dir/$header.g.cs"
-    -c latest-codegen
-    -was "*=internal"
   )
   if [[ -n "$clang_include" ]]; then
     args+=(-I "$clang_include")
@@ -79,7 +109,7 @@ for header in "${headers[@]}"; do
 
   (
     cd "$binding_dir"
-    dotnet "${args[@]}"
+    "${generator_environment[@]}" dotnet "${args[@]}"
   )
 
   if [[ ! -s "$tmp_output_dir/$header.g.cs" ]]; then

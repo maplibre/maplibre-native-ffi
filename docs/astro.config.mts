@@ -41,7 +41,7 @@ export default defineConfig({
         { label: "Concepts", slug: "concepts" },
         {
           label: "Usage",
-          autogenerate: { directory: "guides" },
+          items: [{ autogenerate: { directory: "guides" } }],
         },
         {
           label: "Reference",
@@ -65,7 +65,7 @@ export default defineConfig({
         },
         {
           label: "Development",
-          autogenerate: { directory: "development" },
+          items: [{ autogenerate: { directory: "development" } }],
         },
       ],
     }),

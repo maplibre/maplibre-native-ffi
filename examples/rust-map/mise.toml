@@ -1,52 +1,42 @@
-[tasks.compile-shaders]
-hide = true
-run = '''
-set -euo pipefail
-
-if [[ "$MLN_FFI_RENDER_BACKEND" == "vulkan" ]]; then
-  glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv
-  glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv
-fi
-'''
-
 [tasks.build]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
 set -euo pipefail
-source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
-case "$MLN_FFI_RENDER_BACKEND" in
-  metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
-esac
-cargo build -p rust-map --no-default-features --features "$feature"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  cargo build -p rust-map
 '''
 
 [tasks.check]
-depends = [":build"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+dir = "../.."
 run = '''
 set -euo pipefail
-source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
-case "$MLN_FFI_RENDER_BACKEND" in
-  metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
-esac
-cargo clippy -p rust-map --no-default-features --features "$feature" --all-targets -- -D warnings
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  cargo clippy -p rust-map --all-targets -- -D warnings
 '''
 
 [tasks.run]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
-usage = 'arg "render-target"'
+depends = ["//:build"]
+dir = "../.."
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
 run = '''
 set -euo pipefail
-source "$MLN_FFI_BUILD_DIR/maplibre-native-c.cargo-rustflags"
-case "$MLN_FFI_RENDER_BACKEND" in
-  metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
-  *) echo "unsupported rust-map render backend: $MLN_FFI_RENDER_BACKEND" >&2; exit 1 ;;
-esac
-env LD_LIBRARY_PATH="$MLN_FFI_BUILD_DIR:$MLN_FFI_DEPENDENCY_LIBRARY_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+  cargo run -p rust-map -- "{{ usage.render_target }}"
+'''
+run_windows = '''
+set -euo pipefail
+native_install_dir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  cargo run -p rust-map -- "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]

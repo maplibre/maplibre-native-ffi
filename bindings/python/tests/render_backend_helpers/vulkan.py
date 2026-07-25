@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from ctypes.util import find_library
 from importlib import metadata, util
+import os
 from pathlib import Path
 from typing import Any
-import os
 import sys
 import types
 
@@ -21,12 +22,14 @@ def _import_vulkan() -> Any:
 
         return vulkan
 
-    library_dir = Path(os.environ.get("MLN_FFI_DEPENDENCY_LIBRARY_DIR", ""))
-    library_path = library_dir / "libvulkan.dylib"
-    if not library_path.is_file():
-        import vulkan
-
-        return vulkan
+    loader_dir = os.environ.get("MLN_FFI_VULKAN_LOADER_DIR")
+    library_path = (
+        str(Path(loader_dir) / "libvulkan.dylib")
+        if loader_dir is not None
+        else find_library("vulkan")
+    )
+    if library_path is None:
+        raise VulkanUnavailableError("missing host Vulkan loader")
 
     distribution = metadata.distribution("vulkan")
     package_root = Path(distribution.locate_file("vulkan"))

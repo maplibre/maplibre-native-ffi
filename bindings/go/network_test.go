@@ -30,6 +30,7 @@ func TestNetworkStatusRoundTripsThroughNativeABI(t *testing.T) {
 		t.Fatalf("CurrentNetworkStatus() = %v, %v; want online, nil", got, err)
 	}
 }
+
 func TestInvalidNetworkStatusReportsNativeError(t *testing.T) {
 	err := networkStatusSetRaw(999_999)
 	if !errors.Is(err, ErrInvalidArgument) {
@@ -47,6 +48,7 @@ func TestInvalidNetworkStatusReportsNativeError(t *testing.T) {
 		t.Fatal("Diagnostic() is empty")
 	}
 }
+
 func TestUnknownNetworkStatusRejectedBeforeNativeCall(t *testing.T) {
 	err := SetNetworkStatus(NetworkStatus(999_999))
 	if !errors.Is(err, ErrInvalidArgument) {

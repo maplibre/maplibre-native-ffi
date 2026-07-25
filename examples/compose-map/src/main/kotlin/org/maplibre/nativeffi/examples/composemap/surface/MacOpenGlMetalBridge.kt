@@ -428,19 +428,21 @@ internal class MacAngleEglContext private constructor(private val angleRoot: Pat
     }
 
     private fun resolveAngleRoot(): Path {
-      val fromEnvironment = System.getenv("MLN_FFI_EGL_ROOT")?.let(::Path)
-      if (fromEnvironment != null && fromEnvironment.exists()) {
-        return fromEnvironment.absolute()
-      }
-      val fromCheckout =
-        Path("third_party/angle/chromium-7151_rev1/macos-arm64").absolute().normalize()
-      if (fromCheckout.exists()) {
-        return fromCheckout
-      }
+      // CMake installs the ANGLE dylibs beside libmaplibre-native-c.dylib.
+      val angleRoot =
+        System.getProperty("org.maplibre.nativeffi.library.path")?.let { Path(it).parent }
+          ?: throw NativeSurfaceBridgeException(
+            "The native library path is required for macOS EGL; run the example through Gradle"
+          )
+      val angleRootPath = angleRoot
+      if (angleRootPath.isAngleRoot()) return angleRootPath.absolute()
       throw NativeSurfaceBridgeException(
-        "ANGLE root is unavailable; set MLN_FFI_EGL_ROOT to the directory containing libEGL.dylib"
+        "ANGLE runtime libraries are unavailable in $angleRootPath"
       )
     }
+
+    private fun Path.isAngleRoot(): Boolean =
+      resolve("libEGL.dylib").exists() && resolve("libGLESv2.dylib").exists()
   }
 }
 

@@ -14,7 +14,7 @@ jobs:
     environment: codeberg
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           fetch-depth: 0
@@ -33,4 +33,5 @@ jobs:
           git remote add mirror https://codeberg.org/maplibre/maplibre-native-ffi.git
           git fetch origin --tags
           git push mirror main
-          git push mirror --tags
+          # Floating tags (e.g. unstable-native-snapshot) are force-moved on origin.
+          git push mirror --tags --force

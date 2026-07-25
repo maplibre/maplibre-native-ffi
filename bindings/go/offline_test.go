@@ -53,6 +53,7 @@ func requireDiscardOfflineOperation[T any](t *testing.T, operation *OfflineOpera
 		t.Fatalf("Discard(): %v", err)
 	}
 }
+
 func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -126,6 +127,7 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 	}
 	requireDiscardOfflineOperation(t, deleteOperation, OfflineOperationRegionDelete, OfflineOperationResultNone)
 }
+
 func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
@@ -145,6 +147,7 @@ func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, opera
 	var zero T
 	return zero
 }
+
 func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
@@ -191,6 +194,7 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 		t.Fatal("offline region list is empty after creating a region")
 	}
 }
+
 func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 	stdruntime.LockOSThread()
 	defer stdruntime.UnlockOSThread()
@@ -238,6 +242,7 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 	}
 	t.Fatal("offline completion event was not reported")
 }
+
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 	lockOSThreadForTest(t)
 

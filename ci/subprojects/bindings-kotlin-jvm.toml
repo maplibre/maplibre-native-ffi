@@ -1,8 +1,0 @@
-label = "Kotlin/JVM"
-source_directory = "bindings/kotlin"
-
-[requires]
-os = ["linux", "macos", "windows"]
-
-[ci]
-test = "//bindings/kotlin:jvmTest"

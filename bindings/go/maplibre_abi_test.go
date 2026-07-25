@@ -12,6 +12,7 @@ func TestCVersionUsesNativeABI(t *testing.T) {
 		t.Fatalf("CVersion() = %d, want %d", got, ExpectedCABIVersion)
 	}
 }
+
 func TestABIVersionMismatchUsesStableBindingError(t *testing.T) {
 	actualVersion := ExpectedCABIVersion + 1
 	err := checkCompatibleCABI(actualVersion)
@@ -30,6 +31,7 @@ func TestABIVersionMismatchUsesStableBindingError(t *testing.T) {
 		t.Fatalf("ABI mismatch diagnostic = %q", diagnostic)
 	}
 }
+
 func TestSupportedRenderBackendsUsesNativeABIConstants(t *testing.T) {
 	mask := SupportedRenderBackends()
 	if mask == 0 {
@@ -42,6 +44,7 @@ func TestSupportedRenderBackendsUsesNativeABIConstants(t *testing.T) {
 		t.Fatal("RenderBackendVulkan has zero ABI value")
 	}
 }
+
 func TestNativePointerIsOpaqueValue(t *testing.T) {
 	var pointer NativePointer = 0x1234
 	if uintptr(pointer) != 0x1234 {

@@ -1,4 +1,36 @@
-function(mln_configure_android_platform target)
+function(mln_configure_platform_dependencies target)
+  target_link_libraries(${target} INTERFACE android atomic z)
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_DEFAULT_LOGGING_STDERR
+      TRUE
+      MLN_FFI_DEFAULT_THREAD_LOCAL
+      TRUE
+      MLN_FFI_SHARED_SUPPORTED
+      TRUE
+      MLN_FFI_ARCHIVE_FORMAT
+      elf
+      MLN_FFI_STATIC_ARCHIVES
+      "mbgl-vendor-icu;maplibre_native_platform_rust"
+      MLN_FFI_TEST_SUPPORTED
+      FALSE)
+  if(ANDROID_ABI STREQUAL "arm64-v8a")
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM android-arm64 MLN_FFI_ZIG_TARGET
+        aarch64-linux-android)
+  else()
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM android-x64 MLN_FFI_ZIG_TARGET
+        x86_64-linux-android)
+  endif()
+endfunction()
+
+function(mln_configure_platform target)
   include(mln_rust)
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
@@ -35,7 +67,9 @@ function(mln_configure_android_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE MapLibreNative::Base::jni.hpp mbgl-vendor-icu android atomic z)
+    PRIVATE
+      MapLibreNative::Base::jni.hpp mbgl-vendor-icu
+      MLN_FFI::PlatformDependencies)
 
   mln_link_rust_platform(${target})
 endfunction()

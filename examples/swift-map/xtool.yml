@@ -1,0 +1,3 @@
+version: 1
+bundleID: org.maplibre.nativeffi.examples.swift-map-ios
+product: swift-map-ios

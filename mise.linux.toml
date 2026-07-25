@@ -1,0 +1,79 @@
+[settings]
+# The Swift toolchain ships a separate tarball per Linux distro, while the
+# lockfile records one checksum per os-arch pair. Pin the distro so every Linux
+# machine downloads the artifact the lockfile describes.
+swift.platform = "ubuntu24.04"
+
+[vars]
+host_native_preset = "linux-{{ arch() }}-vulkan"
+# Highest glibc release our published Linux natives may require. Raising this
+# drops support for distributions that ship an older glibc, so change it
+# together with the CI runner images in ci/workflow.py.
+glibc_floor = "2.39"
+
+[bootstrap.packages]
+"apt:build-essential" = "latest"
+"apt:clang" = "latest"
+"apt:glslang-tools" = "latest"
+"apt:libclang-dev" = "latest"
+"apt:libegl1-mesa-dev" = "latest"
+"apt:libgles2-mesa-dev" = "latest"
+"apt:libicu-dev" = "latest"
+"apt:libncurses6" = "latest"
+"apt:libsqlite3-0" = "latest"
+"apt:libuv1-dev" = "latest"
+"apt:libvulkan-dev" = "latest"
+"apt:ninja-build" = "latest"
+"apt:pkg-config" = "latest"
+"apt:zlib1g-dev" = "latest"
+"dnf:clang-devel" = "latest"
+"dnf:clang" = "latest"
+"dnf:gcc" = "latest"
+"dnf:gcc-c++" = "latest"
+"dnf:glslang" = "latest"
+"dnf:libicu-devel" = "latest"
+"dnf:libglvnd-devel" = "latest"
+"dnf:libstdc++-static" = "latest"
+"dnf:libuv-devel" = "latest"
+"dnf:libuv-static" = "latest"
+"dnf:mesa-libEGL-devel" = "latest"
+"dnf:ncurses-libs" = "latest"
+"dnf:ninja-build" = "latest"
+"dnf:pkgconf-pkg-config" = "latest"
+"dnf:sqlite-libs" = "latest"
+"dnf:vulkan-loader-devel" = "latest"
+"dnf:zlib-ng-compat-devel" = "latest"
+"dnf:zlib-ng-compat-static" = "latest"
+
+[tasks.check-glibc-floor]
+description = "Verify a built Linux native requires no glibc newer than the floor."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = '''
+floor="{{vars.glibc_floor}}"
+library="$MISE_MONOREPO_ROOT/build/$usage_preset/install/lib/libmaplibre-native-c.so"
+
+if [[ ! -f "$library" ]]; then
+  echo "error: $library not found; build $usage_preset first" >&2
+  exit 1
+fi
+
+required="$(readelf --version-info "$library" |
+  grep -oE 'GLIBC_[0-9]+\.[0-9]+' |
+  sort -uV |
+  tail -1)"
+
+if [[ -z "$required" ]]; then
+  echo "error: $library declares no glibc version requirement" >&2
+  exit 1
+fi
+
+highest="$(printf '%s\nGLIBC_%s\n' "$required" "$floor" | sort -V | tail -1)"
+if [[ "$highest" != "GLIBC_$floor" ]]; then
+  echo "error: $usage_preset requires $required, above the GLIBC_$floor floor" >&2
+  echo "The build host's glibc sets this floor; build on an older image or" >&2
+  echo "raise glibc_floor in mise.linux.toml to accept the new requirement." >&2
+  exit 1
+fi
+
+echo "$usage_preset requires $required (floor GLIBC_$floor)"
+'''

@@ -1,3 +1,7 @@
+[tools]
+"conda:doxygen" = { version = "{{vars.doxygen_version}}", os = ["linux", "macos", "windows/x64"] }
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+
 [tasks."api:c"]
 run = [
   "rm -rf doxygen/gen public/reference/c",
@@ -7,25 +11,22 @@ run = [
 ]
 
 [tasks."api:rust"]
-depends = ["//:ensure-native-library"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+depends = ["//:build"]
+dir = ".."
 run = '''
 rm -rf docs/public/reference/rust
 mkdir -p docs/public/reference
-cargo doc -p maplibre-native --no-deps
-doc_dir="target/doc"
-if [ -n "${CARGO_BUILD_TARGET:-}" ]; then
-  doc_dir="target/${CARGO_BUILD_TARGET}/doc"
-fi
-cp -a "${doc_dir}/." docs/public/reference/rust/
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+  cargo doc -p maplibre-native --no-deps
+cp -a target/doc/. docs/public/reference/rust/
 '''
 
 [tasks."api:zig"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
+dir = "../bindings/zig"
 run = '''
 rm -rf ../../docs/public/reference/zig
 mkdir -p ../../docs/public/reference
-zig build docs -Dinclude-dir="{{env.MLN_FFI_INCLUDE_DIR}}" --prefix ../../docs/public/reference/zig
+zig build docs -Dinclude-dir=../../include --prefix ../../docs/public/reference/zig
 '''
 
 [tasks.api]
@@ -35,21 +36,27 @@ run = [
   { task = "api:zig" },
 ]
 
+[tasks.install]
+run = "pnpm exec astro sync"
+
 [tasks.dev]
-depends = ["//:docs:generate-support-matrix", "api"]
-run = "pnpm exec astro dev"
+depends = ["api", "install", "generate-support-matrix"]
+run = "pnpm run dev"
 
 [tasks.start]
-depends = ["//:docs:generate-support-matrix", "api"]
-run = "pnpm exec astro dev"
+depends = ["api", "install", "generate-support-matrix"]
+run = "pnpm run start"
 
 [tasks.build]
-depends = ["//:docs:generate-support-matrix", "api"]
-run = "pnpm exec astro build"
+depends = ["api", "install", "generate-support-matrix"]
+run = "pnpm run build"
 
 [tasks.preview]
-depends = ["//:docs:generate-support-matrix", "api"]
-run = "pnpm exec astro preview"
+depends = ["api", "install", "generate-support-matrix"]
+run = "pnpm run preview"
 
 [tasks.astro]
 run = "pnpm exec astro"
+
+[tasks.generate-support-matrix]
+run = "pnpm run generate-support-matrix"

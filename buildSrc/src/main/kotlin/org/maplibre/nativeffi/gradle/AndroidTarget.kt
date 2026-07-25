@@ -2,47 +2,65 @@ package org.maplibre.nativeffi.gradle
 
 enum class AndroidTarget(
   val cargoTarget: String,
+  val targetPlatform: String,
+  val cmakeArchitecture: String,
   val ndkAbi: String,
   val javaCppPlatform: String,
-  val ndkCompilerTriple: String,
+  val ndkTargetTriple: String,
+  val taskSuffix: String,
 ) {
   ARM64(
     cargoTarget = "aarch64-linux-android",
+    targetPlatform = "android-arm64",
+    cmakeArchitecture = "arm64",
     ndkAbi = "arm64-v8a",
     javaCppPlatform = "android-arm64",
-    ndkCompilerTriple = "aarch64-linux-android24",
+    ndkTargetTriple = "aarch64-linux-android",
+    taskSuffix = "Arm64",
   ),
   X64(
     cargoTarget = "x86_64-linux-android",
+    targetPlatform = "android-x64",
+    cmakeArchitecture = "x64",
     ndkAbi = "x86_64",
     javaCppPlatform = "android-x86_64",
-    ndkCompilerTriple = "x86_64-linux-android24",
+    ndkTargetTriple = "x86_64-linux-android",
+    taskSuffix = "X86_64",
   );
 
+  fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang++"
+
+  fun cmakePreset(backend: String): String =
+    "android-$cmakeArchitecture-${if (backend == "opengl") "egl" else "vulkan"}"
+
   companion object {
-    /** Resolves when [CARGO_BUILD_TARGET] names a supported Android triple. */
-    fun fromEnv(): AndroidTarget? {
-      val cargoTarget = System.getenv("CARGO_BUILD_TARGET") ?: return null
-      return entries.firstOrNull { it.cargoTarget == cargoTarget }
+    const val DEFAULT_ABIS = "arm64-v8a,x86_64"
+    const val DEFAULT_BACKEND = "opengl"
+
+    fun parseAbis(value: String): List<AndroidTarget> {
+      val abis = value.split(',').map(String::trim)
+      require(abis.isNotEmpty() && abis.none(String::isEmpty)) {
+        "maplibre.android.abis must be a comma-separated list of supported ABIs"
+      }
+      require(abis.distinct().size == abis.size) {
+        "maplibre.android.abis contains duplicate ABIs: $value"
+      }
+
+      return abis.map { abi ->
+        entries.firstOrNull { it.ndkAbi == abi }
+          ?: error(
+            "Unsupported Android ABI '$abi'; maplibre.android.abis supports " +
+              entries.joinToString(",") { it.ndkAbi }
+          )
+      }
     }
 
-    fun current(): AndroidTarget =
-      fromEnv()
-        ?: error(
-          "CARGO_BUILD_TARGET must be set to a supported Android triple " +
-            "(expected ${entries.joinToString(" or ") { it.cargoTarget }})"
-        )
-
-    /**
-     * Cargo `--filter-platform` for rustls-platform-verifier-android Maven metadata. The published
-     * artifact is ABI-agnostic; [ARM64] is the fallback when the env names a host desktop triple
-     * during Linux native builds.
-     */
-    fun rustlsMetadataCargoTarget(): String = fromEnv()?.cargoTarget ?: ARM64.cargoTarget
-
-    /**
-     * NDK ABI filter for Android Gradle when [CARGO_BUILD_TARGET] is unset or names a host triple.
-     */
-    fun ndkAbiForGradleConfiguration(): String = fromEnv()?.ndkAbi ?: ARM64.ndkAbi
+    fun parseBackend(value: String): String {
+      val backend = value.trim().lowercase()
+      require(backend == "opengl" || backend == "vulkan") {
+        "Unsupported Android backend '$value'; maplibre.android.backend supports opengl or vulkan"
+      }
+      return backend
+    }
   }
 }
