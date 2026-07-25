@@ -88,6 +88,8 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
   var _retirementSignals = 0;
   var _retirementQueued = false;
 
+  bool get retirementQueuedForTesting => _retirementQueued;
+
   void retire() {
     if (_retirementQueued) {
       return;

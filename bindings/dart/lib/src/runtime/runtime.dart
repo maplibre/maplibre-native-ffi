@@ -11,6 +11,7 @@ import '../internal/callback/callback_state.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
+import '../internal/lifecycle/frame_construction.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
 import '../internal/struct/geometry.dart' as native_geometry;
@@ -33,6 +34,25 @@ part 'runtime_native_conversions.dart';
 final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
 
 const int _resourceKindWildcard = 0xffffffff;
+
+/// Read-only view of one custom-geometry callback root for lifecycle tests.
+final class CustomGeometryCallbackLifecycleProbe {
+  CustomGeometryCallbackLifecycleProbe._(this._state);
+
+  final _CustomGeometryCallbackState _state;
+
+  bool get retirementQueued => _state.retirementQueuedForTesting;
+  bool get closed => _state.closedForTesting;
+}
+
+/// Returns the callback root currently owned by [map] for lifecycle tests.
+CustomGeometryCallbackLifecycleProbe? customGeometryCallbackProbeForTesting(
+  MapHandle map,
+  String sourceId,
+) {
+  final state = map._customGeometryCallbacks[sourceId];
+  return state == null ? null : CustomGeometryCallbackLifecycleProbe._(state);
+}
 
 /// Dart resource provider callback run on the owner isolate.
 typedef ResourceProviderCallback =
@@ -568,6 +588,12 @@ final class RuntimeEvent {
   /// Copied event message, when one was provided.
   final String? message;
 }
+
+/// Copies a raw runtime event through the production decoder for tests.
+RuntimeEvent copyRuntimeEventForTesting(
+  raw.mln_runtime_event event,
+  RuntimeHandle runtime,
+) => RuntimeEvent._fromNative(event, runtime);
 
 /// Runtime event type with forward-compatible unknown values.
 final class RuntimeEventType {

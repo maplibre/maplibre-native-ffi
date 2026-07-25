@@ -143,6 +143,9 @@ MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(
   mln_custom_geometry_source_tile_callback callback, void* user_data,
   mln_canonical_tile_id tile_id
 ) MLN_DART_SHIM_NOEXCEPT;
+MLN_API uint32_t mln_dart_test_emit_log(
+  uint32_t severity, uint32_t event, int64_t code, const char* message
+) MLN_DART_SHIM_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)
 

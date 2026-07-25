@@ -4,7 +4,9 @@ final class _TextureFrameLease {
   _TextureFrameLease(Object owner, this.release)
     : owner = WeakReference<Object>(owner);
 
-  final WeakReference<Object> owner;
+  _TextureFrameLease.orphaned(this.release) : owner = null;
+
+  final WeakReference<Object>? owner;
   final void Function() release;
 }
 
@@ -386,16 +388,15 @@ final class RenderSessionHandle {
     try {
       outFrame.ref.size = sizeOf<raw.mln_metal_owned_texture_frame>();
       _check(_c.raw.mln_metal_owned_texture_acquire_frame(_pointer, outFrame));
-      try {
-        return MetalOwnedTextureFrame._(this, outFrame);
-      } catch (_) {
-        _c.raw.mln_metal_owned_texture_release_frame(_pointer, outFrame);
-        rethrow;
-      }
     } catch (_) {
       calloc.free(outFrame);
       rethrow;
     }
+    return _constructAcquiredTextureFrame(
+      outFrame,
+      () => _c.raw.mln_metal_owned_texture_release_frame(_pointer, outFrame),
+      () => MetalOwnedTextureFrame._(this, outFrame),
+    );
   }
 
   /// Acquires the latest Vulkan texture frame until [VulkanOwnedTextureFrame.close].
@@ -405,16 +406,15 @@ final class RenderSessionHandle {
     try {
       outFrame.ref.size = sizeOf<raw.mln_vulkan_owned_texture_frame>();
       _check(_c.raw.mln_vulkan_owned_texture_acquire_frame(_pointer, outFrame));
-      try {
-        return VulkanOwnedTextureFrame._(this, outFrame);
-      } catch (_) {
-        _c.raw.mln_vulkan_owned_texture_release_frame(_pointer, outFrame);
-        rethrow;
-      }
     } catch (_) {
       calloc.free(outFrame);
       rethrow;
     }
+    return _constructAcquiredTextureFrame(
+      outFrame,
+      () => _c.raw.mln_vulkan_owned_texture_release_frame(_pointer, outFrame),
+      () => VulkanOwnedTextureFrame._(this, outFrame),
+    );
   }
 
   /// Acquires the latest OpenGL texture frame until [OpenGLOwnedTextureFrame.close].
@@ -424,16 +424,15 @@ final class RenderSessionHandle {
     try {
       outFrame.ref.size = sizeOf<raw.mln_opengl_owned_texture_frame>();
       _check(_c.raw.mln_opengl_owned_texture_acquire_frame(_pointer, outFrame));
-      try {
-        return OpenGLOwnedTextureFrame._(this, outFrame);
-      } catch (_) {
-        _c.raw.mln_opengl_owned_texture_release_frame(_pointer, outFrame);
-        rethrow;
-      }
     } catch (_) {
       calloc.free(outFrame);
       rethrow;
     }
+    return _constructAcquiredTextureFrame(
+      outFrame,
+      () => _c.raw.mln_opengl_owned_texture_release_frame(_pointer, outFrame),
+      () => OpenGLOwnedTextureFrame._(this, outFrame),
+    );
   }
 
   /// Explicitly destroys this render session.
@@ -450,9 +449,31 @@ final class RenderSessionHandle {
     _activeTextureFrame = _TextureFrameLease(frame, release);
   }
 
+  T _constructAcquiredTextureFrame<T, F extends NativeType>(
+    Pointer<F> descriptor,
+    raw.mln_status Function() release,
+    T Function() construct,
+  ) {
+    try {
+      return construct();
+    } catch (error, stackTrace) {
+      cleanupFailedFrameConstruction(
+        release: () => _statusCode(release()),
+        releaseSucceeded: () => calloc.free(descriptor),
+        releaseFailed: () {
+          _activeTextureFrame = _TextureFrameLease.orphaned(() {
+            _check(release());
+            calloc.free(descriptor);
+          });
+        },
+      );
+      Error.throwWithStackTrace(error, stackTrace);
+    }
+  }
+
   void _releaseTextureFrame(Object frame) {
     final lease = _activeTextureFrame;
-    if (lease == null || !identical(lease.owner.target, frame)) {
+    if (lease == null || !identical(lease.owner?.target, frame)) {
       return;
     }
     lease.release();
@@ -464,7 +485,7 @@ final class RenderSessionHandle {
     if (lease == null) {
       return;
     }
-    if (lease.owner.target != null) {
+    if (lease.owner?.target != null) {
       throwInvalidState(
         '$operation requires releasing the active texture frame',
       );

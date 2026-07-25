@@ -13,5 +13,9 @@ export 'src/projection/projection.dart';
 export 'src/query/query.dart';
 export 'src/render/render.dart';
 export 'src/resource/resource.dart';
-export 'src/runtime/runtime.dart';
+export 'src/runtime/runtime.dart'
+    hide
+        CustomGeometryCallbackLifecycleProbe,
+        copyRuntimeEventForTesting,
+        customGeometryCallbackProbeForTesting;
 export 'src/style/style.dart';

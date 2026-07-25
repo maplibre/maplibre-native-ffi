@@ -3,10 +3,15 @@ import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
+    as raw;
 import 'package:maplibre_native_ffi/src/internal/callback/callback_state.dart';
 import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
+import 'package:maplibre_native_ffi/src/internal/lifecycle/frame_construction.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
+import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
+import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
 
 final class _FakeNativeHandle extends Opaque {}
@@ -222,5 +227,99 @@ void main() {
       state.close((_) => nativeStatusOk, () => 'unused');
       expect(state.isClosed, isTrue);
     });
+  });
+
+  group('owned frame construction cleanup', () {
+    test('successful cleanup releases descriptor ownership', () {
+      var released = 0;
+      var retained = 0;
+
+      cleanupFailedFrameConstruction(
+        release: () => nativeStatusOk,
+        releaseSucceeded: () => released += 1,
+        releaseFailed: () => retained += 1,
+      );
+
+      expect(released, 1);
+      expect(retained, 0);
+    });
+
+    test('failed cleanup preserves descriptor for owner-thread retry', () {
+      var released = 0;
+      var retained = 0;
+
+      cleanupFailedFrameConstruction(
+        release: () => nativeStatusInvalidState,
+        releaseSucceeded: () => released += 1,
+        releaseFailed: () => retained += 1,
+      );
+
+      expect(released, 0);
+      expect(retained, 1);
+    });
+  });
+
+  test('runtime event decoding copies and guards native payloads', () {
+    final runtime = RuntimeHandle.create();
+    final event = calloc<raw.mln_runtime_event>();
+    final unknownPayload = calloc<Uint8>(3);
+    final message = 'copied message'.toNativeUtf8();
+    try {
+      event.ref.size = sizeOf<raw.mln_runtime_event>();
+      event.ref.type = 0xfeed;
+      event.ref.source_type = 0xbeef;
+      event.ref.source = nullptr;
+      event.ref.code = 17;
+      event.ref.payload_type = 0xf00d;
+      event.ref.payload = unknownPayload.cast<Void>();
+      event.ref.payload_size = 3;
+      event.ref.message = message.cast<Char>();
+      event.ref.message_size = 14;
+      unknownPayload.asTypedList(3).setAll(0, [1, 2, 3]);
+
+      final copied = copyRuntimeEventForTesting(event.ref, runtime);
+      unknownPayload.asTypedList(3).fillRange(0, 3, 9);
+      message.cast<Uint8>()[0] = 'X'.codeUnitAt(0);
+
+      expect(copied.eventType.rawValue, 0xfeed);
+      expect(copied.source, isA<UnknownRuntimeEventSource>());
+      expect(copied.payload, isA<RuntimeEventPayloadUnknown>());
+      expect((copied.payload as RuntimeEventPayloadUnknown).bytes, [1, 2, 3]);
+      expect(copied.message, 'copied message');
+
+      event.ref.payload_type = 2;
+      event.ref.payload_size = 1;
+      expect(
+        copyRuntimeEventForTesting(event.ref, runtime).payload,
+        isA<RuntimeEventPayloadUnknown>(),
+      );
+
+      event.ref.payload = nullptr;
+      event.ref.payload_size = 7;
+      final nullPayload = copyRuntimeEventForTesting(
+        event.ref,
+        runtime,
+      ).payload;
+      expect(nullPayload, isA<RuntimeEventPayloadUnknown>());
+      expect((nullPayload as RuntimeEventPayloadUnknown).bytes, isEmpty);
+
+      final renderMap = calloc<raw.mln_runtime_event_render_map>();
+      try {
+        renderMap.ref.size = sizeOf<raw.mln_runtime_event_render_map>();
+        renderMap.ref.mode = 1;
+        event.ref.payload = renderMap.cast<Void>();
+        event.ref.payload_size = sizeOf<raw.mln_runtime_event_render_map>();
+        final typed = copyRuntimeEventForTesting(event.ref, runtime).payload;
+        expect(typed, isA<RuntimeEventRenderMap>());
+        expect((typed as RuntimeEventRenderMap).mode, RenderMode.full);
+      } finally {
+        calloc.free(renderMap);
+      }
+    } finally {
+      malloc.free(message);
+      calloc.free(unknownPayload);
+      calloc.free(event);
+      runtime.close();
+    }
   });
 }

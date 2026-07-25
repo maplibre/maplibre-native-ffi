@@ -7,6 +7,12 @@ abstract base class RetainedCallbackState {
   var _closeScheduled = false;
   var _closed = false;
 
+  /// Whether retirement has started, exposed for internal lifecycle tests.
+  bool get retiredForTesting => _retired;
+
+  /// Whether all callback resources have closed, exposed for lifecycle tests.
+  bool get closedForTesting => _closed;
+
   /// Runs [body] as one active Dart upcall.
   ///
   /// Returns false when this state is already closed and [body] was not run.

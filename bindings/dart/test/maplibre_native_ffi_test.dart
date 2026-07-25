@@ -6,6 +6,8 @@ import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
+import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
+    show customGeometryCallbackProbeForTesting;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
@@ -62,6 +64,116 @@ void main() {
     Maplibre.clearLogCallback();
   });
 
+  test('log callback replacement and clear change native delivery', () async {
+    final c = MaplibreNativeCApi.open();
+    final first = <LogRecord>[];
+    final replacement = <LogRecord>[];
+
+    Maplibre.setLogCallback(first.add, consume: true);
+    expect(
+      c.dartTestEmitLog(
+        severity: LogSeverity.info.rawValue,
+        event: LogEvent.general.rawValue,
+        code: 101,
+        message: 'first',
+      ),
+      1,
+    );
+    await _waitUntil(() => first.isNotEmpty);
+    expect(first.single.code, 101);
+    expect(first.single.message, 'first');
+
+    Maplibre.setLogCallback(replacement.add);
+    expect(
+      c.dartTestEmitLog(
+        severity: LogSeverity.warning.rawValue,
+        event: LogEvent.setup.rawValue,
+        code: 202,
+        message: 'replacement',
+      ),
+      0,
+    );
+    await _waitUntil(() => replacement.isNotEmpty);
+    expect(first, hasLength(1));
+    expect(replacement.single.code, 202);
+    expect(replacement.single.message, 'replacement');
+
+    Maplibre.clearLogCallback();
+    expect(
+      c.dartTestEmitLog(
+        severity: LogSeverity.error.rawValue,
+        event: LogEvent.render.rawValue,
+        code: 303,
+        message: 'cleared',
+      ),
+      0,
+    );
+    expect(replacement, hasLength(1));
+  });
+
+  test(
+    'native provider rules complete matching style requests inline',
+    () async {
+      const styleUrl = 'custom://dart-inline-provider-style.json';
+      final runtime = RuntimeHandle.create();
+      runtime.setResourceProviderRules([
+        ResourceProviderRule(
+          kind: ResourceKind.style,
+          url: styleUrl,
+          response: ResourceResponse(
+            status: ResourceResponseStatus.ok,
+            bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+          ),
+        ),
+      ]);
+      final map = runtime.createMap();
+
+      map.setStyleUrl(styleUrl);
+      final event = await _pumpUntilEvent(
+        runtime,
+        (candidate) =>
+            candidate.eventType == RuntimeEventType.mapStyleLoaded &&
+            candidate.source is MapRuntimeEventSource,
+      );
+      expect((event.source as MapRuntimeEventSource).map, same(map));
+
+      map.close();
+      runtime.close();
+    },
+  );
+
+  test('unmatched provider routes pass through to native loading', () async {
+    const unmatchedUrl = 'custom://dart-provider-pass-through.json';
+    final runtime = RuntimeHandle.create();
+    var providerCalls = 0;
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            url: 'custom://different-style.json',
+          ),
+        ],
+        callback: (_, handle) {
+          providerCalls += 1;
+          handle.close();
+        },
+      ),
+    );
+    final map = runtime.createMap();
+
+    map.setStyleUrl(unmatchedUrl);
+    final event = await _pumpUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
+    );
+    expect(event.source, isA<MapRuntimeEventSource>());
+    expect(providerCalls, 0);
+
+    map.close();
+    runtime.close();
+  });
+
   test('queued resource provider callbacks cross the native C ABI', () async {
     const styleUrl = 'custom://dart-provider-style.json';
     final runtime = RuntimeHandle.create();
@@ -102,9 +214,135 @@ void main() {
     await _pumpUntil(runtime, () => requests.isNotEmpty);
 
     ownerToken.waitUntilReleased();
+    expect(ownerToken.isReleased, isTrue);
+    expect(
+      () => ownerToken.cancelled(),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    ownerToken.close();
     map.close();
     runtime.close();
     expect(await completion, isTrue);
+  });
+
+  test('cancelled transferred requests complete terminally', () async {
+    const styleUrl = 'custom://dart-provider-cancelled.json';
+    final runtime = RuntimeHandle.create();
+    ResourceRequestToken? token;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          token = handle.transfer();
+        },
+      ),
+    );
+
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntil(runtime, () => token != null);
+    final liveToken = token!;
+    final waiter = Isolate.run(() {
+      liveToken.waitUntilReleased();
+      return liveToken.isReleased;
+    });
+
+    map.close();
+    runtime.close();
+    await _waitUntil(liveToken.cancelled);
+    expect(
+      () => liveToken.complete(
+        ResourceResponse(status: ResourceResponseStatus.noContent),
+      ),
+      throwsA(isA<InvalidStateException>()),
+    );
+    expect(liveToken.isReleased, isTrue);
+    expect(await waiter, isTrue);
+  });
+
+  test('transferred response validation preserves the live token', () async {
+    const styleUrl = 'custom://dart-provider-token-validation.json';
+    final runtime = RuntimeHandle.create();
+    ResourceRequestToken? token;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          token = handle.transfer();
+        },
+      ),
+    );
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntil(runtime, () => token != null);
+
+    final liveToken = token!;
+    expect(
+      () => liveToken.complete(
+        ResourceResponse(
+          status: ResourceResponseStatus.error,
+          errorMessage: 'bad\u0000message',
+        ),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(liveToken.isReleased, isFalse);
+    liveToken.complete(
+      ResourceResponse(
+        status: ResourceResponseStatus.ok,
+        bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+      ),
+    );
+    expect(liveToken.isReleased, isTrue);
+
+    map.close();
+    runtime.close();
+  });
+
+  test('transferred token aliases have one terminal winner', () async {
+    const styleUrl = 'custom://dart-provider-token-race.json';
+    final runtime = RuntimeHandle.create();
+    ResourceRequestToken? token;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          token = handle.transfer();
+        },
+      ),
+    );
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntil(runtime, () => token != null);
+
+    final liveToken = token!;
+    final waiter = Isolate.run(() {
+      liveToken.waitUntilReleased();
+      return liveToken.isReleased;
+    });
+    final race = Future.wait([
+      Isolate.run(() => _completeTokenAlias(liveToken)),
+      Isolate.run(() => _closeTokenAlias(liveToken)),
+    ]);
+    map.close();
+    runtime.close();
+    final results = await race;
+
+    expect(results.where((result) => result).length, 1);
+    expect(await waiter, isTrue);
+    expect(
+      () => liveToken.cancelled(),
+      throwsA(isA<InvalidArgumentException>()),
+    );
   });
 
   test('queued resource provider callback exceptions are contained', () async {
@@ -127,6 +365,51 @@ void main() {
     final map = runtime.createMap();
     map.setStyleUrl(styleUrl);
     await _pumpUntil(runtime, () => calls > 0);
+
+    map.close();
+    runtime.close();
+  });
+
+  test('closed resource request handles reject further use', () async {
+    const styleUrl = 'custom://dart-provider-closed-handle.json';
+    final runtime = RuntimeHandle.create();
+    var callbackFinished = false;
+    var cancelledRejected = false;
+    var completionRejected = false;
+    var repeatedCloseSucceeded = false;
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+        ],
+        callback: (_, handle) {
+          handle.close();
+          try {
+            handle.cancelled();
+          } on InvalidArgumentException {
+            cancelledRejected = true;
+          }
+          try {
+            handle.complete(
+              ResourceResponse(status: ResourceResponseStatus.noContent),
+            );
+          } on InvalidArgumentException {
+            completionRejected = true;
+          }
+          handle.close();
+          repeatedCloseSucceeded = true;
+          callbackFinished = true;
+        },
+      ),
+    );
+    final map = runtime.createMap();
+    map.setStyleUrl(styleUrl);
+    await _pumpUntil(runtime, () => callbackFinished);
+
+    expect(cancelledRejected, isTrue);
+    expect(completionRejected, isTrue);
+    expect(repeatedCloseSucceeded, isTrue);
 
     map.close();
     runtime.close();
@@ -174,6 +457,52 @@ void main() {
     expect(deliveredTiles.single.y, 5);
     callback.close();
   });
+
+  test(
+    'custom geometry callback roots retire at lifecycle boundaries',
+    () async {
+      final runtime = RuntimeHandle.create();
+      final map = runtime.createMap();
+      map.setStyleJson(_emptyStyleJson);
+
+      map.addCustomGeometrySource(
+        'dart-lifecycle-source',
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      final removedProbe = customGeometryCallbackProbeForTesting(
+        map,
+        'dart-lifecycle-source',
+      )!;
+      expect(map.removeStyleSource('dart-lifecycle-source'), isTrue);
+      expect(removedProbe.retirementQueued, isTrue);
+
+      map.addCustomGeometrySource(
+        'dart-lifecycle-source',
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      final reloadProbe = customGeometryCallbackProbeForTesting(
+        map,
+        'dart-lifecycle-source',
+      )!;
+      map.setStyleJson(_emptyStyleJson);
+      expect(reloadProbe.retirementQueued, isTrue);
+
+      map.addCustomGeometrySource(
+        'dart-lifecycle-source',
+        CustomGeometrySourceOptions(fetchTile: (_) {}),
+      );
+      final closeProbe = customGeometryCallbackProbeForTesting(
+        map,
+        'dart-lifecycle-source',
+      )!;
+      map.close();
+      runtime.close();
+      expect(closeProbe.retirementQueued, isTrue);
+      await _waitUntil(
+        () => removedProbe.closed && reloadProbe.closed && closeProbe.closed,
+      );
+    },
+  );
 
   test('runtime and map handles use the native C ABI', () async {
     expect(
@@ -726,6 +1055,11 @@ void main() {
       const LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
     );
     expect(map.removeStyleSource('dart-custom-source'), isTrue);
+    map.addCustomGeometrySource(
+      'dart-custom-source',
+      CustomGeometrySourceOptions(fetchTile: fetchedTiles.add),
+    );
+    expect(map.removeStyleSource('dart-custom-source'), isTrue);
 
     map.addGeoJsonSourceData(
       'dart-geojson-source',
@@ -892,6 +1226,31 @@ Future<bool> _completeTransferredRequest(ResourceRequestToken token) {
   });
 }
 
+bool _completeTokenAlias(ResourceRequestToken token) {
+  try {
+    token.complete(
+      ResourceResponse(
+        status: ResourceResponseStatus.ok,
+        bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+      ),
+    );
+    return true;
+  } on InvalidStateException {
+    return true;
+  } on InvalidArgumentException {
+    return false;
+  }
+}
+
+bool _closeTokenAlias(ResourceRequestToken token) {
+  try {
+    token.close();
+    return true;
+  } on InvalidArgumentException {
+    return false;
+  }
+}
+
 void _clearLogCallback() {
   Maplibre.clearLogCallback();
 }
@@ -906,6 +1265,24 @@ Future<void> _pumpUntil(
     runtime.drainEvents();
     return condition();
   }, timeout: timeout);
+}
+
+Future<RuntimeEvent> _pumpUntilEvent(
+  RuntimeHandle runtime,
+  bool Function(RuntimeEvent event) predicate,
+) async {
+  RuntimeEvent? matched;
+  await _waitUntil(() {
+    runtime.runOnce();
+    RuntimeEvent? event;
+    while ((event = runtime.pollEvent()) != null) {
+      if (predicate(event!)) {
+        matched = event;
+      }
+    }
+    return matched != null;
+  });
+  return matched!;
 }
 
 Future<void> _waitUntil(

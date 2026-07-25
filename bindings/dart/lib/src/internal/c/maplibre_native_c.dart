@@ -104,6 +104,29 @@ final class MaplibreNativeCApi {
       tileId,
     );
   }
+
+  /// Emits one deterministic log record through the active native callback.
+  int dartTestEmitLog({
+    required int severity,
+    required int event,
+    required int code,
+    required String message,
+  }) {
+    final nativeMessage = message.toNativeUtf8();
+    try {
+      return library.lookupFunction<
+        Uint32 Function(Uint32, Uint32, Int64, Pointer<Char>),
+        int Function(int, int, int, Pointer<Char>)
+      >('mln_dart_test_emit_log')(
+        severity,
+        event,
+        code,
+        nativeMessage.cast<Char>(),
+      );
+    } finally {
+      malloc.free(nativeMessage);
+    }
+  }
 }
 
 /// Validates a reported C ABI version before public handles are created.

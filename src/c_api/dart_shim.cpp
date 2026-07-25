@@ -538,3 +538,15 @@ extern "C" MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(
     callback(user_data, tile_id);
   }
 }
+
+extern "C" MLN_API auto mln_dart_test_emit_log(
+  std::uint32_t severity, std::uint32_t event, std::int64_t code,
+  const char* message
+) noexcept -> std::uint32_t {
+  void* state = nullptr;
+  {
+    const auto lock = std::scoped_lock{dart_log_state_mutex};
+    state = active_dart_log_callback;
+  }
+  return mln_dart_log_callback(state, severity, event, code, message);
+}
