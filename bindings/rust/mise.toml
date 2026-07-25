@@ -25,10 +25,17 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-rpath,$native_install_dir/lib"
+# The sys crate emits its own rpath, but cargo:rustc-link-arg only covers that
+# crate's link targets, so the core and umbrella test binaries need the library
+# located at run time. Resolving it here instead of through RUSTFLAGS keeps the
+# preset out of the compiler command line, which is what sccache keys on: every
+# preset would otherwise get its own copy of every dependency crate.
+lib_dirs="$native_install_dir/lib"
 if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
-  export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,-rpath,$MLN_FFI_VULKAN_LOADER_DIR"
+  lib_dirs="$lib_dirs:$MLN_FFI_VULKAN_LOADER_DIR"
 fi
+export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo test \
   -p maplibre-native-sys \

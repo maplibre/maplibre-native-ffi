@@ -29,6 +29,10 @@ runs:
           third_party/maplibre-native
           .git/modules/third_party/maplibre-native
         key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+        # sync-submodules re-syncs whatever it restores, so an older checkout
+        # turns a pin bump into an incremental fetch instead of a fresh clone.
+        restore-keys: |
+          mln-src-v2-
 
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
