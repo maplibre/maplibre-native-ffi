@@ -197,6 +197,13 @@ def verify_android(root: pathlib.Path) -> None:
                     expected = f"jni/{abi}/{library}"
                     if expected not in names:
                         raise SystemExit(f"{runtime} is missing {expected}")
+                    payload = aar.read(expected)
+                    if not payload.startswith(b"\x7fELF"):
+                        raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
+                    if library == "libc++_shared.so" and b".debug_info" in payload:
+                        raise SystemExit(
+                            f"{runtime} packages unstripped {expected}"
+                        )
 
 
 def verify_jvm(root: pathlib.Path) -> None:
