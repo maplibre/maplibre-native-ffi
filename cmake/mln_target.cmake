@@ -133,6 +133,16 @@ function(mln_configure_shared_exports target)
   endif()
 endfunction()
 
+function(mln_configure_static_cxx_runtime target)
+  # Bundle the C++ runtime so the shared library carries no libstdc++ ABI
+  # requirement from the build host. The C ABI never passes C++ types or
+  # exceptions across the boundary, and the version script plus --exclude-libs
+  # keep the bundled runtime symbols private to the library.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_link_options(${target} PRIVATE -static-libstdc++ -static-libgcc)
+  endif()
+endfunction()
+
 function(mln_configure_install_rpath target)
   if(APPLE)
     set(install_rpath "@loader_path")
@@ -283,6 +293,7 @@ endfunction()
 function(mln_configure_shared_c_api_wrapper target implementation_target)
   mln_configure_c_api_wrapper(${target} ${implementation_target})
   mln_configure_shared_exports(${target})
+  mln_configure_static_cxx_runtime(${target})
   mln_configure_install_rpath(${target})
 endfunction()
 
