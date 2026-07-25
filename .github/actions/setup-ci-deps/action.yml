@@ -67,12 +67,25 @@ runs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
+    # Zig's global cache holds downloaded package tarballs, which keeps SDL's
+    # source dependencies off the network. Windows resolves it under
+    # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
+    - name: Cache Zig packages
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cache/zig
+          ~/AppData/Local/zig
+        key: ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
+
     - name: Cache OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/setup-ohos-sdk
-        key: ohos-sdk-v3-v6.1-${{ runner.os }}-${{ runner.arch }}
+        key: ohos-sdk-v4-v6.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
@@ -90,15 +103,20 @@ runs:
             --repo openharmony-rs/ohos-sdk \
             --pattern "${archive}*"
 
-          cat "${archive}".a* > "$archive"
+          # Stream the parts through sha256sum and tar; holding the parts, a
+          # joined copy, and the extracted tree at once overflows the disk,
+          # which kills the runner agent rather than failing the step.
           expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
-          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          actual_sha="$(cat "${archive}".a* | sha256sum | awk '{print $1}')"
           if [[ "$actual_sha" != "$expected_sha" ]]; then
             echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
             exit 1
           fi
-          tar -xf "$archive"
+          # tar cannot sniff compression from a pipe, so -z is required here.
+          cat "${archive}".a* | tar -xzf -
+          rm -f "${archive}".a*
           unzip -q linux/native-*.zip -d linux
+          rm -f linux/native-*.zip
         fi
 
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"

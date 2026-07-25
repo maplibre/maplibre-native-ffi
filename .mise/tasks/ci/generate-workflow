@@ -9,12 +9,16 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
 OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
-CHECKOUT = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1"
-DOWNLOAD = "actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1"
-UPLOAD = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
 sys.path.insert(0, str(ROOT))
 
+from ci.action_pins import load_pins  # noqa: E402
 from ci.workflow import load_configuration, target_rows  # noqa: E402
+
+# Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
+PINS = load_pins(ROOT)
+CHECKOUT = PINS["actions/checkout"]
+DOWNLOAD = PINS["actions/download-artifact"]
+UPLOAD = PINS["actions/upload-artifact"]
 
 
 def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:

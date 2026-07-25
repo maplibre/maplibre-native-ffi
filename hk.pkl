@@ -14,6 +14,17 @@ local lintSteps = new Mapping<String, Step> {
     glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
     check = "actionlint {{files}}"
   }
+  // Whole-repository check: every reference must agree with the pins catalog,
+  // so it runs whenever any workflow or composite action changes.
+  ["action-pins"] {
+    glob = List(
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      ".github/actions/**/action.yml",
+      ".github/actions/**/action.yaml",
+    )
+    check = "mise run ci:check-action-pins"
+  }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"

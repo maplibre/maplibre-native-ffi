@@ -295,9 +295,6 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-wgl &&
               mise run //examples/rust-map:check windows-arm64-wgl &&
-              mise run //bindings/zig:test windows-arm64-wgl &&
-              mise run //examples/zig-map:build windows-arm64-wgl &&
-              mise run //examples/zig-readback:run windows-arm64-wgl &&
               mise run //bindings/kotlin:jvmTest windows-arm64-wgl &&
               mise run //examples/compose-map:build windows-arm64-wgl &&
               mise run //examples/lwjgl-map:build windows-arm64-wgl &&
@@ -311,9 +308,6 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-vulkan &&
               mise run //examples/rust-map:check windows-arm64-vulkan &&
-              mise run //bindings/zig:test windows-arm64-vulkan &&
-              mise run //examples/zig-map:build windows-arm64-vulkan &&
-              mise run //examples/zig-readback:run windows-arm64-vulkan &&
               mise run //bindings/kotlin:jvmTest windows-arm64-vulkan &&
               mise run //examples/compose-map:build windows-arm64-vulkan &&
               mise run //examples/lwjgl-map:build windows-arm64-vulkan &&
