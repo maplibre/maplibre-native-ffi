@@ -1,3 +1,6 @@
+[tools]
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]

@@ -1,7 +1,7 @@
 tasks:
   install-dependencies:
     name: Install dependencies
-    description: Install the pinned repository tools and dependencies.
+    description: Install pinned shared tools; project tasks install their scoped tools on demand.
     command: |
       mise trust -y
       mise install

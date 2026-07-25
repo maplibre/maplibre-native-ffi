@@ -1,3 +1,17 @@
+[tools]
+# The published devcontainer is the aggregate environment: bake every tool used
+# by a binding, example, or docs project while keeping normal root installs lean.
+"core:dotnet" = "{{vars.dotnet_version}}"
+"core:go" = "{{vars.go_version}}"
+"aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
+"core:java" = "{{vars.java_version}}"
+"aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}"
+"aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+"github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+"conda:doxygen" = { version = "{{vars.doxygen_version}}", os = ["linux", "macos", "windows/x64"] }
+
 [oci]
 from = "ubuntu:24.04"
 tag = "maplibre-native-ffi-devcontainer:local"

@@ -20,9 +20,11 @@ interop or the popular MapLibre Android/iOS SDKs.
 ## Workflow
 
 ```bash
-# Install/refresh system packages, tools, and repository hooks.
+# Install/refresh system packages, shared tools, and repository hooks.
 # On Linux this uses sudo; --yes accepts package-manager prompts.
 mise bootstrap --yes
+
+# Project-specific tools install automatically with namespaced tasks.
 
 # List available tasks across the workspace
 mise tasks --all

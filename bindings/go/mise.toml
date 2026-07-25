@@ -1,3 +1,21 @@
+[tools]
+"core:go" = "{{vars.go_version}}"
+"aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
+
+[tasks._gofumpt-check]
+description = "List Go files that require gofumpt."
+hide = true
+raw_args = true
+dir = "../.."
+run = "gofumpt -l"
+
+[tasks._gofumpt-fix]
+description = "Format Go files with gofumpt."
+hide = true
+raw_args = true
+dir = "../.."
+run = "gofumpt -w"
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
