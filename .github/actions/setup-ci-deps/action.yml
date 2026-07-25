@@ -249,6 +249,15 @@ runs:
       shell: bash
       run: MISE_NO_HOOKS=1 mise install --force rust
 
+    # Project tools live in each project's config, so the root install covers
+    # only the repository-wide set. Installing the rest lazily would leave every
+    # job holding a different subset when the shared mise cache key is saved,
+    # and the winner would decide what later jobs restore. The devcontainer
+    # aggregate is the same set the published image bakes.
+    - name: Install project toolchains
+      shell: bash
+      run: MISE_NO_HOOKS=1 mise -C .devcontainer install
+
     # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
     # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
     # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>

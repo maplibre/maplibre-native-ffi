@@ -31,6 +31,7 @@ jobs:
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run ci:generate-workflow --check
+      - run: mise run ci:generate-devcontainer-tools --check
       - run: dprint output-resolved-config > /dev/null
       - run: mise run fix
       - name: Check generated and formatted files
