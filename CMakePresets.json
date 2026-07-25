@@ -366,68 +366,75 @@
   ],
   "testPresets": [
     {
+      "name": "_test-base",
+      "hidden": true,
+      "description": "Bounds each test so a wedged run reports through ctest instead of consuming the CI job budget.",
+      "output": { "outputOnFailure": true },
+      "execution": { "timeout": 300 }
+    },
+    {
       "name": "linux-x64-egl",
       "configurePreset": "linux-x64-egl",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "linux-x64-vulkan",
       "configurePreset": "linux-x64-vulkan",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "linux-arm64-egl",
       "configurePreset": "linux-arm64-egl",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "linux-arm64-vulkan",
       "configurePreset": "linux-arm64-vulkan",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "macos-arm64-metal",
       "configurePreset": "macos-arm64-metal",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "macos-arm64-vulkan",
       "configurePreset": "macos-arm64-vulkan",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "macos-arm64-egl",
       "configurePreset": "macos-arm64-egl",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "ios-simulator-arm64-metal",
       "configurePreset": "ios-simulator-arm64-metal",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "windows-x64-wgl",
       "configurePreset": "windows-x64-wgl",
       "configuration": "Release",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "windows-x64-vulkan",
       "configurePreset": "windows-x64-vulkan",
       "configuration": "Release",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "windows-arm64-wgl",
       "configurePreset": "windows-arm64-wgl",
       "configuration": "Release",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     },
     {
       "name": "windows-arm64-vulkan",
       "configurePreset": "windows-arm64-vulkan",
       "configuration": "Release",
-      "output": { "outputOnFailure": true }
+      "inherits": "_test-base"
     }
   ],
   "packagePresets": [
