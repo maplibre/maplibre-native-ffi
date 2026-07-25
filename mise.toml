@@ -177,7 +177,7 @@ tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
-pnpm --dir docs exec astro sync
+mise run //docs:install
 hk check --all
 '''
 
@@ -186,7 +186,7 @@ tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
-pnpm --dir docs exec astro sync
+mise run //docs:install
 hk fix --all
 '''
 
