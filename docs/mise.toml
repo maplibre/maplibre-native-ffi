@@ -2,6 +2,16 @@
 "conda:doxygen" = { version = "{{vars.doxygen_version}}", os = ["linux", "macos", "windows/x64"] }
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 
+# The built-in pnpm provider is only active where the lockfile sits, which is
+# the workspace root, so declare this project's install directly. The filter
+# keeps `pnpm install` from reaching across the whole workspace.
+[deps.node-modules]
+auto = true
+description = "Install the docs site's node modules"
+sources = ["package.json", "../pnpm-lock.yaml"]
+outputs = ["node_modules"]
+run = "pnpm install --filter ."
+
 [tasks."api:c"]
 run = [
   "rm -rf doxygen/gen public/reference/c",

@@ -108,6 +108,10 @@ run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
 auto = true
+# Install only the root project. `pnpm install` covers every workspace project
+# regardless of the directory it runs from, which would make each native and
+# binding job install the docs site; docs/mise.toml installs that itself.
+run = "pnpm install --filter ."
 
 [deps.submodules]
 auto = true
