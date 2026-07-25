@@ -1,0 +1,26 @@
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" pnpm build
+'''
+
+[tasks.test]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+pnpm test
+cargo clippy -p maplibre-native-node --all-targets -- -D warnings
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+pnpm test
+cargo clippy -p maplibre-native-node --all-targets -- -D warnings
+'''

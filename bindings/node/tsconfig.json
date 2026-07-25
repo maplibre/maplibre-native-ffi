@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "declaration": false,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2024"
+  },
+  "include": [
+    "*.cjs",
+    "*.d.cts",
+    "*.d.mts",
+    "index.d.ts",
+    "test/**/*.cjs",
+    "test/**/*.cts",
+    "test/**/*.mts"
+  ]
+}

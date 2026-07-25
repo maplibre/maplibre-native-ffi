@@ -1,5 +1,6 @@
 packages:
   - docs
+  - bindings/node
 
 allowBuilds:
   esbuild: true

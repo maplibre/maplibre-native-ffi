@@ -516,14 +516,13 @@ impl PremultipliedRgba8Image {
 pub fn premultiplied_rgba8_image_to_native(
     image: &PremultipliedRgba8Image,
 ) -> sys::mln_premultiplied_rgba8_image {
-    sys::mln_premultiplied_rgba8_image {
-        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
-        width: image.info.width,
-        height: image.info.height,
-        stride: image.info.stride,
-        pixels: image.data.as_ptr(),
-        byte_length: image.data.len(),
-    }
+    let mut raw = unsafe { sys::mln_premultiplied_rgba8_image_default() };
+    raw.width = image.info.width;
+    raw.height = image.info.height;
+    raw.stride = image.info.stride;
+    raw.pixels = image.data.as_ptr();
+    raw.byte_length = image.data.len();
+    raw
 }
 
 /// Copied fixed metadata for one runtime style image.

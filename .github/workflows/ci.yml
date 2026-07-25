@@ -74,6 +74,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test linux-x64-egl &&
               mise run //examples/rust-map:check linux-x64-egl &&
+              mise run //bindings/node:test linux-x64-egl &&
               mise run //bindings/zig:test linux-x64-egl &&
               mise run //examples/zig-map:build linux-x64-egl &&
               mise run //examples/zig-readback:run linux-x64-egl &&
@@ -94,6 +95,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test linux-x64-vulkan &&
               mise run //examples/rust-map:check linux-x64-vulkan &&
+              mise run //bindings/node:test linux-x64-vulkan &&
               mise run //bindings/zig:test linux-x64-vulkan &&
               mise run //examples/zig-map:build linux-x64-vulkan &&
               mise run //examples/zig-readback:run linux-x64-vulkan &&
@@ -114,6 +116,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-egl &&
               mise run //examples/rust-map:check linux-arm64-egl &&
+              mise run //bindings/node:test linux-arm64-egl &&
               mise run //bindings/zig:test linux-arm64-egl &&
               mise run //examples/zig-map:build linux-arm64-egl &&
               mise run //examples/zig-readback:run linux-arm64-egl &&
@@ -134,6 +137,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-vulkan &&
               mise run //examples/rust-map:check linux-arm64-vulkan &&
+              mise run //bindings/node:test linux-arm64-vulkan &&
               mise run //bindings/zig:test linux-arm64-vulkan &&
               mise run //examples/zig-map:build linux-arm64-vulkan &&
               mise run //examples/zig-readback:run linux-arm64-vulkan &&
@@ -153,6 +157,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-metal &&
               mise run //examples/rust-map:check macos-arm64-metal &&
+              mise run //bindings/node:test macos-arm64-metal &&
               mise run //bindings/zig:test macos-arm64-metal &&
               mise run //examples/zig-map:build macos-arm64-metal &&
               mise run //examples/zig-readback:run macos-arm64-metal &&
@@ -174,6 +179,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-vulkan &&
               mise run //examples/rust-map:check macos-arm64-vulkan &&
+              mise run //bindings/node:test macos-arm64-vulkan &&
               mise run //bindings/zig:test macos-arm64-vulkan &&
               mise run //examples/zig-map:build macos-arm64-vulkan &&
               mise run //examples/zig-readback:run macos-arm64-vulkan &&
@@ -193,6 +199,7 @@ jobs:
               mise run test macos-arm64-egl
             consumer_commands: >-
               mise run //bindings/rust:test macos-arm64-egl &&
+              mise run //bindings/node:test macos-arm64-egl &&
               mise run //bindings/zig:test macos-arm64-egl &&
               mise run //examples/zig-map:build macos-arm64-egl &&
               mise run //examples/zig-readback:run macos-arm64-egl &&
@@ -281,6 +288,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-x64-wgl &&
               mise run //examples/rust-map:check windows-x64-wgl &&
+              mise run //bindings/node:test windows-x64-wgl &&
               mise run //bindings/zig:test windows-x64-wgl &&
               mise run //examples/zig-map:build windows-x64-wgl &&
               mise run //examples/zig-readback:run windows-x64-wgl &&
@@ -298,6 +306,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-x64-vulkan &&
               mise run //examples/rust-map:check windows-x64-vulkan &&
+              mise run //bindings/node:test windows-x64-vulkan &&
               mise run //bindings/zig:test windows-x64-vulkan &&
               mise run //examples/zig-map:build windows-x64-vulkan &&
               mise run //examples/zig-readback:run windows-x64-vulkan &&
@@ -315,6 +324,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-wgl &&
               mise run //examples/rust-map:check windows-arm64-wgl &&
+              mise run //bindings/node:test windows-arm64-wgl &&
               mise run //bindings/kotlin:jvmTest windows-arm64-wgl &&
               mise run //examples/compose-map:build windows-arm64-wgl &&
               mise run //examples/lwjgl-map:build windows-arm64-wgl &&
@@ -329,6 +339,7 @@ jobs:
             consumer_commands: >-
               mise run //bindings/rust:test windows-arm64-vulkan &&
               mise run //examples/rust-map:check windows-arm64-vulkan &&
+              mise run //bindings/node:test windows-arm64-vulkan &&
               mise run //bindings/kotlin:jvmTest windows-arm64-vulkan &&
               mise run //examples/compose-map:build windows-arm64-vulkan &&
               mise run //examples/lwjgl-map:build windows-arm64-vulkan &&

@@ -45,7 +45,7 @@ local lintSteps = new Mapping<String, Step> {
       "**/*.svelte",
       "**/*.astro",
     )
-    exclude = List("third_party/**")
+    exclude = List("third_party/**", "bindings/node/test/**")
     check = "pnpm exec vp check --no-fmt {{files}}"
     fix = "pnpm exec vp check --no-fmt --fix {{files}}"
   }
