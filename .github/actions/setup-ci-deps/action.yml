@@ -67,12 +67,9 @@ runs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
-    # Zig unpacks packages into a project-local `zig-pkg/`, but the downloaded
-    # tarballs live in the global cache, shared across every project. Caching
-    # the global cache keeps SDL's ~27 source dependencies (most served by
-    # gitlab.freedesktop.org, which generates archives per request and returns
-    # 5xx under load) off the network. Zig resolves the global cache to
-    # `%LOCALAPPDATA%\zig` on Windows and `~/.cache/zig` everywhere else.
+    # Zig's global cache holds downloaded package tarballs, which keeps SDL's
+    # source dependencies off the network. Windows resolves it under
+    # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
     - name: Cache Zig packages
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -106,19 +103,17 @@ runs:
             --repo openharmony-rs/ohos-sdk \
             --pattern "${archive}*"
 
-          # Stream the split parts through sha256sum and tar rather than
-          # concatenating them to disk first. The runner does not have room for
-          # the parts, a joined copy, and the extracted tree at once, and
-          # overflowing the disk kills the runner agent itself rather than
-          # failing the step. Intermediates are removed as soon as they are
-          # consumed so the cached SDK stays lean too.
+          # Stream the parts through sha256sum and tar; holding the parts, a
+          # joined copy, and the extracted tree at once overflows the disk,
+          # which kills the runner agent rather than failing the step.
           expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
           actual_sha="$(cat "${archive}".a* | sha256sum | awk '{print $1}')"
           if [[ "$actual_sha" != "$expected_sha" ]]; then
             echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
             exit 1
           fi
-          cat "${archive}".a* | tar -xf -
+          # tar cannot sniff compression from a pipe, so -z is required here.
+          cat "${archive}".a* | tar -xzf -
           rm -f "${archive}".a*
           unzip -q linux/native-*.zip -d linux
           rm -f linux/native-*.zip

@@ -1,10 +1,4 @@
-"""Read and verify the third-party GitHub Actions pins catalog.
-
-`.github/workflows/action-pins.yml` is the single source of truth for every
-third-party action this repository uses. It lives under `.github/workflows`
-because that is the only place Dependabot looks, so pins referenced from
-composite actions or from `ci:generate-workflow` stay updated too.
-"""
+"""Read and verify the third-party GitHub Actions pins catalog."""
 
 from __future__ import annotations
 

@@ -57,6 +57,8 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
     for suite in source["suites"]:
         if platform(preset) not in suite["platforms"]:
             continue
+        if preset in suite.get("exclude", []):
+            continue
         for command in suite["commands"]:
             if (
                 command.get("platforms")

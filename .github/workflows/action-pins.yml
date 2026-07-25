@@ -1,15 +1,7 @@
-# Single source of truth for third-party GitHub Actions pins.
-#
-# Dependabot only scans `.github/workflows` and a root `action.yml`, so pins
-# that live anywhere else — composite actions under `.github/actions`, or the
-# `ci:generate-workflow` script — never get updated. Listing every pinned
-# action here puts all of them under Dependabot's watch.
-#
-# `mise run ci:generate-workflow` reads its pins from this file, and
-# `mise run ci:check-action-pins` verifies that every workflow and composite
-# action resolves each action to the same commit and version comment.
-#
-# This workflow exists to be read, not run.
+# Single source of truth for third-party action pins. Dependabot only scans
+# `.github/workflows` and a root `action.yml`, so pins used elsewhere — the
+# composite actions, `ci:generate-workflow` — are listed here to keep them
+# updated. `mise run ci:check-action-pins` verifies every reference agrees.
 name: Action pins
 
 # Deliberately unreachable: this branch is never created, so the job below is
