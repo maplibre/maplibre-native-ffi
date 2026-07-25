@@ -4,8 +4,8 @@
 # updated. `mise run ci:check-action-pins` verifies every reference agrees.
 name: Action pins
 
-# Deliberately unreachable: this branch is never created, so the job below is
-# never scheduled and cannot be dispatched manually.
+# Never runs. The trigger is a branch that is never created, and `!always()` is
+# false by construction, so the steps cannot execute even if someone pushes it.
 on:
   push:
     branches:
@@ -17,6 +17,7 @@ permissions:
 jobs:
   pins:
     name: pins
+    if: ${{ !always() }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
