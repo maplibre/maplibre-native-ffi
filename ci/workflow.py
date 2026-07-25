@@ -124,6 +124,28 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     return commands
 
 
+ZIG_PROJECTS = (
+    "mise run //bindings/zig:",
+    "mise run //examples/zig-map:",
+    "mise run //examples/zig-readback:",
+)
+
+
+def uses_zig(commands: list[str]) -> bool:
+    """Whether a row fetches every Zig project the package cache key covers.
+
+    The key hashes every `build.zig.zon` in the repository and is shared by all
+    rows on the same runner OS and architecture. Cache keys are immutable, so a
+    row that runs only some of those projects would win the key with a cache
+    that is missing the rest, and Zig's fetcher has no retry: the rows that do
+    run the examples would then fail whenever an upstream host is unavailable.
+    """
+    return all(
+        any(command.startswith(project) for command in commands)
+        for project in ZIG_PROJECTS
+    )
+
+
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
@@ -159,6 +181,7 @@ def target_rows(
             "preset": preset,
             "runner": runner(preset),
             "package": preset in packaged,
+            "zig": uses_zig(native + consumers),
             "native_commands": native if preset in packaged else native + consumers,
         }
         if preset in packaged:

@@ -14,6 +14,19 @@ inputs:
     description: R2 S3 secret access key with Object Read & Write (push jobs only)
     required: false
     default: ""
+  zig:
+    description: Restore the Zig package cache and expose its key for a later save
+    required: false
+    default: "false"
+
+outputs:
+  zig-cache-key:
+    description: Key the job saves the Zig package cache under once its checks pass
+    value: ${{ steps.zig-cache-key.outputs.key }}
+  zig-cache-hit:
+    description: Whether the Zig package cache was restored from an exact key match
+    value: ${{ steps.zig-packages.outputs.cache-hit }}
+
 runs:
   using: composite
   steps:
@@ -106,13 +119,30 @@ runs:
     # Zig's global cache holds downloaded package tarballs, which keeps SDL's
     # source dependencies off the network. Windows resolves it under
     # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
-    - name: Cache Zig packages
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+    #
+    # Restore only. `actions/cache` saves in a post step even when the job
+    # failed, so a fetch that died partway published an incomplete cache under
+    # the exact key — and because a key is never overwritten, every later run
+    # restored the same gaps and retried the same downloads, turning one
+    # transient network error into a permanent one. The job saves this cache
+    # itself, after the checks that populate it pass.
+    - name: Compute Zig package cache key
+      if: ${{ inputs.zig == 'true' }}
+      id: zig-cache-key
+      shell: bash
+      run: >-
+        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}"
+        >> "$GITHUB_OUTPUT"
+
+    - name: Restore Zig packages
+      if: ${{ inputs.zig == 'true' }}
+      id: zig-packages
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: |
           ~/.cache/zig
           ~/AppData/Local/zig
-        key: ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}
+        key: ${{ steps.zig-cache-key.outputs.key }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
 

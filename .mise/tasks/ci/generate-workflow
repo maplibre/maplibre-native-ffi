@@ -17,6 +17,7 @@ from ci.workflow import load_configuration, target_rows  # noqa: E402
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
 CHECKOUT = PINS["actions/checkout"]
+CACHE_SAVE = PINS["actions/cache/save"]
 DOWNLOAD = PINS["actions/download-artifact"]
 UPLOAD = PINS["actions/upload-artifact"]
 
@@ -46,16 +47,20 @@ SCCACHE_ENVIRONMENT = (
 )
 
 
-def setup(target: str | None = None) -> list[str]:
+def setup(target: str | None = None, zig: bool = False) -> list[str]:
     lines = [
         f"      - uses: {CHECKOUT}",
         "        with:",
         "          persist-credentials: false",
         "      - uses: ./.github/actions/setup-ci-deps",
-        "        with:",
     ]
+    if zig:
+        lines.append("        id: setup")
+    lines.append("        with:")
     if target:
         lines.append(f"          target: {target}")
+    if zig:
+        lines.append("          zig: ${{ matrix.zig }}")
     lines.extend(
         [
             "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -124,7 +129,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "      matrix:",
         *matrix(rows),
         "    steps:",
-        *setup("${{ matrix.preset }}"),
+        *setup("${{ matrix.preset }}", zig=True),
         "      - name: Run native checks",
         "        run: ${{ matrix.native_commands }}",
         "      - name: Archive native artifact",
@@ -141,6 +146,19 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "        env:",
         '          MISE_TASK_SKIP: "//:build"',
         "        run: ${{ matrix.consumer_commands }}",
+        # Only rows that fetch every Zig project the key covers may claim it;
+        # see `uses_zig`. No status function in the `if`, so `success()` is
+        # implied: a job that fetched only part of its Zig packages before
+        # failing saves nothing, leaving the key free for a later run that
+        # completes the fetch.
+        "      - name: Save Zig packages",
+        "        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}",
+        f"        uses: {CACHE_SAVE}",
+        "        with:",
+        "          path: |",
+        "            ~/.cache/zig",
+        "            ~/AppData/Local/zig",
+        "          key: ${{ steps.setup.outputs.zig-cache-key }}",
         "      - name: Upload native artifact",
         "        if: ${{ matrix.package }}",
         f"        uses: {UPLOAD}",
