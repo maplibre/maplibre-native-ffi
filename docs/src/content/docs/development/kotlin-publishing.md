@@ -107,9 +107,8 @@ Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
 MapLibre Native FFI shared library and the runtime dependencies that the project
 redistributes. The JVM binding extracts that packaged set to a versioned
 directory and loads packaged dependencies before the C API library. Linux hosts
-currently provide zlib and libuv, in addition to the selected graphics loader
-and driver. Explicit native-library path configuration remains available as an
-override.
+still need the selected graphics loader and driver. Explicit native-library path
+configuration remains available as an override.
 
 ## Snapshot publication
 
