@@ -101,7 +101,7 @@ val compileGeneratedJavaCppBindings =
 val packageAndroidNativeLibraries =
   tasks.register("packageAndroidNativeLibraries") {
     group = "build"
-    description = "Packages MapLibre C, JavaCPP JNI, and libc++ libraries for Android."
+    description = "Packages MapLibre C, JavaCPP JNI, and stripped libc++ libraries for Android."
   }
 
 androidTargets.forEach { target ->
@@ -123,9 +123,13 @@ androidTargets.forEach { target ->
   val ndkCompiler = androidNdkPrebuilt.map {
     it.file("bin/${target.ndkCompilerName(androidApiLevel)}${hostPlatform.androidNdkCommandSuffix}")
   }
+  val llvmStrip = androidNdkPrebuilt.map {
+    it.file("bin/llvm-strip${hostPlatform.executableSuffix}")
+  }
   val libcxxShared = androidNdkPrebuilt.map {
     it.file("sysroot/usr/lib/${target.ndkTargetTriple}/libc++_shared.so")
   }
+  val strippedLibcxxShared = targetRoot.map { it.file("stripped/libc++_shared.so") }
 
   val buildNative =
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
@@ -173,14 +177,40 @@ androidTargets.forEach { target ->
       outputs.file(javaCppNativeLibrary)
     }
 
+  val stripLibcxxShared =
+    tasks.register<Exec>("stripAndroidLibcxxShared${target.taskSuffix}") {
+      group = "build"
+      description = "Strips NDK libc++_shared.so for Android ${target.ndkAbi}."
+      inputs.file(libcxxShared).withPropertyName("libcxxShared")
+      inputs.file(llvmStrip).withPropertyName("llvmStrip")
+      outputs.file(strippedLibcxxShared)
+      doFirst { strippedLibcxxShared.get().asFile.parentFile.mkdirs() }
+      executable(llvmStrip.get().asFile.absolutePath)
+      args(
+        "--strip-unneeded",
+        "-o",
+        strippedLibcxxShared.get().asFile.absolutePath,
+        libcxxShared.get().asFile.absolutePath,
+      )
+      doLast {
+        val asLatin1 = strippedLibcxxShared.get().asFile.readBytes().toString(Charsets.ISO_8859_1)
+        check(asLatin1.startsWith("\u007fELF")) {
+          "Stripped libc++_shared.so for ${target.ndkAbi} is not a valid ELF shared library"
+        }
+        check(".debug_info" !in asLatin1) {
+          "Stripped libc++_shared.so for ${target.ndkAbi} still contains .debug_info"
+        }
+      }
+    }
+
   val packageTarget =
     tasks.register<Sync>("packageAndroidNativeLibraries${target.taskSuffix}") {
       description = "Packages Android ${target.ndkAbi} native libraries."
-      dependsOn(generateJavaCppNativeLibrary)
+      dependsOn(generateJavaCppNativeLibrary, stripLibcxxShared)
       into(packageDir)
       from(nativeLibrary) { into(target.ndkAbi) }
       from(javaCppNativeLibrary) { into(target.ndkAbi) }
-      from(libcxxShared) { into(target.ndkAbi) }
+      from(strippedLibcxxShared) { into(target.ndkAbi) }
     }
 
   packageAndroidNativeLibraries.configure { dependsOn(packageTarget) }
