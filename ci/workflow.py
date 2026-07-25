@@ -118,6 +118,20 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     return commands
 
 
+def uses_zig(commands: list[str]) -> bool:
+    """Whether a row runs Zig, and so populates the Zig package cache.
+
+    Rows that never fetch Zig packages must not restore or save that cache: the
+    key is shared by every row on the same runner OS and architecture, and cache
+    keys are immutable, so an empty save from an Android or iOS row would deny
+    the Zig rows a complete cache for as long as the key stays current.
+    """
+    return any(
+        command.startswith(("mise run //bindings/zig:", "mise run //examples/zig-"))
+        for command in commands
+    )
+
+
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
@@ -153,6 +167,7 @@ def target_rows(
             "preset": preset,
             "runner": runner(preset),
             "package": preset in packaged,
+            "zig": uses_zig(native + consumers),
             "native_commands": native if preset in packaged else native + consumers,
         }
         if preset in packaged:

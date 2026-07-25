@@ -67,6 +67,7 @@ jobs:
           - preset: linux-x64-egl
             runner: ubuntu-latest
             package: true
+            zig: true
             native_commands: >-
               mise run test linux-x64-egl
             consumer_commands: >-
@@ -86,6 +87,7 @@ jobs:
           - preset: linux-x64-vulkan
             runner: ubuntu-latest
             package: true
+            zig: true
             native_commands: >-
               mise run test linux-x64-vulkan
             consumer_commands: >-
@@ -105,6 +107,7 @@ jobs:
           - preset: linux-arm64-egl
             runner: ubuntu-24.04-arm
             package: true
+            zig: true
             native_commands: >-
               mise run test linux-arm64-egl
             consumer_commands: >-
@@ -123,6 +126,7 @@ jobs:
           - preset: linux-arm64-vulkan
             runner: ubuntu-24.04-arm
             package: true
+            zig: true
             native_commands: >-
               mise run test linux-arm64-vulkan
             consumer_commands: >-
@@ -141,6 +145,7 @@ jobs:
           - preset: macos-arm64-metal
             runner: macos-26
             package: true
+            zig: true
             native_commands: >-
               mise run test macos-arm64-metal
             consumer_commands: >-
@@ -161,6 +166,7 @@ jobs:
           - preset: macos-arm64-vulkan
             runner: macos-26
             package: true
+            zig: true
             native_commands: >-
               mise run test macos-arm64-vulkan
             consumer_commands: >-
@@ -180,6 +186,7 @@ jobs:
           - preset: macos-arm64-egl
             runner: macos-26
             package: true
+            zig: true
             native_commands: >-
               mise run test macos-arm64-egl
             consumer_commands: >-
@@ -198,6 +205,7 @@ jobs:
           - preset: ios-arm64-metal
             runner: macos-26
             package: true
+            zig: false
             native_commands: >-
               mise run build ios-arm64-metal
             consumer_commands: >-
@@ -207,6 +215,7 @@ jobs:
           - preset: ios-simulator-arm64-metal
             runner: macos-26
             package: true
+            zig: true
             native_commands: >-
               mise run test ios-simulator-arm64-metal
             consumer_commands: >-
@@ -218,6 +227,7 @@ jobs:
           - preset: android-arm64-egl
             runner: ubuntu-latest
             package: true
+            zig: false
             native_commands: >-
               mise run build android-arm64-egl
             consumer_commands: >-
@@ -226,6 +236,7 @@ jobs:
           - preset: android-arm64-vulkan
             runner: ubuntu-latest
             package: true
+            zig: false
             native_commands: >-
               mise run build android-arm64-vulkan
             consumer_commands: >-
@@ -233,6 +244,7 @@ jobs:
           - preset: android-x64-egl
             runner: ubuntu-latest
             package: true
+            zig: false
             native_commands: >-
               mise run build android-x64-egl
             consumer_commands: >-
@@ -241,6 +253,7 @@ jobs:
           - preset: android-x64-vulkan
             runner: ubuntu-latest
             package: true
+            zig: false
             native_commands: >-
               mise run build android-x64-vulkan
             consumer_commands: >-
@@ -248,16 +261,19 @@ jobs:
           - preset: ohos-arm64-egl
             runner: ubuntu-latest
             package: false
+            zig: false
             native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-egl
           - preset: ohos-arm64-vulkan
             runner: ubuntu-latest
             package: false
+            zig: false
             native_commands: >-
               mise run //bindings/rust:build:ohos ohos-arm64-vulkan
           - preset: windows-x64-wgl
             runner: windows-2022
             package: true
+            zig: true
             native_commands: >-
               mise run test windows-x64-wgl
             consumer_commands: >-
@@ -274,6 +290,7 @@ jobs:
           - preset: windows-x64-vulkan
             runner: windows-2022
             package: true
+            zig: true
             native_commands: >-
               mise run test windows-x64-vulkan
             consumer_commands: >-
@@ -290,6 +307,7 @@ jobs:
           - preset: windows-arm64-wgl
             runner: windows-11-arm
             package: true
+            zig: false
             native_commands: >-
               mise run test windows-arm64-wgl
             consumer_commands: >-
@@ -303,6 +321,7 @@ jobs:
           - preset: windows-arm64-vulkan
             runner: windows-11-arm
             package: true
+            zig: false
             native_commands: >-
               mise run test windows-arm64-vulkan
             consumer_commands: >-
@@ -321,7 +340,7 @@ jobs:
         id: setup
         with:
           target: ${{ matrix.preset }}
-          zig: "true"
+          zig: ${{ matrix.zig }}
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - name: Run native checks
@@ -341,7 +360,7 @@ jobs:
           MISE_TASK_SKIP: "//:build"
         run: ${{ matrix.consumer_commands }}
       - name: Save Zig packages
-        if: ${{ matrix.package && steps.setup.outputs.zig-cache-hit != 'true' }}
+        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |

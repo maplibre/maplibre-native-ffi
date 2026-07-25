@@ -60,7 +60,7 @@ def setup(target: str | None = None, zig: bool = False) -> list[str]:
     if target:
         lines.append(f"          target: {target}")
     if zig:
-        lines.append('          zig: "true"')
+        lines.append("          zig: ${{ matrix.zig }}")
     lines.extend(
         [
             "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -146,11 +146,12 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "        env:",
         '          MISE_TASK_SKIP: "//:build"',
         "        run: ${{ matrix.consumer_commands }}",
-        # No status function in the `if`, so `success()` is implied: a job that
+        # Only rows that actually run Zig may claim the key; see `uses_zig`. No
+        # status function in the `if`, so `success()` is implied: a job that
         # fetched only part of its Zig packages before failing saves nothing,
         # leaving the key free for a later run that completes the fetch.
         "      - name: Save Zig packages",
-        "        if: ${{ matrix.package && steps.setup.outputs.zig-cache-hit != 'true' }}",
+        "        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}",
         f"        uses: {CACHE_SAVE}",
         "        with:",
         "          path: |",
