@@ -69,6 +69,36 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-
 
+    # uv, pnpm, NuGet, and Go each default to a different per-OS cache location,
+    # and some of those paths carry a tool-version suffix. Pinning them under
+    # one directory keeps a single cache entry accurate on every runner. Windows
+    # tools need a native path, so prefer USERPROFILE with forward slashes.
+    - name: Pin package download caches
+      shell: bash
+      run: |
+        if [[ -n "${USERPROFILE:-}" ]]; then
+          home="${USERPROFILE//\\//}"
+        else
+          home="$HOME"
+        fi
+        cache_root="$home/.ci-package-cache"
+        {
+          echo "UV_CACHE_DIR=$cache_root/uv"
+          echo "npm_config_store_dir=$cache_root/pnpm"
+          echo "NUGET_PACKAGES=$cache_root/nuget"
+          # bindings/go declares no module requirements, so only the build cache
+          # is worth carrying between jobs.
+          echo "GOCACHE=$cache_root/go-build"
+        } >> "$GITHUB_ENV"
+
+    - name: Cache package downloads
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/.ci-package-cache
+        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v1-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', '**/dotnet-tools.json', '**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-pkg-v1-
+
     # Zig's global cache holds downloaded package tarballs, which keeps SDL's
     # source dependencies off the network. Windows resolves it under
     # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
