@@ -8,12 +8,7 @@ fi
 
 repo_root="${MISE_MONOREPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 
-# mise x installs the docs project's node modules on demand, so linting mdx
-# works without every other project installing the docs site.
-if [[ "${MLN_DPRINT_SCOPED_TOOLS:-}" != "1" ]]; then
-  exec mise -C "$repo_root/docs" x -- \
-    env MLN_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-mdxlint" "$@"
-fi
-
+# The workspace-wide pnpm install covers the docs site, and pnpm is a
+# repository-wide tool, so mdxlint runs without a project-scoped tool hop.
 cd "$repo_root/docs"
 exec pnpm exec mdxlint --rc-path .mdxlintrc.json --file-path "$1"

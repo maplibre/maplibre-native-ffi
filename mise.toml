@@ -107,11 +107,10 @@ auto = true
 run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
+# The built-in provider runs pnpm directly. A `run` script would go through Git
+# Bash, and on Windows ARM64 the lifecycle scripts pnpm spawns through cmd then
+# fail to resolve mise's node, so the workspace-wide install stays.
 auto = true
-# Install only the root project. `pnpm install` covers every workspace project
-# regardless of the directory it runs from, which would make each native and
-# binding job install the docs site; docs/mise.toml installs that itself.
-run = "pnpm install --filter ."
 
 [deps.submodules]
 auto = true
