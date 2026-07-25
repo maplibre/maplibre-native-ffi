@@ -38,6 +38,11 @@ targets are all supported by one backend may depend on that runtime from
 `commonMain`. Applications using different backends select runtime publications
 from their platform source sets.
 
+Every `maplibre-native-ffi` module attaches Dokka-generated API documentation as
+its Maven javadoc artifact. The generated site covers the common API and each
+platform API. The runtime modules carry no public API, so their javadoc
+artifacts remain empty placeholders for the Central requirement.
+
 ```kotlin
 commonMain.dependencies {
   implementation("org.maplibre.nativeffi:maplibre-native-ffi:$version")
@@ -140,6 +145,7 @@ The initial snapshot workflow validates:
 - native archive presence in published KLIBs;
 - JNI library and Rustls helper presence in Android AARs;
 - native resource presence in JVM classifier JARs;
+- Dokka-generated API pages in every API-bearing javadoc JAR;
 - published JVM consumption through the Compose and LWJGL examples;
 - published Android consumption through the Android map example.
 
