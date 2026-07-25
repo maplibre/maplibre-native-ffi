@@ -4,10 +4,8 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  linux-arm64-*) kotlin_target=linuxArm64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  windows-*) kotlin_target= ;;
+  linux-*|windows-*) kotlin_target= ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2
@@ -28,10 +26,8 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  linux-arm64-*) kotlin_target=linuxArm64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  windows-*) kotlin_target= ;;
+  linux-*|windows-*) kotlin_target= ;;
   *)
     echo "Unsupported Kotlin test preset: $usage_preset" >&2
     exit 2
@@ -62,8 +58,6 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 case "$usage_preset" in
-  linux-x64-*) kotlin_target=linuxX64 ;;
-  linux-arm64-*) kotlin_target=linuxArm64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   *)
     echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2

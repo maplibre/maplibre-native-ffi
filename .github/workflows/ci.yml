@@ -76,7 +76,6 @@ jobs:
               mise run //examples/zig-map:build linux-x64-egl &&
               mise run //examples/zig-readback:run linux-x64-egl &&
               mise run //bindings/kotlin:jvmTest linux-x64-egl &&
-              mise run //bindings/kotlin:nativeTest linux-x64-egl &&
               mise run //examples/compose-map:build linux-x64-egl &&
               mise run //examples/lwjgl-map:build linux-x64-egl &&
               mise run //bindings/swift:test linux-x64-egl &&
@@ -95,7 +94,6 @@ jobs:
               mise run //examples/zig-map:build linux-x64-vulkan &&
               mise run //examples/zig-readback:run linux-x64-vulkan &&
               mise run //bindings/kotlin:jvmTest linux-x64-vulkan &&
-              mise run //bindings/kotlin:nativeTest linux-x64-vulkan &&
               mise run //examples/compose-map:build linux-x64-vulkan &&
               mise run //examples/lwjgl-map:build linux-x64-vulkan &&
               mise run //bindings/swift:test linux-x64-vulkan &&

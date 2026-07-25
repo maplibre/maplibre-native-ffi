@@ -20,9 +20,6 @@ val packagedAndroidNativeLibs =
 kotlin {
   jvm { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
-  linuxX64()
-  linuxArm64()
-
   android {
     namespace = "org.maplibre.nativeffi.runtime.vulkan"
     compileSdk = libs.versions.android.compileSdk.get().toInt()

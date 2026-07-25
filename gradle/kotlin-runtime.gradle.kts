@@ -44,14 +44,15 @@ fun nativeTargets(
   targetFamily: MaplibreRuntimeTargetFamily,
 ): Map<String, NativeTargetConfiguration> =
   when (targetFamily) {
+    // The OpenGL and Vulkan runtimes reach Linux through the JVM and Android
+    // artifacts. Kotlin/Native links the runtime archive statically, and its
+    // Linux toolchain targets a far older glibc than the archive requires, so
+    // these backends register no Kotlin/Native targets.
     MaplibreRuntimeTargetFamily.LINUX -> {
       require(backend != MaplibreRuntimeBackend.METAL) {
-        "Metal does not support Linux Kotlin/Native targets"
+        "Metal does not support the Linux runtime target family"
       }
-      mapOf(
-        "linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-x64"),
-        "linuxArm64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-arm64"),
-      )
+      emptyMap()
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
       require(backend == MaplibreRuntimeBackend.METAL) {
@@ -330,12 +331,7 @@ canonicalizeKmpRootMetadata(
   targetModules =
     when (targetFamily) {
       MaplibreRuntimeTargetFamily.LINUX ->
-        mapOf(
-          "android" to "$mavenArtifact-android",
-          "jvm" to "$mavenArtifact-jvm",
-          "linuxArm64" to "$mavenArtifact-linuxarm64",
-          "linuxX64" to "$mavenArtifact-linuxx64",
-        )
+        mapOf("android" to "$mavenArtifact-android", "jvm" to "$mavenArtifact-jvm")
       MaplibreRuntimeTargetFamily.APPLE ->
         mapOf(
           "iosArm64" to "$mavenArtifact-iosarm64",
