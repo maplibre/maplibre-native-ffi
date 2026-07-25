@@ -27,40 +27,70 @@ before implementing or reviewing a binding.
 
 ## Getting Set Up
 
-Install the platform toolchain:
+Install the platform prerequisites:
 
-- On macOS, install the Xcode version listed in `.xcode-version`, or a recent
-  compatible Xcode. Run the pinned
-  [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
-  switch to the repository version.
-- On Fedora, install the `C Development Tools and Libraries` package group with
-  `sudo dnf group install c-development`.
-- On Debian or Ubuntu, install the C and C++ compiler packages with
-  `sudo apt install build-essential`.
-- On Windows, install a recent version of Visual Studio Community (or Build
-  Tools) 2022 with the `Desktop development with C++` workload and
-  `Git for Windows`. We rely on Git Bash to run project scripts.
+- On macOS Apple Silicon, install Homebrew and Xcode 26.0.1. Mise bootstrap
+  installs the required Homebrew packages.
+- On Linux, mise bootstrap installs the compiler and development libraries
+  through apt on Ubuntu and dnf on Fedora. On other distributions, install the
+  packages analogous to those listed in `mise.linux.toml`.
+- For Android, install the Android SDK packages pinned in `mise.toml`.
+- For OpenHarmony, install the native component of an API 24 SDK.
 
-Install [`mise`](https://mise.jdx.dev/), then install pinned project tools and
-run repository setup hooks:
+On Windows, run these commands from PowerShell:
 
-```bash
-mise install
+```powershell
+winget install --exact --id Git.Git
+winget install --exact --id KhronosGroup.VulkanSDK
+winget install --exact --id LLVM.LLVM
+winget install --exact --id Microsoft.VisualStudio.2022.BuildTools --override "--passive --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --add Microsoft.VisualStudio.Component.VC.Tools.ARM64"
 ```
 
-The setup hooks install project dependencies and initialize the MapLibre Native
-submodule at `third_party/maplibre-native`.
+The Visual Studio command installs the Desktop development with C++ workload,
+the recommended x64 tools and Windows SDK, and the ARM64 build tools. Project
+tasks run in Git Bash.
 
-Run the Zig map example as a smoke test:
+Install [`mise`](https://mise.jdx.dev/), then bootstrap system packages, install
+pinned project tools, and run repository setup hooks:
 
 ```bash
-mise run //examples/zig-map:run:owned-texture
+mise trust
+mise bootstrap --yes
 ```
 
-Mise selects the native build profile that matches your host when one is
-available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
-`mise -E <variant> run ...`, to build, test, or run examples for another
-platform and render backend.
+Android and OpenHarmony builds require their SDK paths in environment variables.
+Put the absolute paths in the Git-ignored `mise.local.toml` at the repository
+root:
+
+```toml
+[env]
+ANDROID_HOME = "/home/you/Android/Sdk"
+OHOS_SDK_NATIVE = "/home/you/HarmonyOS/command-line-tools/sdk/default/openharmony/native"
+```
+
+Mise loads `mise.local.toml` automatically. The Android tool versions are
+environment variables in `mise.toml` and may also be overridden locally.
+
+Run the headless Zig readback example:
+
+```bash
+mise run //examples/zig-readback:run
+```
+
+The default host preset uses Metal on macOS and Vulkan on Linux and Windows.
+Pass another preset to select a different native target or backend:
+
+```bash
+mise run build linux-x64-egl
+```
+
+## Compiler Cache
+
+Native builds use [`sccache`](https://github.com/mozilla/sccache) through mise.
+`mise.toml` pins the tool and sets the public read-only R2 backend plus CMake
+compiler-launcher env, so `mise run build` and other mise tasks pick up the
+shared cache automatically. CI overrides those settings with write credentials
+when available.
 
 ## Common Commands
 
@@ -85,25 +115,15 @@ mise run //docs:build
 
 This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
-model.
-
-Project-managed dependency state keeps builds reproducible. Mise supplies
-repository tools, owns task execution, and exports the environment consumed by
-build systems, bindings, and examples. Pixi currently supplies desktop native
-libraries from [`conda-forge`](https://conda-forge.org/). Platform SDKs such as
-Xcode, Visual Studio, Linux compiler packages, and the Android SDK remain host
+model. Platform SDKs such as Xcode, Visual Studio, and the Android SDK are host
 toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
-tools, installs Git hooks, selects backend variants, and runs repository tasks.
-Use `mise run ...` for common workflows: build, test, check, fix, and examples.
-Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
-and pnpm.
-
-[`pixi`](https://pixi.sh/) installs the desktop native libraries used by local
-builds. CMake, Ninja, pkg-config, shader tools, Doxygen, and clang-tidy are
-pinned by mise. Host platform toolchains provide C and C++ compilers, and CMake
-builds the native C/C++ library.
+tools, installs system packages and Git hooks, and runs repository tasks. CMake
+presets define native targets and render backends. CMake uses platform SDKs and
+system libraries where available, and acquires pinned native libraries that are
+not available from system package managers. Gradle selects CMake presets and
+packages Android applications.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
@@ -122,8 +142,9 @@ build the documentation site. Generated API reference HTML is installed into
 ## Tests And Examples
 
 Every feature needs automated CI coverage when practical. The root
-`mise run test` command builds the native library and runs the direct Zig C API
-suite. Language binding suites run through their binding-specific CI tasks.
+`mise run test` command builds the native library and runs the direct C API
+suite through CTest and Unity. Language binding suites run through their
+binding-specific CI tasks.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.

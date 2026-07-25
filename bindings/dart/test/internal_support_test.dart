@@ -2,6 +2,7 @@ import 'dart:ffi';
 import 'dart:isolate';
 
 import 'package:maplibre_native_ffi/src/error/maplibre_exception.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/callback/callback_state.dart';
 import 'package:maplibre_native_ffi/src/internal/lifecycle/lifecycle.dart';
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
@@ -21,6 +22,25 @@ final class _FakeCallbackState extends RetainedCallbackState {
 
 void main() {
   group('status conversion', () {
+    test('ABI mismatch has a stable public error category', () {
+      expect(
+        () => validateCAbiVersion(expectedCAbiVersion + 1),
+        throwsA(
+          isA<AbiVersionMismatchException>()
+              .having(
+                (error) => error.status,
+                'status',
+                MaplibreStatus.abiVersionMismatch,
+              )
+              .having(
+                (error) => error.diagnostic,
+                'diagnostic',
+                contains('expected $expectedCAbiVersion'),
+              ),
+        ),
+      );
+    });
+
     test('ok status returns without reading diagnostics', () {
       var diagnosticReads = 0;
 
@@ -32,19 +52,58 @@ void main() {
       expect(diagnosticReads, 0);
     });
 
-    test('native failure maps status and copies diagnostic', () {
+    test('native failures map every known status category', () {
+      final cases = <(int, Type)>[
+        (nativeStatusInvalidArgument, InvalidArgumentException),
+        (nativeStatusInvalidState, InvalidStateException),
+        (nativeStatusWrongThread, WrongThreadException),
+        (nativeStatusUnsupported, UnsupportedFeatureException),
+        (nativeStatusNativeError, NativeErrorException),
+      ];
+
+      for (final (status, type) in cases) {
+        try {
+          checkNativeStatus(status, () => 'diagnostic $status');
+          fail('status $status unexpectedly succeeded');
+        } on MaplibreException catch (error) {
+          expect(error.runtimeType, type);
+          expect(error.nativeStatusCode, status);
+          expect(error.diagnostic, 'diagnostic $status');
+        }
+      }
+    });
+
+    test('unknown native status and copied diagnostic remain available', () {
+      var nativeDiagnostic = 'first diagnostic';
+      late MaplibreException error;
+
+      try {
+        checkNativeStatus(-999, () => nativeDiagnostic);
+        fail('unknown status unexpectedly succeeded');
+      } on MaplibreException catch (caught) {
+        error = caught;
+      }
+      nativeDiagnostic = 'later diagnostic';
+
+      expect(error.status.name, 'unknown');
+      expect(error.nativeStatusCode, -999);
+      expect(error.diagnostic, 'first diagnostic');
+    });
+
+    test('binding validation produces a fresh binding diagnostic', () {
       expect(
-        () => checkNativeStatus(
-          nativeStatusWrongThread,
-          () => 'owner thread mismatch',
-        ),
+        () => throwInvalidArgument('fresh binding diagnostic'),
         throwsA(
-          isA<WrongThreadException>()
-              .having((error) => error.nativeStatusCode, 'nativeStatusCode', -3)
+          isA<InvalidArgumentException>()
+              .having(
+                (error) => error.nativeStatusCode,
+                'nativeStatusCode',
+                isNull,
+              )
               .having(
                 (error) => error.diagnostic,
                 'diagnostic',
-                'owner thread mismatch',
+                'fresh binding diagnostic',
               ),
         ),
       );
@@ -89,6 +148,7 @@ void main() {
 
       state.close();
       expect(state.closes, 0);
+      expect(state.runUpcall(() {}), isFalse);
 
       await Future<void>.delayed(Duration.zero);
       expect(state.closes, 1);

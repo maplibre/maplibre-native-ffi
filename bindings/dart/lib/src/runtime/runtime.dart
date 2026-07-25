@@ -16,6 +16,7 @@ import '../internal/status/status.dart';
 import '../internal/struct/geometry.dart' as native_geometry;
 import '../internal/struct/json.dart' as native_json;
 import '../internal/struct/struct.dart' as native_struct;
+import '../internal/value/uint64.dart';
 import '../json/json.dart';
 import '../offline/offline.dart';
 import '../query/query.dart';
@@ -40,7 +41,10 @@ typedef ResourceProviderCallback =
 /// Owner-isolate resource provider definition.
 final class ResourceProvider {
   /// Creates a resource provider with native-owned routing rules.
-  const ResourceProvider({required this.routes, required this.callback});
+  ResourceProvider({
+    required List<ResourceProviderRoute> routes,
+    required this.callback,
+  }) : routes = List.unmodifiable(routes);
 
   /// Exact routes handled by this provider.
   final List<ResourceProviderRoute> routes;
@@ -61,7 +65,7 @@ final class RuntimeOptions {
   final String? cachePath;
 
   /// Maximum ambient cache size in bytes.
-  final int? maximumCacheSize;
+  final BigInt? maximumCacheSize;
 }
 
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
@@ -71,6 +75,7 @@ final class RuntimeHandle {
 
   final NativeHandleState<raw.mln_runtime> _state;
   final _maps = <int, WeakReference<MapHandle>>{};
+  final _offlineOperations = <int, WeakReference<OfflineOperationHandle>>{};
   _ResourceTransformState? _resourceTransformState;
   _ResourceProviderRulesState? _resourceProviderRulesState;
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
@@ -168,7 +173,7 @@ final class RuntimeHandle {
       });
       _resourceProviderRulesState?.close();
       _resourceProviderRulesState = state;
-      _resourceProviderCallbackState?.close();
+      _resourceProviderCallbackState?.retire();
       _resourceProviderCallbackState = null;
     } catch (_) {
       state.close();
@@ -191,7 +196,7 @@ final class RuntimeHandle {
           _c.raw.mln_runtime_set_resource_provider(_pointer, nativeProvider),
         );
       });
-      _resourceProviderCallbackState?.close();
+      _resourceProviderCallbackState?.retire();
       _resourceProviderCallbackState = state;
       _resourceProviderRulesState?.close();
       _resourceProviderRulesState = null;
@@ -445,6 +450,14 @@ final class RuntimeHandle {
     }
   }
 
+  void _registerOfflineOperation(OfflineOperationHandle operation) {
+    _offlineOperations[operation._id] = WeakReference(operation);
+  }
+
+  void _unregisterOfflineOperation(int id) {
+    _offlineOperations.remove(id);
+  }
+
   void _handleRuntimeEvent(RuntimeEvent event) {
     if (event.sourceType !=
         raw.mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP.value) {
@@ -454,10 +467,10 @@ final class RuntimeHandle {
         raw.mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.value) {
       return;
     }
-    final reference = _maps[event.sourceAddress];
+    final reference = _maps[event._sourceAddress];
     final map = reference?.target;
     if (map == null) {
-      _maps.remove(event.sourceAddress);
+      _maps.remove(event._sourceAddress);
       return;
     }
     map._clearCustomGeometryCallbacksAfterUrlStyleLoad();
@@ -465,6 +478,22 @@ final class RuntimeHandle {
 
   /// Explicitly destroys this runtime.
   void close() {
+    final collectedOperationIds = _offlineOperations.entries
+        .where((entry) => entry.value.target == null)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    for (final operationId in collectedOperationIds) {
+      _check(
+        _c.raw.mln_runtime_offline_operation_discard(_pointer, operationId),
+      );
+      _offlineOperations.remove(operationId);
+    }
+    if (_offlineOperations.isNotEmpty) {
+      throwInvalidState(
+        'RuntimeHandle has ${_offlineOperations.length} live offline '
+        'operation(s); take or discard every result before closing',
+      );
+    }
     _state.close(
       (pointer) => _c.raw.mln_runtime_destroy(pointer).value,
       _c.threadLastErrorMessage,
@@ -473,7 +502,7 @@ final class RuntimeHandle {
     _resourceTransformState = null;
     _resourceProviderRulesState?.close();
     _resourceProviderRulesState = null;
-    _resourceProviderCallbackState?.close();
+    _resourceProviderCallbackState?.retire();
     _resourceProviderCallbackState = null;
   }
 }
@@ -484,13 +513,13 @@ final class RuntimeEvent {
     required this.eventType,
     required this.sourceType,
     required this.source,
-    required this.sourceAddress,
+    required int sourceAddress,
     required this.code,
     required this.payloadType,
     required this.payload,
     required this.payloadSize,
     required this.message,
-  });
+  }) : _sourceAddress = sourceAddress;
 
   factory RuntimeEvent._fromNative(
     raw.mln_runtime_event event,
@@ -504,7 +533,7 @@ final class RuntimeEvent {
       sourceAddress: event.source.address,
       code: event.code,
       payloadType: event.payload_type,
-      payload: RuntimeEventPayload._fromNative(event),
+      payload: RuntimeEventPayload._fromNative(event, runtime),
       payloadSize: event.payload_size,
       message: _copyNativeString(event.message, event.message_size),
     );
@@ -522,8 +551,7 @@ final class RuntimeEvent {
   /// Typed event source, preserving unknown raw values.
   final RuntimeEventSource source;
 
-  /// Borrowed native source handle address copied as an opaque value.
-  final int sourceAddress;
+  final int _sourceAddress;
 
   /// Native event code.
   final int code;
@@ -674,7 +702,7 @@ final class RuntimeEventSourceType {
 
 /// Typed runtime event source copied from the native event.
 sealed class RuntimeEventSource {
-  const RuntimeEventSource(this.sourceType, this.address);
+  const RuntimeEventSource(this.sourceType);
 
   factory RuntimeEventSource._fromNative(
     raw.mln_runtime_event event,
@@ -683,31 +711,29 @@ sealed class RuntimeEventSource {
     final sourceType = RuntimeEventSourceType.fromRawValue(event.source_type);
     final address = event.source.address;
     if (sourceType == RuntimeEventSourceType.runtime) {
-      return RuntimeRuntimeEventSource(runtime, address: address);
+      return RuntimeRuntimeEventSource(runtime);
     }
     if (sourceType == RuntimeEventSourceType.map) {
       final map = runtime._maps[address]?.target;
-      return MapRuntimeEventSource(map, address: address);
+      return MapRuntimeEventSource(map);
     }
-    return UnknownRuntimeEventSource(sourceType, address: address);
+    return UnknownRuntimeEventSource(sourceType);
   }
 
   final RuntimeEventSourceType sourceType;
-  final int address;
 }
 
 /// Runtime-scoped event source.
 final class RuntimeRuntimeEventSource extends RuntimeEventSource {
-  const RuntimeRuntimeEventSource(this.runtime, {required int address})
-    : super(RuntimeEventSourceType.runtime, address);
+  const RuntimeRuntimeEventSource(this.runtime)
+    : super(RuntimeEventSourceType.runtime);
 
   final RuntimeHandle runtime;
 }
 
 /// Map-scoped event source.
 final class MapRuntimeEventSource extends RuntimeEventSource {
-  const MapRuntimeEventSource(this.map, {required int address})
-    : super(RuntimeEventSourceType.map, address);
+  const MapRuntimeEventSource(this.map) : super(RuntimeEventSourceType.map);
 
   /// Map handle when still alive in this runtime.
   final MapHandle? map;
@@ -715,10 +741,7 @@ final class MapRuntimeEventSource extends RuntimeEventSource {
 
 /// Unknown event source type.
 final class UnknownRuntimeEventSource extends RuntimeEventSource {
-  const UnknownRuntimeEventSource(
-    RuntimeEventSourceType sourceType, {
-    required int address,
-  }) : super(sourceType, address);
+  const UnknownRuntimeEventSource(super.sourceType);
 }
 
 /// Render mode reported by render event payloads.
@@ -879,7 +902,10 @@ final class OfflineOperationResultKind {
 sealed class RuntimeEventPayload {
   const RuntimeEventPayload(this.rawPayloadType, this.payloadSize);
 
-  factory RuntimeEventPayload._fromNative(raw.mln_runtime_event event) {
+  factory RuntimeEventPayload._fromNative(
+    raw.mln_runtime_event event,
+    RuntimeHandle runtime,
+  ) {
     final rawPayloadType = event.payload_type;
     final payloadSize = event.payload_size;
     if (rawPayloadType == 0) {
@@ -1000,7 +1026,7 @@ sealed class RuntimeEventPayload {
             rawPayloadType: rawPayloadType,
             payloadSize: payloadSize,
             regionId: value.region_id,
-            limit: value.limit,
+            limit: uint64FromNative(value.limit),
           );
         },
       ),
@@ -1014,7 +1040,7 @@ sealed class RuntimeEventPayload {
           return RuntimeEventOfflineOperationCompleted(
             rawPayloadType: rawPayloadType,
             payloadSize: payloadSize,
-            operationId: value.operation_id,
+            operation: runtime._offlineOperations[value.operation_id]?.target,
             operationKind: OfflineOperationKind.fromRawValue(
               value.operation_kind,
             ),
@@ -1147,7 +1173,7 @@ final class RuntimeEventOfflineRegionTileCountLimit
   }) : super(rawPayloadType, payloadSize);
 
   final int regionId;
-  final int limit;
+  final BigInt limit;
 }
 
 /// Offline operation completion event payload.
@@ -1155,7 +1181,7 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
   const RuntimeEventOfflineOperationCompleted({
     required int rawPayloadType,
     required int payloadSize,
-    required this.operationId,
+    required this.operation,
     required this.operationKind,
     required this.rawOperationKind,
     required this.resultKind,
@@ -1165,7 +1191,8 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
     required this.found,
   }) : super(rawPayloadType, payloadSize);
 
-  final int operationId;
+  /// Matching live operation, or null when it is no longer tracked.
+  final OfflineOperationHandle? operation;
   final OfflineOperationKind operationKind;
   final int rawOperationKind;
   final OfflineOperationResultKind resultKind;
@@ -1177,11 +1204,11 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
 
 /// Unknown runtime event payload copied as raw bytes.
 final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
-  const RuntimeEventPayloadUnknown(
+  RuntimeEventPayloadUnknown(
     super.rawPayloadType,
     super.payloadSize,
-    this.bytes,
-  );
+    Uint8List bytes,
+  ) : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
 
   final Uint8List bytes;
 }
@@ -1323,7 +1350,7 @@ final class MapHandle {
   final RuntimeHandle _runtime;
   final NativeHandleState<raw.mln_map> _state;
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
-  var _clearCustomGeometryCallbacksWhenUrlStyleLoads = false;
+  final _pendingUrlStyleCallbacks = <Set<_CustomGeometryCallbackState>>[];
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -1341,8 +1368,7 @@ final class MapHandle {
         _c.raw.mln_map_set_style_url(_pointer, nativeUrl.pointer.cast<Char>()),
       );
     });
-    _clearCustomGeometryCallbacksWhenUrlStyleLoads =
-        _customGeometryCallbacks.isNotEmpty;
+    _pendingUrlStyleCallbacks.add(_customGeometryCallbacks.values.toSet());
   }
 
   /// Loads inline style JSON through MapLibre Native style APIs.
@@ -1725,7 +1751,10 @@ final class MapHandle {
   void setViewportOptions(MapViewportOptions options) {
     withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_map_viewport_options>();
-      nativeOptions.ref = native_struct.mapViewportOptionsToNative(options);
+      nativeOptions.ref = native_struct.mapViewportOptionsToNative(
+        options,
+        _c.raw.mln_map_viewport_options_default(),
+      );
       _check(_c.raw.mln_map_set_viewport_options(_pointer, nativeOptions));
     });
   }
@@ -1744,7 +1773,10 @@ final class MapHandle {
   void setTileOptions(MapTileOptions options) {
     withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_map_tile_options>();
-      nativeOptions.ref = native_struct.mapTileOptionsToNative(options);
+      nativeOptions.ref = native_struct.mapTileOptionsToNative(
+        options,
+        _c.raw.mln_map_tile_options_default(),
+      );
       _check(_c.raw.mln_map_set_tile_options(_pointer, nativeOptions));
     });
   }
@@ -1763,7 +1795,10 @@ final class MapHandle {
   void setBounds(BoundOptions options) {
     withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_bound_options>();
-      nativeOptions.ref = native_struct.boundOptionsToNative(options);
+      nativeOptions.ref = native_struct.boundOptionsToNative(
+        options,
+        _c.raw.mln_bound_options_default(),
+      );
       _check(_c.raw.mln_map_set_bounds(_pointer, nativeOptions));
     });
   }
@@ -1782,7 +1817,10 @@ final class MapHandle {
   void setFreeCameraOptions(FreeCameraOptions options) {
     withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_free_camera_options>();
-      nativeOptions.ref = native_struct.freeCameraOptionsToNative(options);
+      nativeOptions.ref = native_struct.freeCameraOptionsToNative(
+        options,
+        _c.raw.mln_free_camera_options_default(),
+      );
       _check(_c.raw.mln_map_set_free_camera_options(_pointer, nativeOptions));
     });
   }
@@ -1801,7 +1839,10 @@ final class MapHandle {
   void setProjectionMode(ProjectionModeOptions mode) {
     withNativeArena((arena) {
       final nativeMode = arena<raw.mln_projection_mode>();
-      nativeMode.ref = native_struct.projectionModeOptionsToNative(mode);
+      nativeMode.ref = native_struct.projectionModeOptionsToNative(
+        mode,
+        _c.raw.mln_projection_mode_default(),
+      );
       _check(_c.raw.mln_map_set_projection_mode(_pointer, nativeMode));
     });
   }
@@ -1815,7 +1856,10 @@ final class MapHandle {
       final outCamera = arena<raw.mln_camera_options>();
       outCamera.ref.size = sizeOf<raw.mln_camera_options>();
       final nativeFitOptions = arena<raw.mln_camera_fit_options>();
-      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
+        fitOptions,
+        _c.raw.mln_camera_fit_options_default(),
+      );
       _check(
         _c.raw.mln_map_camera_for_lat_lng_bounds(
           _pointer,
@@ -1837,7 +1881,10 @@ final class MapHandle {
       final outCamera = arena<raw.mln_camera_options>();
       outCamera.ref.size = sizeOf<raw.mln_camera_options>();
       final nativeFitOptions = arena<raw.mln_camera_fit_options>();
-      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
+        fitOptions,
+        _c.raw.mln_camera_fit_options_default(),
+      );
       _check(
         _c.raw.mln_map_camera_for_lat_lngs(
           _pointer,
@@ -1860,7 +1907,10 @@ final class MapHandle {
       final outCamera = arena<raw.mln_camera_options>();
       outCamera.ref.size = sizeOf<raw.mln_camera_options>();
       final nativeFitOptions = arena<raw.mln_camera_fit_options>();
-      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(fitOptions);
+      nativeFitOptions.ref = native_struct.cameraFitOptionsToNative(
+        fitOptions,
+        _c.raw.mln_camera_fit_options_default(),
+      );
       final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
       _check(
         _c.raw.mln_map_camera_for_geometry(
@@ -2425,7 +2475,7 @@ final class MapHandle {
           ),
         );
       });
-      _customGeometryCallbacks.remove(sourceId)?.close();
+      _customGeometryCallbacks.remove(sourceId)?.retire();
       _customGeometryCallbacks[sourceId] = callbackState;
     } catch (_) {
       callbackState.close();
@@ -2514,7 +2564,7 @@ final class MapHandle {
       return outRemoved.value;
     });
     if (removed) {
-      _customGeometryCallbacks.remove(sourceId)?.close();
+      _customGeometryCallbacks.remove(sourceId)?.retire();
     }
     return removed;
   }
@@ -2918,18 +2968,27 @@ final class MapHandle {
   }
 
   void _clearCustomGeometryCallbacksAfterUrlStyleLoad() {
-    if (!_clearCustomGeometryCallbacksWhenUrlStyleLoads) {
+    if (_pendingUrlStyleCallbacks.isEmpty) {
       return;
     }
-    _clearCustomGeometryCallbacksWhenUrlStyleLoads = false;
-    _clearCustomGeometryCallbacks();
+    final retired = _pendingUrlStyleCallbacks.removeAt(0);
+    for (final state in retired) {
+      final entries = _customGeometryCallbacks.entries
+          .where((entry) => identical(entry.value, state))
+          .toList(growable: false);
+      for (final entry in entries) {
+        _customGeometryCallbacks.remove(entry.key);
+      }
+      state.retire();
+    }
   }
 
   void _clearCustomGeometryCallbacks() {
     for (final state in _customGeometryCallbacks.values) {
-      state.close();
+      state.retire();
     }
     _customGeometryCallbacks.clear();
+    _pendingUrlStyleCallbacks.clear();
   }
 }
 

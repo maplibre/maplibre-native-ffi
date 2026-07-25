@@ -1,23 +1,45 @@
-[tasks.ensure-environment]
-hide = true
-run = '''
-if [[ "$MISE_ENV" != android-arm64-egl && "$MISE_ENV" != android-arm64-vulkan ]]; then
-  echo "Use an Android map mise environment:" >&2
-  echo "  mise -E android-arm64-egl run //examples/android-map:build" >&2
-  echo "  mise -E android-arm64-vulkan run //examples/android-map:build" >&2
-  exit 1
-fi
-'''
-
 [tasks.build]
-depends = ["ensure-environment", "//:ensure-native-library"]
+description = "Build the Android map example."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+flag "--prebuilt" help="Use native packages installed under build/"
+'''
+dir = "../.."
 run = '''
-../../gradlew :examples:android-map:assembleDebug
+gradle_args=(
+  -Pmaplibre.android.backend="$usage_backend"
+  -Pmaplibre.android.abis="$usage_abis"
+)
+if [[ "$usage_prebuilt" == "true" ]]; then
+  gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
+fi
+./gradlew "${gradle_args[@]}" :examples:android-map:assembleDebug
 '''
 
 [tasks.run]
-depends = ["ensure-environment", "//:ensure-native-library"]
+description = "Build, install, and start the Android map example."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+flag "--prebuilt" help="Use native packages installed under build/"
+'''
+dir = "../.."
 run = '''
-../../gradlew :examples:android-map:installDebug
-adb shell am start -S -n org.maplibre.nativeffi.examples.androidmap/.MainActivity
+gradle_args=(
+  -Pmaplibre.android.backend="$usage_backend"
+  -Pmaplibre.android.abis="$usage_abis"
+)
+if [[ "$usage_prebuilt" == "true" ]]; then
+  gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
+fi
+./gradlew "${gradle_args[@]}" :examples:android-map:runDebug
 '''

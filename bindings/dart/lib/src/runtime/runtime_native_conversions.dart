@@ -58,6 +58,10 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
         NativeCallable<
           raw.mln_custom_geometry_source_tile_callbackFunction
         >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+          if (_isRetirementTile(tileId)) {
+            _receiveRetirementSignal();
+            return;
+          }
           runUpcall(() => _invokeTileCallback(options.fetchTile, tileId));
         });
     cancelTile = options.cancelTile == null
@@ -65,6 +69,10 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
         : NativeCallable<
             raw.mln_custom_geometry_source_tile_callbackFunction
           >.listener((Pointer<Void> _, raw.mln_canonical_tile_id tileId) {
+            if (_isRetirementTile(tileId)) {
+              _receiveRetirementSignal();
+              return;
+            }
             runUpcall(() => _invokeTileCallback(options.cancelTile!, tileId));
           });
   }
@@ -77,6 +85,37 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
     raw.mln_custom_geometry_source_tile_callbackFunction
   >?
   cancelTile;
+  var _retirementSignals = 0;
+  var _retirementQueued = false;
+
+  void retire() {
+    if (_retirementQueued) {
+      return;
+    }
+    _retirementQueued = true;
+    _retirementSignals = cancelTile == null ? 1 : 2;
+    _c.raw.mln_dart_custom_geometry_callbacks_retire(
+      fetchTile.nativeFunction,
+      cancelTile?.nativeFunction ??
+          nullptr
+              .cast<
+                NativeFunction<
+                  raw.mln_custom_geometry_source_tile_callbackFunction
+                >
+              >(),
+      nullptr,
+    );
+  }
+
+  void _receiveRetirementSignal() {
+    _retirementSignals -= 1;
+    if (_retirementSignals == 0) {
+      close();
+    }
+  }
+
+  bool _isRetirementTile(raw.mln_canonical_tile_id tileId) =>
+      tileId.z == 255 && tileId.x == 0 && tileId.y == 0;
 
   @override
   void closeResources() {
@@ -733,7 +772,10 @@ Pointer<raw.mln_camera_options> _nativeCamera(
   Allocator allocator,
 ) {
   final nativeCamera = allocator<raw.mln_camera_options>();
-  nativeCamera.ref = native_struct.cameraOptionsToNative(camera);
+  nativeCamera.ref = native_struct.cameraOptionsToNative(
+    camera,
+    _c.raw.mln_camera_options_default(),
+  );
   return nativeCamera;
 }
 
@@ -745,7 +787,10 @@ Pointer<raw.mln_animation_options> _nativeAnimation(
     return nullptr.cast<raw.mln_animation_options>();
   }
   final nativeAnimation = allocator<raw.mln_animation_options>();
-  nativeAnimation.ref = native_struct.animationOptionsToNative(animation);
+  nativeAnimation.ref = native_struct.animationOptionsToNative(
+    animation,
+    _c.raw.mln_animation_options_default(),
+  );
   return nativeAnimation;
 }
 

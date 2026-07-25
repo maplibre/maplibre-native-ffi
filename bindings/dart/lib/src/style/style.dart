@@ -205,12 +205,12 @@ final class StyleImageOptions {
 /// Caller-owned premultiplied RGBA8 image pixels.
 final class PremultipliedRgba8Image {
   /// Creates a premultiplied RGBA8 image.
-  const PremultipliedRgba8Image({
+  PremultipliedRgba8Image({
     required this.width,
     required this.height,
     required this.stride,
-    required this.bytes,
-  });
+    required Uint8List bytes,
+  }) : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
 
   /// Image width in pixels.
   final int width;
@@ -259,7 +259,8 @@ final class StyleImageInfo {
 /// Copied style image pixels and metadata.
 final class StyleImage {
   /// Creates a copied style image.
-  const StyleImage({required this.info, required this.bytes});
+  StyleImage({required this.info, required Uint8List bytes})
+    : bytes = Uint8List.fromList(bytes).asUnmodifiableView();
 
   /// Copied image metadata.
   final StyleImageInfo info;

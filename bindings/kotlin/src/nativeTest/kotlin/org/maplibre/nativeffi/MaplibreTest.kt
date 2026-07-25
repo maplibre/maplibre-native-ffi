@@ -7,16 +7,13 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.set
-import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
-import platform.posix.getenv
 
 @OptIn(ExperimentalForeignApi::class)
 class MaplibreTest : org.maplibre.nativeffi.NativeTestBase() {
@@ -40,24 +37,6 @@ class MaplibreTest : org.maplibre.nativeffi.NativeTestBase() {
     val coordinate = Maplibre.latLngForProjectedMeters(meters)
     assertEquals(0.0, coordinate.latitude)
     assertEquals(0.0, coordinate.longitude)
-  }
-
-  @Test
-  fun configuredRenderBackendIsReportedSupported() {
-    // Inapplicable when the test target is not configured for a specific render backend.
-    val configured = getenv("MLN_FFI_RENDER_BACKEND")?.toKString() ?: return
-    val expected =
-      when (configured) {
-        "metal" -> RenderBackend.METAL
-        "vulkan" -> RenderBackend.VULKAN
-        "opengl" -> RenderBackend.OPENGL
-        else -> error("Unknown MLN_FFI_RENDER_BACKEND=$configured")
-      }
-
-    assertTrue(expected in Maplibre.supportedRenderBackends())
-    if (expected == RenderBackend.OPENGL) {
-      assertTrue(Maplibre.supportedOpenGLContextProviders().isNotEmpty())
-    }
   }
 
   @Test

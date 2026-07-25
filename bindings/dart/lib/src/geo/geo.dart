@@ -254,7 +254,8 @@ final class PointGeometry extends Geometry {
 /// Line-string geometry.
 final class LineStringGeometry extends Geometry {
   /// Creates a line-string geometry.
-  const LineStringGeometry(this.coordinates);
+  LineStringGeometry(List<LatLng> coordinates)
+    : coordinates = List.unmodifiable(coordinates);
 
   /// Coordinates in order.
   final List<LatLng> coordinates;
@@ -263,7 +264,10 @@ final class LineStringGeometry extends Geometry {
 /// Polygon geometry as linear rings.
 final class PolygonGeometry extends Geometry {
   /// Creates polygon geometry.
-  const PolygonGeometry(this.rings);
+  PolygonGeometry(List<List<LatLng>> rings)
+    : rings = List.unmodifiable(
+        rings.map((ring) => List<LatLng>.unmodifiable(ring)),
+      );
 
   /// Polygon rings.
   final List<List<LatLng>> rings;
@@ -272,7 +276,8 @@ final class PolygonGeometry extends Geometry {
 /// Multi-point geometry.
 final class MultiPointGeometry extends Geometry {
   /// Creates multi-point geometry.
-  const MultiPointGeometry(this.coordinates);
+  MultiPointGeometry(List<LatLng> coordinates)
+    : coordinates = List.unmodifiable(coordinates);
 
   /// Point coordinates.
   final List<LatLng> coordinates;
@@ -281,7 +286,10 @@ final class MultiPointGeometry extends Geometry {
 /// Multi-line-string geometry.
 final class MultiLineStringGeometry extends Geometry {
   /// Creates multi-line-string geometry.
-  const MultiLineStringGeometry(this.lines);
+  MultiLineStringGeometry(List<List<LatLng>> lines)
+    : lines = List.unmodifiable(
+        lines.map((line) => List<LatLng>.unmodifiable(line)),
+      );
 
   /// Line strings.
   final List<List<LatLng>> lines;
@@ -290,7 +298,14 @@ final class MultiLineStringGeometry extends Geometry {
 /// Multi-polygon geometry.
 final class MultiPolygonGeometry extends Geometry {
   /// Creates multi-polygon geometry.
-  const MultiPolygonGeometry(this.polygons);
+  MultiPolygonGeometry(List<List<List<LatLng>>> polygons)
+    : polygons = List.unmodifiable(
+        polygons.map(
+          (polygon) => List<List<LatLng>>.unmodifiable(
+            polygon.map((ring) => List<LatLng>.unmodifiable(ring)),
+          ),
+        ),
+      );
 
   /// Polygons as rings.
   final List<List<List<LatLng>>> polygons;
@@ -299,7 +314,8 @@ final class MultiPolygonGeometry extends Geometry {
 /// Geometry collection.
 final class GeometryCollection extends Geometry {
   /// Creates a geometry collection.
-  const GeometryCollection(this.geometries);
+  GeometryCollection(List<Geometry> geometries)
+    : geometries = List.unmodifiable(geometries);
 
   /// Child geometries.
   final List<Geometry> geometries;
@@ -318,11 +334,17 @@ final class NullFeatureIdentifier extends FeatureIdentifier {
 
 /// Unsigned integer feature identifier.
 final class UIntFeatureIdentifier extends FeatureIdentifier {
-  /// Creates an unsigned integer feature identifier in the supported unsigned 63-bit subset.
-  const UIntFeatureIdentifier(this.value);
+  /// Creates an unsigned identifier from a non-negative Dart [int].
+  UIntFeatureIdentifier(int value) : value = BigInt.from(value);
 
-  /// Identifier value in the supported unsigned 63-bit subset.
-  final int value;
+  /// Creates an identifier across the full `uint64_t` domain.
+  UIntFeatureIdentifier.fromBigInt(this.value);
+
+  /// Unsigned value, represented as [BigInt] so all 64 bits are preserved.
+  ///
+  /// Use [BigInt.compareTo] for ordering and [BigInt.toString] or
+  /// [BigInt.toRadixString] for formatting.
+  final BigInt value;
 }
 
 /// Signed integer feature identifier.
@@ -369,11 +391,11 @@ final class GeometryGeoJson extends GeoJson {
 /// GeoJSON feature descriptor.
 final class FeatureGeoJson extends GeoJson {
   /// Creates a feature GeoJSON descriptor.
-  const FeatureGeoJson({
+  FeatureGeoJson({
     required this.geometry,
-    this.properties = const [],
+    List<JsonMember> properties = const [],
     this.identifier = const NullFeatureIdentifier(),
-  });
+  }) : properties = List.unmodifiable(properties);
 
   /// Feature geometry.
   final Geometry geometry;
@@ -388,7 +410,8 @@ final class FeatureGeoJson extends GeoJson {
 /// GeoJSON feature collection descriptor.
 final class FeatureCollectionGeoJson extends GeoJson {
   /// Creates a feature collection GeoJSON descriptor.
-  const FeatureCollectionGeoJson(this.features);
+  FeatureCollectionGeoJson(List<FeatureGeoJson> features)
+    : features = List.unmodifiable(features);
 
   /// Feature entries.
   final List<FeatureGeoJson> features;

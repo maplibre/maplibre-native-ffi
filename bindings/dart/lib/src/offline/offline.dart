@@ -72,22 +72,22 @@ final class OfflineRegionStatus {
   final OfflineRegionDownloadState downloadState;
 
   /// Completed resource count.
-  final int completedResourceCount;
+  final BigInt completedResourceCount;
 
   /// Completed resource byte size.
-  final int completedResourceSize;
+  final BigInt completedResourceSize;
 
   /// Completed tile count.
-  final int completedTileCount;
+  final BigInt completedTileCount;
 
   /// Required tile count.
-  final int requiredTileCount;
+  final BigInt requiredTileCount;
 
   /// Completed tile byte size.
-  final int completedTileSize;
+  final BigInt completedTileSize;
 
   /// Required resource count.
-  final int requiredResourceCount;
+  final BigInt requiredResourceCount;
 
   /// Whether [requiredResourceCount] is precise.
   final bool requiredResourceCountIsPrecise;
@@ -99,6 +99,15 @@ final class OfflineRegionStatus {
 /// Offline region definition.
 sealed class OfflineRegionDefinition {
   const OfflineRegionDefinition();
+}
+
+/// Offline region definition type unknown to this binding version.
+final class UnknownOfflineRegionDefinition extends OfflineRegionDefinition {
+  /// Creates an unknown definition while preserving its native tag.
+  const UnknownOfflineRegionDefinition(this.rawType);
+
+  /// Raw native definition type.
+  final int rawType;
 }
 
 /// Tile-pyramid offline region definition.
@@ -166,11 +175,11 @@ final class OfflineGeometryRegionDefinition extends OfflineRegionDefinition {
 /// Copied offline region metadata and definition.
 final class OfflineRegionInfo {
   /// Creates copied offline region info.
-  const OfflineRegionInfo({
+  OfflineRegionInfo({
     required this.id,
     required this.definition,
-    required this.metadata,
-  });
+    required Uint8List metadata,
+  }) : metadata = Uint8List.fromList(metadata).asUnmodifiableView();
 
   /// Native region identifier.
   final int id;

@@ -13,7 +13,7 @@ abstract base class RetainedCallbackState {
   /// Callers that own copied native payloads must release them on a false
   /// return.
   bool runUpcall(void Function() body) {
-    if (_closed) {
+    if (_retired || _closed) {
       return false;
     }
     _activeUpcalls += 1;

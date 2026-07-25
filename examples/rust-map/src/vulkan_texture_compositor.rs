@@ -7,8 +7,8 @@ use maplibre_native::{Error, ErrorKind, VulkanOwnedTextureFrameHandle};
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
 
-const VERT_SHADER: &[u8] = include_bytes!("vulkan_texture_compositor/shaders/fullscreen.vert.spv");
-const FRAG_SHADER: &[u8] = include_bytes!("vulkan_texture_compositor/shaders/sample.frag.spv");
+const VERT_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/fullscreen.vert.spv"));
+const FRAG_SHADER: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/sample.frag.spv"));
 
 pub struct VulkanTextureCompositor {
     surface_loader: ash::khr::surface::Instance,

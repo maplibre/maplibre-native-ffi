@@ -23,6 +23,38 @@ final void Function(Pointer<Void>) _destroyLeakToken = _library
       'mln_dart_handle_leak_token_destroy',
     );
 
+/// Attaches the binding's non-owning native-handle leak diagnostic to [owner].
+final class NativeLeakReporter {
+  /// Creates a live leak report token.
+  NativeLeakReporter(Finalizable owner, String typeName, Pointer<Void> handle) {
+    final nativeTypeName = typeName.toNativeUtf8().cast<Char>();
+    try {
+      final token = _createLeakToken(nativeTypeName, handle);
+      if (token == nullptr) {
+        return;
+      }
+      _token = token;
+      _leakReporter.attach(owner, token, detach: _detachToken);
+    } finally {
+      calloc.free(nativeTypeName);
+    }
+  }
+
+  final Object _detachToken = Object();
+  Pointer<Void>? _token;
+
+  /// Marks the native lifetime as explicitly released.
+  void close() {
+    final token = _token;
+    if (token == null) {
+      return;
+    }
+    _leakReporter.detach(_detachToken);
+    _destroyLeakToken(token);
+    _token = null;
+  }
+}
+
 /// Close-once state for an owned native handle pointer.
 final class NativeHandleState<T extends NativeType> implements Finalizable {
   /// Creates state for a live native handle pointer.

@@ -35,11 +35,17 @@ final class JsonBool extends JsonValue {
 
 /// JSON unsigned integer.
 final class JsonUInt extends JsonValue {
-  /// Creates a JSON unsigned integer in the supported unsigned 63-bit subset.
-  const JsonUInt(this.value);
+  /// Creates a JSON unsigned integer from a non-negative Dart [int].
+  JsonUInt(int value) : value = BigInt.from(value);
 
-  /// Integer value in the supported unsigned 63-bit subset.
-  final int value;
+  /// Creates a JSON unsigned integer across the full `uint64_t` domain.
+  JsonUInt.fromBigInt(this.value);
+
+  /// Unsigned value, represented as [BigInt] so all 64 bits are preserved.
+  ///
+  /// Use [BigInt.compareTo] for ordering and [BigInt.toString] or
+  /// [BigInt.toRadixString] for formatting.
+  final BigInt value;
 }
 
 /// JSON signed integer.
@@ -72,7 +78,7 @@ final class JsonString extends JsonValue {
 /// JSON array.
 final class JsonArray extends JsonValue {
   /// Creates a JSON array.
-  const JsonArray(this.values);
+  JsonArray(List<JsonValue> values) : values = List.unmodifiable(values);
 
   /// Array values.
   final List<JsonValue> values;
@@ -81,7 +87,7 @@ final class JsonArray extends JsonValue {
 /// JSON object.
 final class JsonObject extends JsonValue {
   /// Creates a JSON object.
-  const JsonObject(this.members);
+  JsonObject(List<JsonMember> members) : members = List.unmodifiable(members);
 
   /// Ordered object members.
   final List<JsonMember> members;

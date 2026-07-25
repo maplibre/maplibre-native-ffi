@@ -13,7 +13,9 @@ import 'struct.dart';
 /// Maximum nested geometry descriptor depth accepted by the binding.
 const int maxGeometryDescriptorDepth = 64;
 
-const int _maxUnsignedInt63 = 0x7fffffffffffffff;
+final BigInt _uint64Modulus = BigInt.one << 64;
+final BigInt _maxUnsignedInt64 = _uint64Modulus - BigInt.one;
+final BigInt _maxSignedInt64 = (BigInt.one << 63) - BigInt.one;
 
 /// Call-scoped native geometry descriptor.
 final class NativeGeometry {
@@ -225,7 +227,7 @@ void _writeFeatureIdentifier(
           .MLN_FEATURE_IDENTIFIER_TYPE_NULL
           .value;
     case UIntFeatureIdentifier(:final value):
-      _checkUnsignedInt63(
+      final nativeValue = _uint64ToNative(
         value,
         'feature identifiers with unsigned integer values',
       );
@@ -233,7 +235,7 @@ void _writeFeatureIdentifier(
           .mln_feature_identifier_type
           .MLN_FEATURE_IDENTIFIER_TYPE_UINT
           .value;
-      out.identifier.uint_value = value;
+      out.identifier.uint_value = nativeValue;
     case IntFeatureIdentifier(:final value):
       out.identifier_type =
           raw.mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_INT.value;
@@ -355,12 +357,9 @@ FeatureIdentifier _featureIdentifierFromNative(raw.mln_feature value) {
     case 0:
       return const NullFeatureIdentifier();
     case 1:
-      final uintValue = value.identifier.uint_value;
-      _checkUnsignedInt63(
-        uintValue,
-        'native unsigned integer feature identifiers',
+      return UIntFeatureIdentifier.fromBigInt(
+        _uint64FromNative(value.identifier.uint_value),
       );
-      return UIntFeatureIdentifier(uintValue);
     case 2:
       return IntFeatureIdentifier(value.identifier.int_value);
     case 3:
@@ -376,10 +375,17 @@ FeatureIdentifier _featureIdentifierFromNative(raw.mln_feature value) {
   }
 }
 
-void _checkUnsignedInt63(int value, String name) {
-  if (value < 0 || value > _maxUnsignedInt63) {
-    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt63');
+int _uint64ToNative(BigInt value, String name) {
+  if (value < BigInt.zero || value > _maxUnsignedInt64) {
+    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt64');
   }
+  final signedBits = value > _maxSignedInt64 ? value - _uint64Modulus : value;
+  return signedBits.toInt();
+}
+
+BigInt _uint64FromNative(int value) {
+  final bits = BigInt.from(value);
+  return value < 0 ? bits + _uint64Modulus : bits;
 }
 
 String _copyStringView(raw.mln_string_view view) {

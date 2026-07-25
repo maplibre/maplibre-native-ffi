@@ -128,7 +128,11 @@ public sealed class ResourceResponse
     public byte[] Bytes
     {
         get => (byte[])bytes.Clone();
-        set => bytes = value is null ? [] : (byte[])value.Clone();
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            bytes = (byte[])value.Clone();
+        }
     }
 
     public string? ErrorMessage { get; set; }

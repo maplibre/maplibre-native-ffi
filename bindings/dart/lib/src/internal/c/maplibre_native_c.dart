@@ -2,12 +2,19 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 
+import '../../error/maplibre_exception.dart';
 import '../loader/native_library.dart';
 import 'maplibre_native_c.g.dart' as generated;
 
+/// C ABI contract version supported by this generated binding.
+const int expectedCAbiVersion = 0;
+
 /// Native library handle plus binding-private Dart shim entry points.
 final class MaplibreNativeCApi {
-  MaplibreNativeCApi._(this.library) : raw = generated.MaplibreNativeC(library);
+  MaplibreNativeCApi._(this.library)
+    : raw = generated.MaplibreNativeC(library) {
+    validateCAbiVersion(raw.mln_c_version());
+  }
 
   /// Opens the native library and resolves generated C symbols lazily.
   factory MaplibreNativeCApi.open({String? path}) =>
@@ -97,4 +104,15 @@ final class MaplibreNativeCApi {
       tileId,
     );
   }
+}
+
+/// Validates a reported C ABI version before public handles are created.
+void validateCAbiVersion(int actualVersion) {
+  if (actualVersion == expectedCAbiVersion) {
+    return;
+  }
+  throw MaplibreException.abiVersionMismatch(
+    'MapLibre Native C ABI version $actualVersion is incompatible with this '
+    'binding; expected $expectedCAbiVersion.',
+  );
 }

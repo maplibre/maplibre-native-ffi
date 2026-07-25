@@ -68,17 +68,12 @@ auto make_resource_transform(void* platform_context)
       mbgl::ResourceTransform::FinishedCallback finished
     ) -> void {
       std::string replacement_url;
-      try {
-        const auto status = invoke_resource_transform(
-          platform_context, resource_kind_to_abi(kind), url.c_str(),
-          replacement_url
-        );
-        if (status == MLN_STATUS_OK && !replacement_url.empty()) {
-          finished(replacement_url);
-          return;
-        }
-      } catch (...) {
-        finished(url);
+      const auto status = invoke_resource_transform(
+        platform_context, resource_kind_to_abi(kind), url.c_str(),
+        replacement_url
+      );
+      if (status == MLN_STATUS_OK && !replacement_url.empty()) {
+        finished(replacement_url);
         return;
       }
       finished(url);

@@ -216,23 +216,6 @@ final class ResourceErrorReason {
   final String name;
 }
 
-/// Decision returned by a resource provider callback.
-final class ResourceProviderDecision {
-  const ResourceProviderDecision._(this.rawValue, this.name);
-
-  /// Let native networking handle the request.
-  static const passThrough = ResourceProviderDecision._(0, 'passThrough');
-
-  /// The binding will complete or release the request handle.
-  static const handle = ResourceProviderDecision._(1, 'handle');
-
-  /// Raw native value.
-  final int rawValue;
-
-  /// Human-readable name.
-  final String name;
-}
-
 /// Exact URL rewrite rule used by the runtime resource transform.
 final class ResourceUrlRewriteRule {
   /// Creates an exact URL rewrite rule.
@@ -255,7 +238,7 @@ final class ResourceUrlRewriteRule {
 /// Copied resource request delivered to a Dart resource provider.
 final class ResourceRequest {
   /// Creates a copied resource request.
-  const ResourceRequest({
+  ResourceRequest({
     required this.url,
     required this.kind,
     required this.loadingMethod,
@@ -266,8 +249,10 @@ final class ResourceRequest {
     this.priorModifiedUnixMs,
     this.priorExpiresUnixMs,
     this.priorEtag,
-    this.priorData,
-  });
+    Uint8List? priorData,
+  }) : priorData = priorData == null
+           ? null
+           : Uint8List.fromList(priorData).asUnmodifiableView();
 
   /// Requested URL.
   final String url;
@@ -288,7 +273,7 @@ final class ResourceRequest {
   final ResourceStoragePolicy storagePolicy;
 
   /// Optional byte range as inclusive start/end values.
-  final ({int start, int end})? range;
+  final ({BigInt start, BigInt end})? range;
 
   /// Optional previously modified timestamp in Unix milliseconds.
   final int? priorModifiedUnixMs;
@@ -337,17 +322,19 @@ final class ResourceProviderRule {
 /// Resource response returned by a Dart resource provider.
 final class ResourceResponse {
   /// Creates a resource response.
-  const ResourceResponse({
+  ResourceResponse({
     required this.status,
     this.errorReason = ResourceErrorReason.none,
-    this.bytes,
+    Uint8List? bytes,
     this.errorMessage,
     this.mustRevalidate = false,
     this.modifiedUnixMs,
     this.expiresUnixMs,
     this.etag,
     this.retryAfterUnixMs,
-  });
+  }) : bytes = bytes == null
+           ? null
+           : Uint8List.fromList(bytes).asUnmodifiableView();
 
   /// Response status.
   final ResourceResponseStatus status;

@@ -5,10 +5,12 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    native_config_path: std.Build.LazyPath,
+    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
+    dependency_include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
+    system_root: ?std.Build.LazyPath,
 };
 
 fn appendIncludeDir(
@@ -29,12 +31,11 @@ fn sdlLibrary(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     });
     const library = sdl.artifact("SDL3");
     if (options.target.result.os.tag == .macos) {
-        if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
-            if (system_root.len != 0) {
-                library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
-                library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
-                library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
-            }
+        if (options.system_root) |system_root| {
+            const system_root_path = system_root.getPath(b);
+            library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "include" }) });
+            library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "usr", "lib" }) });
+            library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root_path, "System", "Library", "Frameworks" }) });
         }
     }
     return library;
@@ -44,7 +45,11 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
         .optimize = options.optimize,
-        .native_config_path = options.native_config_path,
+        .native_install_dir = options.native_install_dir,
+        .render_backend = options.render_backend,
+        .dependency_include_dirs = options.dependency_include_dirs,
+        .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
 }
 
@@ -78,6 +83,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         .optimize = options.optimize,
         .include_dirs = c_include_dirs,
         .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
+        .system_root = options.system_root,
     }));
     root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     if (options.render_backend == .opengl) {
@@ -96,6 +102,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
 
     if (options.render_backend == .metal) {
@@ -107,20 +114,37 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         root_module.linkFramework("Foundation", .{});
     }
 
+    if (options.render_backend == .vulkan) {
+        var previous: ?*std.Build.Step = null;
+        for ([2][]const u8{ "fullscreen.vert", "sample.frag" }) |shader| {
+            const compile_shader = b.addSystemCommand(&.{ "glslangValidator", "-V" });
+            compile_shader.addFileArg(b.path(b.pathJoin(&.{ "render/vulkan/shaders", shader })));
+            compile_shader.addArgs(&.{ "-o", b.pathJoin(&.{ "render/vulkan/shaders", b.fmt("{s}.spv", .{shader}) }) });
+            if (previous) |step| compile_shader.step.dependOn(step);
+            previous = &compile_shader.step;
+        }
+        example.step.dependOn(previous.?);
+    }
+
     b.installArtifact(example);
     return example;
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const render_backend = maplibre_build.renderBackend(b);
+    const native_install_dir = maplibre_build.nativeInstallDirPath(b);
+    const target = maplibre_build.nativeTarget(b, native_install_dir);
+    const render_backend = maplibre_build.renderBackend(b, native_install_dir);
+    const system_root = maplibre_build.maybeSystemRootPath(b);
+    const dependency_include_dirs = maplibre_build.dependencyIncludeDirs(b);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .native_config_path = maplibre_build.nativeArtifactConfigPath(b),
-        .include_dirs = maplibre_build.includeDirs(b),
+        .native_install_dir = native_install_dir,
+        .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .dependency_include_dirs = dependency_include_dirs,
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
+        .system_root = system_root,
     };
 
     const run_step = b.step("run", "Run Zig map example");

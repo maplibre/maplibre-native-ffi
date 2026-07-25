@@ -24,6 +24,12 @@ final class MaplibreStatus {
   static MaplibreStatus unknown(int nativeStatusCode) =>
       MaplibreStatus._('unknown', nativeStatusCode);
 
+  /// The loaded native library uses an incompatible C ABI version.
+  static const abiVersionMismatch = MaplibreStatus._(
+    'abiVersionMismatch',
+    -1000,
+  );
+
   /// Creates the stable status category for a native status code.
   static MaplibreStatus fromNativeStatusCode(int nativeStatusCode) =>
       switch (nativeStatusCode) {
@@ -74,6 +80,10 @@ class MaplibreException implements Exception {
   /// Creates a binding-side invalid-state error before native code is called.
   factory MaplibreException.invalidState(String diagnostic) =>
       InvalidStateException(null, diagnostic);
+
+  /// Creates a binding-side ABI-version mismatch.
+  factory MaplibreException.abiVersionMismatch(String diagnostic) =>
+      AbiVersionMismatchException(diagnostic);
 
   /// Stable status category.
   final MaplibreStatus status;
@@ -127,4 +137,11 @@ class NativeErrorException extends MaplibreException {
   /// Creates a native-error exception.
   const NativeErrorException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.nativeError, nativeStatusCode, diagnostic);
+}
+
+/// Loaded native library uses a different C ABI contract version.
+class AbiVersionMismatchException extends MaplibreException {
+  /// Creates an ABI-version mismatch exception.
+  const AbiVersionMismatchException(String diagnostic)
+    : super(MaplibreStatus.abiVersionMismatch, null, diagnostic);
 }

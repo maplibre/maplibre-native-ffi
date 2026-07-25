@@ -33,6 +33,9 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 | `examples/swift-map`   | Desktop | Swift      | AppKit, SwiftUI | macOS                 | Metal                 |
 | `examples/swift-map`   | Mobile  | Swift      | UIKit           | iOS                   | Metal                 |
 
+The Compose map example follows the broad strokes of this specification, but
+uses its own renderer-integration architecture for Skiko texture sharing.
+
 For examples built by native render-backend variant, “Backends” is the union of
 supported configured variants. Each native library artifact includes one render
 backend. A single run uses one graphics API, selected at build time

@@ -53,7 +53,8 @@ final class RenderedQueryBox extends RenderedQueryGeometry {
 /// Rendered line-string query geometry.
 final class RenderedQueryLineString extends RenderedQueryGeometry {
   /// Creates a rendered line-string query.
-  const RenderedQueryLineString(this.points);
+  RenderedQueryLineString(List<ScreenPoint> points)
+    : points = List.unmodifiable(points);
 
   /// Screen points to query.
   final List<ScreenPoint> points;
@@ -62,7 +63,8 @@ final class RenderedQueryLineString extends RenderedQueryGeometry {
 /// Options for rendered feature queries.
 final class RenderedFeatureQueryOptions {
   /// Creates rendered feature query options.
-  const RenderedFeatureQueryOptions({this.layerIds, this.filter});
+  RenderedFeatureQueryOptions({List<String>? layerIds, this.filter})
+    : layerIds = layerIds == null ? null : List.unmodifiable(layerIds);
 
   /// Optional style layer IDs. When absent, all rendered layers are queried.
   final List<String>? layerIds;
@@ -74,7 +76,10 @@ final class RenderedFeatureQueryOptions {
 /// Options for source feature queries.
 final class SourceFeatureQueryOptions {
   /// Creates source feature query options.
-  const SourceFeatureQueryOptions({this.sourceLayerIds, this.filter});
+  SourceFeatureQueryOptions({List<String>? sourceLayerIds, this.filter})
+    : sourceLayerIds = sourceLayerIds == null
+          ? null
+          : List.unmodifiable(sourceLayerIds);
 
   /// Optional source-layer IDs. Required by vector sources; ignored by GeoJSON.
   final List<String>? sourceLayerIds;
@@ -123,7 +128,8 @@ final class FeatureExtensionValue extends FeatureExtensionResult {
 /// Feature collection feature extension result.
 final class FeatureExtensionFeatureCollection extends FeatureExtensionResult {
   /// Creates a feature collection extension result.
-  const FeatureExtensionFeatureCollection(this.features);
+  FeatureExtensionFeatureCollection(List<FeatureGeoJson> features)
+    : features = List.unmodifiable(features);
 
   /// Result features.
   final List<FeatureGeoJson> features;

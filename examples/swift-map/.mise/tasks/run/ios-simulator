@@ -2,13 +2,9 @@
 #MISE description="Install and launch the Swift map iOS simulator app."
 set -euo pipefail
 
-if [[ "$MISE_ENV" != ios-simulator-* ]]; then
-  exec mise -E ios-simulator-arm64-metal run //examples/swift-map:run:ios-simulator
-fi
-
 mise run package:ios-simulator
 
-device=${MLN_FFI_IOS_SIMULATOR_DEVICE:-}
+device=${IOS_SIMULATOR_DEVICE:-}
 if [[ -z "$device" ]]; then
   device=$(
     xcrun simctl list devices available iOS |
@@ -16,7 +12,7 @@ if [[ -z "$device" ]]; then
   )
 fi
 if [[ -z "$device" ]]; then
-  echo "No booted iOS simulator device found. Open Simulator or set MLN_FFI_IOS_SIMULATOR_DEVICE." >&2
+  echo "No booted iOS simulator device found. Open Simulator or set IOS_SIMULATOR_DEVICE." >&2
   exit 1
 fi
 
@@ -29,7 +25,7 @@ if [[ "$state" != "Booted" ]]; then
   exit 1
 fi
 
-app_dir=".build/$MISE_ENV/SwiftMapIOS.app"
+app_dir=".build/ios-simulator/SwiftMapIOS.app"
 xcrun simctl install "$device" "$app_dir"
 xcrun simctl launch --terminate-running-process \
   "$device" \

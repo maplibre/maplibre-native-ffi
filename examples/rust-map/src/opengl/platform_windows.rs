@@ -52,12 +52,10 @@ impl OpenGLPlatformContext {
 
 impl Drop for OpenGLPlatformContext {
     fn drop(&mut self) {
-        if !self.hdc.is_null() {
-            // SAFETY: hdc was acquired from this live window with GetDC.
-            unsafe {
-                ReleaseDC(self.hwnd, self.hdc);
-            }
-            self.hdc = std::ptr::null_mut();
+        // SAFETY: hdc was acquired from this live window with GetDC, and the
+        // constructor returns Err on null. Drop runs unconditionally.
+        unsafe {
+            ReleaseDC(self.hwnd, self.hdc);
         }
     }
 }

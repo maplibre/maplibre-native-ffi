@@ -80,6 +80,7 @@ typedef struct mln_dart_log_callback_state {
 
 typedef struct mln_dart_log_record {
   void* owner;
+  bool retire_callback;
   uint32_t severity;
   uint32_t event;
   int64_t code;
@@ -98,6 +99,9 @@ MLN_API uint32_t mln_dart_log_callback(
   void* user_data, uint32_t severity, uint32_t event, int64_t code,
   const char* message
 ) MLN_DART_SHIM_NOEXCEPT;
+MLN_API mln_status mln_dart_log_set_callback(
+  mln_dart_log_callback_state* state
+) MLN_DART_SHIM_NOEXCEPT;
 MLN_API void mln_dart_log_record_destroy(void* record) MLN_DART_SHIM_NOEXCEPT;
 
 MLN_API mln_status mln_dart_resource_transform_rewrite_callback(
@@ -115,6 +119,26 @@ MLN_API uint32_t mln_dart_queued_resource_provider_callback(
 MLN_API void mln_dart_resource_provider_request_destroy(
   void* request
 ) MLN_DART_SHIM_NOEXCEPT;
+MLN_API void mln_dart_queued_resource_provider_retire(
+  mln_dart_queued_resource_provider* provider
+) MLN_DART_SHIM_NOEXCEPT;
+MLN_API void mln_dart_custom_geometry_callbacks_retire(
+  mln_custom_geometry_source_tile_callback fetch_tile,
+  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
+) MLN_DART_SHIM_NOEXCEPT;
+MLN_API uint64_t mln_dart_resource_request_token_create(
+  mln_resource_request_handle* handle
+) MLN_DART_SHIM_NOEXCEPT;
+MLN_API mln_status mln_dart_resource_request_token_cancelled(
+  uint64_t token, bool* out_cancelled
+) MLN_DART_SHIM_NOEXCEPT;
+MLN_API mln_status mln_dart_resource_request_token_complete(
+  uint64_t token, const mln_resource_response* response
+) MLN_DART_SHIM_NOEXCEPT;
+MLN_API mln_status
+mln_dart_resource_request_token_release(uint64_t token) MLN_DART_SHIM_NOEXCEPT;
+MLN_API mln_status
+mln_dart_resource_request_token_wait(uint64_t token) MLN_DART_SHIM_NOEXCEPT;
 MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(
   mln_custom_geometry_source_tile_callback callback, void* user_data,
   mln_canonical_tile_id tile_id

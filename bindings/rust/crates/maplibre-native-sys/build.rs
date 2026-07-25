@@ -6,31 +6,35 @@ use std::path::{Path, PathBuf};
 const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
-    let repo_root = repo_root_from_manifest_dir(&manifest_dir)?;
-    let header = repo_root.join("include/maplibre_native_c.h");
+    println!("cargo:rerun-if-env-changed=MAPLIBRE_NATIVE_C_INSTALL_DIR");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_FAMILY");
+    println!("cargo:rerun-if-env-changed=CARGO_CFG_TARGET_OS");
+    let install_dir = native_install_dir()?;
+    let include_dir = install_dir.join("include");
+    let link_dir = native_library_dir(&install_dir);
+    let target_os = env::var("CARGO_CFG_TARGET_OS")?;
+    let target_family = env::var("CARGO_CFG_TARGET_FAMILY")?;
+    let runtime_dir = native_runtime_dir(&install_dir, &target_os);
+    let header = include_dir.join("maplibre_native_c.h");
 
-    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
-    print_rerun_if_pkg_config_file_changed();
+    require_dir(&include_dir, "native include directory")?;
+    require_dir(&link_dir, "native link directory")?;
+    require_dir(&runtime_dir, "native runtime library directory")?;
 
-    let library = pkg_config::Config::new().probe(LIBRARY_NAME).map_err(|error| {
-        io::Error::other(format!(
-            "could not find {LIBRARY_NAME} with pkg-config; run through mise or add the generated maplibre-native-c.pc directory to PKG_CONFIG_PATH: {error}"
-        ))
-    })?;
-
+    println!("cargo:rustc-link-search=native={}", link_dir.display());
+    println!("cargo:rustc-link-lib={LIBRARY_NAME}");
+    if target_family.split(',').any(|family| family == "unix") {
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runtime_dir.display());
+    }
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
-    print_rerun_if_changed(&repo_root.join("include"));
+    print_rerun_if_changed(&include_dir);
 
-    let mut bindings = bindgen::Builder::default()
+    let bindings = bindgen::Builder::default()
         .header(header.display().to_string())
         .clang_arg("-xc")
-        .clang_arg("-std=c23");
-    for include_path in &library.include_paths {
-        bindings = bindings.clang_arg(format!("-I{}", include_path.display()));
-    }
-    let bindings = bindings
+        .clang_arg("-std=c23")
+        .clang_arg(format!("-I{}", include_dir.display()))
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
@@ -45,18 +49,46 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    manifest_dir
-        .ancestors()
-        .find(|ancestor| ancestor.join("include/maplibre_native_c.h").is_file())
-        .map(Path::to_path_buf)
-        .ok_or_else(|| {
-            format!(
-                "could not locate repository root containing include/maplibre_native_c.h from {}",
-                manifest_dir.display()
-            )
-            .into()
-        })
+fn native_install_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let install_dir = env::var_os("MAPLIBRE_NATIVE_C_INSTALL_DIR").ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::NotFound,
+            "MAPLIBRE_NATIVE_C_INSTALL_DIR is required",
+        )
+    })?;
+    Ok(PathBuf::from(install_dir))
+}
+
+fn native_runtime_dir(install_dir: &Path, target_os: &str) -> PathBuf {
+    if target_os == "windows" {
+        install_dir.join("bin")
+    } else {
+        native_library_dir(install_dir)
+    }
+}
+
+fn native_library_dir(install_dir: &Path) -> PathBuf {
+    for dirname in ["lib", "lib64"] {
+        let candidate = install_dir.join(dirname);
+        if candidate.is_dir() {
+            return candidate;
+        }
+    }
+    install_dir.join("lib")
+}
+
+fn require_dir(path: &Path, label: &str) -> Result<(), Box<dyn Error>> {
+    if path.is_dir() {
+        return Ok(());
+    }
+    Err(io::Error::new(
+        io::ErrorKind::NotFound,
+        format!(
+            "missing {label}: {}; run `mise run build` first",
+            path.display()
+        ),
+    )
+    .into())
 }
 
 fn print_rerun_if_changed(path: &Path) {
@@ -70,18 +102,5 @@ fn print_rerun_if_changed(path: &Path) {
     };
     for entry in entries.flatten() {
         print_rerun_if_changed(&entry.path());
-    }
-}
-
-fn print_rerun_if_pkg_config_file_changed() {
-    let Some(paths) = env::var_os("PKG_CONFIG_PATH") else {
-        return;
-    };
-
-    for path in env::split_paths(&paths) {
-        let pc_file = path.join(format!("{LIBRARY_NAME}.pc"));
-        if pc_file.is_file() {
-            println!("cargo:rerun-if-changed={}", pc_file.display());
-        }
     }
 }

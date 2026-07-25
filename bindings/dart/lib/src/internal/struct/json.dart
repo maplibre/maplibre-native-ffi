@@ -10,7 +10,9 @@ import '../status/status.dart';
 /// Maximum nested JSON descriptor depth accepted by the binding.
 const int maxJsonDescriptorDepth = 64;
 
-const int _maxUnsignedInt63 = 0x7fffffffffffffff;
+final BigInt _uint64Modulus = BigInt.one << 64;
+final BigInt _maxUnsignedInt64 = _uint64Modulus - BigInt.one;
+final BigInt _maxSignedInt64 = (BigInt.one << 63) - BigInt.one;
 
 /// Call-scoped native JSON descriptor.
 final class NativeJsonValue {
@@ -43,9 +45,11 @@ void _writeJsonValue(
       out.ref.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL.value;
       out.ref.data.bool_value = value;
     case JsonUInt(:final value):
-      _checkUnsignedInt63(value, 'JSON unsigned integer values');
       out.ref.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT.value;
-      out.ref.data.uint_value = value;
+      out.ref.data.uint_value = _uint64ToNative(
+        value,
+        'JSON unsigned integer values',
+      );
     case JsonInt(:final value):
       out.ref.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_INT.value;
       out.ref.data.int_value = value;
@@ -101,9 +105,7 @@ JsonValue _jsonValueFromNative(raw.mln_json_value value, int depth) {
     case 1:
       return JsonBool(value.data.bool_value);
     case 2:
-      final uintValue = value.data.uint_value;
-      _checkUnsignedInt63(uintValue, 'native JSON unsigned integer values');
-      return JsonUInt(uintValue);
+      return JsonUInt.fromBigInt(_uint64FromNative(value.data.uint_value));
     case 3:
       return JsonInt(value.data.int_value);
     case 4:
@@ -137,10 +139,17 @@ String _copyStringView(raw.mln_string_view view) {
   return view.data.cast<Utf8>().toDartString(length: view.size);
 }
 
-void _checkUnsignedInt63(int value, String name) {
-  if (value < 0 || value > _maxUnsignedInt63) {
-    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt63');
+int _uint64ToNative(BigInt value, String name) {
+  if (value < BigInt.zero || value > _maxUnsignedInt64) {
+    throwInvalidArgument('$name must be between 0 and $_maxUnsignedInt64');
   }
+  final signedBits = value > _maxSignedInt64 ? value - _uint64Modulus : value;
+  return signedBits.toInt();
+}
+
+BigInt _uint64FromNative(int value) {
+  final bits = BigInt.from(value);
+  return value < 0 ? bits + _uint64Modulus : bits;
 }
 
 void _checkJsonDepth(int depth) {

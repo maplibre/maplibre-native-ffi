@@ -6,16 +6,26 @@ import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins {
   application
-  alias(libs.plugins.kotlin.jvm)
+  id("org.jetbrains.kotlin.jvm")
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
-repositories { mavenCentral() }
+repositories {
+  providers.gradleProperty("maplibre.maven.localRepository").orNull?.let {
+    maven { url = rootProject.uri(it) }
+  }
+  mavenCentral()
+}
 
 val hostPlatform = HostPlatform.current()
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val lwjglNative = hostPlatform.lwjglNativeClassifier
+val usePublishedKotlin =
+  providers.gradleProperty("maplibre.usePublishedKotlin").map(String::toBoolean).getOrElse(false)
+val maplibrePublicationVersion = providers.gradleProperty("maplibre.maven.version").get()
+val maplibreRuntimeBackend =
+  providers.gradleProperty("maplibre.runtime.backend").getOrElse("vulkan")
 val lwjglMapJvmArgs = buildList {
   add("--enable-native-access=ALL-UNNAMED")
   if (hostPlatform.isMac) {
@@ -31,7 +41,15 @@ application {
 }
 
 dependencies {
-  implementation(project(":bindings:kotlin"))
+  if (usePublishedKotlin) {
+    implementation("org.maplibre.nativeffi:maplibre-native-ffi-jvm:$maplibrePublicationVersion")
+    runtimeOnly(
+      "org.maplibre.nativeffi:maplibre-native-ffi-runtime-$maplibreRuntimeBackend-jvm:" +
+        "$maplibrePublicationVersion:${hostPlatform.maplibreNativeClassifier}"
+    )
+  } else {
+    implementation(project(":bindings:kotlin"))
+  }
   implementation(platform(libs.lwjgl.bom))
   implementation(libs.lwjgl)
   implementation(libs.lwjgl.egl)
@@ -52,17 +70,23 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
+val nativeLibraryDirsProperty = "org.maplibre.nativeffi.library.dirs"
 val nativeLibraryPath = maplibreNativeC.libraryPath
-val nativeRuntimeLibraryPath =
-  maplibreNativeC.runtimeLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
+val nativeHostLibraryPath =
+  maplibreNativeC.hostLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
+val nativeLoaderLibraryPath =
+  maplibreNativeC.loaderLibraryDirs.joinToString(File.pathSeparator) { it.absolutePath }
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(lwjglMapJvmArgs)
-  systemProperty("org.lwjgl.librarypath", nativeRuntimeLibraryPath)
-  systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)
-  inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary")
-  inputs
-    .files(maplibreNativeC.runtimeLibraryDirs)
-    .withPropertyName("maplibreNativeCRuntimeLibraryDirs")
-  inputs.file(maplibreNativeC.propertiesFile).withPropertyName("maplibreNativeCProperties")
+  if (!usePublishedKotlin) {
+    systemProperty("org.lwjgl.librarypath", nativeHostLibraryPath)
+    systemProperty(nativeLibraryPathProperty, nativeLibraryPath.absolutePath)
+    systemProperty(nativeLibraryDirsProperty, nativeLoaderLibraryPath)
+    inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary")
+    inputs
+      .files(maplibreNativeC.loaderLibraryDirs)
+      .withPropertyName("maplibreNativeCLoaderLibraryDirs")
+    inputs.dir(maplibreNativeC.installDir).withPropertyName("maplibreNativeCInstallDir")
+  }
 }

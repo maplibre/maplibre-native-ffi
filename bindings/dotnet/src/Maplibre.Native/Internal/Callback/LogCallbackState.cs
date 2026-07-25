@@ -65,9 +65,9 @@ internal sealed unsafe class LogCallbackState : IDisposable
                 current = replacement;
                 old?.Retire();
             }
-            catch
+            catch (Exception error)
             {
-                replacement.Retire();
+                RetireAndSuppress(error, replacement);
                 throw;
             }
         }
@@ -201,6 +201,18 @@ internal sealed unsafe class LogCallbackState : IDisposable
 
             retired = true;
             Registry.Remove(token);
+        }
+    }
+
+    private static void RetireAndSuppress(Exception error, LogCallbackState state)
+    {
+        try
+        {
+            state.Retire();
+        }
+        catch (Exception cleanup)
+        {
+            error.Data["SuppressedCleanupException"] = cleanup;
         }
     }
 }

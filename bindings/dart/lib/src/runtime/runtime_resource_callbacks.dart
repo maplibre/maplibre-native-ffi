@@ -84,6 +84,10 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
         NativeCallable<
           raw.mln_dart_queued_resource_request_listenerFunction
         >.listener((Pointer<Void> request) {
+          if (request == nullptr) {
+            close();
+            return;
+          }
           final ran = runUpcall(
             () => _invokeQueuedResourceProvider(provider.callback, request),
           );
@@ -112,6 +116,15 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     raw.mln_dart_queued_resource_request_listenerFunction
   >
   callback;
+  var _retirementQueued = false;
+
+  void retire() {
+    if (_retirementQueued) {
+      return;
+    }
+    _retirementQueued = true;
+    _c.raw.mln_dart_queued_resource_provider_retire(pointer);
+  }
 
   @override
   void closeResources() {
@@ -134,7 +147,7 @@ void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
     if (!handle.isReleased) {
       try {
         handle.complete(
-          const ResourceResponse(
+          ResourceResponse(
             status: ResourceResponseStatus.error,
             errorReason: ResourceErrorReason.other,
             errorMessage: 'Dart resource provider callback was retired',
@@ -162,7 +175,7 @@ void _invokeQueuedResourceProvider(
       if (!handle.isReleased) {
         try {
           handle.complete(
-            const ResourceResponse(
+            ResourceResponse(
               status: ResourceResponseStatus.error,
               errorReason: ResourceErrorReason.other,
               errorMessage: 'Dart resource provider callback threw',
@@ -195,7 +208,10 @@ ResourceRequest _copyResourceRequest(
     usage: ResourceUsage.fromRawValue(request.usage),
     storagePolicy: ResourceStoragePolicy.fromRawValue(request.storage_policy),
     range: request.has_range
-        ? (start: request.range_start, end: request.range_end)
+        ? (
+            start: uint64FromNative(request.range_start),
+            end: uint64FromNative(request.range_end),
+          )
         : null,
     priorModifiedUnixMs: request.has_prior_modified
         ? request.prior_modified_unix_ms

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -171,6 +172,7 @@ auto to_c_source_type(mbgl::style::SourceType type) -> uint32_t {
     case mbgl::style::SourceType::CustomVector:
       return MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR;
   }
+  assert(false);
   return MLN_STYLE_SOURCE_TYPE_UNKNOWN;
 }
 
@@ -1006,6 +1008,7 @@ auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
     case mbgl::MapObserver::RenderMode::Full:
       return MLN_RENDER_MODE_FULL;
   }
+  assert(false);
   return MLN_RENDER_MODE_PARTIAL;
 }
 
@@ -1300,7 +1303,9 @@ auto to_native_map_mode(uint32_t mode) -> mbgl::MapMode {
     case MLN_MAP_MODE_TILE:
       return mbgl::MapMode::Tile;
     case MLN_MAP_MODE_CONTINUOUS:
+      return mbgl::MapMode::Continuous;
     default:
+      assert(false);
       return mbgl::MapMode::Continuous;
   }
 }
@@ -2095,7 +2100,9 @@ auto to_native_north_orientation(uint32_t orientation)
     case MLN_NORTH_ORIENTATION_LEFT:
       return mbgl::NorthOrientation::Leftwards;
     case MLN_NORTH_ORIENTATION_UP:
+      return mbgl::NorthOrientation::Upwards;
     default:
+      assert(false);
       return mbgl::NorthOrientation::Upwards;
   }
 }
@@ -2110,9 +2117,10 @@ auto from_native_north_orientation(mbgl::NorthOrientation orientation)
     case mbgl::NorthOrientation::Leftwards:
       return MLN_NORTH_ORIENTATION_LEFT;
     case mbgl::NorthOrientation::Upwards:
-    default:
       return MLN_NORTH_ORIENTATION_UP;
   }
+  assert(false);
+  return MLN_NORTH_ORIENTATION_UP;
 }
 
 auto to_native_constrain_mode(uint32_t mode) -> mbgl::ConstrainMode {
@@ -2124,7 +2132,9 @@ auto to_native_constrain_mode(uint32_t mode) -> mbgl::ConstrainMode {
     case MLN_CONSTRAIN_MODE_SCREEN:
       return mbgl::ConstrainMode::Screen;
     case MLN_CONSTRAIN_MODE_HEIGHT_ONLY:
+      return mbgl::ConstrainMode::HeightOnly;
     default:
+      assert(false);
       return mbgl::ConstrainMode::HeightOnly;
   }
 }
@@ -2138,9 +2148,10 @@ auto from_native_constrain_mode(mbgl::ConstrainMode mode) -> uint32_t {
     case mbgl::ConstrainMode::Screen:
       return MLN_CONSTRAIN_MODE_SCREEN;
     case mbgl::ConstrainMode::HeightOnly:
-    default:
       return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
   }
+  assert(false);
+  return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
 }
 
 auto to_native_viewport_mode(uint32_t mode) -> mbgl::ViewportMode {
@@ -2148,7 +2159,9 @@ auto to_native_viewport_mode(uint32_t mode) -> mbgl::ViewportMode {
     case MLN_VIEWPORT_MODE_FLIPPED_Y:
       return mbgl::ViewportMode::FlippedY;
     case MLN_VIEWPORT_MODE_DEFAULT:
+      return mbgl::ViewportMode::Default;
     default:
+      assert(false);
       return mbgl::ViewportMode::Default;
   }
 }
@@ -2158,9 +2171,10 @@ auto from_native_viewport_mode(mbgl::ViewportMode mode) -> uint32_t {
     case mbgl::ViewportMode::FlippedY:
       return MLN_VIEWPORT_MODE_FLIPPED_Y;
     case mbgl::ViewportMode::Default:
-    default:
       return MLN_VIEWPORT_MODE_DEFAULT;
   }
+  assert(false);
+  return MLN_VIEWPORT_MODE_DEFAULT;
 }
 
 auto from_native_edge_insets(const mbgl::EdgeInsets& insets)
@@ -2178,7 +2192,9 @@ auto to_native_tile_lod_mode(uint32_t mode) -> mbgl::TileLodMode {
     case MLN_TILE_LOD_MODE_DISTANCE:
       return mbgl::TileLodMode::Distance;
     case MLN_TILE_LOD_MODE_DEFAULT:
+      return mbgl::TileLodMode::Default;
     default:
+      assert(false);
       return mbgl::TileLodMode::Default;
   }
 }
@@ -2188,9 +2204,10 @@ auto from_native_tile_lod_mode(mbgl::TileLodMode mode) -> uint32_t {
     case mbgl::TileLodMode::Distance:
       return MLN_TILE_LOD_MODE_DISTANCE;
     case mbgl::TileLodMode::Default:
-    default:
       return MLN_TILE_LOD_MODE_DEFAULT;
   }
+  assert(false);
+  return MLN_TILE_LOD_MODE_DEFAULT;
 }
 
 auto from_native_projection_mode(const mbgl::ProjectionMode& mode)
@@ -2763,38 +2780,21 @@ auto map_request_still_image(mln_map* map) -> mln_status {
 }
 
 auto map_owner_thread(const mln_map* map) -> std::thread::id {
-  if (map == nullptr) {
-    return {};
-  }
   return map->owner_thread;
 }
 
-auto map_native(mln_map* map) -> mbgl::Map* {
-  if (map == nullptr) {
-    return nullptr;
-  }
-  return map->map.get();
-}
+auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
 
 auto map_latest_update(mln_map* map)
   -> std::shared_ptr<mbgl::UpdateParameters> {
-  if (map == nullptr || map->frontend == nullptr) {
-    return nullptr;
-  }
   return map->frontend->latest_update();
 }
 
 auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver* {
-  if (map == nullptr || map->frontend == nullptr) {
-    return nullptr;
-  }
   return map->frontend->renderer_observer();
 }
 
 auto map_run_render_jobs(mln_map* map) -> void {
-  if (map == nullptr || map->frontend == nullptr) {
-    return;
-  }
   map->frontend->run_render_jobs();
 }
 
@@ -4612,10 +4612,6 @@ auto map_move_style_layer(
   }
 
   auto layer = style.removeLayer(id);
-  if (!layer) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   style.addLayer(std::move(layer), before);
   return MLN_STATUS_OK;
 }

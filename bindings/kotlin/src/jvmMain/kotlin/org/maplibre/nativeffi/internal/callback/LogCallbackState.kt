@@ -99,7 +99,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
           previous = current.exchange(replacement)
         }
       } catch (error: Throwable) {
-        replacement.close()
+        closeAndSuppress(error, replacement)
         throw error
       }
       closeQuietly(previous)
@@ -122,6 +122,14 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       try {
         state?.close()
       } catch (_: RuntimeException) {}
+    }
+
+    private fun closeAndSuppress(error: Throwable, state: LogCallbackState?) {
+      try {
+        state?.close()
+      } catch (cleanup: Throwable) {
+        error.addSuppressed(cleanup)
+      }
     }
 
     private inline fun <R> withUpdateLock(block: () -> R): R {

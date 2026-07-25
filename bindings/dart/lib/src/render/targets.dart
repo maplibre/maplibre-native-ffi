@@ -25,38 +25,64 @@ final class RenderTargetExtent {
 }
 
 /// Closeable native byte buffer for reusable render readback storage.
-final class NativeBuffer {
+final class NativeBuffer implements Finalizable {
   /// Allocates [byteLength] bytes of native memory.
   NativeBuffer(int byteLength)
     : this._(byteLength, _allocateNativeBuffer(byteLength));
 
-  NativeBuffer._(this.byteLength, this._pointer);
+  NativeBuffer._(this.byteLength, this._pointer) {
+    _finalizer.attach(
+      this,
+      _pointer.cast<Void>(),
+      detach: _finalizerDetachToken,
+    );
+  }
+
+  static final NativeFinalizer _finalizer = NativeFinalizer(calloc.nativeFree);
 
   /// Allocated byte length.
   final int byteLength;
 
   Pointer<Uint8> _pointer;
+  final Object _finalizerDetachToken = Object();
 
   /// Whether this buffer has been freed.
   bool get isClosed => _pointer == nullptr;
 
-  /// Unsafe native pointer to the buffer storage.
+  /// Native storage address for FFI integrations.
   ///
-  /// The pointer is valid until [close] frees this buffer.
-  Pointer<Uint8> get unsafePointer {
+  /// The pointer is valid only until [close]. Prefer [copyBytes] and
+  /// [writeBytes] when direct FFI access is unnecessary.
+  NativePointer get unsafePointer {
     if (_pointer == nullptr) {
       throw StateError('native buffer has been closed');
     }
-    return _pointer;
+    return NativePointer(_pointer.address);
   }
 
-  /// Views the native storage as a Dart typed list.
-  Uint8List asTypedList({int? length}) {
+  /// Copies bytes from native storage into Dart-owned memory.
+  Uint8List copyBytes({int? length}) {
     final viewLength = length ?? byteLength;
     if (viewLength < 0 || viewLength > byteLength) {
       throw RangeError.range(viewLength, 0, byteLength, 'length');
     }
-    return unsafePointer.asTypedList(viewLength);
+    return Uint8List.fromList(_livePointer.asTypedList(viewLength));
+  }
+
+  /// Copies [bytes] into native storage starting at [offset].
+  void writeBytes(Uint8List bytes, {int offset = 0}) {
+    if (offset < 0 || offset > byteLength) {
+      throw RangeError.range(offset, 0, byteLength, 'offset');
+    }
+    if (bytes.length > byteLength - offset) {
+      throw RangeError.range(
+        bytes.length,
+        0,
+        byteLength - offset,
+        'bytes.length',
+      );
+    }
+    (_livePointer + offset).asTypedList(bytes.length).setAll(0, bytes);
   }
 
   /// Frees the native storage. The buffer must not be used afterwards.
@@ -64,8 +90,16 @@ final class NativeBuffer {
     if (_pointer == nullptr) {
       return;
     }
+    _finalizer.detach(_finalizerDetachToken);
     calloc.free(_pointer);
     _pointer = nullptr;
+  }
+
+  Pointer<Uint8> get _livePointer {
+    if (_pointer == nullptr) {
+      throw StateError('native buffer has been closed');
+    }
+    return _pointer;
   }
 }
 

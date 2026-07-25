@@ -369,7 +369,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_owned_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context) {}
 
@@ -386,7 +386,17 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(OpenGLTextureBackend&&) = delete;
   auto operator=(OpenGLTextureBackend&&) -> OpenGLTextureBackend& = delete;
 
-  ~OpenGLTextureBackend() override {
+  ~OpenGLTextureBackend() noexcept override {
+    try {
+      destroy_backend();
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("destroying OpenGL texture backend failed");
+    }
+  }
+
+  void destroy_backend() {
     auto cleanup = [this] {
       resource.reset();
       context.reset();

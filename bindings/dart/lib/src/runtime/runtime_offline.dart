@@ -1,19 +1,26 @@
 part of 'runtime.dart';
 
-final class OfflineOperationHandle {
+final class OfflineOperationHandle implements Finalizable {
   OfflineOperationHandle._(
     this._runtime,
-    this.id,
+    this._id,
     this._kind,
     this._resultKind,
-  );
+  ) {
+    _runtime._registerOfflineOperation(this);
+    _leakReporter = NativeLeakReporter(
+      this,
+      'OfflineOperationHandle',
+      Pointer<Void>.fromAddress(_id == 0 ? 1 : _id),
+    );
+  }
 
   final RuntimeHandle _runtime;
   final _OfflineOperationKind _kind;
   final _OfflineOperationResultKind _resultKind;
 
-  /// Native operation identifier copied into Dart.
-  final int id;
+  final int _id;
+  late final NativeLeakReporter _leakReporter;
 
   var _discarded = false;
 
@@ -33,11 +40,11 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_region_create_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outRegion,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return _copyOfflineRegionSnapshot(outRegion.value);
     });
   }
@@ -56,12 +63,12 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_region_get_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outRegion,
           outFound,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return outFound.value
           ? _copyOfflineRegionSnapshot(outRegion.value)
           : null;
@@ -81,11 +88,11 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_regions_list_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outRegions,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return _copyOfflineRegionList(outRegions.value);
     });
   }
@@ -103,11 +110,11 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_regions_merge_database_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outRegions,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return _copyOfflineRegionList(outRegions.value);
     });
   }
@@ -125,11 +132,11 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_region_update_metadata_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outRegion,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return _copyOfflineRegionSnapshot(outRegion.value);
     });
   }
@@ -147,11 +154,11 @@ final class OfflineOperationHandle {
       _check(
         _c.raw.mln_runtime_offline_region_get_status_take_result(
           _runtime._pointer,
-          id,
+          _id,
           outStatus,
         ),
       );
-      _discarded = true;
+      _markDiscarded();
       return _offlineRegionStatusFromNative(outStatus.ref);
     });
   }
@@ -161,8 +168,16 @@ final class OfflineOperationHandle {
     if (_discarded) {
       return;
     }
-    _check(_c.raw.mln_runtime_offline_operation_discard(_runtime._pointer, id));
+    _check(
+      _c.raw.mln_runtime_offline_operation_discard(_runtime._pointer, _id),
+    );
+    _markDiscarded();
+  }
+
+  void _markDiscarded() {
     _discarded = true;
+    _runtime._unregisterOfflineOperation(_id);
+    _leakReporter.close();
   }
 
   void _requireResult(
@@ -171,12 +186,12 @@ final class OfflineOperationHandle {
     String accessorName,
   ) {
     if (_discarded) {
-      throwInvalidState('offline operation $id has been discarded');
+      throwInvalidState('offline operation has been discarded');
     }
     if (_kind != expectedKind || _resultKind != expected) {
       throwInvalidState(
         '$accessorName cannot take ${_resultKind.name} result from '
-        '${_kind.name} operation $id; expected ${expected.name} result from '
+        '${_kind.name} operation; expected ${expected.name} result from '
         '${expectedKind.name}',
       );
     }
@@ -234,12 +249,12 @@ raw.mln_runtime_options _runtimeOptionsToNative(
   }
   final maximumCacheSize = options.maximumCacheSize;
   if (maximumCacheSize != null) {
-    if (maximumCacheSize < 0) {
-      throwInvalidArgument('maximum cache size must be non-negative');
-    }
     result.flags |=
         raw.mln_runtime_option_flag.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE.value;
-    result.maximum_cache_size = maximumCacheSize;
+    result.maximum_cache_size = uint64ToNative(
+      maximumCacheSize,
+      'maximum cache size',
+    );
   }
   return result;
 }
@@ -268,6 +283,11 @@ raw.mln_offline_region_definition _offlineRegionDefinitionToNative(
       result.data.geometry = _offlineGeometryDefinitionToNative(
         definition,
         allocator,
+      );
+    case UnknownOfflineRegionDefinition():
+      throwInvalidArgument(
+        'unknown offline region definition type ${definition.rawType} cannot '
+        'be used as native input',
       );
   }
   return result;
@@ -432,11 +452,15 @@ OfflineRegionInfo _offlineRegionInfoFromNative(
 OfflineRegionDefinition _offlineRegionDefinitionFromNative(
   raw.mln_offline_region_definition definition,
 ) {
-  if (definition.type ==
-      raw
-          .mln_offline_region_definition_type
-          .MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
-          .value) {
+  final tilePyramidTag = raw
+      .mln_offline_region_definition_type
+      .MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+      .value;
+  final geometryTag = raw
+      .mln_offline_region_definition_type
+      .MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+      .value;
+  if (definition.type == tilePyramidTag) {
     final tilePyramid = definition.data.tile_pyramid;
     return OfflineTilePyramidRegionDefinition(
       styleUrl: tilePyramid.style_url.cast<Utf8>().toDartString(),
@@ -446,6 +470,9 @@ OfflineRegionDefinition _offlineRegionDefinitionFromNative(
       pixelRatio: tilePyramid.pixel_ratio,
       includeIdeographs: tilePyramid.include_ideographs,
     );
+  }
+  if (definition.type != geometryTag) {
+    return UnknownOfflineRegionDefinition(definition.type);
   }
   final geometry = definition.data.geometry;
   return OfflineGeometryRegionDefinition(
@@ -465,12 +492,12 @@ OfflineRegionStatus _offlineRegionStatusFromNative(
     downloadState: OfflineRegionDownloadState.fromRawValue(
       status.download_state,
     ),
-    completedResourceCount: status.completed_resource_count,
-    completedResourceSize: status.completed_resource_size,
-    completedTileCount: status.completed_tile_count,
-    requiredTileCount: status.required_tile_count,
-    completedTileSize: status.completed_tile_size,
-    requiredResourceCount: status.required_resource_count,
+    completedResourceCount: uint64FromNative(status.completed_resource_count),
+    completedResourceSize: uint64FromNative(status.completed_resource_size),
+    completedTileCount: uint64FromNative(status.completed_tile_count),
+    requiredTileCount: uint64FromNative(status.required_tile_count),
+    completedTileSize: uint64FromNative(status.completed_tile_size),
+    requiredResourceCount: uint64FromNative(status.required_resource_count),
     requiredResourceCountIsPrecise: status.required_resource_count_is_precise,
     complete: status.complete,
   );

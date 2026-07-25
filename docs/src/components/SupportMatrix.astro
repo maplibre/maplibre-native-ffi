@@ -100,32 +100,27 @@ function supportLabel(
   return `${label} (${support.backends.map((backend) => backend.backendLabel).join(", ")})`;
 }
 
-function bindingSupport(
+function subprojectSupport(
+  subprojects: SubprojectSupport[],
   environment: EnvironmentColumn & { backends: Backend[] },
+  labelFor: (
+    subproject: SubprojectSupport,
+    support: EnvironmentSupport,
+  ) => string,
 ): { label: string; status: Status; url: string }[] {
-  return supportMatrix.bindings.flatMap((binding) => {
-    const support = environmentSupport(binding, environment.environment);
+  return subprojects.flatMap((subproject) => {
+    const support = environmentSupport(subproject, environment.environment);
     if (!support) {
       return [];
     }
     return [
       {
-        label: supportLabel(binding.label, environment, support),
+        label: labelFor(subproject, support),
         status: supportStatus(support),
-        url: sourceUrl(binding.sourceDirectory),
+        url: sourceUrl(subproject.sourceDirectory),
       },
     ];
   });
-}
-
-function exampleSupport(
-  environment: EnvironmentColumn,
-): { label: string; url: string }[] {
-  return supportMatrix.examples.flatMap((example) =>
-    environmentSupport(example, environment.environment)
-      ? [{ label: example.label, url: sourceUrl(example.sourceDirectory) }]
-      : [],
-  );
 }
 ---
 
@@ -152,8 +147,16 @@ function exampleSupport(
   </thead>
   <tbody>
     {environmentRows.map((environment) => {
-      const bindings = bindingSupport(environment);
-      const examples = exampleSupport(environment);
+      const bindings = subprojectSupport(
+        supportMatrix.bindings,
+        environment,
+        (binding, support) => supportLabel(binding.label, environment, support),
+      );
+      const examples = subprojectSupport(
+        supportMatrix.examples,
+        environment,
+        (example) => example.label,
+      );
       return (
         <tr>
           <th scope="row">{environment.label}</th>
@@ -187,7 +190,7 @@ function exampleSupport(
                 <a class="support-badge-link" href={example.url}>
                   <Badge
                     text={example.label}
-                    variant="default"
+                    variant={badgeVariant(example.status)}
                     size="small"
                   />
                 </a>{" "}

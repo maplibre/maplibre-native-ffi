@@ -16,14 +16,17 @@
 // generate the Dart struct declarations from one source of truth.
 
 #include <algorithm>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "dart_shim.h"
@@ -58,9 +61,26 @@ struct DartLogRecord {
   std::string message;
 };
 
+struct DartLogCallbackEntry {
+  mln_dart_log_record_listener listener = nullptr;
+  std::uint32_t consume = 0;
+  std::size_t in_flight = 0;
+  bool retired = false;
+};
+
 struct DartHandleLeakToken {
   std::string type_name;
 };
+
+std::mutex resource_request_tokens_mutex;
+std::condition_variable resource_request_tokens_changed;
+std::unordered_map<std::uint64_t, mln_resource_request_handle*>
+  resource_request_tokens;
+std::uint64_t next_resource_request_token = 1;
+std::mutex dart_log_setter_mutex;
+std::mutex dart_log_state_mutex;
+std::unordered_map<void*, DartLogCallbackEntry> dart_log_callbacks;
+void* active_dart_log_callback = nullptr;
 
 auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
   return rule_kind == DartResourceKindWildcard || rule_kind == request_kind;
@@ -138,12 +158,13 @@ void destroy_queued_request(DartQueuedResourceRequestView* request) noexcept {
 
 auto copy_log_record(
   std::uint32_t severity, std::uint32_t event, std::int64_t code,
-  const char* message
+  const char* message, bool retire_callback = false
 ) -> DartLogRecordView* {
   auto copy = std::make_unique<DartLogRecord>();
   copy->message = message == nullptr ? std::string{} : std::string{message};
   copy->view = DartLogRecordView{
     .owner = copy.get(),
+    .retire_callback = retire_callback,
     .severity = severity,
     .event = event,
     .code = code,
@@ -158,6 +179,18 @@ void destroy_log_record(DartLogRecordView* record) noexcept {
   }
   auto* owner = static_cast<DartLogRecord*>(record->owner);
   static_cast<void>(std::unique_ptr<DartLogRecord>{owner});
+}
+
+void queue_log_retirement(mln_dart_log_record_listener listener) noexcept {
+  if (listener == nullptr) {
+    return;
+  }
+  try {
+    listener(nullptr);
+  } catch (...) {
+    // The callback has already been removed from native dispatch. Listener
+    // delivery is notification-only at this boundary.
+  }
 }
 
 void destroy_handle_leak_token(void* token) noexcept {
@@ -208,16 +241,80 @@ extern "C" MLN_API auto mln_dart_log_callback(
   if (user_data == nullptr) {
     return 0;
   }
-  const auto& state = *static_cast<const DartLogCallbackState*>(user_data);
-  if (state.listener == nullptr) {
-    return state.consume;
+  mln_dart_log_record_listener listener = nullptr;
+  std::uint32_t consume = 0;
+  {
+    const auto lock = std::scoped_lock{dart_log_state_mutex};
+    const auto iterator = dart_log_callbacks.find(user_data);
+    if (iterator == dart_log_callbacks.end() || iterator->second.retired) {
+      return 0;
+    }
+    listener = iterator->second.listener;
+    consume = iterator->second.consume;
+    ++iterator->second.in_flight;
   }
-  try {
-    state.listener(copy_log_record(severity, event, code, message));
-  } catch (...) {
-    return state.consume;
+  if (listener != nullptr) {
+    try {
+      listener(copy_log_record(severity, event, code, message));
+    } catch (...) {
+      // Logging callbacks are notification-only at the Dart boundary.
+    }
   }
-  return state.consume;
+  mln_dart_log_record_listener retirement_listener = nullptr;
+  {
+    const auto lock = std::scoped_lock{dart_log_state_mutex};
+    const auto iterator = dart_log_callbacks.find(user_data);
+    if (iterator != dart_log_callbacks.end()) {
+      --iterator->second.in_flight;
+      if (iterator->second.retired && iterator->second.in_flight == 0) {
+        retirement_listener = iterator->second.listener;
+        dart_log_callbacks.erase(iterator);
+      }
+    }
+  }
+  queue_log_retirement(retirement_listener);
+  return consume;
+}
+
+extern "C" MLN_API auto mln_dart_log_set_callback(
+  mln_dart_log_callback_state* state
+) noexcept -> mln_status {
+  const auto setter_lock = std::scoped_lock{dart_log_setter_mutex};
+  if (state != nullptr) {
+    const auto state_lock = std::scoped_lock{dart_log_state_mutex};
+    dart_log_callbacks[state] = DartLogCallbackEntry{
+      .listener = state->listener,
+      .consume = state->consume,
+    };
+  }
+  const auto status = state == nullptr
+                        ? mln_log_clear_callback()
+                        : mln_log_set_callback(mln_dart_log_callback, state);
+  if (status != MLN_STATUS_OK) {
+    if (state != nullptr) {
+      const auto state_lock = std::scoped_lock{dart_log_state_mutex};
+      dart_log_callbacks.erase(state);
+    }
+    return status;
+  }
+  mln_dart_log_record_listener retirement_listener = nullptr;
+  {
+    const auto state_lock = std::scoped_lock{dart_log_state_mutex};
+    auto* retired_state = active_dart_log_callback;
+    active_dart_log_callback = state;
+    if (retired_state != nullptr && retired_state != state) {
+      const auto iterator = dart_log_callbacks.find(retired_state);
+      if (iterator != dart_log_callbacks.end()) {
+        iterator->second.retired = true;
+        if (iterator->second.in_flight == 0) {
+          retirement_listener = iterator->second.listener;
+          dart_log_callbacks.erase(iterator);
+        }
+      }
+    }
+  }
+  queue_log_retirement(retirement_listener);
+  return MLN_STATUS_OK;
 }
 
 extern "C" MLN_API void mln_dart_log_record_destroy(void* record) noexcept {
@@ -324,6 +421,113 @@ extern "C" MLN_API void mln_dart_resource_provider_request_destroy(
   void* request
 ) noexcept {
   destroy_queued_request(static_cast<DartQueuedResourceRequestView*>(request));
+}
+
+extern "C" MLN_API void mln_dart_queued_resource_provider_retire(
+  mln_dart_queued_resource_provider* provider
+) noexcept {
+  if (provider != nullptr && provider->listener != nullptr) {
+    provider->listener(nullptr);
+  }
+}
+
+extern "C" MLN_API void mln_dart_custom_geometry_callbacks_retire(
+  mln_custom_geometry_source_tile_callback fetch_tile,
+  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
+) noexcept {
+  constexpr auto RetirementTile = mln_canonical_tile_id{
+    .z = std::numeric_limits<std::uint8_t>::max(),
+    .x = 0,
+    .y = 0,
+  };
+  if (fetch_tile != nullptr) {
+    fetch_tile(user_data, RetirementTile);
+  }
+  if (cancel_tile != nullptr) {
+    cancel_tile(user_data, RetirementTile);
+  }
+}
+
+extern "C" MLN_API auto mln_dart_resource_request_token_create(
+  mln_resource_request_handle* handle
+) noexcept -> std::uint64_t {
+  if (handle == nullptr) {
+    return 0;
+  }
+  try {
+    const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+    auto token = next_resource_request_token++;
+    while (token == 0 || resource_request_tokens.contains(token)) {
+      token = next_resource_request_token++;
+    }
+    resource_request_tokens.emplace(token, handle);
+    return token;
+  } catch (...) {
+    return 0;
+  }
+}
+
+extern "C" MLN_API auto mln_dart_resource_request_token_cancelled(
+  std::uint64_t token, bool* out_cancelled
+) noexcept -> mln_status {
+  if (token == 0 || out_cancelled == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return mln_resource_request_cancelled(iterator->second, out_cancelled);
+}
+
+extern "C" MLN_API auto mln_dart_resource_request_token_complete(
+  std::uint64_t token, const mln_resource_response* response
+) noexcept -> mln_status {
+  if (token == 0 || response == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = iterator->second;
+  const auto status = mln_resource_request_complete(handle, response);
+  mln_resource_request_release(handle);
+  resource_request_tokens.erase(iterator);
+  resource_request_tokens_changed.notify_all();
+  return status;
+}
+
+extern "C" MLN_API auto mln_dart_resource_request_token_release(
+  std::uint64_t token
+) noexcept -> mln_status {
+  if (token == 0) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_resource_request_release(iterator->second);
+  resource_request_tokens.erase(iterator);
+  resource_request_tokens_changed.notify_all();
+  return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API auto mln_dart_resource_request_token_wait(
+  std::uint64_t token
+) noexcept -> mln_status {
+  if (token == 0) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto lock = std::unique_lock{resource_request_tokens_mutex};
+  resource_request_tokens_changed.wait(lock, [token] {
+    return !resource_request_tokens.contains(token);
+  });
+  return MLN_STATUS_OK;
 }
 
 extern "C" MLN_API void mln_dart_test_invoke_custom_geometry_tile_callback(

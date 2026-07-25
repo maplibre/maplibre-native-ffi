@@ -16,12 +16,19 @@ final class _LogCallbackState extends RetainedCallbackState {
   _LogCallbackState(LogCallback callback, {required bool consume}) {
     listener = NativeCallable<raw.mln_dart_log_record_listenerFunction>.listener(
       (Pointer<Void> record) {
+        if (record == nullptr) {
+          close();
+          return;
+        }
         final ran = runUpcall(() {
           try {
+            final copied = record.cast<raw.mln_dart_log_record>().ref;
+            if (copied.retire_callback) {
+              close();
+              return;
+            }
             try {
-              callback(
-                _copyLogRecord(record.cast<raw.mln_dart_log_record>().ref),
-              );
+              callback(_copyLogRecord(copied));
             } catch (_) {
               // Log callbacks are notification boundaries; user exceptions are
               // contained so they never surface from native callback delivery.
@@ -66,6 +73,8 @@ final class Maplibre {
   Maplibre._();
 
   static final MaplibreNativeCApi _c = MaplibreNativeCApi.open();
+  // Retains the Dart listener while native code owns its callback pointer.
+  // ignore: unused_field
   static _LogCallbackState? _logCallbackState;
 
   /// Returns the native C ABI contract version.
@@ -92,20 +101,14 @@ final class Maplibre {
 
   /// Sets MapLibre Native's process-global network status.
   static void setNetworkStatus(NetworkStatus status) {
-    _checkStatus(_c.raw.mln_network_status_set(status.rawValueForSet()));
+    _checkStatus(_c.raw.mln_network_status_set(status.rawValue));
   }
 
   /// Sets the process-global native log callback.
   static void setLogCallback(LogCallback callback, {bool consume = false}) {
     final state = _LogCallbackState(callback, consume: consume);
     try {
-      _checkStatus(
-        _c.raw.mln_log_set_callback(
-          _c.dartLogCallback(),
-          state.pointer.cast<Void>(),
-        ),
-      );
-      _logCallbackState?.close();
+      _checkStatus(_c.raw.mln_dart_log_set_callback(state.pointer));
       _logCallbackState = state;
     } catch (_) {
       state.close();
@@ -115,8 +118,7 @@ final class Maplibre {
 
   /// Clears the process-global native log callback.
   static void clearLogCallback() {
-    _checkStatus(_c.raw.mln_log_clear_callback());
-    _logCallbackState?.close();
+    _checkStatus(_c.raw.mln_dart_log_set_callback(nullptr));
     _logCallbackState = null;
   }
 
@@ -190,19 +192,19 @@ final class RenderBackendMask {
 
 /// Process-global network status.
 final class NetworkStatus {
-  const NetworkStatus._(this.rawValue, this.name, this._canSet);
+  const NetworkStatus._(this.rawValue, this.name);
 
   /// Network requests are allowed.
-  static const online = NetworkStatus._(1, 'online', true);
+  static const online = NetworkStatus._(1, 'online');
 
   /// Online source network requests are paused.
-  static const offline = NetworkStatus._(2, 'offline', true);
+  static const offline = NetworkStatus._(2, 'offline');
 
   /// Creates the public network-status value for a raw native value.
   factory NetworkStatus.fromRawValue(int rawValue) => switch (rawValue) {
     1 => online,
     2 => offline,
-    _ => NetworkStatus._(rawValue, 'unknown', false),
+    _ => NetworkStatus._(rawValue, 'unknown'),
   };
 
   /// Raw native value.
@@ -210,16 +212,6 @@ final class NetworkStatus {
 
   /// Human-readable status name.
   final String name;
-
-  final bool _canSet;
-
-  /// Returns the raw value for native setter calls.
-  int rawValueForSet() {
-    if (!_canSet) {
-      throwInvalidArgument('unknown network status $rawValue cannot be set');
-    }
-    return rawValue;
-  }
 
   @override
   String toString() => name == 'unknown' ? 'unknown($rawValue)' : name;

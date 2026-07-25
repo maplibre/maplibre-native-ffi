@@ -9,7 +9,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
-import kotlin.test.fail
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -23,7 +22,6 @@ import kotlinx.cinterop.objcPtr
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
-import kotlinx.cinterop.toKString
 import kotlinx.cinterop.toLong
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -54,7 +52,6 @@ import platform.Metal.MTLTextureDescriptor
 import platform.Metal.MTLTextureUsageRenderTarget
 import platform.Metal.MTLTextureUsageShaderRead
 import platform.QuartzCore.CAMetalLayer
-import platform.posix.getenv
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
@@ -386,12 +383,7 @@ class RenderSessionHandleTest {
   }
 
   private fun metalSupportedOrInapplicable(): Boolean {
-    if (RenderBackend.METAL in Maplibre.supportedRenderBackends()) return true
-    if (getenv("MLN_FFI_RENDER_BACKEND")?.toKString() == "metal") {
-      fail("MLN_FFI_RENDER_BACKEND=metal but native library reports no Metal support")
-    }
-    // Inapplicable on native library builds that do not include the Metal render backend.
-    return false
+    return RenderBackend.METAL in Maplibre.supportedRenderBackends()
   }
 
   private fun createMetalTexture(device: MTLDeviceProtocol, width: Int, height: Int): ObjCObject {

@@ -103,9 +103,10 @@ raw.mln_unit_bezier unitBezierToNative(UnitBezier value) {
 }
 
 /// Materializes Dart camera options into a native C struct.
-raw.mln_camera_options cameraOptionsToNative(CameraOptions value) {
-  final result = Struct.create<raw.mln_camera_options>();
-  result.size = sizeOf<raw.mln_camera_options>();
+raw.mln_camera_options cameraOptionsToNative(
+  CameraOptions value,
+  raw.mln_camera_options result,
+) {
   final center = value.center;
   if (center != null) {
     result.fields |= raw.mln_camera_option_field.MLN_CAMERA_OPTION_CENTER.value;
@@ -214,9 +215,10 @@ CameraOptions cameraOptionsFromNative(raw.mln_camera_options value) {
 }
 
 /// Materializes Dart camera fit options into a native C struct.
-raw.mln_camera_fit_options cameraFitOptionsToNative(CameraFitOptions value) {
-  final result = Struct.create<raw.mln_camera_fit_options>();
-  result.size = sizeOf<raw.mln_camera_fit_options>();
+raw.mln_camera_fit_options cameraFitOptionsToNative(
+  CameraFitOptions value,
+  raw.mln_camera_fit_options result,
+) {
   final padding = value.padding;
   if (padding != null) {
     result.fields |=
@@ -239,9 +241,10 @@ raw.mln_camera_fit_options cameraFitOptionsToNative(CameraFitOptions value) {
 }
 
 /// Materializes Dart bound options into a native C struct.
-raw.mln_bound_options boundOptionsToNative(BoundOptions value) {
-  final result = Struct.create<raw.mln_bound_options>();
-  result.size = sizeOf<raw.mln_bound_options>();
+raw.mln_bound_options boundOptionsToNative(
+  BoundOptions value,
+  raw.mln_bound_options result,
+) {
   final bounds = value.bounds;
   if (bounds != null) {
     result.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value;
@@ -306,9 +309,10 @@ BoundOptions boundOptionsFromNative(raw.mln_bound_options value) {
 }
 
 /// Materializes Dart free camera options into a native C struct.
-raw.mln_free_camera_options freeCameraOptionsToNative(FreeCameraOptions value) {
-  final result = Struct.create<raw.mln_free_camera_options>();
-  result.size = sizeOf<raw.mln_free_camera_options>();
+raw.mln_free_camera_options freeCameraOptionsToNative(
+  FreeCameraOptions value,
+  raw.mln_free_camera_options result,
+) {
   final position = value.position;
   if (position != null) {
     result.fields |=
@@ -361,9 +365,8 @@ FreeCameraOptions freeCameraOptionsFromNative(
 /// Materializes Dart projection mode options into a native C struct.
 raw.mln_projection_mode projectionModeOptionsToNative(
   ProjectionModeOptions value,
+  raw.mln_projection_mode result,
 ) {
-  final result = Struct.create<raw.mln_projection_mode>();
-  result.size = sizeOf<raw.mln_projection_mode>();
   final axonometric = value.axonometric;
   if (axonometric != null) {
     result.fields |=
@@ -424,9 +427,8 @@ ProjectionModeOptions projectionModeOptionsFromNative(
 /// Materializes Dart viewport options into a native C struct.
 raw.mln_map_viewport_options mapViewportOptionsToNative(
   MapViewportOptions value,
+  raw.mln_map_viewport_options result,
 ) {
-  final result = Struct.create<raw.mln_map_viewport_options>();
-  result.size = sizeOf<raw.mln_map_viewport_options>();
   final northOrientation = value.northOrientation;
   if (northOrientation != null) {
     result.fields |= raw
@@ -508,9 +510,10 @@ MapViewportOptions mapViewportOptionsFromNative(
 }
 
 /// Materializes Dart tile options into a native C struct.
-raw.mln_map_tile_options mapTileOptionsToNative(MapTileOptions value) {
-  final result = Struct.create<raw.mln_map_tile_options>();
-  result.size = sizeOf<raw.mln_map_tile_options>();
+raw.mln_map_tile_options mapTileOptionsToNative(
+  MapTileOptions value,
+  raw.mln_map_tile_options result,
+) {
   final prefetchZoomDelta = value.prefetchZoomDelta;
   if (prefetchZoomDelta != null) {
     result.fields |= raw
@@ -616,9 +619,10 @@ MapTileOptions mapTileOptionsFromNative(raw.mln_map_tile_options value) {
 }
 
 /// Materializes Dart animation options into a native C struct.
-raw.mln_animation_options animationOptionsToNative(AnimationOptions value) {
-  final result = Struct.create<raw.mln_animation_options>();
-  result.size = sizeOf<raw.mln_animation_options>();
+raw.mln_animation_options animationOptionsToNative(
+  AnimationOptions value,
+  raw.mln_animation_options result,
+) {
   final durationMs = value.durationMs;
   if (durationMs != null) {
     result.fields |=

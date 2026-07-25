@@ -1,4 +1,4 @@
-# Regenerate with `dart run ffigen --config ffigen.yaml` from bindings/dart.
+# Regenerate with `mise run //bindings/dart:ffigen` from the repository root.
 name: MaplibreNativeC
 description: Private generated declarations for the MapLibre Native C API.
 output: lib/src/internal/c/maplibre_native_c.g.dart

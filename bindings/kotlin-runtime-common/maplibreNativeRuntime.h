@@ -1,0 +1,1 @@
+/* The runtime cinterop carries a static archive and declares no Kotlin API. */

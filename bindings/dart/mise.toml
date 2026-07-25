@@ -1,12 +1,14 @@
-[tools]
-"core:dart" = "3.10.9"
-
 [tasks.pub-get]
 run = "dart pub get"
 
 [tasks.ffigen]
 depends = [":pub-get"]
-run = "dart run ffigen --config ffigen.yaml"
+run = '''
+clang_resource_dir="$(clang -print-resource-dir)"
+dart run ffigen \
+  --config ffigen.yaml \
+  --compiler-opts "-isystem $clang_resource_dir/include"
+'''
 sources = [
   "ffigen.yaml",
   "pubspec.yaml",
@@ -31,7 +33,10 @@ config = config.replace(
 Path('ffigen.check.yaml').write_text(config)
 PY
 trap 'rm -f ffigen.check.yaml .dart_tool/maplibre_native_c.check.g.dart' EXIT
-dart run ffigen --config ffigen.check.yaml
+clang_resource_dir="$(clang -print-resource-dir)"
+dart run ffigen \
+  --config ffigen.check.yaml \
+  --compiler-opts "-isystem $clang_resource_dir/include"
 cmp --silent .dart_tool/maplibre_native_c.check.g.dart lib/src/internal/c/maplibre_native_c.g.dart
 """
 
@@ -46,8 +51,22 @@ run = "dart analyze"
 depends = [":analyze"]
 
 [tasks.test]
-depends = ["//:ensure-native-library", ":ffigen"]
-run = "dart test"
-
-[tasks.ci]
-depends = [":build", ":test"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [
+  { task = "//:build", args = ["{{usage.preset}}"] },
+  ":analyze",
+]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  native_library="$native_install_dir/lib/libmaplibre-native-c.dylib"
+else
+  native_library="$native_install_dir/lib/libmaplibre-native-c.so"
+fi
+MLN_FFI_NATIVE_LIBRARY="$native_library" dart test
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MLN_FFI_NATIVE_LIBRARY="$native_install_dir/bin/maplibre-native-c.dll" dart test
+'''

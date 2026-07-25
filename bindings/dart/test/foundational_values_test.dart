@@ -2,12 +2,14 @@ import 'dart:ffi';
 import 'dart:typed_data';
 
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
 import 'package:maplibre_native_ffi/src/internal/memory/memory.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/geometry.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/json.dart';
 import 'package:maplibre_native_ffi/src/internal/struct/struct.dart';
+import 'package:maplibre_native_ffi/src/internal/value/uint64.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -26,6 +28,44 @@ void main() {
     );
   });
 
+  test('full-range uint64 conversion preserves native bit patterns', () {
+    final maximum = (BigInt.one << 64) - BigInt.one;
+
+    expect(uint64ToNative(maximum, 'value'), -1);
+    expect(uint64FromNative(-1), maximum);
+    expect(
+      () => uint64ToNative(maximum + BigInt.one, 'value'),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+  });
+
+  test('public collection values defensively copy mutable inputs', () {
+    final jsonValues = <JsonValue>[const JsonString('before')];
+    final json = JsonArray(jsonValues);
+    jsonValues[0] = const JsonString('after');
+
+    final bytes = Uint8List.fromList([1, 2, 3]);
+    final response = ResourceResponse(
+      status: ResourceResponseStatus.ok,
+      bytes: bytes,
+    );
+    bytes[0] = 9;
+
+    final coordinates = <LatLng>[const LatLng(1, 2)];
+    final line = LineStringGeometry(coordinates);
+    coordinates[0] = const LatLng(3, 4);
+
+    expect((json.values.single as JsonString).value, 'before');
+    expect(() => json.values.add(const JsonNull()), throwsUnsupportedError);
+    expect(response.bytes, [1, 2, 3]);
+    expect(() => response.bytes![0] = 9, throwsUnsupportedError);
+    expect(line.coordinates.single, const LatLng(1, 2));
+    expect(
+      () => line.coordinates.add(const LatLng(5, 6)),
+      throwsUnsupportedError,
+    );
+  });
+
   test('camera options materialize field masks and semantic fields', () {
     final native = cameraOptionsToNative(
       const CameraOptions(
@@ -34,6 +74,7 @@ void main() {
         padding: EdgeInsets(top: 4, left: 5, bottom: 6, right: 7),
         fieldOfView: 8,
       ),
+      MaplibreNativeCApi.open().raw.mln_camera_options_default(),
     );
 
     expect(
@@ -63,6 +104,7 @@ void main() {
         durationMs: 100,
         easing: UnitBezier(0, 0.25, 0.75, 1),
       ),
+      MaplibreNativeCApi.open().raw.mln_animation_options_default(),
     );
 
     expect(
@@ -82,7 +124,7 @@ void main() {
   test('geometry values materialize and copy native descriptor trees', () {
     withNativeArena((arena) {
       final native = nativeGeometry(
-        const GeometryCollection([
+        GeometryCollection([
           PointGeometry(LatLng(1, 2)),
           LineStringGeometry([LatLng(3, 4), LatLng(5, 6)]),
         ]),
@@ -111,10 +153,10 @@ void main() {
     () {
       withNativeArena((arena) {
         final native = nativeGeoJson(
-          const FeatureGeoJson(
-            geometry: PointGeometry(LatLng(7, 8)),
+          FeatureGeoJson(
+            geometry: const PointGeometry(LatLng(7, 8)),
             properties: [JsonMember('rank', JsonUInt(4))],
-            identifier: StringFeatureIdentifier('feature-1'),
+            identifier: const StringFeatureIdentifier('feature-1'),
           ),
           arena,
         );
@@ -137,35 +179,33 @@ void main() {
     },
   );
 
-  test(
-    'GeoJSON identifiers reject unsupported unsigned integer values before C calls',
-    () {
-      expect(
-        () => withNativeArena(
-          (arena) => nativeGeoJson(
-            const FeatureGeoJson(
-              geometry: EmptyGeometry(),
-              identifier: UIntFeatureIdentifier(-1),
-            ),
-            arena,
+  test('GeoJSON identifiers preserve the full unsigned 64-bit domain', () {
+    expect(
+      () => withNativeArena(
+        (arena) => nativeGeoJson(
+          FeatureGeoJson(
+            geometry: const EmptyGeometry(),
+            identifier: UIntFeatureIdentifier(-1),
           ),
+          arena,
         ),
-        throwsA(isA<InvalidArgumentException>()),
-      );
-      expect(
-        () => withNativeArena(
-          (arena) => nativeGeoJson(
-            const FeatureGeoJson(
-              geometry: EmptyGeometry(),
-              identifier: UIntFeatureIdentifier(0x8000000000000000),
-            ),
-            arena,
-          ),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    final maximum = (BigInt.one << 64) - BigInt.one;
+    withNativeArena((arena) {
+      final native = nativeGeoJson(
+        FeatureGeoJson(
+          geometry: const EmptyGeometry(),
+          identifier: UIntFeatureIdentifier.fromBigInt(maximum),
         ),
-        throwsA(isA<InvalidArgumentException>()),
+        arena,
       );
-    },
-  );
+      expect(native.pointer.ref.data.feature.ref.identifier.uint_value, -1);
+      final copied = geoJsonFromNative(native.pointer.ref) as FeatureGeoJson;
+      expect((copied.identifier as UIntFeatureIdentifier).value, maximum);
+    });
+  });
 
   test(
     'GeoJSON identifiers reject non-finite double values before C calls',
@@ -173,7 +213,7 @@ void main() {
       expect(
         () => withNativeArena(
           (arena) => nativeGeoJson(
-            const FeatureGeoJson(
+            FeatureGeoJson(
               geometry: EmptyGeometry(),
               identifier: DoubleFeatureIdentifier(double.infinity),
             ),
@@ -188,9 +228,9 @@ void main() {
   test('JSON values materialize and copy native descriptor trees', () {
     withNativeArena((arena) {
       final native = nativeJsonValue(
-        const JsonObject([
-          JsonMember('name', JsonString('maplibre')),
-          JsonMember('enabled', JsonBool(true)),
+        JsonObject([
+          const JsonMember('name', JsonString('maplibre')),
+          const JsonMember('enabled', JsonBool(true)),
           JsonMember('values', JsonArray([JsonInt(-1), JsonUInt(2)])),
         ]),
         arena,
@@ -213,28 +253,25 @@ void main() {
     });
   });
 
-  test('JSON unsigned integer descriptors reject unsupported values', () {
+  test('JSON unsigned integer descriptors preserve all uint64 values', () {
     expect(
-      () => withNativeArena(
-        (arena) => nativeJsonValue(const JsonUInt(-1), arena),
-      ),
+      () => withNativeArena((arena) => nativeJsonValue(JsonUInt(-1), arena)),
       throwsA(isA<InvalidArgumentException>()),
     );
-    expect(
-      () => withNativeArena(
-        (arena) => nativeJsonValue(const JsonUInt(0x8000000000000000), arena),
-      ),
-      throwsA(isA<InvalidArgumentException>()),
-    );
-
+    final maximum = (BigInt.one << 64) - BigInt.one;
+    withNativeArena((arena) {
+      final native = nativeJsonValue(JsonUInt.fromBigInt(maximum), arena);
+      expect(native.pointer.ref.data.uint_value, -1);
+      expect(
+        (jsonValueFromNative(native.pointer.ref) as JsonUInt).value,
+        maximum,
+      );
+    });
     final nativeHighBit = Struct.create<raw.mln_json_value>();
     nativeHighBit.size = sizeOf<raw.mln_json_value>();
     nativeHighBit.type = raw.mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT.value;
     nativeHighBit.data.uint_value = -1;
-    expect(
-      () => jsonValueFromNative(nativeHighBit),
-      throwsA(isA<InvalidArgumentException>()),
-    );
+    expect((jsonValueFromNative(nativeHighBit) as JsonUInt).value, maximum);
   });
 
   test('JSON double descriptors reject non-finite values before C calls', () {
@@ -247,11 +284,11 @@ void main() {
   });
 
   test('query descriptors preserve public semantic fields', () {
-    const geometry = RenderedQueryLineString([
+    final geometry = RenderedQueryLineString([
       ScreenPoint(1, 2),
       ScreenPoint(3, 4),
     ]);
-    const renderedOptions = RenderedFeatureQueryOptions(
+    final renderedOptions = RenderedFeatureQueryOptions(
       layerIds: ['roads'],
       filter: JsonArray([
         JsonString('=='),
@@ -259,7 +296,7 @@ void main() {
         JsonString('primary'),
       ]),
     );
-    const sourceOptions = SourceFeatureQueryOptions(
+    final sourceOptions = SourceFeatureQueryOptions(
       sourceLayerIds: ['transportation'],
     );
 
