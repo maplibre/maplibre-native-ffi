@@ -526,30 +526,6 @@ url = "https://dl.google.com/go/go1.26.3.windows-arm64.zip"
 checksum = "sha256:20d2ceafb4ed41b96b879010927b28bc92a5be57a7c1801ce365a9ca51d3224a"
 url = "https://dl.google.com/go/go1.26.3.windows-amd64.zip"
 
-[[tools."http:zig"]]
-version = "0.16.0"
-backend = "http:zig"
-
-[tools."http:zig"."platforms.linux-arm64"]
-checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
-url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
-
-[tools."http:zig"."platforms.linux-x64"]
-checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
-url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
-
-[tools."http:zig"."platforms.macos-arm64"]
-checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
-url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
-
-[tools."http:zig"."platforms.windows-arm64"]
-checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
-url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
-
-[tools."http:zig"."platforms.windows-x64"]
-checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
-url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip"
-
 [[tools.java]]
 version = "zulu-25.34.17.0"
 backend = "core:java"

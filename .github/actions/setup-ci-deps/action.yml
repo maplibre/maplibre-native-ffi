@@ -67,12 +67,28 @@ runs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
+    # Zig unpacks packages into a project-local `zig-pkg/`, but the downloaded
+    # tarballs live in the global cache, shared across every project. Caching
+    # the global cache keeps SDL's ~27 source dependencies (most served by
+    # gitlab.freedesktop.org, which generates archives per request and returns
+    # 5xx under load) off the network. Zig resolves the global cache to
+    # `%LOCALAPPDATA%\zig` on Windows and `~/.cache/zig` everywhere else.
+    - name: Cache Zig packages
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cache/zig
+          ~/AppData/Local/zig
+        key: ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
+
     - name: Cache OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
         path: ~/setup-ohos-sdk
-        key: ohos-sdk-v3-v6.1-${{ runner.os }}-${{ runner.arch }}
+        key: ohos-sdk-v4-v6.1-${{ runner.os }}-${{ runner.arch }}
 
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
@@ -90,15 +106,22 @@ runs:
             --repo openharmony-rs/ohos-sdk \
             --pattern "${archive}*"
 
-          cat "${archive}".a* > "$archive"
+          # Stream the split parts through sha256sum and tar rather than
+          # concatenating them to disk first. The runner does not have room for
+          # the parts, a joined copy, and the extracted tree at once, and
+          # overflowing the disk kills the runner agent itself rather than
+          # failing the step. Intermediates are removed as soon as they are
+          # consumed so the cached SDK stays lean too.
           expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
-          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          actual_sha="$(cat "${archive}".a* | sha256sum | awk '{print $1}')"
           if [[ "$actual_sha" != "$expected_sha" ]]; then
             echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
             exit 1
           fi
-          tar -xf "$archive"
+          cat "${archive}".a* | tar -xf -
+          rm -f "${archive}".a*
           unzip -q linux/native-*.zip -d linux
+          rm -f linux/native-*.zip
         fi
 
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"

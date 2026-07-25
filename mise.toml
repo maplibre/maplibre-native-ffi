@@ -62,10 +62,7 @@ swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat",
 
 # Other ecosystems
 "core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
-"core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
-# Zig's native Windows ARM64 0.16.0 build crashes while loading build.zig, so
-# Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
-"http:zig" = { version = "0.16.0", os = ["windows/arm64"], url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip", checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e", bin_path = "zig-x86_64-windows-0.16.0" }
+"core:zig" = "0.16.0"
 "core:go" = "1.26.3"
 "aqua:mvdan/gofumpt" = "0.10.0"
 "core:dotnet" = "10.0.203"
