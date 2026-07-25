@@ -1,3 +1,6 @@
+[tools]
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+
 [deps.zig]
 auto = true
 description = "Fetch Zig package dependencies."

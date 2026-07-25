@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Stage, verify, or publish Kotlin Multiplatform snapshots."
+#MISE tools={java="{{vars.java_version}}"}
 
 set -euo pipefail
 

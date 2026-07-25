@@ -1,3 +1,10 @@
+[tools]
+# Zig 0.16.0 has no working Windows ARM64 story: the native aarch64 build exits
+# non-zero with no diagnostic while loading build.zig, and the x64 build under
+# emulation hangs in `zig build` until the job timeout. The Zig binding and
+# examples are skipped there; the C API tests are plain C and do not need Zig.
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+
 [deps.zig]
 auto = true
 description = "Fetch Zig package dependencies."

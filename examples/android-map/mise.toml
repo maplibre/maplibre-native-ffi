@@ -1,3 +1,6 @@
+[tools]
+"core:java" = "{{vars.java_version}}"
+
 [tasks.build]
 description = "Build the Android map example."
 usage = '''

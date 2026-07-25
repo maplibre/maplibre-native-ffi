@@ -1,3 +1,6 @@
+[tools]
+"core:dotnet" = "{{vars.dotnet_version}}"
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
