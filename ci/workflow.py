@@ -42,7 +42,10 @@ def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
     if target_platform == "linux":
-        return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-latest"
+        # Linux runners are pinned because the runner image's glibc sets the
+        # minimum glibc our published natives require. See the glibc_floor
+        # variable in mise.linux.toml.
+        return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
     if target_platform == "windows":
@@ -86,7 +89,10 @@ def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
         return [f"mise run //bindings/rust:build:ohos {preset}"]
-    return [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+    if target_platform == "linux":
+        commands.append(f"mise run check-glibc-floor {preset}")
+    return commands
 
 
 def consumer_commands(source: dict[str, object], preset: str) -> list[str]:

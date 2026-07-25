@@ -65,10 +65,11 @@ jobs:
       matrix:
         include:
           - preset: linux-x64-egl
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             package: true
             native_commands: >-
-              mise run test linux-x64-egl
+              mise run test linux-x64-egl &&
+              mise run check-glibc-floor linux-x64-egl
             consumer_commands: >-
               mise run //bindings/rust:test linux-x64-egl &&
               mise run //examples/rust-map:check linux-x64-egl &&
@@ -83,10 +84,11 @@ jobs:
               mise run //bindings/go:test linux-x64-egl &&
               mise run //bindings/python:test linux-x64-egl
           - preset: linux-x64-vulkan
-            runner: ubuntu-latest
+            runner: ubuntu-24.04
             package: true
             native_commands: >-
-              mise run test linux-x64-vulkan
+              mise run test linux-x64-vulkan &&
+              mise run check-glibc-floor linux-x64-vulkan
             consumer_commands: >-
               mise run //bindings/rust:test linux-x64-vulkan &&
               mise run //examples/rust-map:check linux-x64-vulkan &&
@@ -104,7 +106,8 @@ jobs:
             runner: ubuntu-24.04-arm
             package: true
             native_commands: >-
-              mise run test linux-arm64-egl
+              mise run test linux-arm64-egl &&
+              mise run check-glibc-floor linux-arm64-egl
             consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-egl &&
               mise run //examples/rust-map:check linux-arm64-egl &&
@@ -122,7 +125,8 @@ jobs:
             runner: ubuntu-24.04-arm
             package: true
             native_commands: >-
-              mise run test linux-arm64-vulkan
+              mise run test linux-arm64-vulkan &&
+              mise run check-glibc-floor linux-arm64-vulkan
             consumer_commands: >-
               mise run //bindings/rust:test linux-arm64-vulkan &&
               mise run //examples/rust-map:check linux-arm64-vulkan &&
