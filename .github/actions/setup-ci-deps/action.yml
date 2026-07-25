@@ -66,6 +66,8 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-
 
     # Zig's global cache holds downloaded package tarballs, which keeps SDL's
     # source dependencies off the network. Windows resolves it under
@@ -208,6 +210,10 @@ runs:
           echo "SCCACHE_IDLE_TIMEOUT=0"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+          echo "RUSTC_WRAPPER=sccache"
+          # sccache declines to cache incrementally compiled crates, which is
+          # the cargo default for the dev profile that `cargo test` uses.
+          echo "CARGO_INCREMENTAL=0"
         } >> "$GITHUB_ENV"
 
         if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${SCCACHE_ACCESS_KEY_ID}" && -n "${SCCACHE_SECRET_ACCESS_KEY}" ]]; then

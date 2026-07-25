@@ -84,6 +84,7 @@ SCCACHE_S3_USE_SSL = "true"
 SCCACHE_S3_NO_CREDENTIALS = { default = "1" }
 CMAKE_C_COMPILER_LAUNCHER = "sccache"
 CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
+RUSTC_WRAPPER = "sccache"
 
 [deps.uv]
 auto = true
