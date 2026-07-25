@@ -1,3 +1,16 @@
+[deps.zig]
+auto = true
+description = "Fetch Zig package dependencies."
+sources = [
+  "build.zig",
+  "build.zig.zon",
+  "../../bindings/zig/build.zig",
+  "../../bindings/zig/build.zig.zon",
+]
+outputs = ["zig-pkg"]
+timeout = "10m"
+run = "zig build --fetch=needed"
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
