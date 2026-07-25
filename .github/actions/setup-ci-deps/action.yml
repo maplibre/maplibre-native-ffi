@@ -154,15 +154,15 @@ runs:
 
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
 
-    - name: Cache Gradle
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+    # Caches Gradle User Home and stops the daemons in its post-action, before
+    # the cache is saved. Daemons that outlive the job keep Windows file locks
+    # on `caches/*/**/*.lock`, which a plain archive step cannot read. The
+    # project uses the wrapper, so no `gradle-version` is requested and the
+    # mise-managed JDK stays in charge.
+    - name: Cache Gradle User Home
+      uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
       with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-gradle-
+        add-job-summary: on-failure
 
     - name: Trim Windows PATH before mise activation
       if: ${{ runner.os == 'Windows' }}
