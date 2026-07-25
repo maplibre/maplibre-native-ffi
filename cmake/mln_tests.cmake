@@ -23,6 +23,12 @@ function(mln_add_c_api_test)
       SHA256=b41a66d45a6b99758fb3202ace6178177014d52fc524bf1f72687d93e9867292
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(unity)
+  # Unity buffers its per-test lines when stdout is a pipe, so a run that never
+  # returns takes its progress with it and ctest reports a timeout with no
+  # output. Flushing each line leaves the last test it started in the log. The
+  # flush calls live in Unity's own translation unit, so the definition belongs
+  # on that target rather than on the tests that link it.
+  target_compile_definitions(unity PRIVATE UNITY_USE_FLUSH_STDOUT=1)
   if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
     # match the framework's MSVC warning behavior.
@@ -49,11 +55,6 @@ function(mln_add_c_api_test)
   target_include_directories(
     mln_c_api_tests
     PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})
-
-  # Unity buffers its per-test lines when stdout is a pipe, so a run that never
-  # returns takes its progress with it and ctest reports a timeout with no
-  # output. Flushing each line leaves the last test it started in the log.
-  target_compile_definitions(mln_c_api_tests PRIVATE UNITY_USE_FLUSH_STDOUT=1)
 
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_BACKEND_METAL=1)
