@@ -8,8 +8,8 @@ install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
 
 usage() {
-  echo "usage: $(basename "$0") stage <linux-x64|linux-arm64|apple>" >&2
-  echo "       $(basename "$0") publish-leaves <linux-x64|linux-arm64|apple>" >&2
+  echo "usage: $(basename "$0") stage <android|apple>" >&2
+  echo "       $(basename "$0") publish-leaves <android|apple>" >&2
   echo "       $(basename "$0") publish-roots apple" >&2
   echo "       $(basename "$0") verify <maven-staging>" >&2
 }
@@ -33,20 +33,12 @@ prepare_native_inputs() {
   local presets=()
 
   case "$partition" in
-    linux-x64)
+    android)
       presets=(
-        linux-x64-egl
-        linux-x64-vulkan
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
-      )
-      ;;
-    linux-arm64)
-      presets=(
-        linux-arm64-egl
-        linux-arm64-vulkan
       )
       ;;
     apple)
@@ -80,10 +72,6 @@ prepare_native_inputs() {
 
 prepare_apple_root_inputs() {
   local presets=(
-    linux-x64-egl
-    linux-arm64-egl
-    linux-x64-vulkan
-    linux-arm64-vulkan
     macos-arm64-metal
     ios-arm64-metal
     ios-simulator-arm64-metal
@@ -110,69 +98,36 @@ publish_tasks() {
   ./gradlew "${tasks[@]}" "$@"
 }
 
-publish_linux_x64_leaves() {
+publish_android_leaves() {
   local repository="$1"
   shift
   local common=(
     -Pmaplibre.android.prebuiltInstallRoot="$install_root"
     "-Pmaplibre.android.abis=arm64-v8a,x86_64"
   )
-  local opengl=(
-    -Pmaplibre.android.backend=opengl
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
-  )
-  local vulkan=(
-    -Pmaplibre.android.backend=vulkan
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
-  )
 
   publish_tasks \
     :bindings:kotlin \
     "$repository" \
-    LinuxX64 Android -- \
+    Android -- \
     "$@" \
     "${common[@]}"
 
   publish_tasks \
     :bindings:kotlin-runtime-opengl \
     "$repository" \
-    LinuxX64 Android -- \
+    Android -- \
     "$@" \
     "${common[@]}" \
-    "${opengl[@]}"
+    -Pmaplibre.android.backend=opengl
 
   publish_tasks \
     :bindings:kotlin-runtime-vulkan \
     "$repository" \
-    LinuxX64 Android -- \
+    Android -- \
     "$@" \
     "${common[@]}" \
-    "${vulkan[@]}"
-}
-
-publish_linux_arm64_leaves() {
-  local repository="$1"
-  shift
-
-  publish_tasks \
-    :bindings:kotlin \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@"
-
-  publish_tasks \
-    :bindings:kotlin-runtime-opengl \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@" \
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
-
-  publish_tasks \
-    :bindings:kotlin-runtime-vulkan \
-    "$repository" \
-    LinuxArm64 -- \
-    "$@" \
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
+    -Pmaplibre.android.backend=vulkan
 }
 
 publish_apple_leaves() {
@@ -230,14 +185,6 @@ publish_apple_leaves() {
 publish_apple_roots() {
   local repository="$1"
   shift
-  local opengl=(
-    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
-    -Pmaplibre.runtime.opengl.linuxArm64.installDir="$install_root/linux-arm64-egl"
-  )
-  local vulkan=(
-    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
-    -Pmaplibre.runtime.vulkan.linuxArm64.installDir="$install_root/linux-arm64-vulkan"
-  )
   local metal=(
     -Pmaplibre.runtime.metal.iosArm64.installDir="$install_root/ios-arm64-metal"
     -Pmaplibre.runtime.metal.iosSimulatorArm64.installDir="$install_root/ios-simulator-arm64-metal"
@@ -254,15 +201,13 @@ publish_apple_roots() {
     :bindings:kotlin-runtime-opengl \
     "$repository" \
     KotlinMultiplatform -- \
-    "$@" \
-    "${opengl[@]}"
+    "$@"
 
   publish_tasks \
     :bindings:kotlin-runtime-vulkan \
     "$repository" \
     KotlinMultiplatform -- \
-    "$@" \
-    "${vulkan[@]}"
+    "$@"
 
   publish_tasks \
     :bindings:kotlin-runtime-metal \
@@ -278,11 +223,8 @@ publish_leaf_partition() {
   shift 2
 
   case "$partition" in
-    linux-x64)
-      publish_linux_x64_leaves "$repository" "$@"
-      ;;
-    linux-arm64)
-      publish_linux_arm64_leaves "$repository" "$@"
+    android)
+      publish_android_leaves "$repository" "$@"
       ;;
     apple)
       publish_apple_leaves "$repository" "$@"
@@ -311,7 +253,7 @@ partition="${2:-}"
 case "$operation" in
   stage)
     case "$partition" in
-      linux-x64 | linux-arm64 | apple) ;;
+      android | apple) ;;
       *)
         usage
         exit 2
@@ -327,7 +269,7 @@ case "$operation" in
     ;;
   publish-leaves)
     case "$partition" in
-      linux-x64 | linux-arm64 | apple) ;;
+      android | apple) ;;
       *)
         usage
         exit 2

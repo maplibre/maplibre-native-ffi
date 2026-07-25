@@ -47,10 +47,6 @@ androidMain.dependencies {
   implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:$version")
 }
 
-linuxMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:$version")
-}
-
 macosMain.dependencies {
   implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-metal:$version")
 }
@@ -66,17 +62,21 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-The initial native runtime publications are OpenGL and Vulkan for Linux x64 and
-arm64, plus Metal for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each
-published Kotlin/Native target has a matching runtime variant.
+The native runtime publications are Metal for macOS arm64, iOS arm64, and the
+iOS arm64 simulator. Each published Kotlin/Native target has a matching runtime
+variant.
+
+Linux reaches Kotlin through the JVM and Android publications rather than
+Kotlin/Native. Kotlin/Native links the runtime archive statically, and its Linux
+toolchain targets a far older glibc than the archive requires, so a published
+Linux KLIB could not be linked by consumers.
 
 Gradle registers this target set consistently on every host. Local and CI
 workflows invoke target-specific KLIB and test tasks, leaving targets
 unavailable on the current host idle.
 
-System graphics components remain platform dependencies. Examples include Metal
-frameworks from the Apple SDK and EGL, OpenGL, and Vulkan loaders supplied by
-the Linux system.
+System graphics components remain platform dependencies, such as the Metal
+frameworks supplied by the Apple SDK.
 
 ### Android
 
@@ -114,12 +114,10 @@ override.
 ## Snapshot publication
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
-passed the main CI workflow. A Linux x64 runner builds the Linux x64 publication
-and cross-compiles the Linux ARM64 publication, while macOS runners build the
-macOS and iOS publications. Each consumes native build artifacts produced by the
-platform and backend CI matrix. Android publication runs with the Linux x64
-partition; it reuses the matrix's CMake install archives and builds only the JNI
-bridge and final AARs.
+passed the main CI workflow. A Linux x64 runner builds the Android publications,
+reusing the matrix's CMake install archives to build only the JNI bridge and
+final AARs, while macOS runners build the JVM, macOS, and iOS publications. Each
+consumes native build artifacts produced by the platform and backend CI matrix.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central
@@ -127,14 +125,14 @@ Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`
 GitHub Actions secrets. Snapshot publication does not require signing.
 
 Each host first stages its publications in a local Maven repository. CI merges
-the Linux x64, Linux ARM64, and Apple repositories, then inspects the published
-AAR, JAR, and KLIB payloads and compiles the example consumers against the
-merged repository. After every local check succeeds, each host publishes its own
-target artifacts to the Central Portal. Linux and Apple leaf modules publish
-first; the canonical multiplatform root modules publish last, after every leaf
-upload succeeds. Snapshot workflows are serialized so two commits cannot
-interleave those uploads. Publication jobs reuse the CI-produced native
-archives; they do not rebuild MapLibre Native.
+the Android and Apple repositories, then inspects the published AAR, JAR, and
+KLIB payloads and compiles the example consumers against the merged repository.
+After every local check succeeds, each host publishes its own target artifacts
+to the Central Portal. Android and Apple leaf modules publish first; the
+canonical multiplatform root modules publish last, after every leaf upload
+succeeds. Snapshot workflows are serialized so two commits cannot interleave
+those uploads. Publication jobs reuse the CI-produced native archives; they do
+not rebuild MapLibre Native.
 
 The initial snapshot workflow validates:
 
