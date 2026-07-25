@@ -1,6 +1,5 @@
 [tools]
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
-"http:zig" = { version = "{{vars.zig_version}}", os = ["windows/arm64"], url = "https://ziglang.org/download/{{vars.zig_version}}/zig-x86_64-windows-{{vars.zig_version}}.zip", checksum = "{{vars.zig_windows_arm64_checksum}}", bin_path = "zig-x86_64-windows-{{vars.zig_version}}" }
 
 [deps.zig]
 auto = true

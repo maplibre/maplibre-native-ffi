@@ -59,7 +59,6 @@ swiftformat_version = "0.61.1"
 uv_version = "0.11.11"
 xtool_version = "1.17.0"
 zig_version = "0.16.0"
-zig_windows_arm64_checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e"
 
 [tools]
 # Repository and native tooling
@@ -170,7 +169,7 @@ ctest --preset "$usage_preset"
 '''
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }, "http:zig" = { version = "{{vars.zig_version}}", os = ["windows/arm64"], url = "https://ziglang.org/download/{{vars.zig_version}}/zig-x86_64-windows-{{vars.zig_version}}.zip", checksum = "{{vars.zig_windows_arm64_checksum}}", bin_path = "zig-x86_64-windows-{{vars.zig_version}}" } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
@@ -179,7 +178,7 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }, "http:zig" = { version = "{{vars.zig_version}}", os = ["windows/arm64"], url = "https://ziglang.org/download/{{vars.zig_version}}/zig-x86_64-windows-{{vars.zig_version}}.zip", checksum = "{{vars.zig_windows_arm64_checksum}}", bin_path = "zig-x86_64-windows-{{vars.zig_version}}" } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools

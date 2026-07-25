@@ -6,7 +6,7 @@ commands = [
   { task = "//examples/rust-map:check", exclude = ["macos-arm64-egl"] },
 ]
 
-# Zig is unavailable on Windows ARM64; see the `core:zig` note in mise.toml.
+# Zig is unavailable on Windows ARM64; see the `core:zig` note in bindings/zig/mise.toml.
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 exclude = ["windows-arm64-wgl", "windows-arm64-vulkan"]

@@ -1,8 +1,9 @@
 [tools]
+# Zig 0.16.0 has no working Windows ARM64 story: the native aarch64 build exits
+# non-zero with no diagnostic while loading build.zig, and the x64 build under
+# emulation hangs in `zig build` until the job timeout. The Zig binding and
+# examples are skipped there; the C API tests are plain C and do not need Zig.
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
-# Zig's native Windows ARM64 build crashes while loading build.zig, so Windows
-# ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
-"http:zig" = { version = "{{vars.zig_version}}", os = ["windows/arm64"], url = "https://ziglang.org/download/{{vars.zig_version}}/zig-x86_64-windows-{{vars.zig_version}}.zip", checksum = "{{vars.zig_windows_arm64_checksum}}", bin_path = "zig-x86_64-windows-{{vars.zig_version}}" }
 
 [deps.zig]
 auto = true
