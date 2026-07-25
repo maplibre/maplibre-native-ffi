@@ -112,13 +112,10 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
 
-    - name: Cache OpenHarmony SDK
-      if: ${{ startsWith(inputs.target, 'ohos-') }}
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-      with:
-        path: ~/setup-ohos-sdk
-        key: ohos-sdk-v4-v6.1-${{ runner.os }}-${{ runner.arch }}
-
+    # Downloading and extracting the SDK takes about 40 seconds, which is not
+    # worth the ~1 GB it occupied in a 10 GB repository cache shared with every
+    # other target. The entry was evicted between runs anyway, so the two OHOS
+    # jobs paid the download and the upload.
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
