@@ -126,23 +126,13 @@ ZIG_PROJECTS = (
 
 
 def uses_zig(commands: list[str]) -> bool:
-    """Whether a row runs Zig, and so benefits from the Zig package cache.
+    """Whether a row fetches every Zig project the package cache key covers.
 
-    Rows that never fetch Zig packages must not restore or save that cache: the
-    key is shared by every row on the same runner OS and architecture, and cache
-    keys are immutable, so an empty save from an Android or iOS row would deny
-    the Zig rows a complete cache for as long as the key stays current.
-    """
-    return any(command.startswith(ZIG_PROJECTS) for command in commands)
-
-
-def fills_zig_cache(commands: list[str]) -> bool:
-    """Whether a row fetches every Zig project the cache key covers.
-
-    The key hashes every `build.zig.zon` in the repository, so a row that runs
-    only some of those projects would save a cache that is missing the rest.
-    Because the key is immutable, that partial save would win the shared key and
-    send the rows that do run the examples back to the network on every run.
+    The key hashes every `build.zig.zon` in the repository and is shared by all
+    rows on the same runner OS and architecture. Cache keys are immutable, so a
+    row that runs only some of those projects would win the key with a cache
+    that is missing the rest, and Zig's fetcher has no retry: the rows that do
+    run the examples would then fail whenever an upstream host is unavailable.
     """
     return all(
         any(command.startswith(project) for command in commands)
@@ -186,7 +176,6 @@ def target_rows(
             "runner": runner(preset),
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
-            "zig_save": fills_zig_cache(native + consumers),
             "native_commands": native if preset in packaged else native + consumers,
         }
         if preset in packaged:

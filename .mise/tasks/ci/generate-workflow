@@ -147,12 +147,12 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         '          MISE_TASK_SKIP: "//:build"',
         "        run: ${{ matrix.consumer_commands }}",
         # Only rows that fetch every Zig project the key covers may claim it;
-        # see `fills_zig_cache`. No status function in the `if`, so `success()`
-        # is implied: a job that fetched only part of its Zig packages before
+        # see `uses_zig`. No status function in the `if`, so `success()` is
+        # implied: a job that fetched only part of its Zig packages before
         # failing saves nothing, leaving the key free for a later run that
         # completes the fetch.
         "      - name: Save Zig packages",
-        "        if: ${{ matrix.zig_save && steps.setup.outputs.zig-cache-hit != 'true' }}",
+        "        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}",
         f"        uses: {CACHE_SAVE}",
         "        with:",
         "          path: |",
