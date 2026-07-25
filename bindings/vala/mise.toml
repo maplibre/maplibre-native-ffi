@@ -1,0 +1,86 @@
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+set -euo pipefail
+mkdir -p build/vapi build/include build/c
+valac \
+  --vapidir vapi \
+  --pkg maplibre-native-c \
+  --pkg glib-2.0 \
+  --pkg gmodule-2.0 \
+  --library maplibre-native \
+  --vapi ../vapi/maplibre-native.vapi \
+  -H build/include/maplibre-native-vala.h \
+  -C \
+  -d build/c \
+  src/*.vala
+'''
+
+[tasks.test]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+set -euo pipefail
+mkdir -p build
+
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+
+metal_support_object="build/metal_support.o"
+metal_framework_args=()
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  clang -fobjc-exceptions -c tests/compile/metal_support_macos.m -o "$metal_support_object"
+  metal_framework_args=(
+    -X -framework
+    -X AppKit
+    -X -framework
+    -X Metal
+    -X -framework
+    -X QuartzCore
+  )
+else
+  cat > build/metal_support_stub.c <<'STUB'
+#include <stdbool.h>
+#include <stdint.h>
+typedef struct MlnValaMetalWindowLayer { void* window; void* layer; } MlnValaMetalWindowLayer;
+bool mln_vala_metal_test_window_layer_create(uint32_t width, uint32_t height, MlnValaMetalWindowLayer* out_layer) { (void)width; (void)height; if (out_layer != 0) { out_layer->window = 0; out_layer->layer = 0; } return false; }
+void mln_vala_metal_test_window_layer_destroy(MlnValaMetalWindowLayer* window_layer) { (void)window_layer; }
+void* mln_vala_metal_test_texture_create(void* device, uint32_t width, uint32_t height) { (void)device; (void)width; (void)height; return 0; }
+void mln_vala_metal_test_object_release(void* object) { (void)object; }
+STUB
+  ${CC:-cc} -c build/metal_support_stub.c -o "$metal_support_object"
+fi
+
+read -r -a native_args <<< "$(pkg-config --cflags --libs maplibre-native-c vulkan)"
+compiler_args=()
+for argument in "${native_args[@]}"; do
+  compiler_args+=(-X "$argument")
+done
+
+valac \
+  --vapidir vapi \
+  --pkg maplibre-native-c \
+  --pkg glib-2.0 \
+  --pkg gmodule-2.0 \
+  -X -Wno-unused-value \
+  "${compiler_args[@]}" \
+  "${metal_framework_args[@]}" \
+  -X "$metal_support_object" \
+  src/*.vala \
+  tests/compile/minimal.vala \
+  tests/compile/vulkan_support.c \
+  -o build/minimal
+
+./build/minimal
+MLN_VALA_RUN_OFFLINE_REGION_SMOKE=1 \
+MLN_VALA_RUN_STYLE_URL_SMOKE=1 \
+MLN_VALA_RUN_DEM_LAYER_SMOKE=1 \
+MLN_VALA_RUN_STYLE_LIGHT_SMOKE=1 \
+MLN_VALA_RUN_LOCATION_INDICATOR_PROPERTY_SMOKE=1 \
+MLN_VALA_RUN_TEXTURE_BACKEND_COMPILE_SMOKE=1 \
+MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE=1 \
+./build/minimal
+'''

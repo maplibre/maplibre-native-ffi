@@ -41,5 +41,9 @@ platforms = ["linux", "macos"]
 commands = [{ task = "//bindings/go:test" }]
 
 [[suites]]
+platforms = ["linux", "macos"]
+commands = [{ task = "//bindings/vala:test" }]
+
+[[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]

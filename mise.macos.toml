@@ -7,6 +7,7 @@ host_native_preset = "macos-arm64-metal"
 "brew:molten-vk" = "latest"
 "brew:ninja" = "latest"
 "brew:pkgconf" = "latest"
+"brew:vala" = "latest"
 "brew:vulkan-loader" = "latest"
 
 [env]
