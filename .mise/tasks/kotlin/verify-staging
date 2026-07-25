@@ -27,6 +27,17 @@ MODULES = {
     "maplibre-native-ffi-runtime-vulkan-jvm",
 }
 
+# Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
+# not the manifest-only placeholders Maven Central tolerates for API-free modules.
+API_BEARING_MODULES = {
+    "maplibre-native-ffi",
+    "maplibre-native-ffi-android",
+    "maplibre-native-ffi-iosarm64",
+    "maplibre-native-ffi-iossimulatorarm64",
+    "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-macosarm64",
+}
+
 ROOT_TARGET_MODULES = {
     "maplibre-native-ffi": {
         "android": "maplibre-native-ffi-android",
@@ -123,6 +134,28 @@ def verify_metadata(root: pathlib.Path) -> None:
                 f"{metadata_path} references {referenced_targets}; "
                 f"expected {set(target_modules)}"
             )
+
+
+def verify_javadoc(root: pathlib.Path) -> None:
+    for module in API_BEARING_MODULES:
+        javadoc = one(
+            module_files(root, module, "-javadoc.jar"), f"{module} javadoc JAR"
+        )
+        with zipfile.ZipFile(javadoc) as jar:
+            names = set(jar.namelist())
+            if "index.html" not in names:
+                raise SystemExit(
+                    f"{javadoc} does not contain generated documentation"
+                )
+            if not any(
+                name.startswith("maplibre-native-ffi/org.maplibre.nativeffi")
+                and name.endswith(".html")
+                for name in names
+            ):
+                raise SystemExit(
+                    f"{javadoc} does not contain generated API pages"
+                )
+
 
 def verify_android(root: pathlib.Path) -> None:
     core = one(
@@ -235,6 +268,7 @@ def main() -> int:
         return 2
     root = pathlib.Path(sys.argv[1])
     verify_metadata(root)
+    verify_javadoc(root)
     verify_android(root)
     verify_jvm(root)
     verify_native(root)

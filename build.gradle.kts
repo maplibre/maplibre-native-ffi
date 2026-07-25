@@ -12,6 +12,7 @@ plugins {
   id("com.android.application") apply false
   id("com.android.kotlin.multiplatform.library") apply false
   id("com.vanniktech.maven.publish") apply false
+  alias(libs.plugins.dokka) apply false
 }
 
 allprojects {
