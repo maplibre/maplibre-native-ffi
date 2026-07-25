@@ -149,14 +149,19 @@ def uses_zig(commands: list[str]) -> bool:
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
-    configured = [
-        preset["name"]
-        for preset in presets["configurePresets"]
-        if not preset.get("hidden", False)
-    ]
-    built = {preset["name"] for preset in presets.get("buildPresets", [])}
-    tested = {preset["name"] for preset in presets.get("testPresets", [])}
-    packaged = {preset["name"] for preset in presets.get("packagePresets", [])}
+    def names(kind: str) -> list[str]:
+        # Hidden presets carry shared settings for other presets to inherit and
+        # name no target of their own, so they take part in no preset pairing.
+        return [
+            preset["name"]
+            for preset in presets.get(kind, [])
+            if not preset.get("hidden", False)
+        ]
+
+    configured = names("configurePresets")
+    built = set(names("buildPresets"))
+    tested = set(names("testPresets"))
+    packaged = set(names("packagePresets"))
     if set(configured) != built:
         raise SystemExit(
             "error: configure and build presets differ: "
