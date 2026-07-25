@@ -31,9 +31,9 @@ runs:
           $mesaUrl = "https://github.com/mmozeiko/build-mesa/releases/download/$mesaVersion/$archiveName"
           $manifestName = "lvp_icd.aarch64.json"
         } else {
-          $mesaVersion = "26.0.8"
+          $mesaVersion = "26.1.3"
           $archiveName = "mesa3d-$mesaVersion-release-msvc.7z"
-          $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
+          $expectedHash = "6DD431F4620CEA73970B13E3FFA94F721F2A3924306B8A4283C97648CDB6EB9C"
           $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/$archiveName"
           $manifestName = "lvp_icd.x86_64.json"
         }

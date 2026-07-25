@@ -1,3 +1,15 @@
+[tools]
+"core:dotnet" = "{{vars.dotnet_version}}"
+
+[deps.dotnet-tools]
+auto = true
+dir = "../.."
+sources = ["dotnet-tools.json", "bindings/dotnet/dotnet-tools.json"]
+run = '''
+dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet
+dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet
+'''
+
 [tasks.generate]
 run = "scripts/generate-clangsharp.sh"
 

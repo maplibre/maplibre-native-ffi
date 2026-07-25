@@ -1,3 +1,8 @@
+[tools]
+"core:java" = "{{vars.java_version}}"
+"aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}"
+"aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]

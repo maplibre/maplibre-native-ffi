@@ -51,12 +51,17 @@ the recommended x64 tools and Windows SDK, and the ARM64 build tools. Project
 tasks run in Git Bash.
 
 Install [`mise`](https://mise.jdx.dev/), then bootstrap system packages, install
-pinned project tools, and run repository setup hooks:
+the pinned shared toolchain, and run repository setup hooks:
 
 ```bash
 mise trust
 mise bootstrap --yes
 ```
+
+Language-specific tools are declared by their binding, example, or docs project.
+Mise installs them automatically when a namespaced project task runs, so the
+initial bootstrap stays focused on tools used across the repository. The
+published devcontainer image bakes the complete tool union for fast startup.
 
 Android and OpenHarmony builds require their SDK paths in environment variables.
 Put the absolute paths in the Git-ignored `mise.local.toml` at the repository
@@ -118,12 +123,14 @@ documentation. Each tool owns the layer where it has the clearest dependency
 model. Platform SDKs such as Xcode, Visual Studio, and the Android SDK are host
 toolchain inputs.
 
-[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
-tools, installs system packages and Git hooks, and runs repository tasks. CMake
-presets define native targets and render backends. CMake uses platform SDKs and
-system libraries where available, and acquires pinned native libraries that are
-not available from system package managers. Gradle selects CMake presets and
-packages Android applications.
+[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins shared
+and project-specific tools, installs system packages and Git hooks, and runs
+repository tasks. Root configuration owns tools used across the repository;
+bindings, examples, and docs declare additional tools in their own `mise.toml`
+files. CMake presets define native targets and render backends. CMake uses
+platform SDKs and system libraries where available, and acquires pinned native
+libraries that are not available from system package managers. Gradle selects
+CMake presets and packages Android applications.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

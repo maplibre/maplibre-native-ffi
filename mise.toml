@@ -26,51 +26,67 @@ unix_default_inline_shell_args = "bash -e -c"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
+# The repository pins one SDK. Isolated mode keeps project-scoped .NET installs
+# under MISE_DATA_DIR instead of a user-home-specific shared DOTNET_ROOT.
+dotnet.isolated = true
 
 [monorepo]
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
+lockfile = true
+
+[vars]
+actionlint_version = "1.7.8"
+cmake_version = "4.3.3"
+dart_version = "3.12.2"
+dotnet_version = "10.0.203"
+doxygen_version = "1.13.2"
+dprint_version = "0.53.2"
+go_version = "1.26.3"
+gofumpt_version = "0.10.0"
+google_java_format_version = "1.35.0"
+hk_version = "1.45.0"
+java_version = "zulu-25.34.17.0"
+jvl_version = "2026.05.03"
+ktfmt_version = "0.62"
+node_version = "24.11.0"
+pkl_version = "0.31.0"
+pnpm_version = "10.33.2"
+python_version = "3.14.4"
+rust_version = "1.95.0"
+sccache_version = "0.16.0"
+shellcheck_version = "0.11.0"
+swift_version = "6.3.1"
+swiftformat_version = "0.61.1"
+uv_version = "0.11.11"
+xtool_version = "1.17.0"
+zig_version = "0.16.0"
 
 [tools]
-# General tooling
-"aqua:jdx/hk" = "1.45.0" # Linter orchestration
-"aqua:apple/pkl" = "0.31.0" # hk config dependency
-"aqua:dprint/dprint" = "0.53.2" # Formatter orchestration
-"github:sargunv/jvl" = "2026.05.03" # JSON validator
-"aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
-"aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
-"aqua:Kitware/CMake" = "4.3.3"
-"conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
-sccache = "0.16.0"
+# Repository and native tooling
+"aqua:jdx/hk" = "{{vars.hk_version}}" # Linter orchestration
+"aqua:apple/pkl" = "{{vars.pkl_version}}" # hk config dependency
+"aqua:dprint/dprint" = "{{vars.dprint_version}}" # Formatter orchestration
+"github:sargunv/jvl" = "{{vars.jvl_version}}" # JSON validator
+"aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
+"aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
+"aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+sccache = "{{vars.sccache_version}}"
 
 # Node.js ecosystem
-"core:node" = "24.11.0"
-"aqua:pnpm/pnpm" = "10.33.2"
-
-# Java/Kotlin ecosystem
-"core:java" = "zulu-25.34.17.0"
-"aqua:facebook/ktfmt" = "0.62"
-"aqua:google/google-java-format" = "1.35.0"
+"core:node" = "{{vars.node_version}}"
+"aqua:pnpm/pnpm" = "{{vars.pnpm_version}}"
 
 # Python ecosystem
-"core:python" = "3.14.4"
-"aqua:astral-sh/uv" = "0.11.11"
+"core:python" = "{{vars.python_version}}"
+"aqua:astral-sh/uv" = "{{vars.uv_version}}"
 
-# Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["linux/x64"] }
-swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
-"github:xtool-org/xtool" = { version = "1.17.0", os = ["linux"] }
+# SwiftFormat is a standalone repository formatter and does not require the
+# Swift compiler.
+swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
-# Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
-"core:dart" = "3.12.2"
-# Zig 0.16.0 has no working Windows ARM64 story: the native aarch64 build exits
-# non-zero with no diagnostic while loading build.zig, and the x64 build under
-# emulation hangs in `zig build` until the job timeout. The Zig binding and
-# examples are skipped there; the C API tests are plain C and do not need Zig.
-"core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
-"core:go" = "1.26.3"
-"aqua:mvdan/gofumpt" = "0.10.0"
-"core:dotnet" = "10.0.203"
+# The native CMake build compiles the Rust platform support library, so Rust is
+# part of the repository-wide native toolchain.
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
 
 [env]
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
@@ -92,15 +108,10 @@ auto = true
 run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
+# The built-in provider runs pnpm directly. A `run` script would go through Git
+# Bash, and on Windows ARM64 the lifecycle scripts pnpm spawns through cmd then
+# fail to resolve mise's node, so the workspace-wide install stays.
 auto = true
-
-[deps.dotnet-tools]
-auto = true
-sources = ["dotnet-tools.json", "bindings/dotnet/dotnet-tools.json"]
-run = '''
-dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet
-dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet
-'''
 
 [deps.submodules]
 auto = true
@@ -162,20 +173,23 @@ ctest --preset "$usage_preset"
 '''
 
 [tasks.check]
-depends = ["//docs:install"]
-run = "hk check --all"
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+run = '''
+mise -C bindings/dotnet deps install dotnet-tools
+mise run //docs:install
+hk check --all
+'''
 
 [tasks.fix]
-depends = ["//docs:install"]
-run = "hk fix --all"
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+run = '''
+mise -C bindings/dotnet deps install dotnet-tools
+mise run //docs:install
+hk fix --all
+'''
 
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"
-
-[tasks._ktfmt]
-description = "Called by dprint.jsonc"
-hide = true
-run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
-# ktfmt on windows doesn't work in git bash for some reason
-run_windows = 'cmd /c java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'

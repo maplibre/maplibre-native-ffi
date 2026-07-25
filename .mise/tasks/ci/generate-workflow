@@ -101,9 +101,11 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    steps:",
         *setup(),
         "      - run: mise run ci:generate-workflow --check",
-        "      - run: mise run //docs:install",
+        "      - run: mise run ci:generate-devcontainer-tools --check",
         "      - run: dprint output-resolved-config > /dev/null",
-        "      - run: hk fix --all",
+        # `mise run fix` provides the project-scoped formatter tools that the
+        # dprint wrappers expect; calling hk directly leaves them uninstalled.
+        "      - run: mise run fix",
         "      - name: Check generated and formatted files",
         "        run: |",
         "          git update-index -q --refresh",

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Verify the multi-ABI Android runtime from packaged native artifacts."
+#MISE tools={java="{{vars.java_version}}"}
 
 set -euo pipefail
 

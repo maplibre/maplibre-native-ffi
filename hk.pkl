@@ -1,5 +1,6 @@
 // hk orchestrates checks for pre-commit, `mise run check`, and `mise run fix`.
-// Tools used here must be installed by `mise install`.
+// Repository-wide tools are installed at the root. Language-specific steps
+// enter their binding's mise context and install that toolchain on demand.
 
 amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
 
@@ -60,8 +61,8 @@ local lintSteps = new Mapping<String, Step> {
   }
   ["gofumpt"] {
     glob = List("bindings/go/**/*.go")
-    check = "unformatted=\"$(gofumpt -l {{files}})\"; test -z \"$unformatted\" || { echo \"$unformatted\" >&2; exit 1; }"
-    fix = "gofumpt -w {{files}}"
+    check = "unformatted=\"$(mise run --quiet //bindings/go:_gofumpt-check {{files}})\"; test -z \"$unformatted\" || { echo \"$unformatted\" >&2; exit 1; }"
+    fix = "mise run --quiet //bindings/go:_gofumpt-fix {{files}}"
   }
   ["dart-format"] {
     glob = List("bindings/dart/**/*.dart")
