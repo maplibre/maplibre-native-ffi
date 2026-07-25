@@ -1,3 +1,9 @@
+[settings]
+# The Swift toolchain ships a separate tarball per Linux distro, while the
+# lockfile records one checksum per os-arch pair. Pin the distro so every Linux
+# machine downloads the artifact the lockfile describes.
+swift.platform = "ubuntu24.04"
+
 [vars]
 host_native_preset = "linux-{{ arch() }}-vulkan"
 
