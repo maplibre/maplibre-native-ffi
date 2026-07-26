@@ -1,4 +1,5 @@
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -20,6 +21,7 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
 '''
 
 [tasks.test]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -65,6 +67,7 @@ cargo clippy \
 '''
 
 [tasks."build:ohos"]
+extends = "bash"
 usage = '''
 arg "<preset>" {
   choices "ohos-arm64-egl" "ohos-arm64-vulkan"

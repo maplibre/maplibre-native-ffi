@@ -3,6 +3,7 @@
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -14,6 +15,7 @@ swift build "${swift_args[@]}"
 '''
 
 [tasks.run]
+extends = "bash"
 depends = [":build"]
 usage = '''
 arg "[render-target]" default="owned-texture" {
@@ -26,15 +28,19 @@ exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
 '''
 
 [tasks."run:owned-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["owned-texture"] }]
 
 [tasks."run:borrowed-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
+extends = "bash"
 run = [{ task = "run", args = ["native-surface"] }]
 
 [tasks."build:ios-simulator"]
+extends = "bash"
 depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
@@ -47,6 +53,7 @@ swift build \
 '''
 
 [tasks."build:ios"]
+extends = "bash"
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
@@ -63,6 +70,7 @@ swift build \
 '''
 
 [tasks."run:ios"]
+extends = "bash"
 depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 {% if os() == "linux" %}

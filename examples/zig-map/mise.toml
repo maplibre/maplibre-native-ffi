@@ -15,6 +15,7 @@ timeout = "10m"
 run = "zig build --fetch=needed"
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -24,6 +25,7 @@ zig build \
 '''
 
 [tasks.run]
+extends = "bash"
 depends = ["//:build"]
 usage = '''
 arg "[render-target]" default="owned-texture" {
@@ -46,10 +48,13 @@ zig build run \
 '''
 
 [tasks."run:owned-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["owned-texture"] }]
 
 [tasks."run:borrowed-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
+extends = "bash"
 run = [{ task = "run", args = ["native-surface"] }]

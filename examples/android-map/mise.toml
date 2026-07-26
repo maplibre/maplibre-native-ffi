@@ -2,6 +2,7 @@
 "core:java" = "{{vars.java_version}}"
 
 [tasks.build]
+extends = "bash"
 description = "Build the Android map example."
 usage = '''
 arg "[backend]" default="opengl" {
@@ -25,6 +26,7 @@ fi
 '''
 
 [tasks.run]
+extends = "bash"
 description = "Build, install, and start the Android map example."
 usage = '''
 arg "[backend]" default="opengl" {

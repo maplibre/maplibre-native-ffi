@@ -40,6 +40,7 @@ glibc_floor = "2.39"
 "dnf:vulkan-loader-devel" = "latest"
 
 [tasks.check-glibc-floor]
+extends = "bash"
 description = "Verify a built Linux native requires no glibc newer than the floor."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = '''

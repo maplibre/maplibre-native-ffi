@@ -19,10 +19,6 @@ lockfile_platforms = [
 ]
 pin = true
 experimental = true
-windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
-windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
-unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "bash -e -c"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -35,6 +31,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
 
 [vars]
+task_shell = "bash -e -c"
 actionlint_version = "1.7.8"
 cmake_version = "4.3.3"
 dotnet_version = "10.0.203"
@@ -102,6 +99,10 @@ CMAKE_C_COMPILER_LAUNCHER = "sccache"
 CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
 RUSTC_WRAPPER = "sccache"
 
+[task_templates.bash]
+# Task-level shells remain repository-owned and trusted in mise 2026.7.14+.
+shell = "{{vars.task_shell}}"
+
 [deps.uv]
 auto = true
 run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
@@ -122,11 +123,13 @@ postinstall = [
 ]
 
 [tasks.configure]
+extends = "bash"
 description = "Configure a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = 'cmake --preset "$usage_preset"'
 
 [tasks.build]
+extends = "bash"
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 sources = [
@@ -145,22 +148,26 @@ outputs = { auto = true }
 run = 'cmake --workflow --preset "$usage_preset"'
 
 [tasks.clean]
+extends = "bash"
 description = "Remove one native preset build tree."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
 
 [tasks.package-native]
+extends = "bash"
 description = "Build and archive a native CMake preset."
 usage = 'arg "<preset>"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
 
 [tasks.archive-native]
+extends = "bash"
 description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
 run = 'cpack --preset "$usage_preset"'
 
 [tasks.test]
+extends = "bash"
 description = "Build and run C API tests for a CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
@@ -172,6 +179,7 @@ ctest --preset "$usage_preset"
 '''
 
 [tasks.check]
+extends = "bash"
 tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
@@ -181,6 +189,7 @@ hk check --all
 '''
 
 [tasks.fix]
+extends = "bash"
 tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
@@ -190,5 +199,6 @@ hk fix --all
 '''
 
 [tasks.actions-up]
+extends = "bash"
 description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"

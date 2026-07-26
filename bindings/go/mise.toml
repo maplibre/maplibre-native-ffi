@@ -3,6 +3,7 @@
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
 
 [tasks._gofumpt-check]
+extends = "bash"
 description = "List Go files that require gofumpt."
 hide = true
 raw_args = true
@@ -10,6 +11,7 @@ dir = "../.."
 run = "gofumpt -l"
 
 [tasks._gofumpt-fix]
+extends = "bash"
 description = "Format Go files with gofumpt."
 hide = true
 raw_args = true
@@ -17,6 +19,7 @@ dir = "../.."
 run = "gofumpt -w"
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
@@ -31,6 +34,7 @@ PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CO
 '''
 
 [tasks.test]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''

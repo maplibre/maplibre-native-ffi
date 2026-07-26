@@ -3,6 +3,7 @@
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 
 [tasks."api:c"]
+extends = "bash"
 run = [
   "rm -rf doxygen/gen public/reference/c",
   "mkdir -p doxygen/gen public/reference",
@@ -11,6 +12,7 @@ run = [
 ]
 
 [tasks."api:rust"]
+extends = "bash"
 depends = ["//:build"]
 dir = ".."
 run = '''
@@ -22,6 +24,7 @@ cp -a target/doc/. docs/public/reference/rust/
 '''
 
 [tasks."api:zig"]
+extends = "bash"
 dir = "../bindings/zig"
 run = '''
 rm -rf ../../docs/public/reference/zig
@@ -30,6 +33,7 @@ zig build docs -Dinclude-dir=../../include --prefix ../../docs/public/reference/
 '''
 
 [tasks.api]
+extends = "bash"
 run = [
   { task = "api:c" },
   { task = "api:rust" },
@@ -37,26 +41,33 @@ run = [
 ]
 
 [tasks.install]
+extends = "bash"
 run = "pnpm exec astro sync"
 
 [tasks.dev]
+extends = "bash"
 depends = ["api", "install", "generate-support-matrix"]
 run = "pnpm run dev"
 
 [tasks.start]
+extends = "bash"
 depends = ["api", "install", "generate-support-matrix"]
 run = "pnpm run start"
 
 [tasks.build]
+extends = "bash"
 depends = ["api", "install", "generate-support-matrix"]
 run = "pnpm run build"
 
 [tasks.preview]
+extends = "bash"
 depends = ["api", "install", "generate-support-matrix"]
 run = "pnpm run preview"
 
 [tasks.astro]
+extends = "bash"
 run = "pnpm exec astro"
 
 [tasks.generate-support-matrix]
+extends = "bash"
 run = "pnpm run generate-support-matrix"

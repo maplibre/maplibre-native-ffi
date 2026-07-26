@@ -2,6 +2,7 @@
 "core:java" = "{{vars.java_version}}"
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -12,6 +13,7 @@ run = '''
 '''
 
 [tasks.run]
+extends = "bash"
 depends = ["//:build"]
 dir = "../.."
 run = '''

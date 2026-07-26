@@ -4,6 +4,7 @@
 "aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -26,6 +27,7 @@ fi
 '''
 
 [tasks.test]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -48,6 +50,7 @@ fi
 '''
 
 [tasks.jvmTest]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -58,6 +61,7 @@ run = '''
 '''
 
 [tasks.nativeTest]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -79,6 +83,7 @@ esac
 '''
 
 [tasks.iosBuild]
+extends = "bash"
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''
 arg "<preset>" {
@@ -100,6 +105,7 @@ esac
 '''
 
 [tasks.androidBuild]
+extends = "bash"
 description = "Build the Kotlin Android binding."
 usage = '''
 arg "[backend]" default="opengl" {

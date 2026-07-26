@@ -2,6 +2,7 @@
 "core:java" = "{{vars.java_version}}"
 
 [tasks.build]
+extends = "bash"
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
@@ -12,6 +13,7 @@ run = '''
 '''
 
 [tasks.run]
+extends = "bash"
 depends = ["//:build"]
 dir = "../.."
 usage = '''
@@ -27,10 +29,13 @@ run = '''
 '''
 
 [tasks."run:owned-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["owned-texture"] }]
 
 [tasks."run:borrowed-texture"]
+extends = "bash"
 run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
+extends = "bash"
 run = [{ task = "run", args = ["native-surface"] }]

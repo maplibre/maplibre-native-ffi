@@ -15,6 +15,7 @@ MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
 VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
 
 [tasks."ios-simulator:boot"]
+extends = "bash"
 description = "Boot an available iPhone simulator and wait until it is ready."
 run = '''
 device=$(xcrun simctl list devices available iOS | awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }')
