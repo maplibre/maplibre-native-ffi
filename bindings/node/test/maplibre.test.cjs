@@ -573,6 +573,8 @@ test("finalizers release abandoned request and texture scopes", () => {
 
 test("runtime event lookup does not retain abandoned map wrappers", () => {
   const packageRoot = path.join(__dirname, "..");
+  // A deliberately abandoned native map can keep backend work alive on Windows.
+  // Exit after the leak report proves the JavaScript wrapper was collected.
   const script = `
     process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
     const assert = require("node:assert/strict");
@@ -594,10 +596,13 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
       assert.equal(reports.length, 1);
     }
 
-    main().catch((error) => {
-      console.error(error);
-      process.exitCode = 1;
-    });
+    main().then(
+      () => process.exit(0),
+      (error) => {
+        console.error(error);
+        process.exit(1);
+      }
+    );
   `;
   const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
     encoding: "utf8",
