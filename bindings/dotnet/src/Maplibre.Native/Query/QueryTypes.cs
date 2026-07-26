@@ -22,10 +22,18 @@ public abstract record RenderedQueryGeometry
 
     public sealed record LineString(IReadOnlyList<ScreenPoint> Points) : RenderedQueryGeometry
     {
-        public bool Equals(LineString? other) =>
-            other is not null && ValueEquality.SequenceEquals(Points, other.Points);
+        private readonly IReadOnlyList<ScreenPoint> points = ValueEquality.Snapshot(Points);
 
-        public override int GetHashCode() => ValueEquality.SequenceHashCode(Points);
+        public IReadOnlyList<ScreenPoint> Points
+        {
+            get => points;
+            init => points = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(LineString? other) =>
+            other is not null && ValueEquality.SequenceEquals(points, other.points);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(points);
     }
 }
 
@@ -98,10 +106,18 @@ public abstract record FeatureExtensionResult
 
     public sealed record FeatureCollection(IReadOnlyList<Feature> Features) : FeatureExtensionResult
     {
-        public bool Equals(FeatureCollection? other) =>
-            other is not null && ValueEquality.SequenceEquals(Features, other.Features);
+        private readonly IReadOnlyList<Feature> features = ValueEquality.Snapshot(Features);
 
-        public override int GetHashCode() => ValueEquality.SequenceHashCode(Features);
+        public IReadOnlyList<Feature> Features
+        {
+            get => features;
+            init => features = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(FeatureCollection? other) =>
+            other is not null && ValueEquality.SequenceEquals(features, other.features);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(features);
     }
 
     public sealed record Unknown(uint RawType) : FeatureExtensionResult;
