@@ -403,6 +403,57 @@ void exercise_unknown_feature_identifier_rejection() throws MaplibreNative.Error
   } catch (MaplibreNative.Error.UNSUPPORTED error) {
     assert(error.message == "unknown native feature identifier type 99");
   }
+
+  MaplibreNative.Raw.Feature identifier_less = {};
+  MaplibreNative.FeatureIdentifier.none().apply_to_native(ref identifier_less);
+  assert(identifier_less.identifier_type == (uint32) MaplibreNative.FeatureIdentifierType.NULL);
+}
+
+void exercise_json_null_rejection() throws MaplibreNative.Error {
+  MaplibreNative.JsonValue[] null_values = new MaplibreNative.JsonValue[1];
+  try {
+    MaplibreNative.JsonValue.array_value(null_values);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "JSON array value at index 0 is null");
+  }
+
+  MaplibreNative.JsonMember[] null_members = new MaplibreNative.JsonMember[1];
+  try {
+    MaplibreNative.JsonValue.object_value(null_members);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "JSON object member at index 0 is null");
+  }
+
+  try {
+    new MaplibreNative.JsonMember("null", null_values[0]);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "JSON object member value is null");
+  }
+
+  MaplibreNative.Raw.JsonValue native_array = {};
+  native_array.type = (uint32) MaplibreNative.JsonValueType.ARRAY;
+  native_array.array_value.value_count = 1;
+  try {
+    MaplibreNative.JsonValue.from_native(native_array);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "native JSON array values are null");
+  }
+
+  MaplibreNative.Raw.JsonMember native_member = {};
+  MaplibreNative.Raw.JsonValue native_object = {};
+  native_object.type = (uint32) MaplibreNative.JsonValueType.OBJECT;
+  native_object.object_value.members = &native_member;
+  native_object.object_value.member_count = 1;
+  try {
+    MaplibreNative.JsonValue.from_native(native_object);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "native JSON object member value is null");
+  }
 }
 
 void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) throws MaplibreNative.Error {
@@ -851,6 +902,9 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   var bounds = MaplibreNative.LatLngBounds(MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0));
   var tile_definition = MaplibreNative.OfflineRegionDefinition.tile_pyramid("maplibre://styles/offline", bounds, 0.0, 1.0);
   var geometry_definition = MaplibreNative.OfflineRegionDefinition.geometry_region("maplibre://styles/offline", MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)), 0.0, 1.0);
+  assert(tile_definition.equal(tile_definition.copy()));
+  assert(geometry_definition.equal(geometry_definition.copy()));
+  assert(!tile_definition.equal(geometry_definition));
   uint8[] metadata = { 1, 2, 3 };
   var create_id = runtime.offline_region_create_start(tile_definition, metadata);
   var completion = wait_for_offline_operation(runtime, create_id);
@@ -864,6 +918,8 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   assert(wrong_take_failed);
   var info = runtime.offline_region_create_take_result(create_id);
   assert(info.id.value > 0 && info.metadata.length == metadata.length);
+  var info_copy = info.copy();
+  assert(info.equal(info_copy));
   var copied_metadata = info.metadata;
   copied_metadata[0] = 99;
   assert(info.metadata[0] == metadata[0]);
@@ -1107,6 +1163,7 @@ int main() {
     assert(MaplibreNative.c_version() == 0);
     exercise_frame_access_state();
     exercise_unknown_feature_identifier_rejection();
+    exercise_json_null_rejection();
     exercise_option_value_semantics();
     var backends = MaplibreNative.supported_render_backends();
     assert(backends != 0);

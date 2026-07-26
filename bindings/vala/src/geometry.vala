@@ -557,7 +557,17 @@ namespace MaplibreNative {
             return json;
         }
 
-        public static JsonValue array_value (JsonValue[] values) {
+        public static JsonValue array_value (JsonValue[] values) throws Error {
+            for (var index = 0; index < values.length; index++) {
+                if (values[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("JSON array value at index %d is null", index);
+                }
+            }
+            return JsonValue.array_value_unchecked (values);
+        }
+
+        private static JsonValue array_value_unchecked (JsonValue[] values) {
             var json = new JsonValue (JsonValueType.ARRAY);
             json.array_values = new JsonValue[values.length];
             for (var index = 0; index < values.length; index++) {
@@ -566,7 +576,17 @@ namespace MaplibreNative {
             return json;
         }
 
-        public static JsonValue object_value (JsonMember[] members) {
+        public static JsonValue object_value (JsonMember[] members) throws Error {
+            for (var index = 0; index < members.length; index++) {
+                if (members[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("JSON object member at index %d is null", index);
+                }
+            }
+            return JsonValue.object_value_unchecked (members);
+        }
+
+        private static JsonValue object_value_unchecked (JsonMember[] members) {
             var json = new JsonValue (JsonValueType.OBJECT);
             json.object_members = new JsonMember[members.length];
             for (var index = 0; index < members.length; index++) {
@@ -670,13 +690,13 @@ namespace MaplibreNative {
                 for (var index = 0; index < array_values.length; index++) {
                     values[index] = array_values[index].copy ();
                 }
-                return JsonValue.array_value (values);
+                return JsonValue.array_value_unchecked (values);
             case JsonValueType.OBJECT:
                 JsonMember[] members = new JsonMember[object_members.length];
                 for (var index = 0; index < object_members.length; index++) {
                     members[index] = object_members[index].copy ();
                 }
-                return JsonValue.object_value (members);
+                return JsonValue.object_value_unchecked (members);
             case JsonValueType.NULL:
             default:
                 return JsonValue.null_value ();
@@ -745,6 +765,10 @@ namespace MaplibreNative {
             case JsonValueType.STRING:
                 return JsonValue.string_utf8_bytes (copy_string_view_bytes (native.string_value));
             case JsonValueType.ARRAY:
+                if (native.array_value.value_count > 0 && native.array_value.values == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("native JSON array values are null");
+                }
                 JsonValue[] values = new JsonValue[native.array_value.value_count];
                 Raw.JsonValue* raw_values = (Raw.JsonValue*) native.array_value.values;
                 for (size_t i = 0; i < native.array_value.value_count; i++) {
@@ -752,10 +776,18 @@ namespace MaplibreNative {
                 }
                 return JsonValue.array_value (values);
             case JsonValueType.OBJECT:
+                if (native.object_value.member_count > 0 && native.object_value.members == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("native JSON object members are null");
+                }
                 JsonMember[] members = new JsonMember[native.object_value.member_count];
                 for (size_t i = 0; i < native.object_value.member_count; i++) {
                     Raw.JsonMember member = native.object_value.members[i];
                     Raw.JsonValue* value = (Raw.JsonValue*) member.value;
+                    if (value == null) {
+                        clear_unknown_status ();
+                        throw new Error.INVALID_ARGUMENT ("native JSON object member value is null");
+                    }
                     members[i] = new JsonMember.from_utf8_bytes (copy_string_view_bytes (member.key), JsonValue.from_native (value[0]));
                 }
                 return JsonValue.object_value (members);
@@ -830,13 +862,21 @@ namespace MaplibreNative {
         private uint8[] key_storage;
         public JsonValue value { get; private set; }
 
-        public JsonMember (string key, JsonValue value) {
+        public JsonMember (string key, JsonValue? value) throws Error {
+            if (value == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("JSON object member value is null");
+            }
             key_storage = copy_string_bytes (key);
             this.value = value;
         }
 
-        public JsonMember.from_utf8_bytes (uint8[] key, JsonValue value) throws Error {
+        public JsonMember.from_utf8_bytes (uint8[] key, JsonValue? value) throws Error {
             Utf8String.validate_bytes (key);
+            if (value == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("JSON object member value is null");
+            }
             key_storage = copy_byte_array (key);
             this.value = value;
         }
@@ -1054,6 +1094,8 @@ namespace MaplibreNative {
                 break;
             case FeatureIdentifierType.STRING:
                 native.identifier_string_value = byte_string_view (string_storage);
+                break;
+            case FeatureIdentifierType.NULL:
                 break;
             default:
                 clear_unknown_status ();

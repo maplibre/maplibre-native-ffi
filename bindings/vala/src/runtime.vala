@@ -258,6 +258,46 @@ namespace MaplibreNative {
             return new OfflineRegionDefinition (OfflineRegionDefinitionType.GEOMETRY, style_url, LatLngBounds (LatLng (0.0, 0.0), LatLng (0.0, 0.0)), geometry, min_zoom, max_zoom, pixel_ratio, include_ideographs);
         }
 
+        public OfflineRegionDefinition copy () throws Error {
+            switch (definition_type) {
+            case OfflineRegionDefinitionType.TILE_PYRAMID:
+                return OfflineRegionDefinition.tile_pyramid (style_url, bounds, min_zoom, max_zoom, pixel_ratio, include_ideographs);
+            case OfflineRegionDefinitionType.GEOMETRY:
+                if (geometry == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_STATE ("offline geometry region has no geometry");
+                }
+                return OfflineRegionDefinition.geometry_region (style_url, geometry.copy (), min_zoom, max_zoom, pixel_ratio, include_ideographs);
+            default:
+                clear_unknown_status ();
+                throw new Error.UNSUPPORTED ("unknown offline region definition type %u", definition_type);
+            }
+        }
+
+        public bool equal (OfflineRegionDefinition other) {
+            if (definition_type != other.definition_type
+                || style_url != other.style_url
+                || min_zoom != other.min_zoom
+                || max_zoom != other.max_zoom
+                || pixel_ratio != other.pixel_ratio
+                || include_ideographs != other.include_ideographs) {
+                return false;
+            }
+            switch (definition_type) {
+            case OfflineRegionDefinitionType.TILE_PYRAMID:
+                return bounds.southwest.latitude == other.bounds.southwest.latitude
+                    && bounds.southwest.longitude == other.bounds.southwest.longitude
+                    && bounds.northeast.latitude == other.bounds.northeast.latitude
+                    && bounds.northeast.longitude == other.bounds.northeast.longitude;
+            case OfflineRegionDefinitionType.GEOMETRY:
+                return geometry == null
+                    ? other.geometry == null
+                    : other.geometry != null && geometry.equal (other.geometry);
+            default:
+                return false;
+            }
+        }
+
         internal Raw.OfflineRegionDefinition to_native (ref Raw.Geometry geometry_storage, out Geometry? geometry_owner) throws Error {
             geometry_owner = null;
             Raw.OfflineRegionDefinition definition = {};
@@ -340,6 +380,30 @@ namespace MaplibreNative {
             id = OfflineRegionId (native.id);
             definition = OfflineRegionDefinition.from_native (native.definition);
             metadata_storage = copy_bytes (native.metadata, native.metadata_size) ?? new uint8[0];
+        }
+
+        private OfflineRegionInfo.from_values (OfflineRegionId id, OfflineRegionDefinition definition, uint8[] metadata) {
+            this.id = id;
+            this.definition = definition;
+            metadata_storage = copy_byte_array (metadata);
+        }
+
+        public OfflineRegionInfo copy () throws Error {
+            return new OfflineRegionInfo.from_values (id, definition.copy (), metadata_storage);
+        }
+
+        public bool equal (OfflineRegionInfo other) {
+            if (id.value != other.id.value
+                || !definition.equal (other.definition)
+                || metadata_storage.length != other.metadata_storage.length) {
+                return false;
+            }
+            for (var index = 0; index < metadata_storage.length; index++) {
+                if (metadata_storage[index] != other.metadata_storage[index]) {
+                    return false;
+                }
+            }
+            return true;
         }
     }
 
