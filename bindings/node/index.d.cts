@@ -1245,7 +1245,9 @@ export interface LogRecord {
 
 export type LogCallback = (record: LogRecord) => void;
 
-export declare function setNetworkStatus(status: "online" | "offline"): void;
+export declare function setNetworkStatus(
+  status: "online" | "offline" | NetworkStatusValue,
+): void;
 export declare function setLogCallback(callback: LogCallback): void;
 export declare function clearLogCallback(): void;
 export declare function setAsyncLogSeverities(

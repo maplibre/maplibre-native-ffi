@@ -4,7 +4,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use napi::bindgen_prelude::{BigInt, Env, Result};
+use napi::bindgen_prelude::{BigInt, Either, Env, Result};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -114,15 +114,18 @@ pub fn network_status() -> Result<NetworkStatusValue> {
 }
 
 #[napi(js_name = "setNetworkStatus")]
-pub fn set_network_status(status: String) -> Result<()> {
-    let raw_status = match status.as_str() {
-        "online" => maplibre_native_sys::MLN_NETWORK_STATUS_ONLINE,
-        "offline" => maplibre_native_sys::MLN_NETWORK_STATUS_OFFLINE,
-        other => {
-            return Err(error::invalid_argument(format!(
-                "network status must be 'online' or 'offline', got '{other}'"
-            )));
-        }
+pub fn set_network_status(status: Either<String, u32>) -> Result<()> {
+    let raw_status = match status {
+        Either::A(status) => match status.as_str() {
+            "online" => maplibre_native_sys::MLN_NETWORK_STATUS_ONLINE,
+            "offline" => maplibre_native_sys::MLN_NETWORK_STATUS_OFFLINE,
+            other => {
+                return Err(error::invalid_argument(format!(
+                    "network status must be 'online' or 'offline', got '{other}'"
+                )));
+            }
+        },
+        Either::B(raw_status) => raw_status,
     };
 
     // SAFETY: The raw enum value is passed by value. The C API validates the
@@ -132,7 +135,12 @@ pub fn set_network_status(status: String) -> Result<()> {
 }
 
 #[napi(js_name = "nativeSetLogCallback")]
-pub fn native_set_log_callback(env: Env, callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
+pub fn native_set_log_callback(
+    env: Env,
+    mut callback: ThreadsafeFunction<LogRecord>,
+) -> Result<()> {
+    #[allow(deprecated)]
+    callback.unref(&env)?;
     let state = Arc::new(LogCallbackState {
         id: next_log_callback_id(),
         callback: Arc::new(callback),

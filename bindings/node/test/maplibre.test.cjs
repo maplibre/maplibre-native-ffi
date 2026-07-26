@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const path = require("node:path");
 const test = require("node:test");
 const { Worker } = require("node:worker_threads");
@@ -147,9 +148,10 @@ test("process-global APIs cross the native add-on", () => {
   setNetworkStatus("offline");
   assert.equal(networkStatus().kind, "offline");
 
-  if (original.kind === "online" || original.kind === "offline") {
-    setNetworkStatus(original.kind);
-  }
+  setNetworkStatus({ kind: "unknown", raw: 1 });
+  assert.equal(networkStatus().kind, "online");
+
+  setNetworkStatus(original);
 });
 
 test("projection helpers round trip copied coordinate values", () => {
@@ -238,6 +240,118 @@ test("binding-managed callbacks contain user exceptions", () => {
   );
   assert.doesNotThrow(() => callbacks.fetch?.(null, { z: 0, x: 0, y: 0 }));
   assert.doesNotThrow(() => callbacks.cancel?.(null, { z: 0, x: 0, y: 0 }));
+});
+
+test("binding-managed callbacks contain rejected promises", async () => {
+  const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
+  /** @type {undefined | ((error: Error | null, record: import("..").LogRecord) => void)} */
+  let logBridge;
+  /** @param {(error: Error | null, record: import("..").LogRecord) => void} callback */
+  nativeAddon.nativeSetLogCallback = (callback) => {
+    logBridge = callback;
+  };
+
+  /** @type {{ fetch?: Function | null, cancel?: Function | null }} */
+  const callbacks = {};
+  try {
+    setLogCallback(async () => {
+      throw new Error("async log callback failed");
+    });
+    MapHandle.prototype.addCustomGeometrySource.call(
+      {
+        native: {
+          closed: false,
+          /**
+           * @param {string} _sourceId
+           * @param {unknown} _options
+           * @param {Function | null} fetchTile
+           * @param {Function | null} cancelTile
+           */
+          addCustomGeometrySource(_sourceId, _options, fetchTile, cancelTile) {
+            callbacks.fetch = fetchTile;
+            callbacks.cancel = cancelTile;
+          },
+        },
+      },
+      "custom",
+      {
+        async fetchTile() {
+          throw new Error("async fetch failed");
+        },
+        async cancelTile() {
+          throw new Error("async cancel failed");
+        },
+      },
+    );
+
+    logBridge?.(
+      null,
+      /** @type {import("..").LogRecord} */ ({ message: "hello" }),
+    );
+    callbacks.fetch?.(null, { z: 0, x: 0, y: 0 });
+    callbacks.cancel?.(null, { z: 0, x: 0, y: 0 });
+    await new Promise((resolve) => setImmediate(resolve));
+  } finally {
+    nativeAddon.nativeSetLogCallback = originalSetLogCallback;
+    clearLogCallback();
+  }
+});
+
+test("retired custom geometry sources discard queued callbacks", () => {
+  /** @type {Function[]} */
+  const fetchBridges = [];
+  const fakeMap = {
+    native: {
+      closed: false,
+      /** @param {string} _sourceId @param {unknown} _options @param {Function} fetchTile */
+      addCustomGeometrySource(_sourceId, _options, fetchTile) {
+        fetchBridges.push(fetchTile);
+      },
+      removeStyleSource() {
+        return true;
+      },
+    },
+  };
+  let firstFetches = 0;
+  let secondFetches = 0;
+
+  MapHandle.prototype.addCustomGeometrySource.call(fakeMap, "custom", {
+    fetchTile() {
+      firstFetches += 1;
+    },
+  });
+  assert.equal(
+    MapHandle.prototype.removeStyleSource.call(fakeMap, "custom"),
+    true,
+  );
+  MapHandle.prototype.addCustomGeometrySource.call(fakeMap, "custom", {
+    fetchTile() {
+      secondFetches += 1;
+    },
+  });
+
+  fetchBridges[0](null, { z: 0, x: 0, y: 0 });
+  fetchBridges[1](null, { z: 0, x: 0, y: 0 });
+  assert.equal(firstFetches, 0);
+  assert.equal(secondFetches, 1);
+});
+
+test("log callback registration does not keep a process alive", () => {
+  const packageRoot = path.join(__dirname, "..");
+  const result = spawnSync(
+    process.execPath,
+    ["-e", `require(${JSON.stringify(packageRoot)}).setLogCallback(() => {});`],
+    {
+      env: {
+        ...process.env,
+        MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS: "1",
+      },
+      encoding: "utf8",
+      timeout: 3_000,
+    },
+  );
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("runtime construction checks the loaded C ABI version first", () => {
@@ -1044,6 +1158,55 @@ test("resource provider routes validate Node handoff shape", async () => {
   } finally {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;
+  }
+});
+
+test("runtime teardown closes pending resource request wrappers", () => {
+  const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  /** @type {undefined | ((error: Error | null, request: any) => void)} */
+  let providerBridge;
+  nativeAddon.createNativeRuntimeHandle =
+    /** @type {any} */ (
+      () => ({
+        closed: false,
+        close() {},
+        /**
+         * @param {unknown[]} _routes
+         * @param {(error: Error | null, request: any) => void} callback
+         */
+        setResourceProviderRoutes(_routes, callback) {
+          providerBridge = callback;
+        },
+      })
+    );
+
+  try {
+    const runtime = new RuntimeHandle();
+    /** @type {ResourceRequestHandle | undefined} */
+    let requestHandle;
+    runtime.setResourceProviderRoutes(
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        requestHandle = request.handle;
+      },
+    );
+    providerBridge?.(
+      null,
+      fakeResourceProviderRequest(
+        "resource-request:runtime-close",
+        "custom://pending",
+      ),
+    );
+    assert.ok(requestHandle);
+    const pendingHandle = requestHandle;
+    assert.equal(pendingHandle.closed, false);
+
+    runtime.close();
+
+    assert.equal(pendingHandle.closed, true);
+    assert.throws(() => pendingHandle.cancelled(), InvalidStateError);
+  } finally {
+    nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
   }
 });
 
@@ -1989,5 +2152,16 @@ test("binding-owned validation rejects unknown network status strings", () => {
       assert.match(error.diagnostic, /network status/);
       return true;
     },
+  );
+  assert.throws(
+    () => setNetworkStatus(/** @type {any} */ ({ kind: "unknown", raw: -1 })),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () =>
+      setNetworkStatus(
+        /** @type {any} */ ({ kind: "unknown", raw: 0x1_0000_0000 }),
+      ),
+    InvalidArgumentError,
   );
 });

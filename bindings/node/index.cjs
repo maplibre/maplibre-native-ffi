@@ -104,13 +104,26 @@ function networkStatus() {
 }
 
 function setNetworkStatus(status) {
-  if (status !== "online" && status !== "offline") {
+  let raw;
+  if (status === "online") {
+    raw = status;
+  } else if (status === "offline") {
+    raw = status;
+  } else if (
+    status != null &&
+    typeof status === "object" &&
+    Number.isInteger(status.raw) &&
+    status.raw >= 0 &&
+    status.raw <= 0xffff_ffff
+  ) {
+    raw = status.raw;
+  } else {
     throw new InvalidArgumentError(
       null,
-      `network status must be 'online' or 'offline', got '${status}'`,
+      "network status must be 'online', 'offline', or a status value with an unsigned 32-bit raw field",
     );
   }
-  return translateNativeErrors(() => native.setNetworkStatus(status));
+  return translateNativeErrors(() => native.setNetworkStatus(raw));
 }
 
 function projectedMetersForLatLng(coordinate) {
@@ -135,7 +148,7 @@ function setLogCallback(callback) {
         return;
       }
       try {
-        callback(record);
+        containCallbackResult(callback(record));
       } catch {
         // User logging callbacks must not escape binding-managed callbacks.
       }
@@ -675,6 +688,20 @@ const resourceRequestFinalizer =
         }
       })
     : null;
+const runtimeResourceRequests = new WeakMap();
+
+function registerRuntimeResourceRequest(runtime, registration) {
+  let requests = runtimeResourceRequests.get(runtime);
+  if (requests == null) {
+    requests = new Set();
+    runtimeResourceRequests.set(runtime, requests);
+  }
+  requests.add(registration);
+}
+
+function unregisterRuntimeResourceRequest(runtime, registration) {
+  runtimeResourceRequests.get(runtime)?.delete(registration);
+}
 
 function resourceProviderErrorResponse(error) {
   const unsafeMessage =
@@ -704,27 +731,68 @@ function completeResourceRequestWithProviderError(handle, error) {
   }
 }
 
-function customGeometryCallback(callback) {
+const mapCustomGeometrySourceCallbacks = new WeakMap();
+
+function customGeometrySourceCallbacks(map) {
+  let callbacks = mapCustomGeometrySourceCallbacks.get(map);
+  if (callbacks == null) {
+    callbacks = new Map();
+    mapCustomGeometrySourceCallbacks.set(map, callbacks);
+  }
+  return callbacks;
+}
+
+function retireCustomGeometrySourceCallbacks(map, sourceId) {
+  const callbacks = mapCustomGeometrySourceCallbacks.get(map);
+  const registration = callbacks?.get(sourceId);
+  if (registration != null) {
+    registration.active = false;
+    callbacks.delete(sourceId);
+  }
+}
+
+function retireAllCustomGeometrySourceCallbacks(map) {
+  const callbacks = mapCustomGeometrySourceCallbacks.get(map);
+  if (callbacks == null) {
+    return;
+  }
+  for (const registration of callbacks.values()) {
+    registration.active = false;
+  }
+  callbacks.clear();
+}
+
+function customGeometryCallback(callback, registration) {
   if (callback == null) {
     return null;
   }
   return (error, tileId) => {
-    if (error) {
+    if (error || !registration.active) {
       return;
     }
     try {
-      callback(tileId);
+      containCallbackResult(callback(tileId));
     } catch {
       // Native custom geometry callbacks must not escape into the event loop.
     }
   };
 }
 
+function containCallbackResult(result) {
+  if (result && typeof result.then === "function") {
+    Promise.resolve(result).catch(() => {
+      // Rejected callback promises follow the synchronous exception policy.
+    });
+  }
+}
+
 class ResourceRequestHandle {
   #completionToken;
+  #runtime;
+  #registration;
   #closed = false;
 
-  constructor(token, completionToken) {
+  constructor(token, completionToken, runtime) {
     if (token !== CONSTRUCTION_TOKEN) {
       throw new InvalidArgumentError(
         null,
@@ -733,6 +801,9 @@ class ResourceRequestHandle {
     }
     recordHandleEnvironment(this);
     this.#completionToken = completionToken;
+    this.#runtime = runtime;
+    this.#registration = { handle: new WeakRef(this) };
+    registerRuntimeResourceRequest(runtime, this.#registration);
     resourceRequestFinalizer?.register(this, completionToken, this);
     Object.preventExtensions(this);
   }
@@ -761,8 +832,7 @@ class ResourceRequestHandle {
       throw error;
     } finally {
       if (consumed) {
-        this.#closed = true;
-        resourceRequestFinalizer?.unregister(this);
+        this.#markClosed();
       }
     }
   }
@@ -785,8 +855,20 @@ class ResourceRequestHandle {
     translateNativeErrors(() =>
       native.nativeResourceRequestClose(this.#completionToken),
     );
-    this.#closed = true;
-    resourceRequestFinalizer?.unregister(this);
+    this.#markClosed();
+  }
+
+  _markClosedFromRuntime() {
+    assertHandleEnvironment(this);
+    this.#markClosed();
+  }
+
+  #markClosed() {
+    if (!this.#closed) {
+      this.#closed = true;
+      unregisterRuntimeResourceRequest(this.#runtime, this.#registration);
+      resourceRequestFinalizer?.unregister(this);
+    }
   }
 
   [Symbol.dispose]() {
@@ -947,6 +1029,11 @@ class RuntimeHandle {
     }
     const result = translateNativeErrors(() => nativeOf(this).close());
     this.#mapsByAddress.clear();
+    const resourceRequests = runtimeResourceRequests.get(this);
+    for (const registration of resourceRequests ?? []) {
+      registration.handle.deref()?._markClosedFromRuntime();
+    }
+    resourceRequests?.clear();
     return result;
   }
 
@@ -991,6 +1078,7 @@ class RuntimeHandle {
         const handle = new ResourceRequestHandle(
           CONSTRUCTION_TOKEN,
           request.completionToken,
+          this,
         );
         const wrapped = {
           ...request,
@@ -1687,6 +1775,7 @@ class MapHandle {
 
   close() {
     const result = translateNativeErrors(() => nativeOf(this).close());
+    retireAllCustomGeometrySourceCallbacks(this);
     this.#runtime._unregisterMap(this);
     return result;
   }
@@ -2021,9 +2110,13 @@ class MapHandle {
   }
 
   removeStyleSource(sourceId) {
-    return translateNativeErrors(() =>
+    const removed = translateNativeErrors(() =>
       liveNativeOf(this).removeStyleSource(sourceId),
     );
+    if (removed) {
+      retireCustomGeometrySourceCallbacks(this, sourceId);
+    }
+    return removed;
   }
 
   listStyleSourceIds() {
@@ -2146,14 +2239,23 @@ class MapHandle {
         "custom geometry cancelTile callback must be a function",
       );
     }
-    return translateNativeErrors(() =>
-      liveNativeOf(this).addCustomGeometrySource(
-        sourceId,
-        nativeOptions,
-        customGeometryCallback(fetchTile),
-        customGeometryCallback(cancelTile),
-      ),
-    );
+    const registration = { active: true };
+    try {
+      const result = translateNativeErrors(() =>
+        liveNativeOf(this).addCustomGeometrySource(
+          sourceId,
+          nativeOptions,
+          customGeometryCallback(fetchTile, registration),
+          customGeometryCallback(cancelTile, registration),
+        ),
+      );
+      retireCustomGeometrySourceCallbacks(this, sourceId);
+      customGeometrySourceCallbacks(this).set(sourceId, registration);
+      return result;
+    } catch (error) {
+      registration.active = false;
+      throw error;
+    }
   }
 
   _releaseDetachedCustomGeometrySources() {
@@ -2405,11 +2507,19 @@ class MapHandle {
   }
 
   setStyleJson(json) {
-    return translateNativeErrors(() => liveNativeOf(this).setStyleJson(json));
+    const result = translateNativeErrors(() =>
+      liveNativeOf(this).setStyleJson(json),
+    );
+    retireAllCustomGeometrySourceCallbacks(this);
+    return result;
   }
 
   setStyleUrl(url) {
-    return translateNativeErrors(() => liveNativeOf(this).setStyleUrl(url));
+    const result = translateNativeErrors(() =>
+      liveNativeOf(this).setStyleUrl(url),
+    );
+    retireAllCustomGeometrySourceCallbacks(this);
+    return result;
   }
 
   [Symbol.dispose]() {
@@ -2451,17 +2561,6 @@ function assertNativeAbiVersion() {
       MaplibreStatus.abiVersionMismatch,
       null,
       `maplibre-native-c ABI version ${actual} does not match binding ABI version ${EXPECTED_C_ABI_VERSION}`,
-    );
-  }
-}
-
-function parseJson(value) {
-  try {
-    return JSON.parse(value);
-  } catch (error) {
-    throw new InvalidArgumentError(
-      null,
-      `JSON value from native is invalid: ${error.message}`,
     );
   }
 }
