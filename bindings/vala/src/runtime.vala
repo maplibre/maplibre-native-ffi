@@ -870,6 +870,7 @@ namespace MaplibreNative {
             }
             mutex.unlock ();
         }
+
     }
 
     private class ResourceTransformRegistration {
@@ -920,6 +921,12 @@ namespace MaplibreNative {
             }
             mutex.unlock ();
         }
+
+        public void reopen () {
+            mutex.lock ();
+            closing = false;
+            mutex.unlock ();
+        }
     }
 
     private class ResourceProviderRegistration {
@@ -962,6 +969,12 @@ namespace MaplibreNative {
             while (active_callbacks > 0) {
                 idle.wait (mutex);
             }
+            mutex.unlock ();
+        }
+
+        public void reopen () {
+            mutex.lock ();
+            closing = false;
             mutex.unlock ();
         }
     }
@@ -1130,7 +1143,17 @@ namespace MaplibreNative {
                 transform.close ();
             }
             unowned Raw.Runtime closing = native;
-            check_status (Raw.runtime_destroy (closing));
+            try {
+                check_status (Raw.runtime_destroy (closing));
+            } catch (Error error) {
+                if (transform != null) {
+                    transform.reopen ();
+                }
+                if (provider != null) {
+                    provider.reopen ();
+                }
+                throw error;
+            }
             native = null;
             resource_transform = null;
             resource_provider = null;
