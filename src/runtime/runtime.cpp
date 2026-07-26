@@ -2322,63 +2322,79 @@ auto set_resource_provider(
 }
 
 auto destroy_runtime(mln_runtime* runtime) -> mln_status {
-  const std::scoped_lock lock(runtime_registry_mutex());
   if (runtime == nullptr) {
     set_thread_error("runtime must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto found = runtime_registry().find(runtime);
-  if (found == runtime_registry().end()) {
-    set_thread_error("runtime is not a live handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
+  // Take ownership of the runtime out of the registry, then release the
+  // process-global registry lock before any teardown step that can block on a
+  // native callback. Removing the entry under the registry lock makes the
+  // handle unreachable to every later registry lookup, so the waits below stall
+  // this runtime alone while calls on unrelated runtimes keep running.
+  std::unique_ptr<mln_runtime> owned_runtime;
+  {
+    const std::scoped_lock lock(runtime_registry_mutex());
+    const auto found = runtime_registry().find(runtime);
+    if (found == runtime_registry().end()) {
+      set_thread_error("runtime is not a live handle");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (found->second->owner_thread != std::this_thread::get_id()) {
+      set_thread_error("runtime must be destroyed on its owner thread");
+      return MLN_STATUS_WRONG_THREAD;
+    }
+
+    if (found->second->live_maps != 0) {
+      set_thread_error("runtime still owns live maps");
+      return MLN_STATUS_INVALID_STATE;
+    }
+
+    owned_runtime = std::move(found->second);
+    runtime_registry().erase(found);
   }
 
-  if (found->second->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("runtime must be destroyed on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
-  }
-
-  if (found->second->live_maps != 0) {
-    set_thread_error("runtime still owns live maps");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
+  // A resource transform callback that entered `invoke_resource_transform()`
+  // before the erase above holds a shared transform lock, so this wait covers
+  // every callback that can still observe the runtime.
   {
     const std::unique_lock transform_lock(
-      found->second->resource_transform_mutex
+      owned_runtime->resource_transform_mutex
     );
-    found->second->resource_transform_callback = nullptr;
-    found->second->resource_transform_user_data = nullptr;
+    owned_runtime->resource_transform_callback = nullptr;
+    owned_runtime->resource_transform_user_data = nullptr;
   }
 
   {
     const std::scoped_lock state_lock(
-      found->second->offline_event_state->mutex
+      owned_runtime->offline_event_state->mutex
     );
-    found->second->offline_event_state->alive = false;
-    found->second->offline_event_state->runtime = nullptr;
-    const std::scoped_lock event_lock(found->second->event_mutex);
-    found->second->observed_offline_regions.clear();
-    std::erase_if(found->second->events, [](const auto& event) -> bool {
+    owned_runtime->offline_event_state->alive = false;
+    owned_runtime->offline_event_state->runtime = nullptr;
+    const std::scoped_lock event_lock(owned_runtime->event_mutex);
+    owned_runtime->observed_offline_regions.clear();
+    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
       return event.has_offline_region;
     });
   }
 
   {
     const std::scoped_lock state_lock(
-      found->second->offline_operation_state->mutex
+      owned_runtime->offline_operation_state->mutex
     );
-    found->second->offline_operation_state->alive = false;
-    found->second->offline_operation_state->runtime = nullptr;
-    found->second->offline_operation_state->operations.clear();
-    const std::scoped_lock event_lock(found->second->event_mutex);
-    std::erase_if(found->second->events, [](const auto& event) -> bool {
+    owned_runtime->offline_operation_state->alive = false;
+    owned_runtime->offline_operation_state->runtime = nullptr;
+    owned_runtime->offline_operation_state->operations.clear();
+    const std::scoped_lock event_lock(owned_runtime->event_mutex);
+    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
       return event.has_offline_operation;
     });
   }
 
-  runtime_registry().erase(runtime);
+  // Releasing the run loop and the database file source can join native
+  // threads, and that happens here with the registry lock released.
+  owned_runtime.reset();
   return MLN_STATUS_OK;
 }
 
@@ -2461,6 +2477,10 @@ auto retain_runtime_map(mln_runtime* runtime) -> mln_status {
   }
 
   const std::scoped_lock lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    set_thread_error("runtime is not a live handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   ++runtime->live_maps;
   return MLN_STATUS_OK;
 }
@@ -2514,6 +2534,12 @@ auto invoke_resource_transform(
   auto* runtime = static_cast<mln_runtime*>(platform_context);
   std::shared_lock<std::shared_mutex> transform_lock;
   {
+    // Taking the shared transform lock while the registry lock is held is the
+    // handoff that keeps the runtime alive for the callback:
+    // `destroy_runtime()` removes the registry entry under the same registry
+    // lock and then waits for the exclusive transform lock. A callback that
+    // reaches the shared lock first holds teardown until it returns, and one
+    // that arrives after the erase finds no entry and skips the transform.
     const std::scoped_lock registry_lock(runtime_registry_mutex());
     if (!runtime_registry().contains(runtime)) {
       return MLN_STATUS_OK;
