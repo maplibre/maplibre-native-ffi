@@ -733,16 +733,37 @@ export type OfflineRegionDefinition =
   | OfflineTilePyramidRegionDefinition
   | OfflineGeometryRegionDefinition;
 
-export interface OfflineRegionDefinitionValue {
-  kind: "tilePyramid" | "geometry";
+export interface OfflineTilePyramidRegionDefinitionValue {
+  kind: "tilePyramid";
+  rawType: 1;
   styleUrl: string;
-  bounds?: LatLngBounds | null;
-  geometry?: JsonValue | null;
+  bounds: LatLngBounds;
   minZoom: number;
   maxZoom: number;
   pixelRatio: number;
   includeIdeographs: boolean;
 }
+
+export interface OfflineGeometryRegionDefinitionValue {
+  kind: "geometry";
+  rawType: 2;
+  styleUrl: string;
+  geometry: JsonValue;
+  minZoom: number;
+  maxZoom: number;
+  pixelRatio: number;
+  includeIdeographs: boolean;
+}
+
+export interface OfflineUnknownRegionDefinitionValue {
+  kind: "unknown";
+  rawType: number;
+}
+
+export type OfflineRegionDefinitionValue =
+  | OfflineTilePyramidRegionDefinitionValue
+  | OfflineGeometryRegionDefinitionValue
+  | OfflineUnknownRegionDefinitionValue;
 
 export interface OfflineRegionInfo {
   id: bigint;
@@ -1247,10 +1268,14 @@ export declare class MapHandle {
   removeStyleImage(imageId: string): boolean;
   getStyleImageInfo(imageId: string): StyleImageInfo | null;
   copyStyleImagePremultipliedRgba8(imageId: string): StyleImage | null;
-  addImageSourceUrl(sourceId: string, coordinates: LatLng[], url: string): void;
+  addImageSourceUrl(
+    sourceId: string,
+    coordinates: ImageSourceCoordinates,
+    url: string,
+  ): void;
   addImageSourceImage(
     sourceId: string,
-    coordinates: LatLng[],
+    coordinates: ImageSourceCoordinates,
     image: PremultipliedRgba8ImageInput,
   ): void;
   setImageSourceUrl(sourceId: string, url: string): void;
@@ -1258,8 +1283,11 @@ export declare class MapHandle {
     sourceId: string,
     image: PremultipliedRgba8ImageInput,
   ): void;
-  setImageSourceCoordinates(sourceId: string, coordinates: LatLng[]): void;
-  getImageSourceCoordinates(sourceId: string): LatLng[] | null;
+  setImageSourceCoordinates(
+    sourceId: string,
+    coordinates: ImageSourceCoordinates,
+  ): void;
+  getImageSourceCoordinates(sourceId: string): ImageSourceCoordinates | null;
   addHillshadeLayer(
     layerId: string,
     sourceId: string,
@@ -1313,6 +1341,8 @@ export interface LatLng {
   latitude: number;
   longitude: number;
 }
+
+export type ImageSourceCoordinates = readonly [LatLng, LatLng, LatLng, LatLng];
 
 export interface LatLngBounds {
   southwest: LatLng;

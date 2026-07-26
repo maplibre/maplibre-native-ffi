@@ -1414,6 +1414,19 @@ test("resource provider routes validate Node handoff shape", async () => {
       () => runtime.setResourceProviderRoutes([], /** @type {any} */ (null)),
       InvalidArgumentError,
     );
+    for (const invalidRoute of [null, "catch-all", 42, []]) {
+      assert.throws(
+        () =>
+          runtime.setResourceProviderRoutes(
+            [/** @type {any} */ (invalidRoute)],
+            () => {},
+          ),
+        {
+          constructor: InvalidArgumentError,
+          diagnostic: "resource matcher entries must be objects",
+        },
+      );
+    }
     assert.throws(
       () =>
         runtime.setResourceProviderRoutes(
@@ -1787,6 +1800,13 @@ test("resource provider routes validate Node handoff shape", async () => {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;
   }
+});
+
+test("unknown offline definitions preserve their raw native type", () => {
+  const definition = nativeAddon.nativeTestOfflineRegionDefinitionValue(1000);
+
+  assert.equal(definition.kind, "unknown");
+  assert.equal(definition.rawType, 1000);
 });
 
 test("replaced and closed providers discard queued requests", () => {
@@ -2464,6 +2484,7 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     );
     assert.equal(map.getStyleSourceInfo("missing-source"), null);
 
+    /** @type {import("../index.cjs").ImageSourceCoordinates} */
     const imageCoordinates = [
       { latitude: 1, longitude: 2 },
       { latitude: 1, longitude: 3 },
@@ -2634,6 +2655,25 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       height: 1,
       pixels: new Uint8Array([0, 255, 0, 255]),
     };
+    for (const invalidCoordinates of [
+      imageCoordinates.slice(0, 3),
+      [...imageCoordinates, imageCoordinates[0]],
+      null,
+    ]) {
+      assert.throws(
+        () =>
+          map.addImageSourceUrl(
+            "invalid-image-source",
+            /** @type {any} */ (invalidCoordinates),
+            "https://example.test/image.png",
+          ),
+        {
+          constructor: InvalidArgumentError,
+          diagnostic:
+            "image source coordinates must contain exactly four coordinates",
+        },
+      );
+    }
     map.addImageSourceUrl(
       "image-source",
       imageCoordinates,

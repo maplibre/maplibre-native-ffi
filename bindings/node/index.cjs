@@ -290,11 +290,21 @@ function resourceKindInput(kind) {
 }
 
 function resourceMatcherInputs(matchers) {
-  return matchers.map((matcher) =>
-    Object.hasOwn(matcher ?? {}, "kind")
+  return matchers.map((matcher) => {
+    if (
+      matcher == null ||
+      typeof matcher !== "object" ||
+      Array.isArray(matcher)
+    ) {
+      throw new InvalidArgumentError(
+        null,
+        "resource matcher entries must be objects",
+      );
+    }
+    return Object.hasOwn(matcher, "kind")
       ? { ...matcher, kind: resourceKindInput(matcher.kind) }
-      : { ...matcher },
-  );
+      : { ...matcher };
+  });
 }
 
 function offlineRegionDownloadStateInput(state) {
@@ -1016,6 +1026,16 @@ function normalizeImageInput(image) {
     height: unsigned32(image?.height, "image.height"),
     stride: optionalUnsigned32(image?.stride, "image.stride"),
   };
+}
+
+function imageSourceCoordinatesInput(coordinates) {
+  if (!Array.isArray(coordinates) || coordinates.length !== 4) {
+    throw new InvalidArgumentError(
+      null,
+      "image source coordinates must contain exactly four coordinates",
+    );
+  }
+  return coordinates;
 }
 
 function mutableUint8Array(data, fieldName) {
@@ -2856,7 +2876,11 @@ class MapHandle {
 
   addImageSourceUrl(sourceId, coordinates, url) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addImageSourceUrl(sourceId, coordinates, url),
+      liveNativeOf(this).addImageSourceUrl(
+        sourceId,
+        imageSourceCoordinatesInput(coordinates),
+        url,
+      ),
     );
   }
 
@@ -2864,7 +2888,7 @@ class MapHandle {
     return translateNativeErrors(() =>
       liveNativeOf(this).addImageSourceImage(
         sourceId,
-        coordinates,
+        imageSourceCoordinatesInput(coordinates),
         normalizeImageInput(image),
       ),
     );
@@ -2887,7 +2911,10 @@ class MapHandle {
 
   setImageSourceCoordinates(sourceId, coordinates) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).setImageSourceCoordinates(sourceId, coordinates),
+      liveNativeOf(this).setImageSourceCoordinates(
+        sourceId,
+        imageSourceCoordinatesInput(coordinates),
+      ),
     );
   }
 

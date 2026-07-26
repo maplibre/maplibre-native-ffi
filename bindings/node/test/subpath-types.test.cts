@@ -20,6 +20,7 @@ import {
   TileSourceOptions,
   type CameraOptionsInput,
   type CustomGeometrySourceOptions,
+  type ImageSourceCoordinates,
   type LocationIndicatorImageKind,
   type MapTileOptionsInput,
   type MapViewportOptionsInput,
@@ -28,7 +29,10 @@ import {
   type StyleSourceTypeValue,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
-import type { OfflineRegionDownloadStateValue } from "@maplibre/native-ffi-node/offline";
+import type {
+  OfflineRegionDefinitionValue,
+  OfflineRegionDownloadStateValue,
+} from "@maplibre/native-ffi-node/offline";
 import {
   NativeBuffer,
   NativePointer,
@@ -157,6 +161,21 @@ const transformRule: ResourceTransformRule = {
 const readbackBuffer: TextureReadbackBuffer = NativeBuffer.allocate(4);
 declare const runtime: RuntimeHandle;
 declare const map: MapHandle;
+const imageSourceCoordinates: ImageSourceCoordinates = [
+  { latitude: 1, longitude: 2 },
+  { latitude: 3, longitude: 4 },
+  { latitude: 5, longitude: 6 },
+  { latitude: 7, longitude: 8 },
+];
+map.setImageSourceCoordinates("image", imageSourceCoordinates);
+// @ts-expect-error image sources require exactly four ordered coordinates.
+map.setImageSourceCoordinates("image", imageSourceCoordinates.slice(0, 3));
+declare const offlineDefinition: OfflineRegionDefinitionValue;
+if (offlineDefinition.kind === "unknown") {
+  void offlineDefinition.rawType;
+} else {
+  void offlineDefinition.styleUrl;
+}
 const styleSourceType: StyleSourceTypeValue | null =
   map.getStyleSourceType("source");
 void styleSourceType?.rawType;

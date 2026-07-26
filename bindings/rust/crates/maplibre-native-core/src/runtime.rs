@@ -63,6 +63,22 @@ pub enum OfflineRegionDefinition {
         pixel_ratio: f32,
         include_ideographs: bool,
     },
+    /// Definition kind added by a newer compatible C library.
+    Unknown {
+        /// Raw `mln_offline_region_definition_type` value.
+        raw_type: u32,
+    },
+}
+
+impl OfflineRegionDefinition {
+    /// Returns the represented `mln_offline_region_definition_type` value.
+    pub fn raw_type(&self) -> u32 {
+        match self {
+            Self::TilePyramid { .. } => sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+            Self::GeometryRegion { .. } => sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
+            Self::Unknown { raw_type } => *raw_type,
+        }
+    }
 }
 
 /// Offline region snapshot copied from native storage.
@@ -126,6 +142,9 @@ impl NativeOfflineRegionDefinition {
                 pixel_ratio: *pixel_ratio,
                 include_ideographs: *include_ideographs,
             }),
+            OfflineRegionDefinition::Unknown { raw_type } => Err(crate::Error::invalid_argument(
+                format!("cannot materialize unknown offline region definition type: {raw_type}"),
+            )),
         }
     }
 
@@ -267,9 +286,7 @@ pub fn copy_offline_region_definition(
                 include_ideographs: geometry.include_ideographs,
             })
         }
-        type_ => Err(crate::Error::invalid_argument(format!(
-            "unknown offline region definition type: {type_}"
-        ))),
+        raw_type => Ok(OfflineRegionDefinition::Unknown { raw_type }),
     }
 }
 
@@ -622,6 +639,43 @@ mod tests {
         assert!(
             err.to_string()
                 .contains("offline region geometry must not be null")
+        );
+    }
+
+    #[test]
+    fn offline_region_info_preserves_unknown_definition_type_id_and_metadata() {
+        let metadata = [1_u8, 2, 3];
+        let raw = sys::mln_offline_region_info {
+            size: std::mem::size_of::<sys::mln_offline_region_info>() as u32,
+            id: 7,
+            definition: sys::mln_offline_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+                type_: 1000,
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
+                    tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
+                        size: 0,
+                        style_url: std::ptr::null(),
+                        bounds: crate::values::lat_lng_bounds_to_native(crate::LatLngBounds::new(
+                            crate::LatLng::new(0.0, 0.0),
+                            crate::LatLng::new(0.0, 0.0),
+                        )),
+                        min_zoom: 0.0,
+                        max_zoom: 0.0,
+                        pixel_ratio: 0.0,
+                        include_ideographs: false,
+                    },
+                },
+            },
+            metadata: metadata.as_ptr(),
+            metadata_size: metadata.len(),
+        };
+
+        let copied = copy_offline_region_info(&raw).unwrap();
+        assert_eq!(copied.id, 7);
+        assert_eq!(copied.metadata, metadata);
+        assert_eq!(
+            copied.definition,
+            OfflineRegionDefinition::Unknown { raw_type: 1000 },
         );
     }
 }

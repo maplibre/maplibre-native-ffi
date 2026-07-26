@@ -28,6 +28,7 @@ export {
   type StyleImage,
   type StyleSourceTypeValue,
   type StyleSourceInfo,
+  type ImageSourceCoordinates,
   type TileSourceOptionsInput,
   type CustomGeometrySourceOptions,
   type CustomGeometrySourceCallback,

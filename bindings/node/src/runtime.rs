@@ -42,13 +42,14 @@ pub struct OfflineRegionDefinitionInput {
 #[napi(object)]
 pub struct OfflineRegionDefinitionValue {
     pub kind: String,
-    pub style_url: String,
+    pub raw_type: u32,
+    pub style_url: Option<String>,
     pub bounds: Option<crate::values::LatLngBounds>,
     pub geometry: Option<serde_json::Value>,
-    pub min_zoom: f64,
-    pub max_zoom: f64,
-    pub pixel_ratio: f64,
-    pub include_ideographs: bool,
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub pixel_ratio: Option<f64>,
+    pub include_ideographs: Option<bool>,
 }
 
 #[napi(object)]
@@ -1630,6 +1631,7 @@ fn offline_region_info_to_value(info: core::OfflineRegionInfo) -> Result<Offline
 fn offline_region_definition_to_value(
     definition: core::OfflineRegionDefinition,
 ) -> Result<OfflineRegionDefinitionValue> {
+    let raw_type = definition.raw_type();
     match definition {
         core::OfflineRegionDefinition::TilePyramid {
             style_url,
@@ -1640,13 +1642,14 @@ fn offline_region_definition_to_value(
             include_ideographs,
         } => Ok(OfflineRegionDefinitionValue {
             kind: "tilePyramid".to_owned(),
-            style_url,
+            raw_type: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+            style_url: Some(style_url),
             bounds: Some(crate::values::LatLngBounds::from_core(bounds)),
             geometry: None,
-            min_zoom,
-            max_zoom,
-            pixel_ratio: f64::from(pixel_ratio),
-            include_ideographs,
+            min_zoom: Some(min_zoom),
+            max_zoom: Some(max_zoom),
+            pixel_ratio: Some(f64::from(pixel_ratio)),
+            include_ideographs: Some(include_ideographs),
         }),
         core::OfflineRegionDefinition::GeometryRegion {
             style_url,
@@ -1657,16 +1660,39 @@ fn offline_region_definition_to_value(
             include_ideographs,
         } => Ok(OfflineRegionDefinitionValue {
             kind: "geometry".to_owned(),
-            style_url,
+            raw_type: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
+            style_url: Some(style_url),
             bounds: None,
             geometry: Some(geometry_to_serde(geometry)),
-            min_zoom,
-            max_zoom,
-            pixel_ratio: f64::from(pixel_ratio),
-            include_ideographs,
+            min_zoom: Some(min_zoom),
+            max_zoom: Some(max_zoom),
+            pixel_ratio: Some(f64::from(pixel_ratio)),
+            include_ideographs: Some(include_ideographs),
         }),
-        _ => Err(error::invalid_argument("unknown offline region definition")),
+        _ => Ok(unknown_offline_region_definition_value(raw_type)),
     }
+}
+
+fn unknown_offline_region_definition_value(raw_type: u32) -> OfflineRegionDefinitionValue {
+    OfflineRegionDefinitionValue {
+        kind: "unknown".to_owned(),
+        raw_type,
+        style_url: None,
+        bounds: None,
+        geometry: None,
+        min_zoom: None,
+        max_zoom: None,
+        pixel_ratio: None,
+        include_ideographs: None,
+    }
+}
+
+#[cfg(feature = "test-support")]
+#[napi(js_name = "nativeTestOfflineRegionDefinitionValue")]
+pub fn native_test_offline_region_definition_value(
+    raw_type: u32,
+) -> Result<OfflineRegionDefinitionValue> {
+    Ok(unknown_offline_region_definition_value(raw_type))
 }
 
 fn offline_region_status_value_from_native(
