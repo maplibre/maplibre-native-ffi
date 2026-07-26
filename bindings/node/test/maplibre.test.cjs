@@ -619,7 +619,8 @@ test("offline operation events expose copied typed payloads", async () => {
     assert.equal(event.sourceMap, null);
     const completed = /** @type {any} */ (event.payload)
       .offlineOperationCompleted;
-    assert.equal(typeof completed.operationId, "bigint");
+    assert.equal(completed.operation, operation);
+    assert.equal("operationId" in completed, false);
     assert.equal(completed.operationKind, "ambientCache");
     assert.equal(completed.resultKind, "none");
     assert.equal(typeof completed.rawOperationKind, "number");
@@ -1501,6 +1502,18 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       vectorEncoding: "mvt",
     });
     assert.equal(map.getStyleSourceType("vector-url"), "vector");
+    map.addStyleSourceJson("vector-empty-attribution", {
+      type: "vector",
+      tiles: ["https://example.test/{z}/{x}/{y}.pbf"],
+      attribution: "",
+    });
+    const emptyAttributionInfo = map.getStyleSourceInfo(
+      "vector-empty-attribution",
+    );
+    assert.ok(emptyAttributionInfo);
+    assert.equal(emptyAttributionInfo.hasAttribution, true);
+    assert.equal(emptyAttributionInfo.attributionSize, 0);
+    assert.equal(emptyAttributionInfo.attribution, "");
     map.addRasterSourceUrl("raster-url", "https://example.test/raster.json", {
       tileSize: 256,
     });
@@ -1529,6 +1542,14 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
     assert.throws(
       () =>
+        map.addVectorSourceTiles(
+          "vector-tiles-string",
+          /** @type {any} */ ("https://example.test/{z}/{x}/{y}.pbf"),
+        ),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
         map.addStyleSourceJson("non-finite", {
           type: "geojson",
           data: { type: "Point", coordinates: [Number.NaN, 0] },
@@ -1552,6 +1573,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
         map.addCustomGeometrySource("custom-geometry-invalid", {
           fetchTile: /** @type {any} */ ("nope"),
         }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => map.addCustomGeometrySource("custom-geometry-missing-fetch"),
       InvalidArgumentError,
     );
     map.setCustomGeometrySourceTileData(

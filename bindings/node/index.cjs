@@ -793,11 +793,32 @@ class ResourceRequestHandle {
   }
 }
 
+const offlineOperationFinalizer =
+  typeof FinalizationRegistry === "function"
+    ? new FinalizationRegistry((registration) => {
+        if (registration.closed) {
+          return;
+        }
+        try {
+          liveNativeOf(registration.runtime).discardOfflineOperation(
+            registration.operationId,
+          );
+          registration.closed = true;
+          registration.runtime._unregisterOfflineOperation(registration);
+        } catch (error) {
+          process.emitWarning(
+            `Leaked offline operation ${registration.operationKind} could not be discarded: ${String(error)}`,
+          );
+        }
+      })
+    : null;
+
 class OfflineOperationHandle {
   #runtime;
   #operationId;
   #operationKind;
   #resultKind;
+  #registration;
   #closed = false;
 
   constructor(
@@ -827,7 +848,15 @@ class OfflineOperationHandle {
     this.#operationId = operationId;
     this.#operationKind = operationKind;
     this.#resultKind = resultKind;
-    runtime._registerOfflineOperation(this);
+    this.#registration = {
+      runtime,
+      operationId,
+      operationKind,
+      closed: false,
+      handle: new WeakRef(this),
+    };
+    runtime._registerOfflineOperation(this.#registration);
+    offlineOperationFinalizer?.register(this, this.#registration, this);
     Object.preventExtensions(this);
   }
 
@@ -878,7 +907,9 @@ class OfflineOperationHandle {
   #markClosed() {
     if (!this.#closed) {
       this.#closed = true;
-      this.#runtime._unregisterOfflineOperation(this);
+      this.#registration.closed = true;
+      this.#runtime._unregisterOfflineOperation(this.#registration);
+      offlineOperationFinalizer?.unregister(this);
     }
   }
 
@@ -1176,6 +1207,14 @@ class RuntimeHandle {
         ? (this.#mapsByAddress.get(event.sourceAddress) ?? null)
         : null;
     delete event.sourceAddress;
+    const completed = event.payload?.offlineOperationCompleted;
+    if (typeof completed?.operationId === "bigint") {
+      const registration = [...this.#offlineOperations].find(
+        (candidate) => candidate.operationId === completed.operationId,
+      );
+      completed.operation = registration?.handle.deref() ?? null;
+      delete completed.operationId;
+    }
     return event;
   }
 
@@ -1195,14 +1234,14 @@ class RuntimeHandle {
     }
   }
 
-  _registerOfflineOperation(operation) {
+  _registerOfflineOperation(registration) {
     assertHandleEnvironment(this);
-    this.#offlineOperations.add(operation);
+    this.#offlineOperations.add(registration);
   }
 
-  _unregisterOfflineOperation(operation) {
+  _unregisterOfflineOperation(registration) {
     assertHandleEnvironment(this);
-    this.#offlineOperations.delete(operation);
+    this.#offlineOperations.delete(registration);
   }
 
   [Symbol.dispose]() {
@@ -2029,6 +2068,12 @@ class MapHandle {
   }
 
   addVectorSourceTiles(sourceId, tiles, options) {
+    if (!Array.isArray(tiles)) {
+      throw new InvalidArgumentError(
+        null,
+        "vector source tiles must be an array",
+      );
+    }
     return translateNativeErrors(() =>
       liveNativeOf(this).addVectorSourceTiles(
         sourceId,
@@ -2039,6 +2084,12 @@ class MapHandle {
   }
 
   addRasterSourceTiles(sourceId, tiles, options) {
+    if (!Array.isArray(tiles)) {
+      throw new InvalidArgumentError(
+        null,
+        "raster source tiles must be an array",
+      );
+    }
     return translateNativeErrors(() =>
       liveNativeOf(this).addRasterSourceTiles(
         sourceId,
@@ -2049,6 +2100,12 @@ class MapHandle {
   }
 
   addRasterDemSourceTiles(sourceId, tiles, options) {
+    if (!Array.isArray(tiles)) {
+      throw new InvalidArgumentError(
+        null,
+        "raster DEM source tiles must be an array",
+      );
+    }
     return translateNativeErrors(() =>
       liveNativeOf(this).addRasterDemSourceTiles(
         sourceId,
@@ -2060,7 +2117,7 @@ class MapHandle {
 
   addCustomGeometrySource(sourceId, options = null) {
     const { fetchTile, cancelTile, ...nativeOptions } = options ?? {};
-    if (fetchTile != null && typeof fetchTile !== "function") {
+    if (typeof fetchTile !== "function") {
       throw new InvalidArgumentError(
         null,
         "custom geometry fetchTile callback must be a function",

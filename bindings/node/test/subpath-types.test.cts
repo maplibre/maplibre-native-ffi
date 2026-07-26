@@ -90,9 +90,9 @@ const runtimeEvent = RuntimeHandle.prototype.pollEvent.call(
   {} as RuntimeHandle,
 );
 if (runtimeEvent?.payload.kind === "offline-operation-completed") {
-  const operationId: bigint =
-    runtimeEvent.payload.offlineOperationCompleted.operationId;
-  void operationId;
+  const operation: OfflineOperationHandle | null =
+    runtimeEvent.payload.offlineOperationCompleted.operation;
+  void operation;
 }
 const transformRule: ResourceTransformRule = {
   urlPrefix: "http://example.test/",

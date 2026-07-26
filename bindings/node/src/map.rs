@@ -2,7 +2,10 @@ use std::{
     collections::HashMap,
     ffi::{CString, c_void},
     panic::{AssertUnwindSafe, catch_unwind},
-    sync::{Arc, Condvar, Mutex},
+    sync::{
+        Arc, Condvar, Mutex, OnceLock,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
@@ -867,6 +870,7 @@ impl NativeMapHandle {
         let attribution = copy_style_source_attribution(
             self.state.as_ptr(),
             source_id_view.raw(),
+            raw_info.has_attribution,
             raw_info.attribution_size,
         )
         .map_err(error::from_core)?;
@@ -1105,10 +1109,11 @@ impl NativeMapHandle {
         cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
     ) -> Result<()> {
         let source_id_view = core::string::string_view(&source_id);
-        let state = CustomGeometrySourceState::new(fetch_tile, cancel_tile)
-            .map(CustomGeometrySourceRegistration::new);
-        let options =
-            custom_geometry_source_options_to_native(options.unwrap_or_default(), state.as_ref());
+        let state = CustomGeometrySourceRegistration::new(CustomGeometrySourceState::new(
+            fetch_tile,
+            cancel_tile,
+        )?);
+        let options = custom_geometry_source_options_to_native(options.unwrap_or_default(), &state);
         core::check(unsafe {
             sys::mln_map_add_custom_geometry_source(
                 self.state.as_ptr(),
@@ -1117,12 +1122,10 @@ impl NativeMapHandle {
             )
         })
         .map_err(error::from_core)?;
-        if let Some(state) = state {
-            self.custom_geometry_sources
-                .lock()
-                .expect("custom geometry source mutex poisoned")
-                .insert(source_id, state);
-        }
+        self.custom_geometry_sources
+            .lock()
+            .expect("custom geometry source mutex poisoned")
+            .insert(source_id, state);
         Ok(())
     }
 
@@ -2410,6 +2413,11 @@ struct CustomGeometrySourceRegistration {
     user_data: usize,
 }
 
+static CUSTOM_GEOMETRY_SOURCE_STATES: OnceLock<
+    Mutex<HashMap<usize, Arc<CustomGeometrySourceState>>>,
+> = OnceLock::new();
+static NEXT_CUSTOM_GEOMETRY_SOURCE_TOKEN: AtomicUsize = AtomicUsize::new(1);
+
 struct CustomGeometrySourceLifecycle {
     closing: bool,
     active: usize,
@@ -2431,8 +2439,11 @@ impl CustomGeometrySourceState {
     fn new(
         fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
         cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
-    ) -> Option<Self> {
-        fetch_tile.map(|fetch_tile| Self {
+    ) -> Result<Self> {
+        let fetch_tile = fetch_tile.ok_or_else(|| {
+            error::invalid_argument("custom geometry fetchTile callback must be a function")
+        })?;
+        Ok(Self {
             fetch_tile: Arc::new(fetch_tile),
             cancel_tile: cancel_tile.map(Arc::new),
             lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
@@ -2474,7 +2485,16 @@ impl CustomGeometrySourceState {
 impl CustomGeometrySourceRegistration {
     fn new(state: CustomGeometrySourceState) -> Self {
         let state = Arc::new(state);
-        let user_data = Arc::into_raw(Arc::clone(&state)) as usize;
+        let user_data = loop {
+            let token = NEXT_CUSTOM_GEOMETRY_SOURCE_TOKEN.fetch_add(1, Ordering::Relaxed);
+            if token != 0 {
+                break token;
+            }
+        };
+        custom_geometry_source_states()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(user_data, Arc::clone(&state));
         Self { state, user_data }
     }
 
@@ -2485,8 +2505,11 @@ impl CustomGeometrySourceRegistration {
 
 impl Drop for CustomGeometrySourceRegistration {
     fn drop(&mut self) {
+        custom_geometry_source_states()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&self.user_data);
         self.state.close();
-        unsafe { Arc::decrement_strong_count(self.user_data as *const CustomGeometrySourceState) };
     }
 }
 
@@ -2510,12 +2533,6 @@ impl Drop for CustomGeometryUpcallGuard {
     }
 }
 
-extern "C" fn custom_geometry_source_noop_tile_callback(
-    _user_data: *mut c_void,
-    _tile_id: sys::mln_canonical_tile_id,
-) {
-}
-
 extern "C" fn custom_geometry_source_fetch_tile_callback(
     user_data: *mut c_void,
     tile_id: sys::mln_canonical_tile_id,
@@ -2524,9 +2541,9 @@ extern "C" fn custom_geometry_source_fetch_tile_callback(
         if user_data.is_null() {
             return;
         }
-        let state_ptr = user_data.cast::<CustomGeometrySourceState>();
-        unsafe { Arc::increment_strong_count(state_ptr) };
-        let state = unsafe { Arc::from_raw(state_ptr) };
+        let Some(state) = custom_geometry_source_state(user_data) else {
+            return;
+        };
         let Some(_guard) = CustomGeometrySourceState::enter_callback(Arc::clone(&state)) else {
             return;
         };
@@ -2545,9 +2562,9 @@ extern "C" fn custom_geometry_source_cancel_tile_callback(
         if user_data.is_null() {
             return;
         }
-        let state_ptr = user_data.cast::<CustomGeometrySourceState>();
-        unsafe { Arc::increment_strong_count(state_ptr) };
-        let state = unsafe { Arc::from_raw(state_ptr) };
+        let Some(state) = custom_geometry_source_state(user_data) else {
+            return;
+        };
         let Some(_guard) = CustomGeometrySourceState::enter_callback(Arc::clone(&state)) else {
             return;
         };
@@ -2562,21 +2579,16 @@ extern "C" fn custom_geometry_source_cancel_tile_callback(
 
 fn custom_geometry_source_options_to_native(
     options: CustomGeometrySourceOptions,
-    state: Option<&CustomGeometrySourceRegistration>,
+    state: &CustomGeometrySourceRegistration,
 ) -> sys::mln_custom_geometry_source_options {
     let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
-    if let Some(state) = state {
-        raw.fetch_tile = Some(custom_geometry_source_fetch_tile_callback);
-        raw.cancel_tile = if state.state.cancel_tile.is_some() {
-            Some(custom_geometry_source_cancel_tile_callback)
-        } else {
-            None
-        };
-        raw.user_data = state.user_data as *mut c_void;
+    raw.fetch_tile = Some(custom_geometry_source_fetch_tile_callback);
+    raw.cancel_tile = if state.state.cancel_tile.is_some() {
+        Some(custom_geometry_source_cancel_tile_callback)
     } else {
-        raw.fetch_tile = Some(custom_geometry_source_noop_tile_callback);
-        raw.cancel_tile = Some(custom_geometry_source_noop_tile_callback);
-    }
+        None
+    };
+    raw.user_data = state.user_data as *mut c_void;
     if let Some(value) = options.min_zoom {
         raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
         raw.min_zoom = value;
@@ -2606,6 +2618,19 @@ fn custom_geometry_source_options_to_native(
         raw.wrap = value;
     }
     raw
+}
+
+fn custom_geometry_source_states() -> &'static Mutex<HashMap<usize, Arc<CustomGeometrySourceState>>>
+{
+    CUSTOM_GEOMETRY_SOURCE_STATES.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+fn custom_geometry_source_state(user_data: *mut c_void) -> Option<Arc<CustomGeometrySourceState>> {
+    custom_geometry_source_states()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .get(&(user_data as usize))
+        .cloned()
 }
 
 fn premultiplied_rgba8_image_from_input(
@@ -2648,10 +2673,14 @@ fn json_snapshot_to_string(snapshot: *mut sys::mln_json_snapshot) -> Result<Opti
 fn copy_style_source_attribution(
     map: *mut sys::mln_map,
     source_id: sys::mln_string_view,
+    has_attribution: bool,
     attribution_size: usize,
 ) -> core::Result<Option<String>> {
-    if attribution_size == 0 {
+    if !has_attribution {
         return Ok(None);
+    }
+    if attribution_size == 0 {
+        return Ok(Some(String::new()));
     }
     let mut buffer = vec![0; attribution_size];
     let mut copied_size = 0;
@@ -2666,7 +2695,7 @@ fn copy_style_source_attribution(
             &mut found,
         )
     })?;
-    if !found || copied_size == 0 {
+    if !found {
         return Ok(None);
     }
     buffer.truncate(copied_size);

@@ -249,7 +249,7 @@ export type OfflineOperationResultKind =
 export interface RuntimeEventPayloadOfflineOperationCompleted extends RuntimeEventPayloadBase {
   kind: "offline-operation-completed";
   offlineOperationCompleted: {
-    operationId: bigint;
+    operation: OfflineOperationHandle | null;
     operationKind: OfflineOperationKind;
     rawOperationKind: number;
     resultKind: OfflineOperationResultKind;
@@ -1176,7 +1176,7 @@ export interface CanonicalTileId {
 export type CustomGeometrySourceCallback = (tileId: CanonicalTileId) => void;
 
 export interface CustomGeometrySourceOptions {
-  fetchTile?: CustomGeometrySourceCallback | null;
+  fetchTile: CustomGeometrySourceCallback;
   cancelTile?: CustomGeometrySourceCallback | null;
   minZoom?: number | null;
   maxZoom?: number | null;
