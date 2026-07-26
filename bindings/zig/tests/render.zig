@@ -1354,7 +1354,7 @@ test "render session clips rendered box queries to the viewport" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
 

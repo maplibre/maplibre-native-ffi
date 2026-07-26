@@ -460,7 +460,7 @@ class RenderSessionHandleTest {
           )
           map.setStyleJson(CLUSTER_STYLE_JSON)
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
 
           val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
           val queryGeometry =
