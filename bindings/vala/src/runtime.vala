@@ -144,6 +144,9 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
+            if (consumed) {
+                return;
+            }
             runtime.discard_offline_operation (this);
         }
 
@@ -689,7 +692,14 @@ namespace MaplibreNative {
         }
 
         public void complete_and_release (ResourceResponse response) throws Error {
-            complete (response);
+            try {
+                complete (response);
+            } catch (Error error) {
+                if (is_completed) {
+                    release ();
+                }
+                throw error;
+            }
             release ();
         }
 
@@ -1131,6 +1141,7 @@ namespace MaplibreNative {
             if (maps.length > 0) {
                 throw new Error.INVALID_STATE ("runtime has live map handles");
             }
+            prune_offline_operations ();
             if (offline_operations.length > 0) {
                 throw new Error.INVALID_STATE ("runtime has live offline operation handles");
             }
@@ -1233,6 +1244,7 @@ namespace MaplibreNative {
         }
 
         private OfflineOperationHandle register_offline_operation (uint64 native_id, OfflineOperationKind operation_kind, OfflineOperationResultKind result_kind) {
+            prune_offline_operations ();
             var handle = new OfflineOperationHandle (this, native_id, operation_kind, result_kind);
             var retained = new OfflineOperationRegistration[offline_operations.length + 1];
             for (var index = 0; index < offline_operations.length; index++) {
@@ -1261,12 +1273,33 @@ namespace MaplibreNative {
         }
 
         internal OfflineOperationHandle? resolve_offline_operation (uint64 native_id) {
+            prune_offline_operations ();
             for (var index = 0; index < offline_operations.length; index++) {
                 if (offline_operations[index].native_id == native_id) {
                     return offline_operations[index].handle;
                 }
             }
             return null;
+        }
+
+        private void prune_offline_operations () {
+            uint retained_count = 0;
+            for (var index = 0; index < offline_operations.length; index++) {
+                if (offline_operations[index].handle != null) {
+                    retained_count++;
+                }
+            }
+            if (retained_count == offline_operations.length) {
+                return;
+            }
+            var retained = new OfflineOperationRegistration[retained_count];
+            uint output_index = 0;
+            for (var index = 0; index < offline_operations.length; index++) {
+                if (offline_operations[index].handle != null) {
+                    retained[output_index++] = offline_operations[index];
+                }
+            }
+            offline_operations = retained;
         }
 
         public void set_resource_provider (owned ResourceProviderCallback callback) throws Error {

@@ -379,6 +379,7 @@ namespace MaplibreNative {
         private Raw.JsonValue[] array_natives;
         private Raw.JsonMember[] object_native_members;
         private Raw.JsonValue[] object_native_values;
+        private JsonValue[] native_children;
 
         private JsonValue (JsonValueType type) {
             this.type = type;
@@ -553,16 +554,20 @@ namespace MaplibreNative {
                 break;
             case JsonValueType.ARRAY:
                 array_natives = new Raw.JsonValue[array_values.length];
+                native_children = new JsonValue[array_values.length];
                 for (var i = 0; i < array_values.length; i++) {
-                    array_natives[i] = array_values[i].to_native ();
+                    native_children[i] = array_values[i].copy_for_native ();
+                    array_natives[i] = native_children[i].to_native ();
                 }
                 native.array_value = Raw.JsonArray () { values = (void*) array_natives, value_count = array_natives.length };
                 break;
             case JsonValueType.OBJECT:
                 object_native_members = new Raw.JsonMember[object_members.length];
                 object_native_values = new Raw.JsonValue[object_members.length];
+                native_children = new JsonValue[object_members.length];
                 for (var i = 0; i < object_members.length; i++) {
-                    object_native_values[i] = object_members[i].value.to_native ();
+                    native_children[i] = object_members[i].value.copy_for_native ();
+                    object_native_values[i] = native_children[i].to_native ();
                     object_native_members[i] = Raw.JsonMember () { key = string_view (object_members[i].key), value = (void*) &object_native_values[i] };
                 }
                 native.object_value = Raw.JsonObject () { members = object_native_members, member_count = object_native_members.length };
@@ -571,6 +576,18 @@ namespace MaplibreNative {
                 break;
             }
             return native;
+        }
+
+        private JsonValue copy_for_native () {
+            var copied = new JsonValue (type);
+            copied.bool_storage = bool_storage;
+            copied.uint_storage = uint_storage;
+            copied.int_storage = int_storage;
+            copied.double_storage = double_storage;
+            copied.string_storage = string_storage;
+            copied.array_values = array_values;
+            copied.object_members = object_members;
+            return copied;
         }
     }
 

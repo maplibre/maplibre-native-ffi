@@ -120,8 +120,8 @@ namespace MaplibreNative {
     }
 
     public class CustomGeometrySourceOptions {
-        public CustomGeometryTileCallback fetch_tile;
-        public CustomGeometryTileCallback? cancel_tile;
+        private CustomGeometryTileCallback fetch_tile;
+        private CustomGeometryTileCallback? cancel_tile;
         public double? min_zoom { get; set; }
         public double? max_zoom { get; set; }
         public double? tolerance { get; set; }
@@ -130,8 +130,9 @@ namespace MaplibreNative {
         public bool? clip { get; set; }
         public bool? wrap { get; set; }
 
-        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback fetch_tile) {
+        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback fetch_tile, owned CustomGeometryTileCallback? cancel_tile = null) {
             this.fetch_tile = (owned) fetch_tile;
+            this.cancel_tile = (owned) cancel_tile;
         }
 
         internal Raw.CustomGeometrySourceOptions to_native (CustomGeometrySourceRegistration registration) {

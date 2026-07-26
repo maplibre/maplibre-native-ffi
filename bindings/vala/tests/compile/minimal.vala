@@ -201,11 +201,11 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
       handle.complete(response);
     }
     try {
-      handle.complete(response);
+      handle.complete_and_release(response);
     } catch (MaplibreNative.Error error) {
       resource_provider_one_shot_error_count++;
     }
-    handle.release();
+    assert(handle.released);
     try {
       handle.cancelled();
     } catch (MaplibreNative.Error error) {
@@ -407,6 +407,7 @@ int main() {
     assert(runtime.poll_event() == null);
 
     var map_options = new MaplibreNative.MapOptions();
+    assert(map_options.width == 256 && map_options.height == 256);
     map_options.width = 128;
     map_options.height = 64;
     map_options.scale_factor = 1.0;
@@ -544,6 +545,10 @@ int main() {
     camera.set_pitch(0.0);
     camera.set_roll(0.0);
     camera.set_field_of_view(0.6435011087932844);
+    var camera_copy = camera.copy();
+    assert(camera.equal(camera_copy));
+    camera_copy.set_zoom(2.0);
+    assert(!camera.equal(camera_copy));
     map.jump_to(camera);
     var animation = new MaplibreNative.AnimationOptions();
     animation.set_duration_ms(0.0);
@@ -621,6 +626,8 @@ int main() {
     map.set_geojson_source_data("inline-point", inline_geojson);
     assert(map.remove_style_source("inline-point"));
 
+    var shared_json_subtree = MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("shared") });
+    var repeated_json_subtree = MaplibreNative.JsonValue.array_value({ shared_json_subtree, shared_json_subtree });
     var feature = new MaplibreNative.Feature(
       MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)),
       {
@@ -628,7 +635,8 @@ int main() {
         new MaplibreNative.JsonMember("visible", MaplibreNative.JsonValue.bool_value(true)),
         new MaplibreNative.JsonMember("rank", MaplibreNative.JsonValue.int_value(1)),
         new MaplibreNative.JsonMember("tags", MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("a"), MaplibreNative.JsonValue.string_value("b") })),
-        new MaplibreNative.JsonMember("metadata", MaplibreNative.JsonValue.object_value({ new MaplibreNative.JsonMember("source", MaplibreNative.JsonValue.string_value("vala")) }))
+        new MaplibreNative.JsonMember("metadata", MaplibreNative.JsonValue.object_value({ new MaplibreNative.JsonMember("source", MaplibreNative.JsonValue.string_value("vala")) })),
+        new MaplibreNative.JsonMember("repeated", repeated_json_subtree)
       },
       MaplibreNative.FeatureIdentifier.string_value("feature-1"));
     assert(feature.feature_identifier.get_string() == "feature-1");
@@ -654,8 +662,7 @@ int main() {
     map.add_geojson_source_data("state-source", feature_geojson);
     assert(map.style_source_exists("state-source"));
 
-    var custom_options = new MaplibreNative.CustomGeometrySourceOptions(fetch_custom_geometry_tile);
-    custom_options.cancel_tile = cancel_custom_geometry_tile;
+    var custom_options = new MaplibreNative.CustomGeometrySourceOptions(fetch_custom_geometry_tile, cancel_custom_geometry_tile);
     custom_options.min_zoom = 0.0;
     custom_options.max_zoom = 22.0;
     custom_options.tolerance = 0.375;
@@ -809,6 +816,8 @@ int main() {
 
     var operation_id = runtime.run_ambient_cache_operation_start(MaplibreNative.AmbientCacheOperation.INVALIDATE);
     runtime.discard_offline_operation(operation_id);
+    operation_id.close();
+    operation_id.close();
     compile_offline_region_wrappers(runtime, offline_merge_database_path);
 
     var projection = map.create_projection();

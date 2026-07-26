@@ -1,7 +1,7 @@
 namespace MaplibreNative {
     public class MapOptions {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public MapMode mode { get; set; default = MapMode.CONTINUOUS; }
 

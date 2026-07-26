@@ -483,6 +483,50 @@ namespace MaplibreNative {
             return has_field_of_view;
         }
 
+        public CameraOptions copy () {
+            var copied = new CameraOptions ();
+            copied.has_center = has_center;
+            copied.center_value = center_value;
+            copied.has_center_altitude = has_center_altitude;
+            copied.center_altitude_value = center_altitude_value;
+            copied.has_padding = has_padding;
+            copied.padding_value = padding_value;
+            copied.has_anchor = has_anchor;
+            copied.anchor_value = anchor_value;
+            copied.has_zoom = has_zoom;
+            copied.zoom_value = zoom_value;
+            copied.has_bearing = has_bearing;
+            copied.bearing_value = bearing_value;
+            copied.has_pitch = has_pitch;
+            copied.pitch_value = pitch_value;
+            copied.has_roll = has_roll;
+            copied.roll_value = roll_value;
+            copied.has_field_of_view = has_field_of_view;
+            copied.field_of_view_value = field_of_view_value;
+            return copied;
+        }
+
+        public bool equal (CameraOptions other) {
+            return has_center == other.has_center
+                && (!has_center || (center_value.latitude == other.center_value.latitude && center_value.longitude == other.center_value.longitude))
+                && has_center_altitude == other.has_center_altitude
+                && (!has_center_altitude || center_altitude_value == other.center_altitude_value)
+                && has_padding == other.has_padding
+                && (!has_padding || (padding_value.top == other.padding_value.top && padding_value.left == other.padding_value.left && padding_value.bottom == other.padding_value.bottom && padding_value.right == other.padding_value.right))
+                && has_anchor == other.has_anchor
+                && (!has_anchor || (anchor_value.x == other.anchor_value.x && anchor_value.y == other.anchor_value.y))
+                && has_zoom == other.has_zoom
+                && (!has_zoom || zoom_value == other.zoom_value)
+                && has_bearing == other.has_bearing
+                && (!has_bearing || bearing_value == other.bearing_value)
+                && has_pitch == other.has_pitch
+                && (!has_pitch || pitch_value == other.pitch_value)
+                && has_roll == other.has_roll
+                && (!has_roll || roll_value == other.roll_value)
+                && has_field_of_view == other.has_field_of_view
+                && (!has_field_of_view || field_of_view_value == other.field_of_view_value);
+        }
+
         internal Raw.CameraOptions to_native () {
             Raw.CameraOptions options = Raw.camera_options_default ();
             if (has_center) {
