@@ -30,6 +30,24 @@ namespace MaplibreNative {
                 throw new Error.INVALID_ARGUMENT ("unknown feature extension result type");
             }
         }
+
+        public FeatureExtensionResult copy () throws Error {
+            return new FeatureExtensionResult (
+                result_type,
+                value == null ? null : value.copy (),
+                feature_collection == null ? null : feature_collection.copy ()
+            );
+        }
+
+        public bool equal (FeatureExtensionResult other) {
+            return result_type == other.result_type
+                && (value == null
+                    ? other.value == null
+                    : other.value != null && value.equal (other.value))
+                && (feature_collection == null
+                    ? other.feature_collection == null
+                    : other.feature_collection != null && feature_collection.equal (other.feature_collection));
+        }
     }
 
     internal class FeatureExtensionResultHandle {

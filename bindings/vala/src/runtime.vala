@@ -1202,7 +1202,6 @@ namespace MaplibreNative {
         private ResourceProviderRegistration? resource_provider;
         private MapRegistration[] maps = new MapRegistration[0];
         private OfflineOperationRegistration[] offline_operations = new OfflineOperationRegistration[0];
-        private bool has_created_map;
         private Mutex state_mutex;
         private Cond idle;
         private bool releasing;
@@ -1360,7 +1359,6 @@ namespace MaplibreNative {
 
         internal void register_map (MapHandle map) {
             registry_mutex.lock ();
-            has_created_map = true;
             prune_maps ();
             var retained = new MapRegistration[maps.length + 1];
             for (var index = 0; index < maps.length; index++) {
@@ -1493,25 +1491,22 @@ namespace MaplibreNative {
 
         public void set_resource_provider (owned ResourceProviderCallback callback) throws Error {
             var lease = require_live ();
+            ResourceProviderRegistration? previous = null;
             registry_mutex.lock ();
             try {
-                if (resource_provider != null) {
-                    clear_unknown_status ();
-                    throw new Error.INVALID_STATE ("resource provider is already configured");
-                }
-                if (has_created_map) {
-                    clear_unknown_status ();
-                    throw new Error.INVALID_STATE ("resource provider must be configured before creating a map");
-                }
                 var registration = new ResourceProviderRegistration ((owned) callback);
                 Raw.ResourceProvider provider = {};
                 provider.size = (uint32) sizeof (Raw.ResourceProvider);
                 provider.callback = resource_provider_trampoline;
                 provider.user_data = registration;
                 check_status (Raw.runtime_set_resource_provider (lease.native, &provider));
+                previous = resource_provider;
                 resource_provider = registration;
             } finally {
                 registry_mutex.unlock ();
+            }
+            if (previous != null) {
+                previous.close ();
             }
         }
 

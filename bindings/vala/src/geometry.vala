@@ -885,22 +885,10 @@ namespace MaplibreNative {
         private int64 int_storage;
         private double double_storage;
         private uint8[] string_storage;
-        private uint8[] unknown_storage;
 
         private FeatureIdentifier (FeatureIdentifierType type) {
             raw_type = (uint32) type;
             string_storage = new uint8[0];
-            unknown_storage = new uint8[0];
-        }
-
-        private FeatureIdentifier.from_unknown (Raw.Feature native) throws Error {
-            raw_type = native.identifier_type;
-            string_storage = new uint8[0];
-            if (native.identifier_string_value.data == null && native.identifier_string_value.size > 0) {
-                clear_unknown_status ();
-                throw new Error.INVALID_ARGUMENT ("unknown feature identifier storage is null");
-            }
-            unknown_storage = copy_bytes ((uint8*) native.identifier_string_value.data, native.identifier_string_value.size) ?? new uint8[0];
         }
 
         public static FeatureIdentifier none () {
@@ -989,18 +977,6 @@ namespace MaplibreNative {
             return copied;
         }
 
-        public uint8[] get_unknown_storage () throws Error {
-            if (raw_type <= (uint32) FeatureIdentifierType.STRING) {
-                clear_unknown_status ();
-                throw new Error.INVALID_STATE ("feature identifier type is known");
-            }
-            var copied = new uint8[unknown_storage.length];
-            for (var index = 0; index < unknown_storage.length; index++) {
-                copied[index] = unknown_storage[index];
-            }
-            return copied;
-        }
-
         public FeatureIdentifier copy () {
             switch ((FeatureIdentifierType) raw_type) {
             case FeatureIdentifierType.UINT:
@@ -1014,10 +990,7 @@ namespace MaplibreNative {
             case FeatureIdentifierType.NULL:
                 return FeatureIdentifier.none ();
             default:
-                var copied = new FeatureIdentifier ((FeatureIdentifierType) raw_type);
-                copied.raw_type = raw_type;
-                copied.unknown_storage = get_unknown_storage_unchecked ();
-                return copied;
+                assert_not_reached ();
             }
         }
 
@@ -1045,24 +1018,8 @@ namespace MaplibreNative {
             case FeatureIdentifierType.NULL:
                 return true;
             default:
-                if (unknown_storage.length != other.unknown_storage.length) {
-                    return false;
-                }
-                for (var index = 0; index < unknown_storage.length; index++) {
-                    if (unknown_storage[index] != other.unknown_storage[index]) {
-                        return false;
-                    }
-                }
-                return true;
+                return false;
             }
-        }
-
-        private uint8[] get_unknown_storage_unchecked () {
-            var copied = new uint8[unknown_storage.length];
-            for (var index = 0; index < unknown_storage.length; index++) {
-                copied[index] = unknown_storage[index];
-            }
-            return copied;
         }
 
         internal static FeatureIdentifier from_native (Raw.Feature native) throws Error {
@@ -1078,7 +1035,8 @@ namespace MaplibreNative {
             case FeatureIdentifierType.NULL:
                 return FeatureIdentifier.none ();
             default:
-                return new FeatureIdentifier.from_unknown (native);
+                clear_unknown_status ();
+                throw new Error.UNSUPPORTED ("unknown native feature identifier type %u", native.identifier_type);
             }
         }
 
@@ -1098,11 +1056,8 @@ namespace MaplibreNative {
                 native.identifier_string_value = byte_string_view (string_storage);
                 break;
             default:
-                native.identifier_string_value = Raw.StringView () {
-                    data = unknown_storage.length == 0 ? null : (char*) unknown_storage,
-                    size = unknown_storage.length
-                };
-                break;
+                clear_unknown_status ();
+                throw new Error.UNSUPPORTED ("unknown feature identifier type %u", raw_type);
             }
         }
     }

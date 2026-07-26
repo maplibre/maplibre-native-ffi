@@ -363,6 +363,14 @@ namespace MaplibreNative {
             return bits == 0;
         }
 
+        public NativePointer copy () {
+            return new NativePointer (bits);
+        }
+
+        public bool equal (NativePointer other) {
+            return bits == other.bits;
+        }
+
         internal void* to_native () throws Error {
             if (bits == 0) {
                 clear_unknown_status ();

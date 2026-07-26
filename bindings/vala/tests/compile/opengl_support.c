@@ -3,13 +3,15 @@
 #include <stdint.h>
 
 typedef struct MlnValaOpenGLTestContext {
+  uint32_t platform;
   void* display;
   void* config;
   void* context;
   void* surface;
+  void* get_proc_address;
 } MlnValaOpenGLTestContext;
 
-#if defined(__linux__)
+#if defined(__linux__) || defined(__APPLE__)
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -17,7 +19,16 @@ typedef struct MlnValaOpenGLTestContext {
 bool mln_vala_opengl_test_context_supported(void) { return true; }
 
 static EGLDisplay test_display(void) {
-#if defined(EGL_PLATFORM_SURFACELESS_MESA)
+#if defined(__APPLE__)
+  const EGLAttrib attributes[] = {
+    EGL_PLATFORM_ANGLE_TYPE_ANGLE,
+    EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+    EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE,
+    EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+    EGL_NONE,
+  };
+  return eglGetPlatformDisplay(EGL_PLATFORM_ANGLE_ANGLE, NULL, attributes);
+#elif defined(EGL_PLATFORM_SURFACELESS_MESA)
   EGLDisplay display = eglGetPlatformDisplay(
     EGL_PLATFORM_SURFACELESS_MESA, EGL_DEFAULT_DISPLAY, NULL
   );
@@ -105,6 +116,8 @@ bool mln_vala_opengl_test_context_create(
   out_context->config = config;
   out_context->context = context;
   out_context->surface = surface;
+  out_context->platform = 2;
+  out_context->get_proc_address = (void*)eglGetProcAddress;
   return true;
 }
 
@@ -121,6 +134,91 @@ void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
     eglDestroyContext(display, context->context);
   }
   eglTerminate(display);
+  *context = (MlnValaOpenGLTestContext){0};
+}
+
+#elif defined(_WIN32)
+
+#include <GL/gl.h>
+#include <windows.h>
+
+bool mln_vala_opengl_test_context_supported(void) { return true; }
+
+bool mln_vala_opengl_test_context_create(
+  uint32_t width, uint32_t height, MlnValaOpenGLTestContext* out_context
+) {
+  if (out_context == NULL) {
+    return false;
+  }
+  *out_context = (MlnValaOpenGLTestContext){0};
+
+  static const char class_name[] = "MaplibreNativeValaWgl";
+  HINSTANCE instance = GetModuleHandleA(NULL);
+  const WNDCLASSA window_class = {
+    .style = CS_OWNDC,
+    .lpfnWndProc = DefWindowProcA,
+    .hInstance = instance,
+    .lpszClassName = class_name,
+  };
+  RegisterClassA(&window_class);
+  HWND window = CreateWindowExA(
+    0, class_name, class_name, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT,
+    CW_USEDEFAULT, (int)width, (int)height, NULL, NULL, instance, NULL
+  );
+  if (window == NULL) {
+    return false;
+  }
+  HDC device_context = GetDC(window);
+  const PIXELFORMATDESCRIPTOR pixel_format = {
+    .nSize = sizeof(PIXELFORMATDESCRIPTOR),
+    .nVersion = 1,
+    .dwFlags = PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+    .iPixelType = PFD_TYPE_RGBA,
+    .cColorBits = 32,
+    .cDepthBits = 24,
+    .cStencilBits = 8,
+    .iLayerType = PFD_MAIN_PLANE,
+  };
+  const int format = ChoosePixelFormat(device_context, &pixel_format);
+  if (
+    format == 0 ||
+    SetPixelFormat(device_context, format, &pixel_format) == FALSE
+  ) {
+    ReleaseDC(window, device_context);
+    DestroyWindow(window);
+    return false;
+  }
+  HGLRC context = wglCreateContext(device_context);
+  if (context == NULL || wglMakeCurrent(device_context, context) == FALSE) {
+    if (context != NULL) {
+      wglDeleteContext(context);
+    }
+    ReleaseDC(window, device_context);
+    DestroyWindow(window);
+    return false;
+  }
+
+  out_context->platform = 1;
+  out_context->display = device_context;
+  out_context->context = context;
+  out_context->surface = window;
+  out_context->get_proc_address = (void*)wglGetProcAddress;
+  return true;
+}
+
+void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
+  if (context == NULL || context->surface == NULL) {
+    return;
+  }
+  HWND window = (HWND)context->surface;
+  wglMakeCurrent(NULL, NULL);
+  if (context->context != NULL) {
+    wglDeleteContext((HGLRC)context->context);
+  }
+  if (context->display != NULL) {
+    ReleaseDC(window, (HDC)context->display);
+  }
+  DestroyWindow(window);
   *context = (MlnValaOpenGLTestContext){0};
 }
 

@@ -80,6 +80,20 @@ compiler_args=()
 for argument in "${native_args[@]}"; do
   compiler_args+=(-X "$argument")
 done
+if [[ "$(uname -s)" == "Linux" ]]; then
+  compiler_args+=(-X -lstdc++)
+fi
+if [[ "$(uname -s)" == "Darwin" && "$usage_preset" == *-egl ]]; then
+  compiler_args+=(
+    -X "-I$native_install_dir/include"
+    -X "-L$native_install_dir/lib"
+    -X -lEGL
+    -X -lGLESv2
+    -X "-Wl,-rpath,$native_install_dir/lib"
+  )
+elif [[ "$usage_preset" == windows-*-wgl ]]; then
+  compiler_args+=(-X -lopengl32 -X -lgdi32 -X -luser32)
+fi
 
 valac \
   --vapidir vapi \
