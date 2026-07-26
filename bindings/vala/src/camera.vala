@@ -81,8 +81,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.AnimationOptions to_native () {
-            Raw.AnimationOptions options = {};
-            options.size = (uint32) sizeof (Raw.AnimationOptions);
+            Raw.AnimationOptions options = Raw.animation_options_default ();
             if (has_duration_ms) {
                 options.duration_ms = duration_ms_value;
                 options.fields |= 1U << 0;
@@ -169,8 +168,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.CameraFitOptions to_native () {
-            Raw.CameraFitOptions options = {};
-            options.size = (uint32) sizeof (Raw.CameraFitOptions);
+            Raw.CameraFitOptions options = Raw.camera_fit_options_default ();
             if (has_padding) {
                 options.padding = padding_value.to_native ();
                 options.fields |= 1U << 0;
@@ -303,8 +301,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.BoundOptions to_native () {
-            Raw.BoundOptions options = {};
-            options.size = (uint32) sizeof (Raw.BoundOptions);
+            Raw.BoundOptions options = Raw.bound_options_default ();
             if (has_bounds) {
                 options.bounds = bounds_value.to_native ();
                 options.fields |= 1U << 0;
@@ -391,8 +388,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.FreeCameraOptions to_native () {
-            Raw.FreeCameraOptions options = {};
-            options.size = (uint32) sizeof (Raw.FreeCameraOptions);
+            Raw.FreeCameraOptions options = Raw.free_camera_options_default ();
             if (has_position) {
                 options.position = position_value.to_native ();
                 options.fields |= 1U << 0;
@@ -479,8 +475,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.ProjectionMode to_native () {
-            Raw.ProjectionMode mode = {};
-            mode.size = (uint32) sizeof (Raw.ProjectionMode);
+            Raw.ProjectionMode mode = Raw.projection_mode_default ();
             if (has_axonometric) {
                 mode.axonometric = axonometric_value;
                 mode.fields |= 1U << 0;

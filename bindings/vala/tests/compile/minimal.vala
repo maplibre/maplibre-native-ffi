@@ -407,6 +407,15 @@ void exercise_unknown_feature_identifier_rejection() throws MaplibreNative.Error
   MaplibreNative.Raw.Feature identifier_less = {};
   MaplibreNative.FeatureIdentifier.none().apply_to_native(ref identifier_less);
   assert(identifier_less.identifier_type == (uint32) MaplibreNative.FeatureIdentifierType.NULL);
+
+  MaplibreNative.Raw.FeatureExtensionResultInfo unknown_extension = {};
+  unknown_extension.type = 99;
+  try {
+    MaplibreNative.FeatureExtensionResult.from_native(unknown_extension);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.UNSUPPORTED error) {
+    assert(error.message == "unknown feature extension result type 99");
+  }
 }
 
 void exercise_json_null_rejection() throws MaplibreNative.Error {
@@ -431,6 +440,23 @@ void exercise_json_null_rejection() throws MaplibreNative.Error {
     assert_not_reached();
   } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
     assert(error.message == "JSON object member value is null");
+  }
+
+  try {
+    new MaplibreNative.Feature(
+      MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)),
+      null_members);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "feature property at index 0 is null");
+  }
+
+  MaplibreNative.Feature[] null_features = new MaplibreNative.Feature[1];
+  try {
+    new MaplibreNative.FeatureCollection(null_features);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "feature collection item at index 0 is null");
   }
 
   MaplibreNative.Raw.JsonValue native_array = {};
@@ -466,6 +492,22 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   assert(request_data != null);
   request_data[0] = 9;
   assert(request.prior_data[0] == 1);
+
+  uint8[] response_data = { 7, 8, 9 };
+  var response = MaplibreNative.ResourceResponse.data(response_data);
+  response.must_revalidate = true;
+  response.modified_unix_ms = 1;
+  response.expires_unix_ms = 2;
+  response.etag = "etag";
+  response.retry_after_unix_ms = 3;
+  var response_copy = response.copy();
+  assert(response.equal(response_copy));
+  response_data[0] = 0;
+  var returned_response_data = response_copy.bytes;
+  returned_response_data[0] = 0;
+  assert(response.equal(response_copy));
+  response_copy.must_revalidate = false;
+  assert(!response.equal(response_copy));
 
   uint8[] payload = { 4, 5, 6 };
   MaplibreNative.Raw.RuntimeEvent native_event = {};
@@ -1352,6 +1394,7 @@ int main() {
     assert(map.style_image_exists("marker"));
     var image_info = map.get_style_image_info("marker");
     assert(image_info != null && image_info.width == 1 && image_info.height == 1);
+    assert(image_info.equal(image_info.copy()));
     var copied_image = map.copy_style_image_premultiplied_rgba8("marker");
     assert(copied_image != null && copied_image.length == 4 && copied_image[0] == 255);
     assert(map.remove_style_image("marker"));
@@ -1600,6 +1643,7 @@ int main() {
     assert(map.get_style_source_type("points") == MaplibreNative.StyleSourceType.GEOJSON);
     var source_info = map.get_style_source_info("points");
     assert(source_info != null && source_info.source_type == MaplibreNative.StyleSourceType.GEOJSON && source_info.id_byte_length == "points".length);
+    assert(source_info.equal(source_info.copy()));
     assert(map.copy_style_source_attribution("points") == null);
     assert(map.list_style_source_ids().contains("points"));
     map.set_geojson_source_url("points", "https://example.invalid/updated.geojson");

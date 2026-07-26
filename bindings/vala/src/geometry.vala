@@ -1193,10 +1193,14 @@ namespace MaplibreNative {
         private Raw.JsonValue[] property_value_natives;
         private Raw.Feature native;
 
-        public Feature (Geometry geometry, JsonMember[] properties, FeatureIdentifier? identifier = null) {
+        public Feature (Geometry geometry, JsonMember[] properties, FeatureIdentifier? identifier = null) throws Error {
             geometry_ref = geometry;
             this.properties = new JsonMember[properties.length];
             for (var index = 0; index < properties.length; index++) {
+                if (properties[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("feature property at index %d is null", index);
+                }
                 this.properties[index] = properties[index];
             }
             this.identifier = identifier ?? FeatureIdentifier.none ();
@@ -1284,9 +1288,13 @@ namespace MaplibreNative {
         private Raw.Feature[] feature_natives;
         private Raw.FeatureCollection native;
 
-        public FeatureCollection (Feature[] features) {
+        public FeatureCollection (Feature[] features) throws Error {
             this.features = new Feature[features.length];
             for (var index = 0; index < features.length; index++) {
+                if (features[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("feature collection item at index %d is null", index);
+                }
                 this.features[index] = features[index];
             }
         }

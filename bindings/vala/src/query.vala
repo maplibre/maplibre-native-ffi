@@ -27,7 +27,7 @@ namespace MaplibreNative {
                 return new FeatureExtensionResult (FeatureExtensionResultType.FEATURE_COLLECTION, null, FeatureCollection.from_native (native.feature_collection));
             default:
                 clear_unknown_status ();
-                throw new Error.INVALID_ARGUMENT ("unknown feature extension result type");
+                throw new Error.UNSUPPORTED ("unknown feature extension result type %u", native.type);
             }
         }
 

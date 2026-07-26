@@ -601,6 +601,15 @@ namespace MaplibreNative {
         }
     }
 
+    /**
+     * Handles a copied resource request on the native worker or network thread
+     * that issued it. Implementations stay thread-safe and return promptly,
+     * call only methods on the provided request handle, and avoid map or runtime
+     * APIs. A handled request may retain the handle for later completion from
+     * any thread and releases it when finished; a pass-through request retains
+     * neither argument. The runtime retains this callback until replacement or
+     * close and waits for in-flight calls before releasing it.
+     */
     public delegate ResourceProviderDecision ResourceProviderCallback (ResourceRequest request, ResourceRequestHandle handle);
 
     public class ResourceRequest {
@@ -686,6 +695,40 @@ namespace MaplibreNative {
             return response;
         }
 
+        public ResourceResponse copy () {
+            var copied = new ResourceResponse ();
+            copied.status = status;
+            copied.error_reason = error_reason;
+            copied.bytes_storage = copy_byte_array (bytes_storage);
+            copied.error_message = error_message;
+            copied.must_revalidate = must_revalidate;
+            copied.modified_unix_ms = modified_unix_ms;
+            copied.expires_unix_ms = expires_unix_ms;
+            copied.etag = etag;
+            copied.retry_after_unix_ms = retry_after_unix_ms;
+            return copied;
+        }
+
+        public bool equal (ResourceResponse other) {
+            if (status != other.status
+                || error_reason != other.error_reason
+                || error_message != other.error_message
+                || must_revalidate != other.must_revalidate
+                || modified_unix_ms != other.modified_unix_ms
+                || expires_unix_ms != other.expires_unix_ms
+                || etag != other.etag
+                || retry_after_unix_ms != other.retry_after_unix_ms
+                || bytes_storage.length != other.bytes_storage.length) {
+                return false;
+            }
+            for (var index = 0; index < bytes_storage.length; index++) {
+                if (bytes_storage[index] != other.bytes_storage[index]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         internal Raw.ResourceResponse to_native () throws Error {
             Raw.ResourceResponse response = {};
             response.size = (uint32) sizeof (Raw.ResourceResponse);
@@ -766,7 +809,8 @@ namespace MaplibreNative {
         }
 
         public void complete (ResourceResponse response) throws Error {
-            var native_response = response.to_native ();
+            var response_storage = response.copy ();
+            var native_response = response_storage.to_native ();
             mutex.lock ();
             try {
                 if (completed) {
@@ -870,8 +914,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.RuntimeOptions to_native () throws Error {
-            Raw.RuntimeOptions options = {};
-            options.size = (uint32) sizeof (Raw.RuntimeOptions);
+            Raw.RuntimeOptions options = Raw.runtime_options_default ();
             options.asset_path = optional_c_string (asset_path);
             options.cache_path = optional_c_string (cache_path);
             if (maximum_cache_size != null) {
@@ -976,7 +1019,22 @@ namespace MaplibreNative {
         }
     }
 
+    /**
+     * Receives a copied log record on a logging or worker thread, potentially
+     * while MapLibre holds internal logging locks. Implementations stay
+     * thread-safe, return promptly, and call no MapLibre APIs, including log
+     * callback replacement or clearing. The process retains this callback until
+     * replacement or clearing and waits for in-flight calls before releasing it.
+     */
     public delegate bool LogCallback (LogSeverity severity, LogEvent event, int64 code, string? message);
+
+    /**
+     * Rewrites a copied resource URL on an arbitrary worker or network thread.
+     * Implementations stay thread-safe, return promptly, and call no MapLibre
+     * APIs; the returned string is copied before the callback returns. The
+     * runtime retains this callback until replacement, clearing, or close and
+     * waits for in-flight calls before releasing it.
+     */
     public delegate string? ResourceTransformCallback (ResourceKind kind, string url);
 
     private class LogRegistration {

@@ -52,6 +52,16 @@ namespace MaplibreNative {
         }
     }
 
+    /**
+     * Receives tile fetch or cancellation work on arbitrary native worker
+     * threads, potentially concurrently with map-owner calls and other tile
+     * callbacks. Implementations return promptly, never throw across the
+     * callback boundary, and queue thread-affine map work to the owner thread
+     * instead of calling map APIs directly. The map retains callbacks through
+     * source removal, completed style replacement, or map close and waits for
+     * in-flight calls before releasing them; cancellation is best-effort and
+     * may repeat or race a fetch.
+     */
     public delegate void CustomGeometryTileCallback (CanonicalTileId tile_id);
 
     internal class CustomGeometrySourceRegistration {
@@ -376,6 +386,24 @@ namespace MaplibreNative {
             has_attribution = native.has_attribution;
             attribution_byte_length = native.attribution_size;
         }
+
+        public StyleSourceInfo copy () {
+            Raw.StyleSourceInfo native = {};
+            native.type = (uint32) source_type;
+            native.id_size = id_byte_length;
+            native.is_volatile = is_volatile;
+            native.has_attribution = has_attribution;
+            native.attribution_size = attribution_byte_length;
+            return new StyleSourceInfo (native);
+        }
+
+        public bool equal (StyleSourceInfo other) {
+            return source_type == other.source_type
+                && id_byte_length == other.id_byte_length
+                && is_volatile == other.is_volatile
+                && has_attribution == other.has_attribution
+                && attribution_byte_length == other.attribution_byte_length;
+        }
     }
 
     public class StyleImageInfo {
@@ -393,6 +421,26 @@ namespace MaplibreNative {
             byte_length = native.byte_length;
             pixel_ratio = native.pixel_ratio;
             sdf = native.sdf;
+        }
+
+        public StyleImageInfo copy () {
+            Raw.StyleImageInfo native = Raw.style_image_info_default ();
+            native.width = width;
+            native.height = height;
+            native.stride = stride;
+            native.byte_length = byte_length;
+            native.pixel_ratio = pixel_ratio;
+            native.sdf = sdf;
+            return new StyleImageInfo (native);
+        }
+
+        public bool equal (StyleImageInfo other) {
+            return width == other.width
+                && height == other.height
+                && stride == other.stride
+                && byte_length == other.byte_length
+                && pixel_ratio == other.pixel_ratio
+                && sdf == other.sdf;
         }
     }
 

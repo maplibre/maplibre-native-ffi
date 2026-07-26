@@ -581,6 +581,7 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_resource_request_handle", free_function = "")]
     public class ResourceRequestHandle {}
 
+    [SimpleType]
     [CCode (cname = "mln_runtime_options", has_type_id = false)]
     public struct RuntimeOptions {
         public uint32 size;
@@ -741,6 +742,7 @@ namespace MaplibreNative.Raw {
         public bool found;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_map_options", has_type_id = false)]
     public struct MapOptions {
         public uint32 size;
@@ -804,6 +806,7 @@ namespace MaplibreNative.Raw {
         public double right;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_map_viewport_options", has_type_id = false)]
     public struct MapViewportOptions {
         public uint32 size;
@@ -814,6 +817,7 @@ namespace MaplibreNative.Raw {
         public EdgeInsets frustum_offset;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_map_tile_options", has_type_id = false)]
     public struct MapTileOptions {
         public uint32 size;
@@ -1068,6 +1072,7 @@ namespace MaplibreNative.Raw {
         public double y2;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_animation_options", has_type_id = false)]
     public struct AnimationOptions {
         public uint32 size;
@@ -1078,6 +1083,7 @@ namespace MaplibreNative.Raw {
         public UnitBezier easing;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_camera_fit_options", has_type_id = false)]
     public struct CameraFitOptions {
         public uint32 size;
@@ -1087,6 +1093,7 @@ namespace MaplibreNative.Raw {
         public double pitch;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_bound_options", has_type_id = false)]
     public struct BoundOptions {
         public uint32 size;
@@ -1098,6 +1105,7 @@ namespace MaplibreNative.Raw {
         public double max_pitch;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_free_camera_options", has_type_id = false)]
     public struct FreeCameraOptions {
         public uint32 size;
@@ -1106,6 +1114,7 @@ namespace MaplibreNative.Raw {
         public Quaternion orientation;
     }
 
+    [SimpleType]
     [CCode (cname = "mln_projection_mode", has_type_id = false)]
     public struct ProjectionMode {
         public uint32 size;

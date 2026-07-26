@@ -22,8 +22,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.MapOptions to_native () {
-            Raw.MapOptions options = {};
-            options.size = (uint32) sizeof (Raw.MapOptions);
+            Raw.MapOptions options = Raw.map_options_default ();
             options.width = width;
             options.height = height;
             options.scale_factor = scale_factor;
@@ -129,8 +128,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.MapViewportOptions to_native () {
-            Raw.MapViewportOptions options = {};
-            options.size = (uint32) sizeof (Raw.MapViewportOptions);
+            Raw.MapViewportOptions options = Raw.map_viewport_options_default ();
             if (has_north_orientation) {
                 options.north_orientation = (uint32) north_orientation_value;
                 options.fields |= 1U << 0;
@@ -282,8 +280,7 @@ namespace MaplibreNative {
         }
 
         internal Raw.MapTileOptions to_native () {
-            Raw.MapTileOptions options = {};
-            options.size = (uint32) sizeof (Raw.MapTileOptions);
+            Raw.MapTileOptions options = Raw.map_tile_options_default ();
             if (has_prefetch_zoom_delta) {
                 options.prefetch_zoom_delta = prefetch_zoom_delta_value;
                 options.fields |= 1U << 0;
@@ -931,8 +928,10 @@ namespace MaplibreNative {
         public void add_vector_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_vector_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
@@ -954,8 +953,10 @@ namespace MaplibreNative {
             Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_vector_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
@@ -968,8 +969,10 @@ namespace MaplibreNative {
         public void add_raster_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_raster_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
@@ -991,8 +994,10 @@ namespace MaplibreNative {
             Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_raster_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
@@ -1005,8 +1010,10 @@ namespace MaplibreNative {
         public void add_raster_dem_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_raster_dem_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
@@ -1028,8 +1035,10 @@ namespace MaplibreNative {
             Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
+            StyleTileSourceOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             check_status (Raw.map_add_raster_dem_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
