@@ -12,7 +12,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
   private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handle))
 
   init {
-    UnreachableActions.register(this, ReleaseIfOwnedAction(core))
+    UnreachableActions.register(this, CloseWhenUnreachableAction(core))
   }
 
   public actual fun complete(response: ResourceResponse) {
@@ -58,15 +58,16 @@ public actual class ResourceRequestHandle internal constructor(private val handl
    *
    * Request handles carry no owner-thread affinity, so reclaiming one from the cleanup thread stays
    * within the cleanup-hook contract that keeps runtime, map, projection, and render-session
-   * handles on their owner thread. [ResourceRequestHandleCore] releases only when the provider
-   * still owns the request, so an explicit `close()` or completion keeps this a no-op.
+   * handles on their owner thread. [ResourceRequestHandleCore] first closes the public state, waits
+   * for active completion and cancellation borrows to finish, and releases only when the provider
+   * still owns the request.
    *
    * This holds the ownership state alone. Holding the wrapper would keep it reachable from the
    * cleanup registry and suppress every reclaim.
    */
-  private class ReleaseIfOwnedAction(private val core: ResourceRequestHandleCore) : Runnable {
+  private class CloseWhenUnreachableAction(private val core: ResourceRequestHandleCore) : Runnable {
     override fun run() {
-      core.releaseIfOwned()
+      core.close()
     }
   }
 

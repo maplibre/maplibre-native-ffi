@@ -23,6 +23,7 @@ internal object UnreachableActions {
 
   /** Keeps registrations reachable so the collector can enqueue them. */
   private val pending = ConcurrentHashMap.newKeySet<Registration>()
+  private val pendingLock = Any()
 
   init {
     Thread(::drain, "maplibre-unreachable-actions").apply { isDaemon = true }.start()
@@ -30,7 +31,10 @@ internal object UnreachableActions {
 
   /** Runs [action] once [referent] becomes unreachable. */
   fun register(referent: Any, action: Runnable) {
-    pending.add(Registration(referent, queue, action))
+    // Construct and retain the phantom reference under the same lock used by
+    // the drain path. If collection enqueues it immediately, draining waits
+    // until insertion finishes and cannot remove-before-add.
+    synchronized(pendingLock) { pending.add(Registration(referent, queue, action)) }
   }
 
   private fun drain() {
@@ -42,7 +46,7 @@ internal object UnreachableActions {
           continue
         }
       if (enqueued is Registration) {
-        pending.remove(enqueued)
+        synchronized(pendingLock) { pending.remove(enqueued) }
         try {
           enqueued.run()
         } catch (_: Throwable) {
