@@ -276,6 +276,7 @@ pub struct NativeRuntimeHandle {
     has_created_map: AtomicBool,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
+    retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -296,6 +297,7 @@ pub fn create_native_runtime_handle(
         has_created_map: AtomicBool::new(false),
         resource_transform: Mutex::new(None),
         resource_provider: Mutex::new(None),
+        retired_resource_providers: Mutex::new(Vec::new()),
     })
 }
 
@@ -391,8 +393,12 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_provider(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        let replaced = provider_slot.replace(provider);
-        drop(replaced);
+        if let Some(replaced) = provider_slot.replace(provider) {
+            match self.retired_resource_providers.lock() {
+                Ok(mut retired) => retired.push(replaced),
+                Err(_) => std::mem::forget(replaced),
+            }
+        }
         Ok(())
     }
 
@@ -1509,6 +1515,9 @@ impl NativeRuntimeHandle {
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
         }
+        if let Ok(mut retired) = self.retired_resource_providers.lock() {
+            retired.clear();
+        }
     }
 }
 
@@ -1544,6 +1553,11 @@ impl Drop for NativeRuntimeHandle {
                 && let Some(provider) = provider.take()
             {
                 std::mem::forget(provider);
+            }
+            if let Ok(mut retired) = self.retired_resource_providers.lock() {
+                for provider in retired.drain(..) {
+                    std::mem::forget(provider);
+                }
             }
         }
     }

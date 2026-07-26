@@ -88,6 +88,14 @@ const unknownTileOptions: MapTileOptionsInput = {
   lodMode: "unknown",
   lodModeRaw: 1000,
 };
+// @ts-expect-error unknown viewport names require their raw values.
+const incompleteUnknownViewportOptions: MapViewportOptionsInput = {
+  viewportMode: "unknown",
+};
+// @ts-expect-error unknown tile LOD names require their raw values.
+const incompleteUnknownTileOptions: MapTileOptionsInput = {
+  lodMode: "unknown",
+};
 const runtimeEvent = RuntimeHandle.prototype.pollEvent.call(
   {} as RuntimeHandle,
 );
@@ -144,6 +152,8 @@ void viewportOptions;
 void tileOptions;
 void unknownViewportOptions;
 void unknownTileOptions;
+void incompleteUnknownViewportOptions;
+void incompleteUnknownTileOptions;
 void invalidProviderCallback;
 void transformRule;
 void readbackBuffer;

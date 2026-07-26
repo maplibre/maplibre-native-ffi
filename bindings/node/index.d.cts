@@ -333,57 +333,55 @@ export interface CameraFitOptions {
   pitch?: number | null;
 }
 
-export interface MapViewportOptionsInput {
-  northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
-  northOrientationRaw?: number | null;
-  constrainMode?:
-    | "none"
-    | "heightOnly"
-    | "widthAndHeight"
-    | "screen"
-    | "unknown"
-    | null;
-  constrainModeRaw?: number | null;
-  viewportMode?: "default" | "flippedY" | "unknown" | null;
-  viewportModeRaw?: number | null;
-  frustumOffset?: EdgeInsets | null;
-}
+type NorthOrientationInput =
+  | {
+      northOrientation?: "up" | "right" | "down" | "left" | null;
+      northOrientationRaw?: number | null;
+    }
+  | { northOrientation: "unknown"; northOrientationRaw: number };
 
-export interface MapViewportOptions {
-  northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
-  northOrientationRaw?: number | null;
-  constrainMode?:
-    | "none"
-    | "heightOnly"
-    | "widthAndHeight"
-    | "screen"
-    | "unknown"
-    | null;
-  constrainModeRaw?: number | null;
-  viewportMode?: "default" | "flippedY" | "unknown" | null;
-  viewportModeRaw?: number | null;
-  frustumOffset?: EdgeInsets | null;
-}
+type ConstrainModeInput =
+  | {
+      constrainMode?:
+        | "none"
+        | "heightOnly"
+        | "widthAndHeight"
+        | "screen"
+        | null;
+      constrainModeRaw?: number | null;
+    }
+  | { constrainMode: "unknown"; constrainModeRaw: number };
 
-export interface MapTileOptionsInput {
+type ViewportModeInput =
+  | {
+      viewportMode?: "default" | "flippedY" | null;
+      viewportModeRaw?: number | null;
+    }
+  | { viewportMode: "unknown"; viewportModeRaw: number };
+
+export type MapViewportOptionsInput = NorthOrientationInput &
+  ConstrainModeInput &
+  ViewportModeInput & {
+    frustumOffset?: EdgeInsets | null;
+  };
+
+export type MapViewportOptions = MapViewportOptionsInput;
+
+type MapTileOptionsInputFields = {
   prefetchZoomDelta?: number | null;
   lodMinRadius?: number | null;
   lodScale?: number | null;
   lodPitchThreshold?: number | null;
   lodZoomShift?: number | null;
-  lodMode?: "default" | "distance" | "unknown" | null;
-  lodModeRaw?: number | null;
-}
+};
 
-export interface MapTileOptions {
-  prefetchZoomDelta?: number | null;
-  lodMinRadius?: number | null;
-  lodScale?: number | null;
-  lodPitchThreshold?: number | null;
-  lodZoomShift?: number | null;
-  lodMode?: "default" | "distance" | "unknown" | null;
-  lodModeRaw?: number | null;
-}
+export type MapTileOptionsInput = MapTileOptionsInputFields &
+  (
+    | { lodMode?: "default" | "distance" | null; lodModeRaw?: number | null }
+    | { lodMode: "unknown"; lodModeRaw: number }
+  );
+
+export type MapTileOptions = MapTileOptionsInput;
 
 export interface BoundOptions {
   bounds?: LatLngBounds | null;
