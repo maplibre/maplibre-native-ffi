@@ -206,7 +206,7 @@ func displayRefreshTimeoutMS(window *sdl.Window) int32 {
 	if hz <= 0 {
 		return 16
 	}
-	timeout := int32(math.Ceil(1000 / hz))
+	timeout := int32(math.Floor(1000 / hz))
 	if timeout < 1 {
 		return 1
 	}

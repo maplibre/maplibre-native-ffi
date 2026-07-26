@@ -15,7 +15,7 @@ const glTexture2D = 0x0DE1
 type renderTarget interface {
 	Close() error
 	Resize(viewport) error
-	NeedsReattachOnResize() bool
+	NeedsReattachOnResize() (bool, error)
 	FinishFrame() error
 	RenderUpdate() (bool, error)
 }
@@ -309,7 +309,9 @@ func (target *openGLOwnedTextureTarget) Resize(v viewport) error {
 	return target.session.Resize(v.extent())
 }
 
-func (*openGLOwnedTextureTarget) NeedsReattachOnResize() bool { return false }
+func (*openGLOwnedTextureTarget) NeedsReattachOnResize() (bool, error) {
+	return false, nil
+}
 
 func (target *openGLOwnedTextureTarget) FinishFrame() error { return target.compositor.FinishFrame() }
 
@@ -358,7 +360,14 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 		return nil, err
 	}
 	target.texture = texture
-	session, err := m.AttachOpenGLBorrowedTexture(maplibre.OpenGLBorrowedTextureDescriptor{Extent: v.extent(), Context: compositor.context.descriptor(), Texture: texture, Target: glTexture2D})
+	session, err := m.AttachOpenGLBorrowedTexture(maplibre.OpenGLBorrowedTextureDescriptor{
+		Extent:         v.extent(),
+		PhysicalWidth:  v.physicalWidth,
+		PhysicalHeight: v.physicalHeight,
+		Context:        compositor.context.descriptor(),
+		Texture:        texture,
+		Target:         glTexture2D,
+	})
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL borrowed texture attach failed: %w", err)
@@ -389,7 +398,9 @@ func (*openGLBorrowedTextureTarget) Resize(viewport) error {
 	return errors.New("borrowed texture resize requires reattach")
 }
 
-func (*openGLBorrowedTextureTarget) NeedsReattachOnResize() bool { return true }
+func (*openGLBorrowedTextureTarget) NeedsReattachOnResize() (bool, error) {
+	return true, nil
+}
 
 func (target *openGLBorrowedTextureTarget) FinishFrame() error {
 	return target.compositor.FinishFrame()
@@ -455,8 +466,15 @@ func (target *openGLSurfaceTarget) Close() error {
 
 func (target *openGLSurfaceTarget) Resize(v viewport) error { return target.session.Resize(v.extent()) }
 
-func (target *openGLSurfaceTarget) NeedsReattachOnResize() bool {
-	return target.context.platform.egl != nil
+func (target *openGLSurfaceTarget) NeedsReattachOnResize() (bool, error) {
+	if target.context.platform.egl == nil {
+		return false, nil
+	}
+	surface := target.context.surface()
+	if err := target.context.refreshPlatformSurface(); err != nil {
+		return false, err
+	}
+	return target.context.surface() != surface, nil
 }
 
 func (target *openGLSurfaceTarget) FinishFrame() error {

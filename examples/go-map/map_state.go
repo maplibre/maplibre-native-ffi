@@ -77,7 +77,11 @@ func (state *mapState) resize(v viewport, mode renderTargetMode) error {
 	if state.target == nil {
 		return errors.New("render target is not attached")
 	}
-	if state.target.NeedsReattachOnResize() {
+	reattach, err := state.target.NeedsReattachOnResize()
+	if err != nil {
+		return err
+	}
+	if reattach {
 		if err := state.target.Close(); err != nil {
 			return err
 		}
