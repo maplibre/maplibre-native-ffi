@@ -409,3 +409,124 @@ import Testing
     Issue.record("unexpected error: \(error)")
   }
 }
+
+@Test func geoJSONSourceOptionsMaterializeFieldMaskAndClusterProperties(
+) throws {
+  let options = StyleGeoJSONSourceOptions(
+    minZoom: 1,
+    maxZoom: 12,
+    tolerance: 0.5,
+    clusterMaxZoom: 15,
+    clusterProperties: clusterPropertiesValue(),
+    tileSize: 256,
+    buffer: 64,
+    clusterRadius: 60,
+    clusterMinPoints: 3,
+    lineMetrics: true,
+    cluster: true
+  )
+
+  try options.nativeOptions.withNativeOptions { native in
+    let native = try #require(native)
+    let fields = native.pointee.fields
+    #expect((fields & MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM.rawValue) != 0)
+    #expect((fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue) != 0)
+    #expect(
+      (fields & MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES.rawValue) != 0
+    )
+    #expect(native.pointee.min_zoom == 1)
+    #expect(native.pointee.max_zoom == 12)
+    #expect(native.pointee.tolerance == 0.5)
+    #expect(native.pointee.cluster_max_zoom == 15)
+    #expect(native.pointee.tile_size == 256)
+    #expect(native.pointee.buffer == 64)
+    #expect(native.pointee.cluster_radius == 60)
+    #expect(native.pointee.cluster_min_points == 3)
+    #expect(native.pointee.line_metrics)
+    #expect(native.pointee.cluster)
+
+    let clusterProperties = try #require(native.pointee.cluster_properties)
+    let copied = try NativeJSONValue(copying: clusterProperties.pointee)
+    #expect(JSONValue(native: copied) == clusterPropertiesValue())
+  }
+
+  // Absent options keep the descriptor out of the call.
+  try StyleGeoJSONSourceOptions().nativeOptions.withNativeOptions { native in
+    #expect(native == nil)
+  }
+}
+
+@Test func clusteredGeoJSONSourceOptionsParseThroughNativeMap() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 512)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+  {"version":8,"sources":{},"layers":[]}
+  """)
+
+  try map.addGeoJSONSourceData(
+    sourceId: "clustered",
+    data: nearbyPoints(),
+    options: clusterOptions()
+  )
+
+  #expect(try map.styleSourceExists("clustered"))
+  #expect(try map.styleSourceType("clustered") == .geoJSON)
+
+  // The cluster aggregation graph is borrowed for the call and parsed by
+  // MapLibre Native, so an unparseable expression fails the add.
+  var invalid = clusterOptions()
+  invalid.clusterProperties = .object([
+    JSONMember(key: "weight_sum", value: .string("not-an-expression")),
+  ])
+
+  do {
+    try map.addGeoJSONSourceData(
+      sourceId: "clustered-invalid",
+      data: nearbyPoints(),
+      options: invalid
+    )
+    Issue.record("unparseable cluster properties should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+
+  #expect(try !map.styleSourceExists("clustered-invalid"))
+}
+
+private func clusterPropertiesValue() -> JSONValue {
+  .object([
+    JSONMember(
+      key: "weight_sum",
+      value: .array([.string("+"), .array([.string("get"), .string("weight")])])
+    ),
+  ])
+}
+
+private func clusterOptions() -> StyleGeoJSONSourceOptions {
+  StyleGeoJSONSourceOptions(
+    clusterMaxZoom: 17,
+    clusterProperties: clusterPropertiesValue(),
+    clusterRadius: 60,
+    clusterMinPoints: 2,
+    cluster: true
+  )
+}
+
+private func nearbyPoints() -> GeoJSON {
+  .featureCollection((0 ..< 3).map { index in
+    let offset = Double(index) * 0.001
+    return Feature(
+      geometry: .point(LatLng(latitude: offset, longitude: offset)),
+      properties: [JSONMember(key: "weight", value: .uint(UInt64(index + 1)))]
+    )
+  })
+}

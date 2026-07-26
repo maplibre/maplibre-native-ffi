@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use crate::events::{RuntimeEventSource, RuntimeEventType, empty_runtime_event};
 use crate::{
-    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, JsonMember, MapMode, ResourceKind,
+    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature, JsonMember, MapMode, ResourceKind,
     ResourceProviderDecision, ResourceResponse, TextureImageInfo,
 };
 
@@ -218,6 +218,61 @@ fn tile_source_helpers_call_real_c_api() {
         map.style_source_type("dem-tiles").unwrap(),
         Some(SourceType::RasterDem)
     );
+}
+
+#[test]
+// Spec coverage: BND-060, BND-061, and BND-105.
+fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+    options.cluster_radius = Some(40);
+    // A present zero must reach native as an explicit buffer of zero.
+    options.buffer = Some(0);
+    options.cluster_properties = Some(JsonValue::Object(vec![JsonMember::new(
+        "weight_sum",
+        JsonValue::Array(vec![
+            JsonValue::String("+".to_owned()),
+            JsonValue::Array(vec![
+                JsonValue::String("get".to_owned()),
+                JsonValue::String("weight".to_owned()),
+            ]),
+        ]),
+    )]));
+
+    map.add_geojson_source_url(
+        "geojson-url",
+        "https://example.com/points.geojson",
+        Some(&options),
+    )
+    .unwrap();
+    assert_eq!(
+        map.style_source_type("geojson-url").unwrap(),
+        Some(SourceType::GeoJson)
+    );
+
+    let data = GeoJson::FeatureCollection(vec![Feature::new(
+        Geometry::Point(LatLng::new(0.0, 0.0)),
+        vec![JsonMember::new("weight", JsonValue::UInt(1))],
+    )]);
+    map.add_geojson_source_data("geojson-data", &data, None)
+        .unwrap();
+    assert_eq!(
+        map.style_source_type("geojson-data").unwrap(),
+        Some(SourceType::GeoJson)
+    );
+
+    // Updates carry no options of their own; the source keeps what it was added
+    // with.
+    map.set_geojson_source_data("geojson-url", &data).unwrap();
+    map.set_geojson_source_url("geojson-data", "https://example.com/points.geojson")
+        .unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]

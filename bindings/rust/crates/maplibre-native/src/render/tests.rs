@@ -26,9 +26,10 @@ use static_assertions::assert_not_impl_any;
 use super::*;
 use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, LogSeverity,
-    LogSeverityMask, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
-    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
+    CameraOptions, ErrorKind, FeatureIdentifier, GeoJson, GeoJsonSourceOptions, Geometry,
+    JsonMember, LatLng, LogSeverity, LogSeverityMask, MapMode, MapOptions,
+    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventType, RuntimeHandle, ScreenBox,
+    ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -1995,6 +1996,12 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         feature_member(&cluster.feature, "cluster_id"),
         Some(&JsonValue::UInt(_))
     ));
+
+    // The rendered cluster exists only because the typed GeoJSON adder passed
+    // GeoJsonSourceOptions::cluster, and weight_sum is produced by the
+    // cluster_properties aggregation lowered through the same options.
+    assert_eq!(numeric_member(&cluster.feature, "point_count"), Some(3.0));
+    assert_eq!(numeric_member(&cluster.feature, "weight_sum"), Some(6.0));
 
     let children = session
         .query_feature_extension(

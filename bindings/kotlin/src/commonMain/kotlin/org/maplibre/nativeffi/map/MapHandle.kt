@@ -25,6 +25,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -55,9 +56,9 @@ public expect class MapHandle : AutoCloseable {
 
   public fun styleSourceIds(): List<String>
 
-  public fun addGeoJsonSourceUrl(sourceId: String, url: String)
+  public fun addGeoJsonSourceUrl(sourceId: String, url: String, options: GeoJsonSourceOptions?)
 
-  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson)
+  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson, options: GeoJsonSourceOptions?)
 
   public fun setGeoJsonSourceUrl(sourceId: String, url: String)
 

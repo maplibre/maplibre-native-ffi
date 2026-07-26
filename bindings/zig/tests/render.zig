@@ -1506,6 +1506,101 @@ test "render session queries cluster feature extensions" {
     try testing.expect(!std.mem.eql(u8, try singleLeafName(first), try singleLeafName(second)));
 }
 
+fn featurePropertyNumber(feature: *const maplibre.QueriedFeature, key: []const u8) !f64 {
+    for (feature.feature.properties) |property| {
+        if (!std.mem.eql(u8, property.key, key)) continue;
+        return switch (property.value) {
+            .uint => |value| @floatFromInt(value),
+            .int => |value| @floatFromInt(value),
+            .double => |value| value,
+            else => error.ExpectedNumberProperty,
+        };
+    }
+    return error.MissingFeatureProperty;
+}
+
+fn featurePropertyBool(feature: *const maplibre.QueriedFeature, key: []const u8) !bool {
+    for (feature.feature.properties) |property| {
+        if (!std.mem.eql(u8, property.key, key)) continue;
+        return switch (property.value) {
+            .bool => |value| value,
+            else => error.ExpectedBoolProperty,
+        };
+    }
+    return error.MissingFeatureProperty;
+}
+
+test "GeoJSON source options cluster nearby points and aggregate cluster properties" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{});
+    defer owned.close() catch {};
+    const session = &owned.session;
+
+    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 0 });
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_style_loaded));
+
+    const first_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 1 } }};
+    const second_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 2 } }};
+    const third_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 3 } }};
+    const features = [_]maplibre.Feature{
+        .{ .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } }, .properties = first_properties[0..] },
+        .{ .geometry = .{ .point = .{ .latitude = 0.001, .longitude = 0.001 } }, .properties = second_properties[0..] },
+        .{ .geometry = .{ .point = .{ .latitude = 0.002, .longitude = 0.002 } }, .properties = third_properties[0..] },
+    };
+    const rank_expression = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "rank" } };
+    const total_expression = [_]maplibre.JsonValue{ .{ .string = "+" }, .{ .array = rank_expression[0..] } };
+    const cluster_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = total_expression[0..] } }};
+    try map.addGeoJsonSourceData(
+        testing.allocator,
+        "cluster-options-source",
+        .{ .feature_collection = features[0..] },
+        .{
+            .cluster = true,
+            .cluster_radius = 50,
+            .cluster_min_points = 2,
+            .cluster_max_zoom = 14,
+            .cluster_properties = .{ .object = cluster_properties[0..] },
+        },
+    );
+
+    const filter = [_]maplibre.JsonValue{ .{ .string = "has" }, .{ .string = "point_count" } };
+    const paint = [_]maplibre.JsonMember{.{ .key = "circle-radius", .value = .{ .uint = 20 } }};
+    const layer_members = [_]maplibre.JsonMember{
+        .{ .key = "id", .value = .{ .string = "cluster-options-circle" } },
+        .{ .key = "type", .value = .{ .string = "circle" } },
+        .{ .key = "source", .value = .{ .string = "cluster-options-source" } },
+        .{ .key = "filter", .value = .{ .array = filter[0..] } },
+        .{ .key = "paint", .value = .{ .object = paint[0..] } },
+    };
+    try map.addStyleLayerJson(testing.allocator, .{ .object = layer_members[0..] }, "");
+
+    for (0..5) |_| {
+        if (!try waitForEvent(&runtime, .map_render_update_available)) break;
+        _ = try session.renderUpdate();
+    }
+
+    // The layer only draws features carrying point_count, so a queried feature proves the source
+    // options clustered the points rather than rendering them individually.
+    const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
+    var clusters = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
+        .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
+        .max = .{ .x = query_point.x + 30, .y = query_point.y + 30 },
+    } }, .{ .layer_ids = &.{"cluster-options-circle"} });
+    defer clusters.deinit();
+
+    const cluster = &clusters.features[0];
+    try testing.expect(try featurePropertyBool(cluster, "cluster"));
+    try testing.expectEqual(@as(f64, 3), try featurePropertyNumber(cluster, "point_count"));
+    try testing.expectEqual(@as(f64, 6), try featurePropertyNumber(cluster, "total"));
+}
+
 fn singleLeafName(result: maplibre.FeatureExtensionResult) ![]const u8 {
     const collection = switch (result) {
         .feature_collection => |value| value,

@@ -71,6 +71,70 @@ public struct StyleTileSourceOptions: Equatable, Sendable {
   }
 }
 
+/// Options for GeoJSON sources.
+///
+/// MapLibre Native fixes these options when the source is created, so
+/// ``MapHandle/setGeoJSONSourceURL(sourceId:url:)`` and
+/// ``MapHandle/setGeoJSONSourceData(sourceId:data:)`` keep the options the
+/// source was added with.
+public struct StyleGeoJSONSourceOptions: Equatable, Sendable {
+  public var minZoom: Double?
+  public var maxZoom: Double?
+  public var tolerance: Double?
+  public var clusterMaxZoom: Double?
+  /// Cluster aggregation expressions keyed by property name, as a JSON object
+  /// whose members follow the MapLibre Style Spec `clusterProperties` form.
+  public var clusterProperties: JSONValue?
+  public var tileSize: UInt32?
+  public var buffer: UInt32?
+  public var clusterRadius: UInt32?
+  public var clusterMinPoints: UInt32?
+  public var lineMetrics: Bool?
+  public var cluster: Bool?
+
+  public init(
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    clusterMaxZoom: Double? = nil,
+    clusterProperties: JSONValue? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clusterRadius: UInt32? = nil,
+    clusterMinPoints: UInt32? = nil,
+    lineMetrics: Bool? = nil,
+    cluster: Bool? = nil
+  ) {
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.clusterMaxZoom = clusterMaxZoom
+    self.clusterProperties = clusterProperties
+    self.tileSize = tileSize
+    self.buffer = buffer
+    self.clusterRadius = clusterRadius
+    self.clusterMinPoints = clusterMinPoints
+    self.lineMetrics = lineMetrics
+    self.cluster = cluster
+  }
+
+  var nativeOptions: NativeGeoJSONSourceOptions {
+    NativeGeoJSONSourceOptions(
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+      tolerance: tolerance,
+      clusterMaxZoom: clusterMaxZoom,
+      clusterProperties: clusterProperties?.nativeValue,
+      tileSize: tileSize,
+      buffer: buffer,
+      clusterRadius: clusterRadius,
+      clusterMinPoints: clusterMinPoints,
+      lineMetrics: lineMetrics,
+      cluster: cluster
+    )
+  }
+}
+
 public struct StyleRGBA8Image: Equatable, Sendable {
   public let width: UInt32
   public let height: UInt32
@@ -301,26 +365,52 @@ public extension MapHandle {
     try mapNativeFailure { try NativeStyle.sourceIds(requireLivePointer()) }
   }
 
-  func addGeoJSONSourceURL(sourceId: String, url: String) throws {
+  /// Adds a GeoJSON source that loads data from a URL.
+  ///
+  /// `options` is fixed when the source is created;
+  /// ``setGeoJSONSourceURL(sourceId:url:)`` and
+  /// ``setGeoJSONSourceData(sourceId:data:)`` keep the options the source was
+  /// added with.
+  func addGeoJSONSourceURL(
+    sourceId: String,
+    url: String,
+    options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_geojson_source_url(
-        requireLivePointer(),
-        arena.view(sourceId),
-        arena.view(url)
-      ))
+      try options.nativeOptions.withNativeOptions { options in
+        try checkStatus(mln_map_add_geojson_source_url(
+          requireLivePointer(),
+          arena.view(sourceId),
+          arena.view(url),
+          options
+        ))
+      }
     }
   }
 
-  func addGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
+  /// Adds a GeoJSON source with inline data.
+  ///
+  /// `options` is fixed when the source is created;
+  /// ``setGeoJSONSourceURL(sourceId:url:)`` and
+  /// ``setGeoJSONSourceData(sourceId:data:)`` keep the options the source was
+  /// added with.
+  func addGeoJSONSourceData(
+    sourceId: String,
+    data: GeoJSON,
+    options: StyleGeoJSONSourceOptions = StyleGeoJSONSourceOptions()
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_add_geojson_source_data(
-          requireLivePointer(),
-          arena.view(sourceId),
-          data
-        ))
+        try options.nativeOptions.withNativeOptions { options in
+          try checkStatus(mln_map_add_geojson_source_data(
+            requireLivePointer(),
+            arena.view(sourceId),
+            data,
+            options
+          ))
+        }
       }
     }
   }

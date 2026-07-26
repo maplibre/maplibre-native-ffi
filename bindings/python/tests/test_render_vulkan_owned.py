@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
+    assert_typed_geojson_cluster_source,
     skip_or_fail_fixture_setup,
 )
 
@@ -463,6 +464,16 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
     assert_cluster_feature_extensions(
+        vulkan_owned_session.runtime,
+        vulkan_owned_session.map,
+        vulkan_owned_session.session,
+    )
+
+
+def test_typed_geojson_source_options_cluster_nearby_points(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    assert_typed_geojson_cluster_source(
         vulkan_owned_session.runtime,
         vulkan_owned_session.map,
         vulkan_owned_session.session,

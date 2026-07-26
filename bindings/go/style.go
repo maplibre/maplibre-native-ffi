@@ -164,6 +164,205 @@ func (options cStyleTileSourceOptions) free() {
 	options.attribution.free()
 }
 
+// StyleGeoJSONSourceOptions configures GeoJSON sources. MapLibre Native fixes these options when
+// the source is created, so SetGeoJSONSourceURL and SetGeoJSONSourceData keep the options the
+// source was added with.
+type StyleGeoJSONSourceOptions struct {
+	MinZoom        *float64
+	MaxZoom        *float64
+	Tolerance      *float64
+	ClusterMaxZoom *float64
+	// ClusterProperties holds cluster aggregation expressions keyed by property name, as a JSON
+	// object whose members follow the MapLibre Style Spec clusterProperties form.
+	ClusterProperties *JSONValue
+	TileSize          *uint32
+	Buffer            *uint32
+	ClusterRadius     *uint32
+	ClusterMinPoints  *uint32
+	LineMetrics       *bool
+	Cluster           *bool
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// does not compile for structs holding JSON values.
+func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) bool {
+	return equalPointer(options.MinZoom, other.MinZoom) &&
+		equalPointer(options.MaxZoom, other.MaxZoom) &&
+		equalPointer(options.Tolerance, other.Tolerance) &&
+		equalPointer(options.ClusterMaxZoom, other.ClusterMaxZoom) &&
+		equalJSON(options.ClusterProperties, other.ClusterProperties) &&
+		equalPointer(options.TileSize, other.TileSize) &&
+		equalPointer(options.Buffer, other.Buffer) &&
+		equalPointer(options.ClusterRadius, other.ClusterRadius) &&
+		equalPointer(options.ClusterMinPoints, other.ClusterMinPoints) &&
+		equalPointer(options.LineMetrics, other.LineMetrics) &&
+		equalPointer(options.Cluster, other.Cluster)
+}
+
+// WithMinZoom returns a copy that sets the minimum tiling zoom.
+func (options StyleGeoJSONSourceOptions) WithMinZoom(minZoom float64) StyleGeoJSONSourceOptions {
+	options.MinZoom = new(float64)
+	*options.MinZoom = minZoom
+	return options
+}
+
+// WithMaxZoom returns a copy that sets the maximum tiling zoom.
+func (options StyleGeoJSONSourceOptions) WithMaxZoom(maxZoom float64) StyleGeoJSONSourceOptions {
+	options.MaxZoom = new(float64)
+	*options.MaxZoom = maxZoom
+	return options
+}
+
+// WithTolerance returns a copy that sets the Douglas-Peucker simplification tolerance.
+func (options StyleGeoJSONSourceOptions) WithTolerance(tolerance float64) StyleGeoJSONSourceOptions {
+	options.Tolerance = new(float64)
+	*options.Tolerance = tolerance
+	return options
+}
+
+// WithClusterMaxZoom returns a copy that sets the highest zoom that clusters points.
+func (options StyleGeoJSONSourceOptions) WithClusterMaxZoom(clusterMaxZoom float64) StyleGeoJSONSourceOptions {
+	options.ClusterMaxZoom = new(float64)
+	*options.ClusterMaxZoom = clusterMaxZoom
+	return options
+}
+
+// WithClusterProperties returns a copy that sets cluster aggregation expressions.
+func (options StyleGeoJSONSourceOptions) WithClusterProperties(clusterProperties JSONValue) StyleGeoJSONSourceOptions {
+	options.ClusterProperties = new(JSONValue)
+	*options.ClusterProperties = clusterProperties
+	return options
+}
+
+// WithTileSize returns a copy that sets the tile extent in pixels.
+func (options StyleGeoJSONSourceOptions) WithTileSize(tileSize uint32) StyleGeoJSONSourceOptions {
+	options.TileSize = new(uint32)
+	*options.TileSize = tileSize
+	return options
+}
+
+// WithBuffer returns a copy that sets the tile buffer in pixels.
+func (options StyleGeoJSONSourceOptions) WithBuffer(buffer uint32) StyleGeoJSONSourceOptions {
+	options.Buffer = new(uint32)
+	*options.Buffer = buffer
+	return options
+}
+
+// WithClusterRadius returns a copy that sets the cluster radius in pixels.
+func (options StyleGeoJSONSourceOptions) WithClusterRadius(clusterRadius uint32) StyleGeoJSONSourceOptions {
+	options.ClusterRadius = new(uint32)
+	*options.ClusterRadius = clusterRadius
+	return options
+}
+
+// WithClusterMinPoints returns a copy that sets the points required to form a cluster.
+func (options StyleGeoJSONSourceOptions) WithClusterMinPoints(clusterMinPoints uint32) StyleGeoJSONSourceOptions {
+	options.ClusterMinPoints = new(uint32)
+	*options.ClusterMinPoints = clusterMinPoints
+	return options
+}
+
+// WithLineMetrics returns a copy that sets whether line distance metrics are added.
+func (options StyleGeoJSONSourceOptions) WithLineMetrics(lineMetrics bool) StyleGeoJSONSourceOptions {
+	options.LineMetrics = new(bool)
+	*options.LineMetrics = lineMetrics
+	return options
+}
+
+// WithCluster returns a copy that sets whether point features cluster.
+func (options StyleGeoJSONSourceOptions) WithCluster(cluster bool) StyleGeoJSONSourceOptions {
+	options.Cluster = new(bool)
+	*options.Cluster = cluster
+	return options
+}
+
+// cStyleGeoJSONSourceOptions keeps the native options struct in C storage because the descriptor
+// carries the cluster property tree owned by a Go-side materializer.
+type cStyleGeoJSONSourceOptions struct {
+	raw          *C.mln_geojson_source_options
+	materializer *cJSONMaterializer
+}
+
+func newCStyleGeoJSONSourceOptions(options *StyleGeoJSONSourceOptions) (*cStyleGeoJSONSourceOptions, error) {
+	if options == nil {
+		return nil, nil
+	}
+	raw := &cStyleGeoJSONSourceOptions{
+		raw: (*C.mln_geojson_source_options)(C.malloc(C.size_t(unsafe.Sizeof(C.mln_geojson_source_options{})))),
+	}
+	*raw.raw = C.mln_geojson_source_options_default()
+	if options.MinZoom != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+		raw.raw.min_zoom = C.double(*options.MinZoom)
+	}
+	if options.MaxZoom != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+		raw.raw.max_zoom = C.double(*options.MaxZoom)
+	}
+	if options.Tolerance != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+		raw.raw.tolerance = C.double(*options.Tolerance)
+	}
+	if options.ClusterMaxZoom != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+		raw.raw.cluster_max_zoom = C.double(*options.ClusterMaxZoom)
+	}
+	if options.ClusterProperties != nil {
+		raw.materializer = newCJSONMaterializer()
+		clusterProperties, err := raw.materializer.valuePtr(*options.ClusterProperties)
+		if err != nil {
+			raw.free()
+			return nil, err
+		}
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+		raw.raw.cluster_properties = clusterProperties
+	}
+	if options.TileSize != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+		raw.raw.tile_size = C.uint32_t(*options.TileSize)
+	}
+	if options.Buffer != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_BUFFER
+		raw.raw.buffer = C.uint32_t(*options.Buffer)
+	}
+	if options.ClusterRadius != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+		raw.raw.cluster_radius = C.uint32_t(*options.ClusterRadius)
+	}
+	if options.ClusterMinPoints != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+		raw.raw.cluster_min_points = C.uint32_t(*options.ClusterMinPoints)
+	}
+	if options.LineMetrics != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+		raw.raw.line_metrics = C.bool(*options.LineMetrics)
+	}
+	if options.Cluster != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+		raw.raw.cluster = C.bool(*options.Cluster)
+	}
+	return raw, nil
+}
+
+func (options *cStyleGeoJSONSourceOptions) ptr() *C.mln_geojson_source_options {
+	if options == nil {
+		return nil
+	}
+	return options.raw
+}
+
+func (options *cStyleGeoJSONSourceOptions) free() {
+	if options == nil {
+		return
+	}
+	if options.materializer != nil {
+		options.materializer.free()
+	}
+	if options.raw != nil {
+		C.free(unsafe.Pointer(options.raw))
+	}
+}
+
 // CustomGeometryTileCallback receives custom geometry tile requests. Native
 // code may invoke it on worker threads and may race it with owner-thread map
 // calls. The callback must be thread-safe, must not call MapLibre map APIs
@@ -327,8 +526,10 @@ func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
 	}
 }
 
-// AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL.
-func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string) error {
+// AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL. MapLibre Native fixes options
+// when the source is created, so later SetGeoJSONSourceURL and SetGeoJSONSourceData calls keep the
+// options passed here.
+func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *StyleGeoJSONSourceOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -339,8 +540,13 @@ func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string) error {
 	defer sourceView.free()
 	urlView := newCStringView(url)
 	defer urlView.free()
+	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
+	if err != nil {
+		return newBindingError(ErrInvalidArgument, err.Error())
+	}
+	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw()))
+		return int32(C.mln_map_add_geojson_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw(), rawOptions.ptr()))
 	})
 }
 
@@ -362,8 +568,10 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
 }
 
 // AddGeoJSONSourceData adds a GeoJSON source with inline data. Accepted data is
-// copied into MapLibre Native before the call returns.
-func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON) error {
+// copied into MapLibre Native before the call returns. MapLibre Native fixes options when the
+// source is created, so later SetGeoJSONSourceData and SetGeoJSONSourceURL calls keep the options
+// passed here.
+func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON, options *StyleGeoJSONSourceOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
 		return err
@@ -378,8 +586,13 @@ func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON) error {
 	if err != nil {
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
+	rawOptions, err := newCStyleGeoJSONSourceOptions(options)
+	if err != nil {
+		return newBindingError(ErrInvalidArgument, err.Error())
+	}
+	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_data((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawData))
+		return int32(C.mln_map_add_geojson_source_data((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawData, rawOptions.ptr()))
 	})
 }
 

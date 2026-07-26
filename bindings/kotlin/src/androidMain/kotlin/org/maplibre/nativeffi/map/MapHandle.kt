@@ -41,6 +41,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -176,32 +177,46 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       StringViewScope(url).use { nativeUrl ->
-        Status.check(
-          MaplibreNativeC.mln_map_add_geojson_source_url(
-            map(requireLiveAddress()),
-            nativeSourceId.view,
-            nativeUrl.view,
+        GeoJsonSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_geojson_source_url(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeUrl.view,
+              nativeOptions.options,
+            )
           )
-        )
+        }
       }
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       GeoJsonScope(data).use { nativeData ->
-        Status.check(
-          MaplibreNativeC.mln_map_add_geojson_source_data(
-            map(requireLiveAddress()),
-            nativeSourceId.view,
-            nativeData.value,
+        GeoJsonSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_geojson_source_data(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeData.value,
+              nativeOptions.options,
+            )
           )
-        )
+        }
       }
     }
   }
@@ -2604,6 +2619,66 @@ private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable 
   override fun close() {
     options.close()
     attribution?.close()
+  }
+}
+
+private class GeoJsonSourceOptionsScope(value: GeoJsonSourceOptions?) : AutoCloseable {
+  private val clusterProperties: JsonScope? = value?.clusterProperties?.let(::JsonScope)
+  val options: MaplibreNativeC.mln_geojson_source_options =
+    MaplibreNativeC.mln_geojson_source_options_default()
+
+  init {
+    var fields = 0
+    value?.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+      options.min_zoom(it)
+    }
+    value?.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+      options.max_zoom(it)
+    }
+    value?.tolerance?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+      options.tolerance(it)
+    }
+    value?.clusterMaxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      options.cluster_max_zoom(it)
+    }
+    clusterProperties?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+      options.cluster_properties(it.value)
+    }
+    value?.tileSize?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+      options.tile_size(it)
+    }
+    value?.buffer?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_BUFFER
+      options.buffer(it)
+    }
+    value?.clusterRadius?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+      options.cluster_radius(it)
+    }
+    value?.clusterMinPoints?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      options.cluster_min_points(it)
+    }
+    value?.lineMetrics?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+      options.line_metrics(it)
+    }
+    value?.cluster?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+      options.cluster(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+    clusterProperties?.close()
   }
 }
 

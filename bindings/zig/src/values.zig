@@ -176,6 +176,24 @@ pub const StyleTileSourceOptions = struct {
     raster_encoding: ?StyleRasterDemEncoding = null,
 };
 
+/// Options for GeoJSON sources. MapLibre Native fixes these options when the source is created, so
+/// setGeoJsonSourceUrl and setGeoJsonSourceData keep the options the source was added with.
+pub const StyleGeoJsonSourceOptions = struct {
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+    tolerance: ?f64 = null,
+    cluster_max_zoom: ?f64 = null,
+    /// Cluster aggregation expressions keyed by property name, as a JSON object whose members
+    /// follow the MapLibre Style Spec clusterProperties form.
+    cluster_properties: ?JsonValue = null,
+    tile_size: ?u32 = null,
+    buffer: ?u32 = null,
+    cluster_radius: ?u32 = null,
+    cluster_min_points: ?u32 = null,
+    line_metrics: ?bool = null,
+    cluster: ?bool = null,
+};
+
 pub const PremultipliedRgba8Image = struct {
     width: u32,
     height: u32,

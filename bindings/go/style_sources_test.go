@@ -104,7 +104,11 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
 		t.Fatalf("SetStyleJSON(empty style): %v", err)
 	}
-	if err := m.AddGeoJSONSourceURL("geojson-url", "asset://fixtures/points.geojson"); err != nil {
+	geoJSONOptions := StyleGeoJSONSourceOptions{}.
+		WithMinZoom(1).
+		WithTolerance(0.5).
+		WithBuffer(64)
+	if err := m.AddGeoJSONSourceURL("geojson-url", "asset://fixtures/points.geojson", &geoJSONOptions); err != nil {
 		t.Fatalf("AddGeoJSONSourceURL(): %v", err)
 	}
 	if err := m.SetGeoJSONSourceURL("geojson-url", "asset://fixtures/points-2.geojson"); err != nil {
@@ -143,7 +147,7 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	if err := m.AddVectorSourceTiles("bad-vector", nil, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddVectorSourceTiles(nil) error = %v, want ErrInvalidArgument", err)
 	}
-	if err := m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson"); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson", nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceURL(empty id) error = %v, want ErrInvalidArgument", err)
 	}
 }
@@ -182,7 +186,14 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		Properties: properties,
 		Identifier: "feature-1",
 	}})
-	if err := m.AddGeoJSONSourceData("geojson-data", data); err != nil {
+	options := StyleGeoJSONSourceOptions{}.
+		WithMinZoom(1).
+		WithMaxZoom(16).
+		WithTolerance(0.5).
+		WithBuffer(0).
+		WithLineMetrics(true).
+		WithTileSize(256)
+	if err := m.AddGeoJSONSourceData("geojson-data", data, &options); err != nil {
 		t.Fatalf("AddGeoJSONSourceData(): %v", err)
 	}
 	points[0] = LatLng{Latitude: 90, Longitude: 90}
@@ -198,12 +209,88 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 		t.Fatalf("StyleSourceType(geojson-data) = (%v, %v), want GeoJSON true", sourceType, found)
 	}
 	badID := GeoJSONFeatureCollection([]Feature{{Geometry: PointGeometry(LatLng{}), Identifier: struct{}{}}})
-	if err := m.AddGeoJSONSourceData("bad-geojson-data", badID); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.AddGeoJSONSourceData("bad-geojson-data", badID, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(unsupported id) error = %v, want ErrInvalidArgument", err)
 	}
 	badGeometry := GeoJSON{Type: GeoJSONTypeGeometry, Geometry: Geometry{Type: GeometryType(999)}}
-	if err := m.AddGeoJSONSourceData("bad-geometry", badGeometry); !errors.Is(err, ErrInvalidArgument) {
+	if err := m.AddGeoJSONSourceData("bad-geometry", badGeometry, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("AddGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
+	}
+	badClusterProperties := StyleGeoJSONSourceOptions{}.
+		WithCluster(true).
+		WithClusterProperties(JSONObject(JSONMember{Name: "total", Value: JSONDouble(math.Inf(1))}))
+	if err := m.AddGeoJSONSourceData("bad-cluster-properties", data, &badClusterProperties); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(non-finite cluster property) error = %v, want ErrInvalidArgument", err)
+	}
+	exists, err := m.StyleSourceExists("bad-cluster-properties")
+	if err != nil {
+		t.Fatalf("StyleSourceExists(bad-cluster-properties): %v", err)
+	}
+	if exists {
+		t.Fatalf("StyleSourceExists(bad-cluster-properties) = true, want false")
+	}
+}
+
+func TestGeoJSONSourceClusterOptions(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	points := GeoJSONFeatureCollection([]Feature{
+		{Geometry: PointGeometry(LatLng{Latitude: 0, Longitude: 0}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(1)}}},
+		{Geometry: PointGeometry(LatLng{Latitude: 0.001, Longitude: 0.001}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(2)}}},
+		{Geometry: PointGeometry(LatLng{Latitude: 0.002, Longitude: 0.002}), Properties: JSONMembers{{Name: "rank", Value: JSONInt(3)}}},
+	})
+	// MapLibre Native parses the aggregation expressions while the descriptor is borrowed, so a
+	// source that adds successfully proves the nested cluster property tree crossed the boundary.
+	clusterProperties := JSONMembers{
+		{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("rank")))},
+	}
+	options := StyleGeoJSONSourceOptions{}.
+		WithCluster(true).
+		WithClusterRadius(50).
+		WithClusterMinPoints(2).
+		WithClusterMaxZoom(14).
+		WithClusterProperties(JSONValue{Type: JSONValueTypeObject, Object: clusterProperties})
+	if err := m.AddGeoJSONSourceData("cluster-source", points, &options); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(clustered): %v", err)
+	}
+	clusterProperties[0].Value = JSONString("mutated-after-call")
+	sourceType, found, err := m.StyleSourceType("cluster-source")
+	if err != nil {
+		t.Fatalf("StyleSourceType(cluster-source): %v", err)
+	}
+	if !found || sourceType != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceType(cluster-source) = (%v, %v), want GeoJSON true", sourceType, found)
+	}
+	// Options are fixed at creation, so updating the data keeps the clustered source usable.
+	if err := m.SetGeoJSONSourceData("cluster-source", points); err != nil {
+		t.Fatalf("SetGeoJSONSourceData(clustered): %v", err)
+	}
+	malformed := StyleGeoJSONSourceOptions{}.
+		WithCluster(true).
+		WithClusterProperties(JSONObject(JSONMember{Name: "total", Value: JSONArray(JSONString("+"))}))
+	if err := m.AddGeoJSONSourceData("malformed-cluster-source", points, &malformed); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(malformed cluster properties) error = %v, want ErrInvalidArgument", err)
 	}
 }
 

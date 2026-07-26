@@ -2048,25 +2048,97 @@ impl MapHandle {
         .map_err(map_error)
     }
 
-    fn add_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn add_geojson_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        cluster_max_zoom: Option<f64>,
+        cluster_properties: Option<Bound<'_, PyAny>>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        cluster_radius: Option<u32>,
+        cluster_min_points: Option<u32>,
+        line_metrics: Option<bool>,
+        cluster: Option<bool>,
+    ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
-        // SAFETY: The C API validates the map pointer and borrowed string views.
+        let options = geojson_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            tolerance,
+            cluster_max_zoom,
+            cluster_properties,
+            tile_size,
+            buffer,
+            cluster_radius,
+            cluster_min_points,
+            line_metrics,
+            cluster,
+        )?;
+        let options =
+            maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, borrowed string views, and options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_url(state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_add_geojson_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+            )
         })
         .map_err(map_error)
     }
 
-    fn add_geojson_source_data(&self, source_id: String, data: &Bound<'_, PyAny>) -> PyResult<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn add_geojson_source_data(
+        &self,
+        source_id: String,
+        data: &Bound<'_, PyAny>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        cluster_max_zoom: Option<f64>,
+        cluster_properties: Option<Bound<'_, PyAny>>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        cluster_radius: Option<u32>,
+        cluster_min_points: Option<u32>,
+        line_metrics: Option<bool>,
+        cluster: Option<bool>,
+    ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
         let data = geojson_from_wire(data)?;
         let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
+        let options = geojson_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            tolerance,
+            cluster_max_zoom,
+            cluster_properties,
+            tile_size,
+            buffer,
+            cluster_radius,
+            cluster_min_points,
+            line_metrics,
+            cluster,
+        )?;
+        let options =
+            maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, GeoJSON descriptor, and options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(state.as_ptr(), source_id.raw(), data.as_ptr())
+            sys::mln_map_add_geojson_source_data(
+                state.as_ptr(),
+                source_id.raw(),
+                data.as_ptr(),
+                options.as_ptr(),
+            )
         })
         .map_err(map_error)
     }
@@ -4534,6 +4606,57 @@ fn tile_source_options_from_parts(
                 )));
             }
         });
+    }
+    Ok(options)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn geojson_source_options_from_parts(
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    tolerance: Option<f64>,
+    cluster_max_zoom: Option<f64>,
+    cluster_properties: Option<Bound<'_, PyAny>>,
+    tile_size: Option<u32>,
+    buffer: Option<u32>,
+    cluster_radius: Option<u32>,
+    cluster_min_points: Option<u32>,
+    line_metrics: Option<bool>,
+    cluster: Option<bool>,
+) -> PyResult<maplibre_core::GeoJsonSourceOptions> {
+    let mut options = maplibre_core::GeoJsonSourceOptions::default();
+    if let Some(min_zoom) = min_zoom {
+        options.min_zoom = Some(min_zoom);
+    }
+    if let Some(max_zoom) = max_zoom {
+        options.max_zoom = Some(max_zoom);
+    }
+    if let Some(tolerance) = tolerance {
+        options.tolerance = Some(tolerance);
+    }
+    if let Some(cluster_max_zoom) = cluster_max_zoom {
+        options.cluster_max_zoom = Some(cluster_max_zoom);
+    }
+    if let Some(cluster_properties) = cluster_properties {
+        options.cluster_properties = Some(json_value_from_py(&cluster_properties)?);
+    }
+    if let Some(tile_size) = tile_size {
+        options.tile_size = Some(tile_size);
+    }
+    if let Some(buffer) = buffer {
+        options.buffer = Some(buffer);
+    }
+    if let Some(cluster_radius) = cluster_radius {
+        options.cluster_radius = Some(cluster_radius);
+    }
+    if let Some(cluster_min_points) = cluster_min_points {
+        options.cluster_min_points = Some(cluster_min_points);
+    }
+    if let Some(line_metrics) = line_metrics {
+        options.line_metrics = Some(line_metrics);
+    }
+    if let Some(cluster) = cluster {
+        options.cluster = Some(cluster);
     }
     Ok(options)
 }

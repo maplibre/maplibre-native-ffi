@@ -269,6 +269,64 @@ public sealed class OptionsValueSemanticsTests
 
     [BindingSpecTest("BND-070")]
     [Fact]
+    public void GeoJsonSourceOptionsComparesByPropertyValue()
+    {
+        AssertValueSemantics(
+            () =>
+                new GeoJsonSourceOptions
+                {
+                    MinimumZoom = 1,
+                    MaximumZoom = 2,
+                    TileSize = 256,
+                    Buffer = 64,
+                    Tolerance = 0.5,
+                    LineMetrics = true,
+                    Cluster = true,
+                    ClusterRadius = 60,
+                    ClusterMaximumZoom = 15,
+                    ClusterMinimumPoints = 3,
+                    ClusterProperties = new JsonValue.Object([
+                        new JsonMember("sum", new JsonValue.Int(1)),
+                    ]),
+                },
+            options => options.MinimumZoom = 10,
+            options => options.MaximumZoom = 20,
+            options => options.TileSize = 512,
+            options => options.Buffer = 128,
+            options => options.Tolerance = 0.375,
+            options => options.LineMetrics = false,
+            options => options.Cluster = false,
+            options => options.ClusterRadius = 50,
+            options => options.ClusterMaximumZoom = 17,
+            options => options.ClusterMinimumPoints = 2,
+            options =>
+                options.ClusterProperties = new JsonValue.Object([
+                    new JsonMember("sum", new JsonValue.Int(2)),
+                ])
+        );
+
+        // A present zero-valued field stays distinguishable from an absent one.
+        Assert.NotEqual(new GeoJsonSourceOptions { ClusterRadius = 0 }, new GeoJsonSourceOptions());
+
+        // Distinct cluster-property trees holding equal contents compare equal.
+        Assert.Equal(
+            new GeoJsonSourceOptions
+            {
+                ClusterProperties = new JsonValue.Object([
+                    new JsonMember("sum", new JsonValue.Int(1)),
+                ]),
+            },
+            new GeoJsonSourceOptions
+            {
+                ClusterProperties = new JsonValue.Object([
+                    new JsonMember("sum", new JsonValue.Int(1)),
+                ]),
+            }
+        );
+    }
+
+    [BindingSpecTest("BND-070")]
+    [Fact]
     public void StyleImageOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(

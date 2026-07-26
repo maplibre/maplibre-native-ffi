@@ -74,7 +74,7 @@ test "style source removal reports state and copies missing results" {
     defer map.close() catch @panic("map close failed");
 
     const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "remove-me", .{ .feature_collection = empty_features[0..] });
+    try map.addGeoJsonSourceData(testing.allocator, "remove-me", .{ .feature_collection = empty_features[0..] }, null);
     try testing.expect(try map.styleSourceExists(testing.allocator, "remove-me"));
     try testing.expect(try map.removeStyleSource(testing.allocator, "remove-me"));
     try testing.expect(!try map.styleSourceExists(testing.allocator, "remove-me"));

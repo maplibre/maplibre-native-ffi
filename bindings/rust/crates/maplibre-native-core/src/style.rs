@@ -538,6 +538,70 @@ mod tests {
     }
 
     #[test]
+    fn geojson_source_options_materialize_masks_fields_and_cluster_properties() {
+        let default_native =
+            geojson_source_options_to_native(&GeoJsonSourceOptions::default()).unwrap();
+        let default_raw = default_native.as_ref();
+        assert_eq!(
+            default_raw.size,
+            std::mem::size_of::<sys::mln_geojson_source_options>() as u32
+        );
+        assert_eq!(default_raw.fields, 0);
+        assert!(default_raw.cluster_properties.is_null());
+
+        let options = GeoJsonSourceOptions {
+            min_zoom: Some(0.0),
+            max_zoom: Some(14.0),
+            tolerance: Some(0.5),
+            cluster_max_zoom: Some(12.0),
+            cluster_properties: Some(JsonValue::Object(vec![crate::json::JsonMember::new(
+                "sum",
+                JsonValue::String("+".into()),
+            )])),
+            tile_size: Some(256),
+            buffer: Some(64),
+            cluster_radius: Some(60),
+            cluster_min_points: Some(3),
+            line_metrics: Some(false),
+            cluster: Some(true),
+        };
+
+        let native = geojson_source_options_to_native(&options).unwrap();
+        let raw = native.as_ref();
+
+        assert_eq!(
+            raw.fields,
+            sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+                | sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+                | sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+                | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+                | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+                | sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+                | sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER
+                | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+                | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+                | sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+                | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+        );
+        // A present zero stays distinguishable from an absent field.
+        assert_eq!(raw.min_zoom, 0.0);
+        assert_eq!(raw.max_zoom, 14.0);
+        assert_eq!(raw.tolerance, 0.5);
+        assert_eq!(raw.cluster_max_zoom, 12.0);
+        assert_eq!(raw.tile_size, 256);
+        assert_eq!(raw.buffer, 64);
+        assert_eq!(raw.cluster_radius, 60);
+        assert_eq!(raw.cluster_min_points, 3);
+        assert!(!raw.line_metrics);
+        assert!(raw.cluster);
+        // SAFETY: native keeps the cluster properties descriptor graph alive for
+        // this scope.
+        let copied = unsafe { crate::json::json_value_from_native(&*raw.cluster_properties) }
+            .expect("cluster properties should copy back");
+        assert_eq!(copied, options.cluster_properties.unwrap());
+    }
+
+    #[test]
     fn native_tile_urls_materialize_string_view_array() {
         let urls = vec!["a://tile".to_string(), "b://tile".to_string()];
         let native = NativeTileUrls::new(&urls);

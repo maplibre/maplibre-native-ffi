@@ -172,6 +172,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.Native.Runtime.RuntimeOptions",
             "Maplibre.Native.Style.CustomGeometrySourceCallback",
             "Maplibre.Native.Style.CustomGeometrySourceOptions",
+            "Maplibre.Native.Style.GeoJsonSourceOptions",
             "Maplibre.Native.Style.LocationIndicatorImageKind",
             "Maplibre.Native.Style.RasterDemEncoding",
             "Maplibre.Native.Style.SourceInfo",

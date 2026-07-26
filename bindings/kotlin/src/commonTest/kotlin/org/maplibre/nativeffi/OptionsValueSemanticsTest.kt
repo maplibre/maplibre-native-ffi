@@ -29,6 +29,7 @@ import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -300,6 +301,58 @@ class OptionsValueSemanticsTest {
         ),
     )
   }
+
+  @Test
+  fun geoJsonSourceOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        GeoJsonSourceOptions().apply {
+          minZoom = 1.0
+          maxZoom = 2.0
+          tolerance = 0.5
+          clusterMaxZoom = 14.0
+          clusterProperties = clusterProperties("sum")
+          tileSize = 256
+          buffer = 64
+          clusterRadius = 40
+          clusterMinPoints = 3
+          lineMetrics = true
+          cluster = true
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { minZoom = 10.0 },
+          { maxZoom = 20.0 },
+          { tolerance = 0.25 },
+          { clusterMaxZoom = 12.0 },
+          { clusterProperties = clusterProperties("max") },
+          { tileSize = 512 },
+          { buffer = 128 },
+          { clusterRadius = 50 },
+          { clusterMinPoints = 2 },
+          { lineMetrics = false },
+          { cluster = false },
+        ),
+    )
+  }
+
+  /** Builds a `clusterProperties` object whose aggregation operator is [operator]. */
+  private fun clusterProperties(operator: String): JsonValue =
+    JsonValue.ObjectValue(
+      listOf(
+        JsonValue.Member(
+          "weight",
+          JsonValue.Array(
+            listOf(
+              JsonValue.StringValue(operator),
+              JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))),
+            )
+          ),
+        )
+      )
+    )
 
   @Test
   fun styleImageOptionsComparesByFieldValue() {
