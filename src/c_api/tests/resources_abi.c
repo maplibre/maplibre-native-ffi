@@ -783,7 +783,7 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
 // Blocks inside the provider callback so the per-runtime provider lock stays
 // held while the owner thread clears the provider. It calls no C API function
 // while blocked.
-static uint32_t blocking_resource_provider(
+static uint32_t blocking_resource_provider_for_clear(
   void* user_data, const mln_resource_request* request,
   mln_resource_request_handle* handle
 ) {
@@ -808,7 +808,7 @@ static uint32_t blocking_resource_provider(
 // Drives an offline region download until the provider callback runs. Offline
 // downloads request the region style from a MapLibre file source thread, which
 // is where the provider callback runs, and they need no live map.
-static bool wait_for_provider_callback(
+static bool wait_for_clear_provider_callback(
   mln_runtime* runtime, provider_quiescence_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
@@ -871,13 +871,13 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
-    .callback = blocking_resource_provider,
+    .callback = blocking_resource_provider_for_clear,
     .user_data = &probe,
   };
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
   );
-  TEST_ASSERT_TRUE(wait_for_provider_callback(runtime, &probe));
+  TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
 
   atomic_store(&probe.clear_started, true);
   // The clear blocks here until the provider callback returns.

@@ -549,12 +549,11 @@ MLN_API mln_status mln_runtime_create(
  * or the runtime is destroyed. When this call returns, no in-flight request can
  * still invoke the previous provider. Requests the previous provider already
  * took a handle for keep that handle: complete and release each one as usual.
- * Native
- * OnlineFileSource claims every remaining scheme, so a URL with a scheme
- * MapLibre does not recognize, such as jar:file:, is treated as a network
- * request, reaches this callback, and completes as an HTTP error when the
- * provider passes it through. Hosts use this extension point to serve those
- * schemes from host storage.
+ * Native OnlineFileSource claims every remaining scheme, so a URL with a
+ * scheme MapLibre does not recognize, such as jar:file:, is treated as a
+ * network request, reaches this callback, and completes as an HTTP error when
+ * the provider passes it through. Hosts use this extension point to serve
+ * those schemes from host storage.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

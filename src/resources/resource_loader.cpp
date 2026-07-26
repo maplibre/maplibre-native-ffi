@@ -188,7 +188,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
 
   auto request(const mbgl::Resource& resource, Callback callback)
     -> std::unique_ptr<mbgl::AsyncRequest> override {
-    bool has_provider = false;
+    auto provider_declined = false;
     if (can_request_network(resource)) {
       // Keep the lease through the synchronous callback, then release it
       // before falling through to native loading: the native source may invoke
@@ -196,8 +196,8 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
       const auto provider = acquire_resource_provider_for_platform_context(
         resource_options_.platformContext()
       );
-      has_provider = provider.has_value();
       if (provider.has_value()) {
+        provider_declined = true;
         auto request = request_custom_resource(
           resource, provider->callback(), provider->user_data(), callback
         );
@@ -212,7 +212,9 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     const auto unsupported = unsupported_network_scheme(resource.url);
     if (unsupported.has_value()) {
       return respond_immediately(
-        unsupported_scheme_response(*unsupported, resource.url, has_provider),
+        unsupported_scheme_response(
+          *unsupported, resource.url, provider_declined
+        ),
         std::move(callback)
       );
     }
