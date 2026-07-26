@@ -1,0 +1,423 @@
+---
+title: Create and Run a Map
+description: The minimum host-owned map lifecycle, from runtime to teardown.
+sidebar:
+  order: 2
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+This guide walks through the lifecycle every integration shares: create a
+runtime, create a map, load a style, pump work, and tear everything down in
+order. It renders nothing yet — rendering attaches on top of this skeleton in
+[Render to a Surface](/maplibre-native-ffi/guides/render-to-a-surface/) or
+[Render to a Texture](/maplibre-native-ffi/guides/render-to-a-texture/).
+
+## Create the runtime
+
+The runtime owns scheduler state and event storage for one **owner thread**.
+Create it on the thread that will pump it; every later runtime, map, and render
+session call must run on that same thread, and the API reports
+`MLN_STATUS_WRONG_THREAD` (or the binding equivalent) otherwise. Each thread
+may own one live runtime.
+
+Runtime options select where the runtime reads and writes files:
+
+* `cache_path` — the ambient cache database. Tiles, glyphs, and sprites persist
+  here between runs. The special value `":memory:"` keeps the cache in memory.
+* `asset_path` — the filesystem root that `asset://` URLs resolve against.
+* `maximum_cache_size` — the ambient cache size cap in bytes, when set.
+
+Options are copied at creation; later resource-loading configuration is covered
+in [Configure Resource Loading](/maplibre-native-ffi/guides/configure-resource-loading/).
+
+## Create the map
+
+A map belongs to a runtime. Map options set the initial viewport and behavior:
+
+* `width` / `height` — the initial logical viewport in UI pixels. Attaching a
+  render session replaces these with the render target extent.
+* `scale_factor` — the UI-to-device pixel scale. It is fixed for the map's
+  lifetime and selects sprite, glyph, and raster density.
+* `map_mode` — `CONTINUOUS` for a live updating map, `STATIC` for a one-off
+  still of an arbitrary viewport, or `TILE` for a one-off still of a single
+  tile.
+
+The map is independent of any render target: you can load styles, move the
+camera, mutate sources and layers, and observe events without ever attaching
+one.
+
+## Load a style
+
+`set_style_url` fetches a style document (and everything it references)
+asynchronously; `set_style_json` parses an inline style document. Both are
+"map commands": a success status means the request was accepted, not that the
+style loaded. Watch the runtime events for the outcome:
+
+* `MLN_RUNTIME_EVENT_MAP_STYLE_LOADED` — the style parsed and its sources are
+  ready for runtime additions.
+* `MLN_RUNTIME_EVENT_MAP_LOADING_FAILED` — loading failed; the event carries an
+  error message.
+
+Inline JSON with a syntax error may also fail the `set_style_json` call itself,
+so check both the return status and the events.
+
+## Pump the runtime
+
+MapLibre Native makes progress only when the host pumps the runtime. The loop
+has two halves, always on the owner thread:
+
+1. `mln_runtime_run_once()` drains the owner-thread run loop: every queued task
+   plus the tasks those tasks enqueue, expired timers, and ready network and
+   database work. The promise is drain, not slice — one call can span a full
+   style parse, and an idle runtime returns promptly.
+2. `mln_runtime_poll_event()` pops queued events, one per call, until it
+   reports none. Event payloads and message strings are borrowed; copy anything
+   you keep.
+
+How often you pump is a host decision: GUI examples pump once per frame,
+headless tools pump in a loop with a short sleep. The events worth knowing on
+day one:
+
+| Event                                     | Meaning                                                                         |
+| ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `MAP_STYLE_LOADED` / `MAP_LOADING_FAILED` | Style outcome (above)                                                           |
+| `MAP_RENDER_UPDATE_AVAILABLE`             | The map has new content to render; drive your frame loop from this              |
+| `MAP_CAMERA_WILL/IS/DID_CHANGE`           | Camera transition progress                                                      |
+| `MAP_STILL_IMAGE_FINISHED` / `FAILED`     | A requested still image completed (static/tile modes)                           |
+| `MAP_STYLE_IMAGE_MISSING`                 | The style referenced an image ID nobody provided; add it with `set_style_image` |
+
+## A complete minimal lifecycle
+
+This example creates a runtime and map, loads a style, pumps until the style
+loads (or fails), and tears down. It needs network access for the style URL.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    #include <maplibre_native_c.h>
+    #include <stdio.h>
+    #include <string.h>
+
+    int main(void) {
+      mln_runtime_options options = mln_runtime_options_default();
+      options.cache_path = ":memory:";
+
+      mln_runtime* runtime = NULL;
+      if (mln_runtime_create(&options, &runtime) != MLN_STATUS_OK) return 1;
+
+      mln_map_options map_options = mln_map_options_default();
+      map_options.width = 512;
+      map_options.height = 512;
+      map_options.scale_factor = 1.0;
+
+      mln_map* map = NULL;
+      if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) return 1;
+
+      mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
+
+      bool loaded = false;
+      for (int i = 0; i < 100000 && !loaded; i++) {
+        mln_runtime_run_once(runtime);
+        mln_runtime_event event = {.size = sizeof(event)};
+        bool has_event = false;
+        while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
+               has_event) {
+          if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) loaded = true;
+          if (event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
+            fprintf(stderr, "style failed: %.*s\n", (int)event.message_size,
+                    event.message);
+            goto done;
+          }
+        }
+      }
+
+    done:
+      mln_map_destroy(map);
+      mln_runtime_destroy(runtime);
+      return loaded ? 0 : 1;
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    import org.maplibre.nativeffi.map.MapHandle
+    import org.maplibre.nativeffi.map.MapOptions
+    import org.maplibre.nativeffi.runtime.RuntimeEventType
+    import org.maplibre.nativeffi.runtime.RuntimeHandle
+    import org.maplibre.nativeffi.runtime.RuntimeOptions
+
+    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 512
+          height = 512
+          scaleFactor = 1.0
+        },
+      ).use { map ->
+        map.setStyleUrl("https://tiles.openfreemap.org/styles/bright")
+
+        var loaded = false
+        while (!loaded) {
+          runtime.runOnce()
+          while (true) {
+            val event = runtime.pollEvent() ?: break
+            when (event.type) {
+              RuntimeEventType.MAP_STYLE_LOADED -> loaded = true
+              RuntimeEventType.MAP_LOADING_FAILED -> error("style failed: ${event.message}")
+              else -> Unit
+            }
+          }
+        }
+      }
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    use maplibre_native::{
+        MapHandle, MapOptions, RuntimeEventType, RuntimeHandle, RuntimeOptions,
+    };
+
+    fn main() -> maplibre_native::Result<()> {
+        let mut runtime_options = RuntimeOptions::default();
+        runtime_options.cache_path = Some(":memory:".into());
+        let runtime = RuntimeHandle::with_options(&runtime_options)?;
+
+        let mut map_options = MapOptions::new(512, 512, 1.0);
+        let map = MapHandle::with_options(&runtime, &map_options)?;
+
+        map.set_style_url("https://tiles.openfreemap.org/styles/bright")?;
+
+        let mut loaded = false;
+        while !loaded {
+            runtime.run_once()?;
+            while let Some(event) = runtime.poll_event()? {
+                match event.event_type {
+                    RuntimeEventType::MapStyleLoaded => loaded = true,
+                    RuntimeEventType::MapLoadingFailed => {
+                        eprintln!("style failed: {:?}", event.message);
+                        break;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        map.close()?;
+        runtime.close()
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    import MaplibreNative
+
+    let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    let map = try MapHandle(
+      runtime: runtime,
+      options: MapOptions(width: 512, height: 512, scaleFactor: 1.0, mode: .continuous)
+    )
+
+    try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+
+    var loaded = false
+    while !loaded {
+      try runtime.runOnce()
+      while let event = try runtime.pollEvent() {
+        switch event.type {
+        case .mapStyleLoaded:
+          loaded = true
+        case .mapLoadingFailed:
+          fatalError("style failed: \(event.message)")
+        default:
+          break
+        }
+      }
+    }
+
+    try map.close()
+    try runtime.close()
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const maplibre = @import("maplibre_native");
+
+    var diagnostics = try maplibre.DiagnosticStore.init(allocator);
+    defer diagnostics.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(
+        allocator,
+        .{ .cache_path = ":memory:" },
+        &diagnostics,
+    );
+    defer runtime.close() catch {};
+
+    var map = try maplibre.MapHandle.create(&runtime, .{
+        .width = 512,
+        .height = 512,
+        .scale_factor = 1.0,
+    });
+    defer map.close() catch {};
+
+    try map.setStyleUrl(allocator, "https://tiles.openfreemap.org/styles/bright");
+
+    var loaded = false;
+    while (!loaded) {
+        try runtime.runOnce();
+        while (try runtime.pollEvent(allocator)) |event| {
+            var owned = event;
+            defer owned.deinit();
+            switch (owned.event_type) {
+                .map_style_loaded => loaded = true,
+                .map_loading_failed => return error.StyleLoadingFailed,
+                else => {},
+            }
+        }
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    using Maplibre.Native.Map;
+    using Maplibre.Native.Runtime;
+
+    using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+    using var map = MapHandle.Create(
+        runtime,
+        new MapOptions { Width = 512, Height = 512, ScaleFactor = 1.0 }
+    );
+
+    map.SetStyleUrl("https://tiles.openfreemap.org/styles/bright");
+
+    var loaded = false;
+    while (!loaded)
+    {
+        runtime.RunOnce();
+        while (runtime.PollEvent() is { } runtimeEvent)
+        {
+            if (runtimeEvent.Type == RuntimeEventType.MapStyleLoaded)
+            {
+                loaded = true;
+            }
+            else if (runtimeEvent.Type == RuntimeEventType.MapLoadingFailed)
+            {
+                throw new InvalidOperationException($"style failed: {runtimeEvent.Message}");
+            }
+        }
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    import maplibre_native as mln
+
+    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=":memory:")) as runtime:
+        with runtime.create_map(mln.MapOptions(width=512, height=512)) as map_handle:
+            map_handle.set_style_url("https://tiles.openfreemap.org/styles/bright")
+
+            loaded = False
+            while not loaded:
+                runtime.run_once()
+                while event := runtime.poll_event():
+                    if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
+                        loaded = True
+                    elif event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                        raise RuntimeError(f"style failed: {event.message}")
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    package main
+
+    import (
+    	"fmt"
+    	"runtime"
+
+    	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
+    )
+
+    func main() {
+    	runtime.LockOSThread() // pin the runtime owner thread
+
+    	rt, err := maplibre.NewRuntimeWithOptions(maplibre.RuntimeOptions{CachePath: ":memory:"})
+    	if err != nil {
+    		panic(err)
+    	}
+    	defer rt.Close()
+
+    	m, err := rt.NewMapWithOptions(maplibre.MapOptions{Width: 512, Height: 512, ScaleFactor: 1})
+    	if err != nil {
+    		panic(err)
+    	}
+    	defer m.Close()
+
+    	if err := m.SetStyleURL("https://tiles.openfreemap.org/styles/bright"); err != nil {
+    		panic(err)
+    	}
+
+    	loaded := false
+    	for !loaded {
+    		if err := rt.RunOnce(); err != nil {
+    			panic(err)
+    		}
+    		for {
+    			event, err := rt.PollEvent()
+    			if err != nil {
+    				panic(err)
+    			}
+    			if event == nil {
+    				break
+    			}
+    			switch event.Type {
+    			case maplibre.RuntimeEventMapStyleLoaded:
+    				loaded = true
+    			case maplibre.RuntimeEventMapLoadingFailed:
+    				panic(fmt.Sprintf("style failed: %s", event.Message))
+    			}
+    		}
+    	}
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Tear down in order
+
+Handles form a parent-child chain — runtime → map → render session — and a
+parent refuses to close while children are live (`MLN_STATUS_INVALID_STATE`).
+Close in reverse order of creation:
+
+1. Detach and destroy any render session.
+2. Destroy the map.
+3. Destroy the runtime.
+
+Two teardown behaviors catch new integrators:
+
+* **Closing a map discards its queued events.** There is no flush and no
+  terminal event, so snapshot any state you mirror from events before closing
+  the map that produced them.
+* **Non-deterministic cleanup does not save you.** Finalizers, GC, and `Drop`
+  report leaks but do not destroy thread-affine handles on the bindings' behalf
+  in the general case; explicit close on the owner thread is the contract.
+
+<Aside>
+  Language-specific owner-thread helpers: Go callers must `runtime.LockOSThread()`
+  before creating a runtime and keep its lifecycle on the locked goroutine. .NET
+  ships an `OwnerThread` helper that runs closures on a dedicated owner thread.
+  Zig bindings take an explicit allocator and report native diagnostics through a
+  `DiagnosticStore` you pass at runtime creation. Kotlin/JVM needs
+  `--enable-native-access=ALL-UNNAMED`.
+</Aside>
+
+Next: render the map [to a surface](/maplibre-native-ffi/guides/render-to-a-surface/)
+or [to a texture](/maplibre-native-ffi/guides/render-to-a-texture/).

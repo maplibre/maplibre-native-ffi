@@ -1,0 +1,286 @@
+---
+title: Installation
+description: Install MapLibre Native FFI and its language bindings.
+sidebar:
+  order: 1
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+<Aside type="caution">
+  MapLibre Native FFI is pre-1.0. The C ABI is unstable while
+  `mln_c_version()` returns `0`, and artifacts ship as snapshots rather than
+  stable releases. Expect breaking changes between snapshots.
+</Aside>
+
+Every integration needs two pieces: the **native library** (`maplibre-native-c`,
+the C API implementation) and, unless you call C directly, a **language
+binding** that wraps it. Each native artifact is compiled for one platform and
+one render backend, so pick the artifact that matches your target.
+
+## Get the native library
+
+### Download a prebuilt package
+
+CI publishes CPack archives to the floating `unstable-native-snapshot`
+[GitHub prerelease](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
+named `maplibre-native-c-<preset>.tar.gz` with a `SHA256SUMS` manifest. Presets
+follow the pattern `<os>-<arch>-<backend>`:
+
+| Preset family          | Presets                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| Linux x64 / arm64      | `linux-x64-egl`, `linux-x64-vulkan`, `linux-arm64-egl`, `linux-arm64-vulkan`         |
+| macOS arm64            | `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`                         |
+| Windows x64 / arm64    | `windows-x64-wgl`, `windows-x64-vulkan`, `windows-arm64-wgl`, `windows-arm64-vulkan` |
+| Android arm64 / x64    | `android-arm64-egl`, `android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan` |
+| iOS device / simulator | `ios-arm64-metal`, `ios-simulator-arm64-metal`                                       |
+| OpenHarmony arm64      | `ohos-arm64-egl`, `ohos-arm64-vulkan`                                                |
+
+`egl` and `wgl` are both the OpenGL backend; the suffix selects the context
+provider (EGL everywhere except Windows, WGL on Windows, ANGLE on macOS).
+
+An unpacked archive has this layout:
+
+```text
+include/maplibre_native_c.h          # umbrella header
+include/maplibre_native_c/*.h        # domain headers
+lib/                                 # shared or static library (bin/ on Windows)
+share/pkgconfig/maplibre-native-c.pc # pkg-config descriptor
+share/maplibre-native-c/artifact.json# renderBackend / targetPlatform metadata
+```
+
+### Build from source
+
+The repository builds with CMake presets driven by
+[mise](https://mise.jdx.dev):
+
+```bash
+mise bootstrap --yes                 # system packages, tools, hooks
+mise run build                       # host library for this machine
+mise run build linux-x64-vulkan      # a specific preset
+mise run package-native linux-x64-vulkan  # produce the .tar.gz archive
+```
+
+The install tree lands in `build/<preset>/install` and matches the archive
+layout above.
+
+## Consume from C or C++
+
+The archive installs a pkg-config descriptor; there is no CMake package config.
+Point `PKG_CONFIG_PATH` at the install prefix and compile against it:
+
+```bash
+export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
+cc main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
+```
+
+Static archives additionally define `-DMLN_STATIC` via the descriptor, so the
+same command works for both linkage modes.
+
+## Consume from a language binding
+
+<Tabs syncKey="lang">
+  <TabItem label="Kotlin">
+    Add the snapshot repository and two dependencies: the binding plus one runtime
+    artifact per render backend.
+
+    ```kotlin
+    // settings.gradle.kts
+    dependencyResolutionManagement {
+      repositories {
+        maven {
+          url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+          content { includeGroup("org.maplibre.nativeffi") }
+        }
+      }
+    }
+
+    // build.gradle.kts
+    dependencies {
+      implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
+      implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:0.1.0-SNAPSHOT")
+      // or ...-runtime-vulkan, or ...-runtime-metal on Apple targets
+    }
+    ```
+
+    The runtime artifacts carry the native library: Android AARs bundle JNI libs
+    per ABI, Apple KLIBs embed the static archive, and JVM artifacts resolve a
+    `natives-<os>-<arch>` classifier JAR
+    (`natives-linux-x64`, `natives-linux-arm64`, `natives-macos-arm64`,
+    `natives-windows-x64`, `natives-windows-arm64`) that the binding extracts and
+    loads. Override loading with the system properties
+    `org.maplibre.nativeffi.library.path` or `org.maplibre.nativeffi.library.dirs`.
+
+    On the JVM, run with Java 25+ and pass `--enable-native-access=ALL-UNNAMED`. On
+    Android, call `MaplibreAndroid.initialize(context)` once at startup so network
+    requests can validate TLS with the platform trust store.
+  </TabItem>
+
+  <TabItem label="Rust">
+    The crates are not yet on crates.io; depend on them by path or git, and point
+    the build at a native install prefix.
+
+    ```toml
+    # Cargo.toml
+    [dependencies]
+    maplibre-native = { git = "https://github.com/maplibre/maplibre-native-ffi", ... }
+    ```
+
+    ```bash
+    export MAPLIBRE_NATIVE_C_INSTALL_DIR=/opt/maplibre-native-c
+    cargo build
+    ```
+
+    `maplibre-native-sys` links `-lmaplibre-native-c` from the prefix's `lib/`
+    directory and sets an rpath to it.
+  </TabItem>
+
+  <TabItem label="Swift">
+    Depend on the SwiftPM package and make the native install discoverable through
+    pkg-config.
+
+    ```swift
+    // Package.swift
+    .package(url: "https://github.com/maplibre/maplibre-native-ffi", ...),
+    // target dependency: .product(name: "MaplibreNative", package: "maplibre-native-ffi")
+    ```
+
+    ```bash
+    export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
+    swift build
+    ```
+
+    The package requires macOS 14.3+ or iOS 14.3+.
+  </TabItem>
+
+  <TabItem label="Zig">
+    Add the `maplibre_native` package to `build.zig.zon` and pass the native
+    install prefix as a build option.
+
+    ```bash
+    zig build -Dnative-install-dir=/opt/maplibre-native-c
+    ```
+
+    The package reads `share/maplibre-native-c/artifact.json` from the prefix to
+    select matching link settings for the artifact's backend and target.
+  </TabItem>
+
+  <TabItem label="C#">
+    The `Maplibre.Native` package (`net10.0`) is not yet on NuGet; reference the
+    project or build it from the repository. The native library resolves at
+    runtime, in order:
+
+    1. an explicit `Maplibre.LoadNativeLibrary(path)` call,
+    2. the `Maplibre.Native.LibraryPath` AppContext switch,
+    3. the `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` environment variable,
+    4. the OS library search path for `maplibre-native-c`.
+  </TabItem>
+
+  <TabItem label="Python">
+    The `maplibre-native` package (Python 3.14+) is built with maturin and is not
+    yet on PyPI.
+
+    ```bash
+    export MAPLIBRE_NATIVE_C_INSTALL_DIR=/opt/maplibre-native-c
+    maturin develop --manifest-path bindings/python/Cargo.toml
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    The binding is a plain Go module consumed with `go get`; cgo finds the native
+    library through pkg-config.
+
+    ```bash
+    go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
+    export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
+    ```
+  </TabItem>
+</Tabs>
+
+## Verify the install
+
+Load the library and ask it what it supports. `mln_c_version()` reports the ABI
+contract version (`0` while unstable), and the backend mask reports which
+render backends the artifact was compiled with.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    #include <maplibre_native_c.h>
+    #include <stdio.h>
+
+    int main(void) {
+      printf("ABI version: %u\n", mln_c_version());
+      uint32_t mask = mln_supported_render_backend_mask();
+      printf("OpenGL: %d, Vulkan: %d, Metal: %d\n",
+             !!(mask & MLN_RENDER_BACKEND_FLAG_OPENGL),
+             !!(mask & MLN_RENDER_BACKEND_FLAG_VULKAN),
+             !!(mask & MLN_RENDER_BACKEND_FLAG_METAL));
+      return 0;
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    import org.maplibre.nativeffi.Maplibre
+
+    println("ABI version: ${Maplibre.cVersion()}")
+    println("Backends: ${Maplibre.supportedRenderBackends()}")
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    println!("ABI version: {}", maplibre_native::c_version());
+    println!("Backends: {:?}", maplibre_native::supported_render_backends());
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    import MaplibreNative
+
+    print("ABI version: \(Maplibre.cVersion())")
+    print("Backends: \(Maplibre.supportedRenderBackends())")
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const maplibre = @import("maplibre_native");
+
+    std.debug.print("ABI version: {}\n", .{maplibre.cVersion()});
+    std.debug.print("Backends: {}\n", .{maplibre.supportedRenderBackends()});
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    using Maplibre.Native;
+
+    Console.WriteLine($"ABI version: {Maplibre.CVersion()}");
+    Console.WriteLine($"Backends: {Maplibre.SupportedRenderBackends()}");
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    import maplibre_native as mln
+
+    print("ABI version:", mln.c_version())
+    print("Backends:", mln.supported_render_backends())
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    import maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
+
+    fmt.Println("ABI version:", maplibre.CVersion())
+    fmt.Println("Backends:", maplibre.SupportedRenderBackends())
+    ```
+  </TabItem>
+</Tabs>
+
+Next: [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).

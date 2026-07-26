@@ -1,0 +1,251 @@
+---
+title: Add Data and Style at Runtime
+description: Add sources, layers, images, properties, filters, light, and feature state.
+sidebar:
+  order: 7
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Everything the style document can express, the runtime API can mutate after
+the style loads. The API leans on the
+[MapLibre Style Spec](https://maplibre.org/maplibre-style-spec/): sources and
+layers arrive as style-spec JSON, property and filter values are style-spec
+JSON (expressions included), so the surface stays in step with the
+specification across every source and layer type.
+
+Wait for `MAP_STYLE_LOADED` before mutating: the additions target the current
+style, and a style reload replaces them.
+
+## Sources
+
+The generic path is `add_style_source_json(source_id, source_json)` — any
+style-spec source object. Typed entry points exist where a source needs more
+than construction:
+
+* **GeoJSON** — `add_geojson_source_url` / `add_geojson_source_data`, with
+  matching `set_*` functions to swap the URL or data later. Data arrives as a
+  geometry/feature/feature-collection descriptor graph, not a JSON string.
+* **Vector, raster, raster-DEM** — `add_*_source_url` (TileJSON) or
+  `add_*_source_tiles` (explicit tile URL templates), with tile source options:
+  zoom range, attribution, scheme (XYZ/TMS), bounds, tile size, and tile
+  encoding (MVT/MLT for vector, Mapbox/Terrarium for raster-DEM).
+* **Image** — `add_image_source_url` / `add_image_source_image` with exactly
+  four corner coordinates in top-left, top-right, bottom-right, bottom-left
+  order; setters update the URL, image, or coordinates in place.
+* **Custom geometry** — `add_custom_geometry_source` registers `fetch_tile`
+  and `cancel_tile` callbacks that run on native worker threads. Feed tiles
+  back with `set_custom_geometry_source_tile_data`, and poke the source with
+  the invalidate functions when your data changes. The callbacks must stay
+  valid until the source is removed, the style is replaced, or the map is
+  destroyed.
+
+`remove_style_source` fails while a layer still uses the source — remove the
+layers first. `style_source_exists`, `get_style_source_type`,
+`list_style_source_ids`, and the attribution copy API inspect what is loaded.
+
+## Layers
+
+The primary insertion path is `add_style_layer_json(layer_json,
+before_layer_id)` with any style-spec layer object (it must contain `id` and
+`type`). An empty `before_layer_id` appends on top; otherwise the layer inserts
+before that sibling. `move_style_layer` reorders later, `remove_style_layer`
+deletes, and `style_layer_exists` / `list_style_layer_ids` inspect.
+
+Three typed adders cover layers that need a surface beyond construction:
+
+* `add_hillshade_layer` and `add_color_relief_layer` validate that the source
+  is raster-DEM. Set the color-relief ramp afterwards with
+  `set_layer_property("color-relief-color", ...)`.
+* `add_location_indicator_layer` creates the user-location puck, driven by
+  per-frame setters: `set_location_indicator_location`,
+  `_bearing`, `_accuracy_radius`, and `_image_name`.
+
+## Properties and filters
+
+`set_layer_property(layer_id, property_name, value)` sets any paint or layout
+property by its style-spec name, with style-spec JSON values — expressions
+arrive as JSON arrays like `["interpolate", ["linear"], ["zoom"], ...]`.
+`set_layer_filter` applies a style-spec filter; clearing passes null/absent.
+The matching getters return the current value, or an absent result for an
+undefined property.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    // Add a GeoJSON source and a circle layer styling it.
+    mln_map_add_geojson_source_url(map, mln_sv("cities"), mln_sv(geojson_url));
+
+    const char* layer =
+        "{\"id\":\"cities\",\"type\":\"circle\",\"source\":\"cities\","
+        "\"paint\":{\"circle-radius\":6}}";
+    mln_json_value layer_json = parse_json(layer); // your JSON -> mln_json_value
+    mln_map_add_style_layer_json(map, &layer_json, mln_sv("")); // empty = on top
+
+    // Data-driven styling with an expression value.
+    mln_json_value color = parse_json(
+        "[\"match\",[\"get\",\"capital\"],[\"yes\"],\"#e55e5e\",\"#3887be\"]");
+    mln_map_set_layer_property(map, mln_sv("cities"), mln_sv("circle-color"), &color);
+
+    // Update the data later.
+    mln_map_set_geojson_source_url(map, mln_sv("cities"), mln_sv(new_url));
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    map.addGeoJsonSourceUrl("cities", geojsonUrl)
+
+    map.addStyleLayerJson(
+      JsonValue.ObjectValue(
+        listOf(
+          JsonValue.Member("id", JsonValue.StringValue("cities")),
+          JsonValue.Member("type", JsonValue.StringValue("circle")),
+          JsonValue.Member("source", JsonValue.StringValue("cities")),
+        )
+      ),
+      "", // beforeLayerId; empty = on top
+    )
+
+    // Data-driven styling with an expression value.
+    map.setLayerProperty(
+      "cities",
+      "circle-color",
+      JsonValue.Array(
+        listOf(
+          JsonValue.StringValue("match"),
+          JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("capital"))),
+          JsonValue.Array(listOf(JsonValue.StringValue("yes"))),
+          JsonValue.StringValue("#e55e5e"),
+          JsonValue.StringValue("#3887be"),
+        )
+      ),
+    )
+
+    map.setGeoJsonSourceUrl("cities", newUrl) // update the data later
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    map.add_geojson_source_data("cities", &geojson)?;
+
+    map.add_style_layer_json(&layer_json, None)?; // None = on top
+
+    // Data-driven styling with an expression value.
+    map.set_layer_property("cities", "circle-color", &expression_json)?;
+
+    map.set_geojson_source_data("cities", &updated_geojson)?; // update the data later
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    try map.addGeoJSONSourceURL(sourceId: "cities", url: geojsonUrl)
+
+    try map.addStyleLayerJSON(layerJSON) // beforeLayerId nil = on top
+
+    // Data-driven styling with an expression value.
+    try map.setLayerProperty(layerId: "cities", propertyName: "circle-color", value: expressionJSON)
+
+    try map.setGeoJSONSourceURL(sourceId: "cities", url: newUrl) // update the data later
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    try map.addGeoJsonSourceUrl(allocator, "cities", geojson_url);
+
+    try map.addStyleLayerJson(allocator, layer_json, ""); // empty = on top
+
+    // Data-driven styling with an expression value.
+    try map.setLayerProperty(allocator, "cities", "circle-color", expression_json);
+
+    try map.setGeoJsonSourceUrl(allocator, "cities", new_url); // update the data later
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    map.AddGeoJsonSourceUrl("cities", geojsonUrl);
+
+    map.AddStyleLayerJson(layerJson, ""); // beforeLayerId; empty = on top
+
+    // Data-driven styling with an expression value.
+    map.SetLayerProperty("cities", "circle-color", expressionJson);
+
+    map.SetGeoJsonSourceUrl("cities", newUrl); // update the data later
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    map_handle.add_geojson_source_url("cities", geojson_url)
+
+    map_handle.add_style_layer_json(layer_json)  # before_layer_id None = on top
+
+    # Data-driven styling with an expression value.
+    map_handle.set_layer_property("cities", "circle-color", expression_json)
+
+    map_handle.add_geojson_source_data("cities", updated_geojson)  # or swap the data
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    if err := m.AddGeoJSONSourceURL("cities", geojsonURL); err != nil {
+    	return err
+    }
+
+    if err := m.AddStyleLayerJSON(layerJSON, ""); err != nil { // empty = on top
+    	return err
+    }
+
+    // Data-driven styling with an expression value.
+    if err := m.SetLayerProperty("cities", "circle-color", expressionJSON); err != nil {
+    	return err
+    }
+
+    if err := m.AddGeoJSONSourceData("cities", updatedGeoJSON); err != nil {
+    	return err
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Runtime images
+
+`set_style_image(image_id, image, options)` registers a bitmap the style can
+reference from `icon-image`, `fill-pattern`, and friends; calling it again with
+the same ID replaces the image. Pixels are **premultiplied RGBA8** with an
+explicit stride, and options carry `pixel_ratio` (match it to the map's scale
+factor for crisp icons) and `sdf` for signed-distance-field icons tinted by
+`icon-color`.
+
+Two support pieces matter in practice:
+
+* When a style references an image ID nobody has provided, the runtime emits
+  `MAP_STYLE_IMAGE_MISSING` — handle it by adding the image and letting the
+  repaint machinery pick it up.
+* `copy_style_image_premultiplied_rgba8` reads an image back out (two-call
+  sizing: query the required byte length, then copy).
+
+## Light
+
+The style light steers fill-extrusion shading. `set_style_light_json` replaces
+the whole light object; `set_style_light_property` sets one property
+(`anchor`, `color`, `intensity`, `position`) with the usual getter alongside.
+
+## Feature state
+
+Feature state — per-feature key-value data read by `feature-state` expressions —
+lives on the render session rather than the map. See
+[Query Map Data](/maplibre-native-ffi/guides/query-map-data/#feature-state).
+
+<Aside type="tip">
+  Keep one JSON construction helper per codebase. Expressions get verbose as
+  nested `JsonValue` trees in every binding; a small helper that converts your
+  language's maps/lists/strings into the binding's `JsonValue` pays for itself
+  the second time you build a `match` expression. Number types matter: use the
+  unsigned constructor where the spec or an extension expects unsigned values.
+</Aside>

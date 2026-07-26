@@ -1,0 +1,322 @@
+---
+title: Control the Camera
+description: Camera state, transitions, fitting, constraints, and coordinates.
+sidebar:
+  order: 5
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+The camera lives on the map and moves independently of rendering. All camera
+calls run on the map owner thread and take effect as the runtime pumps.
+
+## Camera state
+
+Camera state is a single options struct — center, altitude, zoom, bearing,
+pitch, roll, field of view, padding, and anchor — where each field is
+individually optional. When you **set** the camera, only the fields you mark
+apply; the rest stay unchanged. When you **get** the camera, you receive a
+snapshot with the current values filled in.
+
+Two details to know:
+
+* `anchor` is the screen-space focal point for a camera command. It is
+  input-only: snapshots never include it.
+* Positions and sizes are in **logical (UI) pixels**, origin top-left — never
+  device pixels.
+
+## Transitions: jump, ease, fly
+
+Three commands apply camera options:
+
+* `jump_to` — instant.
+* `ease_to` — eased transition. The default duration is **zero**: without an
+  explicit duration it behaves like a jump. Set `duration_ms` to animate.
+* `fly_to` — flight transition, and the one command that **animates by
+  default**. Without a duration, the native code derives it from distance and
+  `velocity` (default 1.2 screenfuls per second); `min_zoom` controls how far
+  the flight zooms out at its peak.
+
+Animation options also accept a cubic `easing` curve. Cancel any in-flight
+transition with `cancel_transitions()`.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    mln_camera_options camera = mln_camera_options_default();
+    camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+    camera.latitude = 37.7749;
+    camera.longitude = -122.4194;
+    camera.zoom = 13.0;
+    mln_map_jump_to(map, &camera);
+
+    mln_animation_options animation = mln_animation_options_default();
+    animation.fields = MLN_ANIMATION_OPTION_DURATION;
+    animation.duration_ms = 800.0;
+    mln_map_ease_to(map, &camera, &animation); // animates
+
+    mln_map_fly_to(map, &camera, NULL); // animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    val camera =
+      CameraOptions().apply {
+        center = LatLng(37.7749, -122.4194)
+        zoom = 13.0
+      }
+    map.jumpTo(camera)
+
+    map.easeTo(camera, AnimationOptions().apply { durationMs = 800.0 }) // animates
+    map.flyTo(camera, null) // animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(37.7749, -122.4194));
+    camera.zoom = Some(13.0);
+    map.jump_to(&camera)?;
+
+    let mut animation = AnimationOptions::default();
+    animation.duration_ms = Some(800.0);
+    map.ease_to(&camera, &animation)?; // animates
+    map.fly_to(&camera, &AnimationOptions::default())?; // derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    let camera = CameraOptions(
+      center: LatLng(latitude: 37.7749, longitude: -122.4194),
+      zoom: 13.0
+    )
+    try map.jump(to: camera)
+
+    try map.ease(to: camera, animation: AnimationOptions(durationMilliseconds: 800))
+    try map.fly(to: camera, animation: nil) // animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const camera: maplibre.CameraOptions = .{
+        .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
+        .zoom = 13.0,
+    };
+    try map.jumpTo(camera);
+
+    try map.easeTo(camera, .{ .duration_ms = 800.0 }); // animates
+    try map.flyTo(camera, null); // animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    var camera = new CameraOptions
+    {
+        Center = new LatLng(37.7749, -122.4194),
+        Zoom = 13.0,
+    };
+    map.JumpTo(camera);
+
+    map.EaseTo(camera, new AnimationOptions { Duration = 800.0 }); // animates
+    map.FlyTo(camera, null); // animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    target = camera.CameraOptions(
+        center=geo.LatLng(37.7749, -122.4194),
+        zoom=13.0,
+    )
+    map_handle.jump_to(target)
+
+    map_handle.ease_to(target, camera.AnimationOptions(duration_ms=800.0))  # animates
+    map_handle.fly_to(target)  # animates with derived duration
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    cam := maplibre.CameraOptions{}.
+    	WithCenter(maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194}).
+    	WithZoom(13)
+    if err := m.JumpTo(cam); err != nil {
+    	return err
+    }
+
+    animation := maplibre.AnimationOptions{}.WithDurationMS(800)
+    if err := m.EaseTo(cam, &animation); err != nil { // animates
+    	return err
+    }
+    if err := m.FlyTo(cam, nil); err != nil { // animates with derived duration
+    	return err
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Relative gestures
+
+Pan, zoom, rotate, and pitch come in relative ("by") form only, each with an
+animated variant (same zero-duration default as `ease_to`):
+
+* `move_by(delta_x, delta_y)` — screen-space pan, in logical pixels.
+* `scale_by(scale, anchor)` — zoom by a factor around an optional anchor.
+* `rotate_by(first, second)` — rotate between two screen points.
+* `pitch_by(pitch)` — pitch delta in degrees.
+
+Absolute targets go through `jump_to` / `ease_to` / `fly_to` with the fields
+you want to change.
+
+```kotlin
+// Kotlin; the other bindings mirror these one-to-one.
+map.moveBy(deltaX, deltaY)
+map.scaleBy(1.5, ScreenPoint(x, y))
+map.rotateBy(firstTouch, secondTouch)
+map.pitchBy(10.0)
+```
+
+## Fit the camera to content
+
+The `camera_for_*` family computes a camera that fits content in the current
+viewport, without applying it. Apply the result yourself with `jump_to` or
+`ease_to`:
+
+* `camera_for_lat_lng_bounds(bounds, fit_options)` — fit a bounding box.
+* `camera_for_lat_lngs(coordinates, fit_options)` — fit a coordinate list.
+* `camera_for_geometry(geometry, fit_options)` — fit a geometry.
+
+Fit options add `padding` (edge insets in logical pixels), `bearing`, and
+`pitch` to the computed camera. The inverse —
+`lat_lng_bounds_for_camera(camera)` — reports the geographic bounds a camera
+covers.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    mln_lat_lng_bounds bounds = {
+        .southwest = {.latitude = 37.7, .longitude = -122.5},
+        .northeast = {.latitude = 37.85, .longitude = -122.35},
+    };
+    mln_camera_fit_options fit = mln_camera_fit_options_default();
+    fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
+    fit.padding = (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};
+
+    mln_camera_options camera = mln_camera_options_default();
+    mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &camera);
+    mln_map_ease_to(map, &camera, &animation);
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    val bounds = LatLngBounds(LatLng(37.7, -122.5), LatLng(37.85, -122.35))
+    val fit = CameraFitOptions().apply { padding = EdgeInsets(24.0, 24.0, 24.0, 24.0) }
+    val fitted = map.cameraForLatLngBounds(bounds, fit)
+    map.easeTo(fitted, animation)
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let bounds = LatLngBounds::new(LatLng::new(37.7, -122.5), LatLng::new(37.85, -122.35));
+    let mut fit = CameraFitOptions::default();
+    fit.padding = Some(EdgeInsets::new(24.0, 24.0, 24.0, 24.0));
+    let fitted = map.camera_for_lat_lng_bounds(bounds, &fit)?;
+    map.ease_to(&fitted, &animation)?;
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    let bounds = LatLngBounds(
+      southwest: LatLng(latitude: 37.7, longitude: -122.5),
+      northeast: LatLng(latitude: 37.85, longitude: -122.35)
+    )
+    let fitted = try map.cameraForLatLngBounds(
+      bounds,
+      fitOptions: CameraFitOptions(padding: EdgeInsets(top: 24, left: 24, bottom: 24, right: 24))
+    )
+    try map.ease(to: fitted, animation: animation)
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const camera = try map.cameraForLatLngBounds(bounds, .{
+        .padding = .{ .top = 24, .left = 24, .bottom = 24, .right = 24 },
+    });
+    try map.easeTo(camera, animation);
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    var bounds = new LatLngBounds(new LatLng(37.7, -122.5), new LatLng(37.85, -122.35));
+    var fitted = map.CameraForLatLngBounds(
+        bounds,
+        new CameraFitOptions { Padding = new EdgeInsets(24, 24, 24, 24) }
+    );
+    map.EaseTo(fitted, animation);
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    fitted = map_handle.camera_for_lat_lng_bounds(
+        geo.LatLngBounds(
+            southwest=geo.LatLng(37.7, -122.5),
+            northeast=geo.LatLng(37.85, -122.35),
+        ),
+        camera.CameraFitOptions(padding=camera.EdgeInsets(24.0, 24.0, 24.0, 24.0)),
+    )
+    map_handle.ease_to(fitted, animation)
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    fitted, err := m.CameraForLatLngBounds(bounds, &maplibre.CameraFitOptions{
+    	Padding: &maplibre.EdgeInsets{Top: 24, Left: 24, Bottom: 24, Right: 24},
+    })
+    if err != nil {
+    	return err
+    }
+    if err := m.EaseTo(fitted, animation); err != nil {
+    	return err
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Constrain the camera
+
+`mln_map_set_bounds()` applies camera constraints: geographic `bounds`,
+`min_zoom` / `max_zoom`, and `min_pitch` / `max_pitch`. Only the fields you
+mark apply, and paired min/max fields must be consistent. Read the active
+constraints with `mln_map_get_bounds()`.
+
+## Convert between screen and geographic coordinates
+
+On the live map:
+
+* `pixel_for_lat_lng` / `lat_lng_for_pixel` — single conversions, plus batch
+  variants. Pixels are logical, origin top-left.
+* `mln_map_projection_create(map)` — snapshot the map's transform into a
+  standalone **projection helper**. It survives later camera moves and even
+  map teardown, and answers the same conversions against the frozen camera —
+  useful for placing UI overlays between frames.
+* `projected_meters_for_lat_lng` / `lat_lng_for_projected_meters` — stateless
+  spherical Mercator conversions, no map needed. Higher-level metrics such as
+  meters-per-pixel are host arithmetic on top of these.
+
+## Observe camera movement
+
+Camera transitions emit `MAP_CAMERA_WILL_CHANGE`, `MAP_CAMERA_IS_CHANGING`,
+and `MAP_CAMERA_DID_CHANGE` events. Poll `mln_map_get_camera()` during
+`IS_CHANGING` to mirror the animated position into host UI.

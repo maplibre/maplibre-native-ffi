@@ -1,0 +1,301 @@
+---
+title: Render to a Surface
+description: Render and present through native surfaces.
+sidebar:
+  order: 3
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+A surface render session renders a map into a host-provided native surface and
+presents through it. This is the integration for windows, views, and platform
+surfaces: the host owns the window toolkit and the graphics context, and the
+session draws into them.
+
+## The surface contract
+
+A map has at most one live render session. You create a session by attaching a
+surface descriptor to the map with a backend-specific attach function; the
+backend is fixed by the native artifact you installed. All session calls run on
+the map owner thread.
+
+The surface handle the descriptor carries depends on the backend:
+
+| Backend      | Descriptor field | Actual type                | Presented by     |
+| ------------ | ---------------- | -------------------------- | ---------------- |
+| Metal        | `layer`          | `CAMetalLayer*` (retained) | Layer drawable   |
+| Vulkan       | `surface`        | `VkSurfaceKHR`             | Swapchain        |
+| OpenGL (EGL) | `surface`        | `EGLSurface`               | `eglSwapBuffers` |
+| OpenGL (WGL) | `surface`        | `HDC`                      | `SwapBuffers`    |
+
+The API works with these ready-made handles rather than toolkit objects, so the
+host creates them first: on Android, wrap an `ANativeWindow*` in an
+`EGLSurface` or a `VkSurfaceKHR`; on Linux, create an `EGLSurface` or
+`VkSurfaceKHR` from your X11/Wayland window; on Windows, use the window's
+`HDC`; on Apple platforms, hand over the view's `CAMetalLayer`.
+
+The descriptor also carries a **context** — the backend objects the session
+shares with your application (Metal device; Vulkan instance, device, and
+graphics queue; an EGL or WGL share context). The descriptor's extent is the
+logical viewport size in UI pixels plus the UI-to-device scale factor.
+
+## Drive the frame loop
+
+Rendering is pull-based and host-paced. Each frame:
+
+1. Pump the runtime (`run_once`) and drain events.
+2. When `MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE` arrives for your map,
+   mark rendering as pending.
+3. When pending, call `mln_render_session_render_update()`. Surface sessions
+   render **and present** in this call. The call reports whether it produced a
+   frame; `false` at startup is normal (the map has not published an update
+   yet) — keep pumping and retry.
+
+`MAP_RENDER_FRAME_FINISHED` events carry a `needs_repaint` flag; keep rendering
+while it is set to let animations and symbol placement settle.
+
+Pace the loop with the display where you can: vsync callbacks
+(`CADisplayLink`, Android's `Choreographer`), or your toolkit's frame callback.
+The example apps poll with a short sleep, which is simplest but burns cycles.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    // Attach: layer is a CAMetalLayer*, VkSurfaceKHR, EGLSurface, or HDC
+    // obtained from the host window toolkit.
+    mln_opengl_surface_descriptor desc = mln_opengl_surface_descriptor_default();
+    desc.extent = (mln_render_target_extent){
+        .size = sizeof(mln_render_target_extent),
+        .width = logical_width, .height = logical_height,
+        .scale_factor = scale_factor,
+    };
+    desc.context.data.egl.display = egl_display;      // borrowed
+    desc.context.data.egl.config = egl_config;        // borrowed
+    desc.context.data.egl.share_context = egl_ctx;    // borrowed
+    desc.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+    desc.surface = egl_surface;                       // borrowed
+
+    mln_render_session* session = NULL;
+    mln_opengl_surface_attach(map, &desc, &session);
+
+    // Per frame, on the map owner thread:
+    mln_runtime_run_once(runtime);
+    mln_runtime_event event = {.size = sizeof(event)};
+    bool has_event, pending = false;
+    while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
+           has_event) {
+      if (event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)
+        pending = true;
+    }
+    if (pending) {
+      bool rendered = false;
+      mln_render_session_render_update(session, &rendered);
+      pending = !rendered;
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    // Attach: surface is a NativePointer to the EGLSurface / VkSurfaceKHR / layer.
+    val descriptor =
+      OpenGLSurfaceDescriptor(viewport.extent, graphics.contextDescriptor, graphics.surfacePointer)
+    val session = map.attachOpenGLSurface(descriptor)
+
+    // Per frame, on the map owner thread:
+    runtime.runOnce()
+    while (true) {
+      val event = runtime.pollEvent() ?: break
+      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
+        renderPending = true
+      }
+    }
+    if (renderPending) {
+      renderPending = !session.renderUpdate()
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    // Attach: descriptor borrows the host's surface handle and context.
+    let descriptor = VulkanSurfaceDescriptor::new(extent, context_descriptor, surface);
+    let session = map.attach_vulkan_surface(&descriptor)?;
+
+    // Per frame, on the map owner thread:
+    runtime.run_once()?;
+    while let Some(event) = runtime.poll_event()? {
+        if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
+            render_pending = true;
+        }
+    }
+    if render_pending {
+        render_pending = !session.render_update()?;
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    // Attach: the view's CAMetalLayer; the session retains it.
+    let session = try map.attachMetalSurface(
+      MetalSurfaceDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor,
+        layer: graphics.layerPointer
+      )
+    )
+
+    // Per frame (e.g. from a CADisplayLink or timer), on the map owner thread:
+    try runtime.runOnce()
+    while let event = try runtime.pollEvent() {
+      if event.type == .mapRenderUpdateAvailable, map.isSource(of: event) {
+        renderPending = true
+      }
+    }
+    if renderPending {
+      renderPending = try !session.renderUpdate()
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    // Attach: descriptor borrows the host's surface handle and context.
+    var session = try maplibre.attachOpenGLSurface(&map, .{
+        .extent = .{ .width = w, .height = h, .scale_factor = scale },
+        .context = context.descriptor(),
+        .surface = surface_pointer,
+    });
+    defer session.close() catch {};
+
+    // Per frame, on the map owner thread:
+    try runtime.runOnce();
+    while (try runtime.pollEvent(allocator)) |event| {
+        var owned = event;
+        defer owned.deinit();
+        if (owned.event_type == .map_render_update_available) render_pending = true;
+    }
+    if (render_pending) {
+        render_pending = !(try session.renderUpdate());
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    // Attach: descriptor borrows the host's surface handle and context.
+    var descriptor = new OpenGLSurfaceDescriptor
+    {
+        Extent = new RenderTargetExtent(width, height, scaleFactor),
+        Context = eglContextDescriptor,
+        Surface = surfacePointer,
+    };
+    var session = RenderSessionHandle.AttachOpenGLSurface(map, descriptor);
+
+    // Per frame, on the map owner thread:
+    runtime.RunOnce();
+    while (runtime.PollEvent() is { } runtimeEvent)
+    {
+        if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable
+            && ReferenceEquals(runtimeEvent.MapSource, map))
+        {
+            renderPending = true;
+        }
+    }
+    if (renderPending)
+    {
+        renderPending = !session.RenderUpdate();
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    # Attach: descriptor borrows the host's surface handle and context.
+    session = map_handle.attach_opengl_surface(
+        render.OpenGLSurfaceDescriptor(extent, context_descriptor, surface_pointer)
+    )
+
+    # Per frame, on the map owner thread:
+    runtime.run_once()
+    while event := runtime.poll_event():
+        if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
+            render_pending = True
+    if render_pending:
+        render_pending = not session.render_update()
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    // Attach: descriptor borrows the host's surface handle and context.
+    session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{
+    	Extent:  extent,
+    	Context: contextDescriptor,
+    	Surface: surfacePointer,
+    })
+    if err != nil {
+    	return err
+    }
+    defer session.Close()
+
+    // Per frame, on the (locked) map owner thread:
+    if err := rt.RunOnce(); err != nil {
+    	return err
+    }
+    for {
+    	event, err := rt.PollEvent()
+    	if err != nil {
+    		return err
+    	}
+    	if event == nil {
+    		break
+    	}
+    	if event.Type == maplibre.RuntimeEventMapRenderUpdateAvailable {
+    		renderPending = true
+    	}
+    }
+    if renderPending {
+    	rendered, err := session.RenderUpdate()
+    	if err != nil {
+    		return err
+    	}
+    	renderPending = !rendered
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Resize with the host surface
+
+When the window changes size, call `mln_render_session_resize()` with the new
+logical size and scale factor, then request a repaint. Resize rebuilds the
+renderer on the next render update; map state (camera, style, sources)
+survives, but renderer-held state such as feature state does not.
+
+A scale factor differing from the map's original `scale_factor` logs a warning —
+plan the map's scale factor around the displays you target.
+
+## Follow the surface lifecycle
+
+The session borrows the surface handle and context objects; they must stay
+valid until detach or destroy. When the platform destroys the surface (window
+closed, Android `surfaceDestroyed`, view detached):
+
+1. Call `mln_render_session_detach()` (keeps the handle for reattach) or
+   `mln_render_session_destroy()`.
+2. Release the host surface and context.
+3. When a new surface arrives, attach a fresh session — the same map continues
+   with its camera and style intact.
+
+<Aside type="tip">
+  On Android, call `MaplibreAndroid.initialize(context)` once before any
+  network activity, create the session from `surfaceCreated`/`surfaceChanged`,
+  destroy it from `surfaceDestroyed`, and pace the loop with `Choreographer`.
+  The `android-map` example shows the full pattern.
+</Aside>
+
+The full working versions of these loops, for every backend, live in the
+example apps: `zig-map`, `rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`,
+and `android-map`.

@@ -1,0 +1,259 @@
+---
+title: Query Map Data
+description: Query rendered features, source features, and feature extensions.
+sidebar:
+  order: 6
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Queries read map data back out: what the user tapped, what a source contains,
+or what a feature extension (like a cluster) expands to. All query functions
+hang off the **render session**, not the map — they read the latest render
+session state, so the session must be attached and must have rendered at least
+once. Like everything else, they run on the map owner thread.
+
+## Query rendered features
+
+`query_rendered_features` answers "what is on screen here?" — the classic
+tap handler. It takes:
+
+* A **geometry**: a screen point, a screen box (any corner order; clipped to
+  the viewport), or a screen line string, in logical pixels.
+* **Options**: an optional list of layer IDs to restrict the query (absent
+  means all rendered layers) and an optional style-spec filter expression as
+  JSON.
+
+The result is a list of queried features. Each carries the feature (geometry +
+properties), its source ID, its source layer ID when known, and its rendered
+feature state when set. Results are owned copies; destroy or `deinit` them per
+your binding's rules.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    mln_rendered_query_geometry geometry =
+        mln_rendered_query_geometry_point((mln_screen_point){.x = 256, .y = 256});
+
+    mln_string_view layers[] = {{.data = "poi", .size = 3}};
+    mln_rendered_feature_query_options options =
+        mln_rendered_feature_query_options_default();
+    options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+    options.layer_ids = layers;
+    options.layer_id_count = 1;
+
+    mln_feature_query_result* result = NULL;
+    mln_render_session_query_rendered_features(session, &geometry, &options, &result);
+
+    size_t count = 0;
+    mln_feature_query_result_count(result, &count);
+    for (size_t i = 0; i < count; i++) {
+      mln_queried_feature feature = {.size = sizeof(feature)};
+      mln_feature_query_result_get(result, i, &feature);
+      // inspect feature.feature properties ...
+    }
+    mln_feature_query_result_destroy(result);
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    val features =
+      session.queryRenderedFeatures(
+        RenderedQueryGeometry.Point(ScreenPoint(256.0, 256.0)),
+        RenderedFeatureQueryOptions().apply { layerIds = listOf("poi") },
+      )
+    for (feature in features) {
+      // feature.feature properties, feature.sourceId, feature.sourceLayerId ...
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let geometry = RenderedQueryGeometry::point(ScreenPoint::new(256.0, 256.0));
+    let mut options = RenderedFeatureQueryOptions::default();
+    options.layer_ids = Some(vec!["poi".to_owned()]);
+    let features = session.query_rendered_features(geometry, Some(options))?;
+    for feature in &features {
+        // feature.feature properties, feature.source_id, ...
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    let features = try session.queryRenderedFeatures(
+      geometry: .point(ScreenPoint(x: 256, y: 256)),
+      options: RenderedFeatureQueryOptions(layerIds: ["poi"])
+    )
+    for feature in features {
+      // feature.feature properties, feature.sourceId, ...
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    var result = try session.queryRenderedFeatures(
+        allocator,
+        .{ .point = .{ .x = 256, .y = 256 } },
+        .{ .layer_ids = &.{"poi"} },
+    );
+    defer result.deinit();
+    for (result.features) |feature| {
+        // feature.feature properties, feature.source_id, ...
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    var features = session.QueryRenderedFeatures(
+        new RenderedQueryGeometry.Point(new ScreenPoint(256, 256)),
+        new RenderedFeatureQueryOptions { LayerIds = ["poi"] }
+    );
+    foreach (var feature in features)
+    {
+        // feature.Feature properties, feature.SourceId, ...
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    features = session.query_rendered_features(
+        query.RenderedQueryGeometry.point_geometry(camera.ScreenPoint(256.0, 256.0)),
+        query.RenderedFeatureQueryOptions(layer_ids=("poi",)),
+    )
+    for feature in features:
+        ...  # feature.feature properties, feature.source_id, ...
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    features, err := session.QueryRenderedFeatures(
+    	maplibre.RenderedQueryPoint(maplibre.ScreenPoint{X: 256, Y: 256}),
+    	&maplibre.RenderedFeatureQueryOptions{LayerIDs: []string{"poi"}},
+    )
+    if err != nil {
+    	return err
+    }
+    for _, feature := range features {
+    	_ = feature // feature.Feature properties, feature.SourceID, ...
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Query source features
+
+`query_source_features` reads features straight out of a loaded source,
+independent of what is on screen. Vector sources require the source layer IDs
+in the options; GeoJSON sources ignore them. An optional filter applies the
+same way as rendered queries.
+
+```kotlin
+// Kotlin; the other bindings mirror this one-to-one.
+val features =
+  session.querySourceFeatures(
+    "points",
+    SourceFeatureQueryOptions().apply { sourceLayerIds = listOf("pois") },
+  )
+```
+
+## Feature extensions (supercluster)
+
+`query_feature_extensions` passes a previously queried feature back to a
+source's feature extension. The built-in case is `supercluster`: given a
+cluster feature from a clustered GeoJSON source, ask for its `"leaves"`
+(individual points), `"children"`, or `"expansion-zoom"`.
+
+<Aside type="caution" title="Unsigned JSON is required">
+  Supercluster reads `cluster_id` from the feature's properties and the `limit`
+  and `offset` arguments strictly as **unsigned** JSON values. A JSON library
+  that emits all numbers as doubles silently produces an empty result with a
+  success status. Preserve the queried feature's property types (queried
+  features keep their original JSON types, so feeding the feature back
+  unmodified is safe) and construct `limit`/`offset` as unsigned values.
+</Aside>
+
+The result is either a single JSON value or a feature collection. A wrong-typed
+or missing `cluster_id` yields a JSON null value; a valid cluster with no
+matches yields an empty collection; wrong-typed `limit`/`offset` fall back to
+10 leaves at offset 0.
+
+<Tabs syncKey="lang">
+  <TabItem label="Kotlin">
+    ```kotlin
+    val arguments =
+      JsonValue.ObjectValue(
+        listOf(
+          JsonValue.Member("limit", JsonValue.UInt(10)),
+          JsonValue.Member("offset", JsonValue.UInt(0)),
+        )
+      )
+    val result =
+      session.queryFeatureExtension("points", clusterFeature, "supercluster", "leaves", arguments)
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    arguments = json.JsonObject(
+        (
+            json.JsonMember("limit", json.JsonUInt(10)),
+            json.JsonMember("offset", json.JsonUInt(0)),
+        )
+    )
+    result = session.query_feature_extensions(
+        "points", cluster_feature, "supercluster", "leaves", arguments
+    )
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let arguments = JsonValue::Object(vec![
+        JsonMember::new("limit", JsonValue::UInt(10)),
+        JsonMember::new("offset", JsonValue::UInt(0)),
+    ]);
+    let result = session.query_feature_extension(
+        "points",
+        &cluster_feature,
+        "supercluster",
+        "leaves",
+        Some(&arguments),
+    )?;
+    ```
+  </TabItem>
+</Tabs>
+
+## Feature state
+
+Feature state attaches per-feature key-value data (for example, `"hover":
+true`) that style expressions can read with `feature-state`. It lives on the
+render session's renderer:
+
+* The renderer must exist: render at least once after loading style data
+  before setting state.
+* State does **not** survive a session resize or reattach — reapply it
+  afterward.
+* A set or remove requests a repaint automatically.
+
+The selector identifies the target: `source_id` (required), `source_layer_id`
+(required to disambiguate vector sources), `feature_id`, and — for removing a
+single key — `state_key`.
+
+```kotlin
+// Kotlin; the other bindings mirror these one-to-one.
+val selector =
+  FeatureStateSelector(sourceId = "points").apply {
+    sourceLayerId = "pois"
+    featureId = "station-42"
+  }
+session.setFeatureState(selector, JsonValue.ObjectValue(listOf(JsonValue.Member("selected", JsonValue.Bool(true)))))
+val state = session.getFeatureState(selector)
+session.removeFeatureState(selector)
+```

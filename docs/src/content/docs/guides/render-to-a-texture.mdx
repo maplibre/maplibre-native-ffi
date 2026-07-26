@@ -1,0 +1,265 @@
+---
+title: Render to a Texture
+description: Offscreen texture rendering, frame access, and readback.
+sidebar:
+  order: 4
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+A texture render session renders a map offscreen into a GPU texture instead of
+presenting to a surface. Use it to composite the map into your own rendering
+(engine overlays, toolkit surfaces like Skiko), to snapshot still images, or to
+read pixels back to the CPU. Two ownership modes exist, and choosing between
+them is the main design decision.
+
+## Owned vs. borrowed textures
+
+|                    | Owned (session-owned)                             | Borrowed (caller-owned)                                              |
+| ------------------ | ------------------------------------------------- | -------------------------------------------------------------------- |
+| Texture created by | The session, on your device/context               | You                                                                  |
+| Resize             | `mln_render_session_resize()` in place            | Recreate texture + session                                           |
+| Frame access       | Acquire/release frame API                         | Yours already — you own the texture                                  |
+| CPU readback       | `mln_texture_read_premultiplied_rgba8()`          | Read back with your own backend calls                                |
+| Best for           | Snapshots, headless rendering, simple compositing | Engines and toolkits that composite the map into their own swapchain |
+
+Both modes attach with a backend-specific function —
+`mln_<backend>_owned_texture_attach()` or `mln_<backend>_borrowed_texture_attach()` —
+and a descriptor carrying the logical extent and context. Borrowed descriptors
+additionally state the **physical** pixel size and the texture handle, because
+the session cannot always measure a caller-owned texture (a `VkImage` exposes
+no queryable extent). The physical size must equal
+`ceil(logical * scale_factor)` per dimension;
+`mln_render_target_extent_physical_size()` computes it for you.
+
+## Owned mode: render, acquire, read back
+
+An owned session renders into its own texture when you call
+`mln_render_session_render_update()`. To use the result on the GPU, acquire the
+frame; to use it on the CPU, read it back.
+
+**Acquire/release.** `mln_<backend>_owned_texture_acquire_frame()` borrows the
+most recently rendered frame's backend handles (Metal texture, Vulkan image and
+view, OpenGL texture name) until the matching release. While a frame is
+acquired, resize, render, detach, destroy, and a second acquire all fail with
+`MLN_STATUS_INVALID_STATE`, so keep the borrow scoped: acquire, sample or
+composite, release. Releases validate the frame identity and reject stale
+frames.
+
+**Readback.** `mln_texture_read_premultiplied_rgba8()` copies the latest frame
+as premultiplied RGBA8 in physical pixels into your buffer. Call it with a null
+buffer (or insufficient capacity) to learn the required size, then again with
+the buffer — the image info reports width, height, stride, and byte length.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    mln_opengl_owned_texture_descriptor desc =
+        mln_opengl_owned_texture_descriptor_default();
+    desc.extent = (mln_render_target_extent){
+        .size = sizeof(mln_render_target_extent),
+        .width = 512, .height = 512, .scale_factor = 1.0,
+    };
+    desc.context = context; // session creates a context in your share group
+
+    mln_render_session* session = NULL;
+    mln_opengl_owned_texture_attach(map, &desc, &session);
+
+    // After a render update produced a frame:
+    mln_texture_image_info info = mln_texture_image_info_default();
+    mln_texture_read_premultiplied_rgba8(session, NULL, 0, &info); // size query
+    uint8_t* pixels = malloc(info.byte_length);
+    mln_texture_read_premultiplied_rgba8(session, pixels, info.byte_length, &info);
+
+    // Or borrow the GPU frame for compositing:
+    mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
+    mln_opengl_owned_texture_acquire_frame(session, &frame);
+    // ... sample frame.texture from a context in the same share group ...
+    mln_opengl_owned_texture_release_frame(session, &frame);
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    val session =
+      map.attachMetalOwnedTexture(
+        MetalOwnedTextureDescriptor(
+          extent = RenderTargetExtent(512, 512, 1.0),
+          context = MetalContextDescriptor(devicePointer),
+        )
+      )
+
+    // After a render update produced a frame, composite the GPU frame:
+    session.acquireMetalOwnedTextureFrame().use { frameHandle ->
+      val frame = frameHandle.frame()
+      compositor.drawTexture(frame.texture().address)
+    }
+
+    // Or read pixels back to the CPU:
+    NativeBuffer.allocate(session.textureImageInfo().byteLength).use { buffer ->
+      val info = session.readPremultipliedRgba8(buffer)
+    }
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let session = map.attach_vulkan_owned_texture(&VulkanOwnedTextureDescriptor::new(
+        extent,
+        context.descriptor(),
+    ))?;
+
+    // After a render update produced a frame, composite the GPU frame:
+    {
+        let frame = session.acquire_vulkan_owned_texture_frame()?;
+        compositor.draw(&frame)?;
+        frame.close()?; // release the borrow
+    }
+
+    // Or read pixels back to the CPU:
+    let mut pixels = vec![0u8; session.texture_image_info()?.byte_length];
+    let info = session.read_premultiplied_rgba8_into(&mut pixels)?;
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ````swift
+    let session = try map.attachMetalOwnedTexture(
+      MetalOwnedTextureDescriptor(extent: extent, context: contextDescriptor)
+    )
+
+    // After a render update produced a frame, composite the GPU frame:
+    let frame = try session.acquireMetalOwnedTextureFrame()
+    try frame.withBackendPointers { view in
+      let texture = try view.texture // valid only inside this scope
+      try compositor.draw(texture: texture)
+    }
+    try frame.close()
+
+    // Or read pixels back to the CPU:
+    var pixels = [UInt8](repeating: 0, count: byteCount)
+    let info = try session.readPremultipliedRGBA8(into: &pixels)```
+
+    </TabItem>
+    <TabItem label="Zig">
+
+    ```zig
+    var target = try maplibre.attachMetalOwnedTexture(&map, .{
+        .extent = .{ .width = 512, .height = 512, .scale_factor = 1.0 },
+        .context = context.descriptor(),
+    });
+    defer target.close() catch {};
+    const session = &target.session;
+
+    // After a render update produced a frame, read pixels back:
+    const pixels = try allocator.alloc(u8, 512 * 512 * 4);
+    defer allocator.free(pixels);
+    const info = try session.readPremultipliedRgba8Into(pixels);
+    ````
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    using var session = RenderSessionHandle.AttachVulkanOwnedTexture(
+        map,
+        new VulkanOwnedTextureDescriptor(extent, contextDescriptor)
+    );
+
+    // After a render update produced a frame, read pixels back:
+    using var buffer = new NativeBuffer(session.TextureImageInfo().ByteLength);
+    var info = session.ReadPremultipliedRgba8(buffer);
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    session = map_handle.attach_vulkan_owned_texture(
+        context.owned_texture_descriptor(width, height, scale_factor)
+    )
+
+    # After a render update produced a frame, composite the GPU frame:
+    frame = session.acquire_vulkan_owned_texture_frame()
+    compositor.draw(frame.image)
+    frame.close()
+
+    # Or read pixels back to the CPU:
+    pixels = bytearray(session.texture_image_info().byte_length)
+    info = session.read_premultiplied_rgba8_into(pixels)
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    session, err := m.AttachVulkanOwnedTexture(maplibre.VulkanOwnedTextureDescriptor{
+    	Extent:  extent,
+    	Context: contextDescriptor,
+    })
+    if err != nil {
+    	return err
+    }
+    defer session.Close()
+
+    // After a render update produced a frame, read pixels back:
+    pixels, info, err := session.ReadPremultipliedRGBA8()
+    if err != nil {
+    	return err
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Borrowed mode: render into the host's texture
+
+In borrowed mode you allocate the texture, keep it valid until the session is
+detached, and synchronize any use of it outside the session. The session
+renders into it on `render_update()` and nothing more — there is no acquire,
+no readback, and no resize.
+
+Following a host resize means re-creating the target: detach and destroy the
+session, create a new texture at the new physical size, and attach a new
+session. Only one session may be live per map, so destroy the old one first.
+
+Backend synchronization notes:
+
+* **Vulkan** — before each `render_update()`, make the image available on the
+  descriptor's graphics queue in `initial_layout`. The session waits for its
+  submitted work to finish and leaves the image in `final_layout` before
+  returning; synchronization outside the session is yours.
+* **Metal** — the texture must allow render-target usage and match the stated
+  physical size; the session verifies dimensions.
+* **OpenGL** — the texture must belong to the descriptor's context or one in
+  its share group, with level-0 dimensions matching the stated physical size.
+  The session targets ES 3.0 contexts and cannot verify the size.
+
+```kotlin
+// Kotlin / Compose-style integration: render into a texture your toolkit owns.
+val session =
+  map.attachOpenGLBorrowedTexture(
+    OpenGLBorrowedTextureDescriptor(
+      extent.toRenderTargetExtent(),
+      extent.physicalWidth,
+      extent.physicalHeight,
+      target.context.toDescriptor(),
+      target.textureName,
+      target.textureTarget,
+    )
+  )
+```
+
+The `compose-map` example shows a complete borrowed-texture integration that
+bridges MapLibre into a Skiko/Compose surface, including reattach-on-resize.
+
+## Still images without a frame loop
+
+For one-off snapshots, create the map with `MLN_MAP_MODE_STATIC` (any viewport)
+or `MLN_MAP_MODE_TILE` (a single tile), attach an owned-texture session, and
+call `mln_map_request_still_image()`. Completion arrives as
+`MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED` (or `..._FAILED`); render updates
+still flow through the normal events in between, so the loop looks like any
+other — pump, render on update, and stop when the still finishes. The
+`zig-readback` example renders a style to a PNG-class file headlessly this way.
+
+<Aside type="tip">
+  Continuous-mode maps also read back fine. Static mode exists so snapshot
+  tools skip the repaint machinery entirely and get a defined completion event.
+</Aside>

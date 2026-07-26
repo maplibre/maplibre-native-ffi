@@ -1,0 +1,388 @@
+---
+title: Download Offline Regions
+description: Create, observe, update, and delete offline regions.
+sidebar:
+  order: 9
+---
+
+import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+
+Offline regions download the resources a style needs for an area ahead of time,
+so the map works without a network. Regions live in the runtime's cache
+database — pass a real `cache_path` in the runtime options for them to persist;
+`":memory:"` keeps them only as long as the database.
+
+## The async operation pattern
+
+Every offline API is asynchronous and follows the same shape:
+
+1. A `..._start` call (bindings: `startCreateOfflineRegion`,
+   `start_offline_regions`, etc.) accepts the request and returns an operation
+   ID or handle.
+2. You keep pumping the runtime. Completion arrives as an
+   `OFFLINE_OPERATION_COMPLETED` event carrying the operation ID, the operation
+   kind, the result kind, and a result status.
+3. A matching `..._take_result` call consumes the stored result. On failure the
+   operation stays live so you can retry the take or `discard` it.
+
+Operations with no payload (delete, invalidate, set download state, set
+observed, ambient cache) complete through the event alone and have no take
+call.
+
+<Aside>
+  The handle shapes differ per binding: Kotlin and Go type the handle by its
+  result (`OfflineOperationHandle<OfflineRegionInfo>`), Rust consumes it with a
+  typed `take()`, Swift passes bare operation IDs, and Python/.NET validate the
+  kind at take time. The event flow is identical everywhere.
+</Aside>
+
+## Create a region
+
+Two definition types exist:
+
+* **Tile pyramid** — everything a style URL needs inside a bounding box between
+  `min_zoom` and `max_zoom`, at a given pixel ratio. An infinite `max_zoom`
+  asks for each source's own maximum.
+* **Geometry** — the tiles covering an arbitrary geometry (a route corridor,
+  say) across a zoom range.
+
+Creation takes optional **metadata** — opaque bytes stored with the region and
+returned on every later inspection. Hosts typically stash a name or a JSON blob
+there.
+
+<Tabs syncKey="lang">
+  <TabItem label="C">
+    ```c
+    mln_offline_region_definition definition = {
+        .size = sizeof(definition),
+        .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+        .data.tile_pyramid = {
+            .size = sizeof(mln_offline_tile_pyramid_region_definition),
+            .style_url = "https://tiles.openfreemap.org/styles/bright",
+            .bounds = {.southwest = {37.6, -122.6}, .northeast = {37.9, -122.3}},
+            .min_zoom = 10.0,
+            .max_zoom = 14.0,
+            .pixel_ratio = 2.0f,
+            .include_ideographs = true,
+        },
+    };
+
+    const char* metadata = "{\"name\":\"San Francisco\"}";
+    mln_offline_operation_id operation = 0;
+    mln_runtime_offline_region_create_start(
+        runtime, &definition, (const uint8_t*)metadata, strlen(metadata), &operation);
+    ```
+  </TabItem>
+
+  <TabItem label="Kotlin">
+    ```kotlin
+    val definition =
+      OfflineRegionDefinition.TilePyramid(
+        styleUrl = "https://tiles.openfreemap.org/styles/bright",
+        bounds = LatLngBounds(LatLng(37.6, -122.6), LatLng(37.9, -122.3)),
+        minZoom = 10.0,
+        maxZoom = 14.0,
+        pixelRatio = 2.0f,
+        includeIdeographs = true,
+      )
+    val operation =
+      runtime.startCreateOfflineRegion(definition, """{"name":"San Francisco"}""".encodeToByteArray())
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let definition = OfflineRegionDefinition::TilePyramid {
+        style_url: "https://tiles.openfreemap.org/styles/bright".to_owned(),
+        bounds: LatLngBounds::new(LatLng::new(37.6, -122.6), LatLng::new(37.9, -122.3)),
+        min_zoom: 10.0,
+        max_zoom: 14.0,
+        pixel_ratio: 2.0,
+        include_ideographs: true,
+    };
+    let operation =
+        runtime.start_create_offline_region(&definition, br#"{"name":"San Francisco"}"#)?;
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    let definition = OfflineRegionDefinition.tilePyramid(
+      styleURL: "https://tiles.openfreemap.org/styles/bright",
+      bounds: LatLngBounds(
+        southwest: LatLng(latitude: 37.6, longitude: -122.6),
+        northeast: LatLng(latitude: 37.9, longitude: -122.3)
+      ),
+      minZoom: 10,
+      maxZoom: 14,
+      pixelRatio: 2,
+      includeIdeographs: true
+    )
+    let operationId = try runtime.offlineRegionCreateStart(
+      definition: definition,
+      metadata: Data("{\"name\":\"San Francisco\"}".utf8)
+    )
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const definition: maplibre.OfflineRegionDefinition = .{
+        .tile_pyramid = .{
+            .style_url = "https://tiles.openfreemap.org/styles/bright",
+            .bounds = .{
+                .southwest = .{ .latitude = 37.6, .longitude = -122.6 },
+                .northeast = .{ .latitude = 37.9, .longitude = -122.3 },
+            },
+            .min_zoom = 10.0,
+            .max_zoom = 14.0,
+            .pixel_ratio = 2.0,
+            .include_ideographs = true,
+        },
+    };
+    const operation = try runtime.startCreateOfflineRegion(
+        allocator,
+        definition,
+        "{\"name\":\"San Francisco\"}",
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    var definition = new OfflineRegionDefinition.TilePyramid(
+        "https://tiles.openfreemap.org/styles/bright",
+        new LatLngBounds(new LatLng(37.6, -122.6), new LatLng(37.9, -122.3)),
+        10.0,
+        14.0,
+        2.0f,
+        true
+    );
+    using var operation = runtime.StartCreateOfflineRegion(
+        definition,
+        "{\"name\":\"San Francisco\"}"u8.ToArray()
+    );
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    definition = offline.OfflineTilePyramidRegionDefinition(
+        style_url="https://tiles.openfreemap.org/styles/bright",
+        bounds=geo.LatLngBounds(
+            southwest=geo.LatLng(37.6, -122.6),
+            northeast=geo.LatLng(37.9, -122.3),
+        ),
+        min_zoom=10.0,
+        max_zoom=14.0,
+        pixel_ratio=2.0,
+    )
+    operation = runtime.create_offline_region(definition, b'{"name":"San Francisco"}')
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    definition := maplibre.OfflineTilePyramidRegionDefinition{
+    	StyleURL: "https://tiles.openfreemap.org/styles/bright",
+    	Bounds: maplibre.LatLngBounds{
+    		Southwest: maplibre.LatLng{Latitude: 37.6, Longitude: -122.6},
+    		Northeast: maplibre.LatLng{Latitude: 37.9, Longitude: -122.3},
+    	},
+    	MinZoom:           10,
+    	MaxZoom:           14,
+    	PixelRatio:        2,
+    	IncludeIdeographs: true,
+    }
+    operation, err := rt.StartCreateOfflineRegion(definition, []byte(`{"name":"San Francisco"}`))
+    if err != nil {
+    	return err
+    }
+    ```
+  </TabItem>
+</Tabs>
+
+## Drive and observe the download
+
+A new region starts inactive. Mark it observed, then activate the download:
+
+1. `set_observed(region_id, true)` — the region reports status through events.
+2. `set_download_state(region_id, ACTIVE)` — downloading begins; `INACTIVE`
+   pauses it.
+
+While it runs, three events track progress:
+
+| Event                                      | Payload                                                                                                        |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `OFFLINE_REGION_STATUS_CHANGED`            | Region ID plus a status snapshot: completed/required resource and tile counts and sizes, and a `complete` flag |
+| `OFFLINE_REGION_RESPONSE_ERROR`            | A resource failed, with the error reason (not found, server, connection, rate limit)                           |
+| `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region exceeded the tile ceiling; increase it or shrink the region                                         |
+
+You can also poll: `get_status(region_id)` is an async operation whose result
+is the same status snapshot.
+
+```kotlin
+// Kotlin event loop sketch; the flow is identical in every binding.
+runtime.runOnce()
+while (true) {
+  val event = runtime.pollEvent() ?: break
+  when (val payload = event.payload) {
+    is RuntimeEventPayload.OfflineRegionStatusChanged -> {
+      val status = payload.status
+      progress = status.completedResourceCount.toDouble() / status.requiredResourceCount
+      if (status.complete) onDownloaded(payload.regionId)
+    }
+    is RuntimeEventPayload.OfflineOperationCompleted -> {
+      if (payload.resultStatus != 0) onOperationFailed(payload.operationId)
+    }
+    else -> Unit
+  }
+}
+```
+
+## Inspect, update, and clean up
+
+* `list()` — every region in the database, with definition and metadata.
+* `get(region_id)` — one region; the completion event's `found` flag reports
+  existence.
+* `update_metadata(region_id, metadata)` — replace the stored bytes.
+* `merge_database(path)` — import regions from a side database (for example,
+  one bundled with the app); the result lists the merged regions.
+* `invalidate(region_id)` — drop the region's cached resources but keep the
+  region, so the next activation refetches them.
+* `delete(region_id)` — remove the region and its resources.
+
+Ambient cache maintenance runs through `ambient_cache_operation_start` with
+`RESET_DATABASE`, `PACK_DATABASE`, `INVALIDATE`, or `CLEAR` — operating on the
+ambient (non-region) cache only.
+
+A minimal create-and-confirm flow:
+
+<Tabs syncKey="lang">
+  <TabItem label="Kotlin">
+    ```kotlin
+    val create = runtime.startCreateOfflineRegion(definition, metadata)
+    // pump until OFFLINE_OPERATION_COMPLETED arrives for create.id ...
+    val region = runtime.takeCreateOfflineRegionResult(create)
+
+    runtime.startSetOfflineRegionObserved(region.id, true)
+    runtime.startSetOfflineRegionDownloadState(region.id, OfflineRegionDownloadState.ACTIVE)
+    // ... watch OfflineRegionStatusChanged events until status.complete ...
+
+    val list = runtime.startOfflineRegions()
+    // pump until completion ...
+    val regions = runtime.takeOfflineRegionsResult(list)
+    ```
+  </TabItem>
+
+  <TabItem label="Rust">
+    ```rust
+    let create = runtime.start_create_offline_region(&definition, metadata)?;
+    // pump until OfflineOperationCompleted arrives for the operation ...
+    let region = create.take()?;
+
+    runtime.start_set_offline_region_observed(region.id, true)?;
+    runtime.start_set_offline_region_download_state(region.id, OfflineRegionDownloadState::Active)?;
+    // ... watch OfflineRegionStatus events until status.complete ...
+
+    let list = runtime.start_offline_regions()?;
+    // pump until completion ...
+    let regions = list.take()?;
+    ```
+  </TabItem>
+
+  <TabItem label="Swift">
+    ```swift
+    let createId = try runtime.offlineRegionCreateStart(definition: definition, metadata: metadata)
+    // pump until .offlineOperationCompleted arrives for createId ...
+    let region = try runtime.offlineRegionCreateTakeResult(operationId: createId)
+
+    _ = try runtime.offlineRegionSetObservedStart(regionId: region.id, observed: true)
+    _ = try runtime.offlineRegionSetDownloadStateStart(regionId: region.id, state: .active)
+    // ... watch .offlineRegionStatus events until status.complete ...
+
+    let listId = try runtime.offlineRegionsListStart()
+    // pump until completion ...
+    let regions = try runtime.offlineRegionsListTakeResult(operationId: listId)
+    ```
+  </TabItem>
+
+  <TabItem label="Zig">
+    ```zig
+    const create = try runtime.startCreateOfflineRegion(allocator, definition, metadata);
+    // pump until .offline_operation_completed arrives for create.operationId() ...
+    var region = try runtime.takeOfflineRegion(allocator, create);
+    defer region.deinit();
+
+    _ = try runtime.startSetOfflineRegionObserved(region.id, true);
+    _ = try runtime.startSetOfflineRegionDownloadState(region.id, .active);
+    // ... watch .offline_region_status_changed events until status.complete ...
+
+    const list = try runtime.startListOfflineRegions();
+    // pump until completion ...
+    var regions = try runtime.takeOfflineRegionList(allocator, list);
+    defer regions.deinit();
+    ```
+  </TabItem>
+
+  <TabItem label="C#">
+    ```csharp
+    using var create = runtime.StartCreateOfflineRegion(definition, metadata);
+    // pump until OfflineOperationCompleted arrives for create.ID ...
+    var region = runtime.TakeCreateOfflineRegionResult(create);
+
+    runtime.StartSetOfflineRegionObserved(region.Id, true);
+    runtime.StartSetOfflineRegionDownloadState(region.Id, OfflineRegionDownloadState.Active);
+    // ... watch OfflineRegionStatusChanged events until status.Complete ...
+
+    using var list = runtime.StartOfflineRegions();
+    // pump until completion ...
+    var regions = runtime.TakeOfflineRegionsResult(list);
+    ```
+  </TabItem>
+
+  <TabItem label="Python">
+    ```python
+    create = runtime.create_offline_region(definition, metadata)
+    # pump until OfflineOperationCompleted arrives for create.operation_id ...
+    region = create.take_region()
+
+    runtime.set_offline_region_observed(region.id, True)
+    runtime.set_offline_region_download_state(region.id, offline.OfflineRegionDownloadState.ACTIVE)
+    # ... watch OfflineRegionStatusChanged events until status.complete ...
+
+    list_op = runtime.list_offline_regions()
+    # pump until completion ...
+    regions = list_op.take_region_list()
+    ```
+  </TabItem>
+
+  <TabItem label="Go">
+    ```go
+    create, err := rt.StartCreateOfflineRegion(definition, metadata)
+    if err != nil {
+    	return err
+    }
+    // pump until OfflineOperationCompleted arrives for create.ID() ...
+    region, err := create.Take()
+    if err != nil {
+    	return err
+    }
+
+    if _, err := rt.StartSetOfflineRegionObserved(region.ID, true); err != nil {
+    	return err
+    }
+    if _, err := rt.StartSetOfflineRegionDownloadState(region.ID, maplibre.OfflineRegionDownloadActive); err != nil {
+    	return err
+    }
+    // ... watch OfflineRegionStatusChanged events until Status.Complete ...
+
+    list, err := rt.StartOfflineRegions()
+    if err != nil {
+    	return err
+    }
+    // pump until completion ...
+    regions, err := list.Take()
+    ```
+  </TabItem>
+</Tabs>
