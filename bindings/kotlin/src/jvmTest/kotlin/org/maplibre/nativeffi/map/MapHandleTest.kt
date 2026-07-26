@@ -82,6 +82,28 @@ class MapHandleTest {
   }
 
   @Test
+  fun mapSizeReportsCreationExtentAndPixelRatio() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 512
+          height = 256
+          scaleFactor = 2.0
+        },
+      )
+
+    val size = map.size
+    assertEquals(512, size.width)
+    assertEquals(256, size.height)
+    assertEquals(2.0, size.scaleFactor)
+
+    map.close()
+    runtime.close()
+  }
+
+  @Test
   fun styleSourceJsonCanBeAddedInspectedListedAndRemoved() {
     val runtime = RuntimeHandle.create(RuntimeOptions())
     val map =

@@ -189,6 +189,15 @@ public expect class MapHandle : AutoCloseable {
 
   public fun dumpDebugLogs()
 
+  /**
+   * The map's logical viewport size in UI pixels and its pixel ratio.
+   *
+   * The size starts at the creation width and height, and follows the attach and resize rules
+   * documented on [MapOptions]. The scale factor is fixed for the lifetime of the map and is
+   * independent of any render target's scale factor.
+   */
+  public val size: MapSize
+
   public var viewportOptions: ViewportOptions
 
   public var tileOptions: TileOptions

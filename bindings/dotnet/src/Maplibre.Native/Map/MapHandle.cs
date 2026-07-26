@@ -129,6 +129,21 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Pointer));
     }
 
+    /// <summary>
+    /// Gets the map's logical viewport size in UI pixels and its pixel ratio. The size starts at
+    /// the creation width and height, and follows the attach and resize rules documented on
+    /// <see cref="MapOptions"/>. The scale factor is fixed for the lifetime of the map and is
+    /// independent of any render target's scale factor.
+    /// </summary>
+    public (uint Width, uint Height, double ScaleFactor) GetSize()
+    {
+        uint width;
+        uint height;
+        double scaleFactor;
+        NativeStatus.Check(NativeMethods.mln_map_get_size(Pointer, &width, &height, &scaleFactor));
+        return (width, height, scaleFactor);
+    }
+
     /// <summary>Gets the map's viewport options.</summary>
     public ViewportOptions GetViewportOptions()
     {

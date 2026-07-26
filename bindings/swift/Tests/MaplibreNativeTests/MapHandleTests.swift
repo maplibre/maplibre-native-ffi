@@ -51,6 +51,22 @@ import Testing
   #expect(map.isClosed)
 }
 
+@Test func mapSizeReportsCreationExtentAndPixelRatio() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 256, scaleFactor: 2.0)
+  )
+  defer { try? map.close() }
+
+  let size = try map.size()
+  #expect(size.width == 512)
+  #expect(size.height == 256)
+  #expect(size.scaleFactor == 2.0)
+}
+
 @Test func styleURLRejectsEmbeddedNULAsPublicInvalidArgument() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

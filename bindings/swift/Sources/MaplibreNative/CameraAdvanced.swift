@@ -324,6 +324,16 @@ public extension MapHandle {
     }
   }
 
+  /// Returns the map's logical viewport size in UI pixels and its pixel ratio.
+  ///
+  /// The size starts at the creation width and height, and follows the attach
+  /// and resize rules documented on `MapOptions`. The scale factor is fixed for
+  /// the lifetime of the map and is independent of any render target's scale
+  /// factor.
+  func size() throws -> (width: UInt32, height: UInt32, scaleFactor: Double) {
+    try mapNativeFailure { try NativeMap.size(requireLivePointer()) }
+  }
+
   func viewportOptions() throws -> MapViewportOptions {
     try mapNativeFailure {
       try MapViewportOptions(native: NativeMapViewportOptionsInput(NativeMap

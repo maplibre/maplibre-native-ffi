@@ -1348,6 +1348,19 @@ impl MapHandle {
         Ok(loaded)
     }
 
+    fn get_size(&self) -> PyResult<(u32, u32, f64)> {
+        let state = self.state();
+        let mut width = 0u32;
+        let mut height = 0u32;
+        let mut scale_factor = 0f64;
+        // SAFETY: The C API validates the map pointer and out pointers.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_size(state.as_ptr(), &mut width, &mut height, &mut scale_factor)
+        })
+        .map_err(map_error)?;
+        Ok((width, height, scale_factor))
+    }
+
     fn get_viewport_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         // SAFETY: Default constructor takes no arguments and initializes size.

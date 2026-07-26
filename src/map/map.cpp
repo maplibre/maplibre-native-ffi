@@ -5049,6 +5049,31 @@ auto map_dump_debug_logs(mln_map* map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
+auto map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) -> mln_status {
+  const auto status = validate_map(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_width == nullptr || out_height == nullptr || out_scale_factor == nullptr
+  ) {
+    set_thread_error(
+      "out_width, out_height, and out_scale_factor must not be null"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto options = map->map->getMapOptions();
+  const auto size = options.size();
+  *out_width = size.width;
+  *out_height = size.height;
+  *out_scale_factor = static_cast<double>(options.pixelRatio());
+  return MLN_STATUS_OK;
+}
+
 auto map_get_viewport_options(
   mln_map* map, mln_map_viewport_options* out_options
 ) -> mln_status {

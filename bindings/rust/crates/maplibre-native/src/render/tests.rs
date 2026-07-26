@@ -2045,6 +2045,30 @@ fn resize_updates_owned_texture_frame_extent() {
 }
 
 #[test]
+// The map size follows the attached target, while the map pixel ratio stays at
+// the creation value even when the target renders at a different scale factor.
+fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &static_map_options(64, 32, 2.0)).unwrap();
+    assert_eq!(map.size().unwrap(), (64, 32, 2.0));
+
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    assert_eq!(map.size().unwrap(), (32, 16, 2.0));
+
+    session.resize(48, 24, 1.0).unwrap();
+    assert_eq!(map.size().unwrap(), (48, 24, 2.0));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-170.
 fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls() {
     if !has_test_owned_texture_session_backend() {

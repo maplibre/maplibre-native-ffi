@@ -335,6 +335,70 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
+// This verifies the raw size accessor reports the creation size, follows a
+// render session attach and resize, keeps the creation pixel ratio across a
+// render target that carries a different scale factor, and rejects each null
+// output pointer independently.
+static void map_size_tracks_attach_and_resize(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = NULL;
+  mln_map_options options = mln_map_options_default();
+  options.width = 512;
+  options.height = 256;
+  options.scale_factor = 2.0;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, &options, &map));
+
+  uint32_t width = 0;
+  uint32_t height = 0;
+  double scale_factor = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_UINT32(512, width);
+  TEST_ASSERT_EQUAL_UINT32(256, height);
+  TEST_ASSERT_TRUE(scale_factor == 2.0);
+
+  // The fixture attaches a 64x64 target at scale factor 1.0, so this also
+  // covers the map keeping its own pixel ratio.
+  mln_test_render_fixture render = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &render));
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_UINT32(64, width);
+  TEST_ASSERT_EQUAL_UINT32(64, height);
+  TEST_ASSERT_TRUE(scale_factor == 2.0);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_resize(render.session, 96, 48, 1.0)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_UINT32(96, width);
+  TEST_ASSERT_EQUAL_UINT32(48, height);
+  TEST_ASSERT_TRUE(scale_factor == 2.0);
+  mln_test_render_fixture_destroy(&render);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_size(NULL, &width, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_size(map, NULL, &height, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_size(map, &width, NULL, &scale_factor)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_size(map, &width, &height, NULL)
+  );
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // This verifies raw viewport struct sizes, masks, enum discriminants, and
 // output pointers.
 static void map_viewport_options_reject_invalid_arguments(void) {
@@ -428,6 +492,7 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(standalone_projection_rejects_invalid_arguments);
   RUN_TEST(projected_meters_reject_invalid_arguments);
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
+  RUN_TEST(map_size_tracks_attach_and_resize);
   RUN_TEST(map_viewport_options_reject_invalid_arguments);
   RUN_TEST(map_tile_options_reject_invalid_arguments);
 }

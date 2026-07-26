@@ -8,6 +8,7 @@ import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
+import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.UByteVar
@@ -75,6 +76,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_get_size
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
@@ -1035,6 +1037,17 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual fun dumpDebugLogs() {
     Status.check(mln_map_dump_debug_logs(state.requireLive()))
   }
+
+  public actual val size: MapSize
+    get() = memScoped {
+      val outWidth = alloc<UIntVar>()
+      val outHeight = alloc<UIntVar>()
+      val outScaleFactor = alloc<DoubleVar>()
+      Status.check(
+        mln_map_get_size(state.requireLive(), outWidth.ptr, outHeight.ptr, outScaleFactor.ptr)
+      )
+      MapSize(outWidth.value.toInt(), outHeight.value.toInt(), outScaleFactor.value)
+    }
 
   public actual var viewportOptions: ViewportOptions
     get() = memScoped {

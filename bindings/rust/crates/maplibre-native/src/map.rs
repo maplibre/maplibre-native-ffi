@@ -277,6 +277,25 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(map) })
     }
 
+    /// Reads the map's logical viewport size in UI pixels and its pixel ratio.
+    ///
+    /// The size starts at the creation width and height, and follows the attach
+    /// and resize rules documented on [`MapOptions`]. The scale factor is fixed
+    /// for the lifetime of the map and is independent of any render target's
+    /// scale factor.
+    pub fn size(&self) -> Result<(u32, u32, f64)> {
+        let map = self.inner.as_ptr()?;
+        let mut width = 0u32;
+        let mut height = 0u32;
+        let mut scale_factor = 0f64;
+        // SAFETY: map is live and all three out pointers reference live locals
+        // for the duration of the call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_size(map, &mut width, &mut height, &mut scale_factor)
+        })?;
+        Ok((width, height, scale_factor))
+    }
+
     /// Reads live viewport and render-transform controls.
     pub fn viewport_options(&self) -> Result<MapViewportOptions> {
         let map = self.inner.as_ptr()?;

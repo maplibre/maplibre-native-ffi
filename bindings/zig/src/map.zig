@@ -1083,6 +1083,20 @@ pub const MapHandle = enum(u128) {
         return loaded;
     }
 
+    /// Returns the map's logical viewport size in UI pixels and its pixel ratio.
+    ///
+    /// The size starts at the creation width and height, and follows the attach
+    /// and resize rules documented on MapOptions. The scale factor is fixed for
+    /// the lifetime of the map and is independent of any render target's scale
+    /// factor.
+    pub fn getSize(self: *MapHandle) status.Error!struct { width: u32, height: u32, scale_factor: f64 } {
+        var width: u32 = 0;
+        var height: u32 = 0;
+        var scale_factor: f64 = 0;
+        try status.checkStatus(c.mln_map_get_size(try native(self), &width, &height, &scale_factor), diagnosticStore(self));
+        return .{ .width = width, .height = height, .scale_factor = scale_factor };
+    }
+
     pub fn dumpDebugLogs(self: *MapHandle) status.Error!void {
         try status.checkStatus(c.mln_map_dump_debug_logs(try native(self)), diagnosticStore(self));
     }

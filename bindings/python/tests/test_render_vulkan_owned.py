@@ -211,6 +211,18 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
         frame.close()
 
 
+def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    # The fixture creates a 64x64 map at scale factor 1.0 and attaches a 32x16
+    # target, so the map size already tracks the attach.
+    assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+
+    # Resizing at a different scale factor leaves the map's own pixel ratio.
+    vulkan_owned_session.session.resize(48, 24, 2.0)
+    assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(1.0))
+
+
 def test_cpu_readback_metadata_capacity_and_reusable_buffer(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:

@@ -247,6 +247,29 @@ func (m *MapHandle) IsFullyLoaded() (bool, error) {
 	return bool(loaded), nil
 }
 
+// Size returns the map's logical viewport size in UI pixels and its pixel
+// ratio.
+//
+// The size starts at the creation width and height, and follows the attach and
+// resize rules documented on MapOptions. The scale factor is fixed for the
+// lifetime of the map and is independent of any render target's scale factor.
+func (m *MapHandle) Size() (width uint32, height uint32, scaleFactor float64, err error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var rawWidth, rawHeight C.uint32_t
+	var rawScaleFactor C.double
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_size((*C.mln_map)(unsafe.Pointer(ptr)), &rawWidth, &rawHeight, &rawScaleFactor))
+	}); err != nil {
+		return 0, 0, 0, err
+	}
+	return uint32(rawWidth), uint32(rawHeight), float64(rawScaleFactor), nil
+}
+
 // DumpDebugLogs dumps map debug logs through MapLibre Native logging.
 func (m *MapHandle) DumpDebugLogs() error {
 	ptr, release, err := m.ptr()

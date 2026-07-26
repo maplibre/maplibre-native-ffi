@@ -732,6 +732,17 @@ auto mln_map_dump_debug_logs(mln_map* map) noexcept -> mln_status {
   });
 }
 
+auto mln_map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_size(
+      map, out_width, out_height, out_scale_factor
+    );
+  });
+}
+
 auto mln_map_get_viewport_options(
   mln_map* map, mln_map_viewport_options* out_options
 ) noexcept -> mln_status {
