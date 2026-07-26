@@ -1,12 +1,15 @@
 import maplibre, {
   NativeBuffer,
   type JsonValue,
-  type RuntimeOptions,
+  type RuntimeOptionsInput,
 } from "@maplibre/native-ffi-node";
 import { MaplibreError } from "@maplibre/native-ffi-node/error";
 import { projectedMetersForLatLng } from "@maplibre/native-ffi-node/geo";
 import { setLogCallback } from "@maplibre/native-ffi-node/log";
-import { MapHandle, type StyleImageInput } from "@maplibre/native-ffi-node/map";
+import {
+  MapHandle,
+  type PremultipliedRgba8ImageInput,
+} from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
 import {
   NativePointer,
@@ -15,9 +18,9 @@ import {
 import { ResourceRequestHandle } from "@maplibre/native-ffi-node/resource";
 import { RuntimeHandle } from "@maplibre/native-ffi-node/runtime";
 
-const options: RuntimeOptions = { maximumCacheSize: 1024n };
+const options: RuntimeOptionsInput = { maximumCacheSize: 1024n };
 const json: JsonValue = { enabled: true, maxZoom: 12, tags: ["esm"] };
-const image: StyleImageInput = {
+const image: PremultipliedRgba8ImageInput = {
   width: 1,
   height: 1,
   pixels: new Uint8Array(4),

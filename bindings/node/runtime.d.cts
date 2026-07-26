@@ -1,5 +1,6 @@
 export {
   RuntimeHandle,
+  RuntimeOptions,
   cVersion,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
@@ -7,7 +8,7 @@ export {
   takeNativeLeakReports,
   networkStatus,
   setNetworkStatus,
-  type RuntimeOptions,
+  type RuntimeOptionsInput,
   type RuntimeEvent,
   type RuntimeEventPayload,
   type RuntimeEventPayloadNone,

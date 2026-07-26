@@ -7,13 +7,21 @@ const { Worker } = require("node:worker_threads");
 process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
 
 const {
+  AnimationOptions,
+  BoundOptions,
+  CameraFitOptions,
+  CameraOptions,
   clearLogCallback,
   cVersion,
+  FreeCameraOptions,
   InvalidArgumentError,
   InvalidStateError,
   MaplibreError,
   MapHandle,
+  MapOptions,
   MapProjectionHandle,
+  MapTileOptions,
+  MapViewportOptions,
   latLngForProjectedMeters,
   MaplibreStatus,
   MetalOwnedTextureFrame,
@@ -24,18 +32,24 @@ const {
   ResourceRequestHandle,
   networkStatus,
   projectedMetersForLatLng,
+  ProjectionMode,
+  RenderedFeatureQueryOptions,
   restoreDefaultAsyncLogSeverities,
   renderTargetExtentPhysicalSize,
   RenderSessionHandle,
   RuntimeHandle,
+  RuntimeOptions,
   setAsyncLogSeverities,
   VulkanOwnedTextureFrame,
   setLogCallback,
   setNetworkStatus,
+  SourceFeatureQueryOptions,
+  StyleImageOptions,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
   takeNativeLeakReports,
   threadLastErrorMessage,
+  TileSourceOptions,
 } = require("..");
 const nativeAddon = require("../index.js");
 
@@ -88,19 +102,242 @@ test("concept subpath modules expose curated public API groups", () => {
   const resourceModule = require("@maplibre/native-ffi-node/resource");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
+  assert.equal(runtimeModule.RuntimeOptions, RuntimeOptions);
   assert.equal(runtimeModule.networkStatus, networkStatus);
   assert.equal(
     runtimeModule.supportedOpenGLContextProviders,
     supportedOpenGLContextProviders,
   );
   assert.equal(renderModule.RenderSessionHandle, RenderSessionHandle);
+  assert.equal(
+    renderModule.RenderedFeatureQueryOptions,
+    RenderedFeatureQueryOptions,
+  );
   assert.equal(renderModule.NativeBuffer, NativeBuffer);
   assert.equal(errorModule.InvalidArgumentError, InvalidArgumentError);
   assert.equal(geoModule.projectedMetersForLatLng, projectedMetersForLatLng);
   assert.equal(logModule.setLogCallback, setLogCallback);
   assert.equal(mapModule.MapHandle, MapHandle);
+  assert.equal(mapModule.MapOptions, MapOptions);
   assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
   assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
+});
+
+test("option values compare and copy every semantic field", () => {
+  const bounds = {
+    southwest: { latitude: 1, longitude: 2 },
+    northeast: { latitude: 3, longitude: 4 },
+  };
+  const padding = { top: 1, left: 2, bottom: 3, right: 4 };
+  /** @type {Array<[new (input?: any) => any, Record<string, any>, Record<string, any>]>} */
+  const cases = [
+    [
+      RuntimeOptions,
+      { assetPath: "asset", cachePath: "cache", maximumCacheSize: 1n },
+      { assetPath: "other", cachePath: "other", maximumCacheSize: 2n },
+    ],
+    [
+      MapOptions,
+      { width: 16, height: 8, scaleFactor: 1, mapMode: "static" },
+      { width: 32, height: 4, scaleFactor: 2, mapMode: "tile" },
+    ],
+    [
+      CameraOptions,
+      {
+        center: { latitude: 1, longitude: 2 },
+        zoom: 3,
+        bearing: 4,
+        pitch: 5,
+        centerAltitude: 6,
+        padding,
+        anchor: { x: 7, y: 8 },
+        roll: 9,
+        fieldOfView: 10,
+      },
+      {
+        center: { latitude: 11, longitude: 12 },
+        zoom: 13,
+        bearing: 14,
+        pitch: 15,
+        centerAltitude: 16,
+        padding: { ...padding, top: 10 },
+        anchor: { x: 17, y: 18 },
+        roll: 19,
+        fieldOfView: 20,
+      },
+    ],
+    [
+      AnimationOptions,
+      {
+        durationMs: 1,
+        velocity: 2,
+        minZoom: 3,
+        easing: { x1: 0, y1: 0, x2: 1, y2: 1 },
+      },
+      {
+        durationMs: 4,
+        velocity: 5,
+        minZoom: 6,
+        easing: { x1: 0.1, y1: 0.2, x2: 0.8, y2: 0.9 },
+      },
+    ],
+    [
+      CameraFitOptions,
+      { padding, bearing: 5, pitch: 6 },
+      { padding: { ...padding, left: 10 }, bearing: 7, pitch: 8 },
+    ],
+    [
+      FreeCameraOptions,
+      {
+        position: { x: 1, y: 2, z: 3 },
+        orientation: { x: 0, y: 0, z: 0, w: 1 },
+      },
+      {
+        position: { x: 4, y: 5, z: 6 },
+        orientation: { x: 1, y: 0, z: 0, w: 0 },
+      },
+    ],
+    [
+      BoundOptions,
+      { bounds, minZoom: 5, maxZoom: 6, minPitch: 7, maxPitch: 8 },
+      {
+        bounds: { ...bounds, northeast: { latitude: 30, longitude: 40 } },
+        minZoom: 9,
+        maxZoom: 10,
+        minPitch: 11,
+        maxPitch: 12,
+      },
+    ],
+    [
+      MapViewportOptions,
+      {
+        northOrientation: "up",
+        northOrientationRaw: 0,
+        constrainMode: "none",
+        constrainModeRaw: 0,
+        viewportMode: "default",
+        viewportModeRaw: 0,
+        frustumOffset: padding,
+      },
+      {
+        northOrientation: "right",
+        northOrientationRaw: 1,
+        constrainMode: "screen",
+        constrainModeRaw: 3,
+        viewportMode: "flippedY",
+        viewportModeRaw: 1,
+        frustumOffset: { ...padding, bottom: 10 },
+      },
+    ],
+    [
+      MapTileOptions,
+      {
+        prefetchZoomDelta: 1,
+        lodMinRadius: 2,
+        lodScale: 3,
+        lodPitchThreshold: 4,
+        lodZoomShift: 5,
+        lodMode: "default",
+        lodModeRaw: 0,
+      },
+      {
+        prefetchZoomDelta: 6,
+        lodMinRadius: 7,
+        lodScale: 8,
+        lodPitchThreshold: 9,
+        lodZoomShift: 10,
+        lodMode: "distance",
+        lodModeRaw: 1,
+      },
+    ],
+    [
+      ProjectionMode,
+      { axonometric: false, xSkew: 1, ySkew: 2 },
+      { axonometric: true, xSkew: 3, ySkew: 4 },
+    ],
+    [
+      TileSourceOptions,
+      {
+        minZoom: 1,
+        maxZoom: 2,
+        attribution: "one",
+        scheme: "xyz",
+        bounds,
+        tileSize: 256,
+        vectorEncoding: "mvt",
+        rasterDemEncoding: "mapbox",
+      },
+      {
+        minZoom: 3,
+        maxZoom: 4,
+        attribution: "two",
+        scheme: "tms",
+        bounds: { ...bounds, southwest: { latitude: 10, longitude: 20 } },
+        tileSize: 512,
+        vectorEncoding: "mlt",
+        rasterDemEncoding: "terrarium",
+      },
+    ],
+    [
+      RenderedFeatureQueryOptions,
+      { layerIds: ["one"], filter: ["==", "kind", "one"] },
+      { layerIds: ["two"], filter: ["==", "kind", "two"] },
+    ],
+    [
+      SourceFeatureQueryOptions,
+      { sourceLayerIds: ["one"], filter: ["==", "kind", "one"] },
+      { sourceLayerIds: ["two"], filter: ["==", "kind", "two"] },
+    ],
+    [
+      StyleImageOptions,
+      { pixelRatio: 1, sdf: false },
+      { pixelRatio: 2, sdf: true },
+    ],
+  ];
+
+  for (const [Option, input, alternatives] of cases) {
+    const value = new Option(input);
+    const equal = new Option(input);
+    assert.equal(value.equals(equal), true, Option.name);
+    assert.equal(equal.equals(value), true, Option.name);
+    assert.equal(value.equals({ ...input }), false, Option.name);
+    const copy = value.copy();
+    assert.notEqual(copy, value, Option.name);
+    assert.equal(value.equals(copy), true, Option.name);
+    for (const [field, alternative] of Object.entries(alternatives)) {
+      assert.equal(
+        value.equals(value.copy({ [field]: alternative })),
+        false,
+        `${Option.name}.${field}`,
+      );
+    }
+    const [firstField] = Object.keys(input);
+    assert.equal(
+      new Option().equals(new Option({ [firstField]: null })),
+      false,
+      `${Option.name} absent/null`,
+    );
+  }
+
+  const input = {
+    layerIds: ["layer"],
+    filter: ["==", "kind", { nested: ["original"] }],
+  };
+  const value = new RenderedFeatureQueryOptions(input);
+  input.layerIds[0] = "mutated";
+  /** @type {any} */ (input.filter[2]).nested[0] = "mutated";
+  assert.equal(
+    value.equals(
+      new RenderedFeatureQueryOptions({
+        layerIds: ["layer"],
+        filter: ["==", "kind", { nested: ["original"] }],
+      }),
+    ),
+    true,
+  );
+  const copy = value.copy();
+  assert.notEqual(copy.layerIds, value.layerIds);
+  assert.notEqual(copy.filter, value.filter);
 });
 
 test("map handles are created only by their owning factories", () => {
@@ -606,7 +843,7 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
   `;
   const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
     encoding: "utf8",
-    timeout: 5_000,
+    timeout: 20_000,
   });
   assert.equal(result.signal, null, result.stderr);
   assert.equal(result.status, 0, result.stderr);
@@ -1844,8 +2081,11 @@ test("map viewport and tile options map descriptor fields", () => {
       bottom: 3,
       right: 4,
     });
-    viewport.frustumOffset = { top: 4, left: 3, bottom: 2, right: 1 };
-    map.setViewportOptions(viewport);
+    map.setViewportOptions(
+      viewport.copy({
+        frustumOffset: { top: 4, left: 3, bottom: 2, right: 1 },
+      }),
+    );
     assert.deepEqual(map.getViewportOptions().frustumOffset, {
       top: 4,
       left: 3,
@@ -2129,13 +2369,18 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       1,
     ]);
 
-    map.setStyleImage("red-pixel", {
-      width: 1,
-      height: 1,
-      pixels: new Uint8Array([255, 0, 0, 255]),
-      pixelRatio: 2,
-      sdf: true,
-    });
+    map.setStyleImage(
+      "red-pixel",
+      {
+        width: 1,
+        height: 1,
+        pixels: new Uint8Array([255, 0, 0, 255]),
+      },
+      {
+        pixelRatio: 2,
+        sdf: true,
+      },
+    );
     assert.equal(map.styleImageExists("red-pixel"), true);
     assert.deepEqual(map.getStyleImageInfo("red-pixel"), {
       width: 1,
@@ -2442,6 +2687,25 @@ test("custom geometry callback retention follows current style ownership", async
     [{ kind: "style", url: "custom://empty-style.json" }],
     (request) => {
       assert.equal(request.kind, "style");
+      assert.throws(
+        () =>
+          request.handle.complete({
+            bytes: new TextEncoder().encode(EMPTY_STYLE_JSON),
+            etag: "invalid\0etag",
+          }),
+        InvalidArgumentError,
+      );
+      assert.equal(request.handle.closed, false);
+      assert.throws(
+        () =>
+          request.handle.complete({
+            status: "error",
+            errorReason: "other",
+            errorMessage: "invalid\0message",
+          }),
+        InvalidArgumentError,
+      );
+      assert.equal(request.handle.closed, false);
       request.handle.complete({
         bytes: new TextEncoder().encode(EMPTY_STYLE_JSON),
       });

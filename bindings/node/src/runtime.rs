@@ -275,7 +275,6 @@ pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     has_created_map: AtomicBool,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
-    retired_resource_transforms: Mutex<Vec<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
     retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
@@ -297,7 +296,6 @@ pub fn create_native_runtime_handle(
         state,
         has_created_map: AtomicBool::new(false),
         resource_transform: Mutex::new(None),
-        retired_resource_transforms: Mutex::new(Vec::new()),
         resource_provider: Mutex::new(None),
         retired_resource_providers: Mutex::new(Vec::new()),
     })
@@ -310,17 +308,20 @@ pub fn native_resource_request_complete(
 ) -> Result<()> {
     validate_resource_request_completion_token(&completion_token)?;
     let response = resource_response_from_input(response)?;
+    let _native_response =
+        core::resource::resource_response_to_native(&response).map_err(error::from_core)?;
     let registration = resource_request_handles()
         .lock()
         .map_err(|_| error::invalid_state("resource request registry lock is poisoned"))?
         .get(&completion_token)
         .cloned()
         .ok_or_else(|| error::invalid_state("ResourceRequestHandle is closed"))?;
-    unregister_resource_request_handle(&completion_token);
-    registration
+    let result = registration
         .handle
         .complete(&response)
-        .map_err(error::from_core)
+        .map_err(error::from_core);
+    unregister_resource_request_handle(&completion_token);
+    result
 }
 
 #[napi(js_name = "nativeResourceRequestCancelled")]
@@ -430,12 +431,7 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        if let Some(replaced) = transform_slot.replace(transform) {
-            match self.retired_resource_transforms.lock() {
-                Ok(mut retired) => retired.push(replaced),
-                Err(_) => std::mem::forget(replaced),
-            }
-        }
+        *transform_slot = Some(transform);
         Ok(())
     }
 
@@ -443,17 +439,11 @@ impl NativeRuntimeHandle {
     pub fn clear_resource_transform(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
             .map_err(error::from_core)?;
-        let replaced = self
+        let mut transform = self
             .resource_transform
             .lock()
-            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
-            .take();
-        if let Some(replaced) = replaced {
-            match self.retired_resource_transforms.lock() {
-                Ok(mut retired) => retired.push(replaced),
-                Err(_) => std::mem::forget(replaced),
-            }
-        }
+            .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?;
+        *transform = None;
         Ok(())
     }
 
@@ -1539,9 +1529,6 @@ impl NativeRuntimeHandle {
         if let Ok(mut transform) = self.resource_transform.lock() {
             *transform = None;
         }
-        if let Ok(mut retired) = self.retired_resource_transforms.lock() {
-            retired.clear();
-        }
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
         }
@@ -1578,11 +1565,6 @@ impl Drop for NativeRuntimeHandle {
                 && let Some(transform) = transform.take()
             {
                 std::mem::forget(transform);
-            }
-            if let Ok(mut retired) = self.retired_resource_transforms.lock() {
-                for transform in retired.drain(..) {
-                    std::mem::forget(transform);
-                }
             }
             if let Ok(mut provider) = self.resource_provider.lock()
                 && let Some(provider) = provider.take()

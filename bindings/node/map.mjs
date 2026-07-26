@@ -1,1 +1,15 @@
-export { MapHandle, MapProjectionHandle } from "./index.mjs";
+export {
+  AnimationOptions,
+  BoundOptions,
+  CameraFitOptions,
+  CameraOptions,
+  FreeCameraOptions,
+  MapHandle,
+  MapOptions,
+  MapProjectionHandle,
+  MapTileOptions,
+  MapViewportOptions,
+  ProjectionMode,
+  StyleImageOptions,
+  TileSourceOptions,
+} from "./index.mjs";

@@ -3,6 +3,7 @@
 const root = require("./index.cjs");
 
 exports.RuntimeHandle = root.RuntimeHandle;
+exports.RuntimeOptions = root.RuntimeOptions;
 exports.cVersion = root.cVersion;
 exports.supportedRenderBackends = root.supportedRenderBackends;
 exports.supportedOpenGLContextProviders = root.supportedOpenGLContextProviders;

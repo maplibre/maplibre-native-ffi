@@ -1,5 +1,6 @@
 "use strict";
 
+const { isDeepStrictEqual } = require("node:util");
 const native = require("./index.js");
 
 const EXPECTED_C_ABI_VERSION = 0;
@@ -73,6 +74,148 @@ class NativeError extends MaplibreError {
     this.name = "NativeError";
   }
 }
+
+function copyOptionField(value) {
+  if (value == null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map(copyOptionField));
+  }
+  const copy = {};
+  for (const [key, nested] of Object.entries(value)) {
+    copy[key] = copyOptionField(nested);
+  }
+  return Object.freeze(copy);
+}
+
+class OptionValue {
+  constructor(input, fields) {
+    const source = input ?? {};
+    if (
+      typeof source !== "object" ||
+      Array.isArray(source) ||
+      source === null
+    ) {
+      throw new InvalidArgumentError(null, "option value must be an object");
+    }
+    for (const field of fields) {
+      if (Object.hasOwn(source, field) && source[field] !== undefined) {
+        Object.defineProperty(this, field, {
+          value: copyOptionField(source[field]),
+          enumerable: true,
+        });
+      }
+    }
+    Object.freeze(this);
+  }
+
+  copy(changes = {}) {
+    return new this.constructor(Object.assign({}, this, changes));
+  }
+
+  equals(other) {
+    return (
+      other != null &&
+      other.constructor === this.constructor &&
+      isDeepStrictEqual(this, other)
+    );
+  }
+}
+
+function optionClass(fields) {
+  return class extends OptionValue {
+    constructor(input) {
+      super(input, fields);
+    }
+  };
+}
+
+class RuntimeOptions extends optionClass([
+  "assetPath",
+  "cachePath",
+  "maximumCacheSize",
+]) {}
+
+class CameraOptions extends optionClass([
+  "center",
+  "zoom",
+  "bearing",
+  "pitch",
+  "centerAltitude",
+  "padding",
+  "anchor",
+  "roll",
+  "fieldOfView",
+]) {}
+
+class AnimationOptions extends optionClass([
+  "durationMs",
+  "velocity",
+  "minZoom",
+  "easing",
+]) {}
+
+class FreeCameraOptions extends optionClass(["position", "orientation"]) {}
+
+class CameraFitOptions extends optionClass(["padding", "bearing", "pitch"]) {}
+
+class MapViewportOptions extends optionClass([
+  "northOrientation",
+  "northOrientationRaw",
+  "constrainMode",
+  "constrainModeRaw",
+  "viewportMode",
+  "viewportModeRaw",
+  "frustumOffset",
+]) {}
+
+class MapTileOptions extends optionClass([
+  "prefetchZoomDelta",
+  "lodMinRadius",
+  "lodScale",
+  "lodPitchThreshold",
+  "lodZoomShift",
+  "lodMode",
+  "lodModeRaw",
+]) {}
+
+class BoundOptions extends optionClass([
+  "bounds",
+  "minZoom",
+  "maxZoom",
+  "minPitch",
+  "maxPitch",
+]) {}
+
+class ProjectionMode extends optionClass(["axonometric", "xSkew", "ySkew"]) {}
+
+class MapOptions extends optionClass([
+  "width",
+  "height",
+  "scaleFactor",
+  "mapMode",
+]) {}
+
+class RenderedFeatureQueryOptions extends optionClass(["layerIds", "filter"]) {}
+
+class SourceFeatureQueryOptions extends optionClass([
+  "sourceLayerIds",
+  "filter",
+]) {}
+
+class TileSourceOptions extends optionClass([
+  "minZoom",
+  "maxZoom",
+  "attribution",
+  "scheme",
+  "bounds",
+  "tileSize",
+  "vectorEncoding",
+  "rasterDemEncoding",
+]) {}
+
+class StyleImageOptions extends optionClass(["pixelRatio", "sdf"]) {}
 
 function cVersion() {
   return native.cVersion();
@@ -1670,7 +1813,9 @@ class MapProjectionHandle {
   }
 
   getCamera() {
-    return translateNativeErrors(() => liveNativeOf(this).getCamera());
+    return new CameraOptions(
+      translateNativeErrors(() => liveNativeOf(this).getCamera()),
+    );
   }
 
   setCamera(camera) {
@@ -2274,7 +2419,9 @@ class MapHandle {
   }
 
   getViewportOptions() {
-    return translateNativeErrors(() => liveNativeOf(this).getViewportOptions());
+    return new MapViewportOptions(
+      translateNativeErrors(() => liveNativeOf(this).getViewportOptions()),
+    );
   }
 
   setViewportOptions(options) {
@@ -2299,7 +2446,9 @@ class MapHandle {
   }
 
   getTileOptions() {
-    return translateNativeErrors(() => liveNativeOf(this).getTileOptions());
+    return new MapTileOptions(
+      translateNativeErrors(() => liveNativeOf(this).getTileOptions()),
+    );
   }
 
   setTileOptions(options) {
@@ -2317,7 +2466,9 @@ class MapHandle {
   }
 
   getBounds() {
-    return translateNativeErrors(() => liveNativeOf(this).getBounds());
+    return new BoundOptions(
+      translateNativeErrors(() => liveNativeOf(this).getBounds()),
+    );
   }
 
   setBounds(options) {
@@ -2325,8 +2476,8 @@ class MapHandle {
   }
 
   getFreeCameraOptions() {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).getFreeCameraOptions(),
+    return new FreeCameraOptions(
+      translateNativeErrors(() => liveNativeOf(this).getFreeCameraOptions()),
     );
   }
 
@@ -2337,7 +2488,9 @@ class MapHandle {
   }
 
   getProjectionMode() {
-    return translateNativeErrors(() => liveNativeOf(this).getProjectionMode());
+    return new ProjectionMode(
+      translateNativeErrors(() => liveNativeOf(this).getProjectionMode()),
+    );
   }
 
   setProjectionMode(mode) {
@@ -2347,7 +2500,9 @@ class MapHandle {
   }
 
   getCamera() {
-    return translateNativeErrors(() => liveNativeOf(this).getCamera());
+    return new CameraOptions(
+      translateNativeErrors(() => liveNativeOf(this).getCamera()),
+    );
   }
 
   jumpTo(camera) {
@@ -2367,22 +2522,28 @@ class MapHandle {
   }
 
   cameraForLatLngBounds(bounds, fitOptions) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForLatLngBounds(bounds, fitOptions ?? null),
+    return new CameraOptions(
+      translateNativeErrors(() =>
+        liveNativeOf(this).cameraForLatLngBounds(bounds, fitOptions ?? null),
+      ),
     );
   }
 
   cameraForLatLngs(coordinates, fitOptions) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForLatLngs(coordinates, fitOptions ?? null),
+    return new CameraOptions(
+      translateNativeErrors(() =>
+        liveNativeOf(this).cameraForLatLngs(coordinates, fitOptions ?? null),
+      ),
     );
   }
 
   cameraForGeometry(geometry, fitOptions) {
-    return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForGeometry(
-        stringifyJson(geometry),
-        fitOptions ?? null,
+    return new CameraOptions(
+      translateNativeErrors(() =>
+        liveNativeOf(this).cameraForGeometry(
+          stringifyJson(geometry),
+          fitOptions ?? null,
+        ),
       ),
     );
   }
@@ -2661,9 +2822,13 @@ class MapHandle {
     );
   }
 
-  setStyleImage(imageId, image) {
+  setStyleImage(imageId, image, options = null) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).setStyleImage(imageId, normalizeImageInput(image)),
+      liveNativeOf(this).setStyleImage(
+        imageId,
+        normalizeImageInput(image),
+        options,
+      ),
     );
   }
 
@@ -3059,6 +3224,20 @@ module.exports = {
   OpenGLOwnedTextureFrame,
   NativePointer,
   NativeBuffer,
+  RuntimeOptions,
+  CameraOptions,
+  AnimationOptions,
+  FreeCameraOptions,
+  CameraFitOptions,
+  MapViewportOptions,
+  MapTileOptions,
+  BoundOptions,
+  ProjectionMode,
+  MapOptions,
+  RenderedFeatureQueryOptions,
+  SourceFeatureQueryOptions,
+  TileSourceOptions,
+  StyleImageOptions,
   cVersion,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
@@ -3093,6 +3272,20 @@ module.exports.VulkanOwnedTextureFrame = VulkanOwnedTextureFrame;
 module.exports.OpenGLOwnedTextureFrame = OpenGLOwnedTextureFrame;
 module.exports.NativePointer = NativePointer;
 module.exports.NativeBuffer = NativeBuffer;
+module.exports.RuntimeOptions = RuntimeOptions;
+module.exports.CameraOptions = CameraOptions;
+module.exports.AnimationOptions = AnimationOptions;
+module.exports.FreeCameraOptions = FreeCameraOptions;
+module.exports.CameraFitOptions = CameraFitOptions;
+module.exports.MapViewportOptions = MapViewportOptions;
+module.exports.MapTileOptions = MapTileOptions;
+module.exports.BoundOptions = BoundOptions;
+module.exports.ProjectionMode = ProjectionMode;
+module.exports.MapOptions = MapOptions;
+module.exports.RenderedFeatureQueryOptions = RenderedFeatureQueryOptions;
+module.exports.SourceFeatureQueryOptions = SourceFeatureQueryOptions;
+module.exports.TileSourceOptions = TileSourceOptions;
+module.exports.StyleImageOptions = StyleImageOptions;
 module.exports.cVersion = cVersion;
 module.exports.supportedRenderBackends = supportedRenderBackends;
 module.exports.supportedOpenGLContextProviders =

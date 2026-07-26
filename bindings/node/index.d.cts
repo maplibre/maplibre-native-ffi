@@ -87,10 +87,19 @@ export interface NativeLeakReport {
   address: bigint;
 }
 
-export interface RuntimeOptions {
+export interface RuntimeOptionsInput {
   assetPath?: string | null;
   cachePath?: string | null;
   maximumCacheSize?: bigint | null;
+}
+
+export declare class RuntimeOptions implements RuntimeOptionsInput {
+  constructor(input?: RuntimeOptionsInput | null);
+  readonly assetPath?: string | null;
+  readonly cachePath?: string | null;
+  readonly maximumCacheSize?: bigint | null;
+  equals(other: unknown): boolean;
+  copy(changes?: RuntimeOptionsInput | null): RuntimeOptions;
 }
 
 export interface RuntimeEvent {
@@ -276,7 +285,7 @@ export type MapDebugOption =
   | "stencilClip"
   | "depthBuffer";
 
-export interface CameraOptions {
+export interface CameraOptionsInput {
   center?: LatLng | null;
   zoom?: number | null;
   bearing?: number | null;
@@ -288,6 +297,21 @@ export interface CameraOptions {
   fieldOfView?: number | null;
 }
 
+export declare class CameraOptions implements CameraOptionsInput {
+  constructor(input?: CameraOptionsInput | null);
+  readonly center?: LatLng | null;
+  readonly zoom?: number | null;
+  readonly bearing?: number | null;
+  readonly pitch?: number | null;
+  readonly centerAltitude?: number | null;
+  readonly padding?: EdgeInsets | null;
+  readonly anchor?: ScreenPoint | null;
+  readonly roll?: number | null;
+  readonly fieldOfView?: number | null;
+  equals(other: unknown): boolean;
+  copy(changes?: CameraOptionsInput | null): CameraOptions;
+}
+
 export interface UnitBezier {
   x1: number;
   y1: number;
@@ -295,11 +319,21 @@ export interface UnitBezier {
   y2: number;
 }
 
-export interface AnimationOptions {
+export interface AnimationOptionsInput {
   durationMs?: number | null;
   velocity?: number | null;
   minZoom?: number | null;
   easing?: UnitBezier | null;
+}
+
+export declare class AnimationOptions implements AnimationOptionsInput {
+  constructor(input?: AnimationOptionsInput | null);
+  readonly durationMs?: number | null;
+  readonly velocity?: number | null;
+  readonly minZoom?: number | null;
+  readonly easing?: UnitBezier | null;
+  equals(other: unknown): boolean;
+  copy(changes?: AnimationOptionsInput | null): AnimationOptions;
 }
 
 export interface Vec3 {
@@ -315,9 +349,17 @@ export interface Quaternion {
   w: number;
 }
 
-export interface FreeCameraOptions {
+export interface FreeCameraOptionsInput {
   position?: Vec3 | null;
   orientation?: Quaternion | null;
+}
+
+export declare class FreeCameraOptions implements FreeCameraOptionsInput {
+  constructor(input?: FreeCameraOptionsInput | null);
+  readonly position?: Vec3 | null;
+  readonly orientation?: Quaternion | null;
+  equals(other: unknown): boolean;
+  copy(changes?: FreeCameraOptionsInput | null): FreeCameraOptions;
 }
 
 export interface EdgeInsets {
@@ -327,10 +369,19 @@ export interface EdgeInsets {
   right: number;
 }
 
-export interface CameraFitOptions {
+export interface CameraFitOptionsInput {
   padding?: EdgeInsets | null;
   bearing?: number | null;
   pitch?: number | null;
+}
+
+export declare class CameraFitOptions implements CameraFitOptionsInput {
+  constructor(input?: CameraFitOptionsInput | null);
+  readonly padding?: EdgeInsets | null;
+  readonly bearing?: number | null;
+  readonly pitch?: number | null;
+  equals(other: unknown): boolean;
+  copy(changes?: CameraFitOptionsInput | null): CameraFitOptions;
 }
 
 type NorthOrientationInput =
@@ -373,7 +424,30 @@ export type MapViewportOptionsInput = NorthOrientationInput &
     frustumOffset?: EdgeInsets | null;
   };
 
-export type MapViewportOptions = MapViewportOptionsInput;
+export declare class MapViewportOptions {
+  constructor(input?: MapViewportOptionsInput | null);
+  readonly northOrientation?:
+    | "up"
+    | "right"
+    | "down"
+    | "left"
+    | "unknown"
+    | null;
+  readonly northOrientationRaw?: number | null;
+  readonly constrainMode?:
+    | "none"
+    | "heightOnly"
+    | "widthAndHeight"
+    | "screen"
+    | "unknown"
+    | null;
+  readonly constrainModeRaw?: number | null;
+  readonly viewportMode?: "default" | "flippedY" | "unknown" | null;
+  readonly viewportModeRaw?: number | null;
+  readonly frustumOffset?: EdgeInsets | null;
+  equals(other: unknown): boolean;
+  copy(changes?: MapViewportOptionsInput | null): MapViewportOptions;
+}
 
 type MapTileOptionsInputFields = {
   prefetchZoomDelta?: number | null;
@@ -392,9 +466,20 @@ export type MapTileOptionsInput = MapTileOptionsInputFields &
     | { lodMode: "unknown"; lodModeRaw: number }
   );
 
-export type MapTileOptions = MapTileOptionsInput;
+export declare class MapTileOptions {
+  constructor(input?: MapTileOptionsInput | null);
+  readonly prefetchZoomDelta?: number | null;
+  readonly lodMinRadius?: number | null;
+  readonly lodScale?: number | null;
+  readonly lodPitchThreshold?: number | null;
+  readonly lodZoomShift?: number | null;
+  readonly lodMode?: "default" | "distance" | "unknown" | null;
+  readonly lodModeRaw?: number | null;
+  equals(other: unknown): boolean;
+  copy(changes?: MapTileOptionsInput | null): MapTileOptions;
+}
 
-export interface BoundOptions {
+export interface BoundOptionsInput {
   bounds?: LatLngBounds | null;
   minZoom?: number | null;
   maxZoom?: number | null;
@@ -402,17 +487,47 @@ export interface BoundOptions {
   maxPitch?: number | null;
 }
 
-export interface ProjectionMode {
+export declare class BoundOptions implements BoundOptionsInput {
+  constructor(input?: BoundOptionsInput | null);
+  readonly bounds?: LatLngBounds | null;
+  readonly minZoom?: number | null;
+  readonly maxZoom?: number | null;
+  readonly minPitch?: number | null;
+  readonly maxPitch?: number | null;
+  equals(other: unknown): boolean;
+  copy(changes?: BoundOptionsInput | null): BoundOptions;
+}
+
+export interface ProjectionModeInput {
   axonometric?: boolean | null;
   xSkew?: number | null;
   ySkew?: number | null;
 }
 
-export interface MapOptions {
+export declare class ProjectionMode implements ProjectionModeInput {
+  constructor(input?: ProjectionModeInput | null);
+  readonly axonometric?: boolean | null;
+  readonly xSkew?: number | null;
+  readonly ySkew?: number | null;
+  equals(other: unknown): boolean;
+  copy(changes?: ProjectionModeInput | null): ProjectionMode;
+}
+
+export interface MapOptionsInput {
   width?: number | null;
   height?: number | null;
   scaleFactor?: number | null;
   mapMode?: "continuous" | "static" | "tile" | null;
+}
+
+export declare class MapOptions implements MapOptionsInput {
+  constructor(input?: MapOptionsInput | null);
+  readonly width?: number | null;
+  readonly height?: number | null;
+  readonly scaleFactor?: number | null;
+  readonly mapMode?: "continuous" | "static" | "tile" | null;
+  equals(other: unknown): boolean;
+  copy(changes?: MapOptionsInput | null): MapOptions;
 }
 
 export declare class NativePointer {
@@ -536,9 +651,9 @@ export declare class ResourceRequestHandle {
 }
 
 export declare class RuntimeHandle {
-  constructor(options?: RuntimeOptions | null);
+  constructor(options?: RuntimeOptionsInput | RuntimeOptions | null);
   readonly closed: boolean;
-  createMap(options?: MapOptions | null): MapHandle;
+  createMap(options?: MapOptionsInput | MapOptions | null): MapHandle;
   close(): void;
   runOnce(): void;
   setResourceTransformRules(rules: readonly ResourceTransformRule[]): void;
@@ -865,14 +980,34 @@ export type RenderedQueryGeometry =
   | { kind: "box"; box: ScreenBox }
   | { kind: "lineString"; points: ScreenPoint[] };
 
-export interface RenderedFeatureQueryOptions {
-  layerIds?: string[] | null;
+export interface RenderedFeatureQueryOptionsInput {
+  layerIds?: readonly string[] | null;
   filter?: JsonValue | null;
 }
 
-export interface SourceFeatureQueryOptions {
-  sourceLayerIds?: string[] | null;
+export declare class RenderedFeatureQueryOptions implements RenderedFeatureQueryOptionsInput {
+  constructor(input?: RenderedFeatureQueryOptionsInput | null);
+  readonly layerIds?: readonly string[] | null;
+  readonly filter?: JsonValue | null;
+  equals(other: unknown): boolean;
+  copy(
+    changes?: RenderedFeatureQueryOptionsInput | null,
+  ): RenderedFeatureQueryOptions;
+}
+
+export interface SourceFeatureQueryOptionsInput {
+  sourceLayerIds?: readonly string[] | null;
   filter?: JsonValue | null;
+}
+
+export declare class SourceFeatureQueryOptions implements SourceFeatureQueryOptionsInput {
+  constructor(input?: SourceFeatureQueryOptionsInput | null);
+  readonly sourceLayerIds?: readonly string[] | null;
+  readonly filter?: JsonValue | null;
+  equals(other: unknown): boolean;
+  copy(
+    changes?: SourceFeatureQueryOptionsInput | null,
+  ): SourceFeatureQueryOptions;
 }
 
 export interface QueriedFeature {
@@ -903,11 +1038,14 @@ export declare class RenderSessionHandle {
   removeFeatureState(selector: FeatureStateSelector): void;
   queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
-    options?: RenderedFeatureQueryOptions | null,
+    options?:
+      | RenderedFeatureQueryOptionsInput
+      | RenderedFeatureQueryOptions
+      | null,
   ): QueriedFeature[];
   querySourceFeatures(
     sourceId: string,
-    options?: SourceFeatureQueryOptions | null,
+    options?: SourceFeatureQueryOptionsInput | SourceFeatureQueryOptions | null,
   ): QueriedFeature[];
   queryFeatureExtension(
     sourceId: string,
@@ -928,7 +1066,7 @@ export declare class MapProjectionHandle {
   readonly closed: boolean;
   close(): void;
   getCamera(): CameraOptions;
-  setCamera(camera: CameraOptions): void;
+  setCamera(camera: CameraOptionsInput | CameraOptions): void;
   setVisibleCoordinates(coordinates: LatLng[], padding: EdgeInsets): void;
   setVisibleGeometry(geometry: JsonValue, padding: EdgeInsets): void;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
@@ -937,7 +1075,10 @@ export declare class MapProjectionHandle {
 }
 
 export declare class MapHandle {
-  private constructor(runtime: RuntimeHandle, options?: MapOptions | null);
+  private constructor(
+    runtime: RuntimeHandle,
+    options?: MapOptionsInput | MapOptions | null,
+  );
   readonly closed: boolean;
   renderingStatsViewEnabled: boolean;
   close(): void;
@@ -971,15 +1112,19 @@ export declare class MapHandle {
   getDebugOptionsRawMask(): number;
   setDebugOptions(options: Iterable<MapDebugOption>): void;
   getViewportOptions(): MapViewportOptions;
-  setViewportOptions(options: MapViewportOptionsInput): void;
+  setViewportOptions(
+    options: MapViewportOptionsInput | MapViewportOptions,
+  ): void;
   getTileOptions(): MapTileOptions;
-  setTileOptions(options: MapTileOptionsInput): void;
+  setTileOptions(options: MapTileOptionsInput | MapTileOptions): void;
   getBounds(): BoundOptions;
-  setBounds(options: BoundOptions): void;
+  setBounds(options: BoundOptionsInput | BoundOptions): void;
   getFreeCameraOptions(): FreeCameraOptions;
-  setFreeCameraOptions(options: FreeCameraOptions): void;
+  setFreeCameraOptions(
+    options: FreeCameraOptionsInput | FreeCameraOptions,
+  ): void;
   getProjectionMode(): ProjectionMode;
-  setProjectionMode(mode: ProjectionMode): void;
+  setProjectionMode(mode: ProjectionModeInput | ProjectionMode): void;
   moveBy(deltaX: number, deltaY: number): void;
   scaleBy(scale: number, anchor?: ScreenPoint | null): void;
   rotateBy(first: ScreenPoint, second: ScreenPoint): void;
@@ -987,38 +1132,51 @@ export declare class MapHandle {
   moveByAnimated(
     deltaX: number,
     deltaY: number,
-    animation?: AnimationOptions | null,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
   ): void;
   scaleByAnimated(
     scale: number,
     anchor?: ScreenPoint | null,
-    animation?: AnimationOptions | null,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
   ): void;
   rotateByAnimated(
     first: ScreenPoint,
     second: ScreenPoint,
-    animation?: AnimationOptions | null,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
   ): void;
-  pitchByAnimated(pitch: number, animation?: AnimationOptions | null): void;
+  pitchByAnimated(
+    pitch: number,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
+  ): void;
   cancelTransitions(): void;
   getCamera(): CameraOptions;
-  jumpTo(camera: CameraOptions): void;
-  easeTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
-  flyTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
+  jumpTo(camera: CameraOptionsInput | CameraOptions): void;
+  easeTo(
+    camera: CameraOptionsInput | CameraOptions,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
+  ): void;
+  flyTo(
+    camera: CameraOptionsInput | CameraOptions,
+    animation?: AnimationOptionsInput | AnimationOptions | null,
+  ): void;
   cameraForLatLngBounds(
     bounds: LatLngBounds,
-    fitOptions?: CameraFitOptions | null,
+    fitOptions?: CameraFitOptionsInput | CameraFitOptions | null,
   ): CameraOptions;
   cameraForLatLngs(
     coordinates: LatLng[],
-    fitOptions?: CameraFitOptions | null,
+    fitOptions?: CameraFitOptionsInput | CameraFitOptions | null,
   ): CameraOptions;
   cameraForGeometry(
     geometry: JsonValue,
-    fitOptions?: CameraFitOptions | null,
+    fitOptions?: CameraFitOptionsInput | CameraFitOptions | null,
   ): CameraOptions;
-  latLngBoundsForCamera(camera: CameraOptions): LatLngBounds;
-  latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds;
+  latLngBoundsForCamera(
+    camera: CameraOptionsInput | CameraOptions,
+  ): LatLngBounds;
+  latLngBoundsForCameraUnwrapped(
+    camera: CameraOptionsInput | CameraOptions,
+  ): LatLngBounds;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
   latLngForPixel(point: ScreenPoint): LatLng;
   pixelsForLatLngs(coordinates: LatLng[]): ScreenPoint[];
@@ -1036,32 +1194,32 @@ export declare class MapHandle {
   addVectorSourceUrl(
     sourceId: string,
     url: string,
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addRasterSourceUrl(
     sourceId: string,
     url: string,
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addRasterDemSourceUrl(
     sourceId: string,
     url: string,
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addVectorSourceTiles(
     sourceId: string,
     tiles: readonly string[],
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addRasterSourceTiles(
     sourceId: string,
     tiles: readonly string[],
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addRasterDemSourceTiles(
     sourceId: string,
     tiles: readonly string[],
-    options?: TileSourceOptions | null,
+    options?: TileSourceOptionsInput | TileSourceOptions | null,
   ): void;
   addCustomGeometrySource(
     sourceId: string,
@@ -1080,7 +1238,11 @@ export declare class MapHandle {
     sourceId: string,
     bounds: LatLngBounds,
   ): void;
-  setStyleImage(imageId: string, image: StyleImageInput): void;
+  setStyleImage(
+    imageId: string,
+    image: PremultipliedRgba8ImageInput,
+    options?: StyleImageOptionsInput | StyleImageOptions | null,
+  ): void;
   styleImageExists(imageId: string): boolean;
   removeStyleImage(imageId: string): boolean;
   getStyleImageInfo(imageId: string): StyleImageInfo | null;
@@ -1208,7 +1370,7 @@ export interface StyleSourceInfo {
   attribution?: string | null;
 }
 
-export interface TileSourceOptions {
+export interface TileSourceOptionsInput {
   minZoom?: number | null;
   maxZoom?: number | null;
   attribution?: string | null;
@@ -1217,6 +1379,20 @@ export interface TileSourceOptions {
   tileSize?: number | null;
   vectorEncoding?: "mvt" | "mlt" | null;
   rasterDemEncoding?: "mapbox" | "terrarium" | null;
+}
+
+export declare class TileSourceOptions implements TileSourceOptionsInput {
+  constructor(input?: TileSourceOptionsInput | null);
+  readonly minZoom?: number | null;
+  readonly maxZoom?: number | null;
+  readonly attribution?: string | null;
+  readonly scheme?: "xyz" | "tms" | null;
+  readonly bounds?: LatLngBounds | null;
+  readonly tileSize?: number | null;
+  readonly vectorEncoding?: "mvt" | "mlt" | null;
+  readonly rasterDemEncoding?: "mapbox" | "terrarium" | null;
+  equals(other: unknown): boolean;
+  copy(changes?: TileSourceOptionsInput | null): TileSourceOptions;
 }
 
 export interface CanonicalTileId {
@@ -1246,9 +1422,17 @@ export interface PremultipliedRgba8ImageInput {
   pixels: Uint8Array;
 }
 
-export interface StyleImageInput extends PremultipliedRgba8ImageInput {
+export interface StyleImageOptionsInput {
   pixelRatio?: number | null;
   sdf?: boolean | null;
+}
+
+export declare class StyleImageOptions implements StyleImageOptionsInput {
+  constructor(input?: StyleImageOptionsInput | null);
+  readonly pixelRatio?: number | null;
+  readonly sdf?: boolean | null;
+  equals(other: unknown): boolean;
+  copy(changes?: StyleImageOptionsInput | null): StyleImageOptions;
 }
 
 export interface StyleImageInfo {

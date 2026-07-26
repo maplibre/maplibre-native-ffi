@@ -1,5 +1,6 @@
 export {
   RuntimeHandle,
+  RuntimeOptions,
   cVersion,
   networkStatus,
   setNetworkStatus,

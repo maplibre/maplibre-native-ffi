@@ -8,4 +8,6 @@ exports.VulkanOwnedTextureFrame = root.VulkanOwnedTextureFrame;
 exports.OpenGLOwnedTextureFrame = root.OpenGLOwnedTextureFrame;
 exports.NativePointer = root.NativePointer;
 exports.NativeBuffer = root.NativeBuffer;
+exports.RenderedFeatureQueryOptions = root.RenderedFeatureQueryOptions;
+exports.SourceFeatureQueryOptions = root.SourceFeatureQueryOptions;
 exports.renderTargetExtentPhysicalSize = root.renderTargetExtentPhysicalSize;

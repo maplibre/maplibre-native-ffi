@@ -10,6 +10,7 @@ use std::{
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
+use napi::Env;
 use napi::bindgen_prelude::{BigInt, Result, Uint8Array};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
@@ -189,11 +190,8 @@ pub struct PremultipliedRgba8ImageInput {
 }
 
 #[napi(object)]
-pub struct StyleImageInput {
-    pub width: u32,
-    pub height: u32,
-    pub stride: Option<u32>,
-    pub pixels: Uint8Array,
+#[derive(Default)]
+pub struct StyleImageOptions {
     pub pixel_ratio: Option<f64>,
     pub sdf: Option<bool>,
 }
@@ -1110,11 +1108,13 @@ impl NativeMapHandle {
     #[napi(js_name = "addCustomGeometrySource")]
     pub fn add_custom_geometry_source(
         &self,
+        env: Env,
         source_id: String,
         options: Option<CustomGeometrySourceOptions>,
-        fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
-        cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+        mut fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+        mut cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
     ) -> Result<()> {
+        unref_custom_geometry_callbacks(&env, &mut fetch_tile, &mut cancel_tile)?;
         let source_id_view = core::string::string_view(&source_id);
         let state = CustomGeometrySourceRegistration::new(CustomGeometrySourceState::new(
             fetch_tile,
@@ -1193,7 +1193,12 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "setStyleImage")]
-    pub fn set_style_image(&self, image_id: String, image: StyleImageInput) -> Result<()> {
+    pub fn set_style_image(
+        &self,
+        image_id: String,
+        image: PremultipliedRgba8ImageInput,
+        options: Option<StyleImageOptions>,
+    ) -> Result<()> {
         let image_id = core::string::string_view(&image_id);
         let stride = image.stride.unwrap_or(image.width.saturating_mul(4));
         let mut raw_image = unsafe { sys::mln_premultiplied_rgba8_image_default() };
@@ -1202,17 +1207,23 @@ impl NativeMapHandle {
         raw_image.stride = stride;
         raw_image.pixels = image.pixels.as_ptr();
         raw_image.byte_length = image.pixels.len();
-        let mut options = unsafe { sys::mln_style_image_options_default() };
-        if let Some(pixel_ratio) = image.pixel_ratio {
-            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-            options.pixel_ratio = pixel_ratio as f32;
+        let input_options = options.unwrap_or_default();
+        let mut native_options = unsafe { sys::mln_style_image_options_default() };
+        if let Some(pixel_ratio) = input_options.pixel_ratio {
+            native_options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            native_options.pixel_ratio = pixel_ratio as f32;
         }
-        if let Some(sdf) = image.sdf {
-            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
-            options.sdf = sdf;
+        if let Some(sdf) = input_options.sdf {
+            native_options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            native_options.sdf = sdf;
         }
         core::check(unsafe {
-            sys::mln_map_set_style_image(self.state.as_ptr(), image_id.raw(), &raw_image, &options)
+            sys::mln_map_set_style_image(
+                self.state.as_ptr(),
+                image_id.raw(),
+                &raw_image,
+                &native_options,
+            )
         })
         .map_err(error::from_core)
     }
@@ -2481,6 +2492,22 @@ impl NativeMapHandle {
             sources.clear();
         }
     }
+}
+
+fn unref_custom_geometry_callbacks(
+    env: &Env,
+    fetch_tile: &mut Option<ThreadsafeFunction<CanonicalTileId>>,
+    cancel_tile: &mut Option<ThreadsafeFunction<CanonicalTileId>>,
+) -> Result<()> {
+    if let Some(callback) = fetch_tile.as_mut() {
+        #[allow(deprecated)]
+        callback.unref(env)?;
+    }
+    if let Some(callback) = cancel_tile.as_mut() {
+        #[allow(deprecated)]
+        callback.unref(env)?;
+    }
+    Ok(())
 }
 
 impl CustomGeometrySourceState {

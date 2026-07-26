@@ -6,14 +6,25 @@ import {
 } from "@maplibre/native-ffi-node/geo";
 import { setLogCallback, type LogRecord } from "@maplibre/native-ffi-node/log";
 import {
+  AnimationOptions,
+  BoundOptions,
+  CameraFitOptions,
+  CameraOptions,
+  FreeCameraOptions,
   MapHandle,
-  type CameraOptions,
+  MapOptions,
+  MapTileOptions,
+  MapViewportOptions,
+  ProjectionMode,
+  StyleImageOptions,
+  TileSourceOptions,
+  type CameraOptionsInput,
   type CustomGeometrySourceOptions,
   type LocationIndicatorImageKind,
   type MapTileOptionsInput,
   type MapViewportOptionsInput,
+  type PremultipliedRgba8ImageInput,
   type StyleImageInfo,
-  type StyleImageInput,
   type StyleSourceTypeValue,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
@@ -21,7 +32,9 @@ import type { OfflineRegionDownloadStateValue } from "@maplibre/native-ffi-node/
 import {
   NativeBuffer,
   NativePointer,
+  RenderedFeatureQueryOptions,
   RenderSessionHandle,
+  SourceFeatureQueryOptions,
   type FeatureStateSelector,
   type MetalBorrowedTextureDescriptor,
   type MetalOwnedTextureDescriptor,
@@ -37,6 +50,7 @@ import {
   type ResourceRoute,
   type ResourceTransformRule,
 } from "@maplibre/native-ffi-node/resource";
+import { RuntimeOptions } from "@maplibre/native-ffi-node/runtime";
 import {
   RuntimeHandle,
   networkStatus,
@@ -44,7 +58,9 @@ import {
   type NativeLeakReport,
 } from "@maplibre/native-ffi-node/runtime";
 
-const camera: CameraOptions = { center: { latitude: 1, longitude: 2 } };
+const camera: CameraOptionsInput = {
+  center: { latitude: 1, longitude: 2 },
+};
 const coordinate: LatLng = { latitude: 1, longitude: 2 };
 projectedMetersForLatLng(coordinate);
 setLogCallback((record: LogRecord) => {
@@ -161,11 +177,28 @@ const invalidTransformRuleBothReplacements: ResourceTransformRule = {
   replacementUrl: "https://example.test/a",
   replacementUrlPrefix: "https://example.test/",
 };
-const image: StyleImageInput = {
+const image: PremultipliedRgba8ImageInput = {
   width: 1,
   height: 1,
   pixels: new Uint8Array(4),
 };
+const optionValues = [
+  new RuntimeOptions({ maximumCacheSize: 1n }),
+  new MapOptions({ width: 1 }),
+  new CameraOptions({ zoom: 1 }),
+  new AnimationOptions({ durationMs: 1 }),
+  new CameraFitOptions({ bearing: 1 }),
+  new FreeCameraOptions({ position: { x: 1, y: 2, z: 3 } }),
+  new BoundOptions({ minZoom: 1 }),
+  new MapViewportOptions({ viewportMode: "default" }),
+  new MapTileOptions({ lodMode: "default" }),
+  new ProjectionMode({ axonometric: true }),
+  new TileSourceOptions({ tileSize: 256 }),
+  new RenderedFeatureQueryOptions({ layerIds: ["layer"] }),
+  new SourceFeatureQueryOptions({ sourceLayerIds: ["source-layer"] }),
+  new StyleImageOptions({ pixelRatio: 2 }),
+];
+void optionValues.map((value) => value.copy().equals(value));
 const imageInfo: StyleImageInfo = {
   width: 1,
   height: 1,

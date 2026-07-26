@@ -23,3 +23,12 @@ semantic limits as JavaScript JSON:
 
 Use `MapHandle.setStyleJson(json: string)` when a style document must pass
 through as raw JSON text without wrapper parsing or reformatting.
+
+## Option values
+
+Public option values are immutable wrappers with `equals(other)` for deep
+field-value equality and `copy(changes)` for an independent, optionally modified
+copy. JavaScript's `===` operator always compares object identity and cannot be
+overloaded, so `equals` is the binding's language-specific equality operation.
+API inputs also accept the corresponding structural `*Input` objects for
+ergonomic object literals, and option-valued getters return wrappers.
