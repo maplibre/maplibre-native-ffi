@@ -7,6 +7,7 @@
 "aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
 "conda:doxygen" = { version = "{{vars.doxygen_version}}", os = ["linux", "macos", "windows/x64"] }
+"conda:sdl3" = { version = "3.2", os = ["linux"] }
 "core:dotnet" = "{{vars.dotnet_version}}"
 "core:go" = "{{vars.go_version}}"
 "core:java" = "{{vars.java_version}}"
