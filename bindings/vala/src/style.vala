@@ -208,6 +208,39 @@ namespace MaplibreNative {
         public StyleVectorTileEncoding? vector_encoding { get; set; }
         public StyleRasterDemEncoding? raster_encoding { get; set; }
 
+        public StyleTileSourceOptions copy () {
+            var copied = new StyleTileSourceOptions ();
+            copied.min_zoom = min_zoom;
+            copied.max_zoom = max_zoom;
+            copied.attribution = attribution;
+            copied.scheme = scheme;
+            copied.bounds = bounds;
+            copied.tile_size = tile_size;
+            copied.vector_encoding = vector_encoding;
+            copied.raster_encoding = raster_encoding;
+            return copied;
+        }
+
+        public bool equal (StyleTileSourceOptions other) {
+            if (min_zoom != other.min_zoom
+                || max_zoom != other.max_zoom
+                || attribution != other.attribution
+                || scheme != other.scheme
+                || tile_size != other.tile_size
+                || vector_encoding != other.vector_encoding
+                || raster_encoding != other.raster_encoding
+                || (bounds == null) != (other.bounds == null)) {
+                return false;
+            }
+            if (bounds != null && other.bounds != null) {
+                return bounds.southwest.latitude == other.bounds.southwest.latitude
+                    && bounds.southwest.longitude == other.bounds.southwest.longitude
+                    && bounds.northeast.latitude == other.bounds.northeast.latitude
+                    && bounds.northeast.longitude == other.bounds.northeast.longitude;
+            }
+            return true;
+        }
+
         internal Raw.StyleTileSourceOptions to_native () throws Error {
             Raw.StyleTileSourceOptions options = Raw.style_tile_source_options_default ();
             if (min_zoom != null) {
@@ -281,6 +314,17 @@ namespace MaplibreNative {
     public class StyleImageOptions {
         public float? pixel_ratio { get; set; }
         public bool? sdf { get; set; }
+
+        public StyleImageOptions copy () {
+            var copied = new StyleImageOptions ();
+            copied.pixel_ratio = pixel_ratio;
+            copied.sdf = sdf;
+            return copied;
+        }
+
+        public bool equal (StyleImageOptions other) {
+            return pixel_ratio == other.pixel_ratio && sdf == other.sdf;
+        }
 
         internal Raw.StyleImageOptions to_native () {
             Raw.StyleImageOptions options = Raw.style_image_options_default ();

@@ -143,6 +143,31 @@ namespace MaplibreNative {
             this.filter = filter;
         }
 
+        public RenderedFeatureQueryOptions copy () {
+            var copied = new RenderedFeatureQueryOptions ();
+            copied.has_layer_ids = has_layer_ids;
+            copied.layer_ids = new string[layer_ids.length];
+            for (var index = 0; index < layer_ids.length; index++) {
+                copied.layer_ids[index] = layer_ids[index];
+            }
+            copied.filter = filter == null ? null : filter.copy ();
+            return copied;
+        }
+
+        public bool equal (RenderedFeatureQueryOptions other) {
+            if (has_layer_ids != other.has_layer_ids || layer_ids.length != other.layer_ids.length) {
+                return false;
+            }
+            for (var index = 0; index < layer_ids.length; index++) {
+                if (layer_ids[index] != other.layer_ids[index]) {
+                    return false;
+                }
+            }
+            return filter == null
+                ? other.filter == null
+                : other.filter != null && filter.equal (other.filter);
+        }
+
         internal Raw.RenderedFeatureQueryOptions to_native () throws Error {
             Raw.RenderedFeatureQueryOptions native = Raw.rendered_feature_query_options_default ();
             if (has_layer_ids) {
@@ -183,6 +208,32 @@ namespace MaplibreNative {
 
         public void set_filter (JsonValue filter) {
             this.filter = filter;
+        }
+
+        public SourceFeatureQueryOptions copy () {
+            var copied = new SourceFeatureQueryOptions ();
+            copied.has_source_layer_ids = has_source_layer_ids;
+            copied.source_layer_ids = new string[source_layer_ids.length];
+            for (var index = 0; index < source_layer_ids.length; index++) {
+                copied.source_layer_ids[index] = source_layer_ids[index];
+            }
+            copied.filter = filter == null ? null : filter.copy ();
+            return copied;
+        }
+
+        public bool equal (SourceFeatureQueryOptions other) {
+            if (has_source_layer_ids != other.has_source_layer_ids
+                || source_layer_ids.length != other.source_layer_ids.length) {
+                return false;
+            }
+            for (var index = 0; index < source_layer_ids.length; index++) {
+                if (source_layer_ids[index] != other.source_layer_ids[index]) {
+                    return false;
+                }
+            }
+            return filter == null
+                ? other.filter == null
+                : other.filter != null && filter.equal (other.filter);
         }
 
         internal Raw.SourceFeatureQueryOptions to_native () throws Error {

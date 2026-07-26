@@ -342,11 +342,21 @@ namespace MaplibreNative {
         }
     }
 
-    public struct NativePointer {
-        public size_t bits;
+    public class NativePointer {
+        private size_t bits;
 
-        public NativePointer (size_t bits) {
+        private NativePointer (size_t bits) {
             this.bits = bits;
+        }
+
+        /**
+         * Creates a non-owning backend pointer.
+         *
+         * The caller keeps the pointed-to native resource valid and synchronized
+         * for every C API borrow window that uses this value.
+         */
+        public static NativePointer borrowed (size_t bits) {
+            return new NativePointer (bits);
         }
 
         public bool is_null () {

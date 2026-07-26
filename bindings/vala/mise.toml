@@ -54,7 +54,11 @@ STUB
   ${CC:-cc} -c build/metal_support_stub.c -o "$metal_support_object"
 fi
 
-read -r -a native_args <<< "$(pkg-config --cflags --libs maplibre-native-c vulkan)"
+native_packages=(maplibre-native-c vulkan)
+if [[ "$(uname -s)" == "Linux" ]]; then
+  native_packages+=(egl)
+fi
+read -r -a native_args <<< "$(pkg-config --cflags --libs "${native_packages[@]}")"
 compiler_args=()
 for argument in "${native_args[@]}"; do
   compiler_args+=(-X "$argument")
@@ -71,6 +75,7 @@ valac \
   -X "$metal_support_object" \
   src/*.vala \
   tests/compile/minimal.vala \
+  tests/compile/opengl_support.c \
   tests/compile/vulkan_support.c \
   -o build/minimal
 

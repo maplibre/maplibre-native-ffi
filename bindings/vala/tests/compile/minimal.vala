@@ -70,6 +70,24 @@ extern void vulkan_test_surface_destroy(ref VulkanTestContext context, void* sur
 [CCode(cname = "mln_vala_vulkan_test_context_destroy")]
 extern void vulkan_test_context_destroy(ref VulkanTestContext context);
 
+[SimpleType]
+[CCode(cname = "MlnValaOpenGLTestContext")]
+struct OpenGLTestContext {
+  public void* display;
+  public void* config;
+  public void* context;
+  public void* surface;
+}
+
+[CCode(cname = "mln_vala_opengl_test_context_supported")]
+extern bool opengl_test_context_supported();
+
+[CCode(cname = "mln_vala_opengl_test_context_create")]
+extern bool opengl_test_context_create(uint32 width, uint32 height, out OpenGLTestContext context);
+
+[CCode(cname = "mln_vala_opengl_test_context_destroy")]
+extern void opengl_test_context_destroy(ref OpenGLTestContext context);
+
 int log_count = 0;
 int resource_transform_count = 0;
 int resource_provider_request_count = 0;
@@ -138,6 +156,319 @@ bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, MaplibreNative
     GLib.Thread.usleep(1000);
   }
   return false;
+}
+
+void exercise_runtime_close_race() throws MaplibreNative.Error {
+  var runtime = new MaplibreNative.RuntimeHandle();
+  Mutex state_mutex = Mutex();
+  Cond state_changed = Cond();
+  bool lease_acquired = false;
+  bool release_lease = false;
+  bool close_rejected_new_call = false;
+  bool holder_failed = false;
+
+  var holder = new GLib.Thread<void>("vala-runtime-lease-holder", () => {
+    try {
+      var lease = runtime.require_live();
+      state_mutex.lock();
+      lease_acquired = true;
+      state_changed.broadcast();
+      while (!release_lease) {
+        state_changed.wait(state_mutex);
+      }
+      state_mutex.unlock();
+      assert(lease.native != null);
+    } catch (MaplibreNative.Error error) {
+      holder_failed = true;
+    }
+  });
+
+  state_mutex.lock();
+  while (!lease_acquired) {
+    state_changed.wait(state_mutex);
+  }
+  state_mutex.unlock();
+
+  var coordinator = new GLib.Thread<void>("vala-runtime-close-coordinator", () => {
+    while (true) {
+      try {
+        var lease = runtime.require_live();
+        assert(lease.native != null);
+      } catch (MaplibreNative.Error.INVALID_STATE error) {
+        state_mutex.lock();
+        close_rejected_new_call = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      } catch (MaplibreNative.Error error) {
+        state_mutex.lock();
+        holder_failed = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      }
+      GLib.Thread.usleep(100);
+    }
+  });
+
+  runtime.close();
+  holder.join();
+  coordinator.join();
+  assert(!holder_failed);
+  assert(close_rejected_new_call);
+  assert(runtime.closed);
+  bool closed_call_failed = false;
+  try {
+    runtime.run_once();
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    closed_call_failed = true;
+  }
+  assert(closed_call_failed);
+}
+
+void exercise_unknown_feature_identifier_round_trip() throws MaplibreNative.Error {
+  MaplibreNative.Raw.Feature native = {};
+  native.identifier_type = 99;
+  native.identifier_string_value = MaplibreNative.Raw.StringView() {
+    data = (char*) 0x1234,
+    size = 0x5678
+  };
+  var identifier = MaplibreNative.FeatureIdentifier.from_native(native);
+  assert(identifier.raw_value_type == 99);
+  assert((uint32) identifier.value_type == 99);
+
+  MaplibreNative.Raw.Feature round_trip = {};
+  identifier.apply_to_native(ref round_trip);
+  assert(round_trip.identifier_type == 99);
+  assert(round_trip.identifier_string_value.data == (char*) 0x1234);
+  assert(round_trip.identifier_string_value.size == 0x5678);
+}
+
+void exercise_option_value_semantics() {
+  var map_options = new MaplibreNative.MapOptions();
+  assert(map_options.equal(map_options.copy()));
+  var map_options_changed = map_options.copy();
+  map_options_changed.width++;
+  assert(!map_options.equal(map_options_changed));
+  map_options_changed = map_options.copy();
+  map_options_changed.height++;
+  assert(!map_options.equal(map_options_changed));
+  map_options_changed = map_options.copy();
+  map_options_changed.scale_factor = 2.0;
+  assert(!map_options.equal(map_options_changed));
+  map_options_changed = map_options.copy();
+  map_options_changed.mode = MaplibreNative.MapMode.STATIC;
+  assert(!map_options.equal(map_options_changed));
+
+  var viewport_options = new MaplibreNative.MapViewportOptions();
+  assert(viewport_options.equal(viewport_options.copy()));
+  var viewport_changed = viewport_options.copy();
+  viewport_changed.set_north_orientation((MaplibreNative.NorthOrientation) 0);
+  assert(!viewport_options.equal(viewport_changed));
+  viewport_changed = viewport_options.copy();
+  viewport_changed.set_constrain_mode((MaplibreNative.ConstrainMode) 0);
+  assert(!viewport_options.equal(viewport_changed));
+  viewport_changed = viewport_options.copy();
+  viewport_changed.set_viewport_mode((MaplibreNative.ViewportMode) 0);
+  assert(!viewport_options.equal(viewport_changed));
+  viewport_changed = viewport_options.copy();
+  viewport_changed.set_frustum_offset(MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
+  assert(!viewport_options.equal(viewport_changed));
+
+  var tile_options = new MaplibreNative.MapTileOptions();
+  assert(tile_options.equal(tile_options.copy()));
+  var tile_changed = tile_options.copy();
+  tile_changed.set_prefetch_zoom_delta(0);
+  assert(!tile_options.equal(tile_changed));
+  tile_changed = tile_options.copy();
+  tile_changed.set_lod_min_radius(0.0);
+  assert(!tile_options.equal(tile_changed));
+  tile_changed = tile_options.copy();
+  tile_changed.set_lod_scale(0.0);
+  assert(!tile_options.equal(tile_changed));
+  tile_changed = tile_options.copy();
+  tile_changed.set_lod_pitch_threshold(0.0);
+  assert(!tile_options.equal(tile_changed));
+  tile_changed = tile_options.copy();
+  tile_changed.set_lod_zoom_shift(0.0);
+  assert(!tile_options.equal(tile_changed));
+  tile_changed = tile_options.copy();
+  tile_changed.set_lod_mode((MaplibreNative.TileLodMode) 0);
+  assert(!tile_options.equal(tile_changed));
+
+  var animation_options = new MaplibreNative.AnimationOptions();
+  assert(animation_options.equal(animation_options.copy()));
+  var animation_changed = animation_options.copy();
+  animation_changed.set_duration_ms(0.0);
+  assert(!animation_options.equal(animation_changed));
+  animation_changed = animation_options.copy();
+  animation_changed.set_velocity(0.0);
+  assert(!animation_options.equal(animation_changed));
+  animation_changed = animation_options.copy();
+  animation_changed.set_min_zoom(0.0);
+  assert(!animation_options.equal(animation_changed));
+  animation_changed = animation_options.copy();
+  animation_changed.set_easing(MaplibreNative.UnitBezier(0.0, 0.0, 0.0, 0.0));
+  assert(!animation_options.equal(animation_changed));
+
+  var fit_options = new MaplibreNative.CameraFitOptions();
+  assert(fit_options.equal(fit_options.copy()));
+  var fit_changed = fit_options.copy();
+  fit_changed.set_padding(MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
+  assert(!fit_options.equal(fit_changed));
+  fit_changed = fit_options.copy();
+  fit_changed.set_bearing(0.0);
+  assert(!fit_options.equal(fit_changed));
+  fit_changed = fit_options.copy();
+  fit_changed.set_pitch(0.0);
+  assert(!fit_options.equal(fit_changed));
+
+  var bound_options = new MaplibreNative.BoundOptions();
+  assert(bound_options.equal(bound_options.copy()));
+  var bound_changed = bound_options.copy();
+  bound_changed.set_bounds(MaplibreNative.LatLngBounds(
+    MaplibreNative.LatLng(0.0, 0.0),
+    MaplibreNative.LatLng(0.0, 0.0)));
+  assert(!bound_options.equal(bound_changed));
+  bound_changed = bound_options.copy();
+  bound_changed.set_min_zoom(0.0);
+  assert(!bound_options.equal(bound_changed));
+  bound_changed = bound_options.copy();
+  bound_changed.set_max_zoom(0.0);
+  assert(!bound_options.equal(bound_changed));
+  bound_changed = bound_options.copy();
+  bound_changed.set_min_pitch(0.0);
+  assert(!bound_options.equal(bound_changed));
+  bound_changed = bound_options.copy();
+  bound_changed.set_max_pitch(0.0);
+  assert(!bound_options.equal(bound_changed));
+
+  var free_camera_options = new MaplibreNative.FreeCameraOptions();
+  assert(free_camera_options.equal(free_camera_options.copy()));
+  var free_camera_changed = free_camera_options.copy();
+  free_camera_changed.set_position(MaplibreNative.Vec3(0.0, 0.0, 0.0));
+  assert(!free_camera_options.equal(free_camera_changed));
+  free_camera_changed = free_camera_options.copy();
+  free_camera_changed.set_orientation(MaplibreNative.Quaternion(0.0, 0.0, 0.0, 0.0));
+  assert(!free_camera_options.equal(free_camera_changed));
+
+  var runtime_options = new MaplibreNative.RuntimeOptions();
+  assert(runtime_options.equal(runtime_options.copy()));
+  var runtime_changed = runtime_options.copy();
+  runtime_changed.asset_path = "";
+  assert(!runtime_options.equal(runtime_changed));
+  runtime_changed = runtime_options.copy();
+  runtime_changed.cache_path = "";
+  assert(!runtime_options.equal(runtime_changed));
+  runtime_changed = runtime_options.copy();
+  runtime_changed.maximum_cache_size = 0;
+  assert(!runtime_options.equal(runtime_changed));
+
+  var rendered_options = new MaplibreNative.RenderedFeatureQueryOptions();
+  assert(rendered_options.equal(rendered_options.copy()));
+  var rendered_changed = rendered_options.copy();
+  rendered_changed.set_layer_ids({});
+  assert(!rendered_options.equal(rendered_changed));
+  rendered_changed = rendered_options.copy();
+  rendered_changed.set_filter(MaplibreNative.JsonValue.null_value());
+  assert(!rendered_options.equal(rendered_changed));
+  rendered_options.set_layer_ids({ "one", "two" });
+  rendered_options.set_filter(MaplibreNative.JsonValue.object_value({
+    new MaplibreNative.JsonMember(
+      "nested",
+      MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.int_value(1) }))
+  }));
+  var rendered_copy = rendered_options.copy();
+  assert(rendered_options.equal(rendered_copy));
+  rendered_copy.set_layer_ids({ "changed" });
+  assert(!rendered_options.equal(rendered_copy));
+
+  var source_options = new MaplibreNative.SourceFeatureQueryOptions();
+  assert(source_options.equal(source_options.copy()));
+  var source_changed = source_options.copy();
+  source_changed.set_source_layer_ids({});
+  assert(!source_options.equal(source_changed));
+  source_changed = source_options.copy();
+  source_changed.set_filter(MaplibreNative.JsonValue.null_value());
+  assert(!source_options.equal(source_changed));
+  source_options.set_source_layer_ids({ "one", "two" });
+  source_options.set_filter(MaplibreNative.JsonValue.array_value({
+    MaplibreNative.JsonValue.string_value("nested")
+  }));
+  var source_copy = source_options.copy();
+  assert(source_options.equal(source_copy));
+  source_copy.set_source_layer_ids({ "changed" });
+  assert(!source_options.equal(source_copy));
+
+  var tile_source_options = new MaplibreNative.StyleTileSourceOptions();
+  assert(tile_source_options.equal(tile_source_options.copy()));
+  var tile_source_changed = tile_source_options.copy();
+  tile_source_changed.min_zoom = 0.0;
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.max_zoom = 0.0;
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.attribution = "";
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.scheme = (MaplibreNative.StyleTileScheme) 0;
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.bounds = MaplibreNative.LatLngBounds(
+    MaplibreNative.LatLng(0.0, 0.0),
+    MaplibreNative.LatLng(0.0, 0.0));
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.tile_size = 0;
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.vector_encoding = (MaplibreNative.StyleVectorTileEncoding) 0;
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.raster_encoding = (MaplibreNative.StyleRasterDemEncoding) 0;
+  assert(!tile_source_options.equal(tile_source_changed));
+
+  var image_options = new MaplibreNative.StyleImageOptions();
+  assert(image_options.equal(image_options.copy()));
+  var image_changed = image_options.copy();
+  image_changed.pixel_ratio = 0.0f;
+  assert(!image_options.equal(image_changed));
+  image_changed = image_options.copy();
+  image_changed.sdf = false;
+  assert(!image_options.equal(image_changed));
+
+  var camera_options = new MaplibreNative.CameraOptions();
+  assert(camera_options.equal(camera_options.copy()));
+  var camera_changed = camera_options.copy();
+  camera_changed.set_center(MaplibreNative.LatLng(0.0, 0.0));
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_center_altitude(0.0);
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_padding(MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_anchor(MaplibreNative.ScreenPoint(0.0, 0.0));
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_zoom(0.0);
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_bearing(0.0);
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_pitch(0.0);
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_roll(0.0);
+  assert(!camera_options.equal(camera_changed));
+  camera_changed = camera_options.copy();
+  camera_changed.set_field_of_view(0.0);
+  assert(!camera_options.equal(camera_changed));
 }
 
 MaplibreNative.RuntimeEventOfflineOperationCompleted? wait_for_offline_operation(MaplibreNative.RuntimeHandle runtime, MaplibreNative.OfflineOperationHandle operation) throws MaplibreNative.Error {
@@ -329,7 +660,7 @@ void compile_style_light_wrappers(MaplibreNative.MapHandle map) throws MaplibreN
 }
 
 void compile_texture_backend_wrappers() throws MaplibreNative.Error {
-  var pointer = MaplibreNative.NativePointer(1);
+  var pointer = MaplibreNative.NativePointer.borrowed(1);
   var metal_borrowed = new MaplibreNative.MetalBorrowedTextureDescriptor(pointer);
   metal_borrowed.width = 16;
   metal_borrowed.height = 16;
@@ -372,6 +703,8 @@ void compile_texture_backend_wrappers() throws MaplibreNative.Error {
 int main() {
   try {
     assert(MaplibreNative.c_version() == 0);
+    exercise_unknown_feature_identifier_round_trip();
+    exercise_option_value_semantics();
     var backends = MaplibreNative.supported_render_backends();
     assert(backends != 0);
     MaplibreNative.opengl_supported_context_providers();
@@ -419,7 +752,7 @@ int main() {
     assert(empty_rendered_query_native.layer_id_count == 0);
 
     if ((backends & MaplibreNative.RenderBackendFlags.OPENGL) == 0) {
-      var pointer = MaplibreNative.NativePointer(1);
+      var pointer = MaplibreNative.NativePointer.borrowed(1);
       var egl_context = new MaplibreNative.EglContextDescriptor(pointer, pointer, pointer);
       var opengl_texture = new MaplibreNative.OpenGLOwnedTextureDescriptor(egl_context);
       bool opengl_unsupported = false;
@@ -601,8 +934,28 @@ int main() {
     assert(polygon.get_rings()[0].to_array().length == 5);
     map.camera_for_geometry(MaplibreNative.Geometry.polygon(polygon), fit_options);
     map.camera_for_geometry(MaplibreNative.Geometry.multi_line_string({ geometry_line }), fit_options);
-    map.camera_for_geometry(MaplibreNative.Geometry.multi_polygon({ polygon }), fit_options);
+    map.camera_for_geometry(MaplibreNative.Geometry.multi_polygon({ polygon, polygon }), fit_options);
     map.camera_for_geometry(MaplibreNative.Geometry.geometry_collection({ MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)), line_geometry }), fit_options);
+    var shared_collection = MaplibreNative.Geometry.geometry_collection({ line_geometry, MaplibreNative.Geometry.multi_polygon({ polygon }) });
+    map.camera_for_geometry(MaplibreNative.Geometry.geometry_collection({ shared_collection, shared_collection }), fit_options);
+    var empty_line = MaplibreNative.Geometry.line_string({});
+    var empty_polygon = MaplibreNative.Geometry.polygon(new MaplibreNative.Polygon({}));
+    var empty_multi_point = MaplibreNative.Geometry.multi_point({});
+    var empty_multi_line = MaplibreNative.Geometry.multi_line_string({});
+    var empty_multi_polygon = MaplibreNative.Geometry.multi_polygon({});
+    var empty_collection = MaplibreNative.Geometry.geometry_collection({});
+    assert(empty_line.geometry_type == MaplibreNative.GeometryType.LINE_STRING);
+    assert(empty_polygon.geometry_type == MaplibreNative.GeometryType.POLYGON);
+    assert(empty_multi_point.geometry_type == MaplibreNative.GeometryType.MULTI_POINT);
+    assert(empty_multi_line.geometry_type == MaplibreNative.GeometryType.MULTI_LINE_STRING);
+    assert(empty_multi_polygon.geometry_type == MaplibreNative.GeometryType.MULTI_POLYGON);
+    assert(empty_collection.geometry_type == MaplibreNative.GeometryType.GEOMETRY_COLLECTION);
+    assert(empty_line.get_coordinates().length == 0);
+    assert(empty_polygon.get_polygon().get_rings().length == 0);
+    assert(empty_multi_point.get_coordinates().length == 0);
+    assert(empty_multi_line.get_lines().length == 0);
+    assert(empty_multi_polygon.get_polygons().length == 0);
+    assert(empty_collection.get_geometries().length == 0);
     map.lat_lng_bounds_for_camera(camera);
     map.lat_lng_bounds_for_camera_unwrapped(camera);
     var bound_options = new MaplibreNative.BoundOptions();
@@ -641,7 +994,9 @@ int main() {
         new MaplibreNative.JsonMember("rank", MaplibreNative.JsonValue.int_value(1)),
         new MaplibreNative.JsonMember("tags", MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("a"), MaplibreNative.JsonValue.string_value("b") })),
         new MaplibreNative.JsonMember("metadata", MaplibreNative.JsonValue.object_value({ new MaplibreNative.JsonMember("source", MaplibreNative.JsonValue.string_value("vala")) })),
-        new MaplibreNative.JsonMember("repeated", repeated_json_subtree)
+        new MaplibreNative.JsonMember("repeated", repeated_json_subtree),
+        new MaplibreNative.JsonMember("shared-a", shared_json_subtree),
+        new MaplibreNative.JsonMember("shared-b", shared_json_subtree)
       },
       MaplibreNative.FeatureIdentifier.string_value("feature-1"));
     assert(feature.feature_identifier.get_string() == "feature-1");
@@ -856,13 +1211,13 @@ int main() {
       assert(vulkan_test_context_create(out vulkan_context_storage));
       try {
         var vulkan_context = new MaplibreNative.VulkanContextDescriptor(
-          MaplibreNative.NativePointer((size_t) vulkan_context_storage.instance),
-          MaplibreNative.NativePointer((size_t) vulkan_context_storage.physical_device),
-          MaplibreNative.NativePointer((size_t) vulkan_context_storage.device),
-          MaplibreNative.NativePointer((size_t) vulkan_context_storage.graphics_queue),
+          MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.instance),
+          MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.physical_device),
+          MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.device),
+          MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.graphics_queue),
           vulkan_context_storage.graphics_queue_family_index);
-        vulkan_context.get_instance_proc_addr = MaplibreNative.NativePointer((size_t) vulkan_context_storage.get_instance_proc_addr);
-        vulkan_context.get_device_proc_addr = MaplibreNative.NativePointer((size_t) vulkan_context_storage.get_device_proc_addr);
+        vulkan_context.get_instance_proc_addr = MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.get_instance_proc_addr);
+        vulkan_context.get_device_proc_addr = MaplibreNative.NativePointer.borrowed((size_t) vulkan_context_storage.get_device_proc_addr);
         var vulkan_texture = new MaplibreNative.VulkanOwnedTextureDescriptor(vulkan_context);
         vulkan_texture.width = 32;
         vulkan_texture.height = 16;
@@ -907,8 +1262,8 @@ int main() {
         try {
           var vulkan_borrowed_texture = new MaplibreNative.VulkanBorrowedTextureDescriptor(
             vulkan_context,
-            MaplibreNative.NativePointer((size_t) vulkan_borrowed_storage.image),
-            MaplibreNative.NativePointer((size_t) vulkan_borrowed_storage.image_view));
+            MaplibreNative.NativePointer.borrowed((size_t) vulkan_borrowed_storage.image),
+            MaplibreNative.NativePointer.borrowed((size_t) vulkan_borrowed_storage.image_view));
           vulkan_borrowed_texture.width = 32;
           vulkan_borrowed_texture.height = 16;
           vulkan_borrowed_texture.scale_factor = 1.0;
@@ -956,7 +1311,7 @@ int main() {
           void* vulkan_surface = null;
           try {
             assert(vulkan_test_surface_create(ref vulkan_context_storage, vulkan_surface_layer.layer, out vulkan_surface));
-            var vulkan_surface_descriptor = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, MaplibreNative.NativePointer((size_t) vulkan_surface));
+            var vulkan_surface_descriptor = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, MaplibreNative.NativePointer.borrowed((size_t) vulkan_surface));
             vulkan_surface_descriptor.width = 32;
             vulkan_surface_descriptor.height = 16;
             vulkan_surface_descriptor.scale_factor = 1.0;
@@ -976,10 +1331,44 @@ int main() {
       }
     }
 
+    if ((backends & MaplibreNative.RenderBackendFlags.OPENGL) != 0 && opengl_test_context_supported()) {
+      OpenGLTestContext opengl_context_storage;
+      assert(opengl_test_context_create(32, 16, out opengl_context_storage));
+      assert(opengl_context_storage.surface != null);
+      try {
+        var opengl_context = new MaplibreNative.EglContextDescriptor(
+          MaplibreNative.NativePointer.borrowed((size_t) opengl_context_storage.display),
+          MaplibreNative.NativePointer.borrowed((size_t) opengl_context_storage.config),
+          MaplibreNative.NativePointer.borrowed((size_t) opengl_context_storage.context));
+        var opengl_texture = new MaplibreNative.OpenGLOwnedTextureDescriptor(opengl_context);
+        opengl_texture.width = 32;
+        opengl_texture.height = 16;
+        opengl_texture.scale_factor = 1.0;
+        var opengl_session = map.attach_opengl_owned_texture(opengl_texture);
+        opengl_session.resize(32, 16, 1.0);
+        map.request_repaint();
+        assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 128));
+        assert(opengl_session.render_update());
+        uint8[] opengl_pixels = new uint8[32 * 16 * 4];
+        var opengl_info = opengl_session.read_premultiplied_rgba8(opengl_pixels);
+        assert(opengl_info.width == 32);
+        assert(opengl_info.height == 16);
+        var opengl_frame = opengl_session.acquire_opengl_owned_texture_frame();
+        assert(opengl_frame.get_width() == 32);
+        assert(opengl_frame.get_height() == 16);
+        assert(opengl_frame.get_texture().get() != 0);
+        opengl_frame.close();
+        opengl_session.detach();
+        opengl_session.close();
+      } finally {
+        opengl_test_context_destroy(ref opengl_context_storage);
+      }
+    }
+
     if ((backends & MaplibreNative.RenderBackendFlags.METAL) != 0) {
       void* device = create_system_default_metal_device();
       if (device != null) {
-        var texture = new MaplibreNative.MetalOwnedTextureDescriptor(MaplibreNative.NativePointer((size_t) device));
+        var texture = new MaplibreNative.MetalOwnedTextureDescriptor(MaplibreNative.NativePointer.borrowed((size_t) device));
         texture.width = 32;
         texture.height = 16;
         texture.scale_factor = 1.0;
@@ -1081,7 +1470,7 @@ int main() {
         void* borrowed_texture = metal_test_texture_create(device, 32, 16);
         assert(borrowed_texture != null);
         try {
-          var borrowed_descriptor = new MaplibreNative.MetalBorrowedTextureDescriptor(MaplibreNative.NativePointer((size_t) borrowed_texture));
+          var borrowed_descriptor = new MaplibreNative.MetalBorrowedTextureDescriptor(MaplibreNative.NativePointer.borrowed((size_t) borrowed_texture));
           borrowed_descriptor.width = 32;
           borrowed_descriptor.height = 16;
           borrowed_descriptor.scale_factor = 1.0;
@@ -1121,8 +1510,8 @@ int main() {
         assert(metal_test_window_layer_create(32, 16, out metal_surface_layer));
         assert(metal_surface_layer.window != null);
         try {
-          var surface_descriptor = new MaplibreNative.MetalSurfaceDescriptor(MaplibreNative.NativePointer((size_t) metal_surface_layer.layer));
-          surface_descriptor.device = MaplibreNative.NativePointer((size_t) device);
+          var surface_descriptor = new MaplibreNative.MetalSurfaceDescriptor(MaplibreNative.NativePointer.borrowed((size_t) metal_surface_layer.layer));
+          surface_descriptor.device = MaplibreNative.NativePointer.borrowed((size_t) device);
           surface_descriptor.width = 32;
           surface_descriptor.height = 16;
           surface_descriptor.scale_factor = 1.0;
@@ -1140,6 +1529,7 @@ int main() {
     map.close();
     runtime.close();
     runtime.close();
+    exercise_runtime_close_race();
     var provider_history_runtime = new MaplibreNative.RuntimeHandle();
     var provider_history_map = new MaplibreNative.MapHandle(provider_history_runtime);
     provider_history_map.close();

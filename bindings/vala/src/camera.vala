@@ -52,6 +52,34 @@ namespace MaplibreNative {
             return has_easing;
         }
 
+        public AnimationOptions copy () {
+            var copied = new AnimationOptions ();
+            copied.has_duration_ms = has_duration_ms;
+            copied.duration_ms_value = duration_ms_value;
+            copied.has_velocity = has_velocity;
+            copied.velocity_value = velocity_value;
+            copied.has_min_zoom = has_min_zoom;
+            copied.min_zoom_value = min_zoom_value;
+            copied.has_easing = has_easing;
+            copied.easing_value = easing_value;
+            return copied;
+        }
+
+        public bool equal (AnimationOptions other) {
+            return has_duration_ms == other.has_duration_ms
+                && (!has_duration_ms || duration_ms_value == other.duration_ms_value)
+                && has_velocity == other.has_velocity
+                && (!has_velocity || velocity_value == other.velocity_value)
+                && has_min_zoom == other.has_min_zoom
+                && (!has_min_zoom || min_zoom_value == other.min_zoom_value)
+                && has_easing == other.has_easing
+                && (!has_easing
+                    || (easing_value.x1 == other.easing_value.x1
+                        && easing_value.y1 == other.easing_value.y1
+                        && easing_value.x2 == other.easing_value.x2
+                        && easing_value.y2 == other.easing_value.y2));
+        }
+
         internal Raw.AnimationOptions to_native () {
             Raw.AnimationOptions options = {};
             options.size = (uint32) sizeof (Raw.AnimationOptions);
@@ -114,6 +142,30 @@ namespace MaplibreNative {
         public bool get_pitch (out double value) {
             value = pitch_value;
             return has_pitch;
+        }
+
+        public CameraFitOptions copy () {
+            var copied = new CameraFitOptions ();
+            copied.has_padding = has_padding;
+            copied.padding_value = padding_value;
+            copied.has_bearing = has_bearing;
+            copied.bearing_value = bearing_value;
+            copied.has_pitch = has_pitch;
+            copied.pitch_value = pitch_value;
+            return copied;
+        }
+
+        public bool equal (CameraFitOptions other) {
+            return has_padding == other.has_padding
+                && (!has_padding
+                    || (padding_value.top == other.padding_value.top
+                        && padding_value.left == other.padding_value.left
+                        && padding_value.bottom == other.padding_value.bottom
+                        && padding_value.right == other.padding_value.right))
+                && has_bearing == other.has_bearing
+                && (!has_bearing || bearing_value == other.bearing_value)
+                && has_pitch == other.has_pitch
+                && (!has_pitch || pitch_value == other.pitch_value);
         }
 
         internal Raw.CameraFitOptions to_native () {
@@ -218,6 +270,38 @@ namespace MaplibreNative {
             return has_max_pitch;
         }
 
+        public BoundOptions copy () {
+            var copied = new BoundOptions ();
+            copied.has_bounds = has_bounds;
+            copied.bounds_value = bounds_value;
+            copied.has_min_zoom = has_min_zoom;
+            copied.min_zoom_value = min_zoom_value;
+            copied.has_max_zoom = has_max_zoom;
+            copied.max_zoom_value = max_zoom_value;
+            copied.has_min_pitch = has_min_pitch;
+            copied.min_pitch_value = min_pitch_value;
+            copied.has_max_pitch = has_max_pitch;
+            copied.max_pitch_value = max_pitch_value;
+            return copied;
+        }
+
+        public bool equal (BoundOptions other) {
+            return has_bounds == other.has_bounds
+                && (!has_bounds
+                    || (bounds_value.southwest.latitude == other.bounds_value.southwest.latitude
+                        && bounds_value.southwest.longitude == other.bounds_value.southwest.longitude
+                        && bounds_value.northeast.latitude == other.bounds_value.northeast.latitude
+                        && bounds_value.northeast.longitude == other.bounds_value.northeast.longitude))
+                && has_min_zoom == other.has_min_zoom
+                && (!has_min_zoom || min_zoom_value == other.min_zoom_value)
+                && has_max_zoom == other.has_max_zoom
+                && (!has_max_zoom || max_zoom_value == other.max_zoom_value)
+                && has_min_pitch == other.has_min_pitch
+                && (!has_min_pitch || min_pitch_value == other.min_pitch_value)
+                && has_max_pitch == other.has_max_pitch
+                && (!has_max_pitch || max_pitch_value == other.max_pitch_value);
+        }
+
         internal Raw.BoundOptions to_native () {
             Raw.BoundOptions options = {};
             options.size = (uint32) sizeof (Raw.BoundOptions);
@@ -281,6 +365,29 @@ namespace MaplibreNative {
         public bool get_orientation (out Quaternion value) {
             value = orientation_value;
             return has_orientation;
+        }
+
+        public FreeCameraOptions copy () {
+            var copied = new FreeCameraOptions ();
+            copied.has_position = has_position;
+            copied.position_value = position_value;
+            copied.has_orientation = has_orientation;
+            copied.orientation_value = orientation_value;
+            return copied;
+        }
+
+        public bool equal (FreeCameraOptions other) {
+            return has_position == other.has_position
+                && (!has_position
+                    || (position_value.x == other.position_value.x
+                        && position_value.y == other.position_value.y
+                        && position_value.z == other.position_value.z))
+                && has_orientation == other.has_orientation
+                && (!has_orientation
+                    || (orientation_value.x == other.orientation_value.x
+                        && orientation_value.y == other.orientation_value.y
+                        && orientation_value.z == other.orientation_value.z
+                        && orientation_value.w == other.orientation_value.w));
         }
 
         internal Raw.FreeCameraOptions to_native () {

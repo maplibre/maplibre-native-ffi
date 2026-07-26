@@ -5,6 +5,22 @@ namespace MaplibreNative {
         public double scale_factor { get; set; default = 1.0; }
         public MapMode mode { get; set; default = MapMode.CONTINUOUS; }
 
+        public MapOptions copy () {
+            var copied = new MapOptions ();
+            copied.width = width;
+            copied.height = height;
+            copied.scale_factor = scale_factor;
+            copied.mode = mode;
+            return copied;
+        }
+
+        public bool equal (MapOptions other) {
+            return width == other.width
+                && height == other.height
+                && scale_factor == other.scale_factor
+                && mode == other.mode;
+        }
+
         internal Raw.MapOptions to_native () {
             Raw.MapOptions options = {};
             options.size = (uint32) sizeof (Raw.MapOptions);
@@ -82,6 +98,34 @@ namespace MaplibreNative {
         public bool get_frustum_offset (out EdgeInsets value) {
             value = frustum_offset_value;
             return has_frustum_offset;
+        }
+
+        public MapViewportOptions copy () {
+            var copied = new MapViewportOptions ();
+            copied.has_north_orientation = has_north_orientation;
+            copied.north_orientation_value = north_orientation_value;
+            copied.has_constrain_mode = has_constrain_mode;
+            copied.constrain_mode_value = constrain_mode_value;
+            copied.has_viewport_mode = has_viewport_mode;
+            copied.viewport_mode_value = viewport_mode_value;
+            copied.has_frustum_offset = has_frustum_offset;
+            copied.frustum_offset_value = frustum_offset_value;
+            return copied;
+        }
+
+        public bool equal (MapViewportOptions other) {
+            return has_north_orientation == other.has_north_orientation
+                && (!has_north_orientation || north_orientation_value == other.north_orientation_value)
+                && has_constrain_mode == other.has_constrain_mode
+                && (!has_constrain_mode || constrain_mode_value == other.constrain_mode_value)
+                && has_viewport_mode == other.has_viewport_mode
+                && (!has_viewport_mode || viewport_mode_value == other.viewport_mode_value)
+                && has_frustum_offset == other.has_frustum_offset
+                && (!has_frustum_offset
+                    || (frustum_offset_value.top == other.frustum_offset_value.top
+                        && frustum_offset_value.left == other.frustum_offset_value.left
+                        && frustum_offset_value.bottom == other.frustum_offset_value.bottom
+                        && frustum_offset_value.right == other.frustum_offset_value.right));
         }
 
         internal Raw.MapViewportOptions to_native () {
@@ -205,6 +249,38 @@ namespace MaplibreNative {
             return has_lod_mode;
         }
 
+        public MapTileOptions copy () {
+            var copied = new MapTileOptions ();
+            copied.has_prefetch_zoom_delta = has_prefetch_zoom_delta;
+            copied.prefetch_zoom_delta_value = prefetch_zoom_delta_value;
+            copied.has_lod_min_radius = has_lod_min_radius;
+            copied.lod_min_radius_value = lod_min_radius_value;
+            copied.has_lod_scale = has_lod_scale;
+            copied.lod_scale_value = lod_scale_value;
+            copied.has_lod_pitch_threshold = has_lod_pitch_threshold;
+            copied.lod_pitch_threshold_value = lod_pitch_threshold_value;
+            copied.has_lod_zoom_shift = has_lod_zoom_shift;
+            copied.lod_zoom_shift_value = lod_zoom_shift_value;
+            copied.has_lod_mode = has_lod_mode;
+            copied.lod_mode_value = lod_mode_value;
+            return copied;
+        }
+
+        public bool equal (MapTileOptions other) {
+            return has_prefetch_zoom_delta == other.has_prefetch_zoom_delta
+                && (!has_prefetch_zoom_delta || prefetch_zoom_delta_value == other.prefetch_zoom_delta_value)
+                && has_lod_min_radius == other.has_lod_min_radius
+                && (!has_lod_min_radius || lod_min_radius_value == other.lod_min_radius_value)
+                && has_lod_scale == other.has_lod_scale
+                && (!has_lod_scale || lod_scale_value == other.lod_scale_value)
+                && has_lod_pitch_threshold == other.has_lod_pitch_threshold
+                && (!has_lod_pitch_threshold || lod_pitch_threshold_value == other.lod_pitch_threshold_value)
+                && has_lod_zoom_shift == other.has_lod_zoom_shift
+                && (!has_lod_zoom_shift || lod_zoom_shift_value == other.lod_zoom_shift_value)
+                && has_lod_mode == other.has_lod_mode
+                && (!has_lod_mode || lod_mode_value == other.lod_mode_value);
+        }
+
         internal Raw.MapTileOptions to_native () {
             Raw.MapTileOptions options = {};
             options.size = (uint32) sizeof (Raw.MapTileOptions);
@@ -283,7 +359,8 @@ namespace MaplibreNative {
             this.runtime = runtime;
             var native_options = (options ?? new MapOptions ()).to_native ();
             Raw.Map created;
-            check_status (Raw.map_create (runtime.require_live (), &native_options, out created));
+            var runtime_lease = runtime.require_live ();
+            check_status (Raw.map_create (runtime_lease.native, &native_options, out created));
             native = (owned) created;
             runtime.register_map (this);
         }
