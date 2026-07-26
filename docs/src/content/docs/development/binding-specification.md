@@ -664,16 +664,15 @@ that a real native failure would expose.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                                                |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                   |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                             |
-| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.                                        |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                 |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                      |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                     |
-| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                              |
-| BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and an unsigned `limit` argument bounds the returned leaves. |
+| ID      | Test                                                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                      |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                |
+| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.           |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.    |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.         |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.        |
+| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers. |
 
 ### Logging and callbacks
 
@@ -726,7 +725,7 @@ that a real native failure would expose.
 ### Conditional tests
 
 The following tests apply only when a binding has the named host-language
-mechanic or helper.
+mechanic, helper, or test fixture.
 
 #### Host cleanup hooks
 
@@ -747,6 +746,19 @@ thread or race release on the same owner-thread handle, include:
 | BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
 | BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
 | BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+
+#### Live render session queries
+
+When the binding's test suite attaches a render session on a configured render
+backend, include:
+
+| ID      | Test                                                                                                                                                                                    |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and unsigned `limit` and `offset` arguments bound and shift the returned leaves. |
+
+Bindings without live render-session fixtures cover the binding-owned half of
+this behavior through BND-067, which requires JSON values to preserve unsigned
+integer width across the boundary.
 
 #### Owner-thread execution adapters
 

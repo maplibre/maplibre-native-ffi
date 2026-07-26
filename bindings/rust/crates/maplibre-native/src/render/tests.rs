@@ -1301,6 +1301,27 @@ fn wait_for_source_feature(
     panic!("timed out waiting for {description}");
 }
 
+fn single_cluster_leaf(session: &RenderSessionHandle, feature: &Feature, offset: u64) -> Feature {
+    let arguments = JsonValue::Object(vec![
+        JsonMember::new("limit", JsonValue::UInt(1)),
+        JsonMember::new("offset", JsonValue::UInt(offset)),
+    ]);
+    let result = session
+        .query_feature_extension(
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            Some(&arguments),
+        )
+        .unwrap();
+    let FeatureExtensionResult::FeatureCollection(leaves) = result else {
+        panic!("expected leaves feature collection");
+    };
+    assert_eq!(leaves.len(), 1);
+    leaves.into_iter().next().unwrap()
+}
+
 fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
     feature
         .properties
@@ -1868,23 +1889,15 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     };
     assert!(!children.is_empty());
 
-    let leaves_arguments = JsonValue::Object(vec![
-        JsonMember::new("limit", JsonValue::UInt(1)),
-        JsonMember::new("offset", JsonValue::UInt(0)),
-    ]);
-    let leaves = session
-        .query_feature_extension(
-            "cluster-source",
-            &cluster.feature,
-            "supercluster",
-            "leaves",
-            Some(&leaves_arguments),
-        )
-        .unwrap();
-    let FeatureExtensionResult::FeatureCollection(leaves) = leaves else {
-        panic!("expected leaves feature collection");
-    };
-    assert_eq!(leaves.len(), 1);
+    // An unsigned limit bounds the collection, and an unsigned offset selects a
+    // later leaf. Native ignores arguments of another type and falls back to ten
+    // leaves at offset zero, so both bounds must move the observed result.
+    let first = single_cluster_leaf(&session, &cluster.feature, 0);
+    let second = single_cluster_leaf(&session, &cluster.feature, 1);
+    assert_ne!(
+        feature_member(&first, "name"),
+        feature_member(&second, "name")
+    );
 
     let expansion_zoom = session
         .query_feature_extension(

@@ -135,6 +135,35 @@ def wait_for_rendered_cluster(
     raise AssertionError("cluster feature query returned no features")
 
 
+def feature_member(feature: geo.Feature, key: str) -> json.JsonValue:
+    return next(member.value for member in feature.properties if member.key == key)
+
+
+def single_cluster_leaf(
+    session: render.RenderSessionHandle,
+    feature: geo.Feature,
+    *,
+    offset: int,
+) -> geo.Feature:
+    """Return the one leaf at `offset` through a bounded supercluster query."""
+    leaves = session.query_feature_extensions(
+        "cluster-source",
+        feature,
+        "supercluster",
+        "leaves",
+        json.JsonObject(
+            (
+                json.JsonMember("limit", json.JsonUInt(1)),
+                json.JsonMember("offset", json.JsonUInt(offset)),
+            )
+        ),
+    )
+    assert leaves.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
+    assert leaves.feature_collection is not None
+    assert len(leaves.feature_collection) == 1
+    return leaves.feature_collection[0]
+
+
 def assert_cluster_feature_extensions(
     runtime: mln.RuntimeHandle,
     map_handle: mln.MapHandle,
@@ -144,12 +173,7 @@ def assert_cluster_feature_extensions(
     cluster = wait_for_rendered_cluster(runtime, map_handle, session)
     # Native matches cluster_id by exact JSON value type, so the copied feature
     # must keep the unsigned alternative to resolve on the way back in.
-    cluster_id = next(
-        member.value
-        for member in cluster.feature.properties
-        if member.key == "cluster_id"
-    )
-    assert isinstance(cluster_id, json.JsonUInt)
+    assert isinstance(feature_member(cluster.feature, "cluster_id"), json.JsonUInt)
 
     children = session.query_feature_extensions(
         "cluster-source", cluster.feature, "supercluster", "children", None
@@ -163,18 +187,9 @@ def assert_cluster_feature_extensions(
     assert expansion_zoom.type == query.FeatureExtensionResultType.VALUE
     assert isinstance(expansion_zoom.value, json.JsonUInt)
 
-    leaves = session.query_feature_extensions(
-        "cluster-source",
-        cluster.feature,
-        "supercluster",
-        "leaves",
-        json.JsonObject(
-            (
-                json.JsonMember("limit", json.JsonUInt(1)),
-                json.JsonMember("offset", json.JsonUInt(0)),
-            )
-        ),
-    )
-    assert leaves.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
-    assert leaves.feature_collection is not None
-    assert len(leaves.feature_collection) == 1
+    # An unsigned limit bounds the collection, and an unsigned offset selects a
+    # later leaf. Native ignores arguments of another type and falls back to ten
+    # leaves at offset zero, so both bounds must move the observed result.
+    first = single_cluster_leaf(session, cluster.feature, offset=0)
+    second = single_cluster_leaf(session, cluster.feature, offset=1)
+    assert feature_member(first, "name") != feature_member(second, "name")

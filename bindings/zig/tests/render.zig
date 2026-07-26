@@ -1430,17 +1430,39 @@ test "render session queries cluster feature extensions" {
     };
     try testing.expect(zoom_value == .uint);
 
-    const args_members = [_]maplibre.JsonMember{
+    // An unsigned limit bounds the collection, and an unsigned offset selects a
+    // later leaf. Native ignores arguments of another type and falls back to ten
+    // leaves at offset zero, so both bounds must move the observed result.
+    const first_args = [_]maplibre.JsonMember{
         .{ .key = "limit", .value = .{ .uint = 1 } },
         .{ .key = "offset", .value = .{ .uint = 0 } },
     };
-    var leaves = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = args_members[0..] });
-    defer leaves.deinit(testing.allocator);
-    const leaf_collection = switch (leaves) {
-        .feature_collection => |collection| collection,
+    var first = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = first_args[0..] });
+    defer first.deinit(testing.allocator);
+    const second_args = [_]maplibre.JsonMember{
+        .{ .key = "limit", .value = .{ .uint = 1 } },
+        .{ .key = "offset", .value = .{ .uint = 1 } },
+    };
+    var second = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = second_args[0..] });
+    defer second.deinit(testing.allocator);
+    try testing.expect(!std.mem.eql(u8, try singleLeafName(first), try singleLeafName(second)));
+}
+
+fn singleLeafName(result: maplibre.FeatureExtensionResult) ![]const u8 {
+    const collection = switch (result) {
+        .feature_collection => |value| value,
         else => return error.ExpectedFeatureCollection,
     };
-    try testing.expectEqual(@as(usize, 1), leaf_collection.features.len);
+    try testing.expectEqual(@as(usize, 1), collection.features.len);
+    for (collection.features[0].properties) |member| {
+        if (std.mem.eql(u8, member.key, "name")) {
+            return switch (member.value) {
+                .string => |value| value,
+                else => error.ExpectedStringProperty,
+            };
+        }
+    }
+    return error.MissingNameProperty;
 }
 
 test "unsupported backend owned texture attachment reports unsupported" {

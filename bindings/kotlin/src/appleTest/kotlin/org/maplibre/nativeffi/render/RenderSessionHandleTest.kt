@@ -507,22 +507,13 @@ class RenderSessionHandleTest {
               ?: error("expected expansion-zoom value result")
           assertTrue(expansionZoomValue is JsonValue.UInt)
 
-          val leaves =
-            featureCollectionResult(
-              session.queryFeatureExtension(
-                "cluster-source",
-                cluster.feature,
-                "supercluster",
-                "leaves",
-                JsonValue.ObjectValue(
-                  listOf(
-                    JsonValue.Member("limit", JsonValue.UInt(1)),
-                    JsonValue.Member("offset", JsonValue.UInt(0)),
-                  )
-                ),
-              )
-            )
-          assertEquals(1, leaves.size)
+          // An unsigned limit bounds the collection, and an unsigned offset
+          // selects a later leaf. Native ignores arguments of another type and
+          // falls back to ten leaves at offset zero, so both bounds must move
+          // the observed result.
+          val first = singleClusterLeaf(session, cluster.feature, 0)
+          val second = singleClusterLeaf(session, cluster.feature, 1)
+          assertNotEquals(member(first, "name"), member(second, "name"))
         } finally {
           session.close()
         }
@@ -610,6 +601,34 @@ class RenderSessionHandleTest {
   private fun featureCollectionResult(result: FeatureExtensionResult): List<Feature> =
     (result as? FeatureExtensionResult.FeatureCollection)?.features
       ?: error("expected feature collection result")
+
+  /** Returns the one leaf at [offset] through a bounded supercluster query. */
+  private fun singleClusterLeaf(
+    session: RenderSessionHandle,
+    feature: Feature,
+    offset: Long,
+  ): Feature {
+    val leaves =
+      featureCollectionResult(
+        session.queryFeatureExtension(
+          "cluster-source",
+          feature,
+          "supercluster",
+          "leaves",
+          JsonValue.ObjectValue(
+            listOf(
+              JsonValue.Member("limit", JsonValue.UInt(1)),
+              JsonValue.Member("offset", JsonValue.UInt(offset)),
+            )
+          ),
+        )
+      )
+    assertEquals(1, leaves.size)
+    return leaves.first()
+  }
+
+  private fun member(feature: Feature, key: String): JsonValue? =
+    feature.properties.firstOrNull { it.key == key }?.value
 
   private fun member(feature: QueriedFeature, key: String): JsonValue? =
     feature.feature.properties.firstOrNull { it.key == key }?.value
