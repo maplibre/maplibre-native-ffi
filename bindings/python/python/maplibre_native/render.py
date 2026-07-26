@@ -434,9 +434,10 @@ class RenderSessionHandle(NativeHandleMixin):
         The map retains its latest update, so repeated calls re-render it and
         return True again; use this to redraw on demand after resize or surface
         expose, and gate frame loops on render-update-available events instead
-        of the return value. Returns False when the map has not published a
-        render update yet, which is normal before the map first invalidates;
-        keep pumping the runtime until an update is reported.
+        of the return value. Returns False when no frame was rendered,
+        because the map has not published an update yet or the renderer skipped
+        the frame; both are normal during startup, so keep pumping the runtime
+        until an update is reported.
         """
         return bool(self._native.render_update())
 

@@ -57,8 +57,10 @@ class TextureSessionBackend {
     return headless_backend().getRendererBackend();
   }
   virtual void prepare_render_resources() {}
-  virtual auto after_render(mln_render_session& session) -> mln_status {
+  virtual auto after_render(mln_render_session& session, bool& out_rendered)
+    -> mln_status {
     (void)session;
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
   virtual auto acquire_vulkan_owned_frame(

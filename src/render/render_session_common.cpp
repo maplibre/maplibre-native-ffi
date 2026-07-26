@@ -1029,9 +1029,14 @@ auto render_session_render_update(
     return MLN_STATUS_NATIVE_ERROR;
   }
   if (session->kind == RenderSessionKind::Texture) {
-    const auto after_status = session->texture.backend->after_render(*session);
+    auto frame_rendered = true;
+    const auto after_status =
+      session->texture.backend->after_render(*session, frame_rendered);
     if (after_status != MLN_STATUS_OK) {
       return after_status;
+    }
+    if (!frame_rendered) {
+      return MLN_STATUS_OK;
     }
   }
   session->rendered_generation = session->generation;

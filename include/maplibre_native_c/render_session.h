@@ -51,9 +51,11 @@ MLN_API mln_status mln_render_session_resize(
  * re-render it and report true again; hosts use this to redraw on demand
  * after resize or surface expose, and gate frame-driven loops on
  * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE instead of the return value.
- * *out_rendered is false when the map has not published a render update yet,
- * which is normal before the map first invalidates; keep pumping the runtime
- * and call again when an update is reported.
+ * *out_rendered is false when no frame was rendered: the map has not
+ * published a render update yet, or the renderer skipped producing a frame
+ * for the latest update (for example the Metal texture backend before content
+ * is ready). Both are normal during startup; keep pumping the runtime and
+ * call again when an update is reported.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_rendered set.
