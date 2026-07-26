@@ -49,12 +49,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     } catch (_: Throwable) {
       requestHandle?.finishProviderException() ?: UNKNOWN_DECISION
     } finally {
-      try {
-        lease.close()
-      } finally {
-        // Native owns a releasable request only after it receives the callback decision.
-        requestHandle?.let(::reachabilityFence)
-      }
+      lease.close()
     }
   }
 
@@ -88,10 +83,5 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1
-
-    // Holding an object's monitor is an API 24-compatible reachability fence.
-    private fun reachabilityFence(value: Any) {
-      synchronized(value) {}
-    }
   }
 }

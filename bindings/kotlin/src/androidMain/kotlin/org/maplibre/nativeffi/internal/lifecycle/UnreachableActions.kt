@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Actions run on one daemon thread. An action that fails leaves the thread draining later
  * registrations, matching `Cleaner`.
  */
-internal object UnreachableActions {
+internal class UnreachableActions private constructor(threadName: String) {
   private val queue = ReferenceQueue<Any>()
 
   /** Keeps registrations reachable so the collector can enqueue them. */
@@ -26,7 +26,7 @@ internal object UnreachableActions {
   private val pendingLock = Any()
 
   init {
-    Thread(::drain, "maplibre-unreachable-actions").apply { isDaemon = true }.start()
+    Thread(::drain, threadName).apply { isDaemon = true }.start()
   }
 
   /** Runs [action] once [referent] becomes unreachable. */
@@ -64,5 +64,17 @@ internal object UnreachableActions {
     fun run() {
       action.run()
     }
+  }
+
+  internal companion object {
+    private val shared = UnreachableActions("maplibre-unreachable-actions")
+
+    /** Runs [action] on the shared reclamation worker once [referent] becomes unreachable. */
+    fun register(referent: Any, action: Runnable) {
+      shared.register(referent, action)
+    }
+
+    /** Creates an independent worker for actions that may block. */
+    fun isolated(threadName: String): UnreachableActions = UnreachableActions(threadName)
   }
 }

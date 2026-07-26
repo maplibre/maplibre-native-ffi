@@ -5,7 +5,6 @@ import java.lang.foreign.Linker
 import java.lang.foreign.MemorySegment
 import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
-import java.lang.ref.Reference
 import org.maplibre.nativeffi.internal.c.mln_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_resource_provider_callback
 import org.maplibre.nativeffi.internal.loader.NativeAccess
@@ -55,12 +54,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     } catch (_: Throwable) {
       requestHandle?.finishProviderException() ?: UNKNOWN_DECISION
     } finally {
-      try {
-        lease.close()
-      } finally {
-        // Native owns a releasable request only after it receives the callback decision.
-        Reference.reachabilityFence(requestHandle)
-      }
+      lease.close()
     }
   }
 
