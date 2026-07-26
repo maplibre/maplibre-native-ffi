@@ -115,6 +115,13 @@ public sealed class MetalOwnedTextureDescriptor
 public sealed class MetalBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical texture size in device pixels. The texture is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public NativePointer Texture { get; set; }
 }
 
@@ -127,6 +134,13 @@ public sealed class VulkanOwnedTextureDescriptor
 public sealed class VulkanBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical image size in device pixels. The image is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public NativePointer Image { get; set; }
     public NativePointer ImageView { get; set; }
     public VulkanContextDescriptor? Context { get; set; }
@@ -144,6 +158,13 @@ public sealed class OpenGLOwnedTextureDescriptor
 public sealed class OpenGLBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical texture size in device pixels. The texture is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public OpenGLContextDescriptor? Context { get; set; }
     public uint Texture { get; set; }
     public uint Target { get; set; }

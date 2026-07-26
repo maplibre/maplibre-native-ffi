@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use ash::vk;
@@ -23,10 +24,11 @@ use libloading::Library;
 use static_assertions::assert_not_impl_any;
 
 use super::*;
+use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, MapMode, MapOptions,
-    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventType, RuntimeHandle, ScreenBox,
-    ScreenPoint,
+    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, LogSeverity,
+    LogSeverityMask, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
+    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -136,9 +138,12 @@ fn create_opengl_borrowed_texture_session(
     if !backends.contains(RenderBackendMask::OPENGL) {
         return Err("native library does not support OpenGL borrowed texture sessions".into());
     }
-    let texture = OpenGLBorrowedTexture::new(extent.width, extent.height)?;
+    let (physical_width, physical_height) = extent.physical_size()?;
+    let texture = OpenGLBorrowedTexture::new(physical_width, physical_height)?;
     let session = map.attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
         extent,
+        physical_width,
+        physical_height,
         texture.descriptor(),
         texture.name(),
         glow::TEXTURE_2D,
@@ -1623,6 +1628,52 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
 }
 
 #[test]
+// The map scale factor is fixed at creation and keeps selecting sprites,
+// glyphs, and raster tiles, so a session that renders at a different scale
+// factor degrades styled imagery rather than failing. Attach and resize warn
+// instead of returning an error, and the warning is the only signal callers
+// get.
+fn attaching_or_resizing_with_a_mismatched_scale_factor_warns() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let _logging = LoggingTestGuard::new();
+    // Warnings dispatch asynchronously by default, which would race this test.
+    crate::set_async_log_severity_mask(LogSeverityMask::empty()).unwrap();
+    let warnings = Arc::new(Mutex::new(Vec::new()));
+    let captured = warnings.clone();
+    crate::set_log_callback(move |record| {
+        if record.message.contains("scale_factor") {
+            captured
+                .lock()
+                .unwrap()
+                .push((record.severity, record.message));
+        }
+        false
+    })
+    .unwrap();
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 2.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    let attach_warnings = warnings.lock().unwrap().clone();
+    assert_eq!(attach_warnings.len(), 1);
+    assert_eq!(attach_warnings[0].0, LogSeverity::Warning);
+    assert!(attach_warnings[0].1.contains('2'));
+
+    // Resizing to the map's scale factor is consistent and stays quiet.
+    session.resize(32, 32, 1.0).unwrap();
+    assert_eq!(warnings.lock().unwrap().len(), 1);
+
+    // Resizing back to a different scale factor warns again.
+    session.resize(32, 32, 2.0).unwrap();
+    assert_eq!(warnings.lock().unwrap().len(), 2);
+}
+
+#[test]
 // Spec coverage: BND-105 and BND-106.
 fn feature_state_set_get_and_remove_copy_snapshots() {
     if !has_test_owned_texture_session_backend() {
@@ -2124,6 +2175,8 @@ fn backend_specific_attach_calls_report_native_statuses() {
     let opengl_error = map
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
+            32,
+            16,
             opengl_context,
             0,
             0x0de1,
@@ -2163,6 +2216,8 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     let error = map
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
+            32,
+            16,
             opengl_context.clone(),
             1,
             glow::TEXTURE_2D,

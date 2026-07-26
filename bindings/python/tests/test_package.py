@@ -1460,6 +1460,8 @@ def test_render_descriptors_are_public_python_values() -> None:
     )
     vulkan = render.VulkanBorrowedTextureDescriptor(
         extent=extent,
+        physical_width=641,
+        physical_height=481,
         context=render.VulkanContextDescriptor(
             graphics_queue_family_index=7,
             get_instance_proc_addr=render.NativePointer(0x1111),
@@ -1485,6 +1487,8 @@ def test_render_descriptors_are_public_python_values() -> None:
     )
     opengl_wgl = render.OpenGLBorrowedTextureDescriptor(
         extent=extent,
+        physical_width=641,
+        physical_height=481,
         context=render.WglContextDescriptor(
             device_context=pointer,
             share_context=render.NativePointer(0x8888),
@@ -1494,6 +1498,9 @@ def test_render_descriptors_are_public_python_values() -> None:
         target=0x0DE1,
     )
 
+    # Odd sizes no logical extent maps onto, so these must survive as stated.
+    assert (vulkan.physical_width, vulkan.physical_height) == (641, 481)
+    assert (opengl_wgl.physical_width, opengl_wgl.physical_height) == (641, 481)
     assert vulkan.context.graphics_queue_family_index == 7
     assert vulkan.context.get_instance_proc_addr.address == 0x1111
     assert vulkan.context.get_device_proc_addr.address == 0x2222

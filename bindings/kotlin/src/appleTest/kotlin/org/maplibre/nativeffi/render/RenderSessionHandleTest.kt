@@ -320,6 +320,8 @@ class RenderSessionHandleTest {
           val borrowedDescriptor =
             MetalBorrowedTextureDescriptor(
               extent = RenderTargetExtent(32, 16, 1.0),
+              physicalWidth = 32,
+              physicalHeight = 16,
               texture = NativePointer.ofAddress(borrowedTextureAddress),
             )
           val session = borrowedMap.attachMetalBorrowedTexture(borrowedDescriptor)

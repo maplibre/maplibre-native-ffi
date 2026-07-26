@@ -2199,6 +2199,8 @@ internal object NativeAccess {
         mln_metal_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_metal_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_metal_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       mln_metal_borrowed_texture_descriptor.texture(segment, nativePointer(descriptor.texture))
     }
   }
@@ -2220,6 +2222,8 @@ internal object NativeAccess {
         mln_vulkan_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_vulkan_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_vulkan_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillVulkanContext(mln_vulkan_borrowed_texture_descriptor.context(segment), descriptor.context)
       mln_vulkan_borrowed_texture_descriptor.image(segment, nativePointer(descriptor.image))
       mln_vulkan_borrowed_texture_descriptor.image_view(
@@ -2251,6 +2255,8 @@ internal object NativeAccess {
         mln_opengl_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_opengl_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_opengl_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillOpenGLContext(mln_opengl_borrowed_texture_descriptor.context(segment), descriptor.context)
       mln_opengl_borrowed_texture_descriptor.texture(segment, descriptor.texture)
       mln_opengl_borrowed_texture_descriptor.target(segment, descriptor.target)

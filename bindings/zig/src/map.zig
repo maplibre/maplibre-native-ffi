@@ -59,8 +59,18 @@ pub const MapMode = enum {
 };
 
 pub const MapOptions = struct {
+    /// Initial logical width in UI pixels, replaced by the extent of the first
+    /// attached render session.
     width: u32 = 512,
+    /// Initial logical height in UI pixels, replaced by the extent of the first
+    /// attached render session.
     height: u32 = 512,
+    /// UI-to-device pixel scale, fixed for the lifetime of the map.
+    ///
+    /// This selects sprites, glyphs, and raster tiles for every frame. Render
+    /// targets carry their own scale factor for geometry, so attaching or
+    /// resizing a session with a different one logs a warning and renders
+    /// styled imagery chosen for this density.
     scale_factor: f64 = 1.0,
     mode: MapMode = .continuous,
 };

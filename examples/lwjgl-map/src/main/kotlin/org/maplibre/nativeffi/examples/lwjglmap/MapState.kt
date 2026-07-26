@@ -213,6 +213,8 @@ private constructor(
         val descriptor =
           VulkanBorrowedTextureDescriptor(
               extent(viewport),
+              viewport.framebufferWidth(),
+              viewport.framebufferHeight(),
               vulkanContextDescriptor(vulkan),
               NativePointer.ofAddress(image.imageAddress()),
               NativePointer.ofAddress(image.viewAddress()),
@@ -274,6 +276,8 @@ private constructor(
         val descriptor =
           MetalBorrowedTextureDescriptor(
             extent(viewport),
+            viewport.framebufferWidth(),
+            viewport.framebufferHeight(),
             NativePointer.ofAddress(texture.texture()),
           )
         session = map.attachMetalBorrowedTexture(descriptor)

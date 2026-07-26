@@ -675,6 +675,8 @@ auto metal_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .texture = nullptr,
   };
 }
@@ -714,6 +716,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .context =
       mln_vulkan_context_descriptor{
         .size = sizeof(mln_vulkan_context_descriptor),
@@ -892,9 +896,8 @@ auto opengl_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -903,7 +906,10 @@ auto opengl_borrowed_texture_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  set_session_extent(*session, descriptor->extent);
+  set_borrowed_session_extent(
+    *session, descriptor->extent, descriptor->physical_width,
+    descriptor->physical_height
+  );
   session->texture.api_kind = TextureSessionApi::OpenGL;
   session->texture.mode = TextureSessionMode::Borrowed;
   session->texture.backend = std::make_unique<OpenGLTextureSessionBackend>(

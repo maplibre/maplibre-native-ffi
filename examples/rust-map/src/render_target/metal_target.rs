@@ -149,8 +149,12 @@ fn attach_borrowed_texture(
     viewport: Viewport,
 ) -> maplibre_native::Result<RenderTarget> {
     let texture = MetalBorrowedTexture::new(metal, viewport)?;
-    let descriptor =
-        maplibre_native::MetalBorrowedTextureDescriptor::new(extent(viewport), texture.pointer());
+    let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+        extent(viewport),
+        viewport.physical_width,
+        viewport.physical_height,
+        texture.pointer(),
+    );
     let session = map.attach_metal_borrowed_texture(&descriptor)?;
     let compositor = match MetalTextureCompositor::new(metal) {
         Ok(compositor) => compositor,

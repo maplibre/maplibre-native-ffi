@@ -19,7 +19,25 @@ extern "C" {
  * Resizes an attached render session.
  *
  * Width and height are logical map dimensions. The scale_factor value maps
- * them to physical backend pixels.
+ * them to physical backend pixels. Resizing sets the map size, so the map
+ * viewport and the render target extent stay the same value.
+ *
+ * Surface and session-owned texture sessions resize in place. Caller-owned
+ * borrowed texture targets return MLN_STATUS_UNSUPPORTED because the texture is
+ * sized by its owner; follow a host whose target changed by destroying the
+ * session with mln_render_session_destroy() (or releasing the map slot with
+ * mln_render_session_detach()), recreating the texture, and attaching a new
+ * session. A map holds at most one attached session, so detach or destroy the
+ * old session before attaching the replacement.
+ *
+ * Resizing discards the session renderer, which is rebuilt on the next
+ * mln_render_session_render_update(). Renderer-held state, including feature
+ * state set through mln_render_session_set_feature_state(), does not survive.
+ * Map state such as camera, style, and sources lives on the map and survives
+ * both resize and reattach.
+ *
+ * Passing a scale_factor that differs from the map's mln_map_options
+ * scale_factor logs a warning; see mln_map_options.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

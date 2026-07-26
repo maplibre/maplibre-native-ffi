@@ -142,6 +142,8 @@ internal static unsafe class RenderStructs
         NativeLibraryLoader.EnsureLoaded();
         var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
         native.extent = ToNative(descriptor.Extent);
+        native.physical_width = descriptor.PhysicalWidth;
+        native.physical_height = descriptor.PhysicalHeight;
         native.texture = (void*)descriptor.Texture.Address;
         return native;
     }
@@ -166,6 +168,8 @@ internal static unsafe class RenderStructs
         NativeLibraryLoader.EnsureLoaded();
         var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
         native.extent = ToNative(descriptor.Extent);
+        native.physical_width = descriptor.PhysicalWidth;
+        native.physical_height = descriptor.PhysicalHeight;
         native.context = ToNative(descriptor.Context);
         native.image = (void*)descriptor.Image.Address;
         native.image_view = (void*)descriptor.ImageView.Address;
@@ -201,6 +205,8 @@ internal static unsafe class RenderStructs
         NativeLibraryLoader.EnsureLoaded();
         var native = NativeMethods.mln_opengl_borrowed_texture_descriptor_default();
         native.extent = ToNative(descriptor.Extent);
+        native.physical_width = descriptor.PhysicalWidth;
+        native.physical_height = descriptor.PhysicalHeight;
         if (descriptor.Context is not null)
         {
             native.context = ToNative(descriptor.Context);

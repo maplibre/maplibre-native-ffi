@@ -76,6 +76,8 @@ pub struct MetalOwnedTextureDescriptorFields {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MetalBorrowedTextureDescriptorFields {
     pub extent: RenderTargetExtentFields,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub texture: *mut c_void,
 }
 
@@ -88,6 +90,8 @@ pub struct VulkanOwnedTextureDescriptorFields {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct VulkanBorrowedTextureDescriptorFields {
     pub extent: RenderTargetExtentFields,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: VulkanContextDescriptorFields,
     pub image: *mut c_void,
     pub image_view: *mut c_void,
@@ -105,12 +109,14 @@ pub struct OpenGLOwnedTextureDescriptorFields {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct OpenGLBorrowedTextureDescriptorFields {
     pub extent: RenderTargetExtentFields,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: OpenGLContextDescriptorFields,
     pub texture: u32,
     pub target: u32,
 }
 
-fn render_target_extent_to_native(
+pub fn render_target_extent_to_native(
     fields: RenderTargetExtentFields,
 ) -> sys::mln_render_target_extent {
     sys::mln_render_target_extent {
@@ -238,6 +244,8 @@ pub fn metal_borrowed_texture_descriptor_to_native(
     // SAFETY: Default constructor takes no arguments and initializes size fields.
     let mut raw = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
     raw.extent = render_target_extent_to_native(fields.extent);
+    raw.physical_width = fields.physical_width;
+    raw.physical_height = fields.physical_height;
     raw.texture = fields.texture;
     raw
 }
@@ -258,6 +266,8 @@ pub fn vulkan_borrowed_texture_descriptor_to_native(
     // SAFETY: Default constructor takes no arguments and initializes size fields.
     let mut raw = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
     raw.extent = render_target_extent_to_native(fields.extent);
+    raw.physical_width = fields.physical_width;
+    raw.physical_height = fields.physical_height;
     raw.context = vulkan_context_descriptor_to_native(fields.context);
     raw.image = fields.image;
     raw.image_view = fields.image_view;
@@ -283,6 +293,8 @@ pub fn opengl_borrowed_texture_descriptor_to_native(
     // SAFETY: Default constructor takes no arguments and initializes size fields.
     let mut raw = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
     raw.extent = render_target_extent_to_native(fields.extent);
+    raw.physical_width = fields.physical_width;
+    raw.physical_height = fields.physical_height;
     raw.context = opengl_context_descriptor_to_native(fields.context);
     raw.texture = fields.texture;
     raw.target = fields.target;
@@ -372,6 +384,8 @@ mod tests {
         let borrowed =
             metal_borrowed_texture_descriptor_to_native(MetalBorrowedTextureDescriptorFields {
                 extent: extent(),
+                physical_width: 65,
+                physical_height: 33,
                 texture: ptr(4),
             });
         assert_eq!(
@@ -379,6 +393,10 @@ mod tests {
             std::mem::size_of::<sys::mln_metal_borrowed_texture_descriptor>() as u32
         );
         assert_eq!(borrowed.texture, ptr(4));
+        assert_eq!(
+            (borrowed.physical_width, borrowed.physical_height),
+            (65, 33)
+        );
     }
 
     #[test]
@@ -414,6 +432,8 @@ mod tests {
         let borrowed =
             vulkan_borrowed_texture_descriptor_to_native(VulkanBorrowedTextureDescriptorFields {
                 extent: extent(),
+                physical_width: 65,
+                physical_height: 33,
                 context: vulkan_context(12),
                 image: ptr(17),
                 image_view: ptr(18),
@@ -430,6 +450,10 @@ mod tests {
         assert_eq!(borrowed.format, 19);
         assert_eq!(borrowed.initial_layout, 20);
         assert_eq!(borrowed.final_layout, 21);
+        assert_eq!(
+            (borrowed.physical_width, borrowed.physical_height),
+            (65, 33)
+        );
     }
 
     #[test]
@@ -471,6 +495,8 @@ mod tests {
         let borrowed =
             opengl_borrowed_texture_descriptor_to_native(OpenGLBorrowedTextureDescriptorFields {
                 extent: extent(),
+                physical_width: 65,
+                physical_height: 33,
                 context: wgl_context(11),
                 texture: 12,
                 target: 0x0de1,
@@ -481,5 +507,9 @@ mod tests {
         );
         assert_eq!(borrowed.texture, 12);
         assert_eq!(borrowed.target, 0x0de1);
+        assert_eq!(
+            (borrowed.physical_width, borrowed.physical_height),
+            (65, 33)
+        );
     }
 }

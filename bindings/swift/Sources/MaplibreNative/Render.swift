@@ -249,16 +249,29 @@ public struct MetalOwnedTextureDescriptor: Equatable, Sendable {
 
 public struct MetalBorrowedTextureDescriptor: Equatable, Sendable {
   public var extent: RenderTargetExtent
+  /// Physical texture size in device pixels. The texture is sized by its owner,
+  /// so this is stated rather than derived from `extent`.
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
   public var texture: NativePointer
 
-  public init(extent: RenderTargetExtent, texture: NativePointer) {
+  public init(
+    extent: RenderTargetExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
+    texture: NativePointer
+  ) {
     self.extent = extent
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
     self.texture = texture
   }
 
   var nativeInput: NativeMetalBorrowedTextureDescriptorInput {
     NativeMetalBorrowedTextureDescriptorInput(
       extent: extent.nativeInput,
+      physicalWidth: physicalWidth,
+      physicalHeight: physicalHeight,
       textureAddress: texture.addressBitPattern
     )
   }
@@ -283,6 +296,10 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Sendable {
 
 public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
   public var extent: RenderTargetExtent
+  /// Physical image size in device pixels. The image is sized by its owner,
+  /// so this is stated rather than derived from `extent`.
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
   public var context: VulkanContextDescriptor
   public var image: NativePointer
   public var imageView: NativePointer
@@ -292,6 +309,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
 
   public init(
     extent: RenderTargetExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
     context: VulkanContextDescriptor,
     image: NativePointer,
     imageView: NativePointer,
@@ -300,6 +319,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
     finalLayout: UInt32
   ) {
     self.extent = extent
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
     self.context = context
     self.image = image
     self.imageView = imageView
@@ -311,6 +332,8 @@ public struct VulkanBorrowedTextureDescriptor: Equatable, Sendable {
   var nativeInput: NativeVulkanBorrowedTextureDescriptorInput {
     NativeVulkanBorrowedTextureDescriptorInput(
       extent: extent.nativeInput,
+      physicalWidth: physicalWidth,
+      physicalHeight: physicalHeight,
       context: context.nativeInput,
       imageAddress: image.addressBitPattern,
       imageViewAddress: imageView.addressBitPattern,
@@ -340,17 +363,25 @@ public struct OpenGLOwnedTextureDescriptor: Equatable, Sendable {
 
 public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
   public var extent: RenderTargetExtent
+  /// Physical texture size in device pixels. The texture is sized by its owner,
+  /// so this is stated rather than derived from `extent`.
+  public var physicalWidth: UInt32
+  public var physicalHeight: UInt32
   public var context: OpenGLContextDescriptor
   public var texture: UInt32
   public var target: UInt32
 
   public init(
     extent: RenderTargetExtent,
+    physicalWidth: UInt32,
+    physicalHeight: UInt32,
     context: OpenGLContextDescriptor,
     texture: UInt32,
     target: UInt32
   ) {
     self.extent = extent
+    self.physicalWidth = physicalWidth
+    self.physicalHeight = physicalHeight
     self.context = context
     self.texture = texture
     self.target = target
@@ -359,6 +390,8 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
   var nativeInput: NativeOpenGLBorrowedTextureDescriptorInput {
     NativeOpenGLBorrowedTextureDescriptorInput(
       extent: extent.nativeInput,
+      physicalWidth: physicalWidth,
+      physicalHeight: physicalHeight,
       context: context.nativeInput,
       texture: texture,
       target: target
@@ -392,6 +425,17 @@ public final class RenderSessionHandle {
     }
   }
 
+  /// Resizes this attached render session.
+  ///
+  /// Surface and owned-texture sessions resize in place. Borrowed texture
+  /// targets are sized by their owner and throw an unsupported-feature error:
+  /// close this session, recreate the texture, and attach a new session. A map
+  /// holds at most one attached session, so close before attaching the
+  /// replacement.
+  ///
+  /// Resizing discards the session renderer, so renderer-held state such as
+  /// feature state does not survive. Map state such as camera, style, and
+  /// sources lives on the map and survives both resize and reattach.
   public func resize(width: UInt32, height: UInt32,
                      scaleFactor: Double) throws
   {

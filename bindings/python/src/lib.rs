@@ -6920,6 +6920,8 @@ fn attach_metal_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     texture_address: usize,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
@@ -6929,6 +6931,8 @@ fn attach_metal_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             texture: texture_address as *mut c_void,
         },
     );
@@ -6985,6 +6989,8 @@ fn attach_vulkan_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     instance_address: usize,
     physical_device_address: usize,
     device_address: usize,
@@ -7005,6 +7011,8 @@ fn attach_vulkan_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             context: vulkan_context_fields(
                 instance_address,
                 physical_device_address,
@@ -7109,6 +7117,8 @@ fn attach_opengl_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     context_platform: u32,
     context_address_1: usize,
     context_address_2: usize,
@@ -7124,6 +7134,8 @@ fn attach_opengl_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             context: opengl_context_fields(
                 context_platform,
                 context_address_1,

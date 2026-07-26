@@ -109,10 +109,15 @@ public sealed unsafe class RenderSessionTests
             new MetalBorrowedTextureDescriptor
             {
                 Extent = new RenderTargetExtent(128, 64, 2),
+                PhysicalWidth = 65,
+                PhysicalHeight = 33,
                 Texture = NativePointer.FromBorrowedAddress(20),
             }
         );
         Assert.Equal(20, (nint)metalBorrowed.texture);
+        // Odd sizes no logical extent maps onto, so these must survive as stated.
+        Assert.Equal(65u, metalBorrowed.physical_width);
+        Assert.Equal(33u, metalBorrowed.physical_height);
 
         var vulkanOwned = RenderStructs.ToNative(
             new VulkanOwnedTextureDescriptor
@@ -135,6 +140,8 @@ public sealed unsafe class RenderSessionTests
             new VulkanBorrowedTextureDescriptor
             {
                 Extent = new RenderTargetExtent(256, 128, 1),
+                PhysicalWidth = 65,
+                PhysicalHeight = 33,
                 Image = NativePointer.FromBorrowedAddress(40),
                 ImageView = NativePointer.FromBorrowedAddress(45),
                 Format = 50,
@@ -175,6 +182,8 @@ public sealed unsafe class RenderSessionTests
             new OpenGLBorrowedTextureDescriptor
             {
                 Extent = new RenderTargetExtent(512, 256, 1),
+                PhysicalWidth = 65,
+                PhysicalHeight = 33,
                 Context = new WglContextDescriptor
                 {
                     DeviceContext = NativePointer.FromBorrowedAddress(70),
@@ -209,6 +218,8 @@ public sealed unsafe class RenderSessionTests
             new VulkanBorrowedTextureDescriptor
             {
                 Extent = new RenderTargetExtent(256, 256, 1.0),
+                PhysicalWidth = 65,
+                PhysicalHeight = 33,
                 Image = NativePointer.FromBorrowedAddress(2),
                 ImageView = NativePointer.FromBorrowedAddress(3),
             }
@@ -528,6 +539,8 @@ public sealed unsafe class RenderSessionTests
         var borrowed = new OpenGLBorrowedTextureDescriptor
         {
             Extent = new RenderTargetExtent(32, 16, 1),
+            PhysicalWidth = 65,
+            PhysicalHeight = 33,
             Context = context,
             Texture = 77,
             Target = 0x0de1,
@@ -723,6 +736,8 @@ public sealed unsafe class RenderSessionTests
                 new OpenGLBorrowedTextureDescriptor
                 {
                     Extent = new RenderTargetExtent(32, 16, 1),
+                    PhysicalWidth = 65,
+                    PhysicalHeight = 33,
                     Context = context,
                     Texture = 1,
                     Target = 0x0de1,

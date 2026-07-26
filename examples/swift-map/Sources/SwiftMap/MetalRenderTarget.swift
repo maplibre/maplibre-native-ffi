@@ -181,6 +181,8 @@ enum MetalRenderTarget {
     let session = try map
       .attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
         extent: viewport.extent,
+        physicalWidth: viewport.physicalWidth,
+        physicalHeight: viewport.physicalHeight,
         texture: texture.pointer
       ))
     do {

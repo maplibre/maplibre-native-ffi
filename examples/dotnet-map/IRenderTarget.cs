@@ -342,6 +342,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 new VulkanBorrowedTextureDescriptor
                 {
                     Extent = viewport.RenderTargetExtent,
+                    PhysicalWidth = viewport.PhysicalWidth,
+                    PhysicalHeight = viewport.PhysicalHeight,
                     Context = vulkan.Descriptor(),
                     Image = texture.ImagePointer,
                     ImageView = texture.ViewPointer,
@@ -379,6 +381,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 new MetalBorrowedTextureDescriptor
                 {
                     Extent = viewport.RenderTargetExtent,
+                    PhysicalWidth = viewport.PhysicalWidth,
+                    PhysicalHeight = viewport.PhysicalHeight,
                     Texture = texture.Pointer,
                 }
             );
@@ -411,6 +415,8 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 new OpenGLBorrowedTextureDescriptor
                 {
                     Extent = viewport.RenderTargetExtent,
+                    PhysicalWidth = viewport.PhysicalWidth,
+                    PhysicalHeight = viewport.PhysicalHeight,
                     Context = openGl.Descriptor(requirePbufferConfig: true),
                     Texture = texture.Texture,
                     Target = texture.Target,

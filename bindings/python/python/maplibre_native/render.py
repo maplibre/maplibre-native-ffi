@@ -226,6 +226,10 @@ class MetalBorrowedTextureDescriptor:
     """Metal caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent = RenderTargetExtent()
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int = 0
+    physical_height: int = 0
     texture: NativePointer = NativePointer(0)
 
 
@@ -242,6 +246,10 @@ class VulkanBorrowedTextureDescriptor:
     """Vulkan caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent = RenderTargetExtent()
+    # The image is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int = 0
+    physical_height: int = 0
     context: VulkanContextDescriptor = VulkanContextDescriptor()
     image: NativePointer = NativePointer(0)
     image_view: NativePointer = NativePointer(0)
@@ -263,6 +271,10 @@ class OpenGLBorrowedTextureDescriptor:
     """OpenGL caller-owned texture attachment descriptor."""
 
     extent: RenderTargetExtent = RenderTargetExtent()
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int = 0
+    physical_height: int = 0
     context: OpenGLContextDescriptor = EglContextDescriptor()
     texture: int = 0
     target: int = 0
