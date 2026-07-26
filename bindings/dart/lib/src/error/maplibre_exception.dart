@@ -60,7 +60,10 @@ final class MaplibreStatus {
 }
 
 /// Base exception for errors reported by the native MapLibre C ABI or binding.
-sealed class MaplibreException implements Exception {
+///
+/// The hierarchy remains non-exhaustive so compatible binding releases can add
+/// specialized exceptions without invalidating consumer switches.
+abstract final class MaplibreException implements Exception {
   /// Creates a MapLibre exception.
   const MaplibreException(this.status, this.nativeStatusCode, this.diagnostic);
 
