@@ -67,8 +67,36 @@ auto url_scheme(std::string_view url) -> std::optional<std::string_view> {
   return scheme;
 }
 
+// Keeps enough URL context to identify the failing resource without copying
+// credentials into public diagnostics. Query and fragment values are omitted,
+// and RFC 3986 userinfo is removed from hierarchical URLs.
+auto diagnostic_url(std::string_view url) -> std::string {
+  const auto query = url.find('?');
+  const auto fragment = url.find('#');
+  const auto suffix = std::min(query, fragment);
+  auto sanitized = std::string{url.substr(0, suffix)};
+
+  const auto scheme_separator = sanitized.find(':');
+  if (
+    scheme_separator == std::string::npos ||
+    sanitized.substr(scheme_separator + 1, 2) != "//"
+  ) {
+    return sanitized;
+  }
+
+  const auto authority_start = scheme_separator + 3;
+  const auto authority_end = sanitized.find('/', authority_start);
+  const auto at = sanitized.rfind(
+    '@', authority_end == std::string::npos ? sanitized.size() : authority_end
+  );
+  if (at != std::string::npos && at >= authority_start) {
+    sanitized.erase(authority_start, at - authority_start + 1);
+  }
+  return sanitized;
+}
+
 auto unsupported_scheme_response(
-  std::string_view scheme, const std::string& url
+  std::string_view scheme, const std::string& url, bool provider_declined
 ) -> mbgl::Response {
   auto response = mbgl::Response{};
   // Reason::Other keeps this a terminal configuration error: it surfaces as
@@ -77,9 +105,12 @@ auto unsupported_scheme_response(
   response.error = std::make_unique<mbgl::Response::Error>(
     mbgl::Response::Error::Reason::Other,
     "unsupported URL scheme \"" + std::string{scheme} +
-      "\" for network request \"" + url +
-      "\"; register a resource provider with "
-      "mln_runtime_set_resource_provider() to serve this scheme"
+      "\" for network request \"" + diagnostic_url(url) +
+      (provider_declined
+         ? "\"; the registered resource provider declined this request; "
+           "update it to serve this scheme"
+         : "\"; register a resource provider with "
+           "mln_runtime_set_resource_provider() to serve this scheme")
   );
   return response;
 }
@@ -173,7 +204,9 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     const auto unsupported = unsupported_network_scheme(resource.url);
     if (unsupported.has_value()) {
       return respond_immediately(
-        unsupported_scheme_response(*unsupported, resource.url),
+        unsupported_scheme_response(
+          *unsupported, resource.url, provider.has_value()
+        ),
         std::move(callback)
       );
     }

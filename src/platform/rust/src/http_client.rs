@@ -234,13 +234,7 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
                 }
                 return http_response(&mut response, has_range);
             }
-            Err(error) => {
-                // Naming the attempted URL keeps redirect failures traceable.
-                return http_error(
-                    map_transport_error(&error),
-                    &format!("{error} for URL \"{url}\""),
-                );
-            }
+            Err(error) => return http_error(map_transport_error(&error), &error.to_string()),
         }
     }
 

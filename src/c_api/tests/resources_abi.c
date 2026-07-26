@@ -12,6 +12,8 @@
 static const char offline_style_url[] = "http://example.com/offline-style.json";
 static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";
+static const char credentialed_unsupported_scheme_style_url[] =
+  "jar://user:password@archive/packaged/style.json?access_token=secret#token";
 
 static mln_runtime_event empty_event(void) {
   return (mln_runtime_event){
@@ -395,6 +397,50 @@ static void unsupported_style_url_scheme_names_scheme_and_url(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void unsupported_style_url_diagnostic_redacts_credentials(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_url(map, credentialed_unsupported_scheme_style_url)
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    wait_for_map_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "jar://archive/packaged/style.json"));
+  TEST_ASSERT_NULL(strstr(message, "user"));
+  TEST_ASSERT_NULL(strstr(message, "password"));
+  TEST_ASSERT_NULL(strstr(message, "access_token"));
+  TEST_ASSERT_NULL(strstr(message, "secret"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+static void unsupported_style_url_names_declining_provider(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = resource_provider_stub,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map* map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    wait_for_map_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, "registered resource provider"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "declined"));
+  TEST_ASSERT_NULL(strstr(message, "register a resource provider"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_resources_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
@@ -406,4 +452,6 @@ void run_resources_abi_tests(void) {
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
+  RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
+  RUN_TEST(unsupported_style_url_names_declining_provider);
 }
