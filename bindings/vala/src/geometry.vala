@@ -70,6 +70,10 @@ namespace MaplibreNative {
             }
             return values;
         }
+
+        public LatLng[] to_array () {
+            return to_values ();
+        }
     }
 
     public class Polygon {
@@ -80,7 +84,10 @@ namespace MaplibreNative {
             if (rings.length == 0) {
                 throw new Error.INVALID_ARGUMENT ("polygon rings are empty");
             }
-            this.rings = rings;
+            this.rings = new CoordinateList[rings.length];
+            for (var index = 0; index < rings.length; index++) {
+                this.rings[index] = rings[index];
+            }
         }
 
         internal Raw.PolygonGeometry to_native () {
@@ -101,6 +108,14 @@ namespace MaplibreNative {
             }
             return new Polygon (rings);
         }
+
+        public CoordinateList[] get_rings () {
+            var copied = new CoordinateList[rings.length];
+            for (var index = 0; index < rings.length; index++) {
+                copied[index] = rings[index];
+            }
+            return copied;
+        }
     }
 
     public class Geometry {
@@ -116,9 +131,18 @@ namespace MaplibreNative {
         private Geometry (Raw.Geometry native, owned Raw.LatLng[]? coordinates = null, CoordinateList[]? coordinate_lists = null, Polygon[]? polygon_list = null, Geometry[]? geometry_list = null) {
             this.native = native;
             this.coordinates = (owned) coordinates;
-            this.coordinate_lists = coordinate_lists ?? new CoordinateList[0];
-            this.polygon_list = polygon_list ?? new Polygon[0];
-            this.geometry_list = geometry_list ?? new Geometry[0];
+            this.coordinate_lists = new CoordinateList[coordinate_lists == null ? 0 : coordinate_lists.length];
+            for (var index = 0; coordinate_lists != null && index < coordinate_lists.length; index++) {
+                this.coordinate_lists[index] = coordinate_lists[index];
+            }
+            this.polygon_list = new Polygon[polygon_list == null ? 0 : polygon_list.length];
+            for (var index = 0; polygon_list != null && index < polygon_list.length; index++) {
+                this.polygon_list[index] = polygon_list[index];
+            }
+            this.geometry_list = new Geometry[geometry_list == null ? 0 : geometry_list.length];
+            for (var index = 0; geometry_list != null && index < geometry_list.length; index++) {
+                this.geometry_list[index] = geometry_list[index];
+            }
             refresh_native_views ();
         }
 
@@ -237,6 +261,66 @@ namespace MaplibreNative {
             return new Geometry (geometry, null, null, null, geometries);
         }
 
+        public GeometryType geometry_type { get { return (GeometryType) native.type; } }
+
+        public LatLng get_point () throws Error {
+            if (geometry_type != GeometryType.POINT) {
+                throw new Error.INVALID_STATE ("geometry is not a point");
+            }
+            return LatLng.from_native (native.point);
+        }
+
+        public LatLng[] get_coordinates () throws Error {
+            if (geometry_type != GeometryType.LINE_STRING && geometry_type != GeometryType.MULTI_POINT) {
+                throw new Error.INVALID_STATE ("geometry does not contain a coordinate list");
+            }
+            var copied = new LatLng[coordinates.length];
+            for (var index = 0; index < coordinates.length; index++) {
+                copied[index] = LatLng.from_native (coordinates[index]);
+            }
+            return copied;
+        }
+
+        public Polygon get_polygon () throws Error {
+            if (geometry_type != GeometryType.POLYGON) {
+                throw new Error.INVALID_STATE ("geometry is not a polygon");
+            }
+            return polygon_list[0];
+        }
+
+        public CoordinateList[] get_lines () throws Error {
+            if (geometry_type != GeometryType.MULTI_LINE_STRING) {
+                throw new Error.INVALID_STATE ("geometry is not a multi-line string");
+            }
+            var copied = new CoordinateList[coordinate_lists.length];
+            for (var index = 0; index < coordinate_lists.length; index++) {
+                copied[index] = coordinate_lists[index];
+            }
+            return copied;
+        }
+
+        public Polygon[] get_polygons () throws Error {
+            if (geometry_type != GeometryType.MULTI_POLYGON) {
+                throw new Error.INVALID_STATE ("geometry is not a multi-polygon");
+            }
+            var copied = new Polygon[polygon_list.length];
+            for (var index = 0; index < polygon_list.length; index++) {
+                copied[index] = polygon_list[index];
+            }
+            return copied;
+        }
+
+        public Geometry[] get_geometries () throws Error {
+            if (geometry_type != GeometryType.GEOMETRY_COLLECTION) {
+                throw new Error.INVALID_STATE ("geometry is not a geometry collection");
+            }
+            var copied = new Geometry[geometry_list.length];
+            for (var index = 0; index < geometry_list.length; index++) {
+                copied[index] = geometry_list[index];
+            }
+            return copied;
+        }
+
         internal static Geometry from_native (Raw.Geometry native) throws Error {
             switch ((GeometryType) native.type) {
             case GeometryType.EMPTY:
@@ -339,13 +423,19 @@ namespace MaplibreNative {
 
         public static JsonValue array_value (JsonValue[] values) {
             var json = new JsonValue (JsonValueType.ARRAY);
-            json.array_values = values;
+            json.array_values = new JsonValue[values.length];
+            for (var index = 0; index < values.length; index++) {
+                json.array_values[index] = values[index];
+            }
             return json;
         }
 
         public static JsonValue object_value (JsonMember[] members) {
             var json = new JsonValue (JsonValueType.OBJECT);
-            json.object_members = members;
+            json.object_members = new JsonMember[members.length];
+            for (var index = 0; index < members.length; index++) {
+                json.object_members[index] = members[index];
+            }
             return json;
         }
 
@@ -390,14 +480,22 @@ namespace MaplibreNative {
             if (type != JsonValueType.ARRAY) {
                 throw new Error.INVALID_STATE ("JSON value is not an array");
             }
-            return array_values;
+            var copied = new JsonValue[array_values.length];
+            for (var index = 0; index < array_values.length; index++) {
+                copied[index] = array_values[index];
+            }
+            return copied;
         }
 
         public JsonMember[] get_object_members () throws Error {
             if (type != JsonValueType.OBJECT) {
                 throw new Error.INVALID_STATE ("JSON value is not an object");
             }
-            return object_members;
+            var copied = new JsonMember[object_members.length];
+            for (var index = 0; index < object_members.length; index++) {
+                copied[index] = object_members[index];
+            }
+            return copied;
         }
 
         internal static JsonValue from_native (Raw.JsonValue native) throws Error {
@@ -528,6 +626,34 @@ namespace MaplibreNative {
 
         public FeatureIdentifierType value_type { get { return type; } }
 
+        public uint64 get_uint () throws Error {
+            if (type != FeatureIdentifierType.UINT) {
+                throw new Error.INVALID_STATE ("feature identifier is not a uint");
+            }
+            return uint_storage;
+        }
+
+        public int64 get_int () throws Error {
+            if (type != FeatureIdentifierType.INT) {
+                throw new Error.INVALID_STATE ("feature identifier is not an int");
+            }
+            return int_storage;
+        }
+
+        public double get_double () throws Error {
+            if (type != FeatureIdentifierType.DOUBLE) {
+                throw new Error.INVALID_STATE ("feature identifier is not a double");
+            }
+            return double_storage;
+        }
+
+        public string get_string () throws Error {
+            if (type != FeatureIdentifierType.STRING) {
+                throw new Error.INVALID_STATE ("feature identifier is not a string");
+            }
+            return string_storage;
+        }
+
         internal static FeatureIdentifier from_native (Raw.Feature native) throws Error {
             switch ((FeatureIdentifierType) native.identifier_type) {
             case FeatureIdentifierType.UINT:
@@ -618,12 +744,23 @@ namespace MaplibreNative {
 
         public Feature (Geometry geometry, JsonMember[] properties, FeatureIdentifier? identifier = null) {
             geometry_ref = geometry;
-            this.properties = properties;
+            this.properties = new JsonMember[properties.length];
+            for (var index = 0; index < properties.length; index++) {
+                this.properties[index] = properties[index];
+            }
             this.identifier = identifier ?? FeatureIdentifier.none ();
         }
 
         public Geometry geometry { get { return geometry_ref; } }
-        public JsonMember[] property_members { get { return properties; } }
+        public JsonMember[] property_members {
+            owned get {
+                var copied = new JsonMember[properties.length];
+                for (var index = 0; index < properties.length; index++) {
+                    copied[index] = properties[index];
+                }
+                return copied;
+            }
+        }
         public FeatureIdentifier feature_identifier { get { return identifier; } }
 
         internal static Feature from_native (Raw.Feature native) throws Error {
@@ -669,10 +806,21 @@ namespace MaplibreNative {
         private Raw.FeatureCollection native;
 
         public FeatureCollection (Feature[] features) {
-            this.features = features;
+            this.features = new Feature[features.length];
+            for (var index = 0; index < features.length; index++) {
+                this.features[index] = features[index];
+            }
         }
 
-        public Feature[] feature_items { get { return features; } }
+        public Feature[] feature_items {
+            owned get {
+                var copied = new Feature[features.length];
+                for (var index = 0; index < features.length; index++) {
+                    copied[index] = features[index];
+                }
+                return copied;
+            }
+        }
 
         internal Raw.FeatureCollection to_native () throws Error {
             feature_natives = new Raw.Feature[features.length];

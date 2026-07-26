@@ -119,7 +119,7 @@ void inspect_runtime_event_payload(MaplibreNative.RuntimeEvent event) {
     event.offline_region_tile_count_limit.limit.to_string();
   }
   if (event.offline_operation_completed != null) {
-    event.offline_operation_completed.operation_id.value.to_string();
+    assert(event.offline_operation_completed.operation != null);
     event.offline_operation_completed.operation_kind.to_string();
     event.offline_operation_completed.result_kind.to_string();
   }
@@ -140,7 +140,7 @@ bool wait_for_runtime_event(MaplibreNative.RuntimeHandle runtime, MaplibreNative
   return false;
 }
 
-MaplibreNative.RuntimeEventOfflineOperationCompleted? wait_for_offline_operation(MaplibreNative.RuntimeHandle runtime, MaplibreNative.OfflineOperationId operation_id) throws MaplibreNative.Error {
+MaplibreNative.RuntimeEventOfflineOperationCompleted? wait_for_offline_operation(MaplibreNative.RuntimeHandle runtime, MaplibreNative.OfflineOperationHandle operation) throws MaplibreNative.Error {
   for (uint attempt = 0; attempt < 5000; attempt++) {
     runtime.run_once();
     while (true) {
@@ -149,7 +149,7 @@ MaplibreNative.RuntimeEventOfflineOperationCompleted? wait_for_offline_operation
         break;
       }
       inspect_runtime_event_payload(event);
-      if (event.offline_operation_completed != null && event.offline_operation_completed.operation_id.value == operation_id.value) {
+      if (event.offline_operation_completed != null && event.offline_operation_completed.operation == operation) {
         return event.offline_operation_completed;
       }
     }
@@ -253,14 +253,6 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   var tile_definition = MaplibreNative.OfflineRegionDefinition.tile_pyramid("maplibre://styles/offline", bounds, 0.0, 1.0);
   var geometry_definition = MaplibreNative.OfflineRegionDefinition.geometry_region("maplibre://styles/offline", MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)), 0.0, 1.0);
   uint8[] metadata = { 1, 2, 3 };
-  bool invalid_take_failed = false;
-  try {
-    var snapshot = runtime.offline_region_create_take_result(MaplibreNative.OfflineOperationId(999999));
-    snapshot.close();
-  } catch (MaplibreNative.Error error) {
-    invalid_take_failed = true;
-  }
-  assert(invalid_take_failed);
   var create_id = runtime.offline_region_create_start(tile_definition, metadata);
   var completion = wait_for_offline_operation(runtime, create_id);
   assert(completion != null && completion.operation_kind == MaplibreNative.OfflineOperationKind.REGION_CREATE && completion.result_kind == MaplibreNative.OfflineOperationResultKind.REGION);
@@ -313,12 +305,16 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
     status.download_state.to_string();
     var observed_id = runtime.offline_region_set_observed_start(region_id, false);
     assert(wait_for_offline_operation(runtime, observed_id) != null);
+    observed_id.close();
     var download_id = runtime.offline_region_set_download_state_start(region_id, MaplibreNative.OfflineRegionDownloadState.INACTIVE);
     assert(wait_for_offline_operation(runtime, download_id) != null);
+    download_id.close();
     var invalidate_id = runtime.offline_region_invalidate_start(region_id);
     assert(wait_for_offline_operation(runtime, invalidate_id) != null);
+    invalidate_id.close();
     var delete_id = runtime.offline_region_delete_start(region_id);
     assert(wait_for_offline_operation(runtime, delete_id) != null);
+    delete_id.close();
   }
 }
 
@@ -577,6 +573,10 @@ int main() {
     map.camera_for_lat_lngs({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) }, fit_options);
     map.camera_for_geometry(MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)), fit_options);
     var line_geometry = MaplibreNative.Geometry.line_string({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) });
+    assert(line_geometry.geometry_type == MaplibreNative.GeometryType.LINE_STRING);
+    assert(line_geometry.get_coordinates().length == 2);
+    var point_geometry = MaplibreNative.Geometry.point(MaplibreNative.LatLng(2.0, 3.0));
+    assert(point_geometry.get_point().latitude == 2.0);
     map.camera_for_geometry(line_geometry, fit_options);
     var geometry_line = new MaplibreNative.CoordinateList({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) });
     var geometry_ring = new MaplibreNative.CoordinateList({
@@ -587,6 +587,8 @@ int main() {
       MaplibreNative.LatLng(-1.0, -1.0)
     });
     var polygon = new MaplibreNative.Polygon({ geometry_ring });
+    assert(polygon.get_rings().length == 1);
+    assert(polygon.get_rings()[0].to_array().length == 5);
     map.camera_for_geometry(MaplibreNative.Geometry.polygon(polygon), fit_options);
     map.camera_for_geometry(MaplibreNative.Geometry.multi_line_string({ geometry_line }), fit_options);
     map.camera_for_geometry(MaplibreNative.Geometry.multi_polygon({ polygon }), fit_options);
@@ -629,6 +631,14 @@ int main() {
         new MaplibreNative.JsonMember("metadata", MaplibreNative.JsonValue.object_value({ new MaplibreNative.JsonMember("source", MaplibreNative.JsonValue.string_value("vala")) }))
       },
       MaplibreNative.FeatureIdentifier.string_value("feature-1"));
+    assert(feature.feature_identifier.get_string() == "feature-1");
+    MaplibreNative.JsonValue[] mutable_json_values = { MaplibreNative.JsonValue.string_value("kept") };
+    var copied_json_array = MaplibreNative.JsonValue.array_value(mutable_json_values);
+    mutable_json_values[0] = MaplibreNative.JsonValue.string_value("changed");
+    assert(copied_json_array.get_array_values()[0].get_string() == "kept");
+    var returned_json_values = copied_json_array.get_array_values();
+    returned_json_values[0] = MaplibreNative.JsonValue.string_value("changed again");
+    assert(copied_json_array.get_array_values()[0].get_string() == "kept");
     var feature_geojson = MaplibreNative.GeoJson.feature(feature);
     map.add_geojson_source_data("inline-feature", feature_geojson);
     assert(map.style_source_exists("inline-feature"));
@@ -798,7 +808,6 @@ int main() {
     assert(!map.remove_style_layer("location"));
 
     var operation_id = runtime.run_ambient_cache_operation_start(MaplibreNative.AmbientCacheOperation.INVALIDATE);
-    operation_id.value.to_string();
     runtime.discard_offline_operation(operation_id);
     compile_offline_region_wrappers(runtime, offline_merge_database_path);
 

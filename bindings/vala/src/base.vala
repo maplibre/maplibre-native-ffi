@@ -5,6 +5,7 @@ namespace MaplibreNative {
         WRONG_THREAD,
         UNSUPPORTED,
         NATIVE_ERROR,
+        ABI_MISMATCH,
         UNKNOWN_STATUS
     }
 

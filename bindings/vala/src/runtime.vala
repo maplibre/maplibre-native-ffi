@@ -1,4 +1,6 @@
 namespace MaplibreNative {
+    private const uint32 EXPECTED_C_ABI_VERSION = 0;
+
     public enum ResourceLoadingMethod {
         ALL = 0,
         CACHE_ONLY = 1,
@@ -115,15 +117,59 @@ namespace MaplibreNative {
         }
     }
 
-    public struct OfflineOperationId {
-        public uint64 value;
+    public class OfflineOperationHandle {
+        private RuntimeHandle runtime;
+        private uint64 native_id;
+        private OfflineOperationKind operation_kind;
+        private OfflineOperationResultKind result_kind;
+        private bool consumed;
 
-        public OfflineOperationId (uint64 value) {
-            this.value = value;
+        public bool closed { get { return consumed; } }
+
+        internal OfflineOperationHandle (RuntimeHandle runtime, uint64 native_id, OfflineOperationKind operation_kind, OfflineOperationResultKind result_kind) {
+            this.runtime = runtime;
+            this.native_id = native_id;
+            this.operation_kind = operation_kind;
+            this.result_kind = result_kind;
         }
 
-        internal uint64 to_native () {
+        ~OfflineOperationHandle () {
+            if (!consumed) {
+                try {
+                    runtime.discard_offline_operation (this);
+                } catch (Error error) {
+                    warning ("OfflineOperationHandle finalized while live and could not be discarded: %s", error.message);
+                }
+            }
+        }
+
+        public void close () throws Error {
+            runtime.discard_offline_operation (this);
+        }
+
+        internal uint64 require_live (RuntimeHandle expected_runtime) throws Error {
+            if (consumed) {
+                throw new Error.INVALID_STATE ("offline operation handle is closed");
+            }
+            if (runtime != expected_runtime) {
+                throw new Error.INVALID_STATE ("offline operation belongs to a different runtime");
+            }
+            return native_id;
+        }
+
+        internal uint64 require_result (RuntimeHandle expected_runtime, OfflineOperationKind expected_kind, OfflineOperationResultKind expected_result_kind) throws Error {
+            var value = require_live (expected_runtime);
+            if (operation_kind != expected_kind) {
+                throw new Error.INVALID_STATE ("offline operation has the wrong operation kind");
+            }
+            if (result_kind != expected_result_kind) {
+                throw new Error.INVALID_STATE ("offline operation has the wrong result kind");
+            }
             return value;
+        }
+
+        internal void mark_consumed () {
+            consumed = true;
         }
     }
 
@@ -465,14 +511,14 @@ namespace MaplibreNative {
     }
 
     public class RuntimeEventOfflineOperationCompleted {
-        public OfflineOperationId operation_id { get; private set; }
+        public OfflineOperationHandle? operation { get; private set; }
         public OfflineOperationKind operation_kind { get; private set; }
         public OfflineOperationResultKind result_kind { get; private set; }
         public int32 result_status { get; private set; }
         public bool found { get; private set; }
 
-        internal RuntimeEventOfflineOperationCompleted.from_native (Raw.RuntimeEventOfflineOperationCompleted native) {
-            operation_id = OfflineOperationId (native.operation_id);
+        internal RuntimeEventOfflineOperationCompleted.from_native (RuntimeHandle runtime, Raw.RuntimeEventOfflineOperationCompleted native) {
+            operation = runtime.resolve_offline_operation (native.operation_id);
             operation_kind = offline_operation_kind_from_raw (native.operation_kind);
             result_kind = offline_operation_result_kind_from_raw (native.result_kind);
             result_status = native.result_status;
@@ -764,7 +810,7 @@ namespace MaplibreNative {
                     break;
                 case RuntimeEventPayloadType.OFFLINE_OPERATION_COMPLETED:
                     validate_payload (native, sizeof (Raw.RuntimeEventOfflineOperationCompleted));
-                    offline_operation_completed = new RuntimeEventOfflineOperationCompleted.from_native (((Raw.RuntimeEventOfflineOperationCompleted*) native.payload)[0]);
+                    offline_operation_completed = new RuntimeEventOfflineOperationCompleted.from_native (runtime, ((Raw.RuntimeEventOfflineOperationCompleted*) native.payload)[0]);
                     break;
                 default:
                     break;
@@ -785,8 +831,53 @@ namespace MaplibreNative {
     public delegate bool LogCallback (LogSeverity severity, LogEvent event, int64 code, string? message);
     public delegate string? ResourceTransformCallback (ResourceKind kind, string url);
 
+    private class LogRegistration {
+        private LogCallback callback;
+        private Mutex mutex;
+        private Cond idle;
+        private bool closing;
+        private uint active_callbacks;
+
+        public LogRegistration (owned LogCallback callback) {
+            this.callback = (owned) callback;
+        }
+
+        public uint32 invoke (uint32 severity, uint32 event, int64 code, string? message) {
+            mutex.lock ();
+            if (closing) {
+                mutex.unlock ();
+                return 0;
+            }
+            active_callbacks++;
+            mutex.unlock ();
+            try {
+                return callback (log_severity_from_raw (severity), log_event_from_raw (event), code, message) ? 1U : 0U;
+            } finally {
+                mutex.lock ();
+                active_callbacks--;
+                if (closing && active_callbacks == 0) {
+                    idle.broadcast ();
+                }
+                mutex.unlock ();
+            }
+        }
+
+        public void close () {
+            mutex.lock ();
+            closing = true;
+            while (active_callbacks > 0) {
+                idle.wait (mutex);
+            }
+            mutex.unlock ();
+        }
+    }
+
     private class ResourceTransformRegistration {
         private ResourceTransformCallback callback;
+        private Mutex mutex;
+        private Cond idle;
+        private bool closing;
+        private uint active_callbacks;
 
         public ResourceTransformRegistration (owned ResourceTransformCallback callback) {
             this.callback = (owned) callback;
@@ -798,11 +889,36 @@ namespace MaplibreNative {
             }
             out_response->size = (uint32) sizeof (Raw.ResourceTransformResponse);
             out_response->url = null;
-            var replacement = callback (resource_kind_from_raw (raw_kind), url);
-            if (replacement != null && replacement.length > 0) {
-                return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);
+            mutex.lock ();
+            if (closing) {
+                mutex.unlock ();
+                return Raw.Status.OK;
             }
-            return Raw.Status.OK;
+            active_callbacks++;
+            mutex.unlock ();
+            try {
+                var replacement = callback (resource_kind_from_raw (raw_kind), url);
+                if (replacement != null && replacement.length > 0) {
+                    return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);
+                }
+                return Raw.Status.OK;
+            } finally {
+                mutex.lock ();
+                active_callbacks--;
+                if (closing && active_callbacks == 0) {
+                    idle.broadcast ();
+                }
+                mutex.unlock ();
+            }
+        }
+
+        public void close () {
+            mutex.lock ();
+            closing = true;
+            while (active_callbacks > 0) {
+                idle.wait (mutex);
+            }
+            mutex.unlock ();
         }
     }
 
@@ -850,13 +966,15 @@ namespace MaplibreNative {
         }
     }
 
-    private LogCallback? current_log_callback;
+    private LogRegistration? current_log_registration;
+    private Mutex log_registration_mutex;
 
     private uint32 log_trampoline (void* user_data, uint32 severity, uint32 event, int64 code, string? message) {
-        if (current_log_callback == null) {
+        if (user_data == null) {
             return 0;
         }
-        return current_log_callback (log_severity_from_raw (severity), log_event_from_raw (event), code, message) ? 1U : 0U;
+        unowned LogRegistration registration = (LogRegistration) user_data;
+        return registration.invoke (severity, event, code, message);
     }
 
     private Raw.Status resource_transform_trampoline (void* user_data, uint32 kind, string url, Raw.ResourceTransformResponse* out_response) {
@@ -898,34 +1016,75 @@ namespace MaplibreNative {
     }
 
     public void set_log_callback (owned LogCallback callback) throws Error {
-        var previous = (owned) current_log_callback;
-        current_log_callback = (owned) callback;
+        var registration = new LogRegistration ((owned) callback);
+        LogRegistration? previous = null;
+        log_registration_mutex.lock ();
         try {
-            check_status (Raw.log_set_callback (log_trampoline, null));
-        } catch (Error error) {
-            current_log_callback = (owned) previous;
-            throw error;
+            check_status (Raw.log_set_callback (log_trampoline, registration));
+            previous = current_log_registration;
+            current_log_registration = registration;
+        } finally {
+            log_registration_mutex.unlock ();
+        }
+        if (previous != null) {
+            previous.close ();
         }
     }
 
     public void clear_log_callback () throws Error {
-        check_status (Raw.log_clear_callback ());
-        current_log_callback = null;
+        LogRegistration? previous = null;
+        log_registration_mutex.lock ();
+        try {
+            check_status (Raw.log_clear_callback ());
+            previous = current_log_registration;
+            current_log_registration = null;
+        } finally {
+            log_registration_mutex.unlock ();
+        }
+        if (previous != null) {
+            previous.close ();
+        }
     }
 
     public void set_log_async_severity_mask (LogSeverityMask mask) throws Error {
         check_status (Raw.log_set_async_severity_mask ((uint32) mask));
     }
 
+    private class MapRegistration {
+        public weak MapHandle? map;
+
+        public MapRegistration (MapHandle map) {
+            this.map = map;
+        }
+    }
+
+    private class OfflineOperationRegistration {
+        public uint64 native_id;
+        public weak OfflineOperationHandle? handle;
+
+        public OfflineOperationRegistration (uint64 native_id, OfflineOperationHandle handle) {
+            this.native_id = native_id;
+            this.handle = handle;
+        }
+    }
+
+    private ResourceTransformRegistration[] leaked_resource_transforms;
+    private ResourceProviderRegistration[] leaked_resource_providers;
+
     public class RuntimeHandle {
         private Raw.Runtime? native;
         private ResourceTransformRegistration? resource_transform;
         private ResourceProviderRegistration? resource_provider;
-        private MapHandle[] maps = new MapHandle[0];
+        private MapRegistration[] maps = new MapRegistration[0];
+        private OfflineOperationRegistration[] offline_operations = new OfflineOperationRegistration[0];
 
         public bool closed { get { return native == null; } }
 
         public RuntimeHandle (RuntimeOptions? options = null) throws Error {
+            var actual_version = Raw.c_version ();
+            if (actual_version != EXPECTED_C_ABI_VERSION) {
+                throw new Error.ABI_MISMATCH ("MapLibre Native C ABI version mismatch: expected %u, loaded %u", EXPECTED_C_ABI_VERSION, actual_version);
+            }
             var native_options = (options ?? new RuntimeOptions ()).to_native ();
             Raw.Runtime created;
             check_status (Raw.runtime_create (&native_options, out created));
@@ -935,6 +1094,12 @@ namespace MaplibreNative {
         ~RuntimeHandle () {
             if (native != null) {
                 warning ("RuntimeHandle finalized while live; call close() on the owner thread");
+                if (resource_transform != null) {
+                    leaked_resource_transforms += resource_transform;
+                }
+                if (resource_provider != null) {
+                    leaked_resource_providers += resource_provider;
+                }
             }
         }
 
@@ -949,18 +1114,26 @@ namespace MaplibreNative {
             if (native == null) {
                 return;
             }
+            prune_maps ();
             if (maps.length > 0) {
                 throw new Error.INVALID_STATE ("runtime has live map handles");
+            }
+            if (offline_operations.length > 0) {
+                throw new Error.INVALID_STATE ("runtime has live offline operation handles");
+            }
+            var provider = resource_provider;
+            if (provider != null) {
+                provider.close ();
+            }
+            var transform = resource_transform;
+            if (transform != null) {
+                transform.close ();
             }
             unowned Raw.Runtime closing = native;
             check_status (Raw.runtime_destroy (closing));
             native = null;
             resource_transform = null;
-            var provider = resource_provider;
             resource_provider = null;
-            if (provider != null) {
-                provider.close ();
-            }
         }
 
         public void run_once () throws Error {
@@ -979,25 +1152,26 @@ namespace MaplibreNative {
         }
 
         internal void register_map (MapHandle map) {
-            var retained = new MapHandle[maps.length + 1];
+            prune_maps ();
+            var retained = new MapRegistration[maps.length + 1];
             for (var index = 0; index < maps.length; index++) {
                 retained[index] = maps[index];
             }
-            retained[maps.length] = map;
+            retained[maps.length] = new MapRegistration (map);
             maps = retained;
         }
 
         internal void unregister_map (MapHandle map) {
             uint retained_count = 0;
             for (var index = 0; index < maps.length; index++) {
-                if (maps[index] != map) {
+                if (maps[index].map != null && maps[index].map != map) {
                     retained_count++;
                 }
             }
-            var retained = new MapHandle[retained_count];
+            var retained = new MapRegistration[retained_count];
             uint output_index = 0;
             for (var index = 0; index < maps.length; index++) {
-                if (maps[index] != map) {
+                if (maps[index].map != null && maps[index].map != map) {
                     retained[output_index++] = maps[index];
                 }
             }
@@ -1005,9 +1179,68 @@ namespace MaplibreNative {
         }
 
         internal MapHandle? resolve_map (void* source) {
+            prune_maps ();
             for (var index = 0; index < maps.length; index++) {
-                if (maps[index].matches_native_source (source)) {
-                    return maps[index];
+                var map = maps[index].map;
+                if (map != null && map.matches_native_source (source)) {
+                    return map;
+                }
+            }
+            return null;
+        }
+
+        private void prune_maps () {
+            uint retained_count = 0;
+            for (var index = 0; index < maps.length; index++) {
+                if (maps[index].map != null) {
+                    retained_count++;
+                }
+            }
+            if (retained_count == maps.length) {
+                return;
+            }
+            var retained = new MapRegistration[retained_count];
+            uint output_index = 0;
+            for (var index = 0; index < maps.length; index++) {
+                if (maps[index].map != null) {
+                    retained[output_index++] = maps[index];
+                }
+            }
+            maps = retained;
+        }
+
+        private OfflineOperationHandle register_offline_operation (uint64 native_id, OfflineOperationKind operation_kind, OfflineOperationResultKind result_kind) {
+            var handle = new OfflineOperationHandle (this, native_id, operation_kind, result_kind);
+            var retained = new OfflineOperationRegistration[offline_operations.length + 1];
+            for (var index = 0; index < offline_operations.length; index++) {
+                retained[index] = offline_operations[index];
+            }
+            retained[offline_operations.length] = new OfflineOperationRegistration (native_id, handle);
+            offline_operations = retained;
+            return handle;
+        }
+
+        private void unregister_offline_operation (uint64 native_id) {
+            uint retained_count = 0;
+            for (var index = 0; index < offline_operations.length; index++) {
+                if (offline_operations[index].native_id != native_id) {
+                    retained_count++;
+                }
+            }
+            var retained = new OfflineOperationRegistration[retained_count];
+            uint output_index = 0;
+            for (var index = 0; index < offline_operations.length; index++) {
+                if (offline_operations[index].native_id != native_id) {
+                    retained[output_index++] = offline_operations[index];
+                }
+            }
+            offline_operations = retained;
+        }
+
+        internal OfflineOperationHandle? resolve_offline_operation (uint64 native_id) {
+            for (var index = 0; index < offline_operations.length; index++) {
+                if (offline_operations[index].native_id == native_id) {
+                    return offline_operations[index].handle;
                 }
             }
             return null;
@@ -1033,25 +1266,36 @@ namespace MaplibreNative {
             transform.callback = resource_transform_trampoline;
             transform.user_data = registration;
             check_status (Raw.runtime_set_resource_transform (require_live (), &transform));
+            var previous = resource_transform;
             resource_transform = registration;
+            if (previous != null) {
+                previous.close ();
+            }
         }
 
         public void clear_resource_transform () throws Error {
             check_status (Raw.runtime_clear_resource_transform (require_live ()));
+            var previous = resource_transform;
             resource_transform = null;
+            if (previous != null) {
+                previous.close ();
+            }
         }
 
-        public OfflineOperationId run_ambient_cache_operation_start (AmbientCacheOperation operation) throws Error {
+        public OfflineOperationHandle run_ambient_cache_operation_start (AmbientCacheOperation operation) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_run_ambient_cache_operation_start (require_live (), (uint32) operation, out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.AMBIENT_CACHE, OfflineOperationResultKind.NONE);
         }
 
-        public void discard_offline_operation (OfflineOperationId operation_id) throws Error {
-            check_status (Raw.runtime_offline_operation_discard (require_live (), operation_id.to_native ()));
+        public void discard_offline_operation (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_live (this);
+            check_status (Raw.runtime_offline_operation_discard (require_live (), operation_id));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
         }
 
-        public OfflineOperationId offline_region_create_start (OfflineRegionDefinition definition, uint8[]? metadata = null) throws Error {
+        public OfflineOperationHandle offline_region_create_start (OfflineRegionDefinition definition, uint8[]? metadata = null) throws Error {
             Raw.Geometry geometry_storage = {};
             var native_definition = definition.to_native (ref geometry_storage);
             uint8* metadata_data = null;
@@ -1062,28 +1306,28 @@ namespace MaplibreNative {
             }
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_create_start (require_live (), &native_definition, metadata_data, metadata_size, out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
         }
 
-        public OfflineOperationId offline_region_get_start (OfflineRegionId region_id) throws Error {
+        public OfflineOperationHandle offline_region_get_start (OfflineRegionId region_id) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_get_start (require_live (), region_id.to_native (), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
         }
 
-        public OfflineOperationId offline_regions_list_start () throws Error {
+        public OfflineOperationHandle offline_regions_list_start () throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_regions_list_start (require_live (), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
         }
 
-        public OfflineOperationId offline_regions_merge_database_start (string side_database_path) throws Error {
+        public OfflineOperationHandle offline_regions_merge_database_start (string side_database_path) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_regions_merge_database_start (require_live (), c_string (side_database_path), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
         }
 
-        public OfflineOperationId offline_region_update_metadata_start (OfflineRegionId region_id, uint8[]? metadata = null) throws Error {
+        public OfflineOperationHandle offline_region_update_metadata_start (OfflineRegionId region_id, uint8[]? metadata = null) throws Error {
             uint8* metadata_data = null;
             size_t metadata_size = 0;
             if (metadata != null && metadata.length > 0) {
@@ -1092,89 +1336,107 @@ namespace MaplibreNative {
             }
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_update_metadata_start (require_live (), region_id.to_native (), metadata_data, metadata_size, out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
         }
 
-        public OfflineOperationId offline_region_get_status_start (OfflineRegionId region_id) throws Error {
+        public OfflineOperationHandle offline_region_get_status_start (OfflineRegionId region_id) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_get_status_start (require_live (), region_id.to_native (), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
         }
 
-        public OfflineOperationId offline_region_set_observed_start (OfflineRegionId region_id, bool observed) throws Error {
+        public OfflineOperationHandle offline_region_set_observed_start (OfflineRegionId region_id, bool observed) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_set_observed_start (require_live (), region_id.to_native (), observed, out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_SET_OBSERVED, OfflineOperationResultKind.NONE);
         }
 
-        public OfflineOperationId offline_region_set_download_state_start (OfflineRegionId region_id, OfflineRegionDownloadState state) throws Error {
+        public OfflineOperationHandle offline_region_set_download_state_start (OfflineRegionId region_id, OfflineRegionDownloadState state) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_set_download_state_start (require_live (), region_id.to_native (), (uint32) state, out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_SET_DOWNLOAD_STATE, OfflineOperationResultKind.NONE);
         }
 
-        public OfflineOperationId offline_region_invalidate_start (OfflineRegionId region_id) throws Error {
+        public OfflineOperationHandle offline_region_invalidate_start (OfflineRegionId region_id) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_invalidate_start (require_live (), region_id.to_native (), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_INVALIDATE, OfflineOperationResultKind.NONE);
         }
 
-        public OfflineOperationId offline_region_delete_start (OfflineRegionId region_id) throws Error {
+        public OfflineOperationHandle offline_region_delete_start (OfflineRegionId region_id) throws Error {
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_delete_start (require_live (), region_id.to_native (), out operation_id));
-            return OfflineOperationId (operation_id);
+            return register_offline_operation (operation_id, OfflineOperationKind.REGION_DELETE, OfflineOperationResultKind.NONE);
         }
 
-        public OfflineRegionSnapshotHandle offline_region_create_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionSnapshotHandle offline_region_create_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
-            check_status (Raw.runtime_offline_region_create_take_result (require_live (), operation_id.to_native (), out snapshot));
+            check_status (Raw.runtime_offline_region_create_take_result (require_live (), operation_id, out snapshot));
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region create returned no snapshot");
             }
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             return new OfflineRegionSnapshotHandle ((owned) snapshot);
         }
 
-        public OfflineRegionSnapshotHandle? offline_region_get_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionSnapshotHandle? offline_region_get_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
             Raw.OfflineRegionSnapshot? snapshot;
             bool found;
-            check_status (Raw.runtime_offline_region_get_take_result (require_live (), operation_id.to_native (), out snapshot, out found));
+            check_status (Raw.runtime_offline_region_get_take_result (require_live (), operation_id, out snapshot, out found));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             if (!found || snapshot == null) {
                 return null;
             }
             return new OfflineRegionSnapshotHandle ((owned) snapshot);
         }
 
-        public OfflineRegionListHandle offline_regions_list_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionListHandle offline_regions_list_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
-            check_status (Raw.runtime_offline_regions_list_take_result (require_live (), operation_id.to_native (), out list));
+            check_status (Raw.runtime_offline_regions_list_take_result (require_live (), operation_id, out list));
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions list returned no list");
             }
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             return new OfflineRegionListHandle ((owned) list);
         }
 
-        public OfflineRegionListHandle offline_regions_merge_database_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionListHandle offline_regions_merge_database_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
-            check_status (Raw.runtime_offline_regions_merge_database_take_result (require_live (), operation_id.to_native (), out list));
+            check_status (Raw.runtime_offline_regions_merge_database_take_result (require_live (), operation_id, out list));
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions merge returned no list");
             }
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             return new OfflineRegionListHandle ((owned) list);
         }
 
-        public OfflineRegionSnapshotHandle offline_region_update_metadata_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionSnapshotHandle offline_region_update_metadata_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
-            check_status (Raw.runtime_offline_region_update_metadata_take_result (require_live (), operation_id.to_native (), out snapshot));
+            check_status (Raw.runtime_offline_region_update_metadata_take_result (require_live (), operation_id, out snapshot));
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region metadata update returned no snapshot");
             }
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             return new OfflineRegionSnapshotHandle ((owned) snapshot);
         }
 
-        public OfflineRegionStatus offline_region_get_status_take_result (OfflineOperationId operation_id) throws Error {
+        public OfflineRegionStatus offline_region_get_status_take_result (OfflineOperationHandle operation) throws Error {
+            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
             Raw.OfflineRegionStatus status = {};
             status.size = (uint32) sizeof (Raw.OfflineRegionStatus);
-            check_status (Raw.runtime_offline_region_get_status_take_result (require_live (), operation_id.to_native (), &status));
+            check_status (Raw.runtime_offline_region_get_status_take_result (require_live (), operation_id, &status));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             return OfflineRegionStatus.from_native (status);
         }
     }

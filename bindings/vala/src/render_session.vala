@@ -37,52 +37,47 @@ namespace MaplibreNative {
             frame_acquired = false;
         }
 
+        private unowned Raw.RenderSession require_available () throws Error {
+            if (frame_acquired) {
+                throw new Error.INVALID_STATE ("render session has an acquired frame");
+            }
+            return require_live ();
+        }
+
         public void close () throws Error {
             if (native == null) {
                 return;
             }
-            if (frame_acquired) {
-                throw new Error.INVALID_STATE ("render session has an acquired frame");
-            }
-            unowned Raw.RenderSession closing = native;
+            unowned Raw.RenderSession closing = require_available ();
             check_status (Raw.render_session_destroy (closing));
             native = null;
         }
 
         public void resize (uint32 width, uint32 height, double scale_factor) throws Error {
-            if (frame_acquired) {
-                throw new Error.INVALID_STATE ("render session has an acquired frame");
-            }
-            check_status (Raw.render_session_resize (require_live (), width, height, scale_factor));
+            check_status (Raw.render_session_resize (require_available (), width, height, scale_factor));
         }
 
         public bool render_update () throws Error {
-            if (frame_acquired) {
-                throw new Error.INVALID_STATE ("render session has an acquired frame");
-            }
             bool rendered;
-            check_status (Raw.render_session_render_update (require_live (), out rendered));
+            check_status (Raw.render_session_render_update (require_available (), out rendered));
             return rendered;
         }
 
         public void detach () throws Error {
-            if (frame_acquired) {
-                throw new Error.INVALID_STATE ("render session has an acquired frame");
-            }
-            check_status (Raw.render_session_detach (require_live ()));
+            check_status (Raw.render_session_detach (require_available ()));
             detached = true;
         }
 
         public void reduce_memory_use () throws Error {
-            check_status (Raw.render_session_reduce_memory_use (require_live ()));
+            check_status (Raw.render_session_reduce_memory_use (require_available ()));
         }
 
         public void clear_data () throws Error {
-            check_status (Raw.render_session_clear_data (require_live ()));
+            check_status (Raw.render_session_clear_data (require_available ()));
         }
 
         public void dump_debug_logs () throws Error {
-            check_status (Raw.render_session_dump_debug_logs (require_live ()));
+            check_status (Raw.render_session_dump_debug_logs (require_available ()));
         }
 
         public TextureImageInfo read_premultiplied_rgba8 (uint8[] out_data) throws Error {
@@ -90,7 +85,7 @@ namespace MaplibreNative {
                 throw new Error.INVALID_ARGUMENT ("readback buffer is empty");
             }
             Raw.TextureImageInfo info = Raw.texture_image_info_default ();
-            check_status (Raw.texture_read_premultiplied_rgba8 (require_live (), out_data, out_data.length, &info));
+            check_status (Raw.texture_read_premultiplied_rgba8 (require_available (), out_data, out_data.length, &info));
             return new TextureImageInfo (info);
         }
 
@@ -103,7 +98,7 @@ namespace MaplibreNative {
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
-            check_status (Raw.render_session_query_rendered_features (require_live (), &native_geometry, options_ptr, out result));
+            check_status (Raw.render_session_query_rendered_features (require_available (), &native_geometry, options_ptr, out result));
             return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
@@ -115,7 +110,7 @@ namespace MaplibreNative {
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
-            check_status (Raw.render_session_query_source_features (require_live (), string_view (source_id), options_ptr, out result));
+            check_status (Raw.render_session_query_source_features (require_available (), string_view (source_id), options_ptr, out result));
             return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
@@ -128,20 +123,20 @@ namespace MaplibreNative {
                 arguments_ptr = &native_arguments;
             }
             Raw.FeatureExtensionResult result;
-            check_status (Raw.render_session_query_feature_extensions (require_live (), string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
+            check_status (Raw.render_session_query_feature_extensions (require_available (), string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
             return FeatureExtensionResultHandle.copy_from_native ((owned) result);
         }
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
             Raw.JsonValue native_state = state.to_native ();
-            check_status (Raw.render_session_set_feature_state (require_live (), &native_selector, &native_state));
+            check_status (Raw.render_session_set_feature_state (require_available (), &native_selector, &native_state));
         }
 
         public JsonValue get_feature_state (FeatureStateSelector selector) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
             Raw.JsonSnapshot snapshot;
-            check_status (Raw.render_session_get_feature_state (require_live (), &native_selector, out snapshot));
+            check_status (Raw.render_session_get_feature_state (require_available (), &native_selector, out snapshot));
             try {
                 Raw.JsonValue* value;
                 check_status (Raw.json_snapshot_get (snapshot, out value));
@@ -153,7 +148,7 @@ namespace MaplibreNative {
 
         public void remove_feature_state (FeatureStateSelector selector) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
-            check_status (Raw.render_session_remove_feature_state (require_live (), &native_selector));
+            check_status (Raw.render_session_remove_feature_state (require_available (), &native_selector));
         }
 
         public MetalOwnedTextureFrameHandle acquire_metal_owned_texture_frame () throws Error {

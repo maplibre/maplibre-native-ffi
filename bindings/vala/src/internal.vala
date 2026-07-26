@@ -91,7 +91,7 @@ namespace MaplibreNative {
     }
 
     internal uint8[]? copy_bytes (uint8* data, size_t size) {
-        if (data == null || size == 0) {
+        if (data == null) {
             return null;
         }
         uint8[] copied = new uint8[size];
