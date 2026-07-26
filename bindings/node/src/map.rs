@@ -2510,6 +2510,32 @@ fn unref_custom_geometry_callbacks(
     Ok(())
 }
 
+#[cfg(feature = "test-support")]
+static RETAINED_CUSTOM_GEOMETRY_CALLBACKS: OnceLock<Mutex<Vec<CustomGeometrySourceRegistration>>> =
+    OnceLock::new();
+
+/// Retains real custom-geometry callback state without a native map so a
+/// subprocess can prove its threadsafe functions do not keep Node alive.
+#[cfg(feature = "test-support")]
+#[napi(js_name = "nativeTestRetainCustomGeometryCallbacks")]
+pub fn native_test_retain_custom_geometry_callbacks(
+    env: Env,
+    mut fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+    mut cancel_tile: Option<ThreadsafeFunction<CanonicalTileId>>,
+) -> Result<()> {
+    unref_custom_geometry_callbacks(&env, &mut fetch_tile, &mut cancel_tile)?;
+    let registration = CustomGeometrySourceRegistration::new(CustomGeometrySourceState::new(
+        fetch_tile,
+        cancel_tile,
+    )?);
+    RETAINED_CUSTOM_GEOMETRY_CALLBACKS
+        .get_or_init(|| Mutex::new(Vec::new()))
+        .lock()
+        .expect("retained custom geometry callback mutex poisoned")
+        .push(registration);
+    Ok(())
+}
+
 impl CustomGeometrySourceState {
     fn new(
         fetch_tile: Option<ThreadsafeFunction<CanonicalTileId>>,

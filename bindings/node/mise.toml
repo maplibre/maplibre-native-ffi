@@ -15,25 +15,70 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   --release --platform --manifest-path Cargo.toml "${napi_target_args[@]}"
 '''
 
-[tasks.test]
+[tasks.build-test]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+case "$usage_preset" in
+  linux-*-egl|macos-*-egl) test_backend=egl ;;
+  macos-*-metal) test_backend=metal ;;
+  windows-*-wgl) test_backend=wgl ;;
+  linux-*-vulkan|macos-*-vulkan|windows-*-vulkan) test_backend=vulkan ;;
+  *)
+    echo "Node render integration tests do not support preset: $usage_preset" >&2
+    exit 1
+    ;;
+esac
+napi_target_args=()
+case "$usage_preset" in
+  windows-arm64-*) napi_target_args=(--target aarch64-pc-windows-msvc) ;;
+  windows-x64-*) napi_target_args=(--target x86_64-pc-windows-msvc) ;;
+esac
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+MAPLIBRE_NATIVE_NODE_TEST_BACKENDS="$test_backend" \
+  node node_modules/@napi-rs/cli/dist/cli.js build \
+  --release --platform --manifest-path Cargo.toml --features test-support \
+  "${napi_target_args[@]}"
+'''
+
+[tasks.test]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build-test", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+case "$usage_preset" in
+  linux-*-egl|macos-*-egl) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=egl ;;
+  macos-*-metal) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=metal ;;
+  windows-*-wgl) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=wgl ;;
+  linux-*-vulkan|macos-*-vulkan|windows-*-vulkan) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=vulkan ;;
+  *)
+    echo "Node render integration tests do not support preset: $usage_preset" >&2
+    exit 1
+    ;;
+esac
 node --test test/*.test.cjs
 node test/esm-smoke.mjs
 node node_modules/typescript/bin/tsc --noEmit
-cargo clippy -p maplibre-native-node --all-targets -- -D warnings
+cargo clippy -p maplibre-native-node --all-targets --features test-support -- -D warnings
 '''
 run_windows = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
+case "$usage_preset" in
+  windows-*-wgl) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=wgl ;;
+  windows-*-vulkan) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=vulkan ;;
+  *)
+    echo "Node render integration tests do not support preset: $usage_preset" >&2
+    exit 1
+    ;;
+esac
 node --test test/*.test.cjs
 node test/esm-smoke.mjs
 node node_modules/typescript/bin/tsc --noEmit
-cargo clippy -p maplibre-native-node --all-targets -- -D warnings
+cargo clippy -p maplibre-native-node --all-targets --features test-support -- -D warnings
 '''

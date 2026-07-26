@@ -11,11 +11,16 @@ repository.workspace = true
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+ash = { version = "0.38.0", optional = true }
+khronos-egl = { version = "6.0.0", features = ["dynamic"], optional = true }
 maplibre-native-core = { path = "../rust/crates/maplibre-native-core" }
 maplibre-native-sys = { path = "../rust/crates/maplibre-native-sys" }
 napi = { version = "3", default-features = false, features = ["napi10", "serde-json"] }
 napi-derive = "3"
 serde_json = { version = "1", features = ["preserve_order"] }
+
+[features]
+test-support = ["dep:ash", "dep:khronos-egl"]
 
 [build-dependencies]
 napi-build = "2"

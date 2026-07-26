@@ -1862,7 +1862,7 @@ function nativePointerAddress(value, fieldName) {
 }
 
 function nullableNativePointerAddress(value, fieldName) {
-  return value == null ? null : nativePointerAddress(value, fieldName);
+  return value == null ? undefined : nativePointerAddress(value, fieldName);
 }
 
 function normalizeMetalContext(context = {}) {
@@ -1917,13 +1917,11 @@ function normalizeOpenGLContext(context) {
           "getProcAddress",
         ),
       },
-      egl: null,
     };
   }
   if (platform === "egl") {
     return {
       platform,
-      wgl: null,
       egl: {
         displayAddress: nativePointerAddress(context.display, "display"),
         configAddress: nativePointerAddress(context.config, "config"),

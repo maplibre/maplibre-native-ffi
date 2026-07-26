@@ -12,6 +12,8 @@ mod maplibre;
 mod projection;
 mod render;
 mod runtime;
+#[cfg(feature = "test-support")]
+mod test_render_context;
 mod values;
 
 pub use map::*;
@@ -19,4 +21,6 @@ pub use maplibre::*;
 pub use projection::*;
 pub use render::*;
 pub use runtime::*;
+#[cfg(feature = "test-support")]
+pub use test_render_context::*;
 pub use values::*;

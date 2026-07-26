@@ -2028,6 +2028,60 @@ test("render session attach descriptors translate native failures", () => {
   }
 });
 
+test("OpenGL descriptors omit the inactive context provider", () => {
+  const originalAttach = nativeAddon.createOpenGLOwnedTextureRenderSession;
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap({ width: 16, height: 16 });
+  /** @type {any[]} */
+  const contexts = [];
+  nativeAddon.createOpenGLOwnedTextureRenderSession =
+    /** @type {typeof originalAttach} */ (
+      (_nativeMap, descriptor) => {
+        contexts.push(descriptor.context);
+        return /** @type {any} */ ({
+          closed: false,
+          close() {},
+        });
+      }
+    );
+
+  try {
+    const address = NativePointer.unsafeFromAddress(1n);
+    map
+      .attachOpenGLOwnedTexture({
+        extent: { width: 16, height: 16, scaleFactor: 1 },
+        context: {
+          platform: "egl",
+          display: address,
+          config: address,
+          shareContext: address,
+        },
+      })
+      .close();
+    map
+      .attachOpenGLOwnedTexture({
+        extent: { width: 16, height: 16, scaleFactor: 1 },
+        context: {
+          platform: "wgl",
+          deviceContext: address,
+          shareContext: address,
+        },
+      })
+      .close();
+
+    assert.equal(Object.hasOwn(contexts[0], "wgl"), false);
+    assert.equal(Object.hasOwn(contexts[0], "egl"), true);
+    assert.equal(contexts[0].egl.getProcAddressAddress, undefined);
+    assert.equal(Object.hasOwn(contexts[1], "wgl"), true);
+    assert.equal(Object.hasOwn(contexts[1], "egl"), false);
+    assert.equal(contexts[1].wgl.getProcAddressAddress, undefined);
+  } finally {
+    nativeAddon.createOpenGLOwnedTextureRenderSession = originalAttach;
+    map.close();
+    runtime.close();
+  }
+});
+
 test("map utility methods expose copied booleans and native commands", () => {
   const runtime = new RuntimeHandle();
   const continuousMap = runtime.createMap({ width: 16, height: 16 });
