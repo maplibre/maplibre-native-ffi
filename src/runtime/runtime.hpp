@@ -50,9 +50,11 @@ struct ResourceTransformState {
   void* user_data = nullptr;
 };
 
-// Borrows one registered provider through its synchronous callback invocation.
-// Replacement and runtime teardown take the same mutex exclusively, so the
-// callback and its borrowed user data stay valid while a lease exists.
+// Borrows the resource provider registered on a runtime for the duration of one
+// provider callback. The lease holds a shared lock on the runtime's provider
+// mutex, so `set_resource_provider()`, `clear_resource_provider()`, and
+// `destroy_runtime()` wait for every live lease before they retire a callback
+// and its `user_data`.
 class ResourceProviderLease {
  public:
   ResourceProviderLease(
@@ -133,6 +135,7 @@ auto poll_runtime_event(
 auto set_resource_provider(
   mln_runtime* runtime, const mln_resource_provider* provider
 ) -> mln_status;
+auto clear_resource_provider(mln_runtime* runtime) -> mln_status;
 auto set_resource_transform(
   mln_runtime* runtime, const mln_resource_transform* transform
 ) -> mln_status;
@@ -245,8 +248,8 @@ auto resource_options_for_runtime(mln_runtime* runtime)
 // Leases the resource provider registered on the runtime named by a MapLibre
 // platform context. Acquiring the shared provider lock while the registry lock
 // is held hands runtime lifetime safely to the caller. Hold the returned lease
-// across the synchronous provider callback so teardown cannot retire its
-// callback or user_data. Returns nullopt when the platform context names no
+// across the provider callback, so replacement and teardown cannot retire its
+// callback or `user_data`. Returns nullopt when the platform context names no
 // live runtime or the runtime carries no provider.
 auto acquire_resource_provider_for_platform_context(
   void* platform_context

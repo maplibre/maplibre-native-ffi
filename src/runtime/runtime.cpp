@@ -2333,27 +2333,28 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  // Validate under the registry lock, then release it before the provider wait
-  // below. `validate_runtime()` and `destroy_runtime()` both require the owner
-  // thread, so this thread's ownership keeps the runtime alive without holding
-  // the process-global lock while an in-flight callback drains.
-  {
-    const std::scoped_lock registry_lock(runtime_registry_mutex());
-    if (runtime->live_maps != 0) {
-      set_thread_error("resource provider must be set before map creation");
-      return MLN_STATUS_INVALID_STATE;
-    }
-  }
-
-  // A file-source thread that entered the callback holds a shared provider
-  // lock, so the exclusive lock keeps the outgoing callback and user_data alive
-  // until that invocation returns.
-  const std::unique_lock provider_lock(runtime->resource_provider_mutex);
+  // Waiting for the exclusive provider lock waits for every provider callback
+  // that already leased the previous provider, so the previous callback and its
+  // `user_data` are unreferenced once this returns. The registry lock is not
+  // held across that wait, so one runtime's callback cannot stall others.
+  const std::unique_lock lock(runtime->resource_provider_mutex);
   runtime->has_resource_provider = true;
   runtime->resource_provider = ResourceProvider{
     .callback = provider->callback,
     .user_data = provider->user_data,
   };
+  return MLN_STATUS_OK;
+}
+
+auto clear_resource_provider(mln_runtime* runtime) -> mln_status {
+  const auto status = validate_runtime(runtime);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  const std::unique_lock lock(runtime->resource_provider_mutex);
+  runtime->has_resource_provider = false;
+  runtime->resource_provider = ResourceProvider{};
   return MLN_STATUS_OK;
 }
 
@@ -2413,6 +2414,17 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
     const std::unique_lock transform_lock(transform_state.mutex);
     transform_state.callback = nullptr;
     transform_state.user_data = nullptr;
+  }
+
+  // A resource provider callback that leased the provider before the erase
+  // above holds a shared provider lock, so this wait covers every callback that
+  // can still observe the runtime.
+  {
+    const std::unique_lock provider_lock(
+      owned_runtime->resource_provider_mutex
+    );
+    owned_runtime->has_resource_provider = false;
+    owned_runtime->resource_provider = ResourceProvider{};
   }
 
   {
@@ -2571,15 +2583,19 @@ auto acquire_resource_provider_for_platform_context(
   auto* runtime = static_cast<mln_runtime*>(platform_context);
   std::shared_lock<std::shared_mutex> provider_lock;
   {
-    // Acquire in registry-to-provider order, matching replacement and teardown.
-    // Teardown cannot remove and free the runtime between the registry lookup
-    // and the provider lock, then waits for the lease after removing it.
+    // Taking the shared provider lock while the registry lock is held is the
+    // handoff that keeps the runtime alive for the callback:
+    // `destroy_runtime()` removes the registry entry under the same registry
+    // lock and then waits for the exclusive provider lock. A caller that
+    // reaches the shared lock first holds teardown until the lease ends, and
+    // one that arrives after the erase finds no entry and skips the provider.
     const std::scoped_lock registry_lock(runtime_registry_mutex());
     if (!runtime_registry().contains(runtime)) {
       return std::nullopt;
     }
     provider_lock = std::shared_lock{runtime->resource_provider_mutex};
   }
+
   if (!runtime->has_resource_provider) {
     return std::nullopt;
   }

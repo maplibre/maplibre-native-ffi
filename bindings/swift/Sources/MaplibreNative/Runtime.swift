@@ -453,4 +453,12 @@ public final class RuntimeHandle {
     }
     resourceProvider = replacement
   }
+
+  public func clearResourceProvider() throws {
+    try mapNativeFailure {
+      try checkStatus(mln_runtime_clear_resource_provider(handle
+          .requireLive()))
+    }
+    resourceProvider = nil
+  }
 }

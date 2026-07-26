@@ -358,6 +358,14 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     releaseCallbackRoot(previous)
   }
 
+  public actual fun clearResourceProvider() {
+    resourceProviderState?.checkCanClose()
+    Status.check(MaplibreNativeC.mln_runtime_clear_resource_provider(runtime(requireLiveAddress())))
+    val previous = resourceProviderState
+    resourceProviderState = null
+    closeQuietly(previous)
+  }
+
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?

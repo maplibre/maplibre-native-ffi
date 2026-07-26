@@ -586,6 +586,9 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_runtime_set_resource_provider(mln_runtime* runtime, [NativeTypeName("const mln_resource_provider *")] mln_resource_provider* provider);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_clear_resource_provider(mln_runtime* runtime);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_resource_request_complete(mln_resource_request_handle* handle, [NativeTypeName("const mln_resource_response *")] mln_resource_response* response);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

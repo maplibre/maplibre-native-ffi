@@ -1153,8 +1153,8 @@ impl RuntimeHandle {
         // binding lifecycle gate. The C API validates that it is live.
         // descriptor points to replacement state, which is retained after a
         // successful native registration. Replacement can wait for in-flight
-        // callbacks, so release the GIL while it runs without holding the Rust
-        // handle-state mutex.
+        // callbacks that need the GIL, so release the GIL while it runs without
+        // holding the Rust handle-state mutex.
         let status = py.detach(move || {
             let descriptor = sys::mln_resource_provider {
                 size,
@@ -1169,10 +1169,37 @@ impl RuntimeHandle {
             }
         });
         maplibre_core::check(status).map_err(map_error)?;
+        // Native retired the previous provider before returning, so dropping
+        // the state it replaces here can no longer be reached from native.
         self.resource_provider
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .replace(replacement);
+        Ok(())
+    }
+
+    fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<()> {
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state_for_operation()?;
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live and waits
+        // for in-flight callbacks that need the GIL before returning, so release
+        // the GIL while it runs without holding the Rust handle-state mutex.
+        let status = py.detach(move || unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime_address as *mut sys::mln_runtime)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        // Native can no longer reach the cleared provider state, so drop it.
+        self.resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 
@@ -4069,7 +4096,7 @@ unsafe extern "C" fn resource_provider_trampoline(
             return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
         };
         // SAFETY: user_data points to PyResourceProviderState retained by RuntimeHandle
-        // until replacement or runtime teardown; native waits for in-flight callbacks.
+        // until replacement, clear, or runtime teardown; native waits for in-flight callbacks.
         unsafe { state.as_ref() }.invoke(request, handle)
     }))
     .unwrap_or(maplibre_core::resource::UNKNOWN_PROVIDER_DECISION)

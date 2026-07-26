@@ -260,6 +260,15 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     releaseCallbackRoot(previous)
   }
 
+  public actual fun clearResourceProvider() {
+    NativeAccess.ensureLoaded()
+    resourceProviderState?.checkCanClose()
+    Status.check(NativeAccess.clearResourceProvider(requireLiveHandle()))
+    val previous = resourceProviderState
+    resourceProviderState = null
+    closeQuietly(previous)
+  }
+
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     NativeAccess.ensureLoaded()
     val replacement = ResourceTransformState(callback)

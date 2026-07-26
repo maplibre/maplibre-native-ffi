@@ -440,13 +440,29 @@ class RuntimeHandle(NativeHandleMixin):
         *,
         max_pending_callbacks: int = 64,
     ) -> None:
-        """Install or replace the runtime-scoped network resource provider."""
+        """Install or replace the runtime-scoped network resource provider.
+
+        Replacement is allowed while maps are live. When this call returns, the
+        previous callback is retired and no in-flight request can still reach
+        it. Requests it already took a handle for keep that handle, and each one
+        is completed and released as usual.
+        """
         from .resource import _adapt_resource_provider_callback
 
         self._native.set_resource_provider(
             _adapt_resource_provider_callback(callback),
             max_pending_callbacks,
         )
+
+    def clear_resource_provider(self) -> None:
+        """Clear the runtime-scoped network resource provider.
+
+        Later requests go to MapLibre's online file source. When this call
+        returns, the previous callback is retired and no in-flight request can
+        still reach it. Requests it already took a handle for keep that handle,
+        and each one is completed and released as usual.
+        """
+        self._native.clear_resource_provider()
 
     def poll_event(self) -> RuntimeEvent | None:
         """Poll and copy one queued runtime event.
