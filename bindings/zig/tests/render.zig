@@ -1176,6 +1176,9 @@ test "an ease pumped through rendered frames reports its transition finish once"
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    // Consume the style frame before starting the transition. Leaving it
+    // pending suppresses the next update event that drives the eased frame.
+    try testing.expect(try owned.session.renderUpdate());
 
     // A camera transition advances on rendered frames, so completion needs a
     // live render session pumped alongside the runtime.
