@@ -6,13 +6,24 @@ host_native_preset = "macos-arm64-metal"
 "brew:glslang" = "latest"
 "brew:molten-vk" = "latest"
 "brew:ninja" = "latest"
-"brew:vala" = "latest"
 "brew:vulkan-loader" = "latest"
 
 [env]
 JDK_JAVA_OPTIONS = "-Djava.library.path=/opt/homebrew/opt/vulkan-loader/lib -Dorg.lwjgl.vulkan.libname=libvulkan.1.dylib"
 MLN_FFI_VULKAN_LOADER_DIR = "/opt/homebrew/opt/vulkan-loader/lib"
 VK_DRIVER_FILES = "/opt/homebrew/opt/molten-vk/etc/vulkan/icd.d/MoltenVK_icd.json"
+
+[tasks.bootstrap]
+description = "Install macOS development tools that need Homebrew dependency reconciliation."
+run = '''
+# GitHub's macOS image provides pkgconf through Homebrew. Keep Vala in that
+# package graph so Homebrew can reuse or upgrade the existing keg atomically.
+if command -v brew >/dev/null 2>&1; then
+  brew list --versions vala >/dev/null 2>&1 || brew install vala
+else
+  mise bootstrap packages apply --yes brew:vala
+fi
+'''
 
 [tasks."ios-simulator:boot"]
 description = "Boot an available iPhone simulator and wait until it is ready."
