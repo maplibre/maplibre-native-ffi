@@ -5,6 +5,7 @@ use std::ptr::NonNull;
 use maplibre_native_sys as sys;
 
 use crate::enums::{RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding};
+use crate::json::{JsonValue, NativeJsonValue, json_value_try_to_native};
 use crate::string::{StringView, string_view};
 use crate::values::{
     LatLngBounds, PremultipliedRgba8Image, StyleImageInfo, TextureImageInfo,
@@ -92,6 +93,120 @@ impl AsRef<sys::mln_style_tile_source_options> for NativeTileSourceOptions<'_> {
 
 pub fn tile_source_options_to_native(options: &TileSourceOptions) -> NativeTileSourceOptions<'_> {
     options.to_native()
+}
+
+/// Options for GeoJSON sources.
+///
+/// MapLibre Native fixes these options when the source is created, so updating
+/// a GeoJSON source's URL or data keeps the options it was added with.
+#[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
+pub struct GeoJsonSourceOptions {
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub tolerance: Option<f64>,
+    pub cluster_max_zoom: Option<f64>,
+    /// Cluster aggregation expressions keyed by property name, as a JSON object
+    /// whose members follow the MapLibre Style Spec `clusterProperties` form.
+    pub cluster_properties: Option<JsonValue>,
+    pub tile_size: Option<u32>,
+    pub buffer: Option<u32>,
+    pub cluster_radius: Option<u32>,
+    pub cluster_min_points: Option<u32>,
+    pub line_metrics: Option<bool>,
+    pub cluster: Option<bool>,
+}
+
+impl GeoJsonSourceOptions {
+    fn try_to_native(&self) -> crate::Result<NativeGeoJsonSourceOptions> {
+        NativeGeoJsonSourceOptions::new(self)
+    }
+}
+
+pub struct NativeGeoJsonSourceOptions {
+    raw: sys::mln_geojson_source_options,
+    _cluster_properties: Option<NativeJsonValue>,
+    _cluster_properties_raw: Option<Box<sys::mln_json_value>>,
+}
+
+impl NativeGeoJsonSourceOptions {
+    fn new(options: &GeoJsonSourceOptions) -> crate::Result<Self> {
+        // SAFETY: This C helper returns a plain value with no preconditions.
+        let mut raw = unsafe { sys::mln_geojson_source_options_default() };
+        if let Some(value) = options.min_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = value;
+        }
+        if let Some(value) = options.max_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = value;
+        }
+        if let Some(value) = options.tolerance {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+            raw.tolerance = value;
+        }
+        if let Some(value) = options.cluster_max_zoom {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+            raw.cluster_max_zoom = value;
+        }
+        let cluster_properties = options
+            .cluster_properties
+            .as_ref()
+            .map(json_value_try_to_native)
+            .transpose()?;
+        let cluster_properties_raw = cluster_properties
+            .as_ref()
+            .map(|properties| Box::new(*properties.as_ref()));
+        if let Some(properties) = &cluster_properties_raw {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+            raw.cluster_properties = properties.as_ref();
+        }
+        if let Some(value) = options.tile_size {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
+            raw.tile_size = value;
+        }
+        if let Some(value) = options.buffer {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+            raw.buffer = value;
+        }
+        if let Some(value) = options.cluster_radius {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+            raw.cluster_radius = value;
+        }
+        if let Some(value) = options.cluster_min_points {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+            raw.cluster_min_points = value;
+        }
+        if let Some(value) = options.line_metrics {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+            raw.line_metrics = value;
+        }
+        if let Some(value) = options.cluster {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+            raw.cluster = value;
+        }
+        Ok(Self {
+            raw,
+            _cluster_properties: cluster_properties,
+            _cluster_properties_raw: cluster_properties_raw,
+        })
+    }
+
+    pub fn as_ptr(&self) -> *const sys::mln_geojson_source_options {
+        ptr::from_ref(&self.raw)
+    }
+}
+
+impl AsRef<sys::mln_geojson_source_options> for NativeGeoJsonSourceOptions {
+    fn as_ref(&self) -> &sys::mln_geojson_source_options {
+        &self.raw
+    }
+}
+
+pub fn geojson_source_options_to_native(
+    options: &GeoJsonSourceOptions,
+) -> crate::Result<NativeGeoJsonSourceOptions> {
+    options.try_to_native()
 }
 
 pub struct NativeTileUrls<'a> {
@@ -310,6 +425,17 @@ pub trait TileSourceOptionsNativeExt {
 impl TileSourceOptionsNativeExt for TileSourceOptions {
     fn to_native(&self) -> NativeTileSourceOptions<'_> {
         tile_source_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait GeoJsonSourceOptionsNativeExt {
+    fn try_to_native(&self) -> crate::Result<NativeGeoJsonSourceOptions>;
+}
+
+impl GeoJsonSourceOptionsNativeExt for GeoJsonSourceOptions {
+    fn try_to_native(&self) -> crate::Result<NativeGeoJsonSourceOptions> {
+        geojson_source_options_to_native(self)
     }
 }
 

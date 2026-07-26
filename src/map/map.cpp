@@ -14,6 +14,7 @@
 #include <ratio>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -33,9 +34,10 @@
 #include <mbgl/renderer/renderer_observer.hpp>
 #include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/conversion.hpp>
-#include <mbgl/style/conversion/layer.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/light.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/layer.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/light.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/source.hpp>           // IWYU pragma: keep
 #include <mbgl/style/conversion_impl.hpp>
 #include <mbgl/style/image.hpp>
 #include <mbgl/style/layer.hpp>
@@ -60,6 +62,7 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/image.hpp>
+#include <mbgl/util/immutable.hpp>
 #include <mbgl/util/projection.hpp>
 #include <mbgl/util/range.hpp>
 #include <mbgl/util/size.hpp>
@@ -515,6 +518,192 @@ auto to_native_tileset(
     tileset.bounds = to_native_lat_lng_bounds(options.bounds);
   }
   return tileset;
+}
+
+auto has_geojson_source_option(
+  const mln_geojson_source_options& options, uint32_t field
+) -> bool {
+  return (options.fields & field) != 0U;
+}
+
+auto effective_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_geojson_source_options {
+  auto result = mln::core::geojson_source_options_default();
+  if (options == nullptr) {
+    return result;
+  }
+
+  result.fields = options->fields;
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)) {
+    result.min_zoom = options->min_zoom;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)) {
+    result.max_zoom = options->max_zoom;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
+  ) {
+    result.tolerance = options->tolerance;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+    )
+  ) {
+    result.cluster_max_zoom = options->cluster_max_zoom;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    )
+  ) {
+    result.cluster_properties = options->cluster_properties;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
+  ) {
+    result.tile_size = options->tile_size;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
+    result.buffer = options->buffer;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+    )
+  ) {
+    result.cluster_radius = options->cluster_radius;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+    )
+  ) {
+    result.cluster_min_points = options->cluster_min_points;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
+  ) {
+    result.line_metrics = options->line_metrics;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
+    result.cluster = options->cluster;
+  }
+  return result;
+}
+
+auto validate_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_status {
+  if (options == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (options->size < sizeof(mln_geojson_source_options)) {
+    mln::core::set_thread_error("mln_geojson_source_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
+    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error(
+      "mln_geojson_source_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto effective = effective_geojson_source_options(options);
+  for (const auto& [zoom, name] : {
+         std::pair{effective.min_zoom, "min_zoom"},
+         std::pair{effective.max_zoom, "max_zoom"},
+         std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
+       }) {
+    if (!std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0) {
+      auto message = std::string{name} + " must be within [0, 255]";
+      mln::core::set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  if (effective.min_zoom > effective.max_zoom) {
+    mln::core::set_thread_error(
+      "min_zoom must be less than or equal to max_zoom"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!std::isfinite(effective.tolerance) || effective.tolerance < 0.0) {
+    mln::core::set_thread_error("tolerance must be finite and non-negative");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
+    mln::core::set_thread_error("tile_size must be within [1, 65535]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.buffer > 65535U) {
+    mln::core::set_thread_error("buffer must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.cluster_radius > 65535U) {
+    mln::core::set_thread_error("cluster_radius must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    effective.cluster_properties != nullptr &&
+    !mln::core::validate_style_json_value(effective.cluster_properties)
+  ) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+/**
+ * Converts validated options into mbgl form.
+ *
+ * Cluster properties are handed to Converter<GeoJSONOptions> as a one-member
+ * object so MapLibre Native parses the aggregation expressions.
+ */
+auto to_native_geojson_source_options(const mln_geojson_source_options& options)
+  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
+  auto native = mbgl::style::GeoJSONOptions{};
+  native.minzoom = static_cast<uint8_t>(options.min_zoom);
+  native.maxzoom = static_cast<uint8_t>(options.max_zoom);
+  native.tileSize = static_cast<uint16_t>(options.tile_size);
+  native.buffer = static_cast<uint16_t>(options.buffer);
+  native.tolerance = options.tolerance;
+  native.lineMetrics = options.line_metrics;
+  native.cluster = options.cluster;
+  native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
+  native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
+  native.clusterMinPoints = options.cluster_min_points;
+
+  if (options.cluster_properties != nullptr) {
+    constexpr auto key = std::string_view{"clusterProperties"};
+    const auto member = mln_json_member{
+      .key = {.data = key.data(), .size = key.size()},
+      .value = options.cluster_properties
+    };
+    const auto wrapper = mln_json_value{
+      .size = sizeof(mln_json_value),
+      .type = MLN_JSON_VALUE_TYPE_OBJECT,
+      .data = {.object_value = {.members = &member, .member_count = 1}}
+    };
+    auto error = mbgl::style::conversion::Error{};
+    auto converted =
+      mbgl::style::conversion::convert<mbgl::style::GeoJSONOptions>(
+        mbgl::style::conversion::Convertible{&wrapper}, error
+      );
+    if (!converted) {
+      mln::core::set_style_conversion_error("GeoJSON source options", error);
+      return std::nullopt;
+    }
+    native.clusterProperties = std::move(converted->clusterProperties);
+  }
+
+  return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
 }
 
 auto has_custom_geometry_source_option(
@@ -2573,6 +2762,25 @@ auto style_tile_source_options_default() noexcept
   };
 }
 
+auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
+  const auto defaults = mbgl::style::GeoJSONOptions{};
+  return mln_geojson_source_options{
+    .size = sizeof(mln_geojson_source_options),
+    .fields = 0,
+    .min_zoom = static_cast<double>(defaults.minzoom),
+    .max_zoom = static_cast<double>(defaults.maxzoom),
+    .tolerance = defaults.tolerance,
+    .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
+    .cluster_properties = nullptr,
+    .tile_size = defaults.tileSize,
+    .buffer = defaults.buffer,
+    .cluster_radius = defaults.clusterRadius,
+    .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
+    .line_metrics = defaults.lineMetrics,
+    .cluster = defaults.cluster
+  };
+}
+
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options {
   return mln_custom_geometry_source_options{
@@ -3187,7 +3395,8 @@ auto map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids)
 }
 
 auto map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3204,6 +3413,10 @@ auto map_add_geojson_source_url(
     set_thread_error("url must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3212,14 +3425,23 @@ auto map_add_geojson_source_url(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  auto native_options =
+    to_native_geojson_source_options(effective_geojson_source_options(options));
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setURL(string_from_view(url));
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
 }
 
 auto map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3234,6 +3456,10 @@ auto map_add_geojson_source_data(
   if (!geojson) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3242,7 +3468,15 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  auto native_options =
+    to_native_geojson_source_options(effective_geojson_source_options(options));
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setGeoJSON(*geojson);
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
