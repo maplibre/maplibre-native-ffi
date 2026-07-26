@@ -1146,10 +1146,32 @@ test "map close rejects live render session through public bindings" {
     errdefer owned.close() catch {};
 
     try testing.expectError(error.InvalidState, map.close());
-    try testing.expectEqualStrings("map has live render sessions", diagnostics.get().?.message);
+    try testing.expectEqualStrings("map has an attached render session", diagnostics.get().?.message);
 
     try owned.close();
     try map.close();
+    try runtime.close();
+}
+
+test "map close succeeds after render session detach through public bindings" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
+    errdefer runtime.close() catch {};
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    errdefer map.close() catch {};
+
+    var owned = try attachTestOwnedTexture(&map, .{});
+    errdefer owned.close() catch {};
+
+    try owned.session.detach();
+    // Detaching releases the map, so the map closes while the session is open.
+    try map.close();
+
+    try owned.close();
     try runtime.close();
 }
 

@@ -603,13 +603,35 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
     }
 
-    /// <summary>Runs one pending owner-thread task for this runtime.</summary>
+    /// <summary>
+    /// Runs one iteration of this runtime's owner-thread run loop. The iteration
+    /// drains the high-priority task queue and then the default queue until both
+    /// are empty, including tasks enqueued during the drain, and also dispatches
+    /// expired timers and ready I/O.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RunOnce" /> returns without blocking on new work, but its
+    /// duration is unbounded: a single iteration can span a style parse. Treat it
+    /// as "make progress now" rather than as a fixed per-frame time slice.
+    /// </remarks>
     public void RunOnce()
     {
         NativeStatus.Check(NativeMethods.mln_runtime_run_once(Pointer));
     }
 
-    /// <summary>Polls and copies the next runtime event, when one is queued.</summary>
+    /// <summary>
+    /// Polls and copies the next runtime event, when one is queued, and returns
+    /// <see langword="null" /> when the queue is empty.
+    /// </summary>
+    /// <remarks>
+    /// Polling also advances binding-owned state: on a
+    /// <see cref="RuntimeEventType.MapStyleLoaded" /> event this binding releases
+    /// the map's detached custom geometry sources, closing the upcall stubs for
+    /// sources the new style dropped. That release happens when the event is
+    /// polled, so drain the queue to keep dropped sources from lingering. It also
+    /// needs a resolvable <see cref="RuntimeEvent.MapSource" />; see that member
+    /// for the reference caveat.
+    /// </remarks>
     public RuntimeEvent? PollEvent()
     {
         var raw = RuntimeStructs.EmptyNativeEvent();

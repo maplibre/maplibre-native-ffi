@@ -1198,7 +1198,12 @@ internal sealed class FrameScope : IDisposable
     {
         if (IsClosed)
         {
-            throw new ObjectDisposedException(owner);
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{owner} is closed.",
+                null
+            );
         }
     }
 
