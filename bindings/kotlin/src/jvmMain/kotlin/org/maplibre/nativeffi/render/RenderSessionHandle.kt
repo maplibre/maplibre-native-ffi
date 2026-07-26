@@ -35,10 +35,10 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     NativeAccess.resizeRenderSession(requireLiveHandle(), width, height, scaleFactor)
   }
 
-  public actual fun renderUpdate() {
+  public actual fun renderUpdate(): Boolean {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")
-    NativeAccess.renderUpdate(requireLiveHandle())
+    return NativeAccess.renderUpdate(requireLiveHandle())
   }
 
   public actual fun detach() {

@@ -3,11 +3,21 @@ using Maplibre.Native.Geo;
 namespace Maplibre.Native.Camera;
 
 /// <summary>Mutable camera descriptor used for camera snapshots and commands.</summary>
-public sealed class CameraOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record CameraOptions
 {
     public LatLng? Center { get; set; }
     public double? CenterAltitude { get; set; }
     public EdgeInsets? Padding { get; set; }
+
+    /// <summary>
+    /// Input-only screen point the camera pivots around. Jump, ease, and fly honor
+    /// it; MapLibre leaves it <see langword="null" /> on every read path, including
+    /// camera snapshots and the camera-for-bounds helpers.
+    /// </summary>
     public ScreenPoint? Anchor { get; set; }
     public double? Zoom { get; set; }
     public double? Bearing { get; set; }
@@ -17,7 +27,11 @@ public sealed class CameraOptions
 }
 
 /// <summary>Camera animation descriptor.</summary>
-public sealed class AnimationOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record AnimationOptions
 {
     public double? Duration { get; set; }
     public UnitBezier? Easing { get; set; }
@@ -26,7 +40,11 @@ public sealed class AnimationOptions
 }
 
 /// <summary>Camera fitting descriptor.</summary>
-public sealed class CameraFitOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record CameraFitOptions
 {
     public EdgeInsets? Padding { get; set; }
     public double? Bearing { get; set; }
@@ -34,7 +52,11 @@ public sealed class CameraFitOptions
 }
 
 /// <summary>Camera bound constraint descriptor.</summary>
-public sealed class BoundOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record BoundOptions
 {
     public LatLngBounds? Bounds { get; set; }
     public double? MinimumZoom { get; set; }
@@ -44,7 +66,11 @@ public sealed class BoundOptions
 }
 
 /// <summary>Free camera descriptor.</summary>
-public sealed class FreeCameraOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record FreeCameraOptions
 {
     public Vec3? Position { get; set; }
     public Quaternion? Orientation { get; set; }

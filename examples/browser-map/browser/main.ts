@@ -71,18 +71,16 @@ class BrowserMapShell {
       this.viewport.width,
       this.viewport.height,
       this.viewport.scale,
+      camera.longitude,
+      camera.latitude,
+      camera.zoom,
+      camera.bearing,
+      camera.pitch,
       this.webgpuHost.devicePtr,
       0,
     );
     this.subscribeResize();
     if (result === 0) {
-      module._mln_browser_map_jump_to(
-        camera.longitude,
-        camera.latitude,
-        camera.zoom,
-        camera.bearing,
-        camera.pitch,
-      );
       requestAnimationFrame(() => this.frame());
     } else {
       console.error("Browser map initialization failed");
@@ -92,9 +90,20 @@ class BrowserMapShell {
   private subscribeResize(): void {
     new ResizeObserver(() => this.syncViewport()).observe(this.canvas);
     window.addEventListener("resize", () => this.syncViewport());
+    this.subscribePixelRatioChange();
+  }
+
+  private subscribePixelRatioChange(): void {
     window
       .matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
-      .addEventListener("change", () => this.syncViewport(), { once: true });
+      .addEventListener(
+        "change",
+        () => {
+          this.syncViewport();
+          this.subscribePixelRatioChange();
+        },
+        { once: true },
+      );
   }
 
   private syncViewport(): void {

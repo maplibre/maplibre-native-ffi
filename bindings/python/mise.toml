@@ -1,0 +1,33 @@
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync maturin build --auditwheel skip
+'''
+
+[tasks._install-extension]
+description = "Build and install the Python extension for local tests."
+hide = true
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync maturin build --out dist --auditwheel skip
+uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --find-links dist \
+  "maplibre-native==0.0.0"
+'''
+
+[tasks.test]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
+run = '''
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  uv run --project . --no-sync python -m pytest
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  uv run --project . --no-sync python -m pytest
+'''

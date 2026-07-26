@@ -69,10 +69,11 @@ auto mln_render_session_resize(
   });
 }
 
-auto mln_render_session_render_update(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::render_session_render_update(session);
+    return mln::core::render_session_render_update(session, out_rendered);
   });
 }
 

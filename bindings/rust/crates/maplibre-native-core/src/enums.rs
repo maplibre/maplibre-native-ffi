@@ -9,7 +9,6 @@ bitflags::bitflags! {
         const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
         const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
         const OPENGL = sys::MLN_RENDER_BACKEND_FLAG_OPENGL;
-        const WEBGPU = sys::MLN_RENDER_BACKEND_FLAG_WEBGPU;
         const _ = !0;
     }
 }
@@ -870,10 +869,17 @@ impl NetworkStatus {
         }
     }
 
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Online => sys::MLN_NETWORK_STATUS_ONLINE,
+            Self::Offline => sys::MLN_NETWORK_STATUS_OFFLINE,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
     pub fn raw(self) -> Result<u32> {
         match self {
-            Self::Online => Ok(sys::MLN_NETWORK_STATUS_ONLINE),
-            Self::Offline => Ok(sys::MLN_NETWORK_STATUS_OFFLINE),
+            Self::Online | Self::Offline => Ok(self.raw_value()),
             Self::Unknown(raw) => Err(Error::invalid_argument(format!(
                 "unknown network status values cannot be set: {raw}"
             ))),

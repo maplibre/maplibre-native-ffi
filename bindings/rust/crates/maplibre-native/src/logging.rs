@@ -112,23 +112,21 @@ fn invoke_callback(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::ffi::{CString, c_void};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::{Arc, Mutex, MutexGuard};
+pub(crate) mod test_support {
+    use std::sync::{Mutex, MutexGuard};
 
-    use super::*;
-    use crate::ErrorKind;
-    use maplibre_core::{LogEvent, LogSeverity};
+    use super::{LogSeverityMask, clear_log_callback, set_async_log_severity_mask};
 
     static LOGGING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    struct LoggingTestGuard {
+    /// Serializes tests that install the process-global log callback and
+    /// restores default logging when each one finishes.
+    pub(crate) struct LoggingTestGuard {
         _lock: MutexGuard<'static, ()>,
     }
 
     impl LoggingTestGuard {
-        fn new() -> Self {
+        pub(crate) fn new() -> Self {
             let guard = Self {
                 _lock: LOGGING_TEST_LOCK
                     .lock()
@@ -149,6 +147,18 @@ mod tests {
         let _ = clear_log_callback();
         let _ = set_async_log_severity_mask(LogSeverityMask::DEFAULT);
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::{CString, c_void};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use super::test_support::LoggingTestGuard;
+    use super::*;
+    use crate::ErrorKind;
+    use maplibre_core::{LogEvent, LogSeverity};
 
     #[test]
     // Spec coverage: BND-120.

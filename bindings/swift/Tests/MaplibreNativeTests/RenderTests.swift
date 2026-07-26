@@ -55,6 +55,8 @@ private final class RenderLeakBox: @unchecked Sendable {
   )
   let vulkanTexture = VulkanBorrowedTextureDescriptor(
     extent: extent,
+    physicalWidth: 65,
+    physicalHeight: 33,
     context: vulkanContext,
     image: NativePointer(bitPattern: 0x70),
     imageView: NativePointer(bitPattern: 0x80),
@@ -119,6 +121,8 @@ private final class RenderLeakBox: @unchecked Sendable {
   )
   let openGLTexture = OpenGLBorrowedTextureDescriptor(
     extent: extent,
+    physicalWidth: 65,
+    physicalHeight: 33,
     context: egl,
     texture: 33,
     target: 0x0DE1

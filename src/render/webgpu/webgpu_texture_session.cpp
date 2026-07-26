@@ -44,7 +44,7 @@ auto validate_webgpu_texture(
   ) {
     mln::core::set_thread_error(
       "WebGPU texture must be 2D, single-sample, one-layer, one-mip, and match "
-      "extent"
+      "the descriptor physical dimensions"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -120,10 +120,15 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
         mbgl::gfx::HeadlessBackend(size),
         owns_color_texture_(true),
         color_format_(webgpu_owned_color_format) {
-    initializeContext(descriptor.context);
-    setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
-    setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
-    ensureColorTexture();
+    try {
+      initializeContext(descriptor.context);
+      setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
+      setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
+      ensureColorTexture();
+    } catch (...) {
+      shutdown();
+      throw;
+    }
   }
 
   WebGPUTextureBackend(
@@ -135,11 +140,16 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
         texture_(static_cast<WGPUTexture>(descriptor.texture)),
         color_view_(static_cast<WGPUTextureView>(descriptor.texture_view)),
         color_format_(static_cast<WGPUTextureFormat>(descriptor.format)) {
-    initializeContext(descriptor.context);
     wgpuTextureAddRef(texture_);
     wgpuTextureViewAddRef(color_view_);
-    setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
-    setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
+    try {
+      initializeContext(descriptor.context);
+      setColorFormat(static_cast<wgpu::TextureFormat>(color_format_));
+      setDepthStencilFormat(wgpu::TextureFormat::Depth24PlusStencil8);
+    } catch (...) {
+      shutdown();
+      throw;
+    }
   }
 
   ~WebGPUTextureBackend() override { shutdown(); }
@@ -151,9 +161,7 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
     return *this;
   }
 
-  mbgl::PremultipliedImage readStillImage() override {
-    return mbgl::PremultipliedImage(getSize());
-  }
+  mbgl::PremultipliedImage readStillImage() override { return {}; }
 
   mbgl::gfx::RendererBackend* getRendererBackend() override { return this; }
 
@@ -374,8 +382,12 @@ class WebGPUTextureSessionBackend final
     return backend_;
   }
 
-  auto after_render(mln_render_session& session) -> mln_status override {
+  auto supports_readback() const -> bool override { return false; }
+
+  auto after_render(mln_render_session& session, bool& out_rendered)
+    -> mln_status override {
     session.texture.rendered_native_texture = backend_.rendered_texture();
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
 
@@ -496,22 +508,15 @@ auto webgpu_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
 
-  const auto physical_size = mbgl::Size{
-    physical_dimension(
-      descriptor->extent.width, descriptor->extent.scale_factor
-    ),
-    physical_dimension(
-      descriptor->extent.height, descriptor->extent.scale_factor
-    ),
-  };
+  const auto physical_size =
+    mbgl::Size{descriptor->physical_width, descriptor->physical_height};
   const auto texture_status =
     validate_webgpu_texture(*descriptor, physical_size);
   if (texture_status != MLN_STATUS_OK) {
@@ -522,7 +527,10 @@ auto webgpu_borrowed_texture_attach(
     auto session = std::make_unique<mln_render_session>();
     session->map = map;
     session->owner_thread = map_owner_thread(map);
-    set_session_extent(*session, descriptor->extent);
+    set_borrowed_session_extent(
+      *session, descriptor->extent, descriptor->physical_width,
+      descriptor->physical_height
+    );
     session->texture.api_kind = TextureSessionApi::WebGPU;
     session->texture.mode = TextureSessionMode::Borrowed;
     session->texture.backend =

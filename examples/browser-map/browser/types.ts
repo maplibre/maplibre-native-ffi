@@ -15,6 +15,11 @@ export interface BrowserMapModule {
     logicalWidth: number,
     logicalHeight: number,
     scaleFactor: number,
+    longitude: number,
+    latitude: number,
+    zoom: number,
+    bearing: number,
+    pitch: number,
     webgpuDevice: number,
     webgpuQueue: number,
   ): number;
@@ -41,6 +46,7 @@ export interface BrowserMapModule {
   _mln_browser_map_rotate_by(bearingDelta: number): number;
   _mln_browser_map_pitch_by(pitchDelta: number): number;
   _mln_browser_map_reset_orientation(): number;
+  _mln_browser_map_cancel_transitions(): number;
   _mln_browser_map_jump_to(
     longitude: number,
     latitude: number,

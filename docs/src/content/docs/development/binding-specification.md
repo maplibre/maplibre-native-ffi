@@ -239,14 +239,39 @@ C struct materialization follows this operation:
 
 Structs that C fills and returns by value become copied language values.
 
+### Value semantics
+
+Public option types, copied result values, geometry and feature trees, and
+values wrapping copied byte buffers compare by field value using the target
+language's ordinary equality operation. Option types additionally expose a copy
+operation that produces an independent instance. Callers diff successive
+snapshots and derive modified descriptors without reaching for reference
+identity.
+
+Equality covers every semantic field the value carries, including private copied
+storage, list-valued fields, and nested value trees, and distinguishes an absent
+optional field from a present empty or zero value. Languages whose default
+equality compares collection, array, or pointer members by identity supply the
+comparison that inspects the contents instead, at every level of nesting.
+
+Values that hold callbacks, delegates, or native handles keep identity
+semantics, because behavior rather than field values determines whether two such
+values are interchangeable.
+
+Where the target language hashes values, the hash covers the same fields as
+equality. Values that stay mutable document that an instance in a hash-based
+collection stays unmodified while it is a key.
+
 ### Enums and masks
 
-Public enum values convert to C through a complete named-case mapping. Public
-values represent valid C enum inputs.
+Public enum values expose named cases for known C values and keep the
+represented raw value available for conversion to C.
 
 When C returns an enum value that the binding does not know yet, the binding
 preserves the raw value instead of collapsing it to a known case. Public input
-paths reject values outside the C input contract before crossing into C.
+paths pass represented raw enum values through to C unless the binding owns an
+additional state, lifetime, or type-safety invariant that must fail before C.
+Bindings do not duplicate enum validation performed by the C API.
 
 Public bit masks use a named public type that supports combining, testing, and
 empty values. C field masks stay internal to C struct materializers.
@@ -502,7 +527,8 @@ window.
 The public handle exposes:
 
 - `resize` for session kinds that support resize;
-- `render_update` for the latest available map render update;
+- `render_update` for the latest available map render update, reporting whether
+  an update was rendered;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation.
 
@@ -608,18 +634,20 @@ that a real native failure would expose.
 
 ### Input Structs, Values, and Copied Data
 
-| ID      | Test                                                                                                                                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                |
-| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                     |
-| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                   |
-| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                        |
-| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                       |
-| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                      |
-| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                           |
-| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                        |
-| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.                                                                               |
-| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value. |
+| ID      | Test                                                                                                                                                                                                       |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                        |
+| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                             |
+| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                           |
+| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                                |
+| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                               |
+| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                              |
+| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                                   |
+| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                                |
+| BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                           |
+| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value.         |
+| BND-070 | Option types compare and hash by field value, separate absent optional fields from present empty or zero values, and copy to an independent instance; one case per option type mutates each field in turn. |
+| BND-071 | Copied result values, nested geometry and feature trees, and values wrapping copied byte buffers compare by content when built from distinct list or array instances holding equal contents.               |
 
 ### Runtime and events
 
@@ -677,27 +705,27 @@ that a real native failure would expose.
 
 ### Rendering
 
-| ID      | Test                                                                                                                                                      |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                           |
-| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
-| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
-| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
-| BND-164 | `render_update` maps invalid state without closing the session.                                                                                           |
-| BND-165 | Resize updates extent through the public render session API.                                                                                              |
-| BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
-| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
-| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |
-| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
-| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
-| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
-| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
-| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
+| ID      | Test                                                                                                                                                                    |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                                         |
+| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                                             |
+| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape.               |
+| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                                |
+| BND-164 | `render_update` reports no-update-available as a false result without closing the session.                                                                              |
+| BND-165 | Resize updates extent through the public render session API.                                                                                                            |
+| BND-166 | On backends with CPU readback, readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes. |
+| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                                   |
+| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                                         |
+| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                                    |
+| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                                             |
+| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                                            |
+| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                                |
+| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                               |
 
 ### Conditional tests
 
 The following tests apply only when a binding has the named host-language
-mechanic or helper.
+mechanic, helper, or test fixture.
 
 #### Host cleanup hooks
 
@@ -718,6 +746,19 @@ thread or race release on the same owner-thread handle, include:
 | BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
 | BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
 | BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+
+#### Live render session queries
+
+When the binding's test suite attaches a render session on a configured render
+backend, include:
+
+| ID      | Test                                                                                                                                                                                    |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and unsigned `limit` and `offset` arguments bound and shift the returned leaves. |
+
+Bindings without live render-session fixtures cover the binding-owned half of
+this behavior through BND-067, which requires JSON values to preserve unsigned
+integer width across the boundary.
 
 #### Owner-thread execution adapters
 

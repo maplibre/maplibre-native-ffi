@@ -1,15 +1,15 @@
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 mod metal_target;
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 mod opengl_target;
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 mod vulkan_target;
 
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 pub use metal_target::RenderTarget;
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 pub use opengl_target::RenderTarget;
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 pub use vulkan_target::RenderTarget;
 
 use maplibre_native::RenderTargetExtent;

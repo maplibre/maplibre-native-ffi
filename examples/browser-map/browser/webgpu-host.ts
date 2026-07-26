@@ -33,11 +33,7 @@ const textureFragmentShader = `
 
 @fragment
 fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
-  let color = textureSample(map_texture, map_sampler, uv);
-  // The browser host compositor presents an opaque map viewport. Forwarding the
-  // sampled alpha through the WebGPU canvas path currently presents black in
-  // this browser path even though the sampled RGB data is valid.
-  return vec4f(color.rgb, 1.0);
+  return textureSample(map_texture, map_sampler, uv);
 }
 `;
 

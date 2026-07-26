@@ -1,6 +1,12 @@
 function(mln_add_maplibre_native)
   set(MLN_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/maplibre-native")
 
+  if(MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # MapLibre otherwise selects the GCC spelling, -fno-rtti, based on Clang's
+    # compiler ID. clang-cl uses the MSVC spelling added below instead.
+    set(MLN_WITH_RTTI ON)
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
     # OHOS SDK 6.x exposes some libc++ C++20 facilities behind this clang flag.
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-fexperimental-library>)
@@ -19,6 +25,16 @@ function(mln_add_maplibre_native)
     if(TARGET mbgl-vendor-dawn)
       mln_configure_emdawnwebgpu(mbgl-vendor-dawn)
     endif()
+  endif()
+
+  if(MSVC AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(
+      mbgl-compiler-options
+      INTERFACE $<$<COMPILE_LANGUAGE:CXX>:/GR->)
+
+    # The vendored tile-spec library's Unix -Wall flag means -Weverything to
+    # clang-cl. Neutralize it to match the dependency's MSVC warning behavior.
+    target_compile_options(mlt-cpp PRIVATE -Wno-everything)
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")

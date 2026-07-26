@@ -43,29 +43,34 @@
   "exec": {
     "commands": [
       {
-        "command": "mise run _ktfmt --google-style - --stdin-name={{file_path}}",
+        "command": "bash .mise/bin/dprint-ktfmt --google-style - --stdin-name={{file_path}}",
         "exts": ["kt", "kts"],
       },
       {
-        "command": "google-java-format - --assume-filename {{file_path}}",
+        "command": "bash .mise/bin/dprint-java - --assume-filename {{file_path}}",
         "exts": ["java"],
       },
       {
-        "command": "dotnet csharpier format --write-stdout --stdin-path {{file_path}} --log-level None",
+        "command": "bash .mise/bin/dprint-csharpier {{file_path}}",
         "cwd": "${configDir}",
         "exts": ["cs"],
         "cacheKeyFiles": ["dotnet-tools.json"],
       },
-      { "command": "zig fmt --stdin", "exts": ["zig"] },
-      { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
+      { "command": "bash .mise/bin/dprint-zig fmt --stdin", "exts": ["zig"] },
+      {
+        "command": "bash .mise/bin/dprint-zig fmt --stdin --zon",
+        "exts": ["zon"],
+      },
       { "command": "rustfmt --edition 2024", "exts": ["rs"] },
+      { "command": "bash .mise/bin/dprint-go", "exts": ["go"] },
       {
         "command": "swiftformat stdin --stdin-path {{file_path}} --indent {{indent_width}} --max-width {{line_width}} --quiet",
         "exts": ["swift"],
       },
       {
-        "command": "pnpm --filter docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
+        "command": "bash .mise/bin/dprint-mdxlint {{file_path}}",
         "exts": ["mdx"],
+        "cacheKeyFiles": ["pnpm-lock.yaml"],
       },
     ],
   },

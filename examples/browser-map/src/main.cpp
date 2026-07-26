@@ -20,14 +20,22 @@ struct Viewport {
   double scaleFactor;
 };
 
+struct InitialCamera {
+  double longitude;
+  double latitude;
+  double zoom;
+  double bearing;
+  double pitch;
+};
+
 class App {
  public:
   App(
-    Viewport viewport, void* webgpuDevice, void* webgpuQueue,
-    mln_status& outStatus
+    Viewport viewport, InitialCamera camera, void* webgpuDevice,
+    void* webgpuQueue, mln_status& outStatus
   )
       : viewport_(viewport) {
-    outStatus = initialize(webgpuDevice, webgpuQueue);
+    outStatus = initialize(camera, webgpuDevice, webgpuQueue);
   }
 
   ~App() {
@@ -56,11 +64,15 @@ class App {
       return false;
     }
 
-    const auto status = mln_render_session_render_update(session_);
+    auto rendered = false;
+    const auto status = mln_render_session_render_update(session_, &rendered);
     if (status == MLN_STATUS_INVALID_STATE) {
       return false;
     }
     if (!check("render update", status)) {
+      return false;
+    }
+    if (!rendered) {
       return false;
     }
 
@@ -176,6 +188,10 @@ class App {
 
   auto resetOrientation() -> bool { return setOrientation(0.0, 0.0, true); }
 
+  auto cancelTransitions() -> bool {
+    return check("cancel camera transitions", mln_map_cancel_transitions(map_));
+  }
+
   auto jumpTo(
     double longitude, double latitude, double zoom, double bearing, double pitch
   ) -> bool {
@@ -200,7 +216,8 @@ class App {
     double pitch;
   };
 
-  auto initialize(void* webgpuDevice, void* webgpuQueue) -> mln_status {
+  auto initialize(InitialCamera camera, void* webgpuDevice, void* webgpuQueue)
+    -> mln_status {
     if (!validViewport(viewport_)) {
       std::fprintf(stderr, "browser map init failed: invalid viewport\n");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -208,6 +225,24 @@ class App {
 
     const auto backends = mln_supported_render_backend_mask();
     std::fprintf(stderr, "supported render backends: 0x%x\n", backends);
+    std::fprintf(stderr, "render target: owned-texture\n");
+    std::fprintf(
+      stderr,
+      "render target status: samples MapLibre-owned texture frames into the "
+      "host swapchain\n"
+    );
+    std::fprintf(
+      stderr,
+      "Controls:\n"
+      "  left drag: pan\n"
+      "  right drag or Ctrl+left drag: rotate with X, pitch with Y\n"
+      "  scroll: zoom at cursor\n"
+      "  arrows or WASD: pan\n"
+      "  + / -: zoom at center\n"
+      "  Q / E: rotate\n"
+      "  ] / [: pitch\n"
+      "  0: reset pitch and bearing\n"
+    );
     logViewport();
     if ((backends & MLN_RENDER_BACKEND_FLAG_WEBGPU) == 0) {
       std::fprintf(
@@ -216,7 +251,9 @@ class App {
       return MLN_STATUS_UNSUPPORTED;
     }
 
-    auto status = mln_runtime_create(nullptr, &runtime_);
+    auto runtimeOptions = mln_runtime_options_default();
+    runtimeOptions.cache_path = ":memory:";
+    auto status = mln_runtime_create(&runtimeOptions, &runtime_);
     if (status != MLN_STATUS_OK) {
       logError("create runtime", status);
       return status;
@@ -236,6 +273,20 @@ class App {
     status = mln_map_set_style_url(map_, styleUrl);
     if (status != MLN_STATUS_OK) {
       logError("set style URL", status);
+      return status;
+    }
+
+    auto cameraOptions = mln_camera_options_default();
+    cameraOptions.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM |
+                           MLN_CAMERA_OPTION_BEARING | MLN_CAMERA_OPTION_PITCH;
+    cameraOptions.longitude = camera.longitude;
+    cameraOptions.latitude = camera.latitude;
+    cameraOptions.zoom = camera.zoom;
+    cameraOptions.bearing = camera.bearing;
+    cameraOptions.pitch = clampPitch(camera.pitch);
+    status = mln_map_jump_to(map_, &cameraOptions);
+    if (status != MLN_STATUS_OK) {
+      logError("set initial camera", status);
       return status;
     }
 
@@ -337,15 +388,35 @@ class App {
   void requestRender() { renderPending_ = true; }
 
   void logViewport() const {
+    uint32_t physicalWidth = 0;
+    uint32_t physicalHeight = 0;
+    if (!physicalSize(viewport_, physicalWidth, physicalHeight)) {
+      std::fprintf(stderr, "browser viewport: invalid extent\n");
+      return;
+    }
     std::fprintf(
-      stderr, "browser viewport: %ux%u scale %.3f\n", viewport_.width,
-      viewport_.height, viewport_.scaleFactor
+      stderr, "browser viewport: logical=%ux%u physical=%ux%u scale=%.3f\n",
+      viewport_.width, viewport_.height, physicalWidth, physicalHeight,
+      viewport_.scaleFactor
     );
   }
 
   static auto validViewport(Viewport viewport) -> bool {
-    return viewport.width > 0 && viewport.height > 0 &&
-           std::isfinite(viewport.scaleFactor) && viewport.scaleFactor > 0.0;
+    uint32_t physicalWidth = 0;
+    uint32_t physicalHeight = 0;
+    return physicalSize(viewport, physicalWidth, physicalHeight);
+  }
+
+  static auto physicalSize(Viewport viewport, uint32_t& width, uint32_t& height)
+    -> bool {
+    const auto extent = mln_render_target_extent{
+      .size = sizeof(mln_render_target_extent),
+      .width = viewport.width,
+      .height = viewport.height,
+      .scale_factor = viewport.scaleFactor,
+    };
+    return mln_render_target_extent_physical_size(&extent, &width, &height) ==
+           MLN_STATUS_OK;
   }
 
   static auto clampPitch(double pitch) -> double {
@@ -429,6 +500,7 @@ extern "C" {
 
 EMSCRIPTEN_KEEPALIVE auto mln_browser_map_init(
   uint32_t logicalWidth, uint32_t logicalHeight, double scaleFactor,
+  double longitude, double latitude, double zoom, double bearing, double pitch,
   void* webgpuDevice, void* webgpuQueue
 ) -> int {
   app.reset();
@@ -438,6 +510,13 @@ EMSCRIPTEN_KEEPALIVE auto mln_browser_map_init(
       .width = logicalWidth,
       .height = logicalHeight,
       .scaleFactor = scaleFactor,
+    },
+    InitialCamera{
+      .longitude = longitude,
+      .latitude = latitude,
+      .zoom = zoom,
+      .bearing = bearing,
+      .pitch = pitch,
     },
     webgpuDevice, webgpuQueue, status
   );
@@ -561,6 +640,14 @@ EMSCRIPTEN_KEEPALIVE auto mln_browser_map_pitch_by(double pitchDelta) -> int {
 
 EMSCRIPTEN_KEEPALIVE auto mln_browser_map_reset_orientation() -> int {
   return withApp(false, [](App& current) { return current.resetOrientation(); })
+           ? 0
+           : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_cancel_transitions() -> int {
+  return withApp(
+           false, [](App& current) { return current.cancelTransitions(); }
+         )
            ? 0
            : 1;
 }

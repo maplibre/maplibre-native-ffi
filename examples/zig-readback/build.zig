@@ -4,10 +4,12 @@ const maplibre_build = @import("maplibre_native");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    native_config_path: std.Build.LazyPath,
+    native_install_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
+    dependency_include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
+    system_root: ?std.Build.LazyPath,
 };
 
 fn appendIncludeDir(
@@ -37,7 +39,11 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
         .optimize = options.optimize,
-        .native_config_path = options.native_config_path,
+        .native_install_dir = options.native_install_dir,
+        .render_backend = options.render_backend,
+        .dependency_include_dirs = options.dependency_include_dirs,
+        .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
 }
 
@@ -50,6 +56,7 @@ fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOpti
         .optimize = options.optimize,
         .include_dirs = appendIncludeDir(b, options.include_dirs, sdl.getEmittedIncludeTree()),
         .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
+        .system_root = options.system_root,
     }));
     module.linkLibrary(sdl);
 }
@@ -71,6 +78,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         .optimize = options.optimize,
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
+        .system_root = options.system_root,
     });
     addSdlTranslateC(b, example.root_module, options);
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
@@ -78,21 +86,27 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .system_root = options.system_root,
     });
     b.installArtifact(example);
     return example;
 }
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
-    const render_backend = maplibre_build.renderBackend(b);
+    const native_install_dir = maplibre_build.nativeInstallDirPath(b);
+    const target = maplibre_build.nativeTarget(b, native_install_dir);
+    const render_backend = maplibre_build.renderBackend(b, native_install_dir);
+    const system_root = maplibre_build.maybeSystemRootPath(b);
+    const dependency_include_dirs = maplibre_build.dependencyIncludeDirs(b);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .native_config_path = maplibre_build.nativeArtifactConfigPath(b),
-        .include_dirs = maplibre_build.includeDirs(b),
+        .native_install_dir = native_install_dir,
+        .include_dirs = maplibre_build.installedIncludeDirs(b, native_install_dir, dependency_include_dirs),
+        .dependency_include_dirs = dependency_include_dirs,
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
+        .system_root = system_root,
     };
 
     const readback = addReadbackExample(b, options);

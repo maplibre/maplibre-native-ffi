@@ -63,9 +63,12 @@ class TextureSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend* {
     return headless_backend().getRendererBackend();
   }
+  virtual auto supports_readback() const -> bool { return true; }
   virtual void prepare_render_resources() {}
-  virtual auto after_render(mln_render_session& session) -> mln_status {
+  virtual auto after_render(mln_render_session& session, bool& out_rendered)
+    -> mln_status {
     (void)session;
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
   virtual auto acquire_vulkan_owned_frame(
@@ -212,6 +215,11 @@ inline auto validate_vulkan_context(
   return MLN_STATUS_OK;
 }
 
+auto render_target_extent_physical_size(
+  const mln_render_target_extent* extent, uint32_t* out_width,
+  uint32_t* out_height
+) -> mln_status;
+
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
 auto opengl_context_descriptor_default() noexcept
   -> mln_opengl_context_descriptor;
@@ -242,6 +250,30 @@ inline auto set_session_extent(
     physical_dimension(extent.height, extent.scale_factor);
 }
 
+// Borrowed targets are sized by their owner, so the caller states the physical
+// size instead of deriving it. Physical sizes that no logical extent maps onto,
+// such as an odd width at a scale factor of two, stay expressible this way.
+inline auto set_borrowed_session_extent(
+  mln_render_session& session, const mln_render_target_extent& extent,
+  uint32_t physical_width, uint32_t physical_height
+) -> void {
+  session.width = extent.width;
+  session.height = extent.height;
+  session.scale_factor = extent.scale_factor;
+  session.physical_width = physical_width;
+  session.physical_height = physical_height;
+}
+
+inline auto validate_borrowed_physical_size(
+  uint32_t physical_width, uint32_t physical_height
+) -> mln_status {
+  if (physical_width == 0 || physical_height == 0) {
+    set_thread_error("physical texture dimensions must be positive");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 inline auto validate_physical_size(
   uint32_t width, uint32_t height, double scale_factor,
   const char* too_large_message
@@ -267,7 +299,9 @@ auto render_session_resize(
   mln_render_session* session, uint32_t width, uint32_t height,
   double scale_factor
 ) -> mln_status;
-auto render_session_render_update(mln_render_session* session) -> mln_status;
+auto render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) -> mln_status;
 auto render_session_detach(mln_render_session* session) -> mln_status;
 auto render_session_destroy(mln_render_session* session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session* session)

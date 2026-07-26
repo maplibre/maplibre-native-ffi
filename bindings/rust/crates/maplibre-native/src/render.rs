@@ -222,6 +222,24 @@ impl RenderTargetExtent {
             scale_factor: self.scale_factor,
         }
     }
+
+    /// Returns this extent's physical device-pixel size as
+    /// `ceil(logical * scale_factor)` per dimension.
+    ///
+    /// Session-owned texture targets and surface targets are sized this way.
+    /// Borrowed texture targets state their physical size instead, because not
+    /// every physical size is reachable from a logical extent.
+    pub fn physical_size(&self) -> Result<(u32, u32)> {
+        let native = maplibre_core::render::render_target_extent_to_native(self.to_core());
+        let mut width = 0u32;
+        let mut height = 0u32;
+        // SAFETY: native is a fully initialized extent and both out pointers
+        // reference live locals for the duration of the call.
+        maplibre_core::check(unsafe {
+            sys::mln_render_target_extent_physical_size(&native, &mut width, &mut height)
+        })?;
+        Ok((width, height))
+    }
 }
 
 impl Default for RenderTargetExtent {
@@ -388,38 +406,6 @@ impl Default for EglContextDescriptor {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct WebGPUContextDescriptor {
-    pub instance: NativePointer,
-    pub device: NativePointer,
-    pub queue: NativePointer,
-}
-
-impl WebGPUContextDescriptor {
-    pub fn new(device: NativePointer, queue: NativePointer) -> Self {
-        Self {
-            instance: NativePointer::NULL,
-            device,
-            queue,
-        }
-    }
-
-    pub(crate) fn to_core(&self) -> maplibre_core::render::WebGPUContextDescriptorFields {
-        maplibre_core::render::WebGPUContextDescriptorFields {
-            instance: self.instance.as_void_ptr(),
-            device: self.device.as_void_ptr(),
-            queue: self.queue.as_void_ptr(),
-        }
-    }
-}
-
-impl Default for WebGPUContextDescriptor {
-    fn default() -> Self {
-        Self::new(NativePointer::NULL, NativePointer::NULL)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
 pub enum OpenGLContextDescriptor {
     Wgl(WglContextDescriptor),
     Egl(EglContextDescriptor),
@@ -536,42 +522,6 @@ impl OpenGLSurfaceDescriptor {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct WebGPUSurfaceDescriptor {
-    pub extent: RenderTargetExtent,
-    pub context: WebGPUContextDescriptor,
-    pub canvas_selector: String,
-}
-
-impl WebGPUSurfaceDescriptor {
-    pub fn new(
-        extent: RenderTargetExtent,
-        context: WebGPUContextDescriptor,
-        canvas_selector: impl Into<String>,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            canvas_selector: canvas_selector.into(),
-        }
-    }
-
-    pub(crate) fn to_native(
-        &self,
-    ) -> Result<(sys::mln_webgpu_surface_descriptor, std::ffi::CString)> {
-        let canvas_selector = maplibre_core::string::c_string(&self.canvas_selector)?;
-        let raw = maplibre_core::render::webgpu_surface_descriptor_to_native(
-            maplibre_core::render::WebGPUSurfaceDescriptorFields {
-                extent: self.extent.to_core(),
-                context: self.context.to_core(),
-                canvas_selector: &canvas_selector,
-            },
-        );
-        Ok((raw, canvas_selector))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
 pub struct MetalOwnedTextureDescriptor {
     pub extent: RenderTargetExtent,
     pub context: MetalContextDescriptor,
@@ -596,18 +546,34 @@ impl MetalOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct MetalBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub texture: NativePointer,
 }
 
 impl MetalBorrowedTextureDescriptor {
-    pub fn new(extent: RenderTargetExtent, texture: NativePointer) -> Self {
-        Self { extent, texture }
+    pub fn new(
+        extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
+        texture: NativePointer,
+    ) -> Self {
+        Self {
+            extent,
+            physical_width,
+            physical_height,
+            texture,
+        }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_borrowed_texture_descriptor {
         maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
             maplibre_core::render::MetalBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 texture: self.texture.as_void_ptr(),
             },
         )
@@ -640,6 +606,10 @@ impl VulkanOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct VulkanBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical image size in device pixels. The image is sized by its owner,
+    /// so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: VulkanContextDescriptor,
     pub image: NativePointer,
     pub image_view: NativePointer,
@@ -652,6 +622,8 @@ impl VulkanBorrowedTextureDescriptor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
         context: VulkanContextDescriptor,
         image: NativePointer,
         image_view: NativePointer,
@@ -661,6 +633,8 @@ impl VulkanBorrowedTextureDescriptor {
     ) -> Self {
         Self {
             extent,
+            physical_width,
+            physical_height,
             context,
             image,
             image_view,
@@ -674,6 +648,8 @@ impl VulkanBorrowedTextureDescriptor {
         maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
             maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 context: self.context.to_core(),
                 image: self.image.as_void_ptr(),
                 image_view: self.image_view.as_void_ptr(),
@@ -711,6 +687,10 @@ impl OpenGLOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct OpenGLBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: OpenGLContextDescriptor,
     pub texture: u32,
     pub target: u32,
@@ -719,12 +699,16 @@ pub struct OpenGLBorrowedTextureDescriptor {
 impl OpenGLBorrowedTextureDescriptor {
     pub fn new(
         extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
         context: OpenGLContextDescriptor,
         texture: u32,
         target: u32,
     ) -> Self {
         Self {
             extent,
+            physical_width,
+            physical_height,
             context,
             texture,
             target,
@@ -735,71 +719,11 @@ impl OpenGLBorrowedTextureDescriptor {
         maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
             maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 context: self.context.to_core(),
                 texture: self.texture,
                 target: self.target,
-            },
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct WebGPUOwnedTextureDescriptor {
-    pub extent: RenderTargetExtent,
-    pub context: WebGPUContextDescriptor,
-}
-
-impl WebGPUOwnedTextureDescriptor {
-    pub fn new(extent: RenderTargetExtent, context: WebGPUContextDescriptor) -> Self {
-        Self { extent, context }
-    }
-
-    pub(crate) fn to_native(&self) -> sys::mln_webgpu_owned_texture_descriptor {
-        maplibre_core::render::webgpu_owned_texture_descriptor_to_native(
-            maplibre_core::render::WebGPUOwnedTextureDescriptorFields {
-                extent: self.extent.to_core(),
-                context: self.context.to_core(),
-            },
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct WebGPUBorrowedTextureDescriptor {
-    pub extent: RenderTargetExtent,
-    pub context: WebGPUContextDescriptor,
-    pub texture: NativePointer,
-    pub texture_view: NativePointer,
-    pub format: u32,
-}
-
-impl WebGPUBorrowedTextureDescriptor {
-    pub fn new(
-        extent: RenderTargetExtent,
-        context: WebGPUContextDescriptor,
-        texture: NativePointer,
-        texture_view: NativePointer,
-        format: u32,
-    ) -> Self {
-        Self {
-            extent,
-            context,
-            texture,
-            texture_view,
-            format,
-        }
-    }
-
-    pub(crate) fn to_native(&self) -> sys::mln_webgpu_borrowed_texture_descriptor {
-        maplibre_core::render::webgpu_borrowed_texture_descriptor_to_native(
-            maplibre_core::render::WebGPUBorrowedTextureDescriptorFields {
-                extent: self.extent.to_core(),
-                context: self.context.to_core(),
-                texture: self.texture.as_void_ptr(),
-                texture_view: self.texture_view.as_void_ptr(),
-                format: self.format,
             },
         )
     }
@@ -989,34 +913,6 @@ impl OpenGLOwnedTextureFrame {
             internal_format: raw.internal_format,
             format: raw.format,
             type_: raw.type_,
-        }
-    }
-}
-
-/// Copied metadata for an acquired WebGPU session-owned texture frame.
-///
-/// Backend pointers are exposed by [`WebGPUOwnedTextureFrameHandle`] so their
-/// lifetime stays tied to the open frame handle.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
-pub struct WebGPUOwnedTextureFrame {
-    pub generation: u64,
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub frame_id: u64,
-    pub format: u32,
-}
-
-impl WebGPUOwnedTextureFrame {
-    fn from_native(raw: &sys::mln_webgpu_owned_texture_frame) -> Self {
-        Self {
-            generation: raw.generation,
-            width: raw.width,
-            height: raw.height,
-            scale_factor: raw.scale_factor,
-            frame_id: raw.frame_id,
-            format: raw.format,
         }
     }
 }
@@ -1326,124 +1222,6 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
     }
 }
 
-/// RAII guard for an acquired WebGPU session-owned texture frame.
-///
-/// Releasing the guard ends the borrow of the backend WebGPU texture, texture
-/// view, and device.
-pub struct WebGPUOwnedTextureFrameHandle {
-    session: Rc<RenderSessionState>,
-    raw: sys::mln_webgpu_owned_texture_frame,
-    frame: WebGPUOwnedTextureFrame,
-    closed: Cell<bool>,
-    _thread_affine: PhantomData<Rc<()>>,
-}
-
-impl fmt::Debug for WebGPUOwnedTextureFrameHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("WebGPUOwnedTextureFrameHandle")
-            .field("closed", &self.closed.get())
-            .field("frame", &self.frame)
-            .finish()
-    }
-}
-
-impl WebGPUOwnedTextureFrameHandle {
-    /// Returns copied metadata for this acquired frame.
-    pub fn frame(&self) -> Result<&WebGPUOwnedTextureFrame> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
-        } else {
-            Ok(&self.frame)
-        }
-    }
-
-    /// Returns the borrowed WebGPU texture pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer is valid only while this frame handle remains open.
-    /// The caller must not store or use it after frame release and must satisfy
-    /// WebGPU synchronization and thread-affinity requirements.
-    pub unsafe fn texture(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: The active native frame owns the validity contract for
-            // this borrowed backend handle until release.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture) })
-        }
-    }
-
-    /// Returns the borrowed WebGPU texture view pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`WebGPUOwnedTextureFrameHandle::texture`].
-    pub unsafe fn texture_view(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See texture above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture_view) })
-        }
-    }
-
-    /// Returns the borrowed WebGPU device pointer for backend interop.
-    ///
-    /// # Safety
-    ///
-    /// The returned pointer has the same lifetime and synchronization
-    /// requirements as [`WebGPUOwnedTextureFrameHandle::texture`].
-    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
-        if self.closed.get() {
-            Err(closed_handle_error("WebGPUOwnedTextureFrameHandle"))
-        } else {
-            // SAFETY: See texture above.
-            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
-        }
-    }
-
-    /// Explicitly releases this frame.
-    #[allow(clippy::result_large_err)]
-    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
-        if self.closed.get() {
-            return Ok(());
-        }
-        let session = match self.session.as_ptr() {
-            Ok(session) => session,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
-        };
-        // SAFETY: session is live, and raw is the active frame returned by a
-        // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_webgpu_owned_texture_release_frame(session, &self.raw)
-        }) {
-            return Err(HandleOperationError::new(error, self));
-        }
-        self.closed.set(true);
-        self.session.frame_acquired.set(false);
-        Ok(())
-    }
-}
-
-impl Drop for WebGPUOwnedTextureFrameHandle {
-    fn drop(&mut self) {
-        if self.closed.get() {
-            return;
-        }
-        if let Ok(session) = self.session.as_ptr() {
-            // SAFETY: Best-effort release of the active frame. Drop cannot
-            // report errors and never panics.
-            let status = unsafe { sys::mln_webgpu_owned_texture_release_frame(session, &self.raw) };
-            if status == sys::MLN_STATUS_OK {
-                self.closed.set(true);
-                self.session.frame_acquired.set(false);
-            }
-        }
-    }
-}
-
 impl RenderSessionHandle {
     pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
     where
@@ -1473,6 +1251,16 @@ impl RenderSessionHandle {
         Ok(())
     }
     /// Resizes this attached render session.
+    ///
+    /// Surface and owned-texture sessions resize in place. Borrowed texture
+    /// targets are sized by their owner and report an unsupported-feature
+    /// error: close this session, recreate the texture, and attach a new
+    /// session. A map holds at most one attached session, so close before
+    /// attaching the replacement.
+    ///
+    /// Resizing discards the session renderer, so renderer-held state such as
+    /// feature state does not survive. Map state such as camera, style, and
+    /// sources lives on the map and survives both resize and reattach.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
@@ -1483,11 +1271,24 @@ impl RenderSessionHandle {
     }
 
     /// Processes the latest map render update for this render target.
-    pub fn render_update(&self) -> Result<()> {
+    ///
+    /// The map retains its latest update, so repeated calls re-render it and
+    /// return `true` again; use this to redraw on demand after resize or
+    /// surface expose, and gate frame loops on render-update-available events
+    /// instead of the return value. Returns `false` when no frame was
+    /// rendered, because the map has not published an update yet or the
+    /// renderer skipped the frame; both are normal during startup, so keep
+    /// pumping the runtime until an update is reported.
+    pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_render_update(session) })
+        let mut rendered = false;
+        // SAFETY: session is a live render session handle owned by this wrapper,
+        // and rendered points to caller-owned output storage.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_render_update(session, &raw mut rendered)
+        })?;
+        Ok(rendered)
     }
 
     /// Detaches backend-bound render resources from the map.
@@ -1635,25 +1436,6 @@ impl RenderSessionHandle {
             _thread_affine: PhantomData,
         })
     }
-
-    /// Acquires a borrowed WebGPU frame from a session-owned texture target.
-    pub fn acquire_webgpu_owned_texture_frame(&self) -> Result<WebGPUOwnedTextureFrameHandle> {
-        self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
-        let mut raw = empty_webgpu_owned_texture_frame();
-        // SAFETY: session is live and raw points to initialized writable frame storage.
-        maplibre_core::check(unsafe {
-            sys::mln_webgpu_owned_texture_acquire_frame(session, &mut raw)
-        })?;
-        self.inner.frame_acquired.set(true);
-        Ok(WebGPUOwnedTextureFrameHandle {
-            session: Rc::clone(&self.inner),
-            frame: WebGPUOwnedTextureFrame::from_native(&raw),
-            raw,
-            closed: Cell::new(false),
-            _thread_affine: PhantomData,
-        })
-    }
 }
 
 fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
@@ -1699,21 +1481,6 @@ fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
         internal_format: 0,
         format: 0,
         type_: 0,
-    }
-}
-
-fn empty_webgpu_owned_texture_frame() -> sys::mln_webgpu_owned_texture_frame {
-    sys::mln_webgpu_owned_texture_frame {
-        size: mem::size_of::<sys::mln_webgpu_owned_texture_frame>() as u32,
-        generation: 0,
-        width: 0,
-        height: 0,
-        scale_factor: 0.0,
-        frame_id: 0,
-        texture: std::ptr::null_mut(),
-        texture_view: std::ptr::null_mut(),
-        device: std::ptr::null_mut(),
-        format: 0,
     }
 }
 

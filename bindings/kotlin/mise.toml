@@ -1,30 +1,123 @@
-[tasks.ensure-android-environment]
-hide = true
-run = '''
-if [[ "$MISE_ENV" != android-* ]]; then
-  echo "Use an Android mise environment, for example:" >&2
-  echo "  mise -E android-arm64-egl run //bindings/kotlin:androidBuild" >&2
-  echo "  mise -E android-x64-egl run //bindings/kotlin:androidBuild" >&2
-  exit 1
-fi
-'''
+[tools]
+"core:java" = "{{vars.java_version}}"
+"aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}"
+"aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:assemble"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+case "$usage_preset" in
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  linux-*|windows-*) kotlin_target= ;;
+  *)
+    echo "Unsupported Kotlin build preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+tasks=(:bindings:kotlin:jvmJar)
+if [[ -n "$kotlin_target" ]]; then
+  tasks+=(":bindings:kotlin:${kotlin_target}Klib")
+fi
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  "${tasks[@]}"
+'''
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:check"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+case "$usage_preset" in
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  linux-*|windows-*) kotlin_target= ;;
+  *)
+    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+tasks=(:bindings:kotlin:jvmTest)
+if [[ -n "$kotlin_target" ]]; then
+  tasks+=(":bindings:kotlin:${kotlin_target}Test")
+fi
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  "${tasks[@]}"
+'''
 
 [tasks.jvmTest]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:jvmTest"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :bindings:kotlin:jvmTest
+'''
 
 [tasks.nativeTest]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:nativeTest"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+case "$usage_preset" in
+  macos-arm64-*) kotlin_target=macosArm64 ;;
+  linux-*|windows-*)
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms only, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on macOS to cover nativeMain." >&2
+    exit 2
+    ;;
+  *)
+    echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
+    exit 2
+    ;;
+esac
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  ":bindings:kotlin:${kotlin_target}Test"
+'''
+
+[tasks.iosBuild]
+description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
+usage = '''
+arg "<preset>" {
+  choices "ios-arm64-metal" "ios-simulator-arm64-metal"
+}
+'''
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+case "$usage_preset" in
+  ios-arm64-metal) kotlin_target=iosArm64 ;;
+  ios-simulator-arm64-metal) kotlin_target=iosSimulatorArm64 ;;
+esac
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
+  ":bindings:kotlin:${kotlin_target}Klib" \
+  ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
+'''
 
 [tasks.androidBuild]
-depends = ["ensure-android-environment", "//:ensure-native-library"]
-run = "../../gradlew :bindings:kotlin:androidBuild"
+description = "Build the Kotlin Android binding."
+usage = '''
+arg "[backend]" default="opengl" {
+  choices "opengl" "vulkan"
+}
+arg "[abis]" default="arm64-v8a,x86_64" {
+  choices "arm64-v8a" "x86_64" "arm64-v8a,x86_64"
+}
+flag "--prebuilt" help="Use native packages installed under build/"
+'''
+dir = "../.."
+run = '''
+gradle_args=(
+  -Pmaplibre.android.backend="$usage_backend"
+  -Pmaplibre.android.abis="$usage_abis"
+)
+if [[ "$usage_prebuilt" == "true" ]]; then
+  gradle_args+=(-Pmaplibre.android.prebuiltBuildRoot=build)
+fi
+./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
+'''

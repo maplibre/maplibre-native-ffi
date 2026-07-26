@@ -1,197 +1,234 @@
-#!/usr/bin/env -S uv run --script
-# MISE description="Generate the GitHub Actions CI workflow from CI manifests."
-# /// script
-# dependencies = ["pydantic==2.13.4", "pyyaml==6.0.3"]
-# ///
+#!/usr/bin/env python3
+# MISE description="Generate the GitHub Actions CI workflow."
 
 import argparse
 import difflib
 import pathlib
 import sys
 
-import yaml
+
+ROOT = pathlib.Path(__file__).resolve().parents[3]
+OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
+sys.path.insert(0, str(ROOT))
+
+from ci.action_pins import load_pins  # noqa: E402
+from ci.workflow import load_configuration, target_rows  # noqa: E402
+
+# Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
+PINS = load_pins(ROOT)
+CHECKOUT = PINS["actions/checkout"]
+CACHE_SAVE = PINS["actions/cache/save"]
+DOWNLOAD = PINS["actions/download-artifact"]
+UPLOAD = PINS["actions/upload-artifact"]
 
 
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
-sys.path.insert(0, str(REPO_ROOT))
+def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
+    lines = [" " * indent + "include:"]
+    for row in rows:
+        first, *rest = row.items()
+        key, value = first
+        lines.append(" " * (indent + 2) + f"- {key}: {value}")
+        for key, value in rest:
+            if isinstance(value, list):
+                lines.append(" " * (indent + 4) + f"{key}: >-")
+                for index, command in enumerate(value):
+                    suffix = " &&" if index < len(value) - 1 else ""
+                    lines.append(" " * (indent + 6) + f"{command}{suffix}")
+            else:
+                scalar = str(value).lower() if isinstance(value, bool) else value
+                lines.append(" " * (indent + 4) + f"{key}: {scalar}")
+    return lines
 
-from ci.manifest import (  # noqa: E402
-    Variant,
-    load_subprojects,
-    load_variants,
-    subproject_matches_variant,
+
+# Environment secrets for R2 writes live in the GitHub Environment `sccache`
+# (main only). PRs omit the environment and fall back to public read-only.
+SCCACHE_ENVIRONMENT = (
+    "    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}"
 )
 
-CHECKOUT_ACTION = "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10"
 
-
-def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
-    commands = {variant.name: [] for variant in variants}
-
-    for subproject in load_subprojects(variants):
-        tasks = subproject.manifest.ci.model_dump(exclude_none=True)
-
-        for variant in variants:
-            if not subproject_matches_variant(subproject, variant):
-                continue
-            for action_key, task in tasks.items():
-                if (
-                    action_key == "build"
-                    and tasks.get("test")
-                    and variant.supports_tests
-                ):
-                    continue
-                if action_key in {"run", "test"} and not variant.supports_tests:
-                    continue
-                commands[variant.name].append(f"mise run {task}")
-
-    return commands
-
-
-def variant_job_id(variant: Variant) -> str:
-    return f"variant-{variant.name}"
-
-
-def checkout_step(*, persist_credentials: bool = False) -> dict[str, object]:
-    step: dict[str, object] = {"uses": CHECKOUT_ACTION}
-    if not persist_credentials:
-        step["with"] = {"persist-credentials": False}
-    return step
-
-
-def setup_steps(*, persist_credentials: bool = False) -> list[dict[str, object]]:
-    return [
-        checkout_step(persist_credentials=persist_credentials),
-        {"uses": "./.github/actions/setup-ci-deps"},
+def setup(target: str | None = None, zig: bool = False) -> list[str]:
+    lines = [
+        f"      - uses: {CHECKOUT}",
+        "        with:",
+        "          persist-credentials: false",
+        "      - uses: ./.github/actions/setup-ci-deps",
     ]
-
-
-class LiteralString(str):
-    pass
-
-
-class WorkflowDumper(yaml.SafeDumper):
-    def increase_indent(self, flow: bool = False, indentless: bool = False) -> None:
-        return super().increase_indent(flow, False)
-
-
-def represent_literal_string(dumper: yaml.Dumper, data: LiteralString) -> yaml.Node:
-    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
-
-
-WorkflowDumper.add_representer(LiteralString, represent_literal_string)
-
-
-def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> str:
-    jobs = {
-        "hygiene": {
-            "name": "hygiene",
-            "runs-on": "ubuntu-latest",
-            "timeout-minutes": 30,
-            "steps": [
-                *setup_steps(),
-                {"run": "mise run ci:lint"},
-            ],
-        },
-        "docs": {
-            "name": "docs",
-            "runs-on": "ubuntu-latest",
-            "timeout-minutes": 60,
-            "steps": [
-                *setup_steps(),
-                {"run": "mise run //docs:build"},
-            ],
-        },
-    }
-
-    for variant in variants:
-        variant_commands = commands[variant.name]
-
-        jobs[variant_job_id(variant)] = {
-            "name": f"variant / {variant.name}",
-            "runs-on": variant.runner,
-            "timeout-minutes": 120,
-            "env": {"MISE_ENV": variant.name},
-            "steps": [
-                *setup_steps(),
-                {"run": "mise run configure"},
-                *({"run": command} for command in variant_commands),
-            ],
-        }
-
-    jobs["required"] = {
-        "name": "ci-required",
-        "runs-on": "ubuntu-latest",
-        "timeout-minutes": 5,
-        "if": "${{ always() }}",
-        "needs": [
-            "hygiene",
-            "docs",
-            *(variant_job_id(variant) for variant in variants),
-        ],
-        "steps": [
-            {
-                "name": "Fail if required jobs failed",
-                "if": "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
-                "run": LiteralString("echo '${{ toJSON(needs) }}'\nexit 1\n"),
-            },
-            {"run": "true"},
-        ],
-    }
-
-    workflow = {
-        "name": "CI",
-        "on": {
-            "push": {"branches": ["main"]},
-            "pull_request": {"branches": ["main"]},
-        },
-        "permissions": {"contents": "read"},
-        "concurrency": {
-            "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
-            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
-        },
-        "jobs": jobs,
-    }
-    rendered = yaml.dump(
-        workflow,
-        Dumper=WorkflowDumper,
-        default_flow_style=False,
-        sort_keys=False,
-        width=4096,
+    if zig:
+        lines.append("        id: setup")
+    lines.append("        with:")
+    if target:
+        lines.append(f"          target: {target}")
+    if zig:
+        lines.append("          zig: ${{ matrix.zig }}")
+    lines.extend(
+        [
+            "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
+            "          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}",
+        ]
     )
-    return f"# Generated by `mise run ci:generate-workflow`. Do not edit directly.\n{rendered}"
+    return lines
 
 
-def check_workflow(expected: str) -> int:
-    actual = WORKFLOW_PATH.read_text() if WORKFLOW_PATH.exists() else ""
-    if actual == expected:
-        return 0
-    diff = difflib.unified_diff(
-        actual.splitlines(keepends=True),
-        expected.splitlines(keepends=True),
-        fromfile=str(WORKFLOW_PATH),
-        tofile=f"{WORKFLOW_PATH} (generated)",
-    )
-    sys.stderr.writelines(diff)
-    return 1
+def render(source: dict[str, object], presets: dict[str, object]) -> str:
+    rows = target_rows(source, presets)
+
+    lines = [
+        "# Generated by `mise run ci:generate-workflow`. Do not edit directly.",
+        "name: CI",
+        "",
+        "on:",
+        "  push:",
+        "    branches:",
+        "      - main",
+        "  pull_request:",
+        "    branches:",
+        "      - main",
+        "",
+        "permissions:",
+        "  contents: read",
+        "",
+        "concurrency:",
+        "  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+        "  cancel-in-progress: ${{ github.event_name == 'pull_request' }}",
+        "",
+        "jobs:",
+        "  hygiene:",
+        "    name: hygiene",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 30",
+        SCCACHE_ENVIRONMENT,
+        "    steps:",
+        *setup(),
+        "      - run: mise run ci:generate-workflow --check",
+        "      - run: mise run ci:generate-devcontainer-tools --check",
+        "      - run: dprint output-resolved-config > /dev/null",
+        # `mise run fix` provides the project-scoped formatter tools that the
+        # dprint wrappers expect; calling hk directly leaves them uninstalled.
+        "      - run: mise run fix",
+        "      - name: Check generated and formatted files",
+        "        run: |",
+        "          git update-index -q --refresh",
+        "          git diff --exit-code -- . ':(exclude)mise.lock'",
+        "          git diff --cached --exit-code -- . ':(exclude)mise.lock'",
+        "",
+        "  docs:",
+        "    name: docs",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 60",
+        SCCACHE_ENVIRONMENT,
+        "    steps:",
+        *setup(),
+        "      - run: mise run //docs:build",
+        "",
+        "  target:",
+        "    name: target / ${{ matrix.preset }}",
+        "    runs-on: ${{ matrix.runner }}",
+        "    timeout-minutes: 120",
+        SCCACHE_ENVIRONMENT,
+        "    strategy:",
+        "      fail-fast: false",
+        "      matrix:",
+        *matrix(rows),
+        "    steps:",
+        *setup("${{ matrix.preset }}", zig=True),
+        "      - name: Run native checks",
+        "        run: ${{ matrix.native_commands }}",
+        "      - name: Archive native artifact",
+        "        if: ${{ matrix.package }}",
+        "        run: mise run archive-native ${{ matrix.preset }}",
+        "      - name: Install packaged native artifact",
+        "        if: ${{ matrix.package }}",
+        "        run: >-",
+        "          mise run install-native-package",
+        "          ${{ matrix.preset }}",
+        "          build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
+        "      - name: Run binding and example checks",
+        "        if: ${{ matrix.package }}",
+        "        env:",
+        '          MISE_TASK_SKIP: "//:build"',
+        "        run: ${{ matrix.consumer_commands }}",
+        # Only rows that fetch every Zig project the key covers may claim it;
+        # see `uses_zig`. No status function in the `if`, so `success()` is
+        # implied: a job that fetched only part of its Zig packages before
+        # failing saves nothing, leaving the key free for a later run that
+        # completes the fetch.
+        "      - name: Save Zig packages",
+        "        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}",
+        f"        uses: {CACHE_SAVE}",
+        "        with:",
+        "          path: |",
+        "            ~/.cache/zig",
+        "            ~/AppData/Local/zig",
+        "          key: ${{ steps.setup.outputs.zig-cache-key }}",
+        "      - name: Upload native artifact",
+        "        if: ${{ matrix.package }}",
+        f"        uses: {UPLOAD}",
+        "        with:",
+        "          name: native-package-${{ matrix.preset }}-${{ github.sha }}",
+        "          path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
+        "          if-no-files-found: error",
+        "",
+        "  android-multi:",
+        "    name: Android multi-ABI packaging",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 30",
+        SCCACHE_ENVIRONMENT,
+        "    needs:",
+        "      - target",
+        "    steps:",
+        *setup("android-multi-vulkan"),
+        "      - name: Download Android native artifacts",
+        f"        uses: {DOWNLOAD}",
+        "        with:",
+        "          pattern: native-package-android-*-vulkan-${{ github.sha }}",
+        "          path: build/packages/native/android-multi-input",
+        "      - run: >-",
+        "          mise run //:kotlin:verify-android-multi-abi",
+        "          build/packages/native/android-multi-input",
+        "",
+        "  required:",
+        "    name: ci-required",
+        "    runs-on: ubuntu-latest",
+        "    timeout-minutes: 5",
+        "    if: ${{ always() }}",
+        "    needs:",
+        "      - hygiene",
+        "      - docs",
+        "      - target",
+        "      - android-multi",
+        "    steps:",
+        "      - name: Fail if required jobs failed",
+        "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
+        "        run: |",
+        "          echo '${{ toJSON(needs) }}'",
+        "          exit 1",
+        '      - run: "true"',
+        "",
+    ]
+    return "\n".join(lines)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--check", action="store_true", help="fail if the workflow is not up to date"
-    )
+    parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-
-    variants = load_variants()
-    commands = load_commands(variants)
-    rendered = render_workflow(variants, commands)
-
+    source, presets = load_configuration(ROOT)
+    expected = render(source, presets)
+    actual = OUTPUT.read_text() if OUTPUT.exists() else ""
     if args.check:
-        return check_workflow(rendered)
-
-    WORKFLOW_PATH.write_text(rendered)
+        if actual == expected:
+            return 0
+        sys.stderr.writelines(
+            difflib.unified_diff(
+                actual.splitlines(keepends=True),
+                expected.splitlines(keepends=True),
+                fromfile=str(OUTPUT),
+                tofile=f"{OUTPUT} (generated)",
+            )
+        )
+        return 1
+    OUTPUT.write_text(expected)
     return 0
 
 

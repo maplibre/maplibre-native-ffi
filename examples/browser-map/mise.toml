@@ -1,26 +1,22 @@
+[tools]
+emsdk = "4.0.10"
+
 [tasks.build]
 description = "Build the browser WebGPU map example."
-depends = ["//:ensure-native-library"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
+dir = "{{config_root}}/../.."
 run = '''
 set -euo pipefail
-if [[ "${MISE_ENV:-}" != "browser-wasm64-webgpu" ]]; then
-  echo "browser-map requires the browser WebGPU environment:" >&2
-  echo "  mise -E browser-wasm64-webgpu run //examples/browser-map:build" >&2
-  exit 1
-fi
 
-source "$EMSDK/emsdk_env.sh"
-emmake cmake --build "$MLN_FFI_BUILD_DIR" --target browser_map
-
-output_dir="$MLN_FFI_BUILD_DIR/examples/browser-map"
-pnpm exec vp build "$MLN_FFI_REPO_ROOT/examples/browser-map" \
-  --config "$MLN_FFI_REPO_ROOT/examples/browser-map/vite.config.ts" \
+build_dir="$PWD/build/browser-wasm32-webgpu"
+output_dir="$build_dir/examples/browser-map"
+cmake --workflow --preset browser-wasm32-webgpu
+pnpm exec vp build "$PWD/examples/browser-map" \
+  --config "$PWD/examples/browser-map/vite.config.ts" \
   --outDir "$output_dir" \
   --emptyOutDir
-cp "$MLN_FFI_BUILD_DIR/examples/browser-map-native/browser-map.js" \
+cp "$build_dir/examples/browser-map-native/browser-map.js" \
   "$output_dir/browser-map.js"
-cp "$MLN_FFI_BUILD_DIR/examples/browser-map-native/browser-map.wasm" \
+cp "$build_dir/examples/browser-map-native/browser-map.wasm" \
   "$output_dir/browser-map.wasm"
 '''
 
@@ -30,8 +26,10 @@ run = '''
 set -euo pipefail
 
 mise run build
-exec pnpm exec vp dev "$MLN_FFI_REPO_ROOT/examples/browser-map" \
-  --config "$MLN_FFI_REPO_ROOT/examples/browser-map/vite.config.ts" \
+repo_root="$(cd ../.. && pwd)"
+export MLN_FFI_BUILD_DIR="$repo_root/build/browser-wasm32-webgpu"
+exec pnpm exec vp dev "$repo_root/examples/browser-map" \
+  --config "$repo_root/examples/browser-map/vite.config.ts" \
   --host 0.0.0.0 \
   --port 8080 \
   --strictPort

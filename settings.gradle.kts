@@ -10,9 +10,17 @@ rootProject.name = "maplibre-native-ffi"
 
 include(":bindings:kotlin")
 
+include(":bindings:kotlin-runtime-metal")
+
+include(":bindings:kotlin-runtime-opengl")
+
+include(":bindings:kotlin-runtime-vulkan")
+
 if (androidSdkDir() != null) {
   include(":examples:android-map")
 }
+
+include(":examples:compose-map")
 
 include(":examples:lwjgl-map")
 

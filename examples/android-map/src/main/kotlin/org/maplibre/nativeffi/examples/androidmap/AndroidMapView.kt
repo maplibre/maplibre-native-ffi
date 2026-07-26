@@ -83,9 +83,10 @@ internal class AndroidMapView(context: Context) :
       state.runOnce()
       renderPending = state.drainEvents() || renderPending
       if (renderPending) {
-        state.renderUpdate()
-        renderPending = false
-        finishPendingDrawing()
+        if (state.renderUpdate()) {
+          renderPending = false
+          finishPendingDrawing()
+        }
       }
     } catch (error: RuntimeException) {
       Log.e(TAG, "frame failed", error)

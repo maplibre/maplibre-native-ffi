@@ -10,7 +10,7 @@ target_link_options(
     "-sUSE_ZLIB=1"
     "-sFETCH=1"
     "-sENVIRONMENT=web,worker"
-    "-sEXPORTED_FUNCTIONS=['_mln_browser_map_init','_mln_browser_map_render_frame','_mln_browser_map_acquire_owned_texture','_mln_browser_map_release_owned_texture_frame','_mln_browser_map_resize','_mln_browser_map_move_by','_mln_browser_map_move_by_animated','_mln_browser_map_scale_by','_mln_browser_map_scale_by_animated','_mln_browser_map_rotate_pitch_by','_mln_browser_map_rotate_by','_mln_browser_map_pitch_by','_mln_browser_map_reset_orientation','_mln_browser_map_jump_to','_main','_malloc','_free']"
+    "-sEXPORTED_FUNCTIONS=['_mln_browser_map_init','_mln_browser_map_render_frame','_mln_browser_map_acquire_owned_texture','_mln_browser_map_release_owned_texture_frame','_mln_browser_map_resize','_mln_browser_map_move_by','_mln_browser_map_move_by_animated','_mln_browser_map_scale_by','_mln_browser_map_scale_by_animated','_mln_browser_map_rotate_pitch_by','_mln_browser_map_rotate_by','_mln_browser_map_pitch_by','_mln_browser_map_reset_orientation','_mln_browser_map_cancel_transitions','_mln_browser_map_jump_to','_main','_malloc','_free']"
     "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']"
     "-sMODULARIZE=1"
     "-sEXPORT_NAME=createMapLibreModule"

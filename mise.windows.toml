@@ -1,0 +1,8 @@
+[vars]
+host_native_preset = "windows-{{ arch() }}-vulkan"
+
+[env]
+# Mise tasks use non-interactive Git Bash on Windows. Source VsDevCmd before each
+# task because mise cannot activate Visual Studio's batch environment directly.
+MLN_FFI_WINDOWS_HOST_ARCHITECTURE = "{{ arch() }}"
+BASH_ENV = "{{config_root}}/.mise/bin/windows-msvc-env.sh"

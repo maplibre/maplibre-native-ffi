@@ -141,8 +141,28 @@ typedef enum mln_map_mode : uint32_t {
 /** Options used when creating a map. */
 typedef struct mln_map_options {
   uint32_t size;
+  /**
+   * Initial logical map width in UI pixels. Must be positive.
+   *
+   * Attaching a render session replaces this with the render target extent, and
+   * mln_render_session_resize() replaces it again. Until the first attach it is
+   * the viewport that camera and projection queries such as
+   * mln_map_camera_for_lat_lng_bounds() and mln_map_pixel_for_lat_lng() are
+   * answered against.
+   */
   uint32_t width;
+  /** Initial logical map height in UI pixels. See width. */
   uint32_t height;
+  /**
+   * UI-to-device pixel scale. Must be positive and finite.
+   *
+   * Unlike width and height, this is fixed for the lifetime of the map and
+   * selects sprites, glyphs, and raster tiles for every frame the map renders.
+   * Render targets carry their own scale factor for geometry and shaders, so
+   * create the map with the scale factor you intend to render at. A render
+   * session attached or resized with a different scale factor logs a warning
+   * and renders styled imagery chosen for the map's density.
+   */
   double scale_factor;
   /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
   uint32_t map_mode;
@@ -170,6 +190,14 @@ typedef struct mln_camera_options {
   double longitude;
   double center_altitude;
   mln_edge_insets padding;
+  /**
+   * Screen-space focal point for a camera command. This field is input-only.
+   *
+   * MapLibre Native applies it to camera commands and leaves it out of every
+   * camera snapshot it reports, so MLN_CAMERA_OPTION_ANCHOR is set only by the
+   * caller. mln_map_get_camera(), mln_map_projection_get_camera(), and the
+   * mln_map_camera_for_* family leave it clear.
+   */
   mln_screen_point anchor;
   double zoom;
   double bearing;
@@ -193,9 +221,16 @@ typedef struct mln_animation_options {
   /**
    * Duration in milliseconds. Must be finite and non-negative. Values that
    * would overflow MapLibre Native's internal duration are invalid.
+   *
+   * When this field is omitted, ease, pan, zoom, rotate, and pitch transitions
+   * default to zero and apply instantly, while mln_map_fly_to() derives a
+   * duration from velocity instead.
    */
   double duration_ms;
-  /** Average flyTo velocity in screenfuls per second. Must be positive. */
+  /**
+   * Average flyTo velocity in screenfuls per second. Must be positive.
+   * Defaults to 1.2 when omitted. Applies to mln_map_fly_to().
+   */
   double velocity;
   /** Peak zoom for flyTo transitions. */
   double min_zoom;
@@ -1046,7 +1081,7 @@ MLN_API mln_status mln_map_request_repaint(mln_map* map) MLN_NOEXCEPT;
  * pending, process each MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE event
  * from this map. Render targets use mln_render_session_render_update(). Surface
  * targets present directly. A render-update
- * call can return MLN_STATUS_INVALID_STATE before the next update is available;
+ * call can report *out_rendered as false before the next update is available;
  * keep pumping and polling in that case. After
  * MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED, use the latest successful texture
  * update when the host needs image bytes or a backend texture.
@@ -1067,6 +1102,12 @@ MLN_API mln_status mln_map_request_still_image(mln_map* map) MLN_NOEXCEPT;
  *
  * The map must not have an attached render session.
  *
+ * Destruction also discards this map's queued events, including queued style
+ * loading failures. There is no flush and no terminal event, so the last state
+ * a host mirrored from events can stay behind the map's final state. Snapshot
+ * whatever state the host needs while the map is still live, and let teardown
+ * proceed without awaiting an event for this map.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not a live map handle.
@@ -1083,7 +1124,10 @@ MLN_API mln_status mln_map_destroy(mln_map* map) MLN_NOEXCEPT;
  *
  * This is a map command. The return status reports synchronous acceptance or
  * failure. Later native success and failure are reported through runtime
- * events.
+ * events. A URL that is unreachable, malformed, or serves invalid style
+ * content is still accepted synchronously; every such failure arrives later as
+ * a style loading-failed event, so hosts report style URL errors from the event
+ * stream rather than from this return status.
  *
  * Returns:
  * - MLN_STATUS_OK when the load request was accepted.

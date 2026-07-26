@@ -8,16 +8,19 @@ sidebar:
 Specification for interactive `*-map` example programs: small apps that exercise
 language bindings and render-target integrations through a focused map demo.
 
-The specification has three sections:
+The specification has four sections:
 
 1. [Shared baseline](#shared-baseline) — map, render-session, frame-loop, and
    graphics contracts common to every profile.
 2. [Desktop profile](#desktop-profile) — windowed desktop hosts with CLI entry
    and keyboard/mouse input.
 3. [Mobile profile](#mobile-profile) — embedded view hosts with touch input.
+4. [Browser profile](#browser-profile) — Emscripten/WebGPU hosts with a canvas
+   and browser input.
 
 Implement a desktop example by reading Shared baseline and Desktop profile.
 Implement a mobile example by reading Shared baseline and Mobile profile.
+Implement a browser example by reading Shared baseline and Browser profile.
 
 ---
 
@@ -32,6 +35,10 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 | `examples/dotnet-map`  | Desktop | C#         | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/swift-map`   | Desktop | Swift      | AppKit, SwiftUI | macOS                 | Metal                 |
 | `examples/swift-map`   | Mobile  | Swift      | UIKit           | iOS                   | Metal                 |
+| `examples/browser-map` | Browser | C          | Browser canvas  | Web                   | WebGPU                |
+
+The Compose map example follows the broad strokes of this specification, but
+uses its own renderer-integration architecture for Skiko texture sharing.
 
 For examples built by native render-backend variant, “Backends” is the union of
 supported configured variants. Each native library artifact includes one render
@@ -52,8 +59,8 @@ examples).
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
   map render events and user input.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
-- Camera controls per the active profile ([Desktop profile → Input](#input) or
-  [Mobile profile → Input](#input-1)).
+- Camera controls per the active profile ([Desktop profile → Input](#input),
+  [Mobile profile → Input](#input-1), or [Browser profile → Input](#input-2)).
 - Every graphics API the host toolkit and target platform can support across
   configured variants (Vulkan, Metal, OpenGL/EGL as applicable).
 - Render-target coverage per the active profile
@@ -217,7 +224,9 @@ On host termination or fatal error, close resources in order:
 
 The C API treats runtime pumping and presentation as separate concerns.
 `run_once` advances native scheduler work and fills the event queue; it is not
-display-driven. `render_update` draws only when `render_pending` is true.
+display-driven. One call drains the work it finds instead of running a fixed
+slice, so a single call can take as long as a style parse. `render_update` draws
+only when `render_pending` is true.
 
 `*-map` examples integrate both through a **display-paced host loop** on the
 owner thread: each iteration always pumps the runtime; it renders only when
@@ -292,12 +301,14 @@ Requirements:
     transitions).
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true.
-- MUST clear `render_pending` after `render_update` returns success.
-- On `invalid_state` from `render_update`, leave `render_pending` set and
-  continue the pump loop (no frame was drawn yet).
+- MUST clear `render_pending` after `render_update` reports an update was
+  rendered.
+- When `render_update` reports no update was available, leave `render_pending`
+  set and continue the pump loop (no frame was drawn yet).
 
-Texture modes: after a successful `render_update`, MUST run the compositor pass
-to copy the map texture into the host swapchain before present.
+Texture modes: after `render_update` reports an update was rendered, MUST run
+the compositor pass to copy the map texture into the host swapchain before
+present.
 
 ### Viewport
 
@@ -433,7 +444,8 @@ that pass.
 
 Profile sections define which host events trigger resize
 ([Desktop profile → Resize triggers](#resize-triggers) or
-[Mobile profile → Resize triggers](#resize-triggers-1)).
+[Mobile profile → Resize triggers](#resize-triggers-1), or
+[Browser profile → Resize triggers](#resize-triggers-2)).
 
 ### Diagnostics
 
@@ -482,6 +494,7 @@ binary targets. Implement only the modes required by the active profile
 | ------- | -------------------------------------------------------------------- |
 | Desktop | `owned-texture`, `borrowed-texture`, `native-surface`                |
 | Mobile  | `native-surface`                                                     |
+| Browser | `owned-texture`                                                      |
 
 ---
 
@@ -663,3 +676,51 @@ Input handlers return whether the camera changed so the frame loop can set
   platform log sink (for example `OSLog` on Apple platforms or `logcat` on
   Android).
 - Control help is not required on mobile.
+
+---
+
+## Browser profile
+
+### Scope
+
+Browser `*-map` examples add:
+
+- One full-window HTML canvas hosted by an Emscripten module.
+- The public C API as the browser-facing binding boundary.
+- A WebGPU context imported from the browser and shared with the compositor.
+- The `owned-texture` render-target mode.
+- The Desktop profile pointer, wheel, and keyboard control scheme.
+
+Browser examples use the fixed `owned-texture` mode and do not expose CLI mode
+selection. Camera query parameters MAY override the shared initial camera.
+
+### Lifecycle and loop
+
+- The native Emscripten bridge MAY combine map state and its single fixed render
+  target in one adapter. Browser shell, viewport, input, WebGPU context, and
+  compositor boundaries remain separate modules.
+- Create the browser WebGPU device and canvas context before native runtime
+  creation.
+- Drive the shared pump/render/present loop from `requestAnimationFrame`.
+- Keep the Emscripten module, runtime, map, session, imported WebGPU device, and
+  compositor live for the page lifetime.
+- Report initialization, device-loss, and uncaptured WebGPU errors to the
+  browser console.
+
+### Input
+
+Implement the Desktop profile control scheme and behavioral constants. Print the
+Desktop control help text to the browser console during startup.
+
+### Resize triggers
+
+- Subscribe to canvas layout changes, window resize, and every device-pixel
+  ratio change.
+- Re-arm device-pixel-ratio observation after each change.
+- Resize the canvas backing store, WebGPU canvas context, compositor resources,
+  and native render session from the same viewport snapshot.
+
+### Logging
+
+Emit [Startup](#startup) step 8, control help, and viewport diagnostics through
+the browser console.

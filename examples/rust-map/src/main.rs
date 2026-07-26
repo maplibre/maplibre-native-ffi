@@ -1,17 +1,9 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
-#[cfg(not(any(feature = "metal", feature = "opengl", feature = "vulkan")))]
-compile_error!("rust-map requires exactly one backend feature: metal, opengl, or vulkan");
-#[cfg(any(
-    all(feature = "metal", feature = "opengl"),
-    all(feature = "metal", feature = "vulkan"),
-    all(feature = "opengl", feature = "vulkan")
-))]
-compile_error!("rust-map backend features are mutually exclusive");
-#[cfg(all(feature = "metal", not(target_os = "macos")))]
+#[cfg(all(maplibre_render_backend = "metal", not(target_os = "macos")))]
 compile_error!("rust-map metal backend is only supported on macOS");
 #[cfg(all(
-    feature = "opengl",
+    maplibre_render_backend = "opengl",
     not(any(target_os = "linux", target_os = "windows"))
 ))]
 compile_error!("rust-map opengl backend is only supported on Linux and Windows");
@@ -19,16 +11,16 @@ compile_error!("rust-map opengl backend is only supported on Linux and Windows")
 mod app;
 mod graphics;
 mod input;
-#[cfg(feature = "metal")]
+#[cfg(maplibre_render_backend = "metal")]
 mod metal;
-#[cfg(feature = "opengl")]
+#[cfg(maplibre_render_backend = "opengl")]
 mod opengl;
 mod render_target;
 mod shell;
 mod viewport;
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 mod vulkan;
-#[cfg(feature = "vulkan")]
+#[cfg(maplibre_render_backend = "vulkan")]
 mod vulkan_texture_compositor;
 
 use std::error::Error;

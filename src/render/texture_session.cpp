@@ -86,6 +86,12 @@ auto validate_webgpu_borrowed_texture_descriptor(
   if (extent_status != MLN_STATUS_OK) {
     return extent_status;
   }
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
   const auto context_status =
     validate_webgpu_context(descriptor->context, true);
   if (context_status != MLN_STATUS_OK) {
@@ -120,6 +126,10 @@ auto texture_read_premultiplied_rgba8(
   }
   if (texture->texture.mode != TextureSessionMode::Owned) {
     set_thread_error("texture session does not support CPU readback");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  if (!texture->texture.backend->supports_readback()) {
+    set_thread_error("texture backend does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
   }
   if (texture->rendered_generation != texture->generation) {

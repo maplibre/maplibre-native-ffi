@@ -23,7 +23,9 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/geojson.hpp>
+#include <mbgl/util/logging.hpp>
 #include <mbgl/util/size.hpp>
+#include <mbgl/util/string.hpp>
 
 #include "render/render_session_common.hpp"
 
@@ -48,6 +50,36 @@ struct OwnedQueriedFeatureDescriptor {
   std::string source_layer_id;
   std::unique_ptr<OwnedJsonDescriptor> state;
 };
+
+auto render_target_extent_physical_size(
+  const mln_render_target_extent* extent, uint32_t* out_width,
+  uint32_t* out_height
+) -> mln_status {
+  if (extent == nullptr) {
+    set_thread_error("extent must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_width == nullptr || out_height == nullptr) {
+    set_thread_error("out_width and out_height must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    *extent, "extent dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto physical_status = validate_physical_size(
+    extent->width, extent->height, extent->scale_factor,
+    "scaled extent dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  *out_width = physical_dimension(extent->width, extent->scale_factor);
+  *out_height = physical_dimension(extent->height, extent->scale_factor);
+  return MLN_STATUS_OK;
+}
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -113,6 +145,8 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .context = opengl_context_descriptor_default(),
     .texture = 0,
     .target = 0,
@@ -150,6 +184,8 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .context =
       mln_webgpu_context_descriptor{
         .size = sizeof(mln_webgpu_context_descriptor),
@@ -641,6 +677,31 @@ auto to_screen_line_string(
   return true;
 }
 
+// Normalizes a query box and intersects it with the viewport. Native tile-space
+// query geometry saturates at a few tiles past a tile's own bounds, so a box
+// that over-covers the viewport can degrade into an empty answer instead of the
+// visible features. Clipping to the viewport is lossless for a box: the
+// intersection of a screen-space box with the viewport is the same box over the
+// only region that can hold rendered features. Returns nullopt when the box
+// lies entirely outside the viewport, which holds no rendered features.
+auto clip_screen_box_to_viewport(
+  mln_screen_box box, uint32_t width, uint32_t height
+) -> std::optional<mbgl::ScreenBox> {
+  const auto view_width = static_cast<double>(width);
+  const auto view_height = static_cast<double>(height);
+  const auto min_x = std::min(box.min.x, box.max.x);
+  const auto min_y = std::min(box.min.y, box.max.y);
+  const auto max_x = std::max(box.min.x, box.max.x);
+  const auto max_y = std::max(box.min.y, box.max.y);
+  if (min_x > view_width || min_y > view_height || max_x < 0.0 || max_y < 0.0) {
+    return std::nullopt;
+  }
+  return mbgl::ScreenBox{
+    {std::max(min_x, 0.0), std::max(min_y, 0.0)},
+    {std::min(max_x, view_width), std::min(max_y, view_height)}
+  };
+}
+
 auto feature_identifier_type(
   const mbgl::FeatureIdentifier& identifier,
   mln::core::OwnedQueriedFeatureDescriptor& storage
@@ -881,6 +942,29 @@ auto find_feature_extension_result_locked(
   return found->second.get();
 }
 
+// The map's scale factor is fixed at creation and still selects sprites,
+// glyphs, and raster tiles, while the session's scale factor drives geometry
+// and shaders. A mismatch renders correctly sized geometry against imagery
+// chosen for a different density, so warn instead of failing the call.
+auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
+  constexpr auto tolerance = 1e-6;
+  const auto map_scale_factor = static_cast<double>(
+    mln::core::map_native(map)->getMapOptions().pixelRatio()
+  );
+  if (std::abs(map_scale_factor - scale_factor) <= tolerance) {
+    return;
+  }
+  mbgl::Log::Warning(
+    mbgl::Event::Render,
+    "render target scale_factor " + mbgl::util::toString(scale_factor) +
+      " differs from the map scale_factor " +
+      mbgl::util::toString(map_scale_factor) +
+      "; the map value is fixed at creation and still selects sprites, glyphs, "
+      "and raster tiles, so styled imagery will not match the rendered "
+      "geometry. Create the map with the scale factor you intend to render at."
+  );
+}
+
 }  // namespace
 
 namespace mln::core {
@@ -957,6 +1041,7 @@ auto attach_render_session(
   }
   try {
     map_native(map)->setSize(mbgl::Size{session->width, session->height});
+    warn_on_scale_factor_mismatch(map, session->scale_factor);
     session->kind = kind;
     register_render_session(handle, std::move(session));
   } catch (...) {
@@ -1023,9 +1108,8 @@ auto render_session_resize(
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
   map_native(session->map)->setSize(mbgl::Size{width, height});
-  if (session->kind == RenderSessionKind::Surface) {
-    session->renderer.reset();
-  }
+  warn_on_scale_factor_mismatch(session->map, scale_factor);
+  session->renderer.reset();
   session->rendered_generation = 0;
   session->width = width;
   session->height = height;
@@ -1036,11 +1120,18 @@ auto render_session_resize(
   return MLN_STATUS_OK;
 }
 
-auto render_session_render_update(mln_render_session* session) -> mln_status {
+auto render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) -> mln_status {
   const auto status = validate_live_attached_render_session(session);
   if (status != MLN_STATUS_OK) {
     return status;
   }
+  if (out_rendered == nullptr) {
+    set_thread_error("out_rendered must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_rendered = false;
   if (
     session->kind == RenderSessionKind::Texture && session->texture.acquired
   ) {
@@ -1050,8 +1141,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
 
   auto update = map_latest_update(session->map);
   if (!update) {
-    set_thread_error("no map render update is available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_OK;
   }
 
   if (session->kind == RenderSessionKind::Texture) {
@@ -1083,12 +1173,18 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     return MLN_STATUS_NATIVE_ERROR;
   }
   if (session->kind == RenderSessionKind::Texture) {
-    const auto after_status = session->texture.backend->after_render(*session);
+    auto frame_rendered = true;
+    const auto after_status =
+      session->texture.backend->after_render(*session, frame_rendered);
     if (after_status != MLN_STATUS_OK) {
       return after_status;
     }
+    if (!frame_rendered) {
+      return MLN_STATUS_OK;
+    }
   }
   session->rendered_generation = session->generation;
+  *out_rendered = true;
   return MLN_STATUS_OK;
 }
 
@@ -1307,20 +1403,25 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto line_string = mbgl::ScreenLineString{};
+  auto clipped_box = std::optional<mbgl::ScreenBox>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
       if (!validate_screen_point(geometry->data.point)) {
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       break;
-    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
+    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX: {
       if (
         !validate_screen_point(geometry->data.box.min) ||
         !validate_screen_point(geometry->data.box.max)
       ) {
         return MLN_STATUS_INVALID_ARGUMENT;
       }
+      clipped_box = clip_screen_box_to_viewport(
+        geometry->data.box, session->width, session->height
+      );
       break;
+    }
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING: {
       if (!to_screen_line_string(geometry->data.line_string, line_string)) {
         return MLN_STATUS_INVALID_ARGUMENT;
@@ -1347,13 +1448,11 @@ auto render_session_query_rendered_features(
       );
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
-      features = session->renderer->queryRenderedFeatures(
-        mbgl::ScreenBox{
-          {geometry->data.box.min.x, geometry->data.box.min.y},
-          {geometry->data.box.max.x, geometry->data.box.max.y}
-        },
-        *native_options
-      );
+      if (clipped_box) {
+        features = session->renderer->queryRenderedFeatures(
+          *clipped_box, *native_options
+        );
+      }
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING:
       features =

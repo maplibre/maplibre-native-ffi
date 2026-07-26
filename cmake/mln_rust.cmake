@@ -1,20 +1,58 @@
 function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-  set(rust_target "$ENV{CARGO_BUILD_TARGET}")
-  if(rust_target STREQUAL "")
+  if(EMSCRIPTEN)
+    set(rust_target "wasm32-unknown-emscripten")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    if(ANDROID_ABI STREQUAL "arm64-v8a")
+      set(rust_target "aarch64-linux-android")
+    elseif(ANDROID_ABI STREQUAL "x86_64")
+      set(rust_target "x86_64-linux-android")
+    else()
+      message(FATAL_ERROR "Unsupported Android ABI for Rust: ${ANDROID_ABI}")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+      set(rust_target "aarch64-unknown-linux-gnu")
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|x86_64)$")
+      set(rust_target "x86_64-unknown-linux-gnu")
+    else()
+      message(
+        FATAL_ERROR
+          "Unsupported Linux architecture for Rust: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    set(rust_arch "${MLN_FFI_TARGET_ARCHITECTURE}")
+    if(NOT rust_arch)
+      set(rust_arch "${CMAKE_GENERATOR_PLATFORM}")
+    endif()
+    if(NOT rust_arch)
+      set(rust_arch "${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+    if(rust_arch MATCHES "^(aarch64|ARM64|arm64)$")
+      set(rust_target "aarch64-pc-windows-msvc")
+    elseif(rust_arch MATCHES "^(AMD64|x64|x86_64)$")
+      set(rust_target "x86_64-pc-windows-msvc")
+    else()
+      message(
+        FATAL_ERROR "Unsupported Windows architecture for Rust: ${rust_arch}")
+    endif()
+  else()
     message(
       FATAL_ERROR
-        "CARGO_BUILD_TARGET must be set for Rust platform builds (see .mise/config.*.toml)")
+        "Rust platform support is unavailable for ${CMAKE_SYSTEM_NAME}")
   endif()
 
+  set(MLN_FFI_CARGO_TARGET_DIR "${PROJECT_SOURCE_DIR}/target"
+      CACHE
+        PATH "Cargo target directory for the native platform support library")
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(rust_library
-        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/maplibre_native_platform.lib")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/maplibre_native_platform.lib")
   else()
     set(rust_library
-        "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/libmaplibre_native_platform.a")
+        "${MLN_FFI_CARGO_TARGET_DIR}/${rust_target}/release/libmaplibre_native_platform.a")
   endif()
   file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
        "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
@@ -29,7 +67,6 @@ function(mln_link_rust_platform target)
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     set(rust_linker "${CMAKE_LINKER}")
   endif()
-
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     get_filename_component(rust_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
     string(REGEX REPLACE "^android-" "" android_api_level "${ANDROID_PLATFORM}")
@@ -55,27 +92,7 @@ function(mln_link_rust_platform target)
     endif()
   endif()
 
-  set(rust_cargo_extra_args "")
-  if(rust_target STREQUAL "wasm32-unknown-emscripten")
-    # Pthread WASM links with --shared-memory; the prebuilt std for this target
-    # lacks atomics, so rebuild std via build-std. panic=abort avoids pulling
-    # non-atomic panic_unwind objects into the staticlib.
-    if(DEFINED ENV{RUSTFLAGS}
-       AND NOT "$ENV{RUSTFLAGS}" STREQUAL "")
-      set(rust_rustflags "$ENV{RUSTFLAGS}")
-    else()
-      set(rust_rustflags
-          "-C target-feature=+atomics,+bulk-memory -C panic=abort")
-    endif()
-    list(APPEND rust_cargo_extra_args -Z build-std=std,panic_abort)
-    set(rust_bootstrap "1")
-  elseif(DEFINED ENV{RUSTFLAGS})
-    set(rust_rustflags "$ENV{RUSTFLAGS}")
-  else()
-    set(rust_rustflags "")
-  endif()
-
-  set(rust_env
+  set(rust_environment
       "CC_${rust_target_env}=${rust_cc}"
       "CXX_${rust_target_env}=${rust_cxx}"
       "AR_${rust_target_env}=${CMAKE_AR}"
@@ -83,12 +100,17 @@ function(mln_link_rust_platform target)
       "CXX_${rust_target_env_lower}=${rust_cxx}"
       "AR_${rust_target_env_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
-      "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}")
-  if(NOT rust_rustflags STREQUAL "")
-    list(APPEND rust_env "RUSTFLAGS=${rust_rustflags}")
+      "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
+      "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
+  set(rust_cargo_extra_args)
+  if(EMSCRIPTEN)
+    list(APPEND rust_environment "RUSTC_BOOTSTRAP=1"
+         "RUSTFLAGS=-C target-feature=+atomics,+bulk-memory -C panic=abort")
+    list(APPEND rust_cargo_extra_args -Z build-std=std,panic_abort)
   endif()
-  if(DEFINED rust_bootstrap)
-    list(PREPEND rust_env "RUSTC_BOOTSTRAP=${rust_bootstrap}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND rust_environment
+         "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")
   endif()
 
   add_custom_command(
@@ -97,7 +119,7 @@ function(mln_link_rust_platform target)
       ${CMAKE_COMMAND}
       -E
       env
-      ${rust_env}
+      ${rust_environment}
       "${CARGO_EXECUTABLE}"
       build
       --manifest-path

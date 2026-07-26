@@ -207,7 +207,9 @@ MLN_API mln_status mln_map_set_tile_options(
 /**
  * Copies the current camera snapshot.
  *
- * On success, *out_camera is overwritten.
+ * On success, *out_camera is overwritten. MapLibre Native reports no anchor in
+ * a camera snapshot, so out_camera->fields leaves MLN_CAMERA_OPTION_ANCHOR
+ * clear; anchor is input-only, as documented on mln_camera_options.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -240,8 +242,12 @@ mln_map_jump_to(mln_map* map, const mln_camera_options* camera) MLN_NOEXCEPT;
 /**
  * Applies a camera ease transition command.
  *
- * Only fields indicated by camera->fields affect the map. Passing a null
- * animation uses MapLibre Native's default animation options.
+ * Only fields indicated by camera->fields affect the map.
+ *
+ * MapLibre Native's default ease duration is zero, so a null animation, or one
+ * that omits MLN_ANIMATION_OPTION_DURATION, moves the camera to the target
+ * immediately and reports it on the next snapshot without any pumping. Set
+ * MLN_ANIMATION_OPTION_DURATION to animate.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -261,8 +267,13 @@ MLN_API mln_status mln_map_ease_to(
 /**
  * Applies a camera fly transition command.
  *
- * Only fields indicated by camera->fields affect the map. Passing a null
- * animation uses MapLibre Native's default animation options.
+ * Only fields indicated by camera->fields affect the map.
+ *
+ * This is the one camera command that animates by default. When the animation
+ * is null or omits MLN_ANIMATION_OPTION_DURATION, MapLibre Native derives a
+ * duration from the flight distance and the velocity, which defaults to 1.2
+ * screenfuls per second, so the camera reaches the target over several pumped
+ * frames.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -296,7 +307,8 @@ mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
 /**
  * Applies an animated screen-space pan command.
  *
- * Passing a null animation uses MapLibre Native's default animation options.
+ * This command eases, so it inherits the zero default duration described on
+ * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -332,8 +344,9 @@ MLN_API mln_status mln_map_scale_by(
 /**
  * Applies an animated screen-space zoom command.
  *
- * Passing a null anchor uses MapLibre Native's default zoom anchor. Passing a
- * null animation uses MapLibre Native's default animation options.
+ * Passing a null anchor uses MapLibre Native's default zoom anchor. This
+ * command eases, so it inherits the zero default duration described on
+ * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -368,7 +381,8 @@ MLN_API mln_status mln_map_rotate_by(
 /**
  * Applies an animated screen-space rotate command.
  *
- * Passing a null animation uses MapLibre Native's default animation options.
+ * This command eases, so it inherits the zero default duration described on
+ * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -400,7 +414,8 @@ MLN_API mln_status mln_map_pitch_by(mln_map* map, double pitch) MLN_NOEXCEPT;
 /**
  * Applies an animated pitch delta command.
  *
- * Passing a null animation uses MapLibre Native's default animation options.
+ * This command eases, so it inherits the zero default duration described on
+ * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

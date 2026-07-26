@@ -3,7 +3,11 @@ using Maplibre.Native.Camera;
 namespace Maplibre.Native.Map;
 
 /// <summary>Viewport options descriptor.</summary>
-public sealed class ViewportOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record ViewportOptions
 {
     public NorthOrientation? NorthOrientation { get; set; }
     public ConstrainMode? ConstrainMode { get; set; }
@@ -12,7 +16,11 @@ public sealed class ViewportOptions
 }
 
 /// <summary>Tile tuning options descriptor.</summary>
-public sealed class TileOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record TileOptions
 {
     public uint? PrefetchZoomDelta { get; set; }
     public double? LodMinimumRadius { get; set; }
@@ -23,7 +31,11 @@ public sealed class TileOptions
 }
 
 /// <summary>Projection mode options descriptor.</summary>
-public sealed class ProjectionModeOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record ProjectionModeOptions
 {
     public bool? Axonometric { get; set; }
     public double? XSkew { get; set; }

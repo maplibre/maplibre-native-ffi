@@ -86,6 +86,7 @@ export class InputController {
     if (!leftDown && !rightDown) return;
     this.canvas.focus();
     this.canvas.setPointerCapture(event.pointerId);
+    this.getModule()?._mln_browser_map_cancel_transitions();
     this.drag = {
       pointerId: event.pointerId,
       x: event.clientX,
@@ -107,7 +108,7 @@ export class InputController {
     const delta = this.logicalDelta(this.drag, event);
     if (this.drag.mode === "rotate") {
       this.pendingBearingDelta += delta.x * 0.5;
-      this.pendingPitchDelta += -delta.y * 0.5;
+      this.pendingPitchDelta += delta.y * 0.5;
     } else {
       this.pendingPanX += delta.x;
       this.pendingPanY += delta.y;

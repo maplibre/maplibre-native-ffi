@@ -60,6 +60,17 @@ auto mln_opengl_supported_context_provider_mask(void) noexcept -> uint32_t {
   return mln::core::opengl_supported_context_provider_mask();
 }
 
+auto mln_render_target_extent_physical_size(
+  const mln_render_target_extent* extent, uint32_t* out_width,
+  uint32_t* out_height
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::render_target_extent_physical_size(
+      extent, out_width, out_height
+    );
+  });
+}
+
 auto mln_metal_owned_texture_attach(
   mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session** out_session

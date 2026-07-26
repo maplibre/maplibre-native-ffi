@@ -2,10 +2,14 @@ import type { Viewport } from "./types";
 
 export function readViewport(canvas: HTMLCanvasElement): Viewport {
   const rect = canvas.getBoundingClientRect();
+  const devicePixelRatio = window.devicePixelRatio;
   return {
     width: Math.max(1, Math.round(rect.width)),
     height: Math.max(1, Math.round(rect.height)),
-    scale: Math.max(1, window.devicePixelRatio || 1),
+    scale:
+      Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+        ? devicePixelRatio
+        : 1,
   };
 }
 

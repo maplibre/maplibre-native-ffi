@@ -9,6 +9,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use ash::vk;
@@ -23,10 +24,11 @@ use libloading::Library;
 use static_assertions::assert_not_impl_any;
 
 use super::*;
+use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, MapMode, MapOptions,
-    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventType, RuntimeHandle, ScreenBox,
-    ScreenPoint,
+    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, LogSeverity,
+    LogSeverityMask, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
+    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -136,9 +138,12 @@ fn create_opengl_borrowed_texture_session(
     if !backends.contains(RenderBackendMask::OPENGL) {
         return Err("native library does not support OpenGL borrowed texture sessions".into());
     }
-    let texture = OpenGLBorrowedTexture::new(extent.width, extent.height)?;
+    let (physical_width, physical_height) = extent.physical_size()?;
+    let texture = OpenGLBorrowedTexture::new(physical_width, physical_height)?;
     let session = map.attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
         extent,
+        physical_width,
+        physical_height,
         texture.descriptor(),
         texture.name(),
         glow::TEXTURE_2D,
@@ -860,6 +865,30 @@ impl OpenGLTestContext {
             Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
         }
     }
+
+    #[cfg(target_os = "windows")]
+    fn read_surface_rgba(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
+        self.make_current()?;
+        let mut pixels = vec![0_u8; width as usize * height as usize * 4];
+        unsafe {
+            self.gl.read_buffer(glow::FRONT);
+            self.gl.read_pixels(
+                0,
+                0,
+                width as i32,
+                height as i32,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(Some(&mut pixels)),
+            );
+        }
+        self.check_gl_error("read OpenGL surface")?;
+        Ok(pixels)
+    }
 }
 
 struct OpenGLBorrowedTexture {
@@ -1095,15 +1124,20 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    if let Ok(library_dir) = std::env::var("MLN_FFI_DEPENDENCY_LIBRARY_DIR") {
+    if let Ok(install_dir) = std::env::var("MAPLIBRE_NATIVE_C_INSTALL_DIR") {
+        let library_dir = std::path::Path::new(&install_dir).join(if cfg!(target_os = "windows") {
+            "bin"
+        } else {
+            "lib"
+        });
         let library_name = if cfg!(target_os = "macos") {
-            "libvulkan.dylib"
+            "libvulkan.1.dylib"
         } else if cfg!(target_os = "windows") {
             "vulkan-1.dll"
         } else {
             "libvulkan.so.1"
         };
-        let library_path = std::path::Path::new(&library_dir).join(library_name);
+        let library_path = library_dir.join(library_name);
         if library_path.exists() {
             // SAFETY: Loading the Vulkan loader is delegated to ash.
             return unsafe { ash::Entry::load_from(&library_path) }.map_err(Into::into);
@@ -1189,7 +1223,7 @@ fn load_feature_state_style(
         runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 }
 
 fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
@@ -1272,6 +1306,27 @@ fn wait_for_source_feature(
     panic!("timed out waiting for {description}");
 }
 
+fn single_cluster_leaf(session: &RenderSessionHandle, feature: &Feature, offset: u64) -> Feature {
+    let arguments = JsonValue::Object(vec![
+        JsonMember::new("limit", JsonValue::UInt(1)),
+        JsonMember::new("offset", JsonValue::UInt(offset)),
+    ]);
+    let result = session
+        .query_feature_extension(
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            Some(&arguments),
+        )
+        .unwrap();
+    let FeatureExtensionResult::FeatureCollection(leaves) = result else {
+        panic!("expected leaves feature collection");
+    };
+    assert_eq!(leaves.len(), 1);
+    leaves.into_iter().next().unwrap()
+}
+
 fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
     feature
         .properties
@@ -1350,7 +1405,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
@@ -1361,6 +1416,27 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     assert_eq!(frame.frame().unwrap().type_, glow::UNSIGNED_BYTE);
     assert!(!frame.texture().unwrap().is_zero());
     frame.close().unwrap();
+
+    #[cfg(target_os = "windows")]
+    {
+        let info = session.texture_image_info().unwrap();
+        assert_eq!((info.width, info.height), (32, 16));
+        assert!(info.stride >= info.width * 4);
+        assert!(info.byte_length >= info.stride as usize * info.height as usize);
+
+        let mut undersized = vec![0x7f; info.byte_length - 1];
+        let error = session
+            .read_premultiplied_rgba8_into(&mut undersized)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+        assert!(undersized.iter().all(|byte| *byte == 0x7f));
+
+        let mut pixels = vec![0; info.byte_length];
+        let copied_info = session.read_premultiplied_rgba8_into(&mut pixels).unwrap();
+        assert_eq!(copied_info, info);
+        assert!(pixels.iter().any(|byte| *byte != 0));
+    }
 
     session.close().unwrap();
     map.close().unwrap();
@@ -1385,7 +1461,13 @@ fn opengl_surface_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
+
+    #[cfg(target_os = "windows")]
+    {
+        let pixels = _context.read_surface_rgba(32, 16).unwrap();
+        assert!(pixels.iter().any(|byte| *byte != 0));
+    }
 
     session.close().unwrap();
     map.close().unwrap();
@@ -1410,7 +1492,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -1567,6 +1649,52 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
 }
 
 #[test]
+// The map scale factor is fixed at creation and keeps selecting sprites,
+// glyphs, and raster tiles, so a session that renders at a different scale
+// factor degrades styled imagery rather than failing. Attach and resize warn
+// instead of returning an error, and the warning is the only signal callers
+// get.
+fn attaching_or_resizing_with_a_mismatched_scale_factor_warns() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let _logging = LoggingTestGuard::new();
+    // Warnings dispatch asynchronously by default, which would race this test.
+    crate::set_async_log_severity_mask(LogSeverityMask::empty()).unwrap();
+    let warnings = Arc::new(Mutex::new(Vec::new()));
+    let captured = warnings.clone();
+    crate::set_log_callback(move |record| {
+        if record.message.contains("scale_factor") {
+            captured
+                .lock()
+                .unwrap()
+                .push((record.severity, record.message));
+        }
+        false
+    })
+    .unwrap();
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 2.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    let attach_warnings = warnings.lock().unwrap().clone();
+    assert_eq!(attach_warnings.len(), 1);
+    assert_eq!(attach_warnings[0].0, LogSeverity::Warning);
+    assert!(attach_warnings[0].1.contains('2'));
+
+    // Resizing to the map's scale factor is consistent and stays quiet.
+    session.resize(32, 32, 1.0).unwrap();
+    assert_eq!(warnings.lock().unwrap().len(), 1);
+
+    // Resizing back to a different scale factor warns again.
+    session.resize(32, 32, 2.0).unwrap();
+    assert_eq!(warnings.lock().unwrap().len(), 2);
+}
+
+#[test]
 // Spec coverage: BND-105 and BND-106.
 fn feature_state_set_get_and_remove_copy_snapshots() {
     if !has_test_owned_texture_session_backend() {
@@ -1705,6 +1833,71 @@ fn rendered_and_source_queries_copy_results() {
 
 #[test]
 // Spec coverage: BND-106.
+fn rendered_box_queries_clip_to_the_viewport() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    load_query_style(&runtime, &map, &session);
+    let mut options = RenderedFeatureQueryOptions::default();
+    options.layer_ids = Some(vec!["point-circle".into()]);
+
+    // Over-covering the viewport is the obvious way to ask for everything on
+    // screen, and must answer like the viewport itself.
+    let oversized = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(-4096.0, -4096.0),
+        ScreenPoint::new(4096.0, 4096.0),
+    ));
+    let rendered = wait_for_rendered_feature(
+        &runtime,
+        &session,
+        &oversized,
+        &options,
+        "over-covering box query",
+    );
+    assert_eq!(
+        rendered.feature.identifier,
+        FeatureIdentifier::String("feature-1".into())
+    );
+
+    // Corners in either order describe the same box.
+    let inverted = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(4096.0, 4096.0),
+        ScreenPoint::new(-4096.0, -4096.0),
+    ));
+    assert_eq!(
+        session
+            .query_rendered_features(&inverted, Some(&options))
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
+    // a viewport edge.
+    let offscreen = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(512.0, 512.0),
+        ScreenPoint::new(1024.0, 1024.0),
+    ));
+    assert!(
+        session
+            .query_rendered_features(&offscreen, Some(&options))
+            .unwrap()
+            .is_empty()
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-106 and BND-107.
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -1726,6 +1919,13 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let cluster =
         wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
 
+    // Native matches cluster_id by exact JSON value type, so the copied feature
+    // must keep the unsigned alternative to resolve on the way back in.
+    assert!(matches!(
+        feature_member(&cluster.feature, "cluster_id"),
+        Some(&JsonValue::UInt(_))
+    ));
+
     let children = session
         .query_feature_extension(
             "cluster-source",
@@ -1739,6 +1939,16 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         panic!("expected children feature collection");
     };
     assert!(!children.is_empty());
+
+    // An unsigned limit bounds the collection, and an unsigned offset selects a
+    // later leaf. Native ignores arguments of another type and falls back to ten
+    // leaves at offset zero, so both bounds must move the observed result.
+    let first = single_cluster_leaf(&session, &cluster.feature, 0);
+    let second = single_cluster_leaf(&session, &cluster.feature, 1);
+    assert_ne!(
+        feature_member(&first, "name"),
+        feature_member(&second, "name")
+    );
 
     let expansion_zoom = session
         .query_feature_extension(
@@ -1898,7 +2108,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
 
 #[test]
 // Spec coverage: BND-164.
-fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_live() {
+fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -1908,9 +2118,7 @@ fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_liv
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    let error = session.render_update().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_STATE));
+    assert!(!session.render_update().unwrap());
 
     session.close().unwrap();
     map.close().unwrap();
@@ -2068,6 +2276,8 @@ fn backend_specific_attach_calls_report_native_statuses() {
     let opengl_error = map
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
+            32,
+            16,
             opengl_context,
             0,
             0x0de1,
@@ -2107,6 +2317,8 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     let error = map
         .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
             RenderTargetExtent::new(32, 16, 1.0),
+            32,
+            16,
             opengl_context.clone(),
             1,
             glow::TEXTURE_2D,
