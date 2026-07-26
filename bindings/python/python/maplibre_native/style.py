@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .geo import LatLngBounds
+from .errors import InvalidArgumentError
 from .json import JsonValue
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
@@ -70,6 +71,14 @@ class GeoJsonSourceOptions:
     cluster_min_points: int | None = None
     line_metrics: bool | None = None
     cluster: bool | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
+            value = getattr(self, name)
+            if value is not None and not 0 <= value <= 0xFFFF_FFFF:
+                raise InvalidArgumentError(
+                    None, f"{name} must be within [0, 4294967295]"
+                )
 
 
 class StyleSourceType(UnknownIntEnum):

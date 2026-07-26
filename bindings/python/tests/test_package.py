@@ -869,6 +869,19 @@ def test_style_url_rejects_embedded_nul_before_native_call() -> None:
     assert raised.value.diagnostic != stale
 
 
+@pytest.mark.parametrize(
+    "field",
+    ("tile_size", "buffer", "cluster_radius", "cluster_min_points"),
+)
+def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> None:
+    with pytest.raises(mln.InvalidArgumentError) as raised:
+        style.GeoJsonSourceOptions(**{field: -1})
+
+    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
+    assert raised.value.native_status_code is None
+    assert field in raised.value.diagnostic
+
+
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:

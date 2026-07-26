@@ -83,6 +83,27 @@ func (v JSONValue) Equal(other JSONValue) bool {
 	}
 }
 
+// Clone returns an independent deep copy of this JSON value.
+func (v JSONValue) Clone() JSONValue {
+	cloned := v
+	if v.Array != nil {
+		cloned.Array = make([]JSONValue, len(v.Array))
+		for index := range v.Array {
+			cloned.Array[index] = v.Array[index].Clone()
+		}
+	}
+	if v.Object != nil {
+		cloned.Object = make(JSONMembers, len(v.Object))
+		for index := range v.Object {
+			cloned.Object[index] = JSONMember{
+				Name:  v.Object[index].Name,
+				Value: v.Object[index].Value.Clone(),
+			}
+		}
+	}
+	return cloned
+}
+
 // JSONNull returns a null JSON value.
 func JSONNull() JSONValue {
 	return JSONValue{Type: JSONValueTypeNull}

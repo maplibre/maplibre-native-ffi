@@ -330,6 +330,26 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 	)
 }
 
+func TestStyleGeoJSONSourceOptionsBuildersDeepCopyRetainedFields(t *testing.T) {
+	original := StyleGeoJSONSourceOptions{}.
+		WithMinZoom(1).
+		WithClusterProperties(JSONObject(JSONMember{
+			Name:  "total",
+			Value: JSONArray(JSONString("+"), JSONInt(1)),
+		}))
+	updated := original.WithMaxZoom(2)
+
+	*updated.MinZoom = 9
+	updated.ClusterProperties.Object[0].Value.Array[1] = JSONInt(7)
+
+	if *original.MinZoom != 1 {
+		t.Fatalf("original MinZoom = %v, want 1", *original.MinZoom)
+	}
+	if got := original.ClusterProperties.Object[0].Value.Array[1]; !got.Equal(JSONInt(1)) {
+		t.Fatalf("original nested cluster property = %#v, want JSON int 1", got)
+	}
+}
+
 func TestStyleImageOptionsEqualComparesFieldValues(t *testing.T) {
 	assertValueSemantics(
 		t,

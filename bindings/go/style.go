@@ -199,8 +199,29 @@ func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) 
 		equalPointer(options.Cluster, other.Cluster)
 }
 
+// Clone returns an independent deep copy of this descriptor.
+func (options StyleGeoJSONSourceOptions) Clone() StyleGeoJSONSourceOptions {
+	cloned := options
+	cloned.MinZoom = clonePointer(options.MinZoom)
+	cloned.MaxZoom = clonePointer(options.MaxZoom)
+	cloned.Tolerance = clonePointer(options.Tolerance)
+	cloned.ClusterMaxZoom = clonePointer(options.ClusterMaxZoom)
+	if options.ClusterProperties != nil {
+		value := options.ClusterProperties.Clone()
+		cloned.ClusterProperties = &value
+	}
+	cloned.TileSize = clonePointer(options.TileSize)
+	cloned.Buffer = clonePointer(options.Buffer)
+	cloned.ClusterRadius = clonePointer(options.ClusterRadius)
+	cloned.ClusterMinPoints = clonePointer(options.ClusterMinPoints)
+	cloned.LineMetrics = clonePointer(options.LineMetrics)
+	cloned.Cluster = clonePointer(options.Cluster)
+	return cloned
+}
+
 // WithMinZoom returns a copy that sets the minimum tiling zoom.
 func (options StyleGeoJSONSourceOptions) WithMinZoom(minZoom float64) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.MinZoom = new(float64)
 	*options.MinZoom = minZoom
 	return options
@@ -208,6 +229,7 @@ func (options StyleGeoJSONSourceOptions) WithMinZoom(minZoom float64) StyleGeoJS
 
 // WithMaxZoom returns a copy that sets the maximum tiling zoom.
 func (options StyleGeoJSONSourceOptions) WithMaxZoom(maxZoom float64) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.MaxZoom = new(float64)
 	*options.MaxZoom = maxZoom
 	return options
@@ -215,6 +237,7 @@ func (options StyleGeoJSONSourceOptions) WithMaxZoom(maxZoom float64) StyleGeoJS
 
 // WithTolerance returns a copy that sets the Douglas-Peucker simplification tolerance.
 func (options StyleGeoJSONSourceOptions) WithTolerance(tolerance float64) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.Tolerance = new(float64)
 	*options.Tolerance = tolerance
 	return options
@@ -222,6 +245,7 @@ func (options StyleGeoJSONSourceOptions) WithTolerance(tolerance float64) StyleG
 
 // WithClusterMaxZoom returns a copy that sets the highest zoom that clusters points.
 func (options StyleGeoJSONSourceOptions) WithClusterMaxZoom(clusterMaxZoom float64) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.ClusterMaxZoom = new(float64)
 	*options.ClusterMaxZoom = clusterMaxZoom
 	return options
@@ -229,13 +253,15 @@ func (options StyleGeoJSONSourceOptions) WithClusterMaxZoom(clusterMaxZoom float
 
 // WithClusterProperties returns a copy that sets cluster aggregation expressions.
 func (options StyleGeoJSONSourceOptions) WithClusterProperties(clusterProperties JSONValue) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.ClusterProperties = new(JSONValue)
-	*options.ClusterProperties = clusterProperties
+	*options.ClusterProperties = clusterProperties.Clone()
 	return options
 }
 
 // WithTileSize returns a copy that sets the tile extent in pixels.
 func (options StyleGeoJSONSourceOptions) WithTileSize(tileSize uint32) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.TileSize = new(uint32)
 	*options.TileSize = tileSize
 	return options
@@ -243,6 +269,7 @@ func (options StyleGeoJSONSourceOptions) WithTileSize(tileSize uint32) StyleGeoJ
 
 // WithBuffer returns a copy that sets the tile buffer in pixels.
 func (options StyleGeoJSONSourceOptions) WithBuffer(buffer uint32) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.Buffer = new(uint32)
 	*options.Buffer = buffer
 	return options
@@ -250,6 +277,7 @@ func (options StyleGeoJSONSourceOptions) WithBuffer(buffer uint32) StyleGeoJSONS
 
 // WithClusterRadius returns a copy that sets the cluster radius in pixels.
 func (options StyleGeoJSONSourceOptions) WithClusterRadius(clusterRadius uint32) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.ClusterRadius = new(uint32)
 	*options.ClusterRadius = clusterRadius
 	return options
@@ -257,6 +285,7 @@ func (options StyleGeoJSONSourceOptions) WithClusterRadius(clusterRadius uint32)
 
 // WithClusterMinPoints returns a copy that sets the points required to form a cluster.
 func (options StyleGeoJSONSourceOptions) WithClusterMinPoints(clusterMinPoints uint32) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.ClusterMinPoints = new(uint32)
 	*options.ClusterMinPoints = clusterMinPoints
 	return options
@@ -264,6 +293,7 @@ func (options StyleGeoJSONSourceOptions) WithClusterMinPoints(clusterMinPoints u
 
 // WithLineMetrics returns a copy that sets whether line distance metrics are added.
 func (options StyleGeoJSONSourceOptions) WithLineMetrics(lineMetrics bool) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.LineMetrics = new(bool)
 	*options.LineMetrics = lineMetrics
 	return options
@@ -271,6 +301,7 @@ func (options StyleGeoJSONSourceOptions) WithLineMetrics(lineMetrics bool) Style
 
 // WithCluster returns a copy that sets whether point features cluster.
 func (options StyleGeoJSONSourceOptions) WithCluster(cluster bool) StyleGeoJSONSourceOptions {
+	options = options.Clone()
 	options.Cluster = new(bool)
 	*options.Cluster = cluster
 	return options
