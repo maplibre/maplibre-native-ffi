@@ -11,7 +11,7 @@ typedef struct MlnValaOpenGLTestContext {
   void* get_proc_address;
 } MlnValaOpenGLTestContext;
 
-#if defined(__linux__) || defined(__APPLE__)
+#if defined(MLN_VALA_TEST_EGL)
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
@@ -137,9 +137,8 @@ void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
   *context = (MlnValaOpenGLTestContext){0};
 }
 
-#elif defined(_WIN32)
+#elif defined(MLN_VALA_TEST_WGL)
 
-#include <GL/gl.h>
 #include <windows.h>
 
 bool mln_vala_opengl_test_context_supported(void) { return true; }

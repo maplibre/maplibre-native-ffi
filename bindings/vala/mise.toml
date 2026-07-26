@@ -83,6 +83,9 @@ done
 if [[ "$(uname -s)" == "Linux" ]]; then
   compiler_args+=(-X -lstdc++)
 fi
+if [[ "$usage_preset" == *-egl ]]; then
+  compiler_args+=(-X -DMLN_VALA_TEST_EGL=1)
+fi
 if [[ "$(uname -s)" == "Darwin" && "$usage_preset" == *-egl ]]; then
   compiler_args+=(
     -X "-I$native_install_dir/include"
@@ -92,7 +95,12 @@ if [[ "$(uname -s)" == "Darwin" && "$usage_preset" == *-egl ]]; then
     -X "-Wl,-rpath,$native_install_dir/lib"
   )
 elif [[ "$usage_preset" == windows-*-wgl ]]; then
-  compiler_args+=(-X -lopengl32 -X -lgdi32 -X -luser32)
+  compiler_args+=(
+    -X -DMLN_VALA_TEST_WGL=1
+    -X -lopengl32
+    -X -lgdi32
+    -X -luser32
+  )
 fi
 
 valac \
