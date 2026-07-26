@@ -540,9 +540,13 @@ MLN_API mln_status mln_runtime_create(
  * The provider must be set before any map is created from the runtime. It is
  * invoked for requests that reach the C API network file source. Built-in
  * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
- * native MainResourceLoader before this extension point. The callback and
- * user_data are stored by reference and must remain valid until the runtime is
- * destroyed.
+ * native MainResourceLoader before this extension point. Native
+ * OnlineFileSource claims every remaining scheme, so a URL with a scheme
+ * MapLibre does not recognize, such as jar:file:, is treated as a network
+ * request, reaches this callback, and completes as an HTTP error when the
+ * provider passes it through. Serving those schemes from host storage is what
+ * this extension point is for. The callback and user_data are stored by
+ * reference and must remain valid until the runtime is destroyed.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -690,6 +694,14 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  *
  * The runtime must no longer own live maps.
  *
+ * When a resource transform is registered, this call waits for in-flight
+ * transform callbacks before returning, the same way
+ * mln_runtime_set_resource_transform() and
+ * mln_runtime_clear_resource_transform() do. The callback contract documented
+ * on mln_resource_transform_callback keeps that wait short: the callback
+ * returns quickly and calls no C API function other than
+ * mln_resource_transform_response_set_url().
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
@@ -702,9 +714,18 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
 MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
- * Runs one pending owner-thread task for this runtime.
+ * Runs one iteration of this runtime's owner-thread run loop.
  *
- * If no task is pending, the call returns MLN_STATUS_OK without doing work.
+ * A single call drains the owner-thread task queues. It runs every task queued
+ * when the call begins plus every task those tasks enqueue, and it services
+ * expired timers and file descriptors that are ready for the runtime's own
+ * network and database work. The call returns as soon as that iteration
+ * finishes and never blocks waiting for new work, so an idle runtime returns
+ * promptly.
+ *
+ * The promise is drain, not slice. The duration of one call is bounded only by
+ * the work it finds and can span a full style parse, so treat it as work that
+ * runs to completion rather than as a fixed-cost per-frame slice.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -734,6 +755,10 @@ MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
  * destroyed. Copy those bytes before then when they must outlive that window.
  * For style-image-missing and tile-action events, out_event->message contains
  * the same ID string exposed by the typed payload.
+ *
+ * Destroying a map discards that map's queued events, so this function returns
+ * events only for maps that are still live. Read the state a host mirrors from
+ * events before destroying the map that produces them.
  *
  * Returns:
  * - MLN_STATUS_OK when the poll completed; out_has_event indicates whether an

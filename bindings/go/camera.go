@@ -10,12 +10,15 @@ type CameraOptions struct {
 	Center         *LatLng
 	CenterAltitude *float64
 	Padding        *EdgeInsets
-	Anchor         *ScreenPoint
-	Zoom           *float64
-	Bearing        *float64
-	Pitch          *float64
-	Roll           *float64
-	FieldOfView    *float64
+	// Anchor is input-only: JumpTo, EaseTo, and FlyTo honor it as the screen
+	// point the camera pivots around, and MapLibre leaves it nil on every read
+	// path, including Camera and the CameraFor* fit helpers.
+	Anchor      *ScreenPoint
+	Zoom        *float64
+	Bearing     *float64
+	Pitch       *float64
+	Roll        *float64
+	FieldOfView *float64
 }
 
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which

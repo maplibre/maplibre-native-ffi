@@ -54,7 +54,9 @@ mln_map_projection_destroy(mln_map_projection* projection) MLN_NOEXCEPT;
 /**
  * Copies the current camera snapshot from a standalone projection helper.
  *
- * On success, *out_camera is overwritten.
+ * On success, *out_camera is overwritten. MapLibre Native reports no anchor in
+ * a camera snapshot, so out_camera->fields leaves MLN_CAMERA_OPTION_ANCHOR
+ * clear; anchor is input-only, as documented on mln_camera_options.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
