@@ -15,6 +15,7 @@ const MaplibreStatus = Object.freeze({
 });
 
 const NATIVE_ERROR_PREFIX = "MaplibreNativeError:";
+let logCallbackGeneration = 0;
 
 class MaplibreError extends Error {
   constructor(status, nativeStatusCode, diagnostic, options) {
@@ -87,7 +88,7 @@ function supportedOpenGLContextProviders() {
 
 function renderTargetExtentPhysicalSize(extent) {
   return translateNativeErrors(() =>
-    native.renderTargetExtentPhysicalSize(extent),
+    native.renderTargetExtentPhysicalSize(normalizeRenderTargetExtent(extent)),
   );
 }
 
@@ -218,22 +219,34 @@ function setLogCallback(callback) {
   if (typeof callback !== "function") {
     throw new InvalidArgumentError(null, "log callback must be a function");
   }
-  return translateNativeErrors(() =>
-    native.nativeSetLogCallback((error, record) => {
-      if (error) {
-        return;
-      }
-      try {
-        containCallbackResult(callback(record));
-      } catch {
-        // User logging callbacks must not escape binding-managed callbacks.
-      }
-    }),
-  );
+  const previousGeneration = logCallbackGeneration;
+  const generation = previousGeneration + 1;
+  logCallbackGeneration = generation;
+  try {
+    return translateNativeErrors(() =>
+      native.nativeSetLogCallback((error, record) => {
+        if (error || generation !== logCallbackGeneration) {
+          return;
+        }
+        try {
+          containCallbackResult(callback(record));
+        } catch {
+          // User logging callbacks must not escape binding-managed callbacks.
+        }
+      }),
+    );
+  } catch (error) {
+    if (logCallbackGeneration === generation) {
+      logCallbackGeneration = previousGeneration;
+    }
+    throw error;
+  }
 }
 
 function clearLogCallback() {
-  return translateNativeErrors(() => native.nativeClearLogCallback());
+  const result = translateNativeErrors(() => native.nativeClearLogCallback());
+  logCallbackGeneration += 1;
+  return result;
 }
 
 function setAsyncLogSeverities(severities) {
@@ -813,6 +826,55 @@ function validateByteLength(byteLength) {
   return byteLength;
 }
 
+function unsigned32(value, fieldName) {
+  if (!Number.isSafeInteger(value) || value < 0 || value > 0xffff_ffff) {
+    throw new InvalidArgumentError(
+      null,
+      `${fieldName} must be an unsigned 32-bit integer`,
+    );
+  }
+  return value;
+}
+
+function optionalUnsigned32(value, fieldName) {
+  return value == null ? value : unsigned32(value, fieldName);
+}
+
+function normalizeRenderTargetExtent(extent) {
+  return {
+    ...extent,
+    width: unsigned32(extent?.width, "extent.width"),
+    height: unsigned32(extent?.height, "extent.height"),
+  };
+}
+
+function normalizeCanonicalTileId(tileId) {
+  return {
+    z: unsigned32(tileId?.z, "tileId.z"),
+    x: unsigned32(tileId?.x, "tileId.x"),
+    y: unsigned32(tileId?.y, "tileId.y"),
+  };
+}
+
+function normalizeTileSourceOptions(options) {
+  if (options == null) {
+    return null;
+  }
+  return {
+    ...options,
+    tileSize: optionalUnsigned32(options.tileSize, "options.tileSize"),
+  };
+}
+
+function normalizeImageInput(image) {
+  return {
+    ...image,
+    width: unsigned32(image?.width, "image.width"),
+    height: unsigned32(image?.height, "image.height"),
+    stride: optionalUnsigned32(image?.stride, "image.stride"),
+  };
+}
+
 function mutableUint8Array(data, fieldName) {
   if (data instanceof NativeBuffer) {
     return data.asUint8Array();
@@ -842,6 +904,7 @@ const resourceRequestFinalizer =
       })
     : null;
 const runtimeResourceRequests = new WeakMap();
+const runtimeResourceProviderRegistrations = new WeakMap();
 
 function registerRuntimeResourceRequest(runtime, registration) {
   let requests = runtimeResourceRequests.get(runtime);
@@ -854,6 +917,49 @@ function registerRuntimeResourceRequest(runtime, registration) {
 
 function unregisterRuntimeResourceRequest(runtime, registration) {
   runtimeResourceRequests.get(runtime)?.delete(registration);
+}
+
+function closeQueuedResourceRequest(request) {
+  if (typeof request?.completionToken !== "string") {
+    return;
+  }
+  try {
+    translateNativeErrors(() =>
+      native.nativeResourceRequestClose(request.completionToken),
+    );
+  } catch {
+    // Replacement or runtime teardown may already have removed the request.
+  }
+}
+
+function resourceProviderBridge(runtime, registration, callback) {
+  return (error, request) => {
+    const owner = runtime.deref();
+    if (error || !registration.active || owner == null || owner.closed) {
+      closeQueuedResourceRequest(request);
+      return;
+    }
+    const handle = new ResourceRequestHandle(
+      CONSTRUCTION_TOKEN,
+      request.completionToken,
+      owner,
+    );
+    const wrapped = {
+      ...request,
+      handle,
+    };
+    delete wrapped.completionToken;
+    try {
+      const result = callback(wrapped);
+      if (result && typeof result.then === "function") {
+        Promise.resolve(result).catch((error) => {
+          completeResourceRequestWithProviderError(handle, error);
+        });
+      }
+    } catch (error) {
+      completeResourceRequestWithProviderError(handle, error);
+    }
+  };
 }
 
 function resourceProviderErrorResponse(error) {
@@ -1209,6 +1315,11 @@ class RuntimeHandle {
       throw collectedCleanupError;
     }
     const result = translateNativeErrors(() => nativeOf(this).close());
+    const providerRegistration = runtimeResourceProviderRegistrations.get(this);
+    if (providerRegistration != null) {
+      providerRegistration.active = false;
+      runtimeResourceProviderRegistrations.delete(this);
+    }
     this.#mapsByAddress.clear();
     const resourceRequests = runtimeResourceRequests.get(this);
     for (const registration of resourceRequests ?? []) {
@@ -1253,36 +1364,26 @@ class RuntimeHandle {
         "resource provider callback must be a function",
       );
     }
-    return translateNativeErrors(() =>
-      liveNativeOf(this).setResourceProviderRoutes(
-        resourceMatcherInputs(routes),
-        (error, request) => {
-          if (error) {
-            throw error;
-          }
-          const handle = new ResourceRequestHandle(
-            CONSTRUCTION_TOKEN,
-            request.completionToken,
-            this,
-          );
-          const wrapped = {
-            ...request,
-            handle,
-          };
-          delete wrapped.completionToken;
-          try {
-            const result = callback(wrapped);
-            if (result && typeof result.then === "function") {
-              Promise.resolve(result).catch((error) => {
-                completeResourceRequestWithProviderError(handle, error);
-              });
-            }
-          } catch (error) {
-            completeResourceRequestWithProviderError(handle, error);
-          }
-        },
-      ),
-    );
+    const previousRegistration = runtimeResourceProviderRegistrations.get(this);
+    const registration = { active: true };
+    const runtime = new WeakRef(this);
+    try {
+      const result = translateNativeErrors(() =>
+        liveNativeOf(this).setResourceProviderRoutes(
+          resourceMatcherInputs(routes),
+          resourceProviderBridge(runtime, registration, callback),
+        ),
+      );
+      if (previousRegistration != null) {
+        previousRegistration.active = false;
+      }
+      registration.active = true;
+      runtimeResourceProviderRegistrations.set(this, registration);
+      return result;
+    } catch (error) {
+      registration.active = false;
+      throw error;
+    }
   }
 
   clearResourceTransform() {
@@ -1476,13 +1577,14 @@ class RuntimeHandle {
     if (event == null) {
       return null;
     }
-    if (event?.eventType === "map-style-loaded" && event.sourceType === "map") {
-      this.#mapsByAddress.get(event.sourceAddress)?._finishStyleReplacement();
-    }
-    event.sourceMap =
+    const sourceMap =
       event.sourceType === "map"
-        ? (this.#mapsByAddress.get(event.sourceAddress) ?? null)
+        ? this.#mapForAddress(event.sourceAddress)
         : null;
+    if (event?.eventType === "map-style-loaded") {
+      sourceMap?._finishStyleReplacement();
+    }
+    event.sourceMap = sourceMap;
     delete event.sourceAddress;
     const completed = event.payload?.offlineOperationCompleted;
     if (typeof completed?.operationId === "bigint") {
@@ -1499,7 +1601,7 @@ class RuntimeHandle {
     assertHandleEnvironment(this);
     const nativeAddress = MAP_NATIVE_ADDRESSES.get(map);
     if (nativeAddress != null) {
-      this.#mapsByAddress.set(nativeAddress, map);
+      this.#mapsByAddress.set(nativeAddress, new WeakRef(map));
     }
   }
 
@@ -1509,6 +1611,14 @@ class RuntimeHandle {
     if (nativeAddress != null) {
       this.#mapsByAddress.delete(nativeAddress);
     }
+  }
+
+  #mapForAddress(nativeAddress) {
+    const map = this.#mapsByAddress.get(nativeAddress)?.deref() ?? null;
+    if (map == null) {
+      this.#mapsByAddress.delete(nativeAddress);
+    }
+    return map;
   }
 
   _registerOfflineOperation(registration) {
@@ -1628,7 +1738,10 @@ function normalizeVulkanContext(context) {
       context?.graphicsQueue,
       "graphicsQueue",
     ),
-    graphicsQueueFamilyIndex: context?.graphicsQueueFamilyIndex,
+    graphicsQueueFamilyIndex: unsigned32(
+      context?.graphicsQueueFamilyIndex,
+      "graphicsQueueFamilyIndex",
+    ),
     getInstanceProcAddrAddress: nullableNativePointerAddress(
       context?.getInstanceProcAddr,
       "getInstanceProcAddr",
@@ -1688,23 +1801,23 @@ function normalizeOpenGLContext(context) {
 
 function normalizeMetalOwnedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeMetalContext(descriptor?.context),
   };
 }
 
 function normalizeMetalBorrowedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
-    physicalWidth: descriptor?.physicalWidth,
-    physicalHeight: descriptor?.physicalHeight,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
+    physicalWidth: unsigned32(descriptor?.physicalWidth, "physicalWidth"),
+    physicalHeight: unsigned32(descriptor?.physicalHeight, "physicalHeight"),
     textureAddress: nativePointerAddress(descriptor?.texture, "texture"),
   };
 }
 
 function normalizeMetalSurfaceDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeMetalContext(descriptor?.context),
     layerAddress: nativePointerAddress(descriptor?.layer, "layer"),
   };
@@ -1712,28 +1825,28 @@ function normalizeMetalSurfaceDescriptor(descriptor) {
 
 function normalizeVulkanOwnedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeVulkanContext(descriptor?.context),
   };
 }
 
 function normalizeVulkanBorrowedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
-    physicalWidth: descriptor?.physicalWidth,
-    physicalHeight: descriptor?.physicalHeight,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
+    physicalWidth: unsigned32(descriptor?.physicalWidth, "physicalWidth"),
+    physicalHeight: unsigned32(descriptor?.physicalHeight, "physicalHeight"),
     context: normalizeVulkanContext(descriptor?.context),
     imageAddress: nativePointerAddress(descriptor?.image, "image"),
     imageViewAddress: nativePointerAddress(descriptor?.imageView, "imageView"),
-    format: descriptor?.format,
-    initialLayout: descriptor?.initialLayout,
-    finalLayout: descriptor?.finalLayout,
+    format: unsigned32(descriptor?.format, "format"),
+    initialLayout: unsigned32(descriptor?.initialLayout, "initialLayout"),
+    finalLayout: unsigned32(descriptor?.finalLayout, "finalLayout"),
   };
 }
 
 function normalizeVulkanSurfaceDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeVulkanContext(descriptor?.context),
     surfaceAddress: nativePointerAddress(descriptor?.surface, "surface"),
   };
@@ -1741,25 +1854,25 @@ function normalizeVulkanSurfaceDescriptor(descriptor) {
 
 function normalizeOpenGLOwnedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeOpenGLContext(descriptor?.context),
   };
 }
 
 function normalizeOpenGLBorrowedTextureDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
-    physicalWidth: descriptor?.physicalWidth,
-    physicalHeight: descriptor?.physicalHeight,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
+    physicalWidth: unsigned32(descriptor?.physicalWidth, "physicalWidth"),
+    physicalHeight: unsigned32(descriptor?.physicalHeight, "physicalHeight"),
     context: normalizeOpenGLContext(descriptor?.context),
-    texture: descriptor?.texture,
-    target: descriptor?.target,
+    texture: unsigned32(descriptor?.texture, "texture"),
+    target: unsigned32(descriptor?.target, "target"),
   };
 }
 
 function normalizeOpenGLSurfaceDescriptor(descriptor) {
   return {
-    extent: descriptor?.extent,
+    extent: normalizeRenderTargetExtent(descriptor?.extent),
     context: normalizeOpenGLContext(descriptor?.context),
     surfaceAddress: nativePointerAddress(descriptor?.surface, "surface"),
   };
@@ -1793,7 +1906,11 @@ class RenderSessionHandle {
 
   resize(width, height, scaleFactor) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).resize(width, height, scaleFactor),
+      liveNativeOf(this).resize(
+        unsigned32(width, "width"),
+        unsigned32(height, "height"),
+        scaleFactor,
+      ),
     );
   }
 
@@ -1956,10 +2073,15 @@ class MapHandle {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
     this.#runtime = runtime;
+    const nativeOptions = {
+      ...options,
+      width: optionalUnsigned32(options?.width, "options.width"),
+      height: optionalUnsigned32(options?.height, "options.height"),
+    };
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
-        native.createNativeMapHandle(liveNativeOf(runtime), options ?? {}),
+        native.createNativeMapHandle(liveNativeOf(runtime), nativeOptions),
       ),
     );
     MAP_NATIVE_ADDRESSES.set(this, nativeOf(this).nativeAddress);
@@ -2156,8 +2278,23 @@ class MapHandle {
   }
 
   setViewportOptions(options) {
+    const nativeOptions = {
+      ...options,
+      northOrientationRaw: optionalUnsigned32(
+        options?.northOrientationRaw,
+        "options.northOrientationRaw",
+      ),
+      constrainModeRaw: optionalUnsigned32(
+        options?.constrainModeRaw,
+        "options.constrainModeRaw",
+      ),
+      viewportModeRaw: optionalUnsigned32(
+        options?.viewportModeRaw,
+        "options.viewportModeRaw",
+      ),
+    };
     return translateNativeErrors(() =>
-      liveNativeOf(this).setViewportOptions(options),
+      liveNativeOf(this).setViewportOptions(nativeOptions),
     );
   }
 
@@ -2166,8 +2303,16 @@ class MapHandle {
   }
 
   setTileOptions(options) {
+    const nativeOptions = {
+      ...options,
+      prefetchZoomDelta: optionalUnsigned32(
+        options?.prefetchZoomDelta,
+        "options.prefetchZoomDelta",
+      ),
+      lodModeRaw: optionalUnsigned32(options?.lodModeRaw, "options.lodModeRaw"),
+    };
     return translateNativeErrors(() =>
-      liveNativeOf(this).setTileOptions(options),
+      liveNativeOf(this).setTileOptions(nativeOptions),
     );
   }
 
@@ -2354,19 +2499,31 @@ class MapHandle {
 
   addVectorSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addVectorSourceUrl(sourceId, url, options ?? null),
+      liveNativeOf(this).addVectorSourceUrl(
+        sourceId,
+        url,
+        normalizeTileSourceOptions(options),
+      ),
     );
   }
 
   addRasterSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterSourceUrl(sourceId, url, options ?? null),
+      liveNativeOf(this).addRasterSourceUrl(
+        sourceId,
+        url,
+        normalizeTileSourceOptions(options),
+      ),
     );
   }
 
   addRasterDemSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterDemSourceUrl(sourceId, url, options ?? null),
+      liveNativeOf(this).addRasterDemSourceUrl(
+        sourceId,
+        url,
+        normalizeTileSourceOptions(options),
+      ),
     );
   }
 
@@ -2381,7 +2538,7 @@ class MapHandle {
       liveNativeOf(this).addVectorSourceTiles(
         sourceId,
         Array.from(tiles),
-        options ?? null,
+        normalizeTileSourceOptions(options),
       ),
     );
   }
@@ -2397,7 +2554,7 @@ class MapHandle {
       liveNativeOf(this).addRasterSourceTiles(
         sourceId,
         Array.from(tiles),
-        options ?? null,
+        normalizeTileSourceOptions(options),
       ),
     );
   }
@@ -2413,7 +2570,7 @@ class MapHandle {
       liveNativeOf(this).addRasterDemSourceTiles(
         sourceId,
         Array.from(tiles),
-        options ?? null,
+        normalizeTileSourceOptions(options),
       ),
     );
   }
@@ -2437,7 +2594,14 @@ class MapHandle {
       const result = translateNativeErrors(() =>
         liveNativeOf(this).addCustomGeometrySource(
           sourceId,
-          nativeOptions,
+          {
+            ...nativeOptions,
+            tileSize: optionalUnsigned32(
+              nativeOptions.tileSize,
+              "options.tileSize",
+            ),
+            buffer: optionalUnsigned32(nativeOptions.buffer, "options.buffer"),
+          },
           customGeometryCallback(fetchTile, registration),
           customGeometryCallback(cancelTile, registration),
         ),
@@ -2476,7 +2640,7 @@ class MapHandle {
     return translateNativeErrors(() =>
       liveNativeOf(this).setCustomGeometrySourceTileData(
         sourceId,
-        tileId,
+        normalizeCanonicalTileId(tileId),
         stringifyJson(data),
       ),
     );
@@ -2484,7 +2648,10 @@ class MapHandle {
 
   invalidateCustomGeometrySourceTile(sourceId, tileId) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).invalidateCustomGeometrySourceTile(sourceId, tileId),
+      liveNativeOf(this).invalidateCustomGeometrySourceTile(
+        sourceId,
+        normalizeCanonicalTileId(tileId),
+      ),
     );
   }
 
@@ -2496,7 +2663,7 @@ class MapHandle {
 
   setStyleImage(imageId, image) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).setStyleImage(imageId, image),
+      liveNativeOf(this).setStyleImage(imageId, normalizeImageInput(image)),
     );
   }
 
@@ -2532,7 +2699,11 @@ class MapHandle {
 
   addImageSourceImage(sourceId, coordinates, image) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addImageSourceImage(sourceId, coordinates, image),
+      liveNativeOf(this).addImageSourceImage(
+        sourceId,
+        coordinates,
+        normalizeImageInput(image),
+      ),
     );
   }
 
@@ -2544,7 +2715,10 @@ class MapHandle {
 
   setImageSourceImage(sourceId, image) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).setImageSourceImage(sourceId, image),
+      liveNativeOf(this).setImageSourceImage(
+        sourceId,
+        normalizeImageInput(image),
+      ),
     );
   }
 

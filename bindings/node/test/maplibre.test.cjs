@@ -178,9 +178,41 @@ test("log callback copies records through the Node event loop", async () => {
     assert.equal(typeof records[0].message, "string");
     assert.equal(typeof records[0].rawSeverity, "number");
     assert.equal(typeof records[0].rawEvent, "number");
+    assert.equal(typeof records[0].code, "bigint");
   } finally {
     map.close();
     runtime.close();
+    clearLogCallback();
+  }
+});
+
+test("cleared and replaced log callbacks discard queued records", () => {
+  const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
+  const originalClearLogCallback = nativeAddon.nativeClearLogCallback;
+  /** @type {Function[]} */
+  const bridges = [];
+  nativeAddon.nativeSetLogCallback = (callback) => bridges.push(callback);
+  nativeAddon.nativeClearLogCallback = () => {};
+  let firstRecords = 0;
+  let secondRecords = 0;
+
+  try {
+    setLogCallback(() => {
+      firstRecords += 1;
+    });
+    setLogCallback(() => {
+      secondRecords += 1;
+    });
+    bridges[0](null, { code: 1n });
+    bridges[1](null, { code: 2n });
+    assert.equal(firstRecords, 0);
+    assert.equal(secondRecords, 1);
+    clearLogCallback();
+    bridges[1](null, { code: 3n });
+    assert.equal(secondRecords, 1);
+  } finally {
+    nativeAddon.nativeSetLogCallback = originalSetLogCallback;
+    nativeAddon.nativeClearLogCallback = originalClearLogCallback;
     clearLogCallback();
   }
 });
@@ -524,6 +556,78 @@ test("finalizers release abandoned request and texture scopes", () => {
       assert.equal(discardAttempts, 2);
       runtime.close();
       assert.equal(discardAttempts, 3);
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+  const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("runtime event lookup does not retain abandoned map wrappers", () => {
+  const packageRoot = path.join(__dirname, "..");
+  const script = `
+    process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
+    const assert = require("node:assert/strict");
+    const binding = require(${JSON.stringify(packageRoot)});
+
+    async function main() {
+      binding.takeNativeLeakReports();
+      const runtime = new binding.RuntimeHandle();
+      let map = runtime.createMap({ width: 16, height: 16 });
+      map = undefined;
+      let reports = [];
+      for (let attempt = 0; attempt < 100 && reports.length === 0; attempt += 1) {
+        global.gc();
+        await new Promise((resolve) => setImmediate(resolve));
+        reports = binding.takeNativeLeakReports().filter(
+          (report) => report.handleType === "MapHandle"
+        );
+      }
+      assert.equal(reports.length, 1);
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+  const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("provider callbacks do not retain abandoned runtime wrappers", () => {
+  const packageRoot = path.join(__dirname, "..");
+  const script = `
+    process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
+    const assert = require("node:assert/strict");
+    const binding = require(${JSON.stringify(packageRoot)});
+
+    async function main() {
+      binding.takeNativeLeakReports();
+      let runtime = new binding.RuntimeHandle();
+      runtime.setResourceProviderRoutes([], () => {});
+      runtime = undefined;
+      let reports = [];
+      for (let attempt = 0; attempt < 100 && reports.length === 0; attempt += 1) {
+        global.gc();
+        await new Promise((resolve) => setImmediate(resolve));
+        reports = binding.takeNativeLeakReports().filter(
+          (report) => report.handleType === "RuntimeHandle"
+        );
+      }
+      assert.equal(reports.length, 1);
     }
 
     main().catch((error) => {
@@ -1440,6 +1544,63 @@ test("resource provider routes validate Node handoff shape", async () => {
   } finally {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;
+  }
+});
+
+test("replaced and closed providers discard queued requests", () => {
+  const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  const originalCloseRequest = nativeAddon.nativeResourceRequestClose;
+  /** @type {Function[]} */
+  const bridges = [];
+  /** @type {string[]} */
+  const closedTokens = [];
+  nativeAddon.nativeResourceRequestClose = (token) => {
+    closedTokens.push(token);
+  };
+  nativeAddon.createNativeRuntimeHandle =
+    /** @type {any} */ (
+      () => ({
+        closed: false,
+        close() {
+          this.closed = true;
+        },
+        /** @param {unknown[]} _routes @param {Function} callback */
+        setResourceProviderRoutes(_routes, callback) {
+          bridges.push(callback);
+        },
+      })
+    );
+
+  try {
+    const runtime = new RuntimeHandle();
+    let deliveries = 0;
+    runtime.setResourceProviderRoutes([], () => {
+      deliveries += 1;
+    });
+    runtime.setResourceProviderRoutes([], () => {
+      deliveries += 1;
+    });
+    assert.doesNotThrow(() =>
+      bridges[1](
+        new Error("queued provider delivery failed"),
+        fakeResourceProviderRequest("failed-delivery", "error://"),
+      ),
+    );
+    assert.deepEqual(closedTokens, ["failed-delivery"]);
+    bridges[0](null, fakeResourceProviderRequest("old-provider", "old://"));
+    assert.equal(deliveries, 0);
+    assert.deepEqual(closedTokens, ["failed-delivery", "old-provider"]);
+    runtime.close();
+    bridges[1](null, fakeResourceProviderRequest("closed-runtime", "new://"));
+    assert.equal(deliveries, 0);
+    assert.deepEqual(closedTokens, [
+      "failed-delivery",
+      "old-provider",
+      "closed-runtime",
+    ]);
+  } finally {
+    nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
+    nativeAddon.nativeResourceRequestClose = originalCloseRequest;
   }
 });
 
@@ -2424,6 +2585,93 @@ test("runtime options reject invalid bigint values", () => {
       return true;
     },
   );
+});
+
+test("integer descriptors reject fractional values before native coercion", () => {
+  assert.throws(
+    () =>
+      renderTargetExtentPhysicalSize({
+        width: 1.5,
+        height: 1,
+        scaleFactor: 1,
+      }),
+    InvalidArgumentError,
+  );
+  const runtime = new RuntimeHandle();
+  assert.throws(
+    () => runtime.createMap({ width: 16.5, height: 16 }),
+    InvalidArgumentError,
+  );
+  const map = runtime.createMap({ width: 16, height: 16 });
+
+  try {
+    map.setStyleJson(EMPTY_STYLE_JSON);
+    assert.throws(
+      () =>
+        map.setCustomGeometrySourceTileData(
+          "custom",
+          { z: 0, x: 1.5, y: 0 },
+          { type: "FeatureCollection", features: [] },
+        ),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        map.invalidateCustomGeometrySourceTile("custom", {
+          z: 0,
+          x: 0,
+          y: -1,
+        }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        map.addVectorSourceTiles(
+          "fractional-tile-size",
+          ["https://example.test/{z}/{x}/{y}"],
+          { tileSize: 511.5 },
+        ),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        map.addCustomGeometrySource("fractional-buffer", {
+          fetchTile() {},
+          buffer: 1.5,
+        }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        map.setStyleImage("fractional-image", {
+          width: 1.5,
+          height: 1,
+          pixels: new Uint8Array(4),
+        }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => map.setTileOptions({ prefetchZoomDelta: 1.5 }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => map.setViewportOptions({ viewportModeRaw: 1.5 }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        RenderSessionHandle.prototype.resize.call(
+          { native: { closed: false, resize() {} } },
+          1.5,
+          1,
+          1,
+        ),
+      InvalidArgumentError,
+    );
+  } finally {
+    map.close();
+    runtime.close();
+  }
 });
 
 /** @template T @param {() => T | false | null | undefined} predicate */

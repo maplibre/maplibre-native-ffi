@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
-use napi::bindgen_prelude::{BigInt, Either, Result, Uint8Array};
+use napi::bindgen_prelude::{BigInt, Either, Env, Result, Uint8Array};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -367,14 +367,17 @@ impl NativeRuntimeHandle {
     #[napi(js_name = "setResourceProviderRoutes")]
     pub fn set_resource_provider_routes(
         &self,
+        env: Env,
         routes: Vec<ResourceRouteInput>,
-        callback: ThreadsafeFunction<ResourceProviderRequest>,
+        mut callback: ThreadsafeFunction<ResourceProviderRequest>,
     ) -> Result<()> {
         if self.has_created_map.load(Ordering::Acquire) {
             return Err(error::invalid_state(
                 "resource provider routes must be configured before creating maps from the runtime",
             ));
         }
+        #[allow(deprecated)]
+        callback.unref(&env)?;
         let provider = Arc::new(ResourceProviderState {
             routes: routes
                 .into_iter()

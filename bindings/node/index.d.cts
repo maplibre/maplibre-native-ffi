@@ -1279,7 +1279,7 @@ export interface LogRecord {
   rawSeverity: number;
   event: string;
   rawEvent: number;
-  code: number;
+  code: bigint;
   message: string;
 }
 

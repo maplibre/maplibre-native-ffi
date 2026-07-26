@@ -37,7 +37,7 @@ pub struct LogRecord {
     pub raw_severity: u32,
     pub event: String,
     pub raw_event: u32,
-    pub code: i64,
+    pub code: BigInt,
     pub message: String,
 }
 
@@ -246,7 +246,7 @@ extern "C" fn log_trampoline(
                 raw_severity: severity,
                 event: log_event_name(event).to_owned(),
                 raw_event: event,
-                code,
+                code: BigInt::from(code),
                 message: copy_log_message(message),
             }),
             ThreadsafeFunctionCallMode::NonBlocking,
