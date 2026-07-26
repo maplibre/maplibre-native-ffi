@@ -273,109 +273,48 @@ namespace MaplibreNative {
     }
 
     public class OfflineRegionInfo {
+        private uint8[] metadata_storage;
+
         public OfflineRegionId id { get; private set; }
         public OfflineRegionDefinition definition { get; private set; }
-        public uint8[] metadata { get; private set; }
+        public uint8[] metadata {
+            owned get {
+                return copy_byte_array (metadata_storage);
+            }
+        }
 
         internal OfflineRegionInfo.from_native (Raw.OfflineRegionInfo native) throws Error {
             id = OfflineRegionId (native.id);
             definition = OfflineRegionDefinition.from_native (native.definition);
-            metadata = copy_bytes (native.metadata, native.metadata_size) ?? new uint8[0];
+            metadata_storage = copy_bytes (native.metadata, native.metadata_size) ?? new uint8[0];
         }
     }
 
-    public class OfflineRegionSnapshotHandle {
-        private Raw.OfflineRegionSnapshot? native;
-
-        public bool closed { get { return native == null; } }
-
-        internal OfflineRegionSnapshotHandle (owned Raw.OfflineRegionSnapshot native) {
-            this.native = (owned) native;
-        }
-
-        ~OfflineRegionSnapshotHandle () {
-            if (native != null) {
-                warning ("OfflineRegionSnapshotHandle finalized while live; call close()");
-                Raw.offline_region_snapshot_destroy (native);
-                native = null;
-            }
-        }
-
-        internal unowned Raw.OfflineRegionSnapshot require_live () throws Error {
-            if (native == null) {
-                throw new Error.INVALID_STATE ("offline region snapshot handle is closed");
-            }
-            return native;
-        }
-
-        public OfflineRegionInfo get () throws Error {
+    internal OfflineRegionInfo copy_offline_region_snapshot (owned Raw.OfflineRegionSnapshot native) throws Error {
+        try {
             Raw.OfflineRegionInfo info = {};
             info.size = (uint32) sizeof (Raw.OfflineRegionInfo);
-            check_status (Raw.offline_region_snapshot_get (require_live (), &info));
+            check_status (Raw.offline_region_snapshot_get (native, &info));
             return new OfflineRegionInfo.from_native (info);
-        }
-
-        public void close () {
-            if (native == null) {
-                return;
-            }
+        } finally {
             Raw.offline_region_snapshot_destroy (native);
-            native = null;
         }
     }
 
-    public class OfflineRegionListHandle {
-        private Raw.OfflineRegionList? native;
-
-        public bool closed { get { return native == null; } }
-
-        internal OfflineRegionListHandle (owned Raw.OfflineRegionList native) {
-            this.native = (owned) native;
-        }
-
-        ~OfflineRegionListHandle () {
-            if (native != null) {
-                warning ("OfflineRegionListHandle finalized while live; call close()");
-                Raw.offline_region_list_destroy (native);
-                native = null;
-            }
-        }
-
-        internal unowned Raw.OfflineRegionList require_live () throws Error {
-            if (native == null) {
-                throw new Error.INVALID_STATE ("offline region list handle is closed");
-            }
-            return native;
-        }
-
-        public size_t count () throws Error {
-            size_t value;
-            check_status (Raw.offline_region_list_count (require_live (), out value));
-            return value;
-        }
-
-        public OfflineRegionInfo get (size_t index) throws Error {
-            Raw.OfflineRegionInfo info = {};
-            info.size = (uint32) sizeof (Raw.OfflineRegionInfo);
-            check_status (Raw.offline_region_list_get (require_live (), index, &info));
-            return new OfflineRegionInfo.from_native (info);
-        }
-
-        public OfflineRegionInfo[] to_array () throws Error {
-            var item_count = count ();
+    internal OfflineRegionInfo[] copy_offline_region_list (owned Raw.OfflineRegionList native) throws Error {
+        try {
+            size_t item_count;
+            check_status (Raw.offline_region_list_count (native, out item_count));
             OfflineRegionInfo[] values = new OfflineRegionInfo[item_count];
             for (size_t index = 0; index < item_count; index++) {
-                values[index] = get (index);
+                Raw.OfflineRegionInfo info = {};
+                info.size = (uint32) sizeof (Raw.OfflineRegionInfo);
+                check_status (Raw.offline_region_list_get (native, index, &info));
+                values[index] = new OfflineRegionInfo.from_native (info);
             }
             return values;
-        }
-
-        public void close () {
-            if (native == null) {
-                return;
-            }
+        } finally {
             Raw.offline_region_list_destroy (native);
-            native = null;
         }
     }
 
@@ -532,6 +471,8 @@ namespace MaplibreNative {
     public delegate ResourceProviderDecision ResourceProviderCallback (ResourceRequest request, ResourceRequestHandle handle);
 
     public class ResourceRequest {
+        private uint8[]? prior_data_storage;
+
         public string url { get; private set; }
         public ResourceKind kind { get; private set; }
         public ResourceLoadingMethod loading_method { get; private set; }
@@ -544,7 +485,11 @@ namespace MaplibreNative {
         public int64? prior_modified_unix_ms { get; private set; }
         public int64? prior_expires_unix_ms { get; private set; }
         public string? prior_etag { get; private set; }
-        public uint8[]? prior_data { get; private set; }
+        public uint8[]? prior_data {
+            owned get {
+                return prior_data_storage == null ? null : copy_byte_array (prior_data_storage);
+            }
+        }
 
         internal ResourceRequest.from_native (Raw.ResourceRequest* native) {
             url = copy_c_string (native->url);
@@ -567,7 +512,7 @@ namespace MaplibreNative {
                 prior_expires_unix_ms = null;
             }
             prior_etag = native->prior_etag != null ? copy_c_string (native->prior_etag) : null;
-            prior_data = copy_bytes (native->prior_data, native->prior_data_size);
+            prior_data_storage = copy_bytes (native->prior_data, native->prior_data_size);
         }
     }
 
@@ -729,7 +674,7 @@ namespace MaplibreNative {
                 native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
             } else {
                 native = null;
-                native_decision = (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
+                native_decision = resource_provider_decision_to_raw (decision);
             }
             mutex.unlock ();
 
@@ -739,6 +684,10 @@ namespace MaplibreNative {
             return native_decision;
         }
 
+    }
+
+    internal uint32 resource_provider_decision_to_raw (ResourceProviderDecision decision) {
+        return (uint32) decision;
     }
 
     public class RuntimeOptions {
@@ -774,12 +723,18 @@ namespace MaplibreNative {
     }
 
     public class RuntimeEvent {
+        private uint8[] payload_storage;
+
         public RuntimeEventType event_type { get; private set; }
         public RuntimeEventSourceType source_type { get; private set; }
         public int32 code { get; private set; }
         public RuntimeEventPayloadType payload_type { get; private set; }
         public string message { get; private set; }
-        public uint8[] payload_bytes { get; private set; }
+        public uint8[] payload_bytes {
+            owned get {
+                return copy_byte_array (payload_storage);
+            }
+        }
         public MapHandle? source_map { get; private set; }
         public RuntimeEventRenderFrame? render_frame { get; private set; }
         public RuntimeEventRenderMap? render_map { get; private set; }
@@ -799,7 +754,7 @@ namespace MaplibreNative {
             code = native.code;
             payload_type = runtime_event_payload_type_from_raw (native.payload_type);
             message = copy_c_string_bytes (native.message, native.message_size);
-            payload_bytes = copy_bytes ((uint8*) native.payload, native.payload_size) ?? new uint8[0];
+            payload_storage = copy_bytes ((uint8*) native.payload, native.payload_size) ?? new uint8[0];
             if (native.payload == null) {
                 return;
             }
@@ -1584,7 +1539,7 @@ namespace MaplibreNative {
             return register_offline_operation (operation_id, OfflineOperationKind.REGION_DELETE, OfflineOperationResultKind.NONE);
         }
 
-        public OfflineRegionSnapshotHandle offline_region_create_take_result (OfflineOperationHandle operation) throws Error {
+        public OfflineRegionInfo offline_region_create_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
             var operation_id = operation.require_result (this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
@@ -1594,10 +1549,10 @@ namespace MaplibreNative {
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region create returned no snapshot");
             }
-            return new OfflineRegionSnapshotHandle ((owned) snapshot);
+            return copy_offline_region_snapshot ((owned) snapshot);
         }
 
-        public OfflineRegionSnapshotHandle? offline_region_get_take_result (OfflineOperationHandle operation) throws Error {
+        public OfflineRegionInfo? offline_region_get_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
             var operation_id = operation.require_result (this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
             Raw.OfflineRegionSnapshot? snapshot;
@@ -1608,10 +1563,10 @@ namespace MaplibreNative {
             if (!found || snapshot == null) {
                 return null;
             }
-            return new OfflineRegionSnapshotHandle ((owned) snapshot);
+            return copy_offline_region_snapshot ((owned) snapshot);
         }
 
-        public OfflineRegionListHandle offline_regions_list_take_result (OfflineOperationHandle operation) throws Error {
+        public OfflineRegionInfo[] offline_regions_list_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
             var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
@@ -1621,10 +1576,10 @@ namespace MaplibreNative {
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions list returned no list");
             }
-            return new OfflineRegionListHandle ((owned) list);
+            return copy_offline_region_list ((owned) list);
         }
 
-        public OfflineRegionListHandle offline_regions_merge_database_take_result (OfflineOperationHandle operation) throws Error {
+        public OfflineRegionInfo[] offline_regions_merge_database_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
             var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
@@ -1634,10 +1589,10 @@ namespace MaplibreNative {
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions merge returned no list");
             }
-            return new OfflineRegionListHandle ((owned) list);
+            return copy_offline_region_list ((owned) list);
         }
 
-        public OfflineRegionSnapshotHandle offline_region_update_metadata_take_result (OfflineOperationHandle operation) throws Error {
+        public OfflineRegionInfo offline_region_update_metadata_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
             var operation_id = operation.require_result (this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
@@ -1647,7 +1602,7 @@ namespace MaplibreNative {
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region metadata update returned no snapshot");
             }
-            return new OfflineRegionSnapshotHandle ((owned) snapshot);
+            return copy_offline_region_snapshot ((owned) snapshot);
         }
 
         public OfflineRegionStatus offline_region_get_status_take_result (OfflineOperationHandle operation) throws Error {

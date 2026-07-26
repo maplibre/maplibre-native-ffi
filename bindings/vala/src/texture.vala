@@ -48,8 +48,8 @@ namespace MaplibreNative {
     }
 
     public class MetalOwnedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public NativePointer device { get; set; }
 
@@ -66,11 +66,11 @@ namespace MaplibreNative {
     }
 
     public class MetalBorrowedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
-        public uint32 physical_width { get; set; default = 64; }
-        public uint32 physical_height { get; set; default = 64; }
+        public uint32 physical_width { get; set; default = 256; }
+        public uint32 physical_height { get; set; default = 256; }
         public NativePointer texture { get; set; }
 
         public MetalBorrowedTextureDescriptor (NativePointer texture) {
@@ -178,8 +178,8 @@ namespace MaplibreNative {
     }
 
     public class OpenGLOwnedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public OpenGLContextDescriptor context { get; set; }
 
@@ -196,11 +196,11 @@ namespace MaplibreNative {
     }
 
     public class OpenGLBorrowedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
-        public uint32 physical_width { get; set; default = 64; }
-        public uint32 physical_height { get; set; default = 64; }
+        public uint32 physical_width { get; set; default = 256; }
+        public uint32 physical_height { get; set; default = 256; }
         public OpenGLContextDescriptor context { get; set; }
         public uint32 texture { get; set; }
         public uint32 target { get; set; }
@@ -224,8 +224,8 @@ namespace MaplibreNative {
     }
 
     public class VulkanOwnedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public VulkanContextDescriptor context { get; set; }
 
@@ -242,11 +242,11 @@ namespace MaplibreNative {
     }
 
     public class VulkanBorrowedTextureDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
-        public uint32 physical_width { get; set; default = 64; }
-        public uint32 physical_height { get; set; default = 64; }
+        public uint32 physical_width { get; set; default = 256; }
+        public uint32 physical_height { get; set; default = 256; }
         public VulkanContextDescriptor context { get; set; }
         public NativePointer image { get; set; }
         public NativePointer image_view { get; set; }
@@ -278,7 +278,7 @@ namespace MaplibreNative {
     public class OpenGLOwnedTextureFrameHandle {
         private RenderSessionHandle session;
         private Raw.OpenGLOwnedTextureFrame frame;
-        private bool closed;
+        private FrameAccessState state = new FrameAccessState ("opengl texture frame");
 
         internal OpenGLOwnedTextureFrameHandle (RenderSessionHandle session, Raw.OpenGLOwnedTextureFrame frame) {
             this.session = session;
@@ -286,73 +286,92 @@ namespace MaplibreNative {
         }
 
         ~OpenGLOwnedTextureFrameHandle () {
-            if (!closed) {
+            if (!state.is_closed) {
                 warning ("OpenGLOwnedTextureFrameHandle finalized while live; call close() on the owner thread");
             }
         }
 
-        private void require_live () throws Error {
-            if (closed) {
-                throw new Error.INVALID_STATE ("opengl texture frame is closed");
-            }
+        private FrameAccessLease require_live () throws Error {
+            return state.acquire ();
         }
 
         public void close () throws Error {
-            if (closed) {
+            if (!state.begin_close ()) {
                 return;
             }
-            check_status (Raw.opengl_owned_texture_release_frame (session.require_live (), &frame));
-            closed = true;
-            session.finish_frame_borrow ();
+            bool released = false;
+            try {
+                var lease = session.require_live ();
+                check_status (Raw.opengl_owned_texture_release_frame (lease.native, &frame));
+                released = true;
+            } finally {
+                state.finish_close (released);
+                if (released) {
+                    session.finish_frame_borrow ();
+                }
+            }
         }
 
         public uint32 get_width () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.width;
         }
 
         public uint32 get_height () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.height;
         }
 
         public double get_scale_factor () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.scale_factor;
         }
 
         public uint64 get_generation () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.generation;
         }
 
         public uint64 get_frame_id () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.frame_id;
         }
 
         public FrameUInt32 get_texture () throws Error {
-            require_live ();
-            return new FrameUInt32 (frame.texture, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameUInt32 (frame.texture, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public uint32 get_target () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.target;
         }
 
         public uint32 get_internal_format () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.internal_format;
         }
 
         public uint32 get_format () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.format;
         }
 
         public uint32 get_pixel_type () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.type;
         }
     }
@@ -360,7 +379,7 @@ namespace MaplibreNative {
     public class VulkanOwnedTextureFrameHandle {
         private RenderSessionHandle session;
         private Raw.VulkanOwnedTextureFrame frame;
-        private bool closed;
+        private FrameAccessState state = new FrameAccessState ("vulkan texture frame");
 
         internal VulkanOwnedTextureFrameHandle (RenderSessionHandle session, Raw.VulkanOwnedTextureFrame frame) {
             this.session = session;
@@ -368,73 +387,98 @@ namespace MaplibreNative {
         }
 
         ~VulkanOwnedTextureFrameHandle () {
-            if (!closed) {
+            if (!state.is_closed) {
                 warning ("VulkanOwnedTextureFrameHandle finalized while live; call close() on the owner thread");
             }
         }
 
-        private void require_live () throws Error {
-            if (closed) {
-                throw new Error.INVALID_STATE ("vulkan texture frame is closed");
-            }
+        private FrameAccessLease require_live () throws Error {
+            return state.acquire ();
         }
 
         public void close () throws Error {
-            if (closed) {
+            if (!state.begin_close ()) {
                 return;
             }
-            check_status (Raw.vulkan_owned_texture_release_frame (session.require_live (), &frame));
-            closed = true;
-            session.finish_frame_borrow ();
+            bool released = false;
+            try {
+                var lease = session.require_live ();
+                check_status (Raw.vulkan_owned_texture_release_frame (lease.native, &frame));
+                released = true;
+            } finally {
+                state.finish_close (released);
+                if (released) {
+                    session.finish_frame_borrow ();
+                }
+            }
         }
 
         public uint32 get_width () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.width;
         }
 
         public uint32 get_height () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.height;
         }
 
         public double get_scale_factor () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.scale_factor;
         }
 
         public uint64 get_generation () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.generation;
         }
 
         public uint64 get_frame_id () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.frame_id;
         }
 
         public FrameNativePointer get_image () throws Error {
-            require_live ();
-            return new FrameNativePointer ((size_t) frame.image, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameNativePointer ((size_t) frame.image, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public FrameNativePointer get_image_view () throws Error {
-            require_live ();
-            return new FrameNativePointer ((size_t) frame.image_view, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameNativePointer ((size_t) frame.image_view, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public FrameNativePointer get_device () throws Error {
-            require_live ();
-            return new FrameNativePointer ((size_t) frame.device, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameNativePointer ((size_t) frame.device, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public uint32 get_format () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.format;
         }
 
         public uint32 get_layout () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.layout;
         }
     }

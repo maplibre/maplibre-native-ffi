@@ -21,7 +21,7 @@ run = '''
 if command -v brew >/dev/null 2>&1; then
   brew list --versions vala >/dev/null 2>&1 || brew install vala
 else
-  mise bootstrap packages apply --yes brew:vala
+  mise install brew:vala
 fi
 '''
 

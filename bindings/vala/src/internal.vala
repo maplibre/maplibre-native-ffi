@@ -1,5 +1,27 @@
 namespace MaplibreNative {
+    private static Private? unknown_status_data;
+    private static Mutex unknown_status_init_mutex;
+
+    private static unowned Private unknown_status_store () {
+        unknown_status_init_mutex.lock ();
+        if (unknown_status_data == null) {
+            unknown_status_data = new Private (GLib.free);
+        }
+        unowned Private store = unknown_status_data;
+        unknown_status_init_mutex.unlock ();
+        return store;
+    }
+
+    public int32? thread_last_unknown_status () {
+        int32* value = (int32*) unknown_status_store ().get ();
+        if (value == null) {
+            return null;
+        }
+        return value[0];
+    }
+
     internal void check_status (Raw.Status status) throws Error {
+        unknown_status_store ().replace (null);
         if (status == Raw.Status.OK) {
             return;
         }
@@ -21,6 +43,9 @@ namespace MaplibreNative {
             case Raw.Status.NATIVE_ERROR:
                 throw new Error.NATIVE_ERROR ("%s", message);
             default:
+                int32* raw_status = (int32*) GLib.malloc (sizeof (int32));
+                raw_status[0] = (int32) status;
+                unknown_status_store ().replace ((owned) raw_status);
                 throw new Error.UNKNOWN_STATUS ("unknown native status %d: %s", (int32) status, message);
         }
     }
@@ -42,6 +67,48 @@ namespace MaplibreNative {
     internal Raw.StringView string_view (string value) throws Error {
         reject_embedded_nul (value);
         return Raw.StringView () { data = (char*) value, size = value.length };
+    }
+
+    internal uint8[] copy_string_bytes (string value) {
+        uint8[] copied = new uint8[value.length];
+        for (var index = 0; index < value.length; index++) {
+            copied[index] = value[index];
+        }
+        return copied;
+    }
+
+    internal uint8[] copy_byte_array (uint8[] value) {
+        uint8[] copied = new uint8[value.length];
+        for (var index = 0; index < value.length; index++) {
+            copied[index] = value[index];
+        }
+        return copied;
+    }
+
+    internal Raw.StringView byte_string_view (uint8[] value) {
+        return Raw.StringView () {
+            data = value.length == 0 ? null : (char*) value,
+            size = value.length
+        };
+    }
+
+    internal uint8[] copy_string_view_bytes (Raw.StringView view) throws Error {
+        if (view.data == null && view.size == 0) {
+            return new uint8[0];
+        }
+        if (view.data == null) {
+            throw new Error.INVALID_ARGUMENT ("string view data is null");
+        }
+        return copy_bytes ((uint8*) view.data, view.size) ?? new uint8[0];
+    }
+
+    internal string string_from_bytes (uint8[] value) throws Error {
+        for (var index = 0; index < value.length; index++) {
+            if (value[index] == 0) {
+                throw new Error.INVALID_STATE ("string contains embedded NUL; use the byte accessor");
+            }
+        }
+        return copy_utf8_bytes (value, value.length);
     }
 
     internal void reject_embedded_nul (string value) throws Error {

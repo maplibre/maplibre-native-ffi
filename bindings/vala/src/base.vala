@@ -373,6 +373,87 @@ namespace MaplibreNative {
 
     public delegate void FrameResourceValidator () throws Error;
 
+    internal class FrameAccessState {
+        private Mutex mutex;
+        private bool closed;
+        private bool releasing;
+        private uint active_accesses;
+        private string resource_name;
+
+        internal FrameAccessState (string resource_name) {
+            this.resource_name = resource_name;
+        }
+
+        internal bool is_closed {
+            get {
+                mutex.lock ();
+                var value = closed;
+                mutex.unlock ();
+                return value;
+            }
+        }
+
+        internal FrameAccessLease acquire () throws Error {
+            mutex.lock ();
+            if (closed || releasing) {
+                mutex.unlock ();
+                throw new Error.INVALID_STATE ("%s is closed", resource_name);
+            }
+            active_accesses++;
+            var lease = new FrameAccessLease (this);
+            mutex.unlock ();
+            return lease;
+        }
+
+        internal bool begin_close () throws Error {
+            mutex.lock ();
+            if (closed) {
+                mutex.unlock ();
+                return false;
+            }
+            if (releasing) {
+                mutex.unlock ();
+                throw new Error.INVALID_STATE ("%s release is already in progress", resource_name);
+            }
+            if (active_accesses > 0) {
+                mutex.unlock ();
+                throw new Error.INVALID_STATE ("%s has an active native-value borrow", resource_name);
+            }
+            releasing = true;
+            mutex.unlock ();
+            return true;
+        }
+
+        internal void finish_close (bool succeeded) {
+            mutex.lock ();
+            if (succeeded) {
+                closed = true;
+            }
+            releasing = false;
+            mutex.unlock ();
+        }
+
+        internal void release_access () {
+            mutex.lock ();
+            active_accesses--;
+            mutex.unlock ();
+        }
+    }
+
+    internal class FrameAccessLease {
+        private FrameAccessState owner;
+
+        internal FrameAccessLease (FrameAccessState owner) {
+            this.owner = owner;
+        }
+
+        internal void keep_alive () {}
+
+        ~FrameAccessLease () {
+            owner.release_access ();
+        }
+    }
+
     public class FrameNativePointer {
         private size_t bits;
         private FrameResourceValidator validator;

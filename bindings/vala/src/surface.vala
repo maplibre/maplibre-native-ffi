@@ -1,7 +1,7 @@
 namespace MaplibreNative {
     public class MetalSurfaceDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public NativePointer layer { get; set; }
         public NativePointer? device { get; set; }
@@ -23,8 +23,8 @@ namespace MaplibreNative {
     }
 
     public class OpenGLSurfaceDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public OpenGLContextDescriptor context { get; set; }
         public NativePointer surface { get; set; }
@@ -44,8 +44,8 @@ namespace MaplibreNative {
     }
 
     public class VulkanSurfaceDescriptor {
-        public uint32 width { get; set; default = 64; }
-        public uint32 height { get; set; default = 64; }
+        public uint32 width { get; set; default = 256; }
+        public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public VulkanContextDescriptor context { get; set; }
         public NativePointer surface { get; set; }

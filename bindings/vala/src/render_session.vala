@@ -1,12 +1,44 @@
 namespace MaplibreNative {
+    internal class RenderSessionNativeLease {
+        private RenderSessionHandle owner;
+        public unowned Raw.RenderSession native { get; private set; }
+
+        internal RenderSessionNativeLease (RenderSessionHandle owner, Raw.RenderSession native) {
+            this.owner = owner;
+            this.native = native;
+        }
+
+        ~RenderSessionNativeLease () {
+            owner.release_native_lease ();
+        }
+    }
+
     public class RenderSessionHandle {
         private MapHandle map;
         private Raw.RenderSession? native;
         private bool frame_acquired;
         private bool detached;
+        private Mutex state_mutex;
+        private Cond idle;
+        private bool releasing;
+        private uint active_native_leases;
 
-        public bool closed { get { return native == null; } }
-        public bool is_detached { get { return detached; } }
+        public bool closed {
+            get {
+                state_mutex.lock ();
+                var value = native == null;
+                state_mutex.unlock ();
+                return value;
+            }
+        }
+        public bool is_detached {
+            get {
+                state_mutex.lock ();
+                var value = detached;
+                state_mutex.unlock ();
+                return value;
+            }
+        }
 
         internal RenderSessionHandle (MapHandle map, owned Raw.RenderSession native) {
             this.map = map;
@@ -14,70 +46,137 @@ namespace MaplibreNative {
         }
 
         ~RenderSessionHandle () {
-            if (native != null) {
+            state_mutex.lock ();
+            var leaked = native != null;
+            state_mutex.unlock ();
+            if (leaked) {
                 warning ("RenderSessionHandle finalized while live; call close() on the owner thread");
             }
         }
 
-        internal unowned Raw.RenderSession require_live () throws Error {
-            if (native == null) {
+        internal RenderSessionNativeLease require_live () throws Error {
+            state_mutex.lock ();
+            if (native == null || releasing) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
             }
-            return native;
+            active_native_leases++;
+            var lease = new RenderSessionNativeLease (this, native);
+            state_mutex.unlock ();
+            return lease;
+        }
+
+        internal void release_native_lease () {
+            state_mutex.lock ();
+            active_native_leases--;
+            if (releasing && active_native_leases == 0) {
+                idle.broadcast ();
+            }
+            state_mutex.unlock ();
         }
 
         internal void begin_frame_borrow () throws Error {
+            state_mutex.lock ();
+            if (native == null || releasing) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("render session handle is closed");
+            }
             if (frame_acquired) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("render session already has an acquired frame");
             }
             frame_acquired = true;
+            state_mutex.unlock ();
         }
 
         internal void finish_frame_borrow () {
+            state_mutex.lock ();
             frame_acquired = false;
+            state_mutex.unlock ();
         }
 
-        private unowned Raw.RenderSession require_available () throws Error {
+        private RenderSessionNativeLease require_available () throws Error {
+            state_mutex.lock ();
+            if (native == null || releasing) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("render session handle is closed");
+            }
             if (frame_acquired) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("render session has an acquired frame");
             }
-            return require_live ();
+            active_native_leases++;
+            var lease = new RenderSessionNativeLease (this, native);
+            state_mutex.unlock ();
+            return lease;
         }
 
         public void close () throws Error {
+            state_mutex.lock ();
             if (native == null) {
+                state_mutex.unlock ();
                 return;
             }
-            unowned Raw.RenderSession closing = require_available ();
-            check_status (Raw.render_session_destroy (closing));
-            native = null;
+            if (releasing) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("render session release is already in progress");
+            }
+            if (frame_acquired) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("render session has an acquired frame");
+            }
+            releasing = true;
+            while (active_native_leases > 0) {
+                idle.wait (state_mutex);
+            }
+            unowned Raw.RenderSession closing = native;
+            state_mutex.unlock ();
+
+            var status = Raw.render_session_destroy (closing);
+
+            state_mutex.lock ();
+            if (status == Raw.Status.OK) {
+                native = null;
+            }
+            releasing = false;
+            idle.broadcast ();
+            state_mutex.unlock ();
+            check_status (status);
         }
 
         public void resize (uint32 width, uint32 height, double scale_factor) throws Error {
-            check_status (Raw.render_session_resize (require_available (), width, height, scale_factor));
+            var lease = require_available ();
+            check_status (Raw.render_session_resize (lease.native, width, height, scale_factor));
         }
 
         public bool render_update () throws Error {
             bool rendered;
-            check_status (Raw.render_session_render_update (require_available (), out rendered));
+            var lease = require_available ();
+            check_status (Raw.render_session_render_update (lease.native, out rendered));
             return rendered;
         }
 
         public void detach () throws Error {
-            check_status (Raw.render_session_detach (require_available ()));
+            var lease = require_available ();
+            check_status (Raw.render_session_detach (lease.native));
+            state_mutex.lock ();
             detached = true;
+            state_mutex.unlock ();
         }
 
         public void reduce_memory_use () throws Error {
-            check_status (Raw.render_session_reduce_memory_use (require_available ()));
+            var lease = require_available ();
+            check_status (Raw.render_session_reduce_memory_use (lease.native));
         }
 
         public void clear_data () throws Error {
-            check_status (Raw.render_session_clear_data (require_available ()));
+            var lease = require_available ();
+            check_status (Raw.render_session_clear_data (lease.native));
         }
 
         public void dump_debug_logs () throws Error {
-            check_status (Raw.render_session_dump_debug_logs (require_available ()));
+            var lease = require_available ();
+            check_status (Raw.render_session_dump_debug_logs (lease.native));
         }
 
         public TextureImageInfo read_premultiplied_rgba8 (uint8[] out_data) throws Error {
@@ -85,7 +184,8 @@ namespace MaplibreNative {
                 throw new Error.INVALID_ARGUMENT ("readback buffer is empty");
             }
             Raw.TextureImageInfo info = Raw.texture_image_info_default ();
-            check_status (Raw.texture_read_premultiplied_rgba8 (require_available (), out_data, out_data.length, &info));
+            var lease = require_available ();
+            check_status (Raw.texture_read_premultiplied_rgba8 (lease.native, out_data, out_data.length, &info));
             return new TextureImageInfo (info);
         }
 
@@ -98,7 +198,8 @@ namespace MaplibreNative {
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
-            check_status (Raw.render_session_query_rendered_features (require_available (), &native_geometry, options_ptr, out result));
+            var lease = require_available ();
+            check_status (Raw.render_session_query_rendered_features (lease.native, &native_geometry, options_ptr, out result));
             return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
@@ -110,7 +211,8 @@ namespace MaplibreNative {
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
-            check_status (Raw.render_session_query_source_features (require_available (), string_view (source_id), options_ptr, out result));
+            var lease = require_available ();
+            check_status (Raw.render_session_query_source_features (lease.native, string_view (source_id), options_ptr, out result));
             return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
@@ -123,20 +225,23 @@ namespace MaplibreNative {
                 arguments_ptr = &native_arguments;
             }
             Raw.FeatureExtensionResult result;
-            check_status (Raw.render_session_query_feature_extensions (require_available (), string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
+            var lease = require_available ();
+            check_status (Raw.render_session_query_feature_extensions (lease.native, string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
             return FeatureExtensionResultHandle.copy_from_native ((owned) result);
         }
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
             Raw.JsonValue native_state = state.to_native ();
-            check_status (Raw.render_session_set_feature_state (require_available (), &native_selector, &native_state));
+            var lease = require_available ();
+            check_status (Raw.render_session_set_feature_state (lease.native, &native_selector, &native_state));
         }
 
         public JsonValue get_feature_state (FeatureStateSelector selector) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
             Raw.JsonSnapshot snapshot;
-            check_status (Raw.render_session_get_feature_state (require_available (), &native_selector, out snapshot));
+            var lease = require_available ();
+            check_status (Raw.render_session_get_feature_state (lease.native, &native_selector, out snapshot));
             try {
                 Raw.JsonValue* value;
                 check_status (Raw.json_snapshot_get (snapshot, out value));
@@ -148,7 +253,8 @@ namespace MaplibreNative {
 
         public void remove_feature_state (FeatureStateSelector selector) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
-            check_status (Raw.render_session_remove_feature_state (require_available (), &native_selector));
+            var lease = require_available ();
+            check_status (Raw.render_session_remove_feature_state (lease.native, &native_selector));
         }
 
         public MetalOwnedTextureFrameHandle acquire_metal_owned_texture_frame () throws Error {
@@ -156,7 +262,8 @@ namespace MaplibreNative {
             Raw.MetalOwnedTextureFrame frame = {};
             frame.size = (uint32) sizeof (Raw.MetalOwnedTextureFrame);
             try {
-                check_status (Raw.metal_owned_texture_acquire_frame (require_live (), &frame));
+                var lease = require_live ();
+                check_status (Raw.metal_owned_texture_acquire_frame (lease.native, &frame));
                 return new MetalOwnedTextureFrameHandle (this, frame);
             } catch (Error error) {
                 finish_frame_borrow ();
@@ -169,7 +276,8 @@ namespace MaplibreNative {
             Raw.VulkanOwnedTextureFrame frame = {};
             frame.size = (uint32) sizeof (Raw.VulkanOwnedTextureFrame);
             try {
-                check_status (Raw.vulkan_owned_texture_acquire_frame (require_live (), &frame));
+                var lease = require_live ();
+                check_status (Raw.vulkan_owned_texture_acquire_frame (lease.native, &frame));
                 return new VulkanOwnedTextureFrameHandle (this, frame);
             } catch (Error error) {
                 finish_frame_borrow ();
@@ -182,7 +290,8 @@ namespace MaplibreNative {
             Raw.OpenGLOwnedTextureFrame frame = {};
             frame.size = (uint32) sizeof (Raw.OpenGLOwnedTextureFrame);
             try {
-                check_status (Raw.opengl_owned_texture_acquire_frame (require_live (), &frame));
+                var lease = require_live ();
+                check_status (Raw.opengl_owned_texture_acquire_frame (lease.native, &frame));
                 return new OpenGLOwnedTextureFrameHandle (this, frame);
             } catch (Error error) {
                 finish_frame_borrow ();
@@ -194,7 +303,7 @@ namespace MaplibreNative {
     public class MetalOwnedTextureFrameHandle {
         private RenderSessionHandle session;
         private Raw.MetalOwnedTextureFrame frame;
-        private bool closed;
+        private FrameAccessState state = new FrameAccessState ("metal texture frame");
 
         internal MetalOwnedTextureFrameHandle (RenderSessionHandle session, Raw.MetalOwnedTextureFrame frame) {
             this.session = session;
@@ -202,63 +311,83 @@ namespace MaplibreNative {
         }
 
         ~MetalOwnedTextureFrameHandle () {
-            if (!closed) {
+            if (!state.is_closed) {
                 warning ("MetalOwnedTextureFrameHandle finalized while live; call close() on the owner thread");
             }
         }
 
-        private void require_live () throws Error {
-            if (closed) {
-                throw new Error.INVALID_STATE ("metal texture frame is closed");
-            }
+        private FrameAccessLease require_live () throws Error {
+            return state.acquire ();
         }
 
         public void close () throws Error {
-            if (closed) {
+            if (!state.begin_close ()) {
                 return;
             }
-            check_status (Raw.metal_owned_texture_release_frame (session.require_live (), &frame));
-            closed = true;
-            session.finish_frame_borrow ();
+            bool released = false;
+            try {
+                var lease = session.require_live ();
+                check_status (Raw.metal_owned_texture_release_frame (lease.native, &frame));
+                released = true;
+            } finally {
+                state.finish_close (released);
+                if (released) {
+                    session.finish_frame_borrow ();
+                }
+            }
         }
 
         public uint32 get_width () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.width;
         }
 
         public uint32 get_height () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.height;
         }
 
         public double get_scale_factor () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.scale_factor;
         }
 
         public uint64 get_generation () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.generation;
         }
 
         public uint64 get_frame_id () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.frame_id;
         }
 
         public FrameNativePointer get_texture () throws Error {
-            require_live ();
-            return new FrameNativePointer ((size_t) frame.texture, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameNativePointer ((size_t) frame.texture, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public FrameNativePointer get_device () throws Error {
-            require_live ();
-            return new FrameNativePointer ((size_t) frame.device, () => require_live ());
+            var access = require_live ();
+            access.keep_alive ();
+            return new FrameNativePointer ((size_t) frame.device, () => {
+                var checked_access = require_live ();
+                checked_access.keep_alive ();
+            });
         }
 
         public uint64 get_pixel_format () throws Error {
-            require_live ();
+            var access = require_live ();
+            access.keep_alive ();
             return frame.pixel_format;
         }
     }

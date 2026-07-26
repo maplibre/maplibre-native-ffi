@@ -228,22 +228,195 @@ void exercise_runtime_close_race() throws MaplibreNative.Error {
   assert(closed_call_failed);
 }
 
+void exercise_render_session_close_race(MaplibreNative.RenderSessionHandle session) throws MaplibreNative.Error {
+  Mutex state_mutex = Mutex();
+  Cond state_changed = Cond();
+  bool lease_acquired = false;
+  bool release_lease = false;
+  bool close_rejected_new_call = false;
+  bool holder_failed = false;
+
+  var holder = new GLib.Thread<void>("vala-render-session-lease-holder", () => {
+    try {
+      var lease = session.require_live();
+      state_mutex.lock();
+      lease_acquired = true;
+      state_changed.broadcast();
+      while (!release_lease) {
+        state_changed.wait(state_mutex);
+      }
+      state_mutex.unlock();
+      assert(lease.native != null);
+    } catch (MaplibreNative.Error error) {
+      holder_failed = true;
+    }
+  });
+
+  state_mutex.lock();
+  while (!lease_acquired) {
+    state_changed.wait(state_mutex);
+  }
+  state_mutex.unlock();
+
+  var coordinator = new GLib.Thread<void>("vala-render-session-close-coordinator", () => {
+    while (true) {
+      try {
+        var lease = session.require_live();
+        assert(lease.native != null);
+      } catch (MaplibreNative.Error.INVALID_STATE error) {
+        state_mutex.lock();
+        close_rejected_new_call = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      } catch (MaplibreNative.Error error) {
+        state_mutex.lock();
+        holder_failed = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      }
+      GLib.Thread.usleep(100);
+    }
+  });
+
+  session.close();
+  holder.join();
+  coordinator.join();
+  assert(!holder_failed);
+  assert(close_rejected_new_call);
+  assert(session.closed);
+}
+
+void exercise_projection_close_race(MaplibreNative.MapProjectionHandle projection) throws MaplibreNative.Error {
+  Mutex state_mutex = Mutex();
+  Cond state_changed = Cond();
+  bool lease_acquired = false;
+  bool release_lease = false;
+  bool close_rejected_new_call = false;
+  bool holder_failed = false;
+
+  var holder = new GLib.Thread<void>("vala-projection-lease-holder", () => {
+    try {
+      var lease = projection.require_live();
+      state_mutex.lock();
+      lease_acquired = true;
+      state_changed.broadcast();
+      while (!release_lease) {
+        state_changed.wait(state_mutex);
+      }
+      state_mutex.unlock();
+      assert(lease.native != null);
+    } catch (MaplibreNative.Error error) {
+      holder_failed = true;
+    }
+  });
+
+  state_mutex.lock();
+  while (!lease_acquired) {
+    state_changed.wait(state_mutex);
+  }
+  state_mutex.unlock();
+
+  var coordinator = new GLib.Thread<void>("vala-projection-close-coordinator", () => {
+    while (true) {
+      try {
+        var lease = projection.require_live();
+        assert(lease.native != null);
+      } catch (MaplibreNative.Error.INVALID_STATE error) {
+        state_mutex.lock();
+        close_rejected_new_call = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      } catch (MaplibreNative.Error error) {
+        state_mutex.lock();
+        holder_failed = true;
+        release_lease = true;
+        state_changed.broadcast();
+        state_mutex.unlock();
+        return;
+      }
+      GLib.Thread.usleep(100);
+    }
+  });
+
+  projection.close();
+  holder.join();
+  coordinator.join();
+  assert(!holder_failed);
+  assert(close_rejected_new_call);
+  assert(projection.closed);
+}
+
+void exercise_frame_access_state() throws MaplibreNative.Error {
+  var state = new MaplibreNative.FrameAccessState("test frame");
+  MaplibreNative.FrameAccessLease? access = state.acquire();
+  bool active_close_failed = false;
+  try {
+    state.begin_close();
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    active_close_failed = true;
+  }
+  assert(active_close_failed);
+  access = null;
+  assert(state.begin_close());
+  state.finish_close(true);
+  bool closed_access_failed = false;
+  try {
+    state.acquire();
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    closed_access_failed = true;
+  }
+  assert(closed_access_failed);
+}
+
 void exercise_unknown_feature_identifier_round_trip() throws MaplibreNative.Error {
+  uint8[] unknown_storage = { 0x12, 0x00, 0x34, 0x56 };
   MaplibreNative.Raw.Feature native = {};
   native.identifier_type = 99;
   native.identifier_string_value = MaplibreNative.Raw.StringView() {
-    data = (char*) 0x1234,
-    size = 0x5678
+    data = (char*) unknown_storage,
+    size = unknown_storage.length
   };
   var identifier = MaplibreNative.FeatureIdentifier.from_native(native);
   assert(identifier.raw_value_type == 99);
   assert((uint32) identifier.value_type == 99);
+  unknown_storage[0] = 0xff;
+  assert(identifier.get_unknown_storage()[0] == 0x12);
+  assert(identifier.equal(identifier.copy()));
 
   MaplibreNative.Raw.Feature round_trip = {};
   identifier.apply_to_native(ref round_trip);
   assert(round_trip.identifier_type == 99);
-  assert(round_trip.identifier_string_value.data == (char*) 0x1234);
-  assert(round_trip.identifier_string_value.size == 0x5678);
+  assert(round_trip.identifier_string_value.size == 4);
+  assert(((uint8*) round_trip.identifier_string_value.data)[0] == 0x12);
+  assert(((uint8*) round_trip.identifier_string_value.data)[1] == 0x00);
+}
+
+void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) throws MaplibreNative.Error {
+  uint8[] prior_data = { 1, 2, 3 };
+  MaplibreNative.Raw.ResourceRequest native_request = {};
+  native_request.prior_data = prior_data;
+  native_request.prior_data_size = prior_data.length;
+  var request = new MaplibreNative.ResourceRequest.from_native(&native_request);
+  var request_data = request.prior_data;
+  assert(request_data != null);
+  request_data[0] = 9;
+  assert(request.prior_data[0] == 1);
+
+  uint8[] payload = { 4, 5, 6 };
+  MaplibreNative.Raw.RuntimeEvent native_event = {};
+  native_event.payload_type = 99;
+  native_event.payload = payload;
+  native_event.payload_size = payload.length;
+  var event = new MaplibreNative.RuntimeEvent(runtime, native_event);
+  var event_data = event.payload_bytes;
+  event_data[0] = 9;
+  assert(event.payload_bytes[0] == 4);
 }
 
 void exercise_option_value_semantics() {
@@ -573,8 +746,7 @@ string create_offline_merge_database() throws MaplibreNative.Error {
   uint8[] metadata = { 8, 9, 10 };
   var create_id = side_runtime.offline_region_create_start(tile_definition, metadata);
   assert(wait_for_offline_operation(side_runtime, create_id) != null);
-  var snapshot = side_runtime.offline_region_create_take_result(create_id);
-  snapshot.close();
+  side_runtime.offline_region_create_take_result(create_id);
   side_runtime.close();
   return side_database_path;
 }
@@ -589,16 +761,16 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   assert(completion != null && completion.operation_kind == MaplibreNative.OfflineOperationKind.REGION_CREATE && completion.result_kind == MaplibreNative.OfflineOperationResultKind.REGION);
   bool wrong_take_failed = false;
   try {
-    var wrong_list = runtime.offline_regions_list_take_result(create_id);
-    wrong_list.close();
+    runtime.offline_regions_list_take_result(create_id);
   } catch (MaplibreNative.Error error) {
     wrong_take_failed = true;
   }
   assert(wrong_take_failed);
-  var snapshot = runtime.offline_region_create_take_result(create_id);
-  var info = snapshot.get();
+  var info = runtime.offline_region_create_take_result(create_id);
   assert(info.id.value > 0 && info.metadata.length == metadata.length);
-  snapshot.close();
+  var copied_metadata = info.metadata;
+  copied_metadata[0] = 99;
+  assert(info.metadata[0] == metadata[0]);
   if (GLib.Environment.get_variable("MLN_VALA_RUN_OFFLINE_REGION_SMOKE") == "1") {
     var region_id = info.id;
     var geometry_create_id = runtime.offline_region_create_start(geometry_definition, metadata);
@@ -607,29 +779,21 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
     assert(wait_for_offline_operation(runtime, get_id) != null);
     var get_snapshot = runtime.offline_region_get_take_result(get_id);
     assert(get_snapshot != null);
-    get_snapshot.close();
     var list_id = runtime.offline_regions_list_start();
     assert(wait_for_offline_operation(runtime, list_id) != null);
     var list = runtime.offline_regions_list_take_result(list_id);
-    assert(list.count() > 0);
-    list.get(0);
-    list.to_array();
-    list.close();
+    assert(list.length > 0);
     if (merge_database_path != null) {
       var merge_id = runtime.offline_regions_merge_database_start(merge_database_path);
       assert(wait_for_offline_operation(runtime, merge_id) != null);
       var merged_list = runtime.offline_regions_merge_database_take_result(merge_id);
-      merged_list.count();
-      merged_list.to_array();
-      merged_list.close();
+      assert(merged_list.length > 0);
     }
     uint8[] updated_metadata = { 4, 5, 6, 7 };
     var metadata_id = runtime.offline_region_update_metadata_start(region_id, updated_metadata);
     assert(wait_for_offline_operation(runtime, metadata_id) != null);
-    var metadata_snapshot = runtime.offline_region_update_metadata_take_result(metadata_id);
-    var metadata_info = metadata_snapshot.get();
+    var metadata_info = runtime.offline_region_update_metadata_take_result(metadata_id);
     assert(metadata_info.metadata.length == updated_metadata.length);
-    metadata_snapshot.close();
     var status_id = runtime.offline_region_get_status_start(region_id);
     assert(wait_for_offline_operation(runtime, status_id) != null);
     var status = runtime.offline_region_get_status_take_result(status_id);
@@ -661,7 +825,14 @@ void compile_style_light_wrappers(MaplibreNative.MapHandle map) throws MaplibreN
 
 void compile_texture_backend_wrappers() throws MaplibreNative.Error {
   var pointer = MaplibreNative.NativePointer.borrowed(1);
+  var metal_owned = new MaplibreNative.MetalOwnedTextureDescriptor(pointer);
+  assert(metal_owned.width == 256);
+  assert(metal_owned.height == 256);
   var metal_borrowed = new MaplibreNative.MetalBorrowedTextureDescriptor(pointer);
+  assert(metal_borrowed.width == 256);
+  assert(metal_borrowed.height == 256);
+  assert(metal_borrowed.physical_width == 256);
+  assert(metal_borrowed.physical_height == 256);
   metal_borrowed.width = 16;
   metal_borrowed.height = 16;
   metal_borrowed.scale_factor = 1.0;
@@ -673,28 +844,46 @@ void compile_texture_backend_wrappers() throws MaplibreNative.Error {
   var wgl_context = new MaplibreNative.WglContextDescriptor(pointer, pointer);
   wgl_context.get_proc_address = pointer;
   var opengl_owned = new MaplibreNative.OpenGLOwnedTextureDescriptor(egl_context);
+  assert(opengl_owned.width == 256);
+  assert(opengl_owned.height == 256);
   opengl_owned.width = 16;
   opengl_owned.height = 16;
   opengl_owned.scale_factor = 1.0;
   var opengl_borrowed = new MaplibreNative.OpenGLBorrowedTextureDescriptor(wgl_context, 1, 0x0DE1);
+  assert(opengl_borrowed.width == 256);
+  assert(opengl_borrowed.height == 256);
+  assert(opengl_borrowed.physical_width == 256);
+  assert(opengl_borrowed.physical_height == 256);
   opengl_borrowed.width = 16;
   opengl_borrowed.height = 16;
   opengl_borrowed.scale_factor = 1.0;
   var vulkan_owned = new MaplibreNative.VulkanOwnedTextureDescriptor(vulkan_context);
+  assert(vulkan_owned.width == 256);
+  assert(vulkan_owned.height == 256);
   vulkan_owned.width = 16;
   vulkan_owned.height = 16;
   vulkan_owned.scale_factor = 1.0;
   var vulkan_borrowed = new MaplibreNative.VulkanBorrowedTextureDescriptor(vulkan_context, pointer, pointer);
+  assert(vulkan_borrowed.width == 256);
+  assert(vulkan_borrowed.height == 256);
+  assert(vulkan_borrowed.physical_width == 256);
+  assert(vulkan_borrowed.physical_height == 256);
   vulkan_borrowed.format = 37;
   vulkan_borrowed.initial_layout = 0;
   vulkan_borrowed.final_layout = 1;
   var metal_surface = new MaplibreNative.MetalSurfaceDescriptor(pointer);
+  assert(metal_surface.width == 256);
+  assert(metal_surface.height == 256);
   metal_surface.device = pointer;
   var opengl_surface = new MaplibreNative.OpenGLSurfaceDescriptor(egl_context, pointer);
+  assert(opengl_surface.width == 256);
+  assert(opengl_surface.height == 256);
   opengl_surface.width = 16;
   opengl_surface.height = 16;
   opengl_surface.scale_factor = 1.0;
   var vulkan_surface = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, pointer);
+  assert(vulkan_surface.width == 256);
+  assert(vulkan_surface.height == 256);
   vulkan_surface.width = 16;
   vulkan_surface.height = 16;
   vulkan_surface.scale_factor = 1.0;
@@ -703,6 +892,7 @@ void compile_texture_backend_wrappers() throws MaplibreNative.Error {
 int main() {
   try {
     assert(MaplibreNative.c_version() == 0);
+    exercise_frame_access_state();
     exercise_unknown_feature_identifier_round_trip();
     exercise_option_value_semantics();
     var backends = MaplibreNative.supported_render_backends();
@@ -714,6 +904,15 @@ int main() {
 
     var future_network_status = MaplibreNative.network_status_from_raw(99);
     assert((uint32) future_network_status == 99);
+    assert(MaplibreNative.resource_provider_decision_to_raw((MaplibreNative.ResourceProviderDecision) 99) == 99);
+    bool future_status_failed = false;
+    try {
+      MaplibreNative.check_status((MaplibreNative.Raw.Status) (-9999));
+    } catch (MaplibreNative.Error.UNKNOWN_STATUS error) {
+      future_status_failed = true;
+    }
+    assert(future_status_failed);
+    assert(MaplibreNative.thread_last_unknown_status() == -9999);
     bool future_network_status_rejected_by_native = false;
     try {
       MaplibreNative.set_network_status(future_network_status);
@@ -735,6 +934,7 @@ int main() {
     var runtime_options = new MaplibreNative.RuntimeOptions();
     runtime_options.maximum_cache_size = 1024 * 1024;
     var runtime = new MaplibreNative.RuntimeHandle(runtime_options);
+    exercise_defensive_byte_snapshots(runtime);
     runtime.set_resource_provider(provide_resource);
     runtime.run_once();
     assert(runtime.poll_event() == null);
@@ -1000,6 +1200,52 @@ int main() {
       },
       MaplibreNative.FeatureIdentifier.string_value("feature-1"));
     assert(feature.feature_identifier.get_string() == "feature-1");
+    var feature_copy = feature.copy();
+    assert(feature.equal(feature_copy));
+    var feature_changed = new MaplibreNative.Feature(
+      MaplibreNative.Geometry.point(MaplibreNative.LatLng(1.0, 0.0)),
+      feature_copy.property_members,
+      feature_copy.feature_identifier);
+    assert(!feature.equal(feature_changed));
+    var coordinate_list = new MaplibreNative.CoordinateList({
+      MaplibreNative.LatLng(0.0, 0.0),
+      MaplibreNative.LatLng(1.0, 1.0)
+    });
+    assert(coordinate_list.equal(coordinate_list.copy()));
+    var value_polygon = new MaplibreNative.Polygon({ coordinate_list });
+    assert(value_polygon.equal(value_polygon.copy()));
+    var value_geometry = MaplibreNative.Geometry.geometry_collection({
+      MaplibreNative.Geometry.line_string(coordinate_list.to_array()),
+      MaplibreNative.Geometry.polygon(value_polygon)
+    });
+    assert(value_geometry.equal(value_geometry.copy()));
+    var feature_collection = new MaplibreNative.FeatureCollection({ feature, feature_copy });
+    assert(feature_collection.equal(feature_collection.copy()));
+
+    uint8[] embedded_nul = { 'a', 0, 'b' };
+    var nul_json = MaplibreNative.JsonValue.string_utf8_bytes(embedded_nul);
+    embedded_nul[0] = 'z';
+    var copied_nul_bytes = nul_json.get_string_utf8_bytes();
+    assert(copied_nul_bytes.length == 3 && copied_nul_bytes[0] == 'a' && copied_nul_bytes[1] == 0 && copied_nul_bytes[2] == 'b');
+    bool nul_string_accessor_failed = false;
+    try {
+      nul_json.get_string();
+    } catch (MaplibreNative.Error.INVALID_STATE error) {
+      nul_string_accessor_failed = true;
+    }
+    assert(nul_string_accessor_failed);
+    var nul_member = new MaplibreNative.JsonMember.from_utf8_bytes({ 'k', 0, 'y' }, nul_json);
+    var nul_object = MaplibreNative.JsonValue.object_value({ nul_member });
+    var nul_object_copy = MaplibreNative.JsonValue.from_native(nul_object.to_native());
+    assert(nul_object.equal(nul_object_copy));
+    assert(nul_object_copy.get_object_members()[0].get_key_utf8_bytes()[1] == 0);
+    var nul_identifier = MaplibreNative.FeatureIdentifier.string_utf8_bytes({ 'i', 0, 'd' });
+    MaplibreNative.Raw.Feature nul_identifier_native = {};
+    nul_identifier.apply_to_native(ref nul_identifier_native);
+    var nul_identifier_copy = MaplibreNative.FeatureIdentifier.from_native(nul_identifier_native);
+    assert(nul_identifier.equal(nul_identifier_copy));
+    assert(nul_identifier_copy.get_string_utf8_bytes()[1] == 0);
+
     MaplibreNative.JsonValue[] mutable_json_values = { MaplibreNative.JsonValue.string_value("kept") };
     var copied_json_array = MaplibreNative.JsonValue.array_value(mutable_json_values);
     mutable_json_values[0] = MaplibreNative.JsonValue.string_value("changed");
@@ -1013,7 +1259,7 @@ int main() {
     map.set_geojson_source_data("inline-feature", feature_geojson);
     assert(map.remove_style_source("inline-feature"));
 
-    var feature_collection_geojson = MaplibreNative.GeoJson.feature_collection(new MaplibreNative.FeatureCollection({ feature, feature }));
+    var feature_collection_geojson = MaplibreNative.GeoJson.feature_collection(feature_collection);
     map.add_geojson_source_data("inline-feature-collection", feature_collection_geojson);
     assert(map.style_source_exists("inline-feature-collection"));
     map.set_geojson_source_data("inline-feature-collection", feature_collection_geojson);
@@ -1188,7 +1434,7 @@ int main() {
     projection.set_camera(camera);
     projection.set_visible_coordinates({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) }, MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
     projection.set_visible_geometry(line_geometry, MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
-    projection.close();
+    exercise_projection_close_race(projection);
     bool closed_projection_failed = false;
     try {
       projection.get_camera();
@@ -1254,7 +1500,7 @@ int main() {
         }
         assert(closed_vulkan_frame_image_failed);
         vulkan_session.detach();
-        vulkan_session.close();
+        exercise_render_session_close_race(vulkan_session);
 
         VulkanBorrowedImage vulkan_borrowed_storage;
         assert(vulkan_test_borrowed_image_create(ref vulkan_context_storage, 32, 16, out vulkan_borrowed_storage));
