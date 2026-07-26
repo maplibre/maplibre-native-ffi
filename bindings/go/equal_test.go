@@ -1,0 +1,372 @@
+package maplibre
+
+import "testing"
+
+// BND-070: option descriptors compare by field value rather than pointer identity. Each case
+// lists one mutator per declared field, so a field left out of Equal fails its mutator assertion.
+
+func optionPtr[T any](value T) *T {
+	return &value
+}
+
+func assertValueSemantics[T any](
+	t *testing.T,
+	name string,
+	baseline func() T,
+	equal func(T, T) bool,
+	mutators []func(*T),
+) {
+	t.Helper()
+
+	if !equal(baseline(), baseline()) {
+		t.Fatalf("%s: descriptors with identical fields are not equal", name)
+	}
+	for index, mutate := range mutators {
+		mutated := baseline()
+		mutate(&mutated)
+		if equal(baseline(), mutated) {
+			t.Errorf("%s: field %d is missing from Equal", name, index)
+		}
+	}
+}
+
+func TestCameraOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"CameraOptions",
+		func() CameraOptions {
+			return CameraOptions{
+				Center:         optionPtr(LatLng{Latitude: 1, Longitude: 2}),
+				CenterAltitude: optionPtr(3.0),
+				Padding:        optionPtr(EdgeInsets{Top: 4, Left: 5, Bottom: 6, Right: 7}),
+				Anchor:         optionPtr(ScreenPoint{X: 8, Y: 9}),
+				Zoom:           optionPtr(10.0),
+				Bearing:        optionPtr(11.0),
+				Pitch:          optionPtr(12.0),
+				Roll:           optionPtr(13.0),
+				FieldOfView:    optionPtr(14.0),
+			}
+		},
+		CameraOptions.Equal,
+		[]func(*CameraOptions){
+			func(o *CameraOptions) { o.Center = optionPtr(LatLng{Latitude: 90, Longitude: 90}) },
+			func(o *CameraOptions) { o.CenterAltitude = optionPtr(300.0) },
+			func(o *CameraOptions) { o.Padding = optionPtr(EdgeInsets{}) },
+			func(o *CameraOptions) { o.Anchor = optionPtr(ScreenPoint{X: 80, Y: 90}) },
+			func(o *CameraOptions) { o.Zoom = optionPtr(100.0) },
+			func(o *CameraOptions) { o.Bearing = optionPtr(110.0) },
+			func(o *CameraOptions) { o.Pitch = optionPtr(120.0) },
+			func(o *CameraOptions) { o.Roll = optionPtr(130.0) },
+			func(o *CameraOptions) { o.FieldOfView = optionPtr(140.0) },
+		},
+	)
+}
+
+func TestAnimationOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"AnimationOptions",
+		func() AnimationOptions {
+			return AnimationOptions{
+				DurationMS: optionPtr(1.0),
+				Velocity:   optionPtr(2.0),
+				MinZoom:    optionPtr(3.0),
+				Easing:     optionPtr(UnitBezier{X1: 0.1, Y1: 0.2, X2: 0.3, Y2: 0.4}),
+			}
+		},
+		AnimationOptions.Equal,
+		[]func(*AnimationOptions){
+			func(o *AnimationOptions) { o.DurationMS = optionPtr(10.0) },
+			func(o *AnimationOptions) { o.Velocity = optionPtr(20.0) },
+			func(o *AnimationOptions) { o.MinZoom = optionPtr(30.0) },
+			func(o *AnimationOptions) {
+				o.Easing = optionPtr(UnitBezier{X1: 0.9, Y1: 0.8, X2: 0.7, Y2: 0.6})
+			},
+		},
+	)
+}
+
+func TestCameraFitOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"CameraFitOptions",
+		func() CameraFitOptions {
+			return CameraFitOptions{
+				Padding: optionPtr(EdgeInsets{Top: 1, Left: 2, Bottom: 3, Right: 4}),
+				Bearing: optionPtr(5.0),
+				Pitch:   optionPtr(6.0),
+			}
+		},
+		CameraFitOptions.Equal,
+		[]func(*CameraFitOptions){
+			func(o *CameraFitOptions) { o.Padding = optionPtr(EdgeInsets{}) },
+			func(o *CameraFitOptions) { o.Bearing = optionPtr(50.0) },
+			func(o *CameraFitOptions) { o.Pitch = optionPtr(60.0) },
+		},
+	)
+}
+
+func TestBoundOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"BoundOptions",
+		func() BoundOptions {
+			return BoundOptions{
+				Bounds: optionPtr(LatLngBounds{
+					Southwest: LatLng{Latitude: 0, Longitude: 0},
+					Northeast: LatLng{Latitude: 1, Longitude: 1},
+				}),
+				MinZoom:  optionPtr(2.0),
+				MaxZoom:  optionPtr(3.0),
+				MinPitch: optionPtr(4.0),
+				MaxPitch: optionPtr(5.0),
+			}
+		},
+		BoundOptions.Equal,
+		[]func(*BoundOptions){
+			func(o *BoundOptions) {
+				o.Bounds = optionPtr(LatLngBounds{
+					Southwest: LatLng{Latitude: -1, Longitude: -1},
+					Northeast: LatLng{Latitude: 2, Longitude: 2},
+				})
+			},
+			func(o *BoundOptions) { o.MinZoom = optionPtr(20.0) },
+			func(o *BoundOptions) { o.MaxZoom = optionPtr(30.0) },
+			func(o *BoundOptions) { o.MinPitch = optionPtr(40.0) },
+			func(o *BoundOptions) { o.MaxPitch = optionPtr(50.0) },
+		},
+	)
+}
+
+func TestFreeCameraOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"FreeCameraOptions",
+		func() FreeCameraOptions {
+			return FreeCameraOptions{
+				Position:    optionPtr(Vec3{X: 1, Y: 2, Z: 3}),
+				Orientation: optionPtr(Quaternion{X: 0, Y: 0, Z: 0, W: 1}),
+			}
+		},
+		FreeCameraOptions.Equal,
+		[]func(*FreeCameraOptions){
+			func(o *FreeCameraOptions) { o.Position = optionPtr(Vec3{X: 9, Y: 9, Z: 9}) },
+			func(o *FreeCameraOptions) {
+				o.Orientation = optionPtr(Quaternion{X: 1, Y: 0, Z: 0, W: 0})
+			},
+		},
+	)
+}
+
+func TestViewportOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"ViewportOptions",
+		func() ViewportOptions {
+			return ViewportOptions{
+				NorthOrientation: optionPtr(NorthOrientationUp),
+				ConstrainMode:    optionPtr(ConstrainModeNone),
+				ViewportMode:     optionPtr(ViewportModeDefault),
+				FrustumOffset:    optionPtr(EdgeInsets{Top: 1, Left: 2, Bottom: 3, Right: 4}),
+			}
+		},
+		ViewportOptions.Equal,
+		[]func(*ViewportOptions){
+			func(o *ViewportOptions) { o.NorthOrientation = optionPtr(NorthOrientationDown) },
+			func(o *ViewportOptions) { o.ConstrainMode = optionPtr(ConstrainModeScreen) },
+			func(o *ViewportOptions) { o.ViewportMode = optionPtr(ViewportModeFlippedY) },
+			func(o *ViewportOptions) { o.FrustumOffset = optionPtr(EdgeInsets{}) },
+		},
+	)
+}
+
+func TestTileOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"TileOptions",
+		func() TileOptions {
+			return TileOptions{
+				PrefetchZoomDelta: optionPtr(uint32(1)),
+				LODMinRadius:      optionPtr(2.0),
+				LODScale:          optionPtr(3.0),
+				LODPitchThreshold: optionPtr(4.0),
+				LODZoomShift:      optionPtr(5.0),
+				LODMode:           optionPtr(TileLODModeDefault),
+			}
+		},
+		TileOptions.Equal,
+		[]func(*TileOptions){
+			func(o *TileOptions) { o.PrefetchZoomDelta = optionPtr(uint32(7)) },
+			func(o *TileOptions) { o.LODMinRadius = optionPtr(20.0) },
+			func(o *TileOptions) { o.LODScale = optionPtr(30.0) },
+			func(o *TileOptions) { o.LODPitchThreshold = optionPtr(40.0) },
+			func(o *TileOptions) { o.LODZoomShift = optionPtr(50.0) },
+			func(o *TileOptions) { o.LODMode = optionPtr(TileLODModeDistance) },
+		},
+	)
+}
+
+func TestProjectionModeOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"ProjectionModeOptions",
+		func() ProjectionModeOptions {
+			return ProjectionModeOptions{
+				Axonometric: optionPtr(true),
+				XSkew:       optionPtr(1.0),
+				YSkew:       optionPtr(2.0),
+			}
+		},
+		ProjectionModeOptions.Equal,
+		[]func(*ProjectionModeOptions){
+			func(o *ProjectionModeOptions) { o.Axonometric = optionPtr(false) },
+			func(o *ProjectionModeOptions) { o.XSkew = optionPtr(10.0) },
+			func(o *ProjectionModeOptions) { o.YSkew = optionPtr(20.0) },
+		},
+	)
+}
+
+func TestRuntimeOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"RuntimeOptions",
+		func() RuntimeOptions {
+			return RuntimeOptions{
+				AssetPath:        "assets",
+				CachePath:        "cache",
+				MaximumCacheSize: optionPtr(uint64(1024)),
+			}
+		},
+		RuntimeOptions.Equal,
+		[]func(*RuntimeOptions){
+			func(o *RuntimeOptions) { o.AssetPath = "other-assets" },
+			func(o *RuntimeOptions) { o.CachePath = "other-cache" },
+			func(o *RuntimeOptions) { o.MaximumCacheSize = optionPtr(uint64(2048)) },
+		},
+	)
+}
+
+func TestStyleTileSourceOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"StyleTileSourceOptions",
+		func() StyleTileSourceOptions {
+			return StyleTileSourceOptions{
+				MinZoom:     optionPtr(1.0),
+				MaxZoom:     optionPtr(2.0),
+				Attribution: optionPtr("attribution"),
+				Scheme:      optionPtr(StyleTileSchemeXYZ),
+				Bounds: optionPtr(LatLngBounds{
+					Southwest: LatLng{Latitude: 0, Longitude: 0},
+					Northeast: LatLng{Latitude: 1, Longitude: 1},
+				}),
+				TileSize:       optionPtr(uint32(256)),
+				VectorEncoding: optionPtr(StyleVectorTileEncodingMVT),
+				RasterEncoding: optionPtr(StyleRasterDEMEncodingMapbox),
+			}
+		},
+		StyleTileSourceOptions.Equal,
+		[]func(*StyleTileSourceOptions){
+			func(o *StyleTileSourceOptions) { o.MinZoom = optionPtr(10.0) },
+			func(o *StyleTileSourceOptions) { o.MaxZoom = optionPtr(20.0) },
+			func(o *StyleTileSourceOptions) { o.Attribution = optionPtr("other") },
+			func(o *StyleTileSourceOptions) { o.Scheme = optionPtr(StyleTileSchemeTMS) },
+			func(o *StyleTileSourceOptions) {
+				o.Bounds = optionPtr(LatLngBounds{
+					Southwest: LatLng{Latitude: -1, Longitude: -1},
+					Northeast: LatLng{Latitude: 2, Longitude: 2},
+				})
+			},
+			func(o *StyleTileSourceOptions) { o.TileSize = optionPtr(uint32(512)) },
+			func(o *StyleTileSourceOptions) {
+				o.VectorEncoding = optionPtr(StyleVectorTileEncodingMLT)
+			},
+			func(o *StyleTileSourceOptions) {
+				o.RasterEncoding = optionPtr(StyleRasterDEMEncodingTerrarium)
+			},
+		},
+	)
+}
+
+func TestStyleImageOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"StyleImageOptions",
+		func() StyleImageOptions {
+			return StyleImageOptions{PixelRatio: optionPtr(float32(2)), SDF: optionPtr(true)}
+		},
+		StyleImageOptions.Equal,
+		[]func(*StyleImageOptions){
+			func(o *StyleImageOptions) { o.PixelRatio = optionPtr(float32(3)) },
+			func(o *StyleImageOptions) { o.SDF = optionPtr(false) },
+		},
+	)
+}
+
+func TestQueryOptionsEqualComparesLayerIDsElementByElement(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"RenderedFeatureQueryOptions",
+		func() RenderedFeatureQueryOptions {
+			return RenderedFeatureQueryOptions{
+				LayerIDs: []string{"a", "b"},
+				Filter:   optionPtr(JSONBool(true)),
+			}
+		},
+		RenderedFeatureQueryOptions.Equal,
+		[]func(*RenderedFeatureQueryOptions){
+			func(o *RenderedFeatureQueryOptions) { o.LayerIDs = []string{"a"} },
+			func(o *RenderedFeatureQueryOptions) { o.Filter = optionPtr(JSONString("filter")) },
+		},
+	)
+	assertValueSemantics(
+		t,
+		"SourceFeatureQueryOptions",
+		func() SourceFeatureQueryOptions {
+			return SourceFeatureQueryOptions{
+				SourceLayerIDs: []string{"a", "b"},
+				Filter:         optionPtr(JSONBool(true)),
+			}
+		},
+		SourceFeatureQueryOptions.Equal,
+		[]func(*SourceFeatureQueryOptions){
+			func(o *SourceFeatureQueryOptions) { o.SourceLayerIDs = []string{"a"} },
+			func(o *SourceFeatureQueryOptions) { o.Filter = optionPtr(JSONString("filter")) },
+		},
+	)
+}
+
+func TestQueryOptionsEqualSeparatesAbsentFromEmptyLayerIDs(t *testing.T) {
+	// The native field mask distinguishes an absent layer filter from an empty one.
+	absent := RenderedFeatureQueryOptions{}
+	empty := RenderedFeatureQueryOptions{LayerIDs: []string{}}
+
+	if absent.Equal(empty) {
+		t.Error("absent LayerIDs compares equal to an empty LayerIDs list")
+	}
+}
+
+func TestJSONValueEqualComparesNestedContainers(t *testing.T) {
+	// Query filters compare by value, so the JSON tree they hold has to as well.
+	left := JSONObject(
+		JSONMember{Name: "list", Value: JSONArray(JSONInt(1), JSONString("two"))},
+	)
+	right := JSONObject(
+		JSONMember{Name: "list", Value: JSONArray(JSONInt(1), JSONString("two"))},
+	)
+	if !left.Equal(right) {
+		t.Error("structurally identical JSON values are not equal")
+	}
+
+	differentOrder := JSONObject(
+		JSONMember{Name: "list", Value: JSONArray(JSONString("two"), JSONInt(1))},
+	)
+	if left.Equal(differentOrder) {
+		t.Error("JSON array element order is not compared")
+	}
+
+	// Integer width is part of the value, so a signed and unsigned 1 differ.
+	if JSONInt(1).Equal(JSONUint(1)) {
+		t.Error("signed and unsigned JSON integers compare equal")
+	}
+}

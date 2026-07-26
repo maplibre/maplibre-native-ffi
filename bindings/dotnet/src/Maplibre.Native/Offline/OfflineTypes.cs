@@ -46,6 +46,21 @@ public sealed record OfflineRegionInfo
     public long Id { get; }
     public OfflineRegionDefinition Definition { get; }
     public byte[] Metadata => (byte[])metadata.Clone();
+
+    public bool Equals(OfflineRegionInfo? other) =>
+        other is not null
+        && Id == other.Id
+        && Equals(Definition, other.Definition)
+        && metadata.AsSpan().SequenceEqual(other.metadata);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Id);
+        hash.Add(Definition);
+        hash.AddBytes(metadata);
+        return hash.ToHashCode();
+    }
 }
 
 public sealed record OfflineRegionStatus(

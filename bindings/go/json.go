@@ -37,6 +37,52 @@ type JSONValue struct {
 	Object JSONMembers
 }
 
+// Equal reports whether two JSON values are structurally equal, comparing only the field the type
+// selects and preserving array element order, object member order, and repeated member names. Use
+// this instead of ==, which does not compile for structs holding slices.
+func (v JSONValue) Equal(other JSONValue) bool {
+	if v.Type != other.Type {
+		return false
+	}
+	switch v.Type {
+	case JSONValueTypeNull:
+		return true
+	case JSONValueTypeBool:
+		return v.Bool == other.Bool
+	case JSONValueTypeString:
+		return v.String == other.String
+	case JSONValueTypeInt:
+		return v.Int == other.Int
+	case JSONValueTypeUint:
+		return v.Uint == other.Uint
+	case JSONValueTypeDouble:
+		return v.Double == other.Double
+	case JSONValueTypeArray:
+		if len(v.Array) != len(other.Array) {
+			return false
+		}
+		for index := range v.Array {
+			if !v.Array[index].Equal(other.Array[index]) {
+				return false
+			}
+		}
+		return true
+	case JSONValueTypeObject:
+		if len(v.Object) != len(other.Object) {
+			return false
+		}
+		for index := range v.Object {
+			if v.Object[index].Name != other.Object[index].Name ||
+				!v.Object[index].Value.Equal(other.Object[index].Value) {
+				return false
+			}
+		}
+		return true
+	default:
+		return false
+	}
+}
+
 // JSONNull returns a null JSON value.
 func JSONNull() JSONValue {
 	return JSONValue{Type: JSONValueTypeNull}
