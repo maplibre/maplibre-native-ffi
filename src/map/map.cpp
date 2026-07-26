@@ -652,6 +652,17 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    ) &&
+    effective.cluster_properties == nullptr
+  ) {
+    mln::core::set_thread_error(
+      "cluster_properties must not be null when its field is present"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
     effective.cluster_properties != nullptr &&
     !mln::core::validate_style_json_value(effective.cluster_properties)
   ) {
