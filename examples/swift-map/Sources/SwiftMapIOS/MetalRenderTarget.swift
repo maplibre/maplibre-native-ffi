@@ -69,7 +69,7 @@ final class MetalRenderTarget {
     )
   }
 
-  func renderUpdate() throws {
+  func renderUpdate() throws -> Bool {
     try session.renderUpdate()
   }
 

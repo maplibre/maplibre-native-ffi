@@ -27,7 +27,9 @@ const RenderSessionFrameState = struct {
 
 const RenderSessionState = struct {
     native: ?*NativeRenderSession,
-    map_handle: map_module.MapHandle,
+    /// The map this session is registered against, cleared once the
+    /// registration is released by a successful detach or close.
+    map_handle: ?map_module.MapHandle,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: ?*RenderSessionFrameState,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -76,7 +78,6 @@ const RenderSessionClose = struct {
     native: *c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: *RenderSessionFrameState,
-    map_handle: map_module.MapHandle,
 };
 
 const OwnedTextureFrameLease = struct {
@@ -157,6 +158,26 @@ pub const RenderTargetExtent = struct {
     width: u32 = 512,
     height: u32 = 512,
     scale_factor: f64 = 1.0,
+
+    /// Returns the physical device-pixel size as `ceil(logical * scale_factor)`
+    /// per dimension.
+    ///
+    /// Session-owned texture targets and surface targets are sized this way.
+    /// Borrowed texture targets state their physical size instead, because not
+    /// every physical size is reachable from a logical extent.
+    pub fn physicalSize(
+        self: RenderTargetExtent,
+        diagnostic_store: ?*diagnostics.DiagnosticStore,
+    ) status.Error!struct { width: u32, height: u32 } {
+        const raw = renderTargetExtentToNative(self);
+        var width: u32 = 0;
+        var height: u32 = 0;
+        try status.checkStatus(
+            c.mln_render_target_extent_physical_size(&raw, &width, &height),
+            diagnostic_store,
+        );
+        return .{ .width = width, .height = height };
+    }
 };
 
 pub const MetalContextDescriptor = struct {
@@ -198,6 +219,10 @@ pub const MetalOwnedTextureDescriptor = struct {
 
 pub const MetalBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     texture: NativePointer,
 };
 
@@ -208,6 +233,10 @@ pub const VulkanOwnedTextureDescriptor = struct {
 
 pub const VulkanBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical image size in device pixels. The image is sized by its owner,
+    /// so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     context: VulkanContextDescriptor,
     image: NativePointer,
     image_view: NativePointer,
@@ -223,6 +252,10 @@ pub const OpenGLOwnedTextureDescriptor = struct {
 
 pub const OpenGLBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     context: OpenGLContextDescriptor,
     texture: u32,
     target: u32,
@@ -260,6 +293,11 @@ pub const FeatureStateSelector = struct {
     state_key: ?[]const u8 = null,
 };
 
+/// Screen-space box in logical map pixels.
+///
+/// Corners may be given in any order, and may extend past the viewport.
+/// Rendered queries normalize the corners and clip the box to the viewport, so
+/// a box that over-covers the viewport queries everything visible.
 pub const ScreenBox = struct {
     min: values.ScreenPoint,
     max: values.ScreenPoint,
@@ -390,6 +428,17 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
 pub const RenderSessionHandle = enum(u128) {
     _,
 
+    /// Resizes this attached render session.
+    ///
+    /// Surface and owned-texture sessions resize in place. Borrowed texture
+    /// targets are sized by their owner and return `error.Unsupported`: close
+    /// this session, recreate the texture, and attach a new session. A map
+    /// holds at most one attached session, so close before attaching the
+    /// replacement.
+    ///
+    /// Resizing discards the session renderer, so renderer-held state such as
+    /// feature state does not survive. Map state such as camera, style, and
+    /// sources lives on the map and survives both resize and reattach.
     pub fn resize(self: *RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
@@ -400,18 +449,41 @@ pub const RenderSessionHandle = enum(u128) {
         );
     }
 
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!void {
+    /// Renders the latest available map render update. The map retains its
+    /// latest update, so repeated calls re-render it and return true again;
+    /// use this to redraw on demand after resize or surface expose, and gate
+    /// frame loops on render-update-available events instead of the return
+    /// value. Returns false when no frame was rendered, because the map has
+    /// not published an update yet or the renderer skipped the frame; both are
+    /// normal during startup, so keep pumping the runtime until an update is
+    /// reported.
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
-        try status.checkStatus(c.mln_render_session_render_update(lease.native), lease.diagnostic_store);
+        var rendered: bool = false;
+        try status.checkStatus(
+            c.mln_render_session_render_update(lease.native, &rendered),
+            lease.diagnostic_store,
+        );
+        return rendered;
     }
 
+    /// Detaches the render target from this session. The session stays live and
+    /// still needs `close`, but it no longer holds its map: after a successful
+    /// detach the map can be closed while this session is still open, and every
+    /// session operation that needs an attached target returns a native error.
+    ///
+    /// A detached session stays detached. Attach a new session on the map to
+    /// render again.
     pub fn detach(self: *RenderSessionHandle) status.Error!void {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
         try status.checkStatus(c.mln_render_session_detach(lease.native), lease.diagnostic_store);
+        if (takeMapRegistration(lease.state)) |map_handle| {
+            map_module.unregisterRenderSession(map_handle);
+        }
     }
 
     pub fn reduceMemoryUse(self: *RenderSessionHandle) status.Error!void {
@@ -529,6 +601,15 @@ pub const RenderSessionHandle = enum(u128) {
         return try copyFeatureQueryResult(allocator, result.?, lease.diagnostic_store);
     }
 
+    /// Queries a feature extension from the latest render session state.
+    ///
+    /// The `supercluster` extension reads the `cluster_id` feature property and
+    /// the `limit` and `offset` arguments as `.uint`. Other numeric types are
+    /// treated as absent: a `cluster_id` that is not `.uint` returns a `.value`
+    /// result holding `.null` instead of a `.feature_collection`, and a `limit`
+    /// or `offset` that is not `.uint` leaves `leaves` at the native defaults of
+    /// ten leaves at offset zero. Queried feature properties keep their JSON
+    /// value type, so a queried cluster feature can be passed back unmodified.
     pub fn queryFeatureExtension(
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
@@ -682,7 +763,9 @@ pub const RenderSessionHandle = enum(u128) {
             cancelRenderSessionClose(session_close.state);
             return err;
         };
-        map_module.unregisterRenderSession(session_close.map_handle);
+        if (takeMapRegistration(session_close.state)) |map_handle| {
+            map_module.unregisterRenderSession(map_handle);
+        }
         std.heap.smp_allocator.destroy(session_close.frame_state);
         const session_state = finishRenderSessionClose(self.*) orelse session_close.state;
         std.heap.smp_allocator.destroy(session_state);
@@ -841,6 +924,8 @@ pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwne
 pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.texture = descriptor.texture.toPtr();
     return try attach(map, c.mln_metal_borrowed_texture_attach, &raw);
 }
@@ -855,6 +940,8 @@ pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOw
 pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.context = vulkanContextToNative(descriptor.context);
     raw.image = descriptor.image.toPtr();
     raw.image_view = descriptor.image_view.toPtr();
@@ -874,6 +961,8 @@ pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOw
 pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_opengl_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.context = openglContextToNative(descriptor.context);
     raw.texture = descriptor.texture;
     raw.target = descriptor.target;
@@ -1016,8 +1105,19 @@ fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?Ren
         .native = session,
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
-        .map_handle = session_state.map_handle,
     };
+}
+
+/// Takes this session's map registration exactly once. The caller passes the
+/// returned handle to `map_module.unregisterRenderSession` outside the render
+/// session registry lock.
+fn takeMapRegistration(session_state: *RenderSessionState) ?map_module.MapHandle {
+    lockRenderSessionRegistry();
+    defer unlockRenderSessionRegistry();
+
+    const map_handle = session_state.map_handle orelse return null;
+    session_state.map_handle = null;
+    return map_handle;
 }
 
 fn cancelRenderSessionClose(session_state: *RenderSessionState) void {

@@ -54,18 +54,20 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<()> {
+    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
             } => {
-                session.render_update()?;
+                if !session.render_update()? {
+                    return Ok(false);
+                }
                 let frame = session.acquire_metal_owned_texture_frame()?;
                 let draw_result = compositor.draw(&frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    (Ok(()), Ok(())) => Ok(()),
+                    (Ok(()), Ok(())) => Ok(true),
                     (Err(draw_error), Ok(())) => Err(draw_error),
                     (Ok(()), Err(close_error)) => Err(close_error),
                     (Err(draw_error), Err(close_error)) => Err(Error::new(
@@ -80,8 +82,11 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
-                session.render_update()?;
-                compositor.draw_texture(texture.texture())
+                if !session.render_update()? {
+                    return Ok(false);
+                }
+                compositor.draw_texture(texture.texture())?;
+                Ok(true)
             }
             Self::Surface { session } => session.render_update(),
         }
@@ -149,8 +154,12 @@ fn attach_borrowed_texture(
     viewport: Viewport,
 ) -> maplibre_native::Result<RenderTarget> {
     let texture = MetalBorrowedTexture::new(metal, viewport)?;
-    let descriptor =
-        maplibre_native::MetalBorrowedTextureDescriptor::new(extent(viewport), texture.pointer());
+    let descriptor = maplibre_native::MetalBorrowedTextureDescriptor::new(
+        extent(viewport),
+        viewport.physical_width,
+        viewport.physical_height,
+        texture.pointer(),
+    );
     let session = map.attach_metal_borrowed_texture(&descriptor)?;
     let compositor = match MetalTextureCompositor::new(metal) {
         Ok(compositor) => compositor,

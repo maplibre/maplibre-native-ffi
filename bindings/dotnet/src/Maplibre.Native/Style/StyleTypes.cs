@@ -49,7 +49,11 @@ public sealed record SourceInfo(
     string? Attribution
 );
 
-public sealed class TileSourceOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record TileSourceOptions
 {
     public TileScheme? Scheme { get; set; }
     public double? MinimumZoom { get; set; }
@@ -85,7 +89,11 @@ public sealed record StyleImageInfo(
     bool Sdf
 );
 
-public sealed class StyleImageOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record StyleImageOptions
 {
     public float? PixelRatio { get; set; }
     public bool? Sdf { get; set; }

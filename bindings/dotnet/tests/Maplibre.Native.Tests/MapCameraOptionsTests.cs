@@ -310,5 +310,8 @@ public sealed class MapCameraOptionsTests
         Assert.Equal(45, camera.Bearing.Value, 12);
         Assert.NotNull(camera.Pitch);
         Assert.Equal(30, camera.Pitch.Value, 12);
+
+        // BND-070: successive snapshots of an unchanged camera compare equal.
+        Assert.Equal(camera, map.GetCamera());
     }
 }

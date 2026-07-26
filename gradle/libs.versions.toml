@@ -2,6 +2,7 @@
 kotlin = "2.4.10"
 compose = "1.11.1"
 agp = "9.1.1"
+dokka = "2.2.0"
 maven-publish = "0.37.0"
 javacpp = "1.5.11"
 lwjgl = "3.4.1"
@@ -26,3 +27,4 @@ lwjgl-shaderc = { module = "org.lwjgl:lwjgl-shaderc" }
 [plugins]
 compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose" }
 compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

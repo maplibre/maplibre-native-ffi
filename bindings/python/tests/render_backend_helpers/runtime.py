@@ -5,9 +5,26 @@ import time
 import pytest
 
 import maplibre_native as mln
-from maplibre_native import render
+from maplibre_native import camera, geo, json, query, render
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
+
+CLUSTER_STYLE_JSON = (
+    '{"version":8,"name":"python-cluster-query-test",'
+    '"sources":{"cluster-source":{"type":"geojson","cluster":true,'
+    '"data":{"type":"FeatureCollection","features":['
+    '{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},'
+    '"properties":{"name":"one"}},'
+    '{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},'
+    '"properties":{"name":"two"}},'
+    '{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},'
+    '"properties":{"name":"three"}}]}}},'
+    '"layers":[{"id":"background","type":"background",'
+    '"paint":{"background-color":"#ffffff"}},'
+    '{"id":"cluster-circle","type":"circle","source":"cluster-source",'
+    '"filter":["has","point_count"],'
+    '"paint":{"circle-color":"#2563eb","circle-radius":20}}]}'
+)
 
 
 def is_configured_render_backend(
@@ -70,4 +87,109 @@ def render_until_update(
         iterations=iterations,
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
-    session.render_update()
+    assert session.render_update()
+
+
+def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
+    try:
+        map_handle.request_still_image()
+    except mln.InvalidStateError as error:
+        if "pending still-image request" not in error.diagnostic:
+            raise
+
+
+def wait_for_rendered_cluster(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    session: render.RenderSessionHandle,
+    *,
+    iterations: int = 5000,
+) -> query.QueriedFeature:
+    """Load the cluster style and return the first rendered cluster feature."""
+    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
+    map_handle.set_style_json(CLUSTER_STYLE_JSON)
+    query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0))
+    geometry = query.RenderedQueryGeometry.box_geometry(
+        query.ScreenBox(
+            camera.ScreenPoint(query_point.x - 30.0, query_point.y - 30.0),
+            camera.ScreenPoint(query_point.x + 30.0, query_point.y + 30.0),
+        )
+    )
+    options = query.RenderedFeatureQueryOptions(layer_ids=("cluster-circle",))
+    for _ in range(iterations):
+        request_still_image_if_needed(map_handle)
+        runtime.run_once()
+        while event := runtime.poll_event():
+            if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
+                try:
+                    session.render_update()
+                except mln.InvalidStateError:
+                    pass
+        try:
+            features = session.query_rendered_features(geometry, options)
+        except mln.InvalidStateError:
+            features = ()
+        if features:
+            return features[0]
+        time.sleep(0.001)
+    raise AssertionError("cluster feature query returned no features")
+
+
+def feature_member(feature: geo.Feature, key: str) -> json.JsonValue:
+    return next(member.value for member in feature.properties if member.key == key)
+
+
+def single_cluster_leaf(
+    session: render.RenderSessionHandle,
+    feature: geo.Feature,
+    *,
+    offset: int,
+) -> geo.Feature:
+    """Return the one leaf at `offset` through a bounded supercluster query."""
+    leaves = session.query_feature_extensions(
+        "cluster-source",
+        feature,
+        "supercluster",
+        "leaves",
+        json.JsonObject(
+            (
+                json.JsonMember("limit", json.JsonUInt(1)),
+                json.JsonMember("offset", json.JsonUInt(offset)),
+            )
+        ),
+    )
+    assert leaves.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
+    assert leaves.feature_collection is not None
+    assert len(leaves.feature_collection) == 1
+    return leaves.feature_collection[0]
+
+
+def assert_cluster_feature_extensions(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    session: render.RenderSessionHandle,
+) -> None:
+    """Round-trip a rendered cluster feature through supercluster queries."""
+    cluster = wait_for_rendered_cluster(runtime, map_handle, session)
+    # Native matches cluster_id by exact JSON value type, so the copied feature
+    # must keep the unsigned alternative to resolve on the way back in.
+    assert isinstance(feature_member(cluster.feature, "cluster_id"), json.JsonUInt)
+
+    children = session.query_feature_extensions(
+        "cluster-source", cluster.feature, "supercluster", "children", None
+    )
+    assert children.type == query.FeatureExtensionResultType.FEATURE_COLLECTION
+    assert children.feature_collection
+
+    expansion_zoom = session.query_feature_extensions(
+        "cluster-source", cluster.feature, "supercluster", "expansion-zoom", None
+    )
+    assert expansion_zoom.type == query.FeatureExtensionResultType.VALUE
+    assert isinstance(expansion_zoom.value, json.JsonUInt)
+
+    # An unsigned limit bounds the collection, and an unsigned offset selects a
+    # later leaf. Native ignores arguments of another type and falls back to ten
+    # leaves at offset zero, so both bounds must move the observed result.
+    first = single_cluster_leaf(session, cluster.feature, offset=0)
+    second = single_cluster_leaf(session, cluster.feature, offset=1)
+    assert feature_member(first, "name") != feature_member(second, "name")

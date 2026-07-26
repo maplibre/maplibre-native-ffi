@@ -108,6 +108,28 @@ typedef struct mln_opengl_context_descriptor {
 } mln_opengl_context_descriptor;
 
 /**
+ * Computes the physical device-pixel size of a logical render target extent.
+ *
+ * Each dimension is ceil(logical * scale_factor). Session-owned texture targets
+ * and surface targets are sized this way, so callers that allocate host
+ * resources alongside them can use this instead of repeating the formula.
+ *
+ * Caller-owned borrowed texture targets state their physical size directly and
+ * do not derive it; see texture.h. Not every physical size is reachable from a
+ * logical extent, so a caller that starts from a physical size it does not
+ * control states that size rather than solving for a logical extent.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when extent is null or invalid, out_width or
+ *   out_height is null, or the scaled dimensions are too large.
+ */
+MLN_API mln_status mln_render_target_extent_physical_size(
+  const mln_render_target_extent* extent, uint32_t* out_width,
+  uint32_t* out_height
+) MLN_NOEXCEPT;
+
+/**
  * Returns OpenGL context providers supported by this build.
  */
 MLN_API uint32_t mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;

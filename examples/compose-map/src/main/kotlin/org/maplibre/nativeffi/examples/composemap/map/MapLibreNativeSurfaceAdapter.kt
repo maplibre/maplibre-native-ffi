@@ -47,7 +47,12 @@ internal object MapLibreNativeSurfaceAdapter {
       key = targetKey(target.backend, target.generation, extent),
       attach = { map ->
         map.attachMetalBorrowedTexture(
-          MetalBorrowedTextureDescriptor(extent.toRenderTargetExtent(), target.texture.toPointer())
+          MetalBorrowedTextureDescriptor(
+            extent.toRenderTargetExtent(),
+            extent.physicalWidth,
+            extent.physicalHeight,
+            target.texture.toPointer(),
+          )
         )
       },
     )
@@ -62,6 +67,8 @@ internal object MapLibreNativeSurfaceAdapter {
         map.attachVulkanBorrowedTexture(
           VulkanBorrowedTextureDescriptor(
               extent.toRenderTargetExtent(),
+              extent.physicalWidth,
+              extent.physicalHeight,
               target.context.toDescriptor(),
               target.image.toPointer(),
               target.imageView.toPointer(),
@@ -83,6 +90,8 @@ internal object MapLibreNativeSurfaceAdapter {
         map.attachOpenGLBorrowedTexture(
           OpenGLBorrowedTextureDescriptor(
             extent.toRenderTargetExtent(),
+            extent.physicalWidth,
+            extent.physicalHeight,
             target.context.toDescriptor(),
             target.textureName,
             target.textureTarget,

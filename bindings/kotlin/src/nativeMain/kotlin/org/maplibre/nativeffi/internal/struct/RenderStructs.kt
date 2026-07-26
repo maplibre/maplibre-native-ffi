@@ -74,6 +74,8 @@ internal object RenderStructs {
     val native = scope.alloc<mln_metal_borrowed_texture_descriptor>()
     mln_metal_borrowed_texture_descriptor_default().place(native.ptr)
     fillExtent(native.extent, descriptor.extent)
+    native.physical_width = descriptor.physicalWidth.toUInt()
+    native.physical_height = descriptor.physicalHeight.toUInt()
     native.texture = pointer(descriptor.texture)
     return native.ptr
   }
@@ -96,6 +98,8 @@ internal object RenderStructs {
     val native = scope.alloc<mln_vulkan_borrowed_texture_descriptor>()
     mln_vulkan_borrowed_texture_descriptor_default().place(native.ptr)
     fillExtent(native.extent, descriptor.extent)
+    native.physical_width = descriptor.physicalWidth.toUInt()
+    native.physical_height = descriptor.physicalHeight.toUInt()
     fillVulkanContext(native.context, descriptor.context)
     native.image = pointer(descriptor.image)
     native.image_view = pointer(descriptor.imageView)
@@ -123,6 +127,8 @@ internal object RenderStructs {
     val native = scope.alloc<mln_opengl_borrowed_texture_descriptor>()
     mln_opengl_borrowed_texture_descriptor_default().place(native.ptr)
     fillExtent(native.extent, descriptor.extent)
+    native.physical_width = descriptor.physicalWidth.toUInt()
+    native.physical_height = descriptor.physicalHeight.toUInt()
     fillOpenGLContext(native.context, descriptor.context)
     native.texture = descriptor.texture.toUInt()
     native.target = descriptor.target.toUInt()

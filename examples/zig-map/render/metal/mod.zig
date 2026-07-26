@@ -301,6 +301,8 @@ const MetalBorrowedTextureBackend = struct {
     ) !render_target.Session {
         const texture = maplibre.attachMetalBorrowedTexture(map, .{
             .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
             .texture = maplibre.NativePointer.fromPtr(self.borrowed_texture.value.?),
         }) catch |err| {
             diagnostics.logError("Metal borrowed texture attach failed", err, null);

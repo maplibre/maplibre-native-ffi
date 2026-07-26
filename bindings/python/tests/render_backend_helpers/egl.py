@@ -292,6 +292,8 @@ class EglBorrowedTexture:
                 self.height,
                 self.scale_factor,
             ),
+            physical_width=self.width,
+            physical_height=self.height,
             context=self.context.descriptor(),
             texture=self.texture,
             target=GL.GL_TEXTURE_2D,

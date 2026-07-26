@@ -5,6 +5,8 @@ import org.maplibre.nativeffi.internal.status.Status
 /** Mutable descriptor for Vulkan caller-owned texture render targets. */
 public class VulkanBorrowedTextureDescriptor(
   extent: RenderTargetExtent,
+  physicalWidth: Int,
+  physicalHeight: Int,
   context: VulkanContextDescriptor,
   image: NativePointer,
   imageView: NativePointer,
@@ -12,6 +14,26 @@ public class VulkanBorrowedTextureDescriptor(
   initialLayout: Int,
 ) {
   public var extent: RenderTargetExtent = extent
+
+  /**
+   * Physical image size in device pixels. The image is sized by its owner, so this is stated rather
+   * than derived from [extent].
+   */
+  public var physicalWidth: Int = physicalWidth
+    set(value) {
+      Status.requireArgument(value >= 0) { "physicalWidth must be non-negative" }
+      field = value
+    }
+
+  /**
+   * Physical image size in device pixels. The image is sized by its owner, so this is stated rather
+   * than derived from [extent].
+   */
+  public var physicalHeight: Int = physicalHeight
+    set(value) {
+      Status.requireArgument(value >= 0) { "physicalHeight must be non-negative" }
+      field = value
+    }
 
   public var context: VulkanContextDescriptor = context
 
@@ -38,6 +60,8 @@ public class VulkanBorrowedTextureDescriptor(
     }
 
   init {
+    Status.requireArgument(physicalWidth >= 0) { "physicalWidth must be non-negative" }
+    Status.requireArgument(physicalHeight >= 0) { "physicalHeight must be non-negative" }
     Status.requireArgument(format >= 0) { "format must be non-negative" }
     Status.requireArgument(initialLayout >= 0) { "initialLayout must be non-negative" }
   }

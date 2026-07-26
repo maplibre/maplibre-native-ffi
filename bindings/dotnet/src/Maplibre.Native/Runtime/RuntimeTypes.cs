@@ -70,6 +70,13 @@ public enum RuntimeEventType : uint
     OfflineOperationCompleted = 22,
 }
 
+/// <param name="MapSource">
+/// The map that raised this event, resolved from the runtime's weak map registry.
+/// Hold your own strong reference to a <see cref="MapHandle" /> for as long as you
+/// want to attribute its events: once the only remaining reference is the runtime's
+/// weak one, the map can be collected and this member is <see langword="null" />
+/// even though <see cref="SourceType" /> still reports a map source.
+/// </param>
 public sealed record RuntimeEvent(
     RuntimeEventType Type,
     uint RawType,
@@ -150,5 +157,18 @@ public abstract record RuntimeEventPayload
 
         public uint RawPayloadType { get; }
         public byte[] PayloadBytes => (byte[])payloadBytes.Clone();
+
+        public bool Equals(Unknown? other) =>
+            other is not null
+            && RawPayloadType == other.RawPayloadType
+            && payloadBytes.AsSpan().SequenceEqual(other.payloadBytes);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(RawPayloadType);
+            hash.AddBytes(payloadBytes);
+            return hash.ToHashCode();
+        }
     }
 }

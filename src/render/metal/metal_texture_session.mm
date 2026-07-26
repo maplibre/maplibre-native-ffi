@@ -59,22 +59,15 @@ auto validate_borrowed_descriptor(
     mln::core::set_thread_error("Metal texture must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto physical_status = mln::core::validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = mln::core::validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  const auto physical_width = mln::core::physical_dimension(
-    descriptor->extent.width, descriptor->extent.scale_factor
-  );
-  const auto physical_height = mln::core::physical_dimension(
-    descriptor->extent.height, descriptor->extent.scale_factor
-  );
   if (
-    metal_texture->width() != physical_width ||
-    metal_texture->height() != physical_height
+    metal_texture->width() != descriptor->physical_width ||
+    metal_texture->height() != descriptor->physical_height
   ) {
     mln::core::set_thread_error(
       "Metal texture dimensions must match descriptor physical size"
@@ -216,15 +209,17 @@ class MetalTextureSessionBackend final
     return backend_;
   }
 
-  auto after_render(mln_render_session& texture) -> mln_status override {
+  auto after_render(mln_render_session& texture, bool& out_rendered)
+    -> mln_status override {
     auto* rendered_texture = backend_.metal_texture();
     if (rendered_texture == nullptr) {
-      mln::core::set_thread_error(
-        "render update did not produce a Metal texture"
-      );
-      return MLN_STATUS_INVALID_STATE;
+      // The Metal backend creates its texture on the first real draw; a
+      // renderer pass can complete without one before content is ready.
+      out_rendered = false;
+      return MLN_STATUS_OK;
     }
     texture.texture.rendered_native_texture = rendered_texture;
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
 
@@ -292,6 +287,8 @@ auto metal_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .texture = nullptr,
   };
 }
@@ -366,7 +363,10 @@ auto metal_borrowed_texture_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  set_session_extent(*session, descriptor->extent);
+  set_borrowed_session_extent(
+    *session, descriptor->extent, descriptor->physical_width,
+    descriptor->physical_height
+  );
   session->texture.api_kind = TextureSessionApi::Metal;
   session->texture.mode = TextureSessionMode::Borrowed;
   session->texture.backend = std::make_unique<MetalTextureSessionBackend>(
@@ -494,6 +494,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .context =
       mln_vulkan_context_descriptor{
         .size = sizeof(mln_vulkan_context_descriptor),
@@ -563,9 +565,8 @@ auto vulkan_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -624,9 +625,8 @@ auto opengl_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;

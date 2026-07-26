@@ -6,6 +6,7 @@
 #ifndef MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 #define MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base.h"
@@ -19,7 +20,25 @@ extern "C" {
  * Resizes an attached render session.
  *
  * Width and height are logical map dimensions. The scale_factor value maps
- * them to physical backend pixels.
+ * them to physical backend pixels. Resizing sets the map size, so the map
+ * viewport and the render target extent stay the same value.
+ *
+ * Surface and session-owned texture sessions resize in place. Caller-owned
+ * borrowed texture targets return MLN_STATUS_UNSUPPORTED because the texture is
+ * sized by its owner; follow a host whose target changed by destroying the
+ * session with mln_render_session_destroy() (or releasing the map slot with
+ * mln_render_session_detach()), recreating the texture, and attaching a new
+ * session. A map holds at most one attached session, so detach or destroy the
+ * old session before attaching the replacement.
+ *
+ * Resizing discards the session renderer, which is rebuilt on the next
+ * mln_render_session_render_update(). Renderer-held state, including feature
+ * state set through mln_render_session_set_feature_state(), does not survive.
+ * Map state such as camera, style, and sources lives on the map and survives
+ * both resize and reattach.
+ *
+ * Passing a scale_factor that differs from the map's mln_map_options
+ * scale_factor logs a warning; see mln_map_options.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -45,17 +64,30 @@ MLN_API mln_status mln_render_session_resize(
  * Surface sessions render and present through their native surface. Texture
  * sessions render into their texture target.
  *
+ * On success, *out_rendered reports whether the latest available map render
+ * update was rendered. The map retains its latest update, so repeated calls
+ * re-render it and report true again; hosts use this to redraw on demand
+ * after resize or surface expose, and gate frame-driven loops on
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE instead of the return value.
+ * *out_rendered is false when no frame was rendered: the map has not
+ * published a render update yet, or the renderer skipped producing a frame
+ * for the latest update (for example the Metal texture backend before content
+ * is ready). Both are normal during startup; keep pumping the runtime and
+ * call again when an update is reported.
+ *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
- * - MLN_STATUS_INVALID_STATE when no render update is available or the session
- *   is detached, or a texture frame is currently acquired.
+ * - MLN_STATUS_OK on success, with *out_rendered set.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, or
+ *   out_rendered is null.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame
+ *   is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_render_update(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) MLN_NOEXCEPT;
 
 /**
  * Detaches backend-bound render resources from the map while keeping the

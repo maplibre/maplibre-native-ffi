@@ -6,4 +6,6 @@ sidebar:
 ---
 
 This planned guide will show how to query rendered features, source features,
-and feature extensions from the latest render session state.
+and feature extensions from the latest render session state, including passing a
+queried cluster feature back to the `supercluster` extension and supplying its
+`limit` and `offset` arguments as unsigned JSON values.
