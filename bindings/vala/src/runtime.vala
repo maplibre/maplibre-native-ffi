@@ -806,6 +806,50 @@ namespace MaplibreNative {
         }
     }
 
+    private class ResourceProviderRegistration {
+        private ResourceProviderCallback callback;
+        private Mutex mutex;
+        private Cond idle;
+        private bool closing;
+        private uint active_callbacks;
+
+        public ResourceProviderRegistration (owned ResourceProviderCallback callback) {
+            this.callback = (owned) callback;
+        }
+
+        public uint32 invoke (Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
+            mutex.lock ();
+            if (closing) {
+                mutex.unlock ();
+                return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
+            }
+            active_callbacks++;
+            mutex.unlock ();
+            try {
+                var copied_request = new ResourceRequest.from_native (request);
+                var request_handle = new ResourceRequestHandle (handle);
+                var decision = callback (copied_request, request_handle);
+                return request_handle.finish_provider_decision (decision);
+            } finally {
+                mutex.lock ();
+                active_callbacks--;
+                if (closing && active_callbacks == 0) {
+                    idle.broadcast ();
+                }
+                mutex.unlock ();
+            }
+        }
+
+        public void close () {
+            mutex.lock ();
+            closing = true;
+            while (active_callbacks > 0) {
+                idle.wait (mutex);
+            }
+            mutex.unlock ();
+        }
+    }
+
     private LogCallback? current_log_callback;
 
     private uint32 log_trampoline (void* user_data, uint32 severity, uint32 event, int64 code, string? message) {
@@ -827,8 +871,8 @@ namespace MaplibreNative {
         if (user_data == null || request == null || handle == null) {
             return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
         }
-        unowned RuntimeHandle runtime = (RuntimeHandle) user_data;
-        return runtime.invoke_resource_provider (request, handle);
+        unowned ResourceProviderRegistration registration = (ResourceProviderRegistration) user_data;
+        return registration.invoke (request, handle);
     }
 
     public uint32 c_version () {
@@ -876,7 +920,7 @@ namespace MaplibreNative {
     public class RuntimeHandle {
         private Raw.Runtime? native;
         private ResourceTransformRegistration? resource_transform;
-        private ResourceProviderCallback? resource_provider;
+        private ResourceProviderRegistration? resource_provider;
         private MapHandle[] maps = new MapHandle[0];
 
         public bool closed { get { return native == null; } }
@@ -912,7 +956,11 @@ namespace MaplibreNative {
             check_status (Raw.runtime_destroy (closing));
             native = null;
             resource_transform = null;
+            var provider = resource_provider;
             resource_provider = null;
+            if (provider != null) {
+                provider.close ();
+            }
         }
 
         public void run_once () throws Error {
@@ -966,18 +1014,16 @@ namespace MaplibreNative {
         }
 
         public void set_resource_provider (owned ResourceProviderCallback callback) throws Error {
-            var previous = (owned) resource_provider;
-            resource_provider = (owned) callback;
+            if (resource_provider != null) {
+                throw new Error.INVALID_STATE ("resource provider is already configured");
+            }
+            var registration = new ResourceProviderRegistration ((owned) callback);
             Raw.ResourceProvider provider = {};
             provider.size = (uint32) sizeof (Raw.ResourceProvider);
             provider.callback = resource_provider_trampoline;
-            provider.user_data = this;
-            try {
-                check_status (Raw.runtime_set_resource_provider (require_live (), &provider));
-            } catch (Error error) {
-                resource_provider = (owned) previous;
-                throw error;
-            }
+            provider.user_data = registration;
+            check_status (Raw.runtime_set_resource_provider (require_live (), &provider));
+            resource_provider = registration;
         }
 
         public void set_resource_transform (owned ResourceTransformCallback callback) throws Error {
@@ -993,16 +1039,6 @@ namespace MaplibreNative {
         public void clear_resource_transform () throws Error {
             check_status (Raw.runtime_clear_resource_transform (require_live ()));
             resource_transform = null;
-        }
-
-        internal uint32 invoke_resource_provider (Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
-            if (resource_provider == null) {
-                return (uint32) Raw.ResourceProviderDecision.PASS_THROUGH;
-            }
-            var copied_request = new ResourceRequest.from_native (request);
-            var request_handle = new ResourceRequestHandle (handle);
-            var decision = resource_provider (copied_request, request_handle);
-            return request_handle.finish_provider_decision (decision);
         }
 
         public OfflineOperationId run_ambient_cache_operation_start (AmbientCacheOperation operation) throws Error {
