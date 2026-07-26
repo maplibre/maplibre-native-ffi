@@ -211,6 +211,11 @@ MLN_API mln_status mln_render_session_query_source_features(
 /**
  * Queries a feature extension from the latest render session state.
  *
+ * Feature extensions are renderer-scoped in MapLibre Native: the cluster index
+ * an extension reads lives on the render-side source inside a live renderer,
+ * not on the style source, which is why this query hangs off the session rather
+ * than off a map or a source ID.
+ *
  * The session renderer must already exist. source_id, feature, extension,
  * extension_field, and arguments are borrowed for the duration of the call.
  * arguments may be null. When non-null, arguments must be a JSON object
