@@ -363,13 +363,22 @@ class OptionsValueSemanticsTest {
   }
 
   @Test
-  fun copiedQueryOptionsSnapshotCallerOwnedLayerIds() {
-    // BND-069: a copy does not observe later mutation of the caller's list.
+  fun queryOptionsSnapshotCallerOwnedLayerIds() {
+    // BND-069: neither the descriptor nor its copy observes later mutation of the caller's list.
     val layerIds = mutableListOf("a")
-    val copy = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }.copy()
+    val options = RenderedFeatureQueryOptions().apply { this.layerIds = layerIds }
+    val copy = options.copy()
 
     layerIds.add("b")
 
+    assertEquals(listOf("a"), options.layerIds)
     assertEquals(listOf("a"), copy.layerIds)
+
+    val sourceLayerIds = mutableListOf("a")
+    val sourceOptions = SourceFeatureQueryOptions().apply { this.sourceLayerIds = sourceLayerIds }
+
+    sourceLayerIds.add("b")
+
+    assertEquals(listOf("a"), sourceOptions.sourceLayerIds)
   }
 }

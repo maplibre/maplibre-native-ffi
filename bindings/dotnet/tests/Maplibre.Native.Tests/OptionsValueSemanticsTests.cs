@@ -313,6 +313,27 @@ public sealed class OptionsValueSemanticsTests
         );
     }
 
+    [BindingSpecTest("BND-069", "BND-070")]
+    [Fact]
+    public void QueryOptionsSnapshotCallerOwnedLayerIds()
+    {
+        var layerIds = new List<string> { "a" };
+        var options = new RenderedFeatureQueryOptions { LayerIds = layerIds };
+        var copy = options with { };
+
+        layerIds.Add("b");
+
+        Assert.Equal(["a"], options.LayerIds);
+        Assert.Equal(["a"], copy.LayerIds);
+
+        var sourceLayerIds = new List<string> { "a" };
+        var sourceOptions = new SourceFeatureQueryOptions { SourceLayerIds = sourceLayerIds };
+
+        sourceLayerIds.Add("b");
+
+        Assert.Equal(["a"], sourceOptions.SourceLayerIds);
+    }
+
     [BindingSpecTest("BND-070")]
     [Fact]
     public void AbsentLayerIdsDifferFromEmptyLayerIds()
