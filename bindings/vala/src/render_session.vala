@@ -58,6 +58,7 @@ namespace MaplibreNative {
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
             }
             active_native_leases++;
@@ -79,10 +80,12 @@ namespace MaplibreNative {
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
             }
             if (frame_acquired) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session already has an acquired frame");
             }
             frame_acquired = true;
@@ -99,10 +102,12 @@ namespace MaplibreNative {
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
             }
             if (frame_acquired) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session has an acquired frame");
             }
             active_native_leases++;
@@ -119,10 +124,12 @@ namespace MaplibreNative {
             }
             if (releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session release is already in progress");
             }
             if (frame_acquired) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session has an acquired frame");
             }
             releasing = true;
@@ -181,6 +188,7 @@ namespace MaplibreNative {
 
         public TextureImageInfo read_premultiplied_rgba8 (uint8[] out_data) throws Error {
             if (out_data.length == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("readback buffer is empty");
             }
             Raw.TextureImageInfo info = Raw.texture_image_info_default ();

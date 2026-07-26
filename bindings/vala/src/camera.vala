@@ -458,6 +458,26 @@ namespace MaplibreNative {
             return has_y_skew;
         }
 
+        public ProjectionMode copy () {
+            var copied = new ProjectionMode ();
+            copied.has_axonometric = has_axonometric;
+            copied.axonometric_value = axonometric_value;
+            copied.has_x_skew = has_x_skew;
+            copied.x_skew_value = x_skew_value;
+            copied.has_y_skew = has_y_skew;
+            copied.y_skew_value = y_skew_value;
+            return copied;
+        }
+
+        public bool equal (ProjectionMode other) {
+            return has_axonometric == other.has_axonometric
+                && (!has_axonometric || axonometric_value == other.axonometric_value)
+                && has_x_skew == other.has_x_skew
+                && (!has_x_skew || x_skew_value == other.x_skew_value)
+                && has_y_skew == other.has_y_skew
+                && (!has_y_skew || y_skew_value == other.y_skew_value);
+        }
+
         internal Raw.ProjectionMode to_native () {
             Raw.ProjectionMode mode = {};
             mode.size = (uint32) sizeof (Raw.ProjectionMode);

@@ -58,6 +58,7 @@ namespace MaplibreNative {
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map projection handle is closed");
             }
             active_native_leases++;
@@ -83,6 +84,7 @@ namespace MaplibreNative {
             }
             if (releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map projection release is already in progress");
             }
             releasing = true;
@@ -134,6 +136,7 @@ namespace MaplibreNative {
 
         public void set_visible_coordinates (LatLng[] coordinates, EdgeInsets padding) throws Error {
             if (coordinates.length == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("visible coordinates are empty");
             }
             Raw.LatLng[] native_coordinates = new Raw.LatLng[coordinates.length];

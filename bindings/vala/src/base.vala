@@ -365,6 +365,7 @@ namespace MaplibreNative {
 
         internal void* to_native () throws Error {
             if (bits == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("native pointer is null");
             }
             return (void*) bits;
@@ -397,6 +398,7 @@ namespace MaplibreNative {
             mutex.lock ();
             if (closed || releasing) {
                 mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("%s is closed", resource_name);
             }
             active_accesses++;
@@ -413,10 +415,12 @@ namespace MaplibreNative {
             }
             if (releasing) {
                 mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("%s release is already in progress", resource_name);
             }
             if (active_accesses > 0) {
                 mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("%s has an active native-value borrow", resource_name);
             }
             releasing = true;
@@ -519,13 +523,16 @@ namespace MaplibreNative {
                 } else if (first >= 0xf0 && first <= 0xf4) {
                     count = 4;
                 } else {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid leading byte");
                 }
                 if (index + count > value.length) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("UTF-8 input ends inside a code point");
                 }
                 for (var continuation = 1; continuation < count; continuation++) {
                     if ((value[index + continuation] & 0xc0) != 0x80) {
+                        clear_unknown_status ();
                         throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid continuation byte");
                     }
                 }
@@ -533,6 +540,7 @@ namespace MaplibreNative {
                     || (first == 0xed && value[index + 1] >= 0xa0)
                     || (first == 0xf0 && value[index + 1] < 0x90)
                     || (first == 0xf4 && value[index + 1] >= 0x90)) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid code point");
                 }
                 index += count;
@@ -593,6 +601,7 @@ namespace MaplibreNative {
 
         public string get (uint index) throws Error {
             if (index >= values.length) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("string list index is out of range");
             }
             return values[index].to_string ();
@@ -600,6 +609,7 @@ namespace MaplibreNative {
 
         public Utf8String get_utf8 (uint index) throws Error {
             if (index >= values.length) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("string list index is out of range");
             }
             return values[index].copy ();

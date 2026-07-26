@@ -19,12 +19,14 @@ namespace MaplibreNative {
             switch ((FeatureExtensionResultType) native.type) {
             case FeatureExtensionResultType.VALUE:
                 if (native.value == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("feature extension value is null");
                 }
                 return new FeatureExtensionResult (FeatureExtensionResultType.VALUE, JsonValue.from_native (native.value[0]), null);
             case FeatureExtensionResultType.FEATURE_COLLECTION:
                 return new FeatureExtensionResult (FeatureExtensionResultType.FEATURE_COLLECTION, null, FeatureCollection.from_native (native.feature_collection));
             default:
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("unknown feature extension result type");
             }
         }
@@ -48,6 +50,7 @@ namespace MaplibreNative {
 
         private unowned Raw.FeatureExtensionResult require_live () throws Error {
             if (native == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature extension result handle is closed");
             }
             return native;
@@ -86,18 +89,13 @@ namespace MaplibreNative {
         private RenderedQueryGeometry (Raw.RenderedQueryGeometry native, owned Raw.ScreenPoint[]? points = null) {
             this.native = native;
             this.points = (owned) points;
-            refresh_native_views ();
         }
 
         internal Raw.RenderedQueryGeometry to_native () {
-            refresh_native_views ();
-            return native;
-        }
-
-        private void refresh_native_views () {
             if (points != null && native.type == (uint32) RenderedQueryGeometryType.LINE_STRING) {
-                native.line_string = Raw.ScreenLineString () { points = points, point_count = points.length };
+                return Raw.rendered_query_geometry_line_string (points, points.length);
             }
+            return native;
         }
 
         public static RenderedQueryGeometry point (ScreenPoint point) {
@@ -110,6 +108,7 @@ namespace MaplibreNative {
 
         public static RenderedQueryGeometry line_string (ScreenPoint[] points) throws Error {
             if (points.length == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("rendered query line string is empty");
             }
             Raw.ScreenPoint[] native_points = new Raw.ScreenPoint[points.length];
@@ -117,6 +116,46 @@ namespace MaplibreNative {
                 native_points[i] = points[i].to_native ();
             }
             return new RenderedQueryGeometry (Raw.rendered_query_geometry_line_string (native_points, native_points.length), (owned) native_points);
+        }
+
+        public RenderedQueryGeometry copy () {
+            Raw.ScreenPoint[]? copied_points = null;
+            if (points != null) {
+                copied_points = new Raw.ScreenPoint[points.length];
+                for (var index = 0; index < points.length; index++) {
+                    copied_points[index] = points[index];
+                }
+            }
+            return new RenderedQueryGeometry (native, (owned) copied_points);
+        }
+
+        public bool equal (RenderedQueryGeometry other) {
+            if (native.type != other.native.type) {
+                return false;
+            }
+            switch ((RenderedQueryGeometryType) native.type) {
+            case RenderedQueryGeometryType.POINT:
+                return native.point.x == other.native.point.x
+                    && native.point.y == other.native.point.y;
+            case RenderedQueryGeometryType.BOX:
+                return native.box.min.x == other.native.box.min.x
+                    && native.box.min.y == other.native.box.min.y
+                    && native.box.max.x == other.native.box.max.x
+                    && native.box.max.y == other.native.box.max.y;
+            case RenderedQueryGeometryType.LINE_STRING:
+                if (points.length != other.points.length) {
+                    return false;
+                }
+                for (var index = 0; index < points.length; index++) {
+                    if (points[index].x != other.points[index].x
+                        || points[index].y != other.points[index].y) {
+                        return false;
+                    }
+                }
+                return true;
+            default:
+                return false;
+            }
         }
     }
 
@@ -135,6 +174,7 @@ namespace MaplibreNative {
             var copied = new Utf8String[layer_ids.length];
             for (var index = 0; index < layer_ids.length; index++) {
                 if (layer_ids[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("layer ID is null");
                 }
                 copied[index] = new Utf8String (layer_ids[index]);
@@ -147,6 +187,7 @@ namespace MaplibreNative {
             var copied = new Utf8String[layer_ids.length];
             for (var index = 0; index < layer_ids.length; index++) {
                 if (layer_ids[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("layer ID is null");
                 }
                 copied[index] = layer_ids[index].copy ();
@@ -218,6 +259,7 @@ namespace MaplibreNative {
             var copied = new Utf8String[source_layer_ids.length];
             for (var index = 0; index < source_layer_ids.length; index++) {
                 if (source_layer_ids[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("source layer ID is null");
                 }
                 copied[index] = new Utf8String (source_layer_ids[index]);
@@ -230,6 +272,7 @@ namespace MaplibreNative {
             var copied = new Utf8String[source_layer_ids.length];
             for (var index = 0; index < source_layer_ids.length; index++) {
                 if (source_layer_ids[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("source layer ID is null");
                 }
                 copied[index] = source_layer_ids[index].copy ();
@@ -376,6 +419,7 @@ namespace MaplibreNative {
 
         internal unowned Raw.FeatureQueryResult require_live () throws Error {
             if (native == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature query result handle is closed");
             }
             return native;

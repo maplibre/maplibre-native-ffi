@@ -1,6 +1,23 @@
+[tasks.generate-vapi]
+description = "Generate the private raw VAPI from checked annotated metadata"
+run = "python3 scripts/generate-raw-vapi.py"
+
+[tasks.check-vapi]
+description = "Verify that the raw VAPI is reproducible and covers the public C function surface"
+run = '''
+set -euo pipefail
+generated="$(mktemp)"
+trap 'rm -f "$generated"' EXIT
+python3 scripts/generate-raw-vapi.py --output "$generated"
+diff -u vapi/maplibre-native-c.vapi "$generated"
+'''
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+depends = [
+  { task = "//:build", args = ["{{usage.preset}}"] },
+  { task = ":check-vapi" },
+]
 run = '''
 set -euo pipefail
 mkdir -p build/vapi build/include build/c

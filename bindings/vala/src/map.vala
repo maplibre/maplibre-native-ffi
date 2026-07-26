@@ -381,6 +381,7 @@ namespace MaplibreNative {
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map handle is closed");
             }
             active_native_leases++;
@@ -455,6 +456,7 @@ namespace MaplibreNative {
             }
             if (releasing) {
                 state_mutex.unlock ();
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map handle release is already in progress");
             }
             releasing = true;
@@ -674,6 +676,7 @@ namespace MaplibreNative {
 
         public CameraOptions camera_for_lat_lngs (LatLng[] coordinates, CameraFitOptions? fit_options = null) throws Error {
             if (coordinates.length == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("coordinates are empty");
             }
             Raw.LatLng[] native_coordinates = new Raw.LatLng[coordinates.length];
@@ -930,6 +933,7 @@ namespace MaplibreNative {
             Utf8String[] utf8_tiles = new Utf8String[tiles.length];
             for (var index = 0; index < tiles.length; index++) {
                 if (tiles[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("tile URL is null");
                 }
                 utf8_tiles[index] = new Utf8String (tiles[index]);
@@ -966,6 +970,7 @@ namespace MaplibreNative {
             Utf8String[] utf8_tiles = new Utf8String[tiles.length];
             for (var index = 0; index < tiles.length; index++) {
                 if (tiles[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("tile URL is null");
                 }
                 utf8_tiles[index] = new Utf8String (tiles[index]);
@@ -1002,6 +1007,7 @@ namespace MaplibreNative {
             Utf8String[] utf8_tiles = new Utf8String[tiles.length];
             for (var index = 0; index < tiles.length; index++) {
                 if (tiles[index] == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("tile URL is null");
                 }
                 utf8_tiles[index] = new Utf8String (tiles[index]);

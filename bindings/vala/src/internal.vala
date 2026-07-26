@@ -20,8 +20,12 @@ namespace MaplibreNative {
         return value[0];
     }
 
-    internal void check_status (Raw.Status status) throws Error {
+    internal void clear_unknown_status () {
         unknown_status_store ().replace (null);
+    }
+
+    internal void check_status (Raw.Status status) throws Error {
+        clear_unknown_status ();
         if (status == Raw.Status.OK) {
             return;
         }
@@ -33,14 +37,19 @@ namespace MaplibreNative {
 
         switch (status) {
             case Raw.Status.INVALID_ARGUMENT:
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("%s", message);
             case Raw.Status.INVALID_STATE:
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("%s", message);
             case Raw.Status.WRONG_THREAD:
+                clear_unknown_status ();
                 throw new Error.WRONG_THREAD ("%s", message);
             case Raw.Status.UNSUPPORTED:
+                clear_unknown_status ();
                 throw new Error.UNSUPPORTED ("%s", message);
             case Raw.Status.NATIVE_ERROR:
+                clear_unknown_status ();
                 throw new Error.NATIVE_ERROR ("%s", message);
             default:
                 int32* raw_status = (int32*) GLib.malloc (sizeof (int32));
@@ -55,13 +64,6 @@ namespace MaplibreNative {
             return "";
         }
         return (string) value;
-    }
-
-    internal string copy_c_string_bytes (char* value, size_t size) throws Error {
-        if (value == null || size == 0) {
-            return "";
-        }
-        return copy_utf8_bytes ((uint8*) value, size);
     }
 
     internal uint8[] copy_string_bytes (string value) {
@@ -92,6 +94,7 @@ namespace MaplibreNative {
             return new uint8[0];
         }
         if (view.data == null) {
+            clear_unknown_status ();
             throw new Error.INVALID_ARGUMENT ("string view data is null");
         }
         return copy_bytes ((uint8*) view.data, view.size) ?? new uint8[0];
@@ -100,6 +103,7 @@ namespace MaplibreNative {
     internal string string_from_bytes (uint8[] value) throws Error {
         for (var index = 0; index < value.length; index++) {
             if (value[index] == 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("string contains embedded NUL; use the byte accessor");
             }
         }
@@ -109,6 +113,7 @@ namespace MaplibreNative {
     internal void reject_embedded_nul (string value) throws Error {
         for (var index = 0; index < value.length; index++) {
             if (value[index] == '\0') {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("string inputs must not contain embedded NUL bytes");
             }
         }
@@ -151,6 +156,14 @@ namespace MaplibreNative {
             copied[index] = data[index];
         }
         return copied;
+    }
+
+    internal Utf8String copy_sized_utf8 (char* data, size_t size, string field_name) throws Error {
+        if (data == null && size > 0) {
+            clear_unknown_status ();
+            throw new Error.INVALID_ARGUMENT ("%s data is null", field_name);
+        }
+        return new Utf8String.from_bytes (copy_bytes ((uint8*) data, size) ?? new uint8[0]);
     }
 
     internal StringList copy_style_id_list (owned Raw.StyleIdList list) throws Error {

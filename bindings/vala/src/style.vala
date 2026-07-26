@@ -398,11 +398,13 @@ namespace MaplibreNative {
 
     internal Raw.StringView[] string_views_for_tiles_utf8 (Utf8String[] tiles) throws Error {
         if (tiles.length == 0) {
+            clear_unknown_status ();
             throw new Error.INVALID_ARGUMENT ("tile URL list is empty");
         }
         Raw.StringView[] views = new Raw.StringView[tiles.length];
         for (var index = 0; index < tiles.length; index++) {
             if (tiles[index] == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("tile URL is null");
             }
             views[index] = tiles[index].to_native ();
@@ -412,6 +414,7 @@ namespace MaplibreNative {
 
     internal Raw.LatLng[] image_source_coordinates_to_native (LatLng[] coordinates) throws Error {
         if (coordinates.length != 4) {
+            clear_unknown_status ();
             throw new Error.INVALID_ARGUMENT ("image source coordinates must contain exactly four coordinates");
         }
         Raw.LatLng[] native_coordinates = new Raw.LatLng[coordinates.length];

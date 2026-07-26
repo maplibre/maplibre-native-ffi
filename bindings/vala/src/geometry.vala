@@ -51,6 +51,7 @@ namespace MaplibreNative {
 
         internal static CoordinateList from_native (Raw.CoordinateSpan native) throws Error {
             if (native.coordinate_count > 0 && native.coordinates == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("coordinate span data is null");
             }
             LatLng[] values = new LatLng[native.coordinate_count];
@@ -118,6 +119,7 @@ namespace MaplibreNative {
 
         internal static Polygon from_native (Raw.PolygonGeometry native) throws Error {
             if (native.ring_count > 0 && native.rings == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("polygon ring data is null");
             }
             CoordinateList[] rings = new CoordinateList[native.ring_count];
@@ -316,6 +318,7 @@ namespace MaplibreNative {
 
         public LatLng get_point () throws Error {
             if (geometry_type != GeometryType.POINT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry is not a point");
             }
             return LatLng.from_native (native.point);
@@ -323,6 +326,7 @@ namespace MaplibreNative {
 
         public LatLng[] get_coordinates () throws Error {
             if (geometry_type != GeometryType.LINE_STRING && geometry_type != GeometryType.MULTI_POINT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry does not contain a coordinate list");
             }
             var copied = new LatLng[coordinates.length];
@@ -334,6 +338,7 @@ namespace MaplibreNative {
 
         public Polygon get_polygon () throws Error {
             if (geometry_type != GeometryType.POLYGON) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry is not a polygon");
             }
             return polygon_list[0];
@@ -341,6 +346,7 @@ namespace MaplibreNative {
 
         public CoordinateList[] get_lines () throws Error {
             if (geometry_type != GeometryType.MULTI_LINE_STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry is not a multi-line string");
             }
             var copied = new CoordinateList[coordinate_lists.length];
@@ -352,6 +358,7 @@ namespace MaplibreNative {
 
         public Polygon[] get_polygons () throws Error {
             if (geometry_type != GeometryType.MULTI_POLYGON) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry is not a multi-polygon");
             }
             var copied = new Polygon[polygon_list.length];
@@ -363,6 +370,7 @@ namespace MaplibreNative {
 
         public Geometry[] get_geometries () throws Error {
             if (geometry_type != GeometryType.GEOMETRY_COLLECTION) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("geometry is not a geometry collection");
             }
             var copied = new Geometry[geometry_list.length];
@@ -447,6 +455,7 @@ namespace MaplibreNative {
                 return Geometry.multi_point (CoordinateList.from_native (native.multi_point).to_values ());
             case GeometryType.MULTI_LINE_STRING:
                 if (native.multi_line_string.line_count > 0 && native.multi_line_string.lines == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("multi-line geometry data is null");
                 }
                 CoordinateList[] lines = new CoordinateList[native.multi_line_string.line_count];
@@ -456,6 +465,7 @@ namespace MaplibreNative {
                 return Geometry.multi_line_string (lines);
             case GeometryType.MULTI_POLYGON:
                 if (native.multi_polygon.polygon_count > 0 && native.multi_polygon.polygons == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("multi-polygon geometry data is null");
                 }
                 Polygon[] polygons = new Polygon[native.multi_polygon.polygon_count];
@@ -465,6 +475,7 @@ namespace MaplibreNative {
                 return Geometry.multi_polygon (polygons);
             case GeometryType.GEOMETRY_COLLECTION:
                 if (native.geometry_collection.geometry_count > 0 && native.geometry_collection.geometries == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("geometry collection data is null");
                 }
                 Geometry[] geometries = new Geometry[native.geometry_collection.geometry_count];
@@ -474,6 +485,7 @@ namespace MaplibreNative {
                 }
                 return Geometry.geometry_collection (geometries);
             default:
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("unknown geometry type");
             }
         }
@@ -567,6 +579,7 @@ namespace MaplibreNative {
 
         public bool get_bool () throws Error {
             if (type != JsonValueType.BOOL) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not a bool");
             }
             return bool_storage;
@@ -574,6 +587,7 @@ namespace MaplibreNative {
 
         public int64 get_int () throws Error {
             if (type != JsonValueType.INT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not an int");
             }
             return int_storage;
@@ -581,6 +595,7 @@ namespace MaplibreNative {
 
         public uint64 get_uint () throws Error {
             if (type != JsonValueType.UINT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not a uint");
             }
             return uint_storage;
@@ -588,6 +603,7 @@ namespace MaplibreNative {
 
         public double get_double () throws Error {
             if (type != JsonValueType.DOUBLE) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not a double");
             }
             return double_storage;
@@ -595,6 +611,7 @@ namespace MaplibreNative {
 
         public string get_string () throws Error {
             if (type != JsonValueType.STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not a string");
             }
             return string_from_bytes (string_storage);
@@ -602,6 +619,7 @@ namespace MaplibreNative {
 
         public uint8[] get_string_utf8_bytes () throws Error {
             if (type != JsonValueType.STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not a string");
             }
             var copied = new uint8[string_storage.length];
@@ -613,6 +631,7 @@ namespace MaplibreNative {
 
         public JsonValue[] get_array_values () throws Error {
             if (type != JsonValueType.ARRAY) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not an array");
             }
             var copied = new JsonValue[array_values.length];
@@ -624,6 +643,7 @@ namespace MaplibreNative {
 
         public JsonMember[] get_object_members () throws Error {
             if (type != JsonValueType.OBJECT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("JSON value is not an object");
             }
             var copied = new JsonMember[object_members.length];
@@ -742,6 +762,7 @@ namespace MaplibreNative {
             case JsonValueType.NULL:
                 return JsonValue.null_value ();
             default:
+                clear_unknown_status ();
                 throw new Error.UNSUPPORTED ("unknown native JSON value type %u", native.type);
             }
         }
@@ -876,6 +897,7 @@ namespace MaplibreNative {
             raw_type = native.identifier_type;
             string_storage = new uint8[0];
             if (native.identifier_string_value.data == null && native.identifier_string_value.size > 0) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("unknown feature identifier storage is null");
             }
             unknown_storage = copy_bytes ((uint8*) native.identifier_string_value.data, native.identifier_string_value.size) ?? new uint8[0];
@@ -925,6 +947,7 @@ namespace MaplibreNative {
 
         public uint64 get_uint () throws Error {
             if (raw_type != (uint32) FeatureIdentifierType.UINT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier is not a uint");
             }
             return uint_storage;
@@ -932,6 +955,7 @@ namespace MaplibreNative {
 
         public int64 get_int () throws Error {
             if (raw_type != (uint32) FeatureIdentifierType.INT) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier is not an int");
             }
             return int_storage;
@@ -939,6 +963,7 @@ namespace MaplibreNative {
 
         public double get_double () throws Error {
             if (raw_type != (uint32) FeatureIdentifierType.DOUBLE) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier is not a double");
             }
             return double_storage;
@@ -946,6 +971,7 @@ namespace MaplibreNative {
 
         public string get_string () throws Error {
             if (raw_type != (uint32) FeatureIdentifierType.STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier is not a string");
             }
             return string_from_bytes (string_storage);
@@ -953,6 +979,7 @@ namespace MaplibreNative {
 
         public uint8[] get_string_utf8_bytes () throws Error {
             if (raw_type != (uint32) FeatureIdentifierType.STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier is not a string");
             }
             var copied = new uint8[string_storage.length];
@@ -964,6 +991,7 @@ namespace MaplibreNative {
 
         public uint8[] get_unknown_storage () throws Error {
             if (raw_type <= (uint32) FeatureIdentifierType.STRING) {
+                clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature identifier type is known");
             }
             var copied = new uint8[unknown_storage.length];
@@ -1117,6 +1145,27 @@ namespace MaplibreNative {
             state_key = value.copy ();
         }
 
+        public FeatureStateSelector copy () {
+            var copied = new FeatureStateSelector.from_utf8 (source_id);
+            copied.source_layer_id = source_layer_id == null ? null : source_layer_id.copy ();
+            copied.feature_id = feature_id == null ? null : feature_id.copy ();
+            copied.state_key = state_key == null ? null : state_key.copy ();
+            return copied;
+        }
+
+        public bool equal (FeatureStateSelector other) {
+            return source_id.equal (other.source_id)
+                && (source_layer_id == null
+                    ? other.source_layer_id == null
+                    : other.source_layer_id != null && source_layer_id.equal (other.source_layer_id))
+                && (feature_id == null
+                    ? other.feature_id == null
+                    : other.feature_id != null && feature_id.equal (other.feature_id))
+                && (state_key == null
+                    ? other.state_key == null
+                    : other.state_key != null && state_key.equal (other.state_key));
+        }
+
         internal Raw.FeatureStateSelector to_native () throws Error {
             Raw.FeatureStateSelector native = {};
             native.size = (uint32) sizeof (Raw.FeatureStateSelector);
@@ -1170,16 +1219,19 @@ namespace MaplibreNative {
 
         internal static Feature from_native (Raw.Feature native) throws Error {
             if (native.geometry == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("queried feature geometry is null");
             }
             JsonMember[] members = new JsonMember[native.property_count];
             if (native.property_count > 0 && native.properties == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("queried feature properties are null");
             }
             for (size_t i = 0; i < native.property_count; i++) {
                 Raw.JsonMember member = native.properties[i];
                 Raw.JsonValue* value = (Raw.JsonValue*) member.value;
                 if (value == null) {
+                    clear_unknown_status ();
                     throw new Error.INVALID_ARGUMENT ("queried feature property value is null");
                 }
                 members[i] = new JsonMember.from_utf8_bytes (copy_string_view_bytes (member.key), JsonValue.from_native (value[0]));
@@ -1266,6 +1318,7 @@ namespace MaplibreNative {
         internal static FeatureCollection from_native (Raw.FeatureCollection native) throws Error {
             Feature[] features = new Feature[native.feature_count];
             if (native.feature_count > 0 && native.features == null) {
+                clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("feature collection data is null");
             }
             for (size_t i = 0; i < native.feature_count; i++) {
