@@ -98,6 +98,8 @@ class MapHandleTest {
     assertEquals(512, size.width)
     assertEquals(256, size.height)
     assertEquals(2.0, size.scaleFactor)
+    assertEquals(MapSize(512, 256, 2.0), size)
+    assertEquals(MapSize(512, 256, 2.0).hashCode(), size.hashCode())
 
     map.close()
     runtime.close()

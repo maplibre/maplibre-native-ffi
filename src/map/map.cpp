@@ -2395,6 +2395,7 @@ struct mln_map {
   mln_runtime* runtime = nullptr;
   std::thread::id owner_thread;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
+  double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
   std::unique_ptr<HeadlessObserver> observer;
   std::unique_ptr<HeadlessFrontend> frontend;
@@ -2692,6 +2693,7 @@ auto create_map(
   owned_map->runtime = runtime;
   owned_map->owner_thread = std::this_thread::get_id();
   owned_map->map_mode = effective.map_mode;
+  owned_map->scale_factor = effective.scale_factor;
   try {
     owned_map->observer = std::make_unique<HeadlessObserver>(runtime, handle);
     owned_map->frontend = std::make_unique<HeadlessFrontend>(runtime, handle);
@@ -5070,7 +5072,7 @@ auto map_get_size(
   const auto size = options.size();
   *out_width = size.width;
   *out_height = size.height;
-  *out_scale_factor = static_cast<double>(options.pixelRatio());
+  *out_scale_factor = map->scale_factor;
   return MLN_STATUS_OK;
 }
 
