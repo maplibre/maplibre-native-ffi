@@ -27,7 +27,9 @@ const RenderSessionFrameState = struct {
 
 const RenderSessionState = struct {
     native: ?*NativeRenderSession,
-    map_handle: map_module.MapHandle,
+    /// The map this session is registered against, cleared once the
+    /// registration is released by a successful detach or close.
+    map_handle: ?map_module.MapHandle,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: ?*RenderSessionFrameState,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -76,7 +78,6 @@ const RenderSessionClose = struct {
     native: *c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: *RenderSessionFrameState,
-    map_handle: map_module.MapHandle,
 };
 
 const OwnedTextureFrameLease = struct {
@@ -468,11 +469,21 @@ pub const RenderSessionHandle = enum(u128) {
         return rendered;
     }
 
+    /// Detaches the render target from this session. The session stays live and
+    /// still needs `close`, but it no longer holds its map: after a successful
+    /// detach the map can be closed while this session is still open, and every
+    /// session operation that needs an attached target returns a native error.
+    ///
+    /// A detached session stays detached. Attach a new session on the map to
+    /// render again.
     pub fn detach(self: *RenderSessionHandle) status.Error!void {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
         try status.checkStatus(c.mln_render_session_detach(lease.native), lease.diagnostic_store);
+        if (takeMapRegistration(lease.state)) |map_handle| {
+            map_module.unregisterRenderSession(map_handle);
+        }
     }
 
     pub fn reduceMemoryUse(self: *RenderSessionHandle) status.Error!void {
@@ -752,7 +763,9 @@ pub const RenderSessionHandle = enum(u128) {
             cancelRenderSessionClose(session_close.state);
             return err;
         };
-        map_module.unregisterRenderSession(session_close.map_handle);
+        if (takeMapRegistration(session_close.state)) |map_handle| {
+            map_module.unregisterRenderSession(map_handle);
+        }
         std.heap.smp_allocator.destroy(session_close.frame_state);
         const session_state = finishRenderSessionClose(self.*) orelse session_close.state;
         std.heap.smp_allocator.destroy(session_state);
@@ -1092,8 +1105,19 @@ fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?Ren
         .native = session,
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
-        .map_handle = session_state.map_handle,
     };
+}
+
+/// Takes this session's map registration exactly once. The caller passes the
+/// returned handle to `map_module.unregisterRenderSession` outside the render
+/// session registry lock.
+fn takeMapRegistration(session_state: *RenderSessionState) ?map_module.MapHandle {
+    lockRenderSessionRegistry();
+    defer unlockRenderSessionRegistry();
+
+    const map_handle = session_state.map_handle orelse return null;
+    session_state.map_handle = null;
+    return map_handle;
 }
 
 fn cancelRenderSessionClose(session_state: *RenderSessionState) void {

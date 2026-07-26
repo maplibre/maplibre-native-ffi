@@ -215,6 +215,10 @@ var destroyRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
 	return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
 }
 
+var detachRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
+	return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr))))
+}
+
 type metalOwnedTextureFrameState struct {
 	session *RenderSessionHandle
 	raw     C.mln_metal_owned_texture_frame
@@ -756,7 +760,13 @@ func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	return bool(rendered), nil
 }
 
-// Detach detaches the render target from the session.
+// Detach detaches the render target from the session. The session stays live
+// and still needs Close, but it no longer holds its map: after a successful
+// detach the map can be closed while this session is still open, and every
+// session operation that needs an attached target reports a native error.
+//
+// A detached session stays detached. Attach a new session on the map to render
+// again.
 func (session *RenderSessionHandle) Detach() error {
 	ptr, release, err := session.ptr()
 	if err != nil {
@@ -766,7 +776,13 @@ func (session *RenderSessionHandle) Detach() error {
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 { return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr)))) })
+		if err := checkNative(func() int32 {
+			return detachRenderSessionHandle(ptr)
+		}); err != nil {
+			return err
+		}
+		session.parentChild.Release()
+		return nil
 	})
 }
 

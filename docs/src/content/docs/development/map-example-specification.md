@@ -220,7 +220,9 @@ On host termination or fatal error, close resources in order:
 
 The C API treats runtime pumping and presentation as separate concerns.
 `run_once` advances native scheduler work and fills the event queue; it is not
-display-driven. `render_update` draws only when `render_pending` is true.
+display-driven. One call drains the work it finds instead of running a fixed
+slice, so a single call can take as long as a style parse. `render_update` draws
+only when `render_pending` is true.
 
 `*-map` examples integrate both through a **display-paced host loop** on the
 owner thread: each iteration always pumps the runtime; it renders only when
