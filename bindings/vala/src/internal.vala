@@ -21,7 +21,7 @@ namespace MaplibreNative {
             case Raw.Status.NATIVE_ERROR:
                 throw new Error.NATIVE_ERROR ("%s", message);
             default:
-                throw new Error.UNKNOWN_STATUS ("%s", message);
+                throw new Error.UNKNOWN_STATUS ("unknown native status %d: %s", (int32) status, message);
         }
     }
 

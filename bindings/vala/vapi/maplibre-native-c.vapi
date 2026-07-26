@@ -1187,6 +1187,8 @@ namespace MaplibreNative.Raw {
     public struct MetalBorrowedTextureDescriptor {
         public uint32 size;
         public RenderTargetExtent extent;
+        public uint32 physical_width;
+        public uint32 physical_height;
         public void* texture;
     }
 
@@ -1203,6 +1205,8 @@ namespace MaplibreNative.Raw {
     public struct VulkanBorrowedTextureDescriptor {
         public uint32 size;
         public RenderTargetExtent extent;
+        public uint32 physical_width;
+        public uint32 physical_height;
         public VulkanContextDescriptor context;
         public void* image;
         public void* image_view;
@@ -1224,6 +1228,8 @@ namespace MaplibreNative.Raw {
     public struct OpenGLBorrowedTextureDescriptor {
         public uint32 size;
         public RenderTargetExtent extent;
+        public uint32 physical_width;
+        public uint32 physical_height;
         public OpenGLContextDescriptor context;
         public uint32 texture;
         public uint32 target;
@@ -2038,6 +2044,9 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_opengl_supported_context_provider_mask")]
     public static uint32 opengl_supported_context_provider_mask ();
 
+    [CCode (cname = "mln_render_target_extent_physical_size")]
+    public static Status render_target_extent_physical_size (RenderTargetExtent* extent, out uint32 out_width, out uint32 out_height);
+
     [CCode (cname = "mln_metal_owned_texture_attach")]
     public static Status metal_owned_texture_attach (Map map, MetalOwnedTextureDescriptor* descriptor, out RenderSession session);
 
@@ -2069,7 +2078,7 @@ namespace MaplibreNative.Raw {
     public static Status render_session_resize (RenderSession session, uint32 width, uint32 height, double scale_factor);
 
     [CCode (cname = "mln_render_session_render_update")]
-    public static Status render_session_render_update (RenderSession session);
+    public static Status render_session_render_update (RenderSession session, out bool out_rendered);
 
     [CCode (cname = "mln_render_session_detach")]
     public static Status render_session_detach (RenderSession session);

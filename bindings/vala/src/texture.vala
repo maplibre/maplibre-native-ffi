@@ -15,6 +15,24 @@ namespace MaplibreNative {
         return context;
     }
 
+    public class PhysicalSize {
+        public uint32 width { get; private set; }
+        public uint32 height { get; private set; }
+
+        internal PhysicalSize (uint32 width, uint32 height) {
+            this.width = width;
+            this.height = height;
+        }
+    }
+
+    public PhysicalSize render_target_extent_physical_size (uint32 width, uint32 height, double scale_factor) throws Error {
+        Raw.RenderTargetExtent extent = render_target_extent (width, height, scale_factor);
+        uint32 physical_width;
+        uint32 physical_height;
+        check_status (Raw.render_target_extent_physical_size (&extent, out physical_width, out physical_height));
+        return new PhysicalSize (physical_width, physical_height);
+    }
+
     public class TextureImageInfo {
         public uint32 width { get; private set; }
         public uint32 height { get; private set; }
@@ -51,6 +69,8 @@ namespace MaplibreNative {
         public uint32 width { get; set; default = 64; }
         public uint32 height { get; set; default = 64; }
         public double scale_factor { get; set; default = 1.0; }
+        public uint32 physical_width { get; set; default = 64; }
+        public uint32 physical_height { get; set; default = 64; }
         public NativePointer texture { get; set; }
 
         public MetalBorrowedTextureDescriptor (NativePointer texture) {
@@ -60,6 +80,8 @@ namespace MaplibreNative {
         internal Raw.MetalBorrowedTextureDescriptor to_native () throws Error {
             Raw.MetalBorrowedTextureDescriptor descriptor = Raw.metal_borrowed_texture_descriptor_default ();
             descriptor.extent = render_target_extent (width, height, scale_factor);
+            descriptor.physical_width = physical_width;
+            descriptor.physical_height = physical_height;
             descriptor.texture = texture.to_native ();
             return descriptor;
         }
@@ -177,6 +199,8 @@ namespace MaplibreNative {
         public uint32 width { get; set; default = 64; }
         public uint32 height { get; set; default = 64; }
         public double scale_factor { get; set; default = 1.0; }
+        public uint32 physical_width { get; set; default = 64; }
+        public uint32 physical_height { get; set; default = 64; }
         public OpenGLContextDescriptor context { get; set; }
         public uint32 texture { get; set; }
         public uint32 target { get; set; }
@@ -190,6 +214,8 @@ namespace MaplibreNative {
         internal Raw.OpenGLBorrowedTextureDescriptor to_native () throws Error {
             Raw.OpenGLBorrowedTextureDescriptor descriptor = Raw.opengl_borrowed_texture_descriptor_default ();
             descriptor.extent = render_target_extent (width, height, scale_factor);
+            descriptor.physical_width = physical_width;
+            descriptor.physical_height = physical_height;
             descriptor.context = context.to_native ();
             descriptor.texture = texture;
             descriptor.target = target;
@@ -219,6 +245,8 @@ namespace MaplibreNative {
         public uint32 width { get; set; default = 64; }
         public uint32 height { get; set; default = 64; }
         public double scale_factor { get; set; default = 1.0; }
+        public uint32 physical_width { get; set; default = 64; }
+        public uint32 physical_height { get; set; default = 64; }
         public VulkanContextDescriptor context { get; set; }
         public NativePointer image { get; set; }
         public NativePointer image_view { get; set; }
@@ -235,6 +263,8 @@ namespace MaplibreNative {
         internal Raw.VulkanBorrowedTextureDescriptor to_native () throws Error {
             Raw.VulkanBorrowedTextureDescriptor descriptor = Raw.vulkan_borrowed_texture_descriptor_default ();
             descriptor.extent = render_target_extent (width, height, scale_factor);
+            descriptor.physical_width = physical_width;
+            descriptor.physical_height = physical_height;
             descriptor.context = context.to_native ();
             descriptor.image = image.to_native ();
             descriptor.image_view = image_view.to_native ();

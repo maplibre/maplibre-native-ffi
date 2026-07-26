@@ -56,11 +56,13 @@ namespace MaplibreNative {
             check_status (Raw.render_session_resize (require_live (), width, height, scale_factor));
         }
 
-        public void render_update () throws Error {
+        public bool render_update () throws Error {
             if (frame_acquired) {
                 throw new Error.INVALID_STATE ("render session has an acquired frame");
             }
-            check_status (Raw.render_session_render_update (require_live ()));
+            bool rendered;
+            check_status (Raw.render_session_render_update (require_live (), out rendered));
+            return rendered;
         }
 
         public void detach () throws Error {

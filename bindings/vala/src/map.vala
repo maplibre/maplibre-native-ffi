@@ -249,6 +249,7 @@ namespace MaplibreNative {
             Raw.Map created;
             check_status (Raw.map_create (runtime.require_live (), &native_options, out created));
             native = (owned) created;
+            runtime.register_map (this);
         }
 
         ~MapHandle () {
@@ -264,17 +265,23 @@ namespace MaplibreNative {
             return native;
         }
 
-        private void retain_custom_geometry_source (string source_id, CustomGeometrySourceOptions options) {
+        internal bool matches_native_source (void* source) {
+            return native != null && (void*) native == source;
+        }
+
+        private void retain_custom_geometry_source (CustomGeometrySourceRegistration registration) {
+            string source_id = registration.source_id;
             release_custom_geometry_source (source_id);
             var retained = new CustomGeometrySourceRegistration[custom_geometry_sources.length + 1];
             for (var index = 0; index < custom_geometry_sources.length; index++) {
                 retained[index] = custom_geometry_sources[index];
             }
-            retained[custom_geometry_sources.length] = new CustomGeometrySourceRegistration (source_id, options);
+            retained[custom_geometry_sources.length] = registration;
             custom_geometry_sources = retained;
         }
 
         private void release_custom_geometry_source (string source_id) {
+            CustomGeometrySourceRegistration? released = null;
             uint retained_count = 0;
             for (var index = 0; index < custom_geometry_sources.length; index++) {
                 if (custom_geometry_sources[index].source_id != source_id) {
@@ -286,13 +293,22 @@ namespace MaplibreNative {
             for (var index = 0; index < custom_geometry_sources.length; index++) {
                 if (custom_geometry_sources[index].source_id != source_id) {
                     retained[output_index++] = custom_geometry_sources[index];
+                } else {
+                    released = custom_geometry_sources[index];
                 }
             }
             custom_geometry_sources = retained;
+            if (released != null) {
+                released.close ();
+            }
         }
 
         private void clear_custom_geometry_sources () {
+            var released = custom_geometry_sources;
             custom_geometry_sources = new CustomGeometrySourceRegistration[0];
+            for (var index = 0; index < released.length; index++) {
+                released[index].close ();
+            }
         }
 
         public void close () throws Error {
@@ -302,6 +318,7 @@ namespace MaplibreNative {
             unowned Raw.Map closing = native;
             check_status (Raw.map_destroy (closing));
             native = null;
+            runtime.unregister_map (this);
             clear_custom_geometry_sources ();
         }
 
@@ -319,6 +336,7 @@ namespace MaplibreNative {
 
         public void set_style_json (string json) throws Error {
             check_status (Raw.map_set_style_json (require_live (), c_string (json)));
+            clear_custom_geometry_sources ();
         }
 
         public void set_debug_options (MapDebugOptions options) throws Error {
@@ -778,9 +796,10 @@ namespace MaplibreNative {
         }
 
         public void add_custom_geometry_source (string source_id, CustomGeometrySourceOptions options) throws Error {
-            var native_options = options.to_native ();
+            var registration = new CustomGeometrySourceRegistration (source_id, options);
+            var native_options = options.to_native (registration);
             check_status (Raw.map_add_custom_geometry_source (require_live (), string_view (source_id), &native_options));
-            retain_custom_geometry_source (source_id, options);
+            retain_custom_geometry_source (registration);
         }
 
         public void set_custom_geometry_source_tile_data (string source_id, CanonicalTileId tile_id, GeoJson data) throws Error {

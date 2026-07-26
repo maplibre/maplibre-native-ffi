@@ -823,6 +823,9 @@ int main() {
     meters.easting.to_string();
     var meters_coordinate = MaplibreNative.lat_lng_for_projected_meters(meters);
     assert(meters_coordinate.latitude > -1.0 && meters_coordinate.latitude < 1.0);
+    var physical_size = MaplibreNative.render_target_extent_physical_size(65, 33, 1.5);
+    assert(physical_size.width == 98);
+    assert(physical_size.height == 50);
 
     if ((backends & MaplibreNative.RenderBackendFlags.VULKAN) != 0) {
       VulkanTestContext vulkan_context_storage;

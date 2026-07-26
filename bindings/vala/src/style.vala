@@ -57,10 +57,65 @@ namespace MaplibreNative {
     internal class CustomGeometrySourceRegistration {
         public string source_id { get; private set; }
         public CustomGeometrySourceOptions options { get; private set; }
+        private Mutex mutex;
+        private Cond idle;
+        private bool closing;
+        private uint active_callbacks;
 
         public CustomGeometrySourceRegistration (string source_id, CustomGeometrySourceOptions options) {
             this.source_id = source_id;
             this.options = options;
+        }
+
+        internal bool begin_callback () {
+            mutex.lock ();
+            if (closing) {
+                mutex.unlock ();
+                return false;
+            }
+            active_callbacks++;
+            mutex.unlock ();
+            return true;
+        }
+
+        internal void end_callback () {
+            mutex.lock ();
+            active_callbacks--;
+            if (closing && active_callbacks == 0) {
+                idle.broadcast ();
+            }
+            mutex.unlock ();
+        }
+
+        internal void close () {
+            mutex.lock ();
+            closing = true;
+            while (active_callbacks > 0) {
+                idle.wait (mutex);
+            }
+            mutex.unlock ();
+        }
+
+        internal void invoke_fetch_tile (Raw.CanonicalTileId tile_id) {
+            if (!begin_callback ()) {
+                return;
+            }
+            try {
+                options.invoke_fetch_tile (tile_id);
+            } finally {
+                end_callback ();
+            }
+        }
+
+        internal void invoke_cancel_tile (Raw.CanonicalTileId tile_id) {
+            if (!begin_callback ()) {
+                return;
+            }
+            try {
+                options.invoke_cancel_tile (tile_id);
+            } finally {
+                end_callback ();
+            }
         }
     }
 
@@ -79,13 +134,13 @@ namespace MaplibreNative {
             this.fetch_tile = (owned) fetch_tile;
         }
 
-        internal Raw.CustomGeometrySourceOptions to_native () {
+        internal Raw.CustomGeometrySourceOptions to_native (CustomGeometrySourceRegistration registration) {
             Raw.CustomGeometrySourceOptions options = Raw.custom_geometry_source_options_default ();
             options.fetch_tile = custom_geometry_fetch_tile_trampoline;
             if (cancel_tile != null) {
                 options.cancel_tile = custom_geometry_cancel_tile_trampoline;
             }
-            options.user_data = (void*) this;
+            options.user_data = (void*) registration;
             if (min_zoom != null) {
                 options.min_zoom = min_zoom;
                 options.fields |= (uint32) Raw.CustomGeometrySourceOptionField.MIN_ZOOM;
@@ -132,14 +187,14 @@ namespace MaplibreNative {
         if (user_data == null) {
             return;
         }
-        ((CustomGeometrySourceOptions) user_data).invoke_fetch_tile (tile_id);
+        ((CustomGeometrySourceRegistration) user_data).invoke_fetch_tile (tile_id);
     }
 
     private static void custom_geometry_cancel_tile_trampoline (void* user_data, Raw.CanonicalTileId tile_id) {
         if (user_data == null) {
             return;
         }
-        ((CustomGeometrySourceOptions) user_data).invoke_cancel_tile (tile_id);
+        ((CustomGeometrySourceRegistration) user_data).invoke_cancel_tile (tile_id);
     }
 
     public class StyleTileSourceOptions {

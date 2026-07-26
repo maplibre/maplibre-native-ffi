@@ -634,8 +634,9 @@ namespace MaplibreNative {
                 if (completed) {
                     throw new Error.INVALID_STATE ("resource request is already completed");
                 }
-                check_status (Raw.resource_request_complete (require_live (), &native_response));
+                var status = Raw.resource_request_complete (require_live (), &native_response);
                 completed = true;
+                check_status (status);
             } finally {
                 mutex.unlock ();
             }
@@ -708,6 +709,8 @@ namespace MaplibreNative {
         public int32 code { get; private set; }
         public RuntimeEventPayloadType payload_type { get; private set; }
         public string message { get; private set; }
+        public uint8[] payload_bytes { get; private set; }
+        public MapHandle? source_map { get; private set; }
         public RuntimeEventRenderFrame? render_frame { get; private set; }
         public RuntimeEventRenderMap? render_map { get; private set; }
         public RuntimeEventStyleImageMissing? style_image_missing { get; private set; }
@@ -717,48 +720,91 @@ namespace MaplibreNative {
         public RuntimeEventOfflineRegionTileCountLimit? offline_region_tile_count_limit { get; private set; }
         public RuntimeEventOfflineOperationCompleted? offline_operation_completed { get; private set; }
 
-        internal RuntimeEvent (Raw.RuntimeEvent native) throws Error {
+        internal RuntimeEvent (RuntimeHandle runtime, Raw.RuntimeEvent native) throws Error {
             event_type = runtime_event_type_from_raw (native.type);
             source_type = runtime_event_source_type_from_raw (native.source_type);
+            if (source_type == RuntimeEventSourceType.MAP) {
+                source_map = runtime.resolve_map (native.source);
+            }
             code = native.code;
             payload_type = runtime_event_payload_type_from_raw (native.payload_type);
             message = copy_c_string_bytes (native.message, native.message_size);
+            payload_bytes = copy_bytes ((uint8*) native.payload, native.payload_size) ?? new uint8[0];
             if (native.payload == null) {
                 return;
             }
             switch (payload_type) {
                 case RuntimeEventPayloadType.RENDER_FRAME:
+                    validate_payload (native, sizeof (Raw.RuntimeEventRenderFrame));
                     render_frame = new RuntimeEventRenderFrame.from_native (((Raw.RuntimeEventRenderFrame*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.RENDER_MAP:
+                    validate_payload (native, sizeof (Raw.RuntimeEventRenderMap));
                     render_map = new RuntimeEventRenderMap.from_native (((Raw.RuntimeEventRenderMap*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.STYLE_IMAGE_MISSING:
+                    validate_payload (native, sizeof (Raw.RuntimeEventStyleImageMissing));
                     style_image_missing = new RuntimeEventStyleImageMissing.from_native (((Raw.RuntimeEventStyleImageMissing*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.TILE_ACTION:
+                    validate_payload (native, sizeof (Raw.RuntimeEventTileAction));
                     tile_action = new RuntimeEventTileAction.from_native (((Raw.RuntimeEventTileAction*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.OFFLINE_REGION_STATUS:
+                    validate_payload (native, sizeof (Raw.RuntimeEventOfflineRegionStatus));
                     offline_region_status = new RuntimeEventOfflineRegionStatus.from_native (((Raw.RuntimeEventOfflineRegionStatus*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.OFFLINE_REGION_RESPONSE_ERROR:
+                    validate_payload (native, sizeof (Raw.RuntimeEventOfflineRegionResponseError));
                     offline_region_response_error = new RuntimeEventOfflineRegionResponseError.from_native (((Raw.RuntimeEventOfflineRegionResponseError*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.OFFLINE_REGION_TILE_COUNT_LIMIT:
+                    validate_payload (native, sizeof (Raw.RuntimeEventOfflineRegionTileCountLimit));
                     offline_region_tile_count_limit = new RuntimeEventOfflineRegionTileCountLimit.from_native (((Raw.RuntimeEventOfflineRegionTileCountLimit*) native.payload)[0]);
                     break;
                 case RuntimeEventPayloadType.OFFLINE_OPERATION_COMPLETED:
+                    validate_payload (native, sizeof (Raw.RuntimeEventOfflineOperationCompleted));
                     offline_operation_completed = new RuntimeEventOfflineOperationCompleted.from_native (((Raw.RuntimeEventOfflineOperationCompleted*) native.payload)[0]);
                     break;
                 default:
                     break;
             }
         }
+
+        private static void validate_payload (Raw.RuntimeEvent native, size_t expected_size) throws Error {
+            if (native.payload_size < expected_size) {
+                throw new Error.INVALID_ARGUMENT ("runtime event payload is smaller than its declared type");
+            }
+            uint32 declared_size = ((uint32*) native.payload)[0];
+            if (declared_size < expected_size) {
+                throw new Error.INVALID_ARGUMENT ("runtime event payload struct size is too small");
+            }
+        }
     }
 
     public delegate bool LogCallback (LogSeverity severity, LogEvent event, int64 code, string? message);
     public delegate string? ResourceTransformCallback (ResourceKind kind, string url);
+
+    private class ResourceTransformRegistration {
+        private ResourceTransformCallback callback;
+
+        public ResourceTransformRegistration (owned ResourceTransformCallback callback) {
+            this.callback = (owned) callback;
+        }
+
+        public Raw.Status invoke (uint32 raw_kind, string url, Raw.ResourceTransformResponse* out_response) {
+            if (out_response == null) {
+                return Raw.Status.INVALID_ARGUMENT;
+            }
+            out_response->size = (uint32) sizeof (Raw.ResourceTransformResponse);
+            out_response->url = null;
+            var replacement = callback (resource_kind_from_raw (raw_kind), url);
+            if (replacement != null && replacement.length > 0) {
+                return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);
+            }
+            return Raw.Status.OK;
+        }
+    }
 
     private LogCallback? current_log_callback;
 
@@ -773,8 +819,8 @@ namespace MaplibreNative {
         if (user_data == null) {
             return Raw.Status.INVALID_ARGUMENT;
         }
-        unowned RuntimeHandle runtime = (RuntimeHandle) user_data;
-        return runtime.invoke_resource_transform (kind, url, out_response);
+        unowned ResourceTransformRegistration registration = (ResourceTransformRegistration) user_data;
+        return registration.invoke (kind, url, out_response);
     }
 
     private uint32 resource_provider_trampoline (void* user_data, Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
@@ -829,8 +875,9 @@ namespace MaplibreNative {
 
     public class RuntimeHandle {
         private Raw.Runtime? native;
-        private ResourceTransformCallback? resource_transform;
+        private ResourceTransformRegistration? resource_transform;
         private ResourceProviderCallback? resource_provider;
+        private MapHandle[] maps = new MapHandle[0];
 
         public bool closed { get { return native == null; } }
 
@@ -858,6 +905,9 @@ namespace MaplibreNative {
             if (native == null) {
                 return;
             }
+            if (maps.length > 0) {
+                throw new Error.INVALID_STATE ("runtime has live map handles");
+            }
             unowned Raw.Runtime closing = native;
             check_status (Raw.runtime_destroy (closing));
             native = null;
@@ -877,7 +927,42 @@ namespace MaplibreNative {
             if (!has_event) {
                 return null;
             }
-            return new RuntimeEvent (raw_event);
+            return new RuntimeEvent (this, raw_event);
+        }
+
+        internal void register_map (MapHandle map) {
+            var retained = new MapHandle[maps.length + 1];
+            for (var index = 0; index < maps.length; index++) {
+                retained[index] = maps[index];
+            }
+            retained[maps.length] = map;
+            maps = retained;
+        }
+
+        internal void unregister_map (MapHandle map) {
+            uint retained_count = 0;
+            for (var index = 0; index < maps.length; index++) {
+                if (maps[index] != map) {
+                    retained_count++;
+                }
+            }
+            var retained = new MapHandle[retained_count];
+            uint output_index = 0;
+            for (var index = 0; index < maps.length; index++) {
+                if (maps[index] != map) {
+                    retained[output_index++] = maps[index];
+                }
+            }
+            maps = retained;
+        }
+
+        internal MapHandle? resolve_map (void* source) {
+            for (var index = 0; index < maps.length; index++) {
+                if (maps[index].matches_native_source (source)) {
+                    return maps[index];
+                }
+            }
+            return null;
         }
 
         public void set_resource_provider (owned ResourceProviderCallback callback) throws Error {
@@ -896,36 +981,18 @@ namespace MaplibreNative {
         }
 
         public void set_resource_transform (owned ResourceTransformCallback callback) throws Error {
-            var previous = (owned) resource_transform;
-            resource_transform = (owned) callback;
+            var registration = new ResourceTransformRegistration ((owned) callback);
             Raw.ResourceTransform transform = {};
             transform.size = (uint32) sizeof (Raw.ResourceTransform);
             transform.callback = resource_transform_trampoline;
-            transform.user_data = this;
-            try {
-                check_status (Raw.runtime_set_resource_transform (require_live (), &transform));
-            } catch (Error error) {
-                resource_transform = (owned) previous;
-                throw error;
-            }
+            transform.user_data = registration;
+            check_status (Raw.runtime_set_resource_transform (require_live (), &transform));
+            resource_transform = registration;
         }
 
         public void clear_resource_transform () throws Error {
             check_status (Raw.runtime_clear_resource_transform (require_live ()));
             resource_transform = null;
-        }
-
-        internal Raw.Status invoke_resource_transform (uint32 raw_kind, string url, Raw.ResourceTransformResponse* out_response) {
-            if (out_response == null || resource_transform == null) {
-                return Raw.Status.INVALID_ARGUMENT;
-            }
-            out_response->size = (uint32) sizeof (Raw.ResourceTransformResponse);
-            out_response->url = null;
-            var replacement = resource_transform (resource_kind_from_raw (raw_kind), url);
-            if (replacement != null && replacement.length > 0) {
-                return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);
-            }
-            return Raw.Status.OK;
         }
 
         internal uint32 invoke_resource_provider (Raw.ResourceRequest* request, Raw.ResourceRequestHandle handle) {
