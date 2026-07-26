@@ -720,6 +720,14 @@ raw.mln_metal_borrowed_texture_descriptor
 _metalBorrowedTextureDescriptorToNative(MetalBorrowedTextureDescriptor value) {
   final result = _c.raw.mln_metal_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
+  result.physical_width = _positiveUint32(
+    value.physicalWidth,
+    'physical texture width',
+  );
+  result.physical_height = _positiveUint32(
+    value.physicalHeight,
+    'physical texture height',
+  );
   result.texture = Pointer<Void>.fromAddress(value.texture.address);
   return result;
 }
@@ -739,6 +747,14 @@ _vulkanBorrowedTextureDescriptorToNative(
 ) {
   final result = _c.raw.mln_vulkan_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
+  result.physical_width = _positiveUint32(
+    value.physicalWidth,
+    'physical image width',
+  );
+  result.physical_height = _positiveUint32(
+    value.physicalHeight,
+    'physical image height',
+  );
   result.context = _vulkanContextDescriptorToNative(value.context);
   result.image = Pointer<Void>.fromAddress(value.image.address);
   result.image_view = Pointer<Void>.fromAddress(value.imageView.address);
@@ -763,6 +779,14 @@ _openglBorrowedTextureDescriptorToNative(
 ) {
   final result = _c.raw.mln_opengl_borrowed_texture_descriptor_default();
   result.extent = _renderTargetExtentToNative(value.extent);
+  result.physical_width = _positiveUint32(
+    value.physicalWidth,
+    'physical texture width',
+  );
+  result.physical_height = _positiveUint32(
+    value.physicalHeight,
+    'physical texture height',
+  );
   result.context = _openglContextDescriptorToNative(value.context);
   result.texture = value.texture;
   result.target = value.target;

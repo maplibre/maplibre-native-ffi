@@ -3,7 +3,24 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 
+import '../internal/c/maplibre_native_c.dart';
+import '../internal/c/maplibre_native_c.g.dart' as raw;
+import '../internal/status/status.dart';
 import 'native_pointer.dart';
+
+final MaplibreNativeCApi _renderTargetApi = MaplibreNativeCApi.open();
+
+/// Physical render target dimensions in device pixels.
+final class PhysicalRenderTargetSize {
+  /// Creates a physical render target size.
+  const PhysicalRenderTargetSize({required this.width, required this.height});
+
+  /// Physical width in device pixels.
+  final int width;
+
+  /// Physical height in device pixels.
+  final int height;
+}
 
 /// Logical render target extent in UI pixels.
 final class RenderTargetExtent {
@@ -22,6 +39,41 @@ final class RenderTargetExtent {
 
   /// UI-to-device pixel scale.
   final double scaleFactor;
+
+  /// Returns the physical size as `ceil(logical * scaleFactor)` per dimension.
+  ///
+  /// Session-owned texture and surface targets use this size. Borrowed texture
+  /// targets state their physical dimensions independently.
+  PhysicalRenderTargetSize physicalSize() {
+    return using((arena) {
+      final nativeExtent = arena<raw.mln_render_target_extent>();
+      nativeExtent.ref
+        ..size = sizeOf<raw.mln_render_target_extent>()
+        ..width = _positiveExtentDimension(width, 'render target width')
+        ..height = _positiveExtentDimension(height, 'render target height')
+        ..scale_factor = scaleFactor;
+      final physicalWidth = arena<Uint32>();
+      final physicalHeight = arena<Uint32>();
+      final status = _renderTargetApi.raw
+          .mln_render_target_extent_physical_size(
+            nativeExtent,
+            physicalWidth,
+            physicalHeight,
+          );
+      checkNativeStatus(status.value, _renderTargetApi.threadLastErrorMessage);
+      return PhysicalRenderTargetSize(
+        width: physicalWidth.value,
+        height: physicalHeight.value,
+      );
+    });
+  }
+}
+
+int _positiveExtentDimension(int value, String name) {
+  if (value <= 0 || value > 0xffffffff) {
+    throwInvalidArgument('$name must be in 1...4294967295');
+  }
+  return value;
 }
 
 /// Closeable native byte buffer for reusable render readback storage.
@@ -301,11 +353,19 @@ final class MetalBorrowedTextureDescriptor {
   /// Creates a Metal borrowed-texture descriptor.
   const MetalBorrowedTextureDescriptor({
     required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
     required this.texture,
   });
 
   /// Logical texture extent.
   final RenderTargetExtent extent;
+
+  /// Physical texture width in device pixels.
+  final int physicalWidth;
+
+  /// Physical texture height in device pixels.
+  final int physicalHeight;
 
   /// Borrowed `id<MTLTexture>` / `MTL::Texture*`.
   final NativePointer texture;
@@ -331,6 +391,8 @@ final class VulkanBorrowedTextureDescriptor {
   /// Creates a Vulkan borrowed-texture descriptor.
   const VulkanBorrowedTextureDescriptor({
     required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
     required this.context,
     required this.image,
     required this.imageView,
@@ -341,6 +403,12 @@ final class VulkanBorrowedTextureDescriptor {
 
   /// Logical texture extent.
   final RenderTargetExtent extent;
+
+  /// Physical image width in device pixels.
+  final int physicalWidth;
+
+  /// Physical image height in device pixels.
+  final int physicalHeight;
 
   /// Borrowed Vulkan context.
   final VulkanContextDescriptor context;
@@ -381,6 +449,8 @@ final class OpenGLBorrowedTextureDescriptor {
   /// Creates an OpenGL borrowed-texture descriptor.
   const OpenGLBorrowedTextureDescriptor({
     required this.extent,
+    required this.physicalWidth,
+    required this.physicalHeight,
     required this.context,
     required this.texture,
     required this.target,
@@ -388,6 +458,12 @@ final class OpenGLBorrowedTextureDescriptor {
 
   /// Logical texture extent.
   final RenderTargetExtent extent;
+
+  /// Physical texture width in device pixels.
+  final int physicalWidth;
+
+  /// Physical texture height in device pixels.
+  final int physicalHeight;
 
   /// Borrowed OpenGL context.
   final OpenGLContextDescriptor context;

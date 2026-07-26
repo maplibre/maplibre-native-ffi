@@ -149,10 +149,14 @@ final class RenderSessionHandle {
     );
   }
 
-  /// Processes the latest map render update for this session.
-  void renderUpdate() {
+  /// Processes the latest map render update and reports whether it rendered.
+  bool renderUpdate() {
     _checkNoActiveTextureFrame('render update');
-    _check(_c.raw.mln_render_session_render_update(_pointer));
+    return withNativeArena((arena) {
+      final rendered = arena<Bool>();
+      _check(_c.raw.mln_render_session_render_update(_pointer, rendered));
+      return rendered.value;
+    });
   }
 
   /// Detaches backend-bound render resources while keeping the handle live.

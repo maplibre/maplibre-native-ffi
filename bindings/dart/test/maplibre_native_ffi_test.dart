@@ -55,6 +55,16 @@ void main() {
     Maplibre.clearLogCallback();
   });
 
+  test('render target extents report their physical size through native', () {
+    final size = const RenderTargetExtent(
+      width: 65,
+      height: 33,
+      scaleFactor: 1.5,
+    ).physicalSize();
+    expect(size.width, 98);
+    expect(size.height, 50);
+  });
+
   test('process-global log callbacks retire across isolates', () async {
     Maplibre.setLogCallback((_) {});
     await Isolate.run(_clearLogCallback);
@@ -840,6 +850,8 @@ void main() {
       () => map.attachOpenGLBorrowedTexture(
         const OpenGLBorrowedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
+          physicalWidth: 16,
+          physicalHeight: 16,
           context: EglContextDescriptor(
             display: NativePointer.nullPointer,
             config: NativePointer.nullPointer,
