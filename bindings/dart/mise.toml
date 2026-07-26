@@ -10,7 +10,7 @@ run = '''
 clang_resource_dir="$(clang -print-resource-dir)"
 dart run ffigen \
   --config ffigen.yaml \
-  --compiler-opts "-isystem $clang_resource_dir/include"
+  --compiler-opts "-isystem '$clang_resource_dir/include'"
 '''
 sources = [
   "ffigen.yaml",
@@ -39,7 +39,7 @@ trap 'rm -f ffigen.check.yaml .dart_tool/maplibre_native_c.check.g.dart' EXIT
 clang_resource_dir="$(clang -print-resource-dir)"
 dart run ffigen \
   --config ffigen.check.yaml \
-  --compiler-opts "-isystem $clang_resource_dir/include"
+  --compiler-opts "-isystem '$clang_resource_dir/include'"
 cmp --silent .dart_tool/maplibre_native_c.check.g.dart lib/src/internal/c/maplibre_native_c.g.dart
 """
 
