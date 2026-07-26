@@ -777,7 +777,14 @@ impl RuntimeHandle {
         )
     }
 
-    /// Runs one pending owner-thread task for this runtime.
+    /// Runs one iteration of this runtime's owner-thread run loop.
+    ///
+    /// One iteration drains the high-priority task queue and then the default
+    /// task queue until both are empty, including tasks enqueued while the
+    /// drain runs, and also services expired timers and ready I/O. The call
+    /// returns without blocking on new work, yet its duration is unbounded: a
+    /// single iteration can span a whole style parse. Drive it from a pump loop
+    /// rather than budgeting it as a fixed per-frame slice.
     pub fn run_once(&self) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         // SAFETY: runtime is a live runtime handle owned by this wrapper.
@@ -785,6 +792,12 @@ impl RuntimeHandle {
     }
 
     /// Polls one queued runtime event and copies it into an owned Rust value.
+    ///
+    /// Polling also advances binding-owned state that the event reports. A
+    /// polled [`crate::RuntimeEventType::MapStyleLoaded`] event releases the
+    /// upcall state of custom geometry sources the newly loaded style dropped,
+    /// so keep polling to completion to let that state be reclaimed; a map
+    /// whose events go unpolled keeps those sources' callback state alive.
     pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
         let runtime = self.inner.as_ptr()?;
         let mut event = empty_runtime_event();

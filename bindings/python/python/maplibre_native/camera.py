@@ -64,7 +64,14 @@ class CameraOptions:
     pitch: float | None = None
     center_altitude: float | None = None
     padding: EdgeInsets | None = None
+
     anchor: ScreenPoint | None = None
+    """Screen-space anchor for jump, ease, and fly commands.
+
+    This field is input-only: MapLibre Native applies it to camera commands and
+    never reports it back, so it is always None on a camera read.
+    """
+
     roll: float | None = None
     field_of_view: float | None = None
 

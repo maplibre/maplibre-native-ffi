@@ -750,6 +750,32 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
         assert_wrong_thread_error(error, diagnostics[name])
 
 
+def test_render_session_detach_releases_python_map_reference() -> None:
+    class FakeDetachedSession:
+        closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    class FakeNativeRenderSession:
+        closed = False
+        detached = False
+
+        def detach(self) -> FakeDetachedSession:
+            self.detached = True
+            return FakeDetachedSession()
+
+    session = render.RenderSessionHandle._from_native(
+        FakeNativeRenderSession(), object()
+    )
+
+    detached = session.detach()
+
+    assert session.detached
+    assert session._map is None  # noqa: SLF001
+    detached.close()
+
+
 def test_map_handle_context_manager_closes_once() -> None:
     with mln.RuntimeHandle() as runtime:
         with pytest.raises(TypeError, match="RuntimeHandle.create_map"):

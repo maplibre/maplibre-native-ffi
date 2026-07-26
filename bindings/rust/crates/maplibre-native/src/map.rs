@@ -194,6 +194,12 @@ impl MapHandle {
     /// Native destruction errors are returned. When destruction fails, the
     /// underlying native handle remains live in the shared state so future child
     /// handles can continue to retain and close the map safely.
+    ///
+    /// Closing discards this map's queued runtime events and its recorded
+    /// loading failure. There is no flush and no terminal event, so read any
+    /// state you mirror from events before closing, and treat close as the end
+    /// of this map's event stream rather than awaiting an event during
+    /// teardown. Dropping the handle ends the stream the same way.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
@@ -335,6 +341,10 @@ impl MapHandle {
     }
 
     /// Applies a camera ease transition command.
+    ///
+    /// An absent `animation`, or an animation with no duration, eases over zero
+    /// duration: the camera reaches the target before this call returns, with
+    /// no runtime pump in between. Set a duration to animate over time.
     pub fn ease_to(
         &self,
         camera: &CameraOptions,
@@ -351,6 +361,12 @@ impl MapHandle {
     }
 
     /// Applies a camera fly transition command.
+    ///
+    /// Fly is the one camera command that animates by default. When duration is
+    /// absent, native derives it from `AnimationOptions::velocity`; when
+    /// velocity is absent too, native defaults to 1.2 screenfuls per second.
+    /// The camera is therefore still en route when this call returns and
+    /// advances as the runtime is pumped.
     pub fn fly_to(
         &self,
         camera: &CameraOptions,
@@ -374,6 +390,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space pan command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the pan instantly
+    /// like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn move_by_animated(
         &self,
         delta_x: f64,
@@ -401,6 +421,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space zoom command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the zoom
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn scale_by_animated(
         &self,
         scale: f64,
@@ -432,6 +456,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space rotate command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the rotation
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn rotate_by_animated(
         &self,
         first: ScreenPoint,
@@ -460,6 +488,10 @@ impl MapHandle {
     }
 
     /// Applies an animated pitch delta command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the pitch
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn pitch_by_animated(
         &self,
         pitch: f64,

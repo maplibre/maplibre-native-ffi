@@ -24,6 +24,13 @@ use crate::{
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
     ///
+    /// Loading is asynchronous, so a style that fails to fetch or parse still
+    /// returns `Ok` here and reports through a later loading-failed runtime
+    /// event. Watch the event stream for load outcomes.
+    ///
+    /// Unsupported style versions and other parse failures report a
+    /// loading-failed event; callers must not treat syntactically valid JSON as
+    /// a successful style load until the event stream confirms it.
     pub fn set_style_url(&self, url: &str) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let url = maplibre_core::string::c_string(url)?;
@@ -35,6 +42,15 @@ impl super::MapHandle {
     }
 
     /// Loads inline style JSON through MapLibre Native style APIs.
+    ///
+    /// Malformed JSON is reported twice: this call returns the parse error
+    /// synchronously, and the same message also arrives as a loading-failed
+    /// runtime event. Handle both, so an event-driven loop stays consistent
+    /// with the call site.
+    ///
+    /// Unsupported style versions and other parse failures return an error and
+    /// also report a loading-failed event. Callers must not equate syntactically
+    /// valid JSON with a supported style document.
     pub fn set_style_json(&self, json: &str) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let json = maplibre_core::string::c_string(json)?;

@@ -18,6 +18,10 @@ pub struct CameraOptions {
     pub pitch: Option<f64>,
     pub center_altitude: Option<f64>,
     pub padding: Option<EdgeInsets>,
+    /// Screen-space anchor for jump, ease, and fly commands.
+    ///
+    /// This field is input-only: MapLibre Native applies it to camera commands
+    /// and never reports it back, so it is always `None` on a camera read.
     pub anchor: Option<ScreenPoint>,
     pub roll: Option<f64>,
     pub field_of_view: Option<f64>,

@@ -1999,6 +1999,30 @@ fn owned_texture_session_retains_parent_and_enforces_single_session() {
 }
 
 #[test]
+// Spec coverage: BND-042. The C API rejects destroying a map that still has an
+// attached session and allows destroying one whose session detached, so the
+// binding's parent retention ends at detach rather than at close.
+fn detached_session_releases_the_parent_map_retention() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    let error = map.close().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidState);
+    let map = error.into_handle();
+
+    let detached = session.detach().unwrap();
+    map.close().unwrap();
+    detached.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-165.
 fn resize_updates_owned_texture_frame_extent() {
     if !has_test_owned_texture_session_backend() {
