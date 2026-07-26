@@ -360,7 +360,7 @@ namespace MaplibreNative {
                         native.geometry.include_ideographs);
                 default:
                     clear_unknown_status ();
-                    throw new Error.INVALID_ARGUMENT ("unknown offline region definition type");
+                    throw new Error.UNSUPPORTED ("unknown offline region definition type %u", native.type);
             }
         }
     }

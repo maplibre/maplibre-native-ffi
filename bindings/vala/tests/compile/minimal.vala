@@ -61,6 +61,12 @@ extern void vulkan_test_borrowed_image_destroy(ref VulkanTestContext context, re
 [CCode(cname = "mln_vala_vulkan_test_surface_supported")]
 extern bool vulkan_test_surface_supported();
 
+[CCode(cname = "mln_vala_vulkan_test_surface_required")]
+extern bool vulkan_test_surface_required();
+
+[CCode(cname = "mln_vala_vulkan_test_surface_uses_metal_layer")]
+extern bool vulkan_test_surface_uses_metal_layer();
+
 [CCode(cname = "mln_vala_vulkan_test_surface_create")]
 extern bool vulkan_test_surface_create(ref VulkanTestContext context, void* metal_layer, out void* surface);
 
@@ -847,6 +853,22 @@ void exercise_option_value_semantics() throws MaplibreNative.Error {
   image_changed.sdf = false;
   assert(!image_options.equal(image_changed));
 
+  uint8[] image_pixels = { 1, 2, 3, 4, 5, 6, 7, 8 };
+  var image_value = new MaplibreNative.PremultipliedRgba8Image(2, 1, 8, image_pixels);
+  image_pixels[0] = 9;
+  assert(image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    2, 1, 8, { 1, 2, 3, 4, 5, 6, 7, 8 })));
+  assert(!image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    1, 1, 8, { 1, 2, 3, 4, 5, 6, 7, 8 })));
+  assert(!image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    2, 2, 8, { 1, 2, 3, 4, 5, 6, 7, 8 })));
+  assert(!image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    2, 1, 4, { 1, 2, 3, 4, 5, 6, 7, 8 })));
+  assert(!image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    2, 1, 8, { 1, 2, 3, 4, 5, 6, 7, 9 })));
+  assert(!image_value.equal(new MaplibreNative.PremultipliedRgba8Image(
+    2, 1, 8, { 1, 2, 3, 4 })));
+
   var camera_options = new MaplibreNative.CameraOptions();
   assert(camera_options.equal(camera_options.copy()));
   var camera_changed = camera_options.copy();
@@ -992,6 +1014,15 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   assert(tile_definition.equal(tile_definition.copy()));
   assert(geometry_definition.equal(geometry_definition.copy()));
   assert(!tile_definition.equal(geometry_definition));
+  MaplibreNative.Raw.OfflineRegionDefinition unknown_definition = {};
+  unknown_definition.size = (uint32) sizeof(MaplibreNative.Raw.OfflineRegionDefinition);
+  unknown_definition.type = 999;
+  try {
+    MaplibreNative.OfflineRegionDefinition.from_native(unknown_definition);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.UNSUPPORTED error) {
+    assert(error.message.contains("999"));
+  }
   uint8[] metadata = { 1, 2, 3 };
   var create_id = runtime.offline_region_create_start(tile_definition, metadata);
   var completion = wait_for_offline_operation(runtime, create_id);
@@ -1968,10 +1999,16 @@ int main() {
           vulkan_test_borrowed_image_destroy(ref vulkan_context_storage, ref vulkan_borrowed_storage);
         }
 
-        if (vulkan_test_surface_supported()) {
-          MetalWindowLayer vulkan_surface_layer;
-          assert(metal_test_window_layer_create(32, 16, out vulkan_surface_layer));
-          assert(vulkan_surface_layer.window != null);
+        var vulkan_surface_supported = vulkan_test_surface_supported();
+        if (vulkan_test_surface_required()) {
+          assert(vulkan_surface_supported);
+        }
+        if (vulkan_surface_supported) {
+          MetalWindowLayer vulkan_surface_layer = {};
+          if (vulkan_test_surface_uses_metal_layer()) {
+            assert(metal_test_window_layer_create(32, 16, out vulkan_surface_layer));
+            assert(vulkan_surface_layer.window != null);
+          }
           void* vulkan_surface = null;
           try {
             assert(vulkan_test_surface_create(ref vulkan_context_storage, vulkan_surface_layer.layer, out vulkan_surface));
@@ -1987,7 +2024,9 @@ int main() {
             if (vulkan_surface != null) {
               vulkan_test_surface_destroy(ref vulkan_context_storage, vulkan_surface);
             }
-            metal_test_window_layer_destroy(ref vulkan_surface_layer);
+            if (vulkan_surface_layer.window != null) {
+              metal_test_window_layer_destroy(ref vulkan_surface_layer);
+            }
           }
         }
       } finally {

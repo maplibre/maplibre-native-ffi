@@ -645,7 +645,7 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_offline_region_info", has_type_id = false)]
     public struct OfflineRegionInfo {
         public uint32 size;
-        public int64 id;
+        public OfflineRegionId id;
         public OfflineRegionDefinition definition;
         public uint8* metadata;
         public size_t metadata_size;
@@ -882,7 +882,7 @@ namespace MaplibreNative.Raw {
     [SimpleType]
     [CCode (cname = "mln_geometry_collection", has_type_id = false)]
     public struct GeometryCollection {
-        public void* geometries;
+        public Geometry* geometries;
         public size_t geometry_count;
     }
 
@@ -942,7 +942,7 @@ namespace MaplibreNative.Raw {
     [SimpleType]
     [CCode (cname = "mln_json_array", has_type_id = false)]
     public struct JsonArray {
-        public void* values;
+        public JsonValue* values;
         public size_t value_count;
     }
 
@@ -950,7 +950,7 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_json_member", has_type_id = false)]
     public struct JsonMember {
         public StringView key;
-        public void* value;
+        public JsonValue* value;
     }
 
     [SimpleType]

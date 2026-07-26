@@ -143,6 +143,16 @@ bool mln_vala_vulkan_test_context_create(
       VK_EXT_METAL_SURFACE_EXTENSION_NAME;
   }
 #endif
+#elif defined(VK_EXT_headless_surface)
+  if (
+    has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+    has_instance_extension(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)
+  ) {
+    instance_extensions[instance_extension_count++] =
+      VK_KHR_SURFACE_EXTENSION_NAME;
+    instance_extensions[instance_extension_count++] =
+      VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME;
+  }
 #endif
 
   VkInstanceCreateInfo instance_info;
@@ -151,9 +161,9 @@ bool mln_vala_vulkan_test_context_create(
   instance_info.pApplicationInfo = &app_info;
 #ifdef __APPLE__
   instance_info.flags = VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#endif
   instance_info.enabledExtensionCount = instance_extension_count;
   instance_info.ppEnabledExtensionNames = instance_extensions;
-#endif
 
   VkInstance instance = VK_NULL_HANDLE;
   if (vkCreateInstance(&instance_info, NULL, &instance) != VK_SUCCESS) {
@@ -403,6 +413,27 @@ bool mln_vala_vulkan_test_surface_supported(void) {
   return false;
 #endif
 #else
+#ifdef VK_EXT_headless_surface
+  return has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+         has_instance_extension(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
+#else
+  return false;
+#endif
+#endif
+}
+
+bool mln_vala_vulkan_test_surface_required(void) {
+#ifdef __linux__
+  return true;
+#else
+  return false;
+#endif
+}
+
+bool mln_vala_vulkan_test_surface_uses_metal_layer(void) {
+#ifdef __APPLE__
+  return true;
+#else
   return false;
 #endif
 }
@@ -410,14 +441,14 @@ bool mln_vala_vulkan_test_surface_supported(void) {
 bool mln_vala_vulkan_test_surface_create(
   MlnValaVulkanTestContext* context, void* metal_layer, void** out_surface
 ) {
-  if (
-    context == NULL || context->instance == NULL || metal_layer == NULL ||
-    out_surface == NULL
-  ) {
+  if (context == NULL || context->instance == NULL || out_surface == NULL) {
     return false;
   }
   *out_surface = NULL;
 #ifdef __APPLE__
+  if (metal_layer == NULL) {
+    return false;
+  }
   PFN_vkCreateMetalSurfaceEXT create_surface =
     (PFN_vkCreateMetalSurfaceEXT)vkGetInstanceProcAddr(
       (VkInstance)context->instance, "vkCreateMetalSurfaceEXT"
@@ -429,6 +460,28 @@ bool mln_vala_vulkan_test_surface_create(
   memset(&surface_info, 0, sizeof(surface_info));
   surface_info.sType = VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT;
   surface_info.pLayer = metal_layer;
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  if (
+    create_surface(
+      (VkInstance)context->instance, &surface_info, NULL, &surface
+    ) != VK_SUCCESS
+  ) {
+    return false;
+  }
+  *out_surface = surface;
+  return true;
+#elif defined(VK_EXT_headless_surface)
+  (void)metal_layer;
+  PFN_vkCreateHeadlessSurfaceEXT create_surface =
+    (PFN_vkCreateHeadlessSurfaceEXT)vkGetInstanceProcAddr(
+      (VkInstance)context->instance, "vkCreateHeadlessSurfaceEXT"
+    );
+  if (create_surface == NULL) {
+    return false;
+  }
+  VkHeadlessSurfaceCreateInfoEXT surface_info;
+  memset(&surface_info, 0, sizeof(surface_info));
+  surface_info.sType = VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   if (
     create_surface(

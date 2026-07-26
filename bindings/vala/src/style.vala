@@ -341,6 +341,21 @@ namespace MaplibreNative {
             }
             return copied;
         }
+
+        public bool equal (PremultipliedRgba8Image other) {
+            if (width != other.width
+                || height != other.height
+                || stride != other.stride
+                || pixels.length != other.pixels.length) {
+                return false;
+            }
+            for (int index = 0; index < pixels.length; index++) {
+                if (pixels[index] != other.pixels[index]) {
+                    return false;
+                }
+            }
+            return true;
+        }
     }
 
     public class StyleImageOptions {
