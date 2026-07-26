@@ -2785,6 +2785,10 @@ auto map_owner_thread(const mln_map* map) -> std::thread::id {
   return map->owner_thread;
 }
 
+auto map_scale_factor(const mln_map* map) -> double {
+  return map->scale_factor;
+}
+
 auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
 
 auto map_latest_update(mln_map* map)

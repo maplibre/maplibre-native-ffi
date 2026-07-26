@@ -888,17 +888,15 @@ auto find_feature_extension_result_locked(
 // chosen for a different density, so warn instead of failing the call.
 auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
   constexpr auto tolerance = 1e-6;
-  const auto map_scale_factor = static_cast<double>(
-    mln::core::map_native(map)->getMapOptions().pixelRatio()
-  );
-  if (std::abs(map_scale_factor - scale_factor) <= tolerance) {
+  const auto creation_scale_factor = mln::core::map_scale_factor(map);
+  if (std::abs(creation_scale_factor - scale_factor) <= tolerance) {
     return;
   }
   mbgl::Log::Warning(
     mbgl::Event::Render,
     "render target scale_factor " + mbgl::util::toString(scale_factor) +
       " differs from the map scale_factor " +
-      mbgl::util::toString(map_scale_factor) +
+      mbgl::util::toString(creation_scale_factor) +
       "; the map value is fixed at creation and still selects sprites, glyphs, "
       "and raster tiles, so styled imagery will not match the rendered "
       "geometry. Create the map with the scale factor you intend to render at."
