@@ -14,6 +14,7 @@ plugins {
   id("org.jetbrains.kotlin.multiplatform")
   id("com.android.kotlin.multiplatform.library")
   id("com.vanniktech.maven.publish")
+  alias(libs.plugins.dokka)
 }
 
 apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
@@ -137,6 +138,8 @@ mavenPublishing {
     description.set("Low-level Kotlin Multiplatform bindings for the MapLibre Native C API.")
   }
 }
+
+dokka { moduleName.set(mavenArtifact) }
 
 canonicalizeKmpRootMetadata(
   group = mavenGroup,

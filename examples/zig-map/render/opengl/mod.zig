@@ -632,6 +632,8 @@ const OpenGLBorrowedTextureBackend = struct {
     ) !render_target.Session {
         const texture = maplibre.attachOpenGLBorrowedTexture(map, .{
             .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
             .context = self.compositor.context.descriptor(),
             .texture = self.borrowed_texture.texture,
             .target = gl_texture_target,

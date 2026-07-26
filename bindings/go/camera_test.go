@@ -41,6 +41,14 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 	if gotCamera.Center == nil || gotCamera.Zoom == nil {
 		t.Fatalf("Camera() missing expected fields: %#v", gotCamera)
 	}
+	// BND-070: successive snapshots of an unchanged camera compare equal.
+	secondCamera, err := m.Camera()
+	if err != nil {
+		t.Fatalf("Camera(): %v", err)
+	}
+	if !gotCamera.Equal(secondCamera) {
+		t.Errorf("successive camera snapshots differ: %#v vs %#v", gotCamera, secondCamera)
+	}
 	if err := m.MoveBy(ScreenPoint{X: 1, Y: 2}); err != nil {
 		t.Fatalf("MoveBy(): %v", err)
 	}

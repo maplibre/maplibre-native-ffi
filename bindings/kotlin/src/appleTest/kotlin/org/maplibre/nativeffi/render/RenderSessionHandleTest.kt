@@ -24,18 +24,22 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toLong
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.error.WrongThreadException
+import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
@@ -62,6 +66,44 @@ class RenderSessionHandleTest {
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
   // BND-169, BND-170: owned-texture rendering, readback, queries, frames, and
   // owner-thread checks.
+
+  @Test
+  fun renderUpdateWithoutPendingUpdateReportsFalseAndKeepsSessionLive() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+      try {
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          assertFalse(session.renderUpdate())
+          session.resize(32, 16, 1.0)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
 
   @Test
   fun metalOwnedTextureSessionRendersReadsBackAcquiresFrameAndDetaches() {
@@ -108,7 +150,7 @@ class RenderSessionHandleTest {
 
           map.setStyleJson(QUERY_STYLE_JSON)
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
 
           val sessionCallError = AtomicReference<Throwable?>(null)
           spawnSessionRenderOnNativeThread(session, sessionCallError)
@@ -120,7 +162,7 @@ class RenderSessionHandleTest {
           assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
           assertTrue(sessionCallDiagnostic.isNotBlank())
 
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
 
           assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
 
@@ -276,7 +318,7 @@ class RenderSessionHandleTest {
           assertFailsWith<IllegalStateException> { frame.width() }
 
           session.resize(16, 8, 2.0)
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
           assertFalse(session.isClosed)
@@ -320,6 +362,8 @@ class RenderSessionHandleTest {
           val borrowedDescriptor =
             MetalBorrowedTextureDescriptor(
               extent = RenderTargetExtent(32, 16, 1.0),
+              physicalWidth = 32,
+              physicalHeight = 16,
               texture = NativePointer.ofAddress(borrowedTextureAddress),
             )
           val session = borrowedMap.attachMetalBorrowedTexture(borrowedDescriptor)
@@ -329,7 +373,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            session.renderUpdate()
+            assertTrue(session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -364,7 +408,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            session.renderUpdate()
+            assertTrue(session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -374,6 +418,109 @@ class RenderSessionHandleTest {
           surfaceMap.close()
         }
       } finally {
+        runtime.close()
+      }
+    } finally {
+      Maplibre.clearLogCallback()
+      Maplibre.restoreDefaultAsyncLogSeverities()
+    }
+  }
+
+  // BND-107: an unsigned cluster_id survives the query round trip, and an
+  // unsigned leaves limit bounds the returned features.
+  @Test
+  fun clusterFeatureExtensionQueriesResolveUnsignedClusterIdAndLimit() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setAsyncLogSeverities(emptySet())
+    try {
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(64, 64, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          map.jumpTo(
+            CameraOptions().apply {
+              center = LatLng(0.0, 0.0)
+              zoom = 0.0
+            }
+          )
+          map.setStyleJson(CLUSTER_STYLE_JSON)
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+          assertTrue(session.renderUpdate())
+
+          val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
+          val queryGeometry =
+            RenderedQueryGeometry.Box(
+              ScreenBox(
+                ScreenPoint(queryPoint.x - 30.0, queryPoint.y - 30.0),
+                ScreenPoint(queryPoint.x + 30.0, queryPoint.y + 30.0),
+              )
+            )
+          val cluster =
+            waitForQueriedFeature(runtime, map, session) {
+              session.queryRenderedFeatures(
+                queryGeometry,
+                RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
+              )
+            }
+          // Native matches cluster_id by exact JSON value type, so the copied
+          // feature must keep the unsigned alternative to resolve on the way
+          // back in.
+          assertTrue(member(cluster, "cluster_id") is JsonValue.UInt)
+
+          val children =
+            featureCollectionResult(
+              session.queryFeatureExtension(
+                "cluster-source",
+                cluster.feature,
+                "supercluster",
+                "children",
+                null,
+              )
+            )
+          assertTrue(children.isNotEmpty())
+
+          val expansionZoom =
+            session.queryFeatureExtension(
+              "cluster-source",
+              cluster.feature,
+              "supercluster",
+              "expansion-zoom",
+              null,
+            )
+          val expansionZoomValue =
+            (expansionZoom as? FeatureExtensionResult.Value)?.value
+              ?: error("expected expansion-zoom value result")
+          assertTrue(expansionZoomValue is JsonValue.UInt)
+
+          // An unsigned limit bounds the collection, and an unsigned offset
+          // selects a later leaf. Native ignores arguments of another type and
+          // falls back to ten leaves at offset zero, so both bounds must move
+          // the observed result.
+          val first = singleClusterLeaf(session, cluster.feature, 0)
+          val second = singleClusterLeaf(session, cluster.feature, 1)
+          assertNotEquals(member(first, "name"), member(second, "name"))
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
         runtime.close()
       }
     } finally {
@@ -447,11 +594,43 @@ class RenderSessionHandleTest {
     repeat(100) {
       val event = runtime.pollEvent() ?: return
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        session.renderUpdate()
+        assertTrue(session.renderUpdate())
         return
       }
     }
   }
+
+  private fun featureCollectionResult(result: FeatureExtensionResult): List<Feature> =
+    (result as? FeatureExtensionResult.FeatureCollection)?.features
+      ?: error("expected feature collection result")
+
+  /** Returns the one leaf at [offset] through a bounded supercluster query. */
+  private fun singleClusterLeaf(
+    session: RenderSessionHandle,
+    feature: Feature,
+    offset: Long,
+  ): Feature {
+    val leaves =
+      featureCollectionResult(
+        session.queryFeatureExtension(
+          "cluster-source",
+          feature,
+          "supercluster",
+          "leaves",
+          JsonValue.ObjectValue(
+            listOf(
+              JsonValue.Member("limit", JsonValue.UInt(1)),
+              JsonValue.Member("offset", JsonValue.UInt(offset)),
+            )
+          ),
+        )
+      )
+    assertEquals(1, leaves.size)
+    return leaves.first()
+  }
+
+  private fun member(feature: Feature, key: String): JsonValue? =
+    feature.properties.firstOrNull { it.key == key }?.value
 
   private fun member(feature: QueriedFeature, key: String): JsonValue? =
     feature.feature.properties.firstOrNull { it.key == key }?.value
@@ -568,6 +747,32 @@ class RenderSessionHandleTest {
         "layers": [
           {"id": "background", "type": "background", "paint": {"background-color": "#d8f1ff"}},
           {"id": "point-circle", "type": "circle", "source": "point", "paint": {"circle-color": "#f97316", "circle-radius": 12}}
+        ]
+      }
+      """
+
+    private const val CLUSTER_STYLE_JSON =
+      """
+      {
+        "version": 8,
+        "name": "kotlin-cluster-query-test",
+        "sources": {
+          "cluster-source": {
+            "type": "geojson",
+            "cluster": true,
+            "data": {
+              "type": "FeatureCollection",
+              "features": [
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.0, 0.0]}, "properties": {"name": "one"}},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.001, 0.001]}, "properties": {"name": "two"}},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.002, 0.002]}, "properties": {"name": "three"}}
+              ]
+            }
+          }
+        },
+        "layers": [
+          {"id": "background", "type": "background", "paint": {"background-color": "#ffffff"}},
+          {"id": "cluster-circle", "type": "circle", "source": "cluster-source", "filter": ["has", "point_count"], "paint": {"circle-color": "#2563eb", "circle-radius": 20}}
         ]
       }
       """

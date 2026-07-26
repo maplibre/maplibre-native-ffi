@@ -4,7 +4,6 @@ import kotlin.math.max
 import kotlin.math.min
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
@@ -73,11 +72,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       return NativeSurfaceRenderResult.Skipped
     }
 
-    return try {
-      attached.session.renderUpdate()
+    return if (attached.session.renderUpdate()) {
       renderPending = false
       NativeSurfaceRenderResult.Rendered
-    } catch (_: InvalidStateException) {
+    } else {
       renderPending = true
       surfaceSession?.requestFrame()
       NativeSurfaceRenderResult.Skipped

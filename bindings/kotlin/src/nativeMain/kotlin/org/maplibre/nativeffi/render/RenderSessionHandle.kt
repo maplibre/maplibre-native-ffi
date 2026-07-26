@@ -4,6 +4,7 @@ import cnames.structs.mln_feature_extension_result
 import cnames.structs.mln_feature_query_result
 import cnames.structs.mln_json_snapshot
 import cnames.structs.mln_render_session
+import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -85,9 +86,12 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     )
   }
 
-  public actual fun renderUpdate() {
+  public actual fun renderUpdate(): Boolean = memScoped {
     activeFrame.ensureInactive("render")
-    Status.check(mln_render_session_render_update(state.requireLive()))
+    val outRendered = alloc<BooleanVar>()
+    outRendered.value = false
+    Status.check(mln_render_session_render_update(state.requireLive(), outRendered.ptr))
+    outRendered.value
   }
 
   public actual fun detach() {

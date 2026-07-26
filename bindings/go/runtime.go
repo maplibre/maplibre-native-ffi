@@ -158,6 +158,14 @@ type RuntimeOptions struct {
 	MaximumCacheSize *uint64
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options RuntimeOptions) Equal(other RuntimeOptions) bool {
+	return options.AssetPath == other.AssetPath &&
+		options.CachePath == other.CachePath &&
+		equalPointer(options.MaximumCacheSize, other.MaximumCacheSize)
+}
+
 // WithMaximumCacheSize returns a copy with an explicit maximum ambient cache
 // size.
 func (options RuntimeOptions) WithMaximumCacheSize(size uint64) RuntimeOptions {
@@ -505,7 +513,14 @@ func (runtime *RuntimeHandle) ptr() (*nativeRuntime, func(), error) {
 	return borrow.Ptr(), borrow.Release, nil
 }
 
-// RunOnce runs one pending owner-thread task for this runtime.
+// RunOnce runs one iteration of this runtime's owner-thread run loop. The
+// iteration drains the high-priority task queue and then the default queue
+// until both are empty, including tasks enqueued during the drain, and also
+// dispatches expired timers and ready I/O.
+//
+// RunOnce returns without blocking on new work, but its duration is unbounded:
+// a single iteration can span a style parse. Treat it as "make progress now"
+// rather than as a fixed per-frame time slice.
 func (runtime *RuntimeHandle) RunOnce() error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
@@ -518,7 +533,13 @@ func (runtime *RuntimeHandle) RunOnce() error {
 	})
 }
 
-// PollEvent polls one queued runtime event and copies it into a Go value.
+// PollEvent polls one queued runtime event and copies it into a Go value. It
+// reports a nil event when the queue is empty.
+//
+// Polling also advances binding-owned state: on a map-style-loaded event this
+// binding releases the map's detached custom geometry sources, closing the
+// upcall stubs for sources the new style dropped. That release happens when the
+// event is polled, so drain the queue to keep dropped sources from lingering.
 func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {

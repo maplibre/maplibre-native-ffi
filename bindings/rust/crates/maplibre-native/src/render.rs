@@ -222,6 +222,24 @@ impl RenderTargetExtent {
             scale_factor: self.scale_factor,
         }
     }
+
+    /// Returns this extent's physical device-pixel size as
+    /// `ceil(logical * scale_factor)` per dimension.
+    ///
+    /// Session-owned texture targets and surface targets are sized this way.
+    /// Borrowed texture targets state their physical size instead, because not
+    /// every physical size is reachable from a logical extent.
+    pub fn physical_size(&self) -> Result<(u32, u32)> {
+        let native = maplibre_core::render::render_target_extent_to_native(self.to_core());
+        let mut width = 0u32;
+        let mut height = 0u32;
+        // SAFETY: native is a fully initialized extent and both out pointers
+        // reference live locals for the duration of the call.
+        maplibre_core::check(unsafe {
+            sys::mln_render_target_extent_physical_size(&native, &mut width, &mut height)
+        })?;
+        Ok((width, height))
+    }
 }
 
 impl Default for RenderTargetExtent {
@@ -528,18 +546,34 @@ impl MetalOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct MetalBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub texture: NativePointer,
 }
 
 impl MetalBorrowedTextureDescriptor {
-    pub fn new(extent: RenderTargetExtent, texture: NativePointer) -> Self {
-        Self { extent, texture }
+    pub fn new(
+        extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
+        texture: NativePointer,
+    ) -> Self {
+        Self {
+            extent,
+            physical_width,
+            physical_height,
+            texture,
+        }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_borrowed_texture_descriptor {
         maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
             maplibre_core::render::MetalBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 texture: self.texture.as_void_ptr(),
             },
         )
@@ -572,6 +606,10 @@ impl VulkanOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct VulkanBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical image size in device pixels. The image is sized by its owner,
+    /// so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: VulkanContextDescriptor,
     pub image: NativePointer,
     pub image_view: NativePointer,
@@ -584,6 +622,8 @@ impl VulkanBorrowedTextureDescriptor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
         context: VulkanContextDescriptor,
         image: NativePointer,
         image_view: NativePointer,
@@ -593,6 +633,8 @@ impl VulkanBorrowedTextureDescriptor {
     ) -> Self {
         Self {
             extent,
+            physical_width,
+            physical_height,
             context,
             image,
             image_view,
@@ -606,6 +648,8 @@ impl VulkanBorrowedTextureDescriptor {
         maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
             maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 context: self.context.to_core(),
                 image: self.image.as_void_ptr(),
                 image_view: self.image_view.as_void_ptr(),
@@ -643,6 +687,10 @@ impl OpenGLOwnedTextureDescriptor {
 #[non_exhaustive]
 pub struct OpenGLBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: OpenGLContextDescriptor,
     pub texture: u32,
     pub target: u32,
@@ -651,12 +699,16 @@ pub struct OpenGLBorrowedTextureDescriptor {
 impl OpenGLBorrowedTextureDescriptor {
     pub fn new(
         extent: RenderTargetExtent,
+        physical_width: u32,
+        physical_height: u32,
         context: OpenGLContextDescriptor,
         texture: u32,
         target: u32,
     ) -> Self {
         Self {
             extent,
+            physical_width,
+            physical_height,
             context,
             texture,
             target,
@@ -667,6 +719,8 @@ impl OpenGLBorrowedTextureDescriptor {
         maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
             maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
                 extent: self.extent.to_core(),
+                physical_width: self.physical_width,
+                physical_height: self.physical_height,
                 context: self.context.to_core(),
                 texture: self.texture,
                 target: self.target,
@@ -1197,6 +1251,16 @@ impl RenderSessionHandle {
         Ok(())
     }
     /// Resizes this attached render session.
+    ///
+    /// Surface and owned-texture sessions resize in place. Borrowed texture
+    /// targets are sized by their owner and report an unsupported-feature
+    /// error: close this session, recreate the texture, and attach a new
+    /// session. A map holds at most one attached session, so close before
+    /// attaching the replacement.
+    ///
+    /// Resizing discards the session renderer, so renderer-held state such as
+    /// feature state does not survive. Map state such as camera, style, and
+    /// sources lives on the map and survives both resize and reattach.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
@@ -1207,11 +1271,24 @@ impl RenderSessionHandle {
     }
 
     /// Processes the latest map render update for this render target.
-    pub fn render_update(&self) -> Result<()> {
+    ///
+    /// The map retains its latest update, so repeated calls re-render it and
+    /// return `true` again; use this to redraw on demand after resize or
+    /// surface expose, and gate frame loops on render-update-available events
+    /// instead of the return value. Returns `false` when no frame was
+    /// rendered, because the map has not published an update yet or the
+    /// renderer skipped the frame; both are normal during startup, so keep
+    /// pumping the runtime until an update is reported.
+    pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_render_update(session) })
+        let mut rendered = false;
+        // SAFETY: session is a live render session handle owned by this wrapper,
+        // and rendered points to caller-owned output storage.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_render_update(session, &raw mut rendered)
+        })?;
+        Ok(rendered)
     }
 
     /// Detaches backend-bound render resources from the map.

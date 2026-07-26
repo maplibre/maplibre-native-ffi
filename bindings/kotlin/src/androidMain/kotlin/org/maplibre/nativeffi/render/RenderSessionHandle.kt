@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import java.nio.charset.StandardCharsets
+import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
@@ -52,12 +53,19 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     )
   }
 
-  public actual fun renderUpdate() {
+  public actual fun renderUpdate(): Boolean {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("render")
-    Status.check(
-      MaplibreNativeC.mln_render_session_render_update(renderSession(requireLiveAddress()))
-    )
+    BoolPointer(1).use { outRendered ->
+      outRendered.put(0, false)
+      Status.check(
+        MaplibreNativeC.mln_render_session_render_update(
+          renderSession(requireLiveAddress()),
+          outRendered,
+        )
+      )
+      return outRendered.get()
+    }
   }
 
   public actual fun detach() {
@@ -518,6 +526,8 @@ private fun metalBorrowedTextureDescriptor(
 ): MaplibreNativeC.mln_metal_borrowed_texture_descriptor =
   MaplibreNativeC.mln_metal_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
+    physical_width(descriptor.physicalWidth)
+    physical_height(descriptor.physicalHeight)
     texture(pointerOrNull(descriptor.texture))
   }
 
@@ -543,6 +553,8 @@ private fun vulkanBorrowedTextureDescriptor(
 ): MaplibreNativeC.mln_vulkan_borrowed_texture_descriptor =
   MaplibreNativeC.mln_vulkan_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
+    physical_width(descriptor.physicalWidth)
+    physical_height(descriptor.physicalHeight)
     setVulkanContext(context(), descriptor.context)
     image(pointerOrNull(descriptor.image))
     image_view(pointerOrNull(descriptor.imageView))
@@ -573,6 +585,8 @@ private fun openglBorrowedTextureDescriptor(
 ): MaplibreNativeC.mln_opengl_borrowed_texture_descriptor =
   MaplibreNativeC.mln_opengl_borrowed_texture_descriptor_default().apply {
     setExtent(extent(), descriptor.extent)
+    physical_width(descriptor.physicalWidth)
+    physical_height(descriptor.physicalHeight)
     setOpenGLContext(context(), descriptor.context)
     texture(descriptor.texture)
     target(descriptor.target)

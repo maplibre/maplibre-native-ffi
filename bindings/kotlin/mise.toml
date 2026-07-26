@@ -64,6 +64,10 @@ dir = "../.."
 run = '''
 case "$usage_preset" in
   macos-arm64-*) kotlin_target=macosArm64 ;;
+  linux-*|windows-*)
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms only, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on macOS to cover nativeMain." >&2
+    exit 2
+    ;;
   *)
     echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
     exit 2

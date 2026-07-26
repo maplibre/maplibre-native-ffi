@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    assert_cluster_feature_extensions,
     render_until_update,
     skip_or_fail_fixture_setup,
 )
@@ -306,10 +307,10 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
-def test_render_update_without_pending_update_keeps_session_live(
+def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    assert_invalid_state(opengl_owned_session.session.render_update)
+    assert opengl_owned_session.session.render_update() is False
 
     assert not opengl_owned_session.session.closed
     opengl_owned_session.session.resize(32, 16, 1.0)
@@ -567,3 +568,13 @@ def test_egl_borrowed_texture_session_close_preserves_caller_resources() -> None
             assert _borrowed_descriptor_snapshot(replacement_descriptor) == (
                 before_descriptor
             )
+
+
+def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    assert_cluster_feature_extensions(
+        opengl_owned_session.runtime,
+        opengl_owned_session.map,
+        opengl_owned_session.session,
+    )

@@ -1255,6 +1255,8 @@ class MapHandle(NativeHandleMixin):
         return self._attach_render_session(
             _native.attach_metal_borrowed_texture,
             descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
             descriptor.texture.address,
         )
 
@@ -1281,6 +1283,8 @@ class MapHandle(NativeHandleMixin):
         return self._attach_render_session(
             _native.attach_vulkan_borrowed_texture,
             descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
             descriptor.context.instance.address,
             descriptor.context.physical_device.address,
             descriptor.context.device.address,
@@ -1340,6 +1344,8 @@ class MapHandle(NativeHandleMixin):
         return self._attach_render_session(
             _native.attach_opengl_borrowed_texture,
             descriptor,
+            descriptor.physical_width,
+            descriptor.physical_height,
             platform,
             first,
             second,

@@ -3269,15 +3269,20 @@ impl RenderSessionHandle {
         .map_err(map_error)
     }
 
-    fn render_update(&self) -> PyResult<()> {
+    fn render_update(&self) -> PyResult<bool> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
-        // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_render_update(state.as_ptr()) })
-            .map_err(map_error)
+        let mut rendered = false;
+        // SAFETY: The C API validates the render-session pointer and state, and
+        // rendered points to caller-owned output storage.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_render_update(state.as_ptr(), &raw mut rendered)
+        })
+        .map_err(map_error)?;
+        Ok(rendered)
     }
 
     fn detach(&self) -> PyResult<DetachedRenderSessionHandle> {
@@ -6447,6 +6452,31 @@ fn supported_opengl_context_providers_raw() -> u32 {
     unsafe { sys::mln_opengl_supported_context_provider_mask() }
 }
 
+/// Returns the physical device-pixel size for a logical render target extent.
+#[pyfunction]
+fn render_target_extent_physical_size(
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+) -> PyResult<(u32, u32)> {
+    let extent = maplibre_core::render::render_target_extent_to_native(
+        maplibre_core::render::RenderTargetExtentFields {
+            width,
+            height,
+            scale_factor,
+        },
+    );
+    let mut out_width = 0u32;
+    let mut out_height = 0u32;
+    // SAFETY: extent is fully initialized and both out pointers reference live
+    // locals for the duration of the call.
+    maplibre_core::check(unsafe {
+        sys::mln_render_target_extent_physical_size(&extent, &mut out_width, &mut out_height)
+    })
+    .map_err(map_error)?;
+    Ok((out_width, out_height))
+}
+
 /// Returns the raw process-global network status reported by the linked library.
 #[pyfunction]
 fn network_status_raw() -> PyResult<u32> {
@@ -6920,6 +6950,8 @@ fn attach_metal_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     texture_address: usize,
 ) -> PyResult<RenderSessionHandle> {
     let descriptor = maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
@@ -6929,6 +6961,8 @@ fn attach_metal_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             texture: texture_address as *mut c_void,
         },
     );
@@ -6985,6 +7019,8 @@ fn attach_vulkan_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     instance_address: usize,
     physical_device_address: usize,
     device_address: usize,
@@ -7005,6 +7041,8 @@ fn attach_vulkan_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             context: vulkan_context_fields(
                 instance_address,
                 physical_device_address,
@@ -7109,6 +7147,8 @@ fn attach_opengl_borrowed_texture(
     width: u32,
     height: u32,
     scale_factor: f64,
+    physical_width: u32,
+    physical_height: u32,
     context_platform: u32,
     context_address_1: usize,
     context_address_2: usize,
@@ -7124,6 +7164,8 @@ fn attach_opengl_borrowed_texture(
                 height,
                 scale_factor,
             },
+            physical_width,
+            physical_height,
             context: opengl_context_fields(
                 context_platform,
                 context_address_1,
@@ -7214,6 +7256,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(supported_render_backends_raw, module)?)?;
     module.add_function(wrap_pyfunction!(
         supported_opengl_context_providers_raw,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        render_target_extent_physical_size,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(network_status_raw, module)?)?;

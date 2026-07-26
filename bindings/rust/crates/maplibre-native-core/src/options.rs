@@ -8,8 +8,18 @@ use crate::values::{EdgeInsets, edge_insets_from_native, edge_insets_to_native};
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MapOptions {
+    /// Initial logical width in UI pixels, replaced by the extent of the first
+    /// attached render session.
     pub width: u32,
+    /// Initial logical height in UI pixels, replaced by the extent of the first
+    /// attached render session.
     pub height: u32,
+    /// UI-to-device pixel scale, fixed for the lifetime of the map.
+    ///
+    /// This selects sprites, glyphs, and raster tiles for every frame. Render
+    /// targets carry their own scale factor for geometry, so attaching or
+    /// resizing a session with a different one logs a warning and renders
+    /// styled imagery chosen for this density.
     pub scale_factor: f64,
     pub mode: MapMode,
 }
