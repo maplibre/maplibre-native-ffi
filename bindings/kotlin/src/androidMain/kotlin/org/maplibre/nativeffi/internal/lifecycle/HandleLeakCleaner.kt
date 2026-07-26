@@ -28,6 +28,9 @@ internal object HandleLeakCleaner {
   /** Keeps registrations reachable so the collector can enqueue them. */
   private val pending = ConcurrentHashMap.newKeySet<LeakRegistration>()
 
+  /** Keeps host callback state reachable for as long as native may invoke it. */
+  private val nativeCallbackRoots = ConcurrentHashMap.newKeySet<Any>()
+
   init {
     Thread(::drain, "maplibre-handle-leak-reporter").apply { isDaemon = true }.start()
   }
@@ -35,6 +38,18 @@ internal object HandleLeakCleaner {
   /** Reports [leakReport] when [handle] becomes unreachable before explicit release. */
   fun register(handle: Any, leakReport: HandleStateCore.LeakReport) {
     pending.add(LeakRegistration(handle, queue) { leakReport.report() })
+  }
+
+  /** Retains callback state independently of its public native-owner wrapper. */
+  fun retainNativeCallbackRoot(root: Any) {
+    nativeCallbackRoots.add(root)
+  }
+
+  /** Releases callback state after native can no longer invoke it. */
+  fun releaseNativeCallbackRoot(root: Any?) {
+    if (root != null) {
+      nativeCallbackRoots.remove(root)
+    }
   }
 
   /** Reports [frameCore] when [handle] becomes unreachable before explicit release. */

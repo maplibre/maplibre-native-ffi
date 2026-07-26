@@ -127,7 +127,8 @@ private constructor(
     val sourceState = CustomGeometrySourceState(options)
     try {
       NativeAccess.addCustomGeometrySource(requireLiveHandle(), sourceId, sourceState.descriptor())
-      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
     } catch (error: Throwable) {
       closeQuietly(sourceState)
       throw error
@@ -724,7 +725,7 @@ private constructor(
     while (iterator.hasNext()) {
       val entry = iterator.next()
       if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.value)
+        releaseCallbackRoot(entry.value)
         iterator.remove()
       }
     }
@@ -736,13 +737,18 @@ private constructor(
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    closeQuietly(customGeometrySources.remove(sourceId))
+    releaseCallbackRoot(customGeometrySources.remove(sourceId))
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {

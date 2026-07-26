@@ -258,7 +258,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
           )
         )
       }
-      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
     } catch (error: Throwable) {
       closeQuietly(sourceState)
       throw error
@@ -1461,7 +1462,7 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     while (iterator.hasNext()) {
       val entry = iterator.next()
       if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.value)
+        releaseCallbackRoot(entry.value)
         iterator.remove()
       }
     }
@@ -1572,11 +1573,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    closeQuietly(customGeometrySources.remove(sourceId))
+    releaseCallbackRoot(customGeometrySources.remove(sourceId))
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
 }
@@ -2786,6 +2787,11 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {
