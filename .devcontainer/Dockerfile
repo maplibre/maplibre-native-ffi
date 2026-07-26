@@ -17,6 +17,10 @@ RUN apt-get update \
     sudo \
   && rm -rf /var/lib/apt/lists/*
 
+# mise's OCI v1 builder rejects plugin-backed tools, so install Emscripten in a
+# regular image layer after the content-addressable tool image is assembled.
+RUN mise install emsdk@4.0.10
+
 RUN groupmod --new-name dev ubuntu \
   && usermod --login dev --home /home/dev --move-home --shell /bin/bash ubuntu \
   && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
