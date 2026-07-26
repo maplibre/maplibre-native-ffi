@@ -19,10 +19,6 @@ lockfile_platforms = [
 ]
 pin = true
 experimental = true
-windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
-windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
-unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "bash -e -c"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
