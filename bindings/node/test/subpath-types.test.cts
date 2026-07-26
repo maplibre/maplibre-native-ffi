@@ -80,12 +80,14 @@ RuntimeHandle.prototype.setResourceProviderRoutes.call(
 );
 const viewportOptions: MapViewportOptionsInput = { northOrientation: "up" };
 const tileOptions: MapTileOptionsInput = { lodMode: "distance" };
-const invalidViewportOptions: MapViewportOptionsInput = {
-  // @ts-expect-error input descriptors reject unknown enum sentinels.
+const unknownViewportOptions: MapViewportOptionsInput = {
   viewportMode: "unknown",
+  viewportModeRaw: 1000,
 };
-// @ts-expect-error input descriptors reject unknown enum sentinels.
-const invalidTileOptions: MapTileOptionsInput = { lodMode: "unknown" };
+const unknownTileOptions: MapTileOptionsInput = {
+  lodMode: "unknown",
+  lodModeRaw: 1000,
+};
 const runtimeEvent = RuntimeHandle.prototype.pollEvent.call(
   {} as RuntimeHandle,
 );
@@ -140,8 +142,8 @@ void route;
 void providerCallback;
 void viewportOptions;
 void tileOptions;
-void invalidViewportOptions;
-void invalidTileOptions;
+void unknownViewportOptions;
+void unknownTileOptions;
 void invalidProviderCallback;
 void transformRule;
 void readbackBuffer;

@@ -934,7 +934,7 @@ class RuntimeHandle {
   }
 
   createMap(options) {
-    return new MapHandle(this, options);
+    return new MapHandle(CONSTRUCTION_TOKEN, this, options);
   }
 
   close() {
@@ -1250,8 +1250,14 @@ class RuntimeHandle {
 }
 
 class MapProjectionHandle {
-  constructor(map) {
+  constructor(token, map) {
     recordHandleEnvironment(this);
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "map projections are created by MapHandle.createProjection()",
+      );
+    }
     if (!(map instanceof MapHandle)) {
       throw new InvalidArgumentError(null, "map must be a MapHandle");
     }
@@ -1656,8 +1662,14 @@ function attachRenderSession(map, attach) {
 class MapHandle {
   #runtime;
 
-  constructor(runtime, options) {
+  constructor(token, runtime, options) {
     recordHandleEnvironment(this);
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "maps are created by RuntimeHandle.createMap()",
+      );
+    }
     if (!(runtime instanceof RuntimeHandle)) {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
@@ -1683,7 +1695,7 @@ class MapHandle {
   }
 
   createProjection() {
-    return new MapProjectionHandle(this);
+    return new MapProjectionHandle(CONSTRUCTION_TOKEN, this);
   }
 
   attachMetalOwnedTexture(descriptor) {

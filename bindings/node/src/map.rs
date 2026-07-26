@@ -113,6 +113,7 @@ pub struct MapTileOptions {
     pub lod_pitch_threshold: Option<f64>,
     pub lod_zoom_shift: Option<f64>,
     pub lod_mode: Option<String>,
+    pub lod_mode_raw: Option<u32>,
 }
 
 #[napi(object)]
@@ -1891,35 +1892,59 @@ impl CameraFitOptions {
 impl MapViewportOptions {
     fn into_core(self) -> Result<core::MapViewportOptions> {
         let mut options = core::MapViewportOptions::default();
-        if self.north_orientation.is_some() && self.north_orientation_raw.is_some() {
-            return Err(error::invalid_argument(
-                "northOrientation and northOrientationRaw are mutually exclusive",
-            ));
+        match (self.north_orientation, self.north_orientation_raw) {
+            (Some(name), Some(raw)) => {
+                let value = core::NorthOrientation::from_raw(raw);
+                if north_orientation_name(value) != name {
+                    return Err(error::invalid_argument(
+                        "northOrientation and northOrientationRaw do not match",
+                    ));
+                }
+                options.north_orientation = Some(value);
+            }
+            (None, Some(raw)) => {
+                options.north_orientation = Some(core::NorthOrientation::from_raw(raw));
+            }
+            (Some(name), None) => {
+                options.north_orientation = Some(north_orientation_from_string(&name)?);
+            }
+            (None, None) => {}
         }
-        if let Some(value) = self.north_orientation_raw {
-            options.north_orientation = Some(core::NorthOrientation::from_raw(value));
-        } else if let Some(value) = self.north_orientation {
-            options.north_orientation = Some(north_orientation_from_string(&value)?);
+        match (self.constrain_mode, self.constrain_mode_raw) {
+            (Some(name), Some(raw)) => {
+                let value = core::ConstrainMode::from_raw(raw);
+                if constrain_mode_name(value) != name {
+                    return Err(error::invalid_argument(
+                        "constrainMode and constrainModeRaw do not match",
+                    ));
+                }
+                options.constrain_mode = Some(value);
+            }
+            (None, Some(raw)) => {
+                options.constrain_mode = Some(core::ConstrainMode::from_raw(raw));
+            }
+            (Some(name), None) => {
+                options.constrain_mode = Some(constrain_mode_from_string(&name)?);
+            }
+            (None, None) => {}
         }
-        if self.constrain_mode.is_some() && self.constrain_mode_raw.is_some() {
-            return Err(error::invalid_argument(
-                "constrainMode and constrainModeRaw are mutually exclusive",
-            ));
-        }
-        if let Some(value) = self.constrain_mode_raw {
-            options.constrain_mode = Some(core::ConstrainMode::from_raw(value));
-        } else if let Some(value) = self.constrain_mode {
-            options.constrain_mode = Some(constrain_mode_from_string(&value)?);
-        }
-        if self.viewport_mode.is_some() && self.viewport_mode_raw.is_some() {
-            return Err(error::invalid_argument(
-                "viewportMode and viewportModeRaw are mutually exclusive",
-            ));
-        }
-        if let Some(value) = self.viewport_mode_raw {
-            options.viewport_mode = Some(core::ViewportMode::from_raw(value));
-        } else if let Some(value) = self.viewport_mode {
-            options.viewport_mode = Some(viewport_mode_from_string(&value)?);
+        match (self.viewport_mode, self.viewport_mode_raw) {
+            (Some(name), Some(raw)) => {
+                let value = core::ViewportMode::from_raw(raw);
+                if viewport_mode_name(value) != name {
+                    return Err(error::invalid_argument(
+                        "viewportMode and viewportModeRaw do not match",
+                    ));
+                }
+                options.viewport_mode = Some(value);
+            }
+            (None, Some(raw)) => {
+                options.viewport_mode = Some(core::ViewportMode::from_raw(raw));
+            }
+            (Some(name), None) => {
+                options.viewport_mode = Some(viewport_mode_from_string(&name)?);
+            }
+            (None, None) => {}
         }
         if let Some(value) = self.frustum_offset {
             options.frustum_offset = Some(value.into_core());
@@ -1990,8 +2015,23 @@ impl MapTileOptions {
         if let Some(value) = self.lod_zoom_shift {
             options.lod_zoom_shift = Some(value);
         }
-        if let Some(value) = self.lod_mode {
-            options.lod_mode = Some(tile_lod_mode_from_string(&value)?);
+        match (self.lod_mode, self.lod_mode_raw) {
+            (Some(name), Some(raw)) => {
+                let value = core::TileLodMode::from_raw(raw);
+                if tile_lod_mode_name(value) != name {
+                    return Err(error::invalid_argument(
+                        "lodMode and lodModeRaw do not match",
+                    ));
+                }
+                options.lod_mode = Some(value);
+            }
+            (None, Some(raw)) => {
+                options.lod_mode = Some(core::TileLodMode::from_raw(raw));
+            }
+            (Some(name), None) => {
+                options.lod_mode = Some(tile_lod_mode_from_string(&name)?);
+            }
+            (None, None) => {}
         }
         Ok(options)
     }
@@ -2004,6 +2044,7 @@ impl MapTileOptions {
             lod_pitch_threshold: options.lod_pitch_threshold,
             lod_zoom_shift: options.lod_zoom_shift,
             lod_mode: options.lod_mode.map(tile_lod_mode_name),
+            lod_mode_raw: options.lod_mode.map(core::TileLodMode::as_raw),
         }
     }
 }

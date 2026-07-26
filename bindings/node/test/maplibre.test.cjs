@@ -102,6 +102,17 @@ test("concept subpath modules expose curated public API groups", () => {
   assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
 });
 
+test("map handles are created only by their owning factories", () => {
+  assert.throws(
+    () => Reflect.construct(MapHandle, [null]),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () => Reflect.construct(MapProjectionHandle, [null]),
+    InvalidArgumentError,
+  );
+});
+
 test("process-global APIs cross the native add-on", () => {
   assert.equal(cVersion(), 0);
 
@@ -1173,6 +1184,14 @@ test("map viewport and tile options map descriptor fields", () => {
       bottom: 3,
       right: 4,
     });
+    viewport.frustumOffset = { top: 4, left: 3, bottom: 2, right: 1 };
+    map.setViewportOptions(viewport);
+    assert.deepEqual(map.getViewportOptions().frustumOffset, {
+      top: 4,
+      left: 3,
+      bottom: 2,
+      right: 1,
+    });
 
     map.setTileOptions({
       prefetchZoomDelta: 2,
@@ -1185,11 +1204,25 @@ test("map viewport and tile options map descriptor fields", () => {
     const tile = map.getTileOptions();
     assert.equal(tile.prefetchZoomDelta, 2);
     assert.equal(tile.lodMode, "distance");
+    assert.equal(tile.lodModeRaw, 1);
+    map.setTileOptions(tile);
     assert.throws(
       () =>
         map.setViewportOptions({
           northOrientation: /** @type {any} */ ("north"),
         }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        map.setViewportOptions({
+          northOrientation: "right",
+          northOrientationRaw: 2,
+        }),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () => map.setTileOptions({ lodMode: "distance", lodModeRaw: 0 }),
       InvalidArgumentError,
     );
     assert.throws(

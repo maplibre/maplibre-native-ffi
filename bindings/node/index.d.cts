@@ -334,11 +334,17 @@ export interface CameraFitOptions {
 }
 
 export interface MapViewportOptionsInput {
-  northOrientation?: "up" | "right" | "down" | "left" | null;
+  northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
   northOrientationRaw?: number | null;
-  constrainMode?: "none" | "heightOnly" | "widthAndHeight" | "screen" | null;
+  constrainMode?:
+    | "none"
+    | "heightOnly"
+    | "widthAndHeight"
+    | "screen"
+    | "unknown"
+    | null;
   constrainModeRaw?: number | null;
-  viewportMode?: "default" | "flippedY" | null;
+  viewportMode?: "default" | "flippedY" | "unknown" | null;
   viewportModeRaw?: number | null;
   frustumOffset?: EdgeInsets | null;
 }
@@ -365,7 +371,8 @@ export interface MapTileOptionsInput {
   lodScale?: number | null;
   lodPitchThreshold?: number | null;
   lodZoomShift?: number | null;
-  lodMode?: "default" | "distance" | null;
+  lodMode?: "default" | "distance" | "unknown" | null;
+  lodModeRaw?: number | null;
 }
 
 export interface MapTileOptions {
@@ -375,6 +382,7 @@ export interface MapTileOptions {
   lodPitchThreshold?: number | null;
   lodZoomShift?: number | null;
   lodMode?: "default" | "distance" | "unknown" | null;
+  lodModeRaw?: number | null;
 }
 
 export interface BoundOptions {
@@ -878,7 +886,7 @@ export declare class RenderSessionHandle {
 }
 
 export declare class MapProjectionHandle {
-  constructor(map: MapHandle);
+  private constructor(map: MapHandle);
   readonly closed: boolean;
   close(): void;
   getCamera(): CameraOptions;
@@ -891,7 +899,7 @@ export declare class MapProjectionHandle {
 }
 
 export declare class MapHandle {
-  constructor(runtime: RuntimeHandle, options?: MapOptions | null);
+  private constructor(runtime: RuntimeHandle, options?: MapOptions | null);
   readonly closed: boolean;
   renderingStatsViewEnabled: boolean;
   close(): void;
