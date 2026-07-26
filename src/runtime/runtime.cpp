@@ -2333,11 +2333,12 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::scoped_lock lock(runtime_registry_mutex());
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
   if (runtime->live_maps != 0) {
     set_thread_error("resource provider must be set before map creation");
     return MLN_STATUS_INVALID_STATE;
   }
+  const std::unique_lock provider_lock(runtime->resource_provider_mutex);
   runtime->has_resource_provider = true;
   runtime->resource_provider = ResourceProvider{
     .callback = provider->callback,
@@ -2378,6 +2379,17 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
 
     owned_runtime = std::move(found->second);
     runtime_registry().erase(found);
+  }
+
+  {
+    // A file-source thread that found this runtime under the registry lock
+    // holds a shared provider lock through the callback. Taking the exclusive
+    // lock here keeps callback and user_data lifetime inside runtime lifetime.
+    const std::unique_lock provider_lock(
+      owned_runtime->resource_provider_mutex
+    );
+    owned_runtime->has_resource_provider = false;
+    owned_runtime->resource_provider = ResourceProvider{};
   }
 
   // A resource transform callback that entered `invoke_resource_transform()`
@@ -2539,25 +2551,31 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   return options;
 }
 
-auto find_resource_provider_for_platform_context(
+auto acquire_resource_provider_for_platform_context(
   void* platform_context
-) noexcept -> std::optional<ResourceProvider> {
+) noexcept -> std::optional<ResourceProviderLease> {
   if (platform_context == nullptr) {
     return std::nullopt;
   }
 
-  // Reading the provider while the registry lock is held keeps the whole read
-  // inside the critical section that `destroy_runtime()` uses to retire the
-  // entry, and `set_resource_provider()` writes these fields under the same
-  // lock. Returning a copy leaves the caller with no borrowed runtime state.
-  const std::scoped_lock lock(runtime_registry_mutex());
   auto* runtime = static_cast<mln_runtime*>(platform_context);
-  if (
-    !runtime_registry().contains(runtime) || !runtime->has_resource_provider
-  ) {
+  std::shared_lock<std::shared_mutex> provider_lock;
+  {
+    // Acquire in registry-to-provider order, matching replacement and teardown.
+    // Teardown cannot remove and free the runtime between the registry lookup
+    // and the provider lock, then waits for the lease after removing it.
+    const std::scoped_lock registry_lock(runtime_registry_mutex());
+    if (!runtime_registry().contains(runtime)) {
+      return std::nullopt;
+    }
+    provider_lock = std::shared_lock{runtime->resource_provider_mutex};
+  }
+  if (!runtime->has_resource_provider) {
     return std::nullopt;
   }
-  return runtime->resource_provider;
+  return ResourceProviderLease{
+    std::move(provider_lock), runtime->resource_provider
+  };
 }
 
 auto find_maximum_cache_size_for_platform_context(

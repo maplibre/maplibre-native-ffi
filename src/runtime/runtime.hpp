@@ -11,6 +11,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <mbgl/storage/resource_options.hpp>
@@ -49,6 +50,26 @@ struct ResourceTransformState {
   void* user_data = nullptr;
 };
 
+// Borrows one registered provider through its synchronous callback invocation.
+// Replacement and runtime teardown take the same mutex exclusively, so the
+// callback and its borrowed user data stay valid while a lease exists.
+class ResourceProviderLease {
+ public:
+  ResourceProviderLease(
+    std::shared_lock<std::shared_mutex> lock, ResourceProvider provider
+  )
+      : lock_(std::move(lock)), provider_(provider) {}
+
+  [[nodiscard]] auto callback() const -> mln_resource_provider_callback {
+    return provider_.callback;
+  }
+  [[nodiscard]] auto user_data() const -> void* { return provider_.user_data; }
+
+ private:
+  std::shared_lock<std::shared_mutex> lock_;
+  ResourceProvider provider_;
+};
+
 struct OfflineRegionEventState {
   std::mutex mutex;
   mln_runtime* runtime = nullptr;
@@ -82,6 +103,7 @@ struct mln_runtime {
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
   bool has_maximum_cache_size = false;
   std::uint64_t maximum_cache_size = 0;
+  mutable std::shared_mutex resource_provider_mutex;
   bool has_resource_provider = false;
   mln::core::ResourceProvider resource_provider;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
@@ -220,15 +242,15 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void;
 auto validate_runtime(mln_runtime* runtime) -> mln_status;
 auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions;
-// Copies the resource provider registered on the runtime named by a MapLibre
-// platform context. Every read of the runtime happens while the registry lock
-// is held, so callers on MapLibre worker and network threads hold copied values
-// instead of a handle that runtime teardown may retire. Returns nullopt when
-// the platform context names no live runtime or the runtime carries no
-// provider.
-auto find_resource_provider_for_platform_context(
+// Leases the resource provider registered on the runtime named by a MapLibre
+// platform context. Acquiring the shared provider lock while the registry lock
+// is held hands runtime lifetime safely to the caller. Hold the returned lease
+// across the synchronous provider callback so teardown cannot retire its
+// callback or user_data. Returns nullopt when the platform context names no
+// live runtime or the runtime carries no provider.
+auto acquire_resource_provider_for_platform_context(
   void* platform_context
-) noexcept -> std::optional<ResourceProvider>;
+) noexcept -> std::optional<ResourceProviderLease>;
 
 // Copies the maximum ambient cache size configured on the runtime named by a
 // MapLibre platform context, under the same registry lock. Returns nullopt when
