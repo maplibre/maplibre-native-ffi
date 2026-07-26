@@ -1,24 +1,21 @@
 package org.maplibre.nativeffi.resource
 
-import java.lang.ref.Cleaner
 import org.bytedeco.javacpp.BytePointer
 import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned Android JNI handle for a resource provider request. */
 public actual class ResourceRequestHandle internal constructor(private val handleAddress: Long) :
   AutoCloseable {
-  private val core = ResourceRequestHandleCore {
-    MaplibreNativeC.mln_resource_request_release(resourceRequestHandle(handleAddress))
-  }
-  @Suppress("unused")
-  private val cleanable = CLEANER.register(this, Runnable { core.releaseIfOwned() })
+  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleAddress))
 
   init {
     require(handleAddress != 0L) { "Resource request handle is null" }
+    UnreachableActions.register(this, ReleaseIfOwnedAction(core))
   }
 
   public actual fun complete(response: ResourceResponse) {
@@ -131,8 +128,31 @@ public actual class ResourceRequestHandle internal constructor(private val handl
     }
   }
 
+  /**
+   * Releases the native request once the wrapper becomes unreachable.
+   *
+   * Request handles carry no owner-thread affinity, so reclaiming one from the cleanup thread stays
+   * within the cleanup-hook contract that keeps runtime, map, projection, and render-session
+   * handles on their owner thread. [ResourceRequestHandleCore] releases only when the provider
+   * still owns the request, so an explicit `close()` or completion keeps this a no-op.
+   *
+   * This holds the ownership state alone. Holding the wrapper would keep it reachable from the
+   * cleanup registry and suppress every reclaim.
+   */
+  private class ReleaseIfOwnedAction(private val core: ResourceRequestHandleCore) : Runnable {
+    override fun run() {
+      core.releaseIfOwned()
+    }
+  }
+
+  /** Native release that holds the handle address alone, keeping the wrapper collectable. */
+  private class ReleaseNativeRequest(private val handleAddress: Long) : () -> Unit {
+    override fun invoke() {
+      MaplibreNativeC.mln_resource_request_release(resourceRequestHandle(handleAddress))
+    }
+  }
+
   private companion object {
-    private val CLEANER = Cleaner.create()
     private const val UNKNOWN_DECISION: Int = -1
   }
 }
