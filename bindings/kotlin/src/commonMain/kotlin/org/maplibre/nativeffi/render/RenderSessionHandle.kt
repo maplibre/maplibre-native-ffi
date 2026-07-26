@@ -53,6 +53,17 @@ public expect class RenderSessionHandle : AutoCloseable {
     options: SourceFeatureQueryOptions?,
   ): List<QueriedFeature>
 
+  /**
+   * Queries a feature extension from the latest render session state.
+   *
+   * The `supercluster` extension reads the `cluster_id` feature property and the `limit` and
+   * `offset` arguments as [JsonValue.UInt]. Other numeric types are treated as absent: a
+   * `cluster_id` that is not [JsonValue.UInt] returns [FeatureExtensionResult.Value] holding
+   * [JsonValue.Null] instead of a feature collection, and a `limit` or `offset` that is not
+   * [JsonValue.UInt] leaves `leaves` at the native defaults of ten leaves at offset zero.
+   * [QueriedFeature] properties keep their JSON value type, so a queried cluster feature can be
+   * passed back unmodified.
+   */
   public fun queryFeatureExtension(
     sourceId: String,
     feature: Feature,

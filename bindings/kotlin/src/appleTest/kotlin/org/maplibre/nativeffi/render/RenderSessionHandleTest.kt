@@ -24,11 +24,13 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.toLong
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.error.WrongThreadException
+import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
@@ -37,6 +39,7 @@ import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
@@ -421,6 +424,118 @@ class RenderSessionHandleTest {
     }
   }
 
+  // BND-107: an unsigned cluster_id survives the query round trip, and an
+  // unsigned leaves limit bounds the returned features.
+  @Test
+  fun clusterFeatureExtensionQueriesResolveUnsignedClusterIdAndLimit() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    Maplibre.setLogCallback(LogCallback { true })
+    Maplibre.setAsyncLogSeverities(emptySet())
+    try {
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(64, 64, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          map.jumpTo(
+            CameraOptions().apply {
+              center = LatLng(0.0, 0.0)
+              zoom = 0.0
+            }
+          )
+          map.setStyleJson(CLUSTER_STYLE_JSON)
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+          session.renderUpdate()
+
+          val queryPoint = map.pixelForLatLng(LatLng(0.0, 0.0))
+          val queryGeometry =
+            RenderedQueryGeometry.Box(
+              ScreenBox(
+                ScreenPoint(queryPoint.x - 30.0, queryPoint.y - 30.0),
+                ScreenPoint(queryPoint.x + 30.0, queryPoint.y + 30.0),
+              )
+            )
+          val cluster =
+            waitForQueriedFeature(runtime, map, session) {
+              session.queryRenderedFeatures(
+                queryGeometry,
+                RenderedFeatureQueryOptions().apply { layerIds = listOf("cluster-circle") },
+              )
+            }
+          // Native matches cluster_id by exact JSON value type, so the copied
+          // feature must keep the unsigned alternative to resolve on the way
+          // back in.
+          assertTrue(member(cluster, "cluster_id") is JsonValue.UInt)
+
+          val children =
+            featureCollectionResult(
+              session.queryFeatureExtension(
+                "cluster-source",
+                cluster.feature,
+                "supercluster",
+                "children",
+                null,
+              )
+            )
+          assertTrue(children.isNotEmpty())
+
+          val expansionZoom =
+            session.queryFeatureExtension(
+              "cluster-source",
+              cluster.feature,
+              "supercluster",
+              "expansion-zoom",
+              null,
+            )
+          val expansionZoomValue =
+            (expansionZoom as? FeatureExtensionResult.Value)?.value
+              ?: error("expected expansion-zoom value result")
+          assertTrue(expansionZoomValue is JsonValue.UInt)
+
+          val leaves =
+            featureCollectionResult(
+              session.queryFeatureExtension(
+                "cluster-source",
+                cluster.feature,
+                "supercluster",
+                "leaves",
+                JsonValue.ObjectValue(
+                  listOf(
+                    JsonValue.Member("limit", JsonValue.UInt(1)),
+                    JsonValue.Member("offset", JsonValue.UInt(0)),
+                  )
+                ),
+              )
+            )
+          assertEquals(1, leaves.size)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+        runtime.close()
+      }
+    } finally {
+      Maplibre.clearLogCallback()
+      Maplibre.restoreDefaultAsyncLogSeverities()
+    }
+  }
+
   private fun metalSupportedOrInapplicable(): Boolean {
     return RenderBackend.METAL in Maplibre.supportedRenderBackends()
   }
@@ -491,6 +606,10 @@ class RenderSessionHandleTest {
       }
     }
   }
+
+  private fun featureCollectionResult(result: FeatureExtensionResult): List<Feature> =
+    (result as? FeatureExtensionResult.FeatureCollection)?.features
+      ?: error("expected feature collection result")
 
   private fun member(feature: QueriedFeature, key: String): JsonValue? =
     feature.feature.properties.firstOrNull { it.key == key }?.value
@@ -607,6 +726,32 @@ class RenderSessionHandleTest {
         "layers": [
           {"id": "background", "type": "background", "paint": {"background-color": "#d8f1ff"}},
           {"id": "point-circle", "type": "circle", "source": "point", "paint": {"circle-color": "#f97316", "circle-radius": 12}}
+        ]
+      }
+      """
+
+    private const val CLUSTER_STYLE_JSON =
+      """
+      {
+        "version": 8,
+        "name": "kotlin-cluster-query-test",
+        "sources": {
+          "cluster-source": {
+            "type": "geojson",
+            "cluster": true,
+            "data": {
+              "type": "FeatureCollection",
+              "features": [
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.0, 0.0]}, "properties": {"name": "one"}},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.001, 0.001]}, "properties": {"name": "two"}},
+                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.002, 0.002]}, "properties": {"name": "three"}}
+              ]
+            }
+          }
+        },
+        "layers": [
+          {"id": "background", "type": "background", "paint": {"background-color": "#ffffff"}},
+          {"id": "cluster-circle", "type": "circle", "source": "cluster-source", "filter": ["has", "point_count"], "paint": {"circle-color": "#2563eb", "circle-radius": 20}}
         ]
       }
       """

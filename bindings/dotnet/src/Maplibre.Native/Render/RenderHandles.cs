@@ -441,6 +441,21 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         SourceFeatureQueryOptions? options
     ) => QuerySourceFeaturesCore(sourceId, options);
 
+    /// <summary>
+    /// Queries a feature extension from the latest render session state.
+    /// </summary>
+    /// <remarks>
+    /// The <c>supercluster</c> extension reads the <c>cluster_id</c> feature
+    /// property and the <c>limit</c> and <c>offset</c> arguments as
+    /// <c>JsonValue.UInt</c>. Other numeric types are treated as absent: a
+    /// <c>cluster_id</c> that is not <c>JsonValue.UInt</c> returns a
+    /// <c>FeatureExtensionResult.Value</c> holding <c>JsonValue.Null</c>
+    /// instead of a feature collection, and a <c>limit</c> or <c>offset</c>
+    /// that is not <c>JsonValue.UInt</c> leaves <c>leaves</c> at the native
+    /// defaults of ten leaves at offset zero. Queried feature properties keep
+    /// their JSON value type, so a queried cluster feature can be passed back
+    /// unmodified.
+    /// </remarks>
     public FeatureExtensionResult QueryFeatureExtension(
         string sourceId,
         Feature feature,

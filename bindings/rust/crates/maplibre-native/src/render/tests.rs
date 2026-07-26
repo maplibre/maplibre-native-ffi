@@ -1825,7 +1825,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
 }
 
 #[test]
-// Spec coverage: BND-106.
+// Spec coverage: BND-106 and BND-107.
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -1847,6 +1847,13 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let cluster =
         wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
 
+    // Native matches cluster_id by exact JSON value type, so the copied feature
+    // must keep the unsigned alternative to resolve on the way back in.
+    assert!(matches!(
+        feature_member(&cluster.feature, "cluster_id"),
+        Some(&JsonValue::UInt(_))
+    ));
+
     let children = session
         .query_feature_extension(
             "cluster-source",
@@ -1860,6 +1867,24 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         panic!("expected children feature collection");
     };
     assert!(!children.is_empty());
+
+    let leaves_arguments = JsonValue::Object(vec![
+        JsonMember::new("limit", JsonValue::UInt(1)),
+        JsonMember::new("offset", JsonValue::UInt(0)),
+    ]);
+    let leaves = session
+        .query_feature_extension(
+            "cluster-source",
+            &cluster.feature,
+            "supercluster",
+            "leaves",
+            Some(&leaves_arguments),
+        )
+        .unwrap();
+    let FeatureExtensionResult::FeatureCollection(leaves) = leaves else {
+        panic!("expected leaves feature collection");
+    };
+    assert_eq!(leaves.len(), 1);
 
     let expansion_zoom = session
         .query_feature_extension(

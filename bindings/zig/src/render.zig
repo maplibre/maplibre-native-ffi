@@ -547,6 +547,15 @@ pub const RenderSessionHandle = enum(u128) {
         return try copyFeatureQueryResult(allocator, result.?, lease.diagnostic_store);
     }
 
+    /// Queries a feature extension from the latest render session state.
+    ///
+    /// The `supercluster` extension reads the `cluster_id` feature property and
+    /// the `limit` and `offset` arguments as `.uint`. Other numeric types are
+    /// treated as absent: a `cluster_id` that is not `.uint` returns a `.value`
+    /// result holding `.null` instead of a `.feature_collection`, and a `limit`
+    /// or `offset` that is not `.uint` leaves `leaves` at the native defaults of
+    /// ten leaves at offset zero. Queried feature properties keep their JSON
+    /// value type, so a queried cluster feature can be passed back unmodified.
     pub fn queryFeatureExtension(
         self: *RenderSessionHandle,
         allocator: std.mem.Allocator,

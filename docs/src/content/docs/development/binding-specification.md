@@ -664,15 +664,16 @@ that a real native failure would expose.
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                   |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                      |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                |
-| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.           |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.    |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.         |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.        |
-| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers. |
+| ID      | Test                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                                                   |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                                             |
+| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.                                        |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.                                 |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.                                      |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.                                     |
+| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers.                              |
+| BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and an unsigned `limit` argument bounds the returned leaves. |
 
 ### Logging and callbacks
 

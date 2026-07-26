@@ -528,7 +528,19 @@ class RenderSessionHandle(NativeHandleMixin):
         extension_field: str,
         arguments: JsonObject | None = None,
     ) -> FeatureExtensionResult:
-        """Query a feature extension from the latest render session state."""
+        """Query a feature extension from the latest render session state.
+
+        The `supercluster` extension reads the `cluster_id` feature property and
+        the `limit` and `offset` arguments as `JsonUInt`. Other numeric types are
+        treated as absent: a `cluster_id` that is not `JsonUInt` returns a
+        `FeatureExtensionResultType.VALUE` result holding `None` instead of a
+        `FeatureExtensionResultType.FEATURE_COLLECTION` result,
+        and a `limit` or `offset` that is not `JsonUInt` leaves `leaves` at the
+        native defaults of ten leaves at offset zero. Note that
+        `json.from_python` converts a Python `int` to `JsonInt`; build these
+        arguments with `JsonUInt`. Queried feature properties keep their JSON
+        value type, so a queried cluster feature can be passed back unmodified.
+        """
         from .query import FeatureExtensionResult
 
         raw = self._native.query_feature_extensions(
