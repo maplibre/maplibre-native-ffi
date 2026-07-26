@@ -227,7 +227,7 @@ covers.
     let bounds = LatLngBounds::new(LatLng::new(37.7, -122.5), LatLng::new(37.85, -122.35));
     let mut fit = CameraFitOptions::default();
     fit.padding = Some(EdgeInsets::new(24.0, 24.0, 24.0, 24.0));
-    let fitted = map.camera_for_lat_lng_bounds(bounds, &fit)?;
+    let fitted = map.camera_for_lat_lng_bounds(bounds, Some(&fit))?;
     map.ease_to(&fitted, &animation)?;
     ```
   </TabItem>

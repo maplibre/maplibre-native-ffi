@@ -112,11 +112,16 @@ loads (or fails), and tears down. It needs network access for the style URL.
       map_options.scale_factor = 1.0;
 
       mln_map* map = NULL;
-      if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) return 1;
-
-      mln_map_set_style_url(map, "https://tiles.openfreemap.org/styles/bright");
+      if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
+        mln_runtime_destroy(runtime);
+        return 1;
+      }
 
       bool loaded = false;
+      if (mln_map_set_style_url(
+              map, "https://tiles.openfreemap.org/styles/bright") != MLN_STATUS_OK)
+        goto done;
+
       for (int i = 0; i < 100000 && !loaded; i++) {
         mln_runtime_run_once(runtime);
         mln_runtime_event event = {.size = sizeof(event)};
@@ -182,7 +187,7 @@ loads (or fails), and tears down. It needs network access for the style URL.
         MapHandle, MapOptions, RuntimeEventType, RuntimeHandle, RuntimeOptions,
     };
 
-    fn main() -> maplibre_native::Result<()> {
+    fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut runtime_options = RuntimeOptions::default();
         runtime_options.cache_path = Some(":memory:".into());
         let runtime = RuntimeHandle::with_options(&runtime_options)?;
@@ -199,16 +204,20 @@ loads (or fails), and tears down. It needs network access for the style URL.
                 match event.event_type {
                     RuntimeEventType::MapStyleLoaded => loaded = true,
                     RuntimeEventType::MapLoadingFailed => {
-                        eprintln!("style failed: {:?}", event.message);
-                        break;
+                        return Err(std::io::Error::other(format!(
+                            "style failed: {:?}",
+                            event.message
+                        ))
+                        .into());
                     }
                     _ => {}
                 }
             }
         }
 
-        map.close()?;
-        runtime.close()
+        map.close().map_err(|error| error.into_error())?;
+        runtime.close().map_err(|error| error.into_error())?;
+        Ok(())
     }
     ```
   </TabItem>

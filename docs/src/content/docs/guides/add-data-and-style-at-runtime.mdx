@@ -73,22 +73,28 @@ undefined property.
 <Tabs syncKey="lang">
   <TabItem label="C">
     ```c
+    #include <string.h>
+
+    static mln_string_view sv(const char* value) {
+      return (mln_string_view){.data = value, .size = strlen(value)};
+    }
+
     // Add a GeoJSON source and a circle layer styling it.
-    mln_map_add_geojson_source_url(map, mln_sv("cities"), mln_sv(geojson_url));
+    mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url));
 
     const char* layer =
         "{\"id\":\"cities\",\"type\":\"circle\",\"source\":\"cities\","
         "\"paint\":{\"circle-radius\":6}}";
     mln_json_value layer_json = parse_json(layer); // your JSON -> mln_json_value
-    mln_map_add_style_layer_json(map, &layer_json, mln_sv("")); // empty = on top
+    mln_map_add_style_layer_json(map, &layer_json, sv("")); // empty = on top
 
     // Data-driven styling with an expression value.
     mln_json_value color = parse_json(
         "[\"match\",[\"get\",\"capital\"],[\"yes\"],\"#e55e5e\",\"#3887be\"]");
-    mln_map_set_layer_property(map, mln_sv("cities"), mln_sv("circle-color"), &color);
+    mln_map_set_layer_property(map, sv("cities"), sv("circle-color"), &color);
 
     // Update the data later.
-    mln_map_set_geojson_source_url(map, mln_sv("cities"), mln_sv(new_url));
+    mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
     ```
   </TabItem>
 
@@ -187,7 +193,7 @@ undefined property.
     # Data-driven styling with an expression value.
     map_handle.set_layer_property("cities", "circle-color", expression_json)
 
-    map_handle.add_geojson_source_data("cities", updated_geojson)  # or swap the data
+    map_handle.set_geojson_source_data("cities", updated_geojson)  # swap the data
     ```
   </TabItem>
 
@@ -206,7 +212,7 @@ undefined property.
     	return err
     }
 
-    if err := m.AddGeoJSONSourceData("cities", updatedGeoJSON); err != nil {
+    if err := m.SetGeoJSONSourceData("cities", updatedGeoJSON); err != nil {
     	return err
     }
     ```

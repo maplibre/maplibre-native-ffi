@@ -123,7 +123,7 @@ the buffer — the image info reports width, height, stride, and byte length.
   </TabItem>
 
   <TabItem label="Swift">
-    ````swift
+    ```swift
     let session = try map.attachMetalOwnedTexture(
       MetalOwnedTextureDescriptor(extent: extent, context: contextDescriptor)
     )
@@ -138,24 +138,23 @@ the buffer — the image info reports width, height, stride, and byte length.
 
     // Or read pixels back to the CPU:
     var pixels = [UInt8](repeating: 0, count: byteCount)
-    let info = try session.readPremultipliedRGBA8(into: &pixels)```
+    let info = try session.readPremultipliedRGBA8(into: &pixels)
+    ```
+  </TabItem>
 
-    </TabItem>
-    <TabItem label="Zig">
-
+  <TabItem label="Zig">
     ```zig
-    var target = try maplibre.attachMetalOwnedTexture(&map, .{
+    var session = try maplibre.attachMetalOwnedTexture(&map, .{
         .extent = .{ .width = 512, .height = 512, .scale_factor = 1.0 },
         .context = context.descriptor(),
     });
-    defer target.close() catch {};
-    const session = &target.session;
+    defer session.close() catch {};
 
     // After a render update produced a frame, read pixels back:
     const pixels = try allocator.alloc(u8, 512 * 512 * 4);
     defer allocator.free(pixels);
     const info = try session.readPremultipliedRgba8Into(pixels);
-    ````
+    ```
   </TabItem>
 
   <TabItem label="C#">

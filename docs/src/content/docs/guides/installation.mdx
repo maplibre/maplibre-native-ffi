@@ -66,12 +66,13 @@ layout above.
 
 ## Consume from C or C++
 
-The archive installs a pkg-config descriptor; there is no CMake package config.
-Point `PKG_CONFIG_PATH` at the install prefix and compile against it:
+The public header requires C23. The archive installs a pkg-config descriptor;
+there is no CMake package config. Point `PKG_CONFIG_PATH` at the install prefix
+and compile against it:
 
 ```bash
 export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
-cc main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
+cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
 Static archives additionally define `-DMLN_STATIC` via the descriptor, so the
@@ -132,7 +133,9 @@ same command works for both linkage modes.
     ```
 
     `maplibre-native-sys` links `-lmaplibre-native-c` from the prefix's `lib/`
-    directory and sets an rpath to it.
+    directory and sets an rpath to the runtime library on Unix. On Windows, add
+    the prefix's `bin/` directory to `PATH` before running the executable, or
+    copy `maplibre-native-c.dll` beside it.
   </TabItem>
 
   <TabItem label="Swift">
@@ -171,7 +174,8 @@ same command works for both linkage modes.
     runtime, in order:
 
     1. an explicit `Maplibre.LoadNativeLibrary(path)` call,
-    2. the `Maplibre.Native.LibraryPath` AppContext switch,
+    2. the path set with
+       `AppContext.SetData("Maplibre.Native.LibraryPath", path)`,
     3. the `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` environment variable,
     4. the OS library search path for `maplibre-native-c`.
   </TabItem>

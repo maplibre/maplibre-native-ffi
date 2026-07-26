@@ -74,7 +74,7 @@ your binding's rules.
     let geometry = RenderedQueryGeometry::point(ScreenPoint::new(256.0, 256.0));
     let mut options = RenderedFeatureQueryOptions::default();
     options.layer_ids = Some(vec!["poi".to_owned()]);
-    let features = session.query_rendered_features(geometry, Some(options))?;
+    let features = session.query_rendered_features(&geometry, Some(&options))?;
     for feature in &features {
         // feature.feature properties, feature.source_id, ...
     }

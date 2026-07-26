@@ -27,7 +27,8 @@ Every offline API is asynchronous and follows the same shape:
 
 Operations with no payload (delete, invalidate, set download state, set
 observed, ambient cache) complete through the event alone and have no take
-call.
+call. After matching the completion event, explicitly discard or close their
+operation ID or handle.
 
 <Aside>
   The handle shapes differ per binding: Kotlin and Go type the handle by its
@@ -216,7 +217,7 @@ While it runs, three events track progress:
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
 | `OFFLINE_REGION_STATUS_CHANGED`            | Region ID plus a status snapshot: completed/required resource and tile counts and sizes, and a `complete` flag |
 | `OFFLINE_REGION_RESPONSE_ERROR`            | A resource failed, with the error reason (not found, server, connection, rate limit)                           |
-| `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region exceeded the tile ceiling; increase it or shrink the region                                         |
+| `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region exceeded the tile ceiling; shrink its bounds or zoom range                                          |
 
 You can also poll: `get_status(region_id)` is an async operation whose result
 is the same status snapshot.
@@ -252,9 +253,11 @@ while (true) {
   region, so the next activation refetches them.
 * `delete(region_id)` — remove the region and its resources.
 
-Ambient cache maintenance runs through `ambient_cache_operation_start` with
-`RESET_DATABASE`, `PACK_DATABASE`, `INVALIDATE`, or `CLEAR` — operating on the
-ambient (non-region) cache only.
+Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE`
+and `CLEAR` operate on ambient resources without removing offline regions, and
+`PACK_DATABASE` compacts the shared database. `RESET_DATABASE` deletes and
+recreates that shared database, including all offline-region records and cached
+resources.
 
 A minimal create-and-confirm flow:
 
@@ -265,8 +268,14 @@ A minimal create-and-confirm flow:
     // pump until OFFLINE_OPERATION_COMPLETED arrives for create.id ...
     val region = runtime.takeCreateOfflineRegionResult(create)
 
-    runtime.startSetOfflineRegionObserved(region.id, true)
-    runtime.startSetOfflineRegionDownloadState(region.id, OfflineRegionDownloadState.ACTIVE)
+    val observed = runtime.startSetOfflineRegionObserved(region.id, true)
+    // pump until completion arrives for observed.id ...
+    observed.close()
+
+    val download =
+      runtime.startSetOfflineRegionDownloadState(region.id, OfflineRegionDownloadState.ACTIVE)
+    // pump until completion arrives for download.id ...
+    download.close()
     // ... watch OfflineRegionStatusChanged events until status.complete ...
 
     val list = runtime.startOfflineRegions()
@@ -281,8 +290,14 @@ A minimal create-and-confirm flow:
     // pump until OfflineOperationCompleted arrives for the operation ...
     let region = create.take()?;
 
-    runtime.start_set_offline_region_observed(region.id, true)?;
-    runtime.start_set_offline_region_download_state(region.id, OfflineRegionDownloadState::Active)?;
+    let observed = runtime.start_set_offline_region_observed(region.id, true)?;
+    // pump until completion arrives for the operation ...
+    observed.discard().map_err(|error| error.into_error())?;
+
+    let download =
+        runtime.start_set_offline_region_download_state(region.id, OfflineRegionDownloadState::Active)?;
+    // pump until completion arrives for the operation ...
+    download.discard().map_err(|error| error.into_error())?;
     // ... watch OfflineRegionStatus events until status.complete ...
 
     let list = runtime.start_offline_regions()?;
@@ -297,8 +312,16 @@ A minimal create-and-confirm flow:
     // pump until .offlineOperationCompleted arrives for createId ...
     let region = try runtime.offlineRegionCreateTakeResult(operationId: createId)
 
-    _ = try runtime.offlineRegionSetObservedStart(regionId: region.id, observed: true)
-    _ = try runtime.offlineRegionSetDownloadStateStart(regionId: region.id, state: .active)
+    let observedId = try runtime.offlineRegionSetObservedStart(regionId: region.id, observed: true)
+    // pump until completion arrives for observedId ...
+    try runtime.discardOfflineOperation(observedId)
+
+    let downloadId = try runtime.offlineRegionSetDownloadStateStart(
+      regionId: region.id,
+      state: .active
+    )
+    // pump until completion arrives for downloadId ...
+    try runtime.discardOfflineOperation(downloadId)
     // ... watch .offlineRegionStatus events until status.complete ...
 
     let listId = try runtime.offlineRegionsListStart()
@@ -314,8 +337,13 @@ A minimal create-and-confirm flow:
     var region = try runtime.takeOfflineRegion(allocator, create);
     defer region.deinit();
 
-    _ = try runtime.startSetOfflineRegionObserved(region.id, true);
-    _ = try runtime.startSetOfflineRegionDownloadState(region.id, .active);
+    const observed = try runtime.startSetOfflineRegionObserved(region.id, true);
+    // pump until completion arrives for observed.operationId() ...
+    try observed.discard();
+
+    const download = try runtime.startSetOfflineRegionDownloadState(region.id, .active);
+    // pump until completion arrives for download.operationId() ...
+    try download.discard();
     // ... watch .offline_region_status_changed events until status.complete ...
 
     const list = try runtime.startListOfflineRegions();
@@ -328,11 +356,18 @@ A minimal create-and-confirm flow:
   <TabItem label="C#">
     ```csharp
     using var create = runtime.StartCreateOfflineRegion(definition, metadata);
-    // pump until OfflineOperationCompleted arrives for create.ID ...
+    // pump until OfflineOperationCompleted arrives for create.Id ...
     var region = runtime.TakeCreateOfflineRegionResult(create);
 
-    runtime.StartSetOfflineRegionObserved(region.Id, true);
-    runtime.StartSetOfflineRegionDownloadState(region.Id, OfflineRegionDownloadState.Active);
+    using (var observed = runtime.StartSetOfflineRegionObserved(region.Id, true))
+    {
+        // pump until completion arrives for observed.Id ...
+    }
+    using (var download =
+        runtime.StartSetOfflineRegionDownloadState(region.Id, OfflineRegionDownloadState.Active))
+    {
+        // pump until completion arrives for download.Id ...
+    }
     // ... watch OfflineRegionStatusChanged events until status.Complete ...
 
     using var list = runtime.StartOfflineRegions();
@@ -344,11 +379,17 @@ A minimal create-and-confirm flow:
   <TabItem label="Python">
     ```python
     create = runtime.create_offline_region(definition, metadata)
-    # pump until OfflineOperationCompleted arrives for create.operation_id ...
+    # pump until this operation's OfflineOperationCompleted event arrives ...
     region = create.take_region()
 
-    runtime.set_offline_region_observed(region.id, True)
-    runtime.set_offline_region_download_state(region.id, offline.OfflineRegionDownloadState.ACTIVE)
+    with runtime.set_offline_region_observed(region.id, True) as observed:
+        # pump until this operation's completion event arrives ...
+        pass
+    with runtime.set_offline_region_download_state(
+        region.id, offline.OfflineRegionDownloadState.ACTIVE
+    ) as download:
+        # pump until this operation's completion event arrives ...
+        pass
     # ... watch OfflineRegionStatusChanged events until status.complete ...
 
     list_op = runtime.list_offline_regions()
@@ -369,10 +410,21 @@ A minimal create-and-confirm flow:
     	return err
     }
 
-    if _, err := rt.StartSetOfflineRegionObserved(region.ID, true); err != nil {
+    observed, err := rt.StartSetOfflineRegionObserved(region.ID, true)
+    if err != nil {
+        return err
+    }
+    // pump until completion arrives for observed.ID() ...
+    if err := observed.Discard(); err != nil {
+        return err
+    }
+
+    download, err := rt.StartSetOfflineRegionDownloadState(region.ID, maplibre.OfflineRegionDownloadActive)
+    if err != nil {
     	return err
     }
-    if _, err := rt.StartSetOfflineRegionDownloadState(region.ID, maplibre.OfflineRegionDownloadActive); err != nil {
+    // pump until completion arrives for download.ID() ...
+    if err := download.Discard(); err != nil {
     	return err
     }
     // ... watch OfflineRegionStatusChanged events until Status.Complete ...
