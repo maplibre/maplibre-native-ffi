@@ -1,13 +1,17 @@
 // Raw C ABI coverage: null handles/outputs, unknown operation values, null
 // paths, callback descriptor shape, and invalid offline unions are hidden by
-// bindings.
+// bindings, plus the network file source diagnostic that every binding
+// forwards verbatim.
 
 #include <stdint.h>
+#include <string.h>
 
 #include "test_support.h"
 #include "unity.h"
 
 static const char offline_style_url[] = "http://example.com/offline-style.json";
+static const char unsupported_scheme_style_url[] =
+  "jar:file:/packaged/style.json";
 
 static mln_runtime_event empty_event(void) {
   return (mln_runtime_event){
@@ -50,6 +54,41 @@ static bool wait_for_offline_completion(
       if (payload->operation_id == operation_id) {
         return true;
       }
+    }
+    mln_test_sleep_millisecond();
+  }
+  return false;
+}
+
+static bool wait_for_map_loading_failure(
+  mln_runtime* runtime, const mln_map* map, char* out_message,
+  size_t out_message_capacity
+) {
+  for (size_t attempt = 0; attempt < 5000; attempt += 1) {
+    if (mln_runtime_run_once(runtime) != MLN_STATUS_OK) {
+      return false;
+    }
+    while (true) {
+      mln_runtime_event event = empty_event();
+      bool has_event = false;
+      if (
+        mln_runtime_poll_event(runtime, &event, &has_event) != MLN_STATUS_OK
+      ) {
+        return false;
+      }
+      if (!has_event) {
+        break;
+      }
+      if (
+        event.type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED ||
+        event.source != (const void*)map || event.message == NULL ||
+        event.message_size >= out_message_capacity
+      ) {
+        continue;
+      }
+      memcpy(out_message, event.message, event.message_size);
+      out_message[event.message_size] = '\0';
+      return true;
     }
     mln_test_sleep_millisecond();
   }
@@ -336,6 +375,26 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// This verifies the network file source diagnostic below every binding: a
+// style URL whose scheme no file source serves reports the scheme, the URL,
+// and the resource provider remedy instead of an HTTP client parse error.
+static void unsupported_style_url_scheme_names_scheme_and_url(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
+  );
+  char message[512];
+  TEST_ASSERT_TRUE(
+    wait_for_map_loading_failure(runtime, map, message, sizeof(message))
+  );
+  TEST_ASSERT_NOT_NULL(strstr(message, unsupported_scheme_style_url));
+  TEST_ASSERT_NOT_NULL(strstr(message, "\"jar\""));
+  TEST_ASSERT_NOT_NULL(strstr(message, "mln_runtime_set_resource_provider"));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_resources_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
@@ -346,4 +405,5 @@ void run_resources_abi_tests(void) {
   RUN_TEST(offline_take_rejects_mismatched_result_kind);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
+  RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
 }

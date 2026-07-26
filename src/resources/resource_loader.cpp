@@ -1,13 +1,18 @@
+#include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <exception>
 #include <functional>
 #include <memory>
 #include <optional>
+#include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include <mbgl/storage/database_file_source.hpp>
 #include <mbgl/storage/file_source.hpp>
+#include <mbgl/storage/file_source_request.hpp>
 #include <mbgl/storage/main_resource_loader.hpp>
 #include <mbgl/storage/online_file_source.hpp>
 #include <mbgl/storage/resource.hpp>
@@ -19,6 +24,7 @@
 #include <mbgl/util/event.hpp>
 #include <mbgl/util/logging.hpp>
 #include <mbgl/util/string.hpp>
+#include <mbgl/util/tile_server_options.hpp>
 
 #include "resources/resource_loader.hpp"
 
@@ -32,6 +38,59 @@ namespace {
 
 auto can_request_network(const mbgl::Resource& resource) -> bool {
   return resource.hasLoadingMethod(mbgl::Resource::LoadingMethod::Network);
+}
+
+auto equals_ignoring_case(std::string_view left, std::string_view right)
+  -> bool {
+  return std::ranges::equal(left, right, [](char left_char, char right_char) {
+    return std::tolower(static_cast<unsigned char>(left_char)) ==
+           std::tolower(static_cast<unsigned char>(right_char));
+  });
+}
+
+// Returns the RFC 3986 scheme of a URL, or nullopt when the URL carries none.
+auto url_scheme(std::string_view url) -> std::optional<std::string_view> {
+  const auto separator = url.find(':');
+  if (separator == std::string_view::npos || separator == 0) {
+    return std::nullopt;
+  }
+  const auto scheme = url.substr(0, separator);
+  if (std::isalpha(static_cast<unsigned char>(scheme.front())) == 0) {
+    return std::nullopt;
+  }
+  const auto is_scheme_character = [](char character) -> bool {
+    return std::isalnum(static_cast<unsigned char>(character)) != 0 ||
+           character == '+' || character == '-' || character == '.';
+  };
+  if (!std::ranges::all_of(scheme, is_scheme_character)) {
+    return std::nullopt;
+  }
+  return scheme;
+}
+
+auto unsupported_scheme_response(
+  std::string_view scheme, const std::string& url
+) -> mbgl::Response {
+  auto response = mbgl::Response{};
+  // Reason::Other keeps this a terminal configuration error: it surfaces as
+  // MLN_RESOURCE_ERROR_REASON_OTHER, and the tile and source paths retry or
+  // silently absorb the reasons that describe transport and server state.
+  response.error = std::make_unique<mbgl::Response::Error>(
+    mbgl::Response::Error::Reason::Other,
+    "unsupported URL scheme \"" + std::string{scheme} +
+      "\" for network request \"" + url +
+      "\"; register a resource provider with "
+      "mln_runtime_set_resource_provider() to serve this scheme"
+  );
+  return response;
+}
+
+auto respond_immediately(
+  const mbgl::Response& response, mbgl::FileSource::Callback callback
+) -> std::unique_ptr<mbgl::AsyncRequest> {
+  auto request = std::make_unique<mbgl::FileSourceRequest>(std::move(callback));
+  request->actor().invoke(&mbgl::FileSourceRequest::setResponse, response);
+  return request;
 }
 
 auto resource_kind_to_abi(mbgl::Resource::Kind kind) -> uint32_t {
@@ -112,6 +171,13 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     if (!native_->canRequest(resource)) {
       return nullptr;
     }
+    const auto unsupported = unsupported_network_scheme(resource.url);
+    if (unsupported.has_value()) {
+      return respond_immediately(
+        unsupported_scheme_response(*unsupported, resource.url),
+        std::move(callback)
+      );
+    }
     return native_->request(resource, std::move(callback));
   }
 
@@ -170,6 +236,44 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
       return std::nullopt;
     }
     return runtime->resource_provider;
+  }
+
+  static auto has_resource_transform(void* platform_context) -> bool {
+    const auto* runtime = find_runtime_for_platform_context(platform_context);
+    if (runtime == nullptr) {
+      return false;
+    }
+    const std::shared_lock lock(runtime->resource_transform_mutex);
+    return runtime->resource_transform_callback != nullptr;
+  }
+
+  // Reports the scheme of a URL the online source is unable to serve. The
+  // resource loader routes file, asset, mbtiles, and pmtiles URLs to their own
+  // sources ahead of the network, so anything left here reaches an HTTP
+  // client. A registered resource transform rewrites URLs inside the online
+  // source, so it keeps every scheme available.
+  [[nodiscard]] auto unsupported_network_scheme(const std::string& url) const
+    -> std::optional<std::string_view> {
+    if (has_resource_transform(resource_options_.platformContext())) {
+      return std::nullopt;
+    }
+    const auto scheme = url_scheme(url);
+    if (!scheme.has_value()) {
+      return std::nullopt;
+    }
+    if (
+      equals_ignoring_case(*scheme, "http") ||
+      equals_ignoring_case(*scheme, "https")
+    ) {
+      return std::nullopt;
+    }
+    // Tile server options name a canonical scheme the online source expands
+    // into its configured base URL.
+    const auto alias = resource_options_.tileServerOptions().uriSchemeAlias();
+    if (!alias.empty() && equals_ignoring_case(*scheme, alias)) {
+      return std::nullopt;
+    }
+    return scheme;
   }
 
   void apply_resource_transform() {
