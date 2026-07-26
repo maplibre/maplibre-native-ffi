@@ -1093,6 +1093,20 @@ namespace MaplibreNative {
 
     private ResourceTransformRegistration[] leaked_resource_transforms;
     private ResourceProviderRegistration[] leaked_resource_providers;
+    private Mutex leaked_callback_roots_mutex;
+
+    private void retain_leaked_runtime_callbacks (
+        ResourceTransformRegistration? transform,
+        ResourceProviderRegistration? provider) {
+        leaked_callback_roots_mutex.lock ();
+        if (transform != null) {
+            leaked_resource_transforms += transform;
+        }
+        if (provider != null) {
+            leaked_resource_providers += provider;
+        }
+        leaked_callback_roots_mutex.unlock ();
+    }
 
     public class RuntimeHandle {
         private Raw.Runtime? native;
@@ -1100,6 +1114,7 @@ namespace MaplibreNative {
         private ResourceProviderRegistration? resource_provider;
         private MapRegistration[] maps = new MapRegistration[0];
         private OfflineOperationRegistration[] offline_operations = new OfflineOperationRegistration[0];
+        private bool has_created_map;
 
         public bool closed { get { return native == null; } }
 
@@ -1117,12 +1132,7 @@ namespace MaplibreNative {
         ~RuntimeHandle () {
             if (native != null) {
                 warning ("RuntimeHandle finalized while live; call close() on the owner thread");
-                if (resource_transform != null) {
-                    leaked_resource_transforms += resource_transform;
-                }
-                if (resource_provider != null) {
-                    leaked_resource_providers += resource_provider;
-                }
+                retain_leaked_runtime_callbacks (resource_transform, resource_provider);
             }
         }
 
@@ -1186,6 +1196,7 @@ namespace MaplibreNative {
         }
 
         internal void register_map (MapHandle map) {
+            has_created_map = true;
             prune_maps ();
             var retained = new MapRegistration[maps.length + 1];
             for (var index = 0; index < maps.length; index++) {
@@ -1305,6 +1316,9 @@ namespace MaplibreNative {
         public void set_resource_provider (owned ResourceProviderCallback callback) throws Error {
             if (resource_provider != null) {
                 throw new Error.INVALID_STATE ("resource provider is already configured");
+            }
+            if (has_created_map) {
+                throw new Error.INVALID_STATE ("resource provider must be configured before creating a map");
             }
             var registration = new ResourceProviderRegistration ((owned) callback);
             Raw.ResourceProvider provider = {};

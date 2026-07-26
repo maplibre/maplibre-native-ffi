@@ -412,6 +412,11 @@ int main() {
     map_options.height = 64;
     map_options.scale_factor = 1.0;
     var map = new MaplibreNative.MapHandle(runtime, map_options);
+    var empty_rendered_query_options = new MaplibreNative.RenderedFeatureQueryOptions();
+    empty_rendered_query_options.set_layer_ids({});
+    var empty_rendered_query_native = empty_rendered_query_options.to_native();
+    assert((empty_rendered_query_native.fields & (uint32) MaplibreNative.Raw.RenderedFeatureQueryOptionField.LAYER_IDS) != 0);
+    assert(empty_rendered_query_native.layer_id_count == 0);
 
     if ((backends & MaplibreNative.RenderBackendFlags.OPENGL) == 0) {
       var pointer = MaplibreNative.NativePointer(1);
@@ -653,7 +658,7 @@ int main() {
     map.set_geojson_source_data("inline-feature", feature_geojson);
     assert(map.remove_style_source("inline-feature"));
 
-    var feature_collection_geojson = MaplibreNative.GeoJson.feature_collection(new MaplibreNative.FeatureCollection({ feature }));
+    var feature_collection_geojson = MaplibreNative.GeoJson.feature_collection(new MaplibreNative.FeatureCollection({ feature, feature }));
     map.add_geojson_source_data("inline-feature-collection", feature_collection_geojson);
     assert(map.style_source_exists("inline-feature-collection"));
     map.set_geojson_source_data("inline-feature-collection", feature_collection_geojson);
@@ -693,6 +698,7 @@ int main() {
     map.set_geojson_source_url("points", "https://example.invalid/updated.geojson");
     assert(map.remove_style_source("points"));
     assert(!map.remove_style_source("points"));
+    assert(map.get_style_source_type("points") == null);
 
     var source_json = MaplibreNative.JsonValue.object_value({
       new MaplibreNative.JsonMember("type", MaplibreNative.JsonValue.string_value("geojson")),
@@ -993,6 +999,7 @@ int main() {
         var query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.point(MaplibreNative.ScreenPoint(0.0, 0.0)));
         query_result.length.to_string();
         var rendered_query_options = new MaplibreNative.RenderedFeatureQueryOptions();
+        rendered_query_options.set_layer_ids({});
         rendered_query_options.set_filter(MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("has"), MaplibreNative.JsonValue.string_value("rank") }));
         var box_query_result = session.query_rendered_features(MaplibreNative.RenderedQueryGeometry.box(MaplibreNative.ScreenBox(MaplibreNative.ScreenPoint(0.0, 0.0), MaplibreNative.ScreenPoint(32.0, 16.0))), rendered_query_options);
         box_query_result.length.to_string();
@@ -1131,6 +1138,17 @@ int main() {
     map.close();
     runtime.close();
     runtime.close();
+    var provider_history_runtime = new MaplibreNative.RuntimeHandle();
+    var provider_history_map = new MaplibreNative.MapHandle(provider_history_runtime);
+    provider_history_map.close();
+    bool provider_after_map_close_failed = false;
+    try {
+      provider_history_runtime.set_resource_provider(provide_resource);
+    } catch (MaplibreNative.Error.INVALID_STATE error) {
+      provider_after_map_close_failed = true;
+    }
+    assert(provider_after_map_close_failed);
+    provider_history_runtime.close();
     if (offline_merge_database_path != null) {
       GLib.FileUtils.remove(offline_merge_database_path);
     }

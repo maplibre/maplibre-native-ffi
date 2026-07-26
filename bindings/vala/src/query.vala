@@ -122,6 +122,7 @@ namespace MaplibreNative {
 
     public class RenderedFeatureQueryOptions {
         private string[] layer_ids;
+        private bool has_layer_ids;
         private JsonValue? filter;
         private Raw.StringView[] layer_id_views;
         private Raw.JsonValue filter_native;
@@ -131,7 +132,11 @@ namespace MaplibreNative {
         }
 
         public void set_layer_ids (string[] layer_ids) {
-            this.layer_ids = layer_ids;
+            this.layer_ids = new string[layer_ids.length];
+            for (var index = 0; index < layer_ids.length; index++) {
+                this.layer_ids[index] = layer_ids[index];
+            }
+            has_layer_ids = true;
         }
 
         public void set_filter (JsonValue filter) {
@@ -140,7 +145,7 @@ namespace MaplibreNative {
 
         internal Raw.RenderedFeatureQueryOptions to_native () throws Error {
             Raw.RenderedFeatureQueryOptions native = Raw.rendered_feature_query_options_default ();
-            if (layer_ids.length > 0) {
+            if (has_layer_ids) {
                 layer_id_views = new Raw.StringView[layer_ids.length];
                 for (var i = 0; i < layer_ids.length; i++) {
                     layer_id_views[i] = string_view (layer_ids[i]);
@@ -159,6 +164,7 @@ namespace MaplibreNative {
 
     public class SourceFeatureQueryOptions {
         private string[] source_layer_ids;
+        private bool has_source_layer_ids;
         private JsonValue? filter;
         private Raw.StringView[] source_layer_id_views;
         private Raw.JsonValue filter_native;
@@ -168,7 +174,11 @@ namespace MaplibreNative {
         }
 
         public void set_source_layer_ids (string[] source_layer_ids) {
-            this.source_layer_ids = source_layer_ids;
+            this.source_layer_ids = new string[source_layer_ids.length];
+            for (var index = 0; index < source_layer_ids.length; index++) {
+                this.source_layer_ids[index] = source_layer_ids[index];
+            }
+            has_source_layer_ids = true;
         }
 
         public void set_filter (JsonValue filter) {
@@ -177,7 +187,7 @@ namespace MaplibreNative {
 
         internal Raw.SourceFeatureQueryOptions to_native () throws Error {
             Raw.SourceFeatureQueryOptions native = Raw.source_feature_query_options_default ();
-            if (source_layer_ids.length > 0) {
+            if (has_source_layer_ids) {
                 source_layer_id_views = new Raw.StringView[source_layer_ids.length];
                 for (var i = 0; i < source_layer_ids.length; i++) {
                     source_layer_id_views[i] = string_view (source_layer_ids[i]);

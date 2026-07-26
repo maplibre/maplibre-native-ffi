@@ -819,6 +819,7 @@ namespace MaplibreNative {
 
     public class FeatureCollection {
         private Feature[] features;
+        private Feature[] native_feature_storage;
         private Raw.Feature[] feature_natives;
         private Raw.FeatureCollection native;
 
@@ -840,9 +841,11 @@ namespace MaplibreNative {
         }
 
         internal Raw.FeatureCollection to_native () throws Error {
+            native_feature_storage = new Feature[features.length];
             feature_natives = new Raw.Feature[features.length];
             for (var i = 0; i < features.length; i++) {
-                feature_natives[i] = features[i].to_native ();
+                native_feature_storage[i] = Feature.from_native (features[i].to_native ());
+                feature_natives[i] = native_feature_storage[i].to_native ();
             }
             native = Raw.FeatureCollection () { features = feature_natives, feature_count = feature_natives.length };
             return native;
