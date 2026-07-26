@@ -2539,15 +2539,42 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   return options;
 }
 
-auto find_runtime_for_platform_context(void* platform_context) noexcept
-  -> mln_runtime* {
+auto find_resource_provider_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<ResourceProvider> {
   if (platform_context == nullptr) {
-    return nullptr;
+    return std::nullopt;
+  }
+
+  // Reading the provider while the registry lock is held keeps the whole read
+  // inside the critical section that `destroy_runtime()` uses to retire the
+  // entry, and `set_resource_provider()` writes these fields under the same
+  // lock. Returning a copy leaves the caller with no borrowed runtime state.
+  const std::scoped_lock lock(runtime_registry_mutex());
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  if (
+    !runtime_registry().contains(runtime) || !runtime->has_resource_provider
+  ) {
+    return std::nullopt;
+  }
+  return runtime->resource_provider;
+}
+
+auto find_maximum_cache_size_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<std::uint64_t> {
+  if (platform_context == nullptr) {
+    return std::nullopt;
   }
 
   const std::scoped_lock lock(runtime_registry_mutex());
   auto* runtime = static_cast<mln_runtime*>(platform_context);
-  return runtime_registry().contains(runtime) ? runtime : nullptr;
+  if (
+    !runtime_registry().contains(runtime) || !runtime->has_maximum_cache_size
+  ) {
+    return std::nullopt;
+  }
+  return runtime->maximum_cache_size;
 }
 
 auto has_resource_transform_for_platform_context(

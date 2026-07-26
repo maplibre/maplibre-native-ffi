@@ -5,6 +5,7 @@
 #include <deque>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <shared_mutex>
 #include <string>
 #include <thread>
@@ -219,8 +220,23 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void;
 auto validate_runtime(mln_runtime* runtime) -> mln_status;
 auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions;
-auto find_runtime_for_platform_context(void* platform_context) noexcept
-  -> mln_runtime*;
+// Copies the resource provider registered on the runtime named by a MapLibre
+// platform context. Every read of the runtime happens while the registry lock
+// is held, so callers on MapLibre worker and network threads hold copied values
+// instead of a handle that runtime teardown may retire. Returns nullopt when
+// the platform context names no live runtime or the runtime carries no
+// provider.
+auto find_resource_provider_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<ResourceProvider>;
+
+// Copies the maximum ambient cache size configured on the runtime named by a
+// MapLibre platform context, under the same registry lock. Returns nullopt when
+// the platform context names no live runtime or the runtime carries no maximum.
+auto find_maximum_cache_size_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<std::uint64_t>;
+
 // Reports whether a resource transform is registered. MapLibre-owned threads
 // observe a value instead of a runtime pointer teardown may retire, and the
 // process-global registry lock is released before the per-runtime transform
