@@ -1373,11 +1373,11 @@ namespace MaplibreNative {
             var operation_id = operation.require_result (this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
             check_status (Raw.runtime_offline_region_create_take_result (require_live (), operation_id, out snapshot));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region create returned no snapshot");
             }
-            operation.mark_consumed ();
-            unregister_offline_operation (operation_id);
             return new OfflineRegionSnapshotHandle ((owned) snapshot);
         }
 
@@ -1398,11 +1398,11 @@ namespace MaplibreNative {
             var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
             check_status (Raw.runtime_offline_regions_list_take_result (require_live (), operation_id, out list));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions list returned no list");
             }
-            operation.mark_consumed ();
-            unregister_offline_operation (operation_id);
             return new OfflineRegionListHandle ((owned) list);
         }
 
@@ -1410,11 +1410,11 @@ namespace MaplibreNative {
             var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
             check_status (Raw.runtime_offline_regions_merge_database_take_result (require_live (), operation_id, out list));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions merge returned no list");
             }
-            operation.mark_consumed ();
-            unregister_offline_operation (operation_id);
             return new OfflineRegionListHandle ((owned) list);
         }
 
@@ -1422,11 +1422,11 @@ namespace MaplibreNative {
             var operation_id = operation.require_result (this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
             check_status (Raw.runtime_offline_region_update_metadata_take_result (require_live (), operation_id, out snapshot));
+            operation.mark_consumed ();
+            unregister_offline_operation (operation_id);
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region metadata update returned no snapshot");
             }
-            operation.mark_consumed ();
-            unregister_offline_operation (operation_id);
             return new OfflineRegionSnapshotHandle ((owned) snapshot);
         }
 
