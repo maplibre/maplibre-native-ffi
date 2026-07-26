@@ -494,6 +494,16 @@ class MapHandle(NativeHandleMixin):
         """Dump map debug logs through MapLibre Native logging."""
         self._native.dump_debug_logs()
 
+    def get_size(self) -> tuple[int, int, float]:
+        """Return the map's logical width, height, and pixel ratio.
+
+        The size starts at the creation width and height, and follows the
+        attach and resize rules documented on MapOptions. The scale factor is
+        fixed for the lifetime of the map and is independent of any render
+        target's scale factor.
+        """
+        return self._native.get_size()
+
     def get_viewport_options(self) -> MapViewportOptions:
         """Return live map viewport and render-transform controls."""
         return MapViewportOptions._from_native(self._native.get_viewport_options())

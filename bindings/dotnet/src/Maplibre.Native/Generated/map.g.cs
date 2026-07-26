@@ -822,6 +822,9 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_map_create(mln_runtime* runtime, [NativeTypeName("const mln_map_options *")] mln_map_options* options, mln_map** out_map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_size(mln_map* map, [NativeTypeName("uint32_t *")] uint* out_width, [NativeTypeName("uint32_t *")] uint* out_height, double* out_scale_factor);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_request_repaint(mln_map* map);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

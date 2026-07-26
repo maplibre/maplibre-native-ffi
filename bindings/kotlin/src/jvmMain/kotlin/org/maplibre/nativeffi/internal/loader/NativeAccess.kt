@@ -116,6 +116,7 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.DebugOption
 import org.maplibre.nativeffi.map.MapOptions
+import org.maplibre.nativeffi.map.MapSize
 import org.maplibre.nativeffi.map.NorthOrientation
 import org.maplibre.nativeffi.map.ProjectionModeOptions
 import org.maplibre.nativeffi.map.RenderingStats
@@ -1279,6 +1280,22 @@ internal object NativeAccess {
   internal fun dumpDebugLogs(map: MemorySegment) {
     Status.check(mapStatusFunction("mln_map_dump_debug_logs").invokeWithArguments(map) as Int)
   }
+
+  internal fun mapSize(map: MemorySegment): MapSize =
+    Arena.ofConfined().use { arena ->
+      val outWidth = arena.allocate(ValueLayout.JAVA_INT)
+      val outHeight = arena.allocate(ValueLayout.JAVA_INT)
+      val outScaleFactor = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        mapAddressAddressAddressStatusFunction("mln_map_get_size")
+          .invokeWithArguments(map, outWidth, outHeight, outScaleFactor) as Int
+      )
+      MapSize(
+        outWidth.get(ValueLayout.JAVA_INT, 0),
+        outHeight.get(ValueLayout.JAVA_INT, 0),
+        outScaleFactor.get(ValueLayout.JAVA_DOUBLE, 0),
+      )
+    }
 
   internal fun viewportOptions(map: MemorySegment): ViewportOptions =
     Arena.ofConfined().use { arena ->

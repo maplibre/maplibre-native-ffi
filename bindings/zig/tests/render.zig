@@ -1131,6 +1131,36 @@ test "owned texture render session lifecycle and readback" {
     try owned.close();
 }
 
+test "map size follows attach and resize and keeps the creation scale factor" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 32, .scale_factor = 2.0 });
+    defer map.close() catch @panic("map close failed");
+    const created = try map.getSize();
+    try testing.expectEqual(@as(u32, 64), created.width);
+    try testing.expectEqual(@as(u32, 32), created.height);
+    try testing.expectEqual(@as(f64, 2.0), created.scale_factor);
+
+    // The target renders at a different scale factor, which leaves the map's
+    // own pixel ratio untouched.
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+    const attached = try map.getSize();
+    try testing.expectEqual(@as(u32, 32), attached.width);
+    try testing.expectEqual(@as(u32, 16), attached.height);
+    try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
+
+    try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
+    const resized = try map.getSize();
+    try testing.expectEqual(@as(u32, 48), resized.width);
+    try testing.expectEqual(@as(u32, 24), resized.height);
+    try testing.expectEqual(@as(f64, 2.0), resized.scale_factor);
+}
+
 test "map close rejects live render session through public bindings" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);

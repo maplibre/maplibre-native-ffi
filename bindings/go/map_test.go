@@ -227,6 +227,36 @@ func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	}
 }
 
+func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 256, 2))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	width, height, scaleFactor, err := m.Size()
+	if err != nil {
+		t.Fatalf("Size(): %v", err)
+	}
+	if width != 512 || height != 256 || scaleFactor != 2 {
+		t.Fatalf("Size() = %d, %d, %v; want 512, 256, 2", width, height, scaleFactor)
+	}
+}
+
 func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	lockOSThreadForTest(t)
 

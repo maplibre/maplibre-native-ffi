@@ -2395,6 +2395,7 @@ struct mln_map {
   mln_runtime* runtime = nullptr;
   std::thread::id owner_thread;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
+  double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
   std::unique_ptr<HeadlessObserver> observer;
   std::unique_ptr<HeadlessFrontend> frontend;
@@ -2692,6 +2693,7 @@ auto create_map(
   owned_map->runtime = runtime;
   owned_map->owner_thread = std::this_thread::get_id();
   owned_map->map_mode = effective.map_mode;
+  owned_map->scale_factor = effective.scale_factor;
   try {
     owned_map->observer = std::make_unique<HeadlessObserver>(runtime, handle);
     owned_map->frontend = std::make_unique<HeadlessFrontend>(runtime, handle);
@@ -2781,6 +2783,10 @@ auto map_request_still_image(mln_map* map) -> mln_status {
 
 auto map_owner_thread(const mln_map* map) -> std::thread::id {
   return map->owner_thread;
+}
+
+auto map_scale_factor(const mln_map* map) -> double {
+  return map->scale_factor;
 }
 
 auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
@@ -5046,6 +5052,31 @@ auto map_dump_debug_logs(mln_map* map) -> mln_status {
     return status;
   }
   map->map->dumpDebugLogs();
+  return MLN_STATUS_OK;
+}
+
+auto map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) -> mln_status {
+  const auto status = validate_map(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_width == nullptr || out_height == nullptr || out_scale_factor == nullptr
+  ) {
+    set_thread_error(
+      "out_width, out_height, and out_scale_factor must not be null"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto options = map->map->getMapOptions();
+  const auto size = options.size();
+  *out_width = size.width;
+  *out_height = size.height;
+  *out_scale_factor = map->scale_factor;
   return MLN_STATUS_OK;
 }
 

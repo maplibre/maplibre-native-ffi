@@ -1053,6 +1053,30 @@ MLN_API mln_status mln_map_create(
 ) MLN_NOEXCEPT;
 
 /**
+ * Copies the map's current logical viewport size and its pixel ratio.
+ *
+ * The size starts at mln_map_options.width and height, and follows the
+ * attach and resize rules documented there. The scale factor is
+ * mln_map_options.scale_factor, fixed for the lifetime of the map and
+ * independent of any render target's scale factor; compare the two before
+ * attaching or resizing a render session to keep them in agreement.
+ *
+ * This is a state snapshot. All three out-parameters are required.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_width,
+ *   out_height, or out_scale_factor is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) MLN_NOEXCEPT;
+
+/**
  * Requests a repaint for a continuous map.
  *
  * Continuous maps also invalidate automatically when style data, resources,

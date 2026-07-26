@@ -1650,11 +1650,9 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
 
 #[test]
 // The map scale factor is fixed at creation and keeps selecting sprites,
-// glyphs, and raster tiles, so a session that renders at a different scale
-// factor degrades styled imagery rather than failing. Attach and resize warn
-// instead of returning an error, and the warning is the only signal callers
-// get.
-fn attaching_or_resizing_with_a_mismatched_scale_factor_warns() {
+// glyphs, and raster tiles. Matching the preserved creation double stays quiet,
+// while rendering at a different scale warns instead of failing.
+fn scale_factor_warnings_compare_the_preserved_creation_double() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -1675,22 +1673,28 @@ fn attaching_or_resizing_with_a_mismatched_scale_factor_warns() {
     .unwrap();
 
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    // 32.1 differs from its native float representation by more than the
+    // warning tolerance, so this verifies comparisons use the preserved
+    // creation double.
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(1, 1, 32.1)).unwrap();
     let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 2.0))
+        create_owned_texture_session(&map, RenderTargetExtent::new(1, 1, 32.1))
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    let attach_warnings = warnings.lock().unwrap().clone();
-    assert_eq!(attach_warnings.len(), 1);
-    assert_eq!(attach_warnings[0].0, LogSeverity::Warning);
-    assert!(attach_warnings[0].1.contains('2'));
+    assert!(warnings.lock().unwrap().is_empty());
+
+    session.resize(1, 1, 2.0).unwrap();
+    let mismatch_warnings = warnings.lock().unwrap().clone();
+    assert_eq!(mismatch_warnings.len(), 1);
+    assert_eq!(mismatch_warnings[0].0, LogSeverity::Warning);
+    assert!(mismatch_warnings[0].1.contains('2'));
 
     // Resizing to the map's scale factor is consistent and stays quiet.
-    session.resize(32, 32, 1.0).unwrap();
+    session.resize(1, 1, 32.1).unwrap();
     assert_eq!(warnings.lock().unwrap().len(), 1);
 
     // Resizing back to a different scale factor warns again.
-    session.resize(32, 32, 2.0).unwrap();
+    session.resize(1, 1, 2.0).unwrap();
     assert_eq!(warnings.lock().unwrap().len(), 2);
 }
 
@@ -2066,6 +2070,30 @@ fn resize_updates_owned_texture_frame_extent() {
     map.close().unwrap();
     runtime.close().unwrap();
     panic!("timed out waiting for resized owned texture frame");
+}
+
+#[test]
+// The map size follows the attached target, while the map pixel ratio stays at
+// the creation value even when the target renders at a different scale factor.
+fn map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &static_map_options(64, 32, 2.0)).unwrap();
+    assert_eq!(map.size().unwrap(), (64, 32, 2.0));
+
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    assert_eq!(map.size().unwrap(), (32, 16, 2.0));
+
+    session.resize(48, 24, 1.0).unwrap();
+    assert_eq!(map.size().unwrap(), (48, 24, 2.0));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]

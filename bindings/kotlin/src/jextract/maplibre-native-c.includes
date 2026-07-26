@@ -36,6 +36,7 @@
 --include-function mln_map_get_free_camera_options
 --include-function mln_map_get_projection_mode
 --include-function mln_map_get_rendering_stats_view_enabled
+--include-function mln_map_get_size
 --include-function mln_map_get_tile_options
 --include-function mln_map_get_viewport_options
 --include-function mln_map_is_fully_loaded

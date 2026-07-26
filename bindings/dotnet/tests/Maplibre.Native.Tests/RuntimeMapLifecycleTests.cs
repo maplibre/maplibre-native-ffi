@@ -71,6 +71,23 @@ public sealed class RuntimeMapLifecycleTests
         map.DumpDebugLogs();
     }
 
+    [Fact]
+    public void MapSizeReportsCreationExtentAndPixelRatio()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(
+            runtime,
+            new MapOptions
+            {
+                Width = 512,
+                Height = 256,
+                ScaleFactor = 2,
+            }
+        );
+
+        Assert.Equal((512u, 256u, 2d), map.GetSize());
+    }
+
     [BindingSpecTest("BND-190", "BND-191")]
     [Fact]
     public void OwnerThreadViolationMapsToWrongThreadException()

@@ -415,6 +415,12 @@ private constructor(
     NativeAccess.dumpDebugLogs(requireLiveHandle())
   }
 
+  public actual val size: MapSize
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.mapSize(requireLiveHandle())
+    }
+
   public actual var viewportOptions: ViewportOptions
     get() {
       NativeAccess.ensureLoaded()

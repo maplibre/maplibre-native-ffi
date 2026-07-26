@@ -978,6 +978,23 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     Status.check(MaplibreNativeC.mln_map_dump_debug_logs(map(requireLiveAddress())))
   }
 
+  public actual val size: MapSize
+    get() {
+      NativeAccess.ensureLoaded()
+      val outWidth = intArrayOf(0)
+      val outHeight = intArrayOf(0)
+      val outScaleFactor = doubleArrayOf(0.0)
+      Status.check(
+        MaplibreNativeC.mln_map_get_size(
+          map(requireLiveAddress()),
+          outWidth,
+          outHeight,
+          outScaleFactor,
+        )
+      )
+      return MapSize(outWidth[0], outHeight[0], outScaleFactor[0])
+    }
+
   public actual var viewportOptions: ViewportOptions
     get() {
       NativeAccess.ensureLoaded()
