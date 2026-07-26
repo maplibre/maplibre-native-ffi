@@ -853,7 +853,7 @@ namespace MaplibreNative {
             code = native.code;
             payload_type = runtime_event_payload_type_from_raw (native.payload_type);
             message_storage = copy_sized_utf8 (native.message, native.message_size, "runtime event message");
-            payload_storage = copy_bytes ((uint8*) native.payload, native.payload_size) ?? new uint8[0];
+            payload_storage = copy_sized_bytes ((uint8*) native.payload, native.payload_size, "runtime event payload");
             if (native.payload == null) {
                 return;
             }

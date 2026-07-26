@@ -158,12 +158,16 @@ namespace MaplibreNative {
         return copied;
     }
 
-    internal Utf8String copy_sized_utf8 (char* data, size_t size, string field_name) throws Error {
+    internal uint8[] copy_sized_bytes (uint8* data, size_t size, string field_name) throws Error {
         if (data == null && size > 0) {
             clear_unknown_status ();
             throw new Error.INVALID_ARGUMENT ("%s data is null", field_name);
         }
-        return new Utf8String.from_bytes (copy_bytes ((uint8*) data, size) ?? new uint8[0]);
+        return copy_bytes (data, size) ?? new uint8[0];
+    }
+
+    internal Utf8String copy_sized_utf8 (char* data, size_t size, string field_name) throws Error {
+        return new Utf8String.from_bytes (copy_sized_bytes ((uint8*) data, size, field_name));
     }
 
     internal StringList copy_style_id_list (owned Raw.StyleIdList list) throws Error {

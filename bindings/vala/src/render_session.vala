@@ -260,7 +260,8 @@ namespace MaplibreNative {
         }
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
-            Raw.FeatureStateSelector native_selector = selector.to_native ();
+            var selector_storage = selector.copy ();
+            Raw.FeatureStateSelector native_selector = selector_storage.to_native ();
             var state_storage = state.copy ();
             Raw.JsonValue native_state = state_storage.to_native ();
             var lease = require_available ();
@@ -268,7 +269,8 @@ namespace MaplibreNative {
         }
 
         public JsonValue get_feature_state (FeatureStateSelector selector) throws Error {
-            Raw.FeatureStateSelector native_selector = selector.to_native ();
+            var selector_storage = selector.copy ();
+            Raw.FeatureStateSelector native_selector = selector_storage.to_native ();
             Raw.JsonSnapshot snapshot;
             var lease = require_available ();
             check_status (Raw.render_session_get_feature_state (lease.native, &native_selector, out snapshot));
@@ -282,7 +284,8 @@ namespace MaplibreNative {
         }
 
         public void remove_feature_state (FeatureStateSelector selector) throws Error {
-            Raw.FeatureStateSelector native_selector = selector.to_native ();
+            var selector_storage = selector.copy ();
+            Raw.FeatureStateSelector native_selector = selector_storage.to_native ();
             var lease = require_available ();
             check_status (Raw.render_session_remove_feature_state (lease.native, &native_selector));
         }

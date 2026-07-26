@@ -431,6 +431,15 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   var event_data = event.payload_bytes;
   event_data[0] = 9;
   assert(event.payload_bytes[0] == 4);
+
+  native_event.payload = null;
+  native_event.payload_size = 1;
+  try {
+    new MaplibreNative.RuntimeEvent(runtime, native_event);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "runtime event payload data is null");
+  }
 }
 
 void exercise_option_value_semantics() throws MaplibreNative.Error {
