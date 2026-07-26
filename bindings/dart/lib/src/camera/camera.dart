@@ -76,6 +76,32 @@ final class CameraOptions {
 
   /// Optional field of view.
   final double? fieldOfView;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CameraOptions &&
+      other.center == center &&
+      other.zoom == zoom &&
+      other.bearing == bearing &&
+      other.pitch == pitch &&
+      other.centerAltitude == centerAltitude &&
+      other.padding == padding &&
+      other.anchor == anchor &&
+      other.roll == roll &&
+      other.fieldOfView == fieldOfView;
+
+  @override
+  int get hashCode => Object.hashAll([
+    center,
+    zoom,
+    bearing,
+    pitch,
+    centerAltitude,
+    padding,
+    anchor,
+    roll,
+    fieldOfView,
+  ]);
 }
 
 /// Optional animation controls for camera transitions.
@@ -99,6 +125,17 @@ final class AnimationOptions {
 
   /// Optional easing curve.
   final UnitBezier? easing;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AnimationOptions &&
+      other.durationMs == durationMs &&
+      other.velocity == velocity &&
+      other.minZoom == minZoom &&
+      other.easing == easing;
+
+  @override
+  int get hashCode => Object.hash(durationMs, velocity, minZoom, easing);
 }
 
 /// Optional fitting controls for camera-for-viewport queries.
@@ -114,6 +151,16 @@ final class CameraFitOptions {
 
   /// Optional pitch in degrees.
   final double? pitch;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CameraFitOptions &&
+      other.padding == padding &&
+      other.bearing == bearing &&
+      other.pitch == pitch;
+
+  @override
+  int get hashCode => Object.hash(padding, bearing, pitch);
 }
 
 /// Map north orientation values.
@@ -146,6 +193,13 @@ final class NorthOrientation {
 
   /// Human-readable name.
   final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is NorthOrientation && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
 }
 
 /// Map camera constraint mode.
@@ -178,6 +232,13 @@ final class ConstrainMode {
 
   /// Human-readable name.
   final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ConstrainMode && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
 }
 
 /// Viewport orientation mode.
@@ -202,6 +263,13 @@ final class ViewportMode {
 
   /// Human-readable name.
   final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ViewportMode && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
 }
 
 /// Tile LOD algorithm.
@@ -226,6 +294,13 @@ final class TileLodMode {
 
   /// Human-readable name.
   final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is TileLodMode && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
 }
 
 /// Optional live map viewport and render-transform controls.
@@ -249,6 +324,18 @@ final class MapViewportOptions {
 
   /// Optional frustum offset.
   final EdgeInsets? frustumOffset;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapViewportOptions &&
+      other.northOrientation == northOrientation &&
+      other.constrainMode == constrainMode &&
+      other.viewportMode == viewportMode &&
+      other.frustumOffset == frustumOffset;
+
+  @override
+  int get hashCode =>
+      Object.hash(northOrientation, constrainMode, viewportMode, frustumOffset);
 }
 
 /// Optional tile prefetch and LOD tuning controls.
@@ -280,6 +367,26 @@ final class MapTileOptions {
 
   /// Optional LOD mode.
   final TileLodMode? lodMode;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapTileOptions &&
+      other.prefetchZoomDelta == prefetchZoomDelta &&
+      other.lodMinRadius == lodMinRadius &&
+      other.lodScale == lodScale &&
+      other.lodPitchThreshold == lodPitchThreshold &&
+      other.lodZoomShift == lodZoomShift &&
+      other.lodMode == lodMode;
+
+  @override
+  int get hashCode => Object.hash(
+    prefetchZoomDelta,
+    lodMinRadius,
+    lodScale,
+    lodPitchThreshold,
+    lodZoomShift,
+    lodMode,
+  );
 }
 
 /// Optional map camera constraint fields.
@@ -307,6 +414,18 @@ final class BoundOptions {
 
   /// Optional maximum pitch.
   final double? maxPitch;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BoundOptions &&
+      other.bounds == bounds &&
+      other.minZoom == minZoom &&
+      other.maxZoom == maxZoom &&
+      other.minPitch == minPitch &&
+      other.maxPitch == maxPitch;
+
+  @override
+  int get hashCode => Object.hash(bounds, minZoom, maxZoom, minPitch, maxPitch);
 }
 
 /// Free camera position and orientation in MapLibre Native camera space.
@@ -319,6 +438,15 @@ final class FreeCameraOptions {
 
   /// Optional orientation.
   final Quaternion? orientation;
+
+  @override
+  bool operator ==(Object other) =>
+      other is FreeCameraOptions &&
+      other.position == position &&
+      other.orientation == orientation;
+
+  @override
+  int get hashCode => Object.hash(position, orientation);
 }
 
 /// MapLibre axonometric rendering options used for snapshots and commands.
@@ -334,4 +462,14 @@ final class ProjectionModeOptions {
 
   /// Optional native y-skew factor.
   final double? ySkew;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ProjectionModeOptions &&
+      other.axonometric == axonometric &&
+      other.xSkew == xSkew &&
+      other.ySkew == ySkew;
+
+  @override
+  int get hashCode => Object.hash(axonometric, xSkew, ySkew);
 }

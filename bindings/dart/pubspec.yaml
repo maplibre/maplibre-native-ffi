@@ -1,7 +1,8 @@
 name: maplibre_native_ffi
-description: Low-level Dart bindings for the MapLibre Native C API.
+description: Low-level, memory-safe Dart bindings for the MapLibre Native C API and render backend integration surfaces.
 version: 0.0.0
 repository: https://github.com/maplibre/maplibre-native-ffi
+homepage: https://maplibre.org/maplibre-native-ffi/
 publish_to: none
 
 environment:
@@ -11,6 +12,6 @@ dependencies:
   ffi: ^2.1.4
 
 dev_dependencies:
-  ffigen: ">=19.0.0 <21.0.0"
+  ffigen: ^20.0.0
   lints: ^6.0.0
   test: ^1.26.3

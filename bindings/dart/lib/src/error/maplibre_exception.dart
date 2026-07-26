@@ -49,11 +49,18 @@ final class MaplibreStatus {
   final int nativeStatusCode;
 
   @override
+  bool operator ==(Object other) =>
+      other is MaplibreStatus && other.nativeStatusCode == nativeStatusCode;
+
+  @override
+  int get hashCode => nativeStatusCode.hashCode;
+
+  @override
   String toString() => name;
 }
 
 /// Base exception for errors reported by the native MapLibre C ABI or binding.
-class MaplibreException implements Exception {
+sealed class MaplibreException implements Exception {
   /// Creates a MapLibre exception.
   const MaplibreException(this.status, this.nativeStatusCode, this.diagnostic);
 
@@ -69,7 +76,7 @@ class MaplibreException implements Exception {
       -3 => WrongThreadException(nativeStatusCode, diagnostic),
       -4 => UnsupportedFeatureException(nativeStatusCode, diagnostic),
       -5 => NativeErrorException(nativeStatusCode, diagnostic),
-      _ => MaplibreException(status, nativeStatusCode, diagnostic),
+      _ => UnknownMaplibreException(status, nativeStatusCode, diagnostic),
     };
   }
 
@@ -105,43 +112,53 @@ class MaplibreException implements Exception {
 }
 
 /// Native invalid-argument failure.
-class InvalidArgumentException extends MaplibreException {
+final class InvalidArgumentException extends MaplibreException {
   /// Creates an invalid-argument exception.
   const InvalidArgumentException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.invalidArgument, nativeStatusCode, diagnostic);
 }
 
 /// Native invalid-state failure.
-class InvalidStateException extends MaplibreException {
+final class InvalidStateException extends MaplibreException {
   /// Creates an invalid-state exception.
   const InvalidStateException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.invalidState, nativeStatusCode, diagnostic);
 }
 
 /// Native wrong-thread failure.
-class WrongThreadException extends MaplibreException {
+final class WrongThreadException extends MaplibreException {
   /// Creates a wrong-thread exception.
   const WrongThreadException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.wrongThread, nativeStatusCode, diagnostic);
 }
 
 /// Native unsupported-feature failure.
-class UnsupportedFeatureException extends MaplibreException {
+final class UnsupportedFeatureException extends MaplibreException {
   /// Creates an unsupported-feature exception.
   const UnsupportedFeatureException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.unsupported, nativeStatusCode, diagnostic);
 }
 
 /// Native error or converted C++ exception.
-class NativeErrorException extends MaplibreException {
+final class NativeErrorException extends MaplibreException {
   /// Creates a native-error exception.
   const NativeErrorException(int? nativeStatusCode, String diagnostic)
     : super(MaplibreStatus.nativeError, nativeStatusCode, diagnostic);
 }
 
 /// Loaded native library uses a different C ABI contract version.
-class AbiVersionMismatchException extends MaplibreException {
+final class AbiVersionMismatchException extends MaplibreException {
   /// Creates an ABI-version mismatch exception.
   const AbiVersionMismatchException(String diagnostic)
     : super(MaplibreStatus.abiVersionMismatch, null, diagnostic);
+}
+
+/// Failure category returned by a newer native ABI.
+final class UnknownMaplibreException extends MaplibreException {
+  /// Creates an exception that preserves an unknown native status code.
+  const UnknownMaplibreException(
+    super.status,
+    super.nativeStatusCode,
+    super.diagnostic,
+  );
 }

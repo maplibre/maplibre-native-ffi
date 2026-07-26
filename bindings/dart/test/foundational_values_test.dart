@@ -98,6 +98,56 @@ void main() {
     expect(native.field_of_view, 8);
   });
 
+  test('camera descriptor values compare and hash by every field', () {
+    final equalPairs = <(Object, Object)>[
+      (
+        const CameraOptions(center: LatLng(1, 2), zoom: 3),
+        const CameraOptions(center: LatLng(1, 2), zoom: 3),
+      ),
+      (
+        const AnimationOptions(durationMs: 4, easing: UnitBezier(0, 0, 1, 1)),
+        const AnimationOptions(durationMs: 4, easing: UnitBezier(0, 0, 1, 1)),
+      ),
+      (
+        const CameraFitOptions(bearing: 5, pitch: 6),
+        const CameraFitOptions(bearing: 5, pitch: 6),
+      ),
+      (NorthOrientation.fromRawValue(100), NorthOrientation.fromRawValue(100)),
+      (
+        const MapViewportOptions(
+          northOrientation: NorthOrientation.right,
+          frustumOffset: EdgeInsets(top: 1),
+        ),
+        const MapViewportOptions(
+          northOrientation: NorthOrientation.right,
+          frustumOffset: EdgeInsets(top: 1),
+        ),
+      ),
+      (
+        const MapTileOptions(lodScale: 2, lodMode: TileLodMode.distance),
+        const MapTileOptions(lodScale: 2, lodMode: TileLodMode.distance),
+      ),
+      (
+        const BoundOptions(minZoom: 1, maxZoom: 10),
+        const BoundOptions(minZoom: 1, maxZoom: 10),
+      ),
+      (
+        const FreeCameraOptions(position: Vec3(1, 2, 3)),
+        const FreeCameraOptions(position: Vec3(1, 2, 3)),
+      ),
+      (
+        const ProjectionModeOptions(axonometric: true, xSkew: 0.5),
+        const ProjectionModeOptions(axonometric: true, xSkew: 0.5),
+      ),
+    ];
+
+    for (final (left, right) in equalPairs) {
+      expect(left, right);
+      expect(left.hashCode, right.hashCode);
+    }
+    expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
+  });
+
   test('animation options materialize field masks', () {
     final native = animationOptionsToNative(
       const AnimationOptions(

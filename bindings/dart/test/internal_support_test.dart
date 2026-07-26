@@ -90,6 +90,7 @@ void main() {
       }
       nativeDiagnostic = 'later diagnostic';
 
+      expect(error, isA<UnknownMaplibreException>());
       expect(error.status.name, 'unknown');
       expect(error.nativeStatusCode, -999);
       expect(error.diagnostic, 'first diagnostic');
