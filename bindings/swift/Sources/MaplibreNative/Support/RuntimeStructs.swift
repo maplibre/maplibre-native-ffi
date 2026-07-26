@@ -71,6 +71,14 @@ struct NativeRenderMapEvent: Equatable {
   }
 }
 
+struct NativeCameraTransitionFinishedEvent: Equatable {
+  let transitionId: UInt64
+
+  init(_ raw: mln_runtime_event_camera_transition_finished) {
+    transitionId = raw.transition_id
+  }
+}
+
 struct NativeTileId: Equatable {
   let overscaledZ: UInt32
   let wrap: Int32
@@ -182,6 +190,7 @@ enum NativeRuntimeEventPayload: Equatable {
   case offlineRegionResponseError(NativeOfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(NativeOfflineRegionTileCountLimitEvent)
   case offlineOperationCompleted(NativeOfflineOperationCompletedEvent)
+  case cameraTransitionFinished(NativeCameraTransitionFinishedEvent)
   case unknown(type: UInt32, byteCount: Int)
 }
 
@@ -260,6 +269,13 @@ struct NativeRuntimeEvent: Equatable {
         as: mln_runtime_event_offline_operation_completed.self
       ) {
         .offlineOperationCompleted(NativeOfflineOperationCompletedEvent($0))
+      }
+    case MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED.rawValue:
+      return try withPayload(
+        raw,
+        as: mln_runtime_event_camera_transition_finished.self
+      ) {
+        .cameraTransitionFinished(NativeCameraTransitionFinishedEvent($0))
       }
     default:
       return .unknown(type: raw.payload_type, byteCount: raw.payload_size)

@@ -14,7 +14,9 @@ _Vec3: TypeAlias = tuple[float, float, float]
 _Quat: TypeAlias = tuple[float, float, float, float]
 _Insets: TypeAlias = tuple[float, float, float, float]
 _Bounds: TypeAlias = tuple[_Point, _Point]
-_Animation: TypeAlias = tuple[float | None, float | None, float | None, _Insets | None]
+_Animation: TypeAlias = tuple[
+    float | None, float | None, float | None, _Insets | None, int | None
+]
 _WireDict: TypeAlias = dict[str, Any]
 
 class _RuntimeHandle:
@@ -584,6 +586,9 @@ def create_runtime_with_abi_version_for_test(
     maximum_cache_size: int | None,
 ) -> _RuntimeHandle: ...
 def runtime_event_payload_wire_shapes_for_test() -> dict[str, _WireDict]: ...
+def camera_transition_finished_event_for_test(
+    transition_id: int, missing_payload_bytes: int
+) -> _WireDict: ...
 def projected_meters_for_lat_lng(latitude: float, longitude: float) -> _WireDict: ...
 def lat_lng_for_projected_meters(northing: float, easting: float) -> _WireDict: ...
 def set_log_callback(max_queued_records: int, consume: bool) -> _LogReceiver: ...

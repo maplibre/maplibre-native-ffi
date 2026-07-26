@@ -1161,6 +1161,59 @@ test "map size follows attach and resize and keeps the creation scale factor" {
     try testing.expectEqual(@as(f64, 2.0), resized.scale_factor);
 }
 
+test "an ease pumped through rendered frames reports its transition finish once" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+
+    // A camera transition advances on rendered frames, so completion needs a
+    // live render session pumped alongside the runtime.
+    try map.easeTo(
+        .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
+        .{ .duration_ms = 50, .transition_id = 31 },
+    );
+
+    var finished_count: usize = 0;
+    var last_transition_id: ?u64 = null;
+    var settled_frames: usize = 0;
+    for (0..2000) |_| {
+        try runtime.runOnce();
+        _ = try owned.session.renderUpdate();
+        while (try runtime.pollEvent(testing.allocator)) |polled| {
+            var event = polled;
+            defer event.deinit();
+            const payload = switch (event.payload) {
+                .camera_transition_finished => |value| value,
+                else => continue,
+            };
+            try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
+            finished_count += 1;
+            last_transition_id = payload.transition_id;
+        }
+        if (finished_count > 0) {
+            settled_frames += 1;
+            if (settled_frames == 50) break;
+        }
+        try std.Thread.yield();
+    }
+
+    try testing.expectEqual(@as(usize, 1), finished_count);
+    try testing.expectEqual(@as(?u64, 31), last_transition_id);
+    const settled_camera = try map.getCamera();
+    try testing.expectApproxEqAbs(@as(f64, 4.0), settled_camera.zoom.?, 0.000001);
+}
+
 test "map close rejects live render session through public bindings" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);

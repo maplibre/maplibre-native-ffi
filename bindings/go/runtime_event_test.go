@@ -101,6 +101,7 @@ func TestRuntimeEventKnownPayloadsRequireFullStructSize(t *testing.T) {
 		RuntimeEventPayloadOfflineRegionResponseError,
 		RuntimeEventPayloadOfflineRegionTileCountLimit,
 		RuntimeEventPayloadOfflineOperationCompleted,
+		RuntimeEventPayloadCameraTransitionFinished,
 	} {
 		size := sizes[payloadType]
 		if size < 2 {

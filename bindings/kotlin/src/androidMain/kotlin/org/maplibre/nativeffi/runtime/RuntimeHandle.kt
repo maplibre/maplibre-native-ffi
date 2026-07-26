@@ -581,6 +581,12 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
         } else {
           RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
         }
+      MaplibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+        if (hasPayloadSize(event, PayloadSizes.CAMERA_TRANSITION_FINISHED)) {
+          cameraTransitionFinishedPayload(event.payload())
+        } else {
+          RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
+        }
       else -> RuntimeEventPayload.Unknown(payloadType, event.payload_size(), payloadBytes)
     }
   }
@@ -902,6 +908,13 @@ private fun offlineOperationCompletedPayload(
   )
 }
 
+private fun cameraTransitionFinishedPayload(
+  payload: Pointer
+): RuntimeEventPayload.CameraTransitionFinished =
+  RuntimeEventPayload.CameraTransitionFinished(
+    MaplibreNativeC.mln_runtime_event_camera_transition_finished(payload).transition_id()
+  )
+
 private object PayloadSizes {
   val RENDER_FRAME: Long =
     MaplibreNativeC.mln_runtime_event_render_frame().use { it.sizeof().toLong() }
@@ -918,6 +931,8 @@ private object PayloadSizes {
     MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit().use { it.sizeof().toLong() }
   val OFFLINE_OPERATION_COMPLETED: Long =
     MaplibreNativeC.mln_runtime_event_offline_operation_completed().use { it.sizeof().toLong() }
+  val CAMERA_TRANSITION_FINISHED: Long =
+    MaplibreNativeC.mln_runtime_event_camera_transition_finished().use { it.sizeof().toLong() }
 }
 
 private fun runtime(address: Long): MaplibreNativeC.mln_runtime =

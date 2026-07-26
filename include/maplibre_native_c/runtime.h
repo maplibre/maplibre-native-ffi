@@ -106,8 +106,9 @@ typedef struct mln_offline_region_status {
  * - MAP_LOADING_STARTED: code is 0; payload NONE.
  * - MAP_LOADING_FINISHED: code is 0; payload NONE.
  * - MAP_LOADING_FAILED: code is the ordinal of MapLibre Native's internal map
- *   load error kind, which this API does not name as an enum; read message for
- *   the failure text; payload NONE.
+ *   load error kind, which this API does not name as an enum, and is 0 when the
+ *   failure came from a style-loading exception raised inside a C API call.
+ *   Read message for the failure text in both cases; payload NONE.
  * - MAP_IDLE: code is 0; payload NONE.
  * - MAP_RENDER_UPDATE_AVAILABLE: code is 0; payload NONE.
  * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.

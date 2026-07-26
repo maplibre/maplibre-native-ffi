@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_EASING
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_TRANSITION_ID
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_VELOCITY
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_BOUNDS
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_PITCH
@@ -97,6 +98,10 @@ internal object MapStructs {
       native.easing.y1 = it.y1
       native.easing.x2 = it.x2
       native.easing.y2 = it.y2
+    }
+    value.transitionId?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_TRANSITION_ID
+      native.transition_id = it.toULong()
     }
     return native.ptr
   }

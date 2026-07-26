@@ -283,6 +283,7 @@ def _animation_parts(
         float | None,
         float | None,
         tuple[float, float, float, float] | None,
+        int | None,
     ]
     | None
 ):
@@ -298,7 +299,13 @@ def _animation_parts(
         if animation.easing is not None
         else None
     )
-    return animation.duration_ms, animation.velocity, animation.min_zoom, easing
+    return (
+        animation.duration_ms,
+        animation.velocity,
+        animation.min_zoom,
+        easing,
+        animation.transition_id,
+    )
 
 
 def _coordinate_parts(
@@ -1197,7 +1204,13 @@ class MapHandle(NativeHandleMixin):
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
-        """Cancel active camera transitions."""
+        """Cancel active camera transitions.
+
+        A cancelled transition that carried an ``AnimationOptions``
+        ``transition_id`` reports its end through a
+        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, the same event a
+        transition that runs to completion reports.
+        """
         self._native.cancel_transitions()
 
     def get_free_camera_options(self) -> FreeCameraOptions:

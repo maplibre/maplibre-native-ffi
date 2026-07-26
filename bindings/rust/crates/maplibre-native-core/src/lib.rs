@@ -37,8 +37,8 @@ pub use camera::{
     FreeCameraOptions, ProjectionMode,
 };
 pub use enums::{
-    AmbientCacheOperation, ConstrainMode, LocationIndicatorImageKind, LogEvent, LogSeverity,
-    LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
+    AmbientCacheOperation, CameraChangeMode, ConstrainMode, LocationIndicatorImageKind, LogEvent,
+    LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
     OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
     OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode,
     ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
@@ -47,10 +47,11 @@ pub use enums::{
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
-    CopiedRuntimeEvent, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent,
-    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
-    RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload,
-    StyleImageMissingEvent, TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, CopiedRuntimeEvent, OfflineOperationCompletedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent,
+    RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
+    UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;

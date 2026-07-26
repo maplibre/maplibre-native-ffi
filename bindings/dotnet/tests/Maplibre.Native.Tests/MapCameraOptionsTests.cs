@@ -325,6 +325,136 @@ public sealed class MapCameraOptionsTests
         map.CancelTransitions();
     }
 
+    private sealed record CameraEventTally(
+        List<ulong> FinishedTransitionIds,
+        List<CameraChangeMode> DidChangeModes
+    );
+
+    private static CameraEventTally DrainCameraEvents(RuntimeHandle runtime)
+    {
+        var finished = new List<ulong>();
+        var didChange = new List<CameraChangeMode>();
+        while (runtime.PollEvent() is { } runtimeEvent)
+        {
+            switch (runtimeEvent.Type)
+            {
+                case RuntimeEventType.MapCameraTransitionFinished:
+                    var payload = Assert.IsType<RuntimeEventPayload.CameraTransitionFinished>(
+                        runtimeEvent.Payload
+                    );
+                    finished.Add(payload.TransitionId);
+                    break;
+                case RuntimeEventType.MapCameraDidChange:
+                    didChange.Add((CameraChangeMode)runtimeEvent.Code);
+                    break;
+            }
+        }
+
+        return new CameraEventTally(finished, didChange);
+    }
+
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void ZeroDurationEaseReportsItsTransitionIdOnceAsAnImmediateChange()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 };
+
+        map.EaseTo(camera, new AnimationOptions { Duration = 0, TransitionId = 7 });
+
+        var tally = DrainCameraEvents(runtime);
+        Assert.Equal([7ul], tally.FinishedTransitionIds);
+        Assert.Contains(CameraChangeMode.Immediate, tally.DidChangeModes);
+        Assert.DoesNotContain(CameraChangeMode.Animated, tally.DidChangeModes);
+
+        // The transition ended, so no later pump repeats the event.
+        runtime.RunOnce();
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+    }
+
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void SupersededCameraTransitionReportsOnlyTheReplacedTransitionId()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 };
+
+        map.EaseTo(camera, new AnimationOptions { Duration = 5000, TransitionId = 11 });
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+
+        map.EaseTo(
+            camera with
+            {
+                Zoom = 13,
+            },
+            new AnimationOptions { Duration = 5000, TransitionId = 12 }
+        );
+
+        var tally = DrainCameraEvents(runtime);
+        Assert.Equal([11ul], tally.FinishedTransitionIds);
+        Assert.Contains(CameraChangeMode.Animated, tally.DidChangeModes);
+
+        // The superseding transition is still running, so it reports nothing yet.
+        map.CancelTransitions();
+        Assert.Equal([12ul], DrainCameraEvents(runtime).FinishedTransitionIds);
+    }
+
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void CancelledCameraTransitionReportsItsTransitionIdOnce()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.FlyTo(
+            new CameraOptions { Center = new LatLng(40, -70), Zoom = 14 },
+            new AnimationOptions { Duration = 5000, TransitionId = 21 }
+        );
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+
+        map.CancelTransitions();
+        Assert.Equal([21ul], DrainCameraEvents(runtime).FinishedTransitionIds);
+
+        map.CancelTransitions();
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+    }
+
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void CameraTransitionThatRunsToCompletionReportsItsTransitionIdOnce()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(
+            runtime,
+            new MapOptions
+            {
+                Width = 512,
+                Height = 512,
+                MapMode = MapMode.Static,
+            }
+        );
+
+        map.EaseTo(
+            new CameraOptions { Center = new LatLng(0, 0), Zoom = 11 },
+            new AnimationOptions { Duration = 5000, TransitionId = 31 }
+        );
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+
+        // A static map advances its transitions to their end state the next time it
+        // updates, so requesting a still image runs this ease to completion.
+        map.RequestStillImage();
+        runtime.RunOnce();
+
+        var tally = DrainCameraEvents(runtime);
+        Assert.Equal([31ul], tally.FinishedTransitionIds);
+        Assert.Equal(11, map.GetCamera().Zoom);
+
+        runtime.RunOnce();
+        Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
+    }
+
     [BindingSpecTest("BND-102")]
     [Fact]
     public void JumpToAppliesCameraFieldsThroughNativeMap()

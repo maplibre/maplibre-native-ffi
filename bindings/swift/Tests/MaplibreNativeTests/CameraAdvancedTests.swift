@@ -55,6 +55,20 @@ import Testing
   }
 }
 
+@Test func animationOptionsDistinguishAbsentAndZeroTransitionId() throws {
+  try AnimationOptions(transitionId: 0).nativeInput
+    .withOptionalNativeOptions { native in
+      #expect(native != nil)
+      #expect(native!.pointee.fields == MLN_ANIMATION_OPTION_TRANSITION_ID
+        .rawValue)
+      #expect(native!.pointee.transition_id == 0)
+    }
+
+  try AnimationOptions().nativeInput.withOptionalNativeOptions { native in
+    #expect(native == nil)
+  }
+}
+
 @Test func nativeCameraOptionsPreserveAbsentFieldMasks() throws {
   var raw = mln_camera_options_default()
   raw.fields = MLN_CAMERA_OPTION_ZOOM.rawValue

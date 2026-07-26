@@ -2068,6 +2068,10 @@ private class AnimationOptionsScope(value: AnimationOptions?) : AutoCloseable {
         fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_EASING
         options.easing(MaplibreNativeC.mln_unit_bezier().x1(it.x1).y1(it.y1).x2(it.x2).y2(it.y2))
       }
+      value.transitionId?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_TRANSITION_ID
+        options.transition_id(it)
+      }
       options.fields(fields)
     }
   }

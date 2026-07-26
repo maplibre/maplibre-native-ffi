@@ -97,12 +97,21 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class AnimationOptions:
-    """Optional animation controls for camera transitions."""
+    """Optional animation controls for camera transitions.
+
+    ``transition_id`` is a caller-chosen identity for the transition these
+    options start. When it is set, the transition reports its end once through
+    a ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event carrying that value in a
+    ``CameraTransitionFinishedPayload``. The C API passes the value through
+    without interpreting it, so callers pick their own scheme, such as a
+    monotonically increasing counter. Leaving it unset reports no such event.
+    """
 
     duration_ms: float | None = None
     velocity: float | None = None
     min_zoom: float | None = None
     easing: UnitBezier | None = None
+    transition_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)

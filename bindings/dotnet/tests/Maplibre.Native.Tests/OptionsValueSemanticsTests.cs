@@ -75,11 +75,13 @@ public sealed class OptionsValueSemanticsTests
                     Easing = new UnitBezier(0.1, 0.2, 0.3, 0.4),
                     MinimumZoom = 3,
                     Velocity = 4,
+                    TransitionId = 5,
                 },
             options => options.Duration = 10,
             options => options.Easing = new UnitBezier(0.9, 0.8, 0.7, 0.6),
             options => options.MinimumZoom = 30,
-            options => options.Velocity = 40
+            options => options.Velocity = 40,
+            options => options.TransitionId = 50
         );
     }
 

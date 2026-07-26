@@ -60,6 +60,15 @@ pub const AnimationOptions = struct {
     velocity: ?f64 = null,
     min_zoom: ?f64 = null,
     easing: ?UnitBezier = null,
+    /// Caller-chosen identity for the transition these options start.
+    ///
+    /// When set, the transition reports its end once through a
+    /// `map_camera_transition_finished` runtime event carrying this value, as
+    /// described on `CameraTransitionFinishedPayload`. MapLibre Native passes
+    /// the value through without interpreting it, so callers pick their own
+    /// scheme, such as a monotonically increasing counter. Leaving it absent
+    /// reports no such event.
+    transition_id: ?u64 = null,
 };
 
 pub const CameraFitOptions = struct {
@@ -757,6 +766,10 @@ pub fn animationOptionsToNative(value: AnimationOptions) c.mln_animation_options
     if (value.easing) |easing| {
         raw.fields |= c.MLN_ANIMATION_OPTION_EASING;
         raw.easing = .{ .x1 = easing.x1, .y1 = easing.y1, .x2 = easing.x2, .y2 = easing.y2 };
+    }
+    if (value.transition_id) |transition_id| {
+        raw.fields |= c.MLN_ANIMATION_OPTION_TRANSITION_ID;
+        raw.transition_id = transition_id;
     }
     return raw;
 }

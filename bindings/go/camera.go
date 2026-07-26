@@ -162,6 +162,30 @@ type AnimationOptions struct {
 	Velocity   *float64
 	MinZoom    *float64
 	Easing     *UnitBezier
+	// TransitionID is a caller-chosen identity for the transition these options
+	// start. When it is set, the transition emits one
+	// RuntimeEventMapCameraTransitionFinished event carrying this value in its
+	// RuntimeEventCameraTransitionFinishedPayload. MapLibre Native passes the
+	// value through without interpreting it, so callers pick their own scheme,
+	// such as a monotonically increasing counter.
+	//
+	// Each transition emits that event exactly once, whichever way it ends:
+	// running to completion, being superseded by a later camera command, being
+	// cancelled by CancelTransitions, completing instantly as a zero-duration
+	// jump, or exiting early because the requested camera contained a non-finite
+	// value. MapLibre Native reports the moment a transition releases the camera
+	// and does not report which of those outcomes occurred, so the event
+	// establishes transition identity rather than a completion reason. A host
+	// that needs to tell completion from cancellation compares the resulting
+	// camera against the requested one, or tracks which transition ID is
+	// current.
+	//
+	// The event is queued on the runtime that owns the map and is drained by
+	// RuntimeHandle.PollEvent. For a transition that runs to completion, it is
+	// queued immediately before that transition's
+	// RuntimeEventMapCameraDidChange event. Leaving the field absent emits no
+	// such event.
+	TransitionID *uint64
 }
 
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
@@ -170,7 +194,8 @@ func (options AnimationOptions) Equal(other AnimationOptions) bool {
 	return equalPointer(options.DurationMS, other.DurationMS) &&
 		equalPointer(options.Velocity, other.Velocity) &&
 		equalPointer(options.MinZoom, other.MinZoom) &&
-		equalPointer(options.Easing, other.Easing)
+		equalPointer(options.Easing, other.Easing) &&
+		equalPointer(options.TransitionID, other.TransitionID)
 }
 
 // WithDurationMS returns a copy that sets the duration in milliseconds.
@@ -202,6 +227,16 @@ func (options AnimationOptions) WithEasing(easing UnitBezier) AnimationOptions {
 	return options
 }
 
+// WithTransitionID returns a copy that stamps a caller-chosen identity on the
+// transition these options start, so the transition reports its end once
+// through a RuntimeEventMapCameraTransitionFinished event. See
+// AnimationOptions.TransitionID.
+func (options AnimationOptions) WithTransitionID(transitionID uint64) AnimationOptions {
+	options.TransitionID = new(uint64)
+	*options.TransitionID = transitionID
+	return options
+}
+
 func cAnimationOptions(options AnimationOptions) C.mln_animation_options {
 	raw := C.mln_animation_options_default()
 	if options.DurationMS != nil {
@@ -224,6 +259,10 @@ func cAnimationOptions(options AnimationOptions) C.mln_animation_options {
 			x2: C.double(options.Easing.X2),
 			y2: C.double(options.Easing.Y2),
 		}
+	}
+	if options.TransitionID != nil {
+		raw.fields |= C.MLN_ANIMATION_OPTION_TRANSITION_ID
+		raw.transition_id = C.uint64_t(*options.TransitionID)
 	}
 	return raw
 }

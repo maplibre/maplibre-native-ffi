@@ -221,24 +221,27 @@ struct NativeAnimationOptionsInput: Equatable {
   var velocity: Double?
   var minimumZoom: Double?
   var easing: NativeUnitBezier?
+  var transitionId: UInt64?
 
   init(
     durationMilliseconds: Double? = nil,
     velocity: Double? = nil,
     minimumZoom: Double? = nil,
-    easing: NativeUnitBezier? = nil
+    easing: NativeUnitBezier? = nil,
+    transitionId: UInt64? = nil
   ) {
     self.durationMilliseconds = durationMilliseconds
     self.velocity = velocity
     self.minimumZoom = minimumZoom
     self.easing = easing
+    self.transitionId = transitionId
   }
 
   func withOptionalNativeOptions<Result>(
     _ body: (UnsafePointer<mln_animation_options>?) throws -> Result
   ) throws -> Result {
     if durationMilliseconds == nil, velocity == nil, minimumZoom == nil,
-       easing == nil
+       easing == nil, transitionId == nil
     {
       return try body(nil)
     }
@@ -258,6 +261,10 @@ struct NativeAnimationOptionsInput: Equatable {
     if let easing {
       animation.fields |= MLN_ANIMATION_OPTION_EASING.rawValue
       animation.easing = easing.native
+    }
+    if let transitionId {
+      animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue
+      animation.transition_id = transitionId
     }
     return try withUnsafePointer(to: &animation, body)
   }

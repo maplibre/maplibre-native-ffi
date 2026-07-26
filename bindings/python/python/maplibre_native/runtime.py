@@ -21,7 +21,27 @@ class NetworkStatus(UnknownIntEnum):
 
 
 class RuntimeEventType(UnknownIntEnum):
-    """Runtime event type values reported by the C API."""
+    """Runtime event type values reported by the C API.
+
+    The event type selects the meaning of ``RuntimeEvent.code`` and the payload
+    value carried by ``RuntimeEvent.payload``:
+
+    - ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` carry a
+      :class:`CameraChangeMode` as ``code`` and no payload.
+    - ``MAP_CAMERA_TRANSITION_FINISHED`` carries a
+      :class:`CameraTransitionFinishedPayload`.
+    - ``MAP_LOADING_FAILED`` carries the ordinal of MapLibre Native's internal
+      map load error kind as ``code`` and the failure text as ``message``.
+    - ``MAP_RENDER_FRAME_FINISHED`` carries a :class:`RenderFramePayload`,
+      ``MAP_RENDER_MAP_FINISHED`` a :class:`RenderMapPayload`,
+      ``MAP_STYLE_IMAGE_MISSING`` a :class:`StyleImageMissingPayload`, and
+      ``MAP_TILE_ACTION`` a :class:`TileActionPayload`.
+    - ``OFFLINE_OPERATION_COMPLETED`` carries the operation result as an
+      ``MaplibreStatus`` value in ``code`` and an
+      ``OfflineOperationCompleted`` payload reporting the same status.
+    - The remaining offline event types carry their matching offline payload.
+    - Every other event type reports ``code`` as ``0`` and no payload.
+    """
 
     MAP_CAMERA_WILL_CHANGE = 1
     MAP_CAMERA_IS_CHANGING = 2
@@ -45,6 +65,18 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
     OFFLINE_OPERATION_COMPLETED = 22
+    MAP_CAMERA_TRANSITION_FINISHED = 23
+
+
+class CameraChangeMode(UnknownIntEnum):
+    """Camera change kinds reported as ``code`` by camera change events.
+
+    ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` events report one
+    of these values.
+    """
+
+    IMMEDIATE = 0
+    ANIMATED = 1
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -184,6 +216,30 @@ class TileActionPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class CameraTransitionFinishedPayload:
+    """Runtime camera transition-finished event payload.
+
+    A transition that carried a ``transition_id`` on its ``AnimationOptions``
+    reports its end once for every terminal outcome: running to completion,
+    being superseded by a later camera command, being cancelled by
+    ``MapHandle.cancel_transitions``, completing instantly as a zero-duration
+    jump, and exiting early on a non-finite camera value. MapLibre Native
+    reports the moment the transition releases the camera without naming which
+    outcome occurred, so this payload establishes transition identity rather
+    than a completion reason.
+    """
+
+    transition_id: int
+
+    @classmethod
+    def _from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "CameraTransitionFinishedPayload":
+        """Build a camera transition-finished payload from RuntimeEvent.payload."""
+        return cls(transition_id=payload["transition_id"])
+
+
+@dataclass(frozen=True, slots=True)
 class UnknownRuntimeEventPayload:
     """Forward-compatible runtime event payload bytes."""
 
@@ -216,7 +272,13 @@ class RuntimeEventSource:
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEvent:
-    """Runtime event copied into Python-owned values."""
+    """Runtime event copied into Python-owned values.
+
+    ``event_type`` selects the meaning of ``code`` and the type of ``payload``.
+    ``code`` carries a :class:`CameraChangeMode`, a ``MaplibreStatus`` value, a
+    MapLibre Native error ordinal, or ``0``; see :class:`RuntimeEventType` for
+    the per-type meaning.
+    """
 
     event_type: RuntimeEventType
     source: RuntimeEventSource
@@ -504,10 +566,14 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
     if kind == "offline_operation_completed":
         return OfflineOperationCompleted._from_runtime_payload(payload)
+    if kind == "camera_transition_finished":
+        return CameraTransitionFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
 
 
 __all__ = [
+    "CameraChangeMode",
+    "CameraTransitionFinishedPayload",
     "NetworkStatus",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -549,5 +615,6 @@ RuntimeEventPayload = (
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
     | OfflineOperationCompleted
+    | CameraTransitionFinishedPayload
     | UnknownRuntimeEventPayload
 )

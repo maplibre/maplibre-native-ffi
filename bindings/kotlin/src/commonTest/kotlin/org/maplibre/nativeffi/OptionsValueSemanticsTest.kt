@@ -106,6 +106,7 @@ class OptionsValueSemanticsTest {
           velocity = 2.0
           minZoom = 3.0
           easing = UnitBezier(0.1, 0.2, 0.3, 0.4)
+          transitionId = 4L
         }
       },
       copyOf = { it.copy() },
@@ -115,6 +116,7 @@ class OptionsValueSemanticsTest {
           { velocity = 20.0 },
           { minZoom = 30.0 },
           { easing = UnitBezier(0.9, 0.8, 0.7, 0.6) },
+          { transitionId = 40L },
         ),
     )
   }

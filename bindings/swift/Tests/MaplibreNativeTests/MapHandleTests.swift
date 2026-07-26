@@ -1,6 +1,33 @@
 @testable import MaplibreNative
 import Testing
 
+private struct CameraEventTally {
+  var finishedTransitionIds: [UInt64] = []
+  var lastDidChangeMode: CameraChangeMode?
+}
+
+private func drainCameraEvents(_ runtime: RuntimeHandle) throws
+  -> CameraEventTally
+{
+  var tally = CameraEventTally()
+  while let event = try runtime.pollEvent() {
+    switch event.type {
+    case .mapCameraTransitionFinished:
+      guard case let .cameraTransitionFinished(payload) = event.payload else {
+        Issue.record("unexpected transition payload: \(event.payload)")
+        continue
+      }
+      tally.finishedTransitionIds.append(payload.transitionId)
+    case .mapCameraDidChange:
+      tally.lastDidChangeMode = CameraChangeMode
+        .fromNative(UInt32(bitPattern: event.code))
+    default:
+      break
+    }
+  }
+  return tally
+}
+
 @Test func mapCreateCameraStyleAndClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -65,6 +92,76 @@ import Testing
   #expect(size.width == 512)
   #expect(size.height == 256)
   #expect(size.scaleFactor == 2.0)
+}
+
+/// Terminal outcomes a headless map reaches without rendering frames: a
+/// zero-duration ease, a transition superseded by a later camera command, and a
+/// cancelled transition. Running a transition to completion needs a live render
+/// session, which this suite has no fixture for.
+@Test func cameraTransitionIdReportsTerminalOutcomesOnce() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(
+      width: 256,
+      height: 256,
+      scaleFactor: 1.0,
+      mode: .continuous
+    )
+  )
+  defer { try? map.close() }
+
+  var camera = CameraOptions(
+    center: LatLng(latitude: 37.7749, longitude: -122.4194),
+    zoom: 11,
+    bearing: 12,
+    pitch: 30
+  )
+
+  // A zero-duration ease resolves inside the call, so its event lands ahead of
+  // the immediate did-change event.
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 0, transitionId: 7)
+  )
+  var tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [7])
+  #expect(tally.lastDidChangeMode == .immediate)
+
+  // A running transition stays silent until it releases the camera.
+  camera.zoom = 12
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000, transitionId: 11)
+  )
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds.isEmpty)
+
+  // A later camera command supersedes it and reports the superseded identity.
+  camera.zoom = 13
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000, transitionId: 12)
+  )
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [11])
+  #expect(tally.lastDidChangeMode == .animated)
+
+  try map.cancelTransitions()
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [12])
+
+  // A transition started without an identity reports nothing when cancelled.
+  camera.zoom = 14
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000)
+  )
+  try map.cancelTransitions()
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds.isEmpty)
 }
 
 @Test func styleURLRejectsEmbeddedNULAsPublicInvalidArgument() throws {
