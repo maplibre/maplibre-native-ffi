@@ -180,6 +180,20 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
+def test_detached_session_leaves_the_map_free_to_close(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    session = vulkan_owned_session.session
+
+    assert_invalid_state(vulkan_owned_session.map.close)
+
+    detached = session.detach()
+    vulkan_owned_session.map.close()
+    detached.close()
+
+    assert session.closed
+
+
 def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:

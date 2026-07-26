@@ -773,9 +773,18 @@ impl RenderSessionState {
         }
     }
 
+    /// Releases the retained parent map state at most once.
+    ///
+    /// Detach and close both call this. `Option::take` leaves the second call a
+    /// no-op, so the parent retention is released exactly once no matter which
+    /// order a detached session reaches close in.
+    fn release_map(&self) {
+        self.map.borrow_mut().take();
+    }
+
     fn close(&self) -> Result<()> {
         self.handle.close()?;
-        self.map.borrow_mut().take();
+        self.release_map();
         Ok(())
     }
 }
@@ -795,6 +804,9 @@ impl fmt::Debug for RenderSessionHandle {
 }
 
 /// Render session after backend resources have been detached.
+///
+/// A detached session holds no reference to its former map, so it stays
+/// destroyable after that map closes.
 pub struct DetachedRenderSessionHandle {
     inner: Rc<RenderSessionState>,
 }
@@ -1295,6 +1307,11 @@ impl RenderSessionHandle {
     ///
     /// The native session remains live only for destruction, so successful
     /// detach consumes this handle and returns a detached close-only handle.
+    ///
+    /// Detach also releases this session's retention of the parent map, so a
+    /// detached session leaves the map free to close. Close the detached
+    /// session whenever it suits the host; it stays destroyable after the map
+    /// closes because a detached session no longer reaches its map.
     pub fn detach(
         self,
     ) -> std::result::Result<DetachedRenderSessionHandle, HandleOperationError<Self>> {
@@ -1311,6 +1328,10 @@ impl RenderSessionHandle {
             return Err(HandleOperationError::new(error, self));
         }
         self.inner.detached.set(true);
+        // A detached session cannot reattach and never dereferences its map
+        // again, so the parent retention ends here and the map becomes free to
+        // close while this session is still open.
+        self.inner.release_map();
         Ok(DetachedRenderSessionHandle {
             inner: Rc::clone(&self.inner),
         })

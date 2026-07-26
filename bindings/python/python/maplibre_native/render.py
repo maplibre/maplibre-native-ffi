@@ -406,7 +406,11 @@ class OpenGLOwnedTextureFrame:
 
 
 class DetachedRenderSessionHandle(NativeHandleMixin):
-    """Close-only render session handle after backend resources detach."""
+    """Close-only render session handle after backend resources detach.
+
+    A detached session holds no reference to its former map, so it stays
+    destroyable after that map closes.
+    """
 
     _handle_name = "DetachedRenderSessionHandle"
 
@@ -466,7 +470,13 @@ class RenderSessionHandle(NativeHandleMixin):
         return bool(self._native.render_update())
 
     def detach(self) -> DetachedRenderSessionHandle:
-        """Detach backend resources and return a close-only handle."""
+        """Detach backend resources and return a close-only handle.
+
+        Detach ends this session's hold on the map, so a detached session
+        leaves the map free to close. Close the returned handle whenever it
+        suits the host; it stays destroyable after the map closes because a
+        detached session no longer reaches its map.
+        """
         return DetachedRenderSessionHandle._from_native(self._native.detach())  # noqa: SLF001
 
     def reduce_memory_use(self) -> None:

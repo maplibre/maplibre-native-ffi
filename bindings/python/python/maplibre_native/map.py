@@ -451,7 +451,14 @@ class MapHandle(NativeHandleMixin):
         return self._native_address_value
 
     def close(self) -> None:
-        """Release this map handle exactly once."""
+        """Release this map handle exactly once.
+
+        Closing discards this map's queued runtime events and its recorded
+        loading failure. There is no flush and no terminal event, so read any
+        state you mirror from events before closing, and treat close as the end
+        of this map's event stream rather than awaiting an event during
+        teardown.
+        """
         self._native.close()
         self._runtime._unregister_map(self)  # noqa: SLF001
 
@@ -528,11 +535,32 @@ class MapHandle(NativeHandleMixin):
         )
 
     def set_style_url(self, url: str) -> None:
-        """Load a style URL through MapLibre Native style APIs."""
+        """Load a style URL through MapLibre Native style APIs.
+
+        Loading is asynchronous, so a style that fails to fetch or parse still
+        returns normally here and reports through a later loading-failed
+        runtime event. Watch the event stream for load outcomes.
+
+        A well-formed style whose contents are semantically invalid, such as an
+        unknown "version" or a layer naming a missing source, loads without an
+        error and without an event: MapLibre Native logs it and renders what it
+        can.
+        """
         self._native.set_style_url(url)
 
     def set_style_json(self, json: str) -> None:
-        """Load inline style JSON through MapLibre Native style APIs."""
+        """Load inline style JSON through MapLibre Native style APIs.
+
+        Malformed JSON is reported twice: this call raises the parse error
+        synchronously, and the same message also arrives as a loading-failed
+        runtime event. Handle both, so an event-driven loop stays consistent
+        with the call site.
+
+        A well-formed style whose contents are semantically invalid, such as an
+        unknown "version" or a layer naming a missing source, loads without an
+        error and without an event: MapLibre Native logs it and renders what it
+        can.
+        """
         self._native.set_style_json(json)
 
     def add_style_source_json(self, source_id: str, source_json: JsonObject) -> None:
@@ -919,7 +947,12 @@ class MapHandle(NativeHandleMixin):
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply a camera ease transition command."""
+        """Apply a camera ease transition command.
+
+        An absent `animation`, or an animation with no duration, eases over
+        zero duration: the camera reaches the target before this call returns,
+        with no runtime pump in between. Set a duration to animate over time.
+        """
         self._native.ease_to(*_camera_parts(camera), _animation_parts(animation))
 
     def fly_to(
@@ -927,7 +960,13 @@ class MapHandle(NativeHandleMixin):
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply a camera fly transition command."""
+        """Apply a camera fly transition command.
+
+        Fly is the one camera command that animates by default: an absent
+        `animation`, or an animation with no duration, derives a duration from
+        a default velocity of 1.2 screenfuls per second, so the camera is still
+        en route when this call returns and advances as the runtime is pumped.
+        """
         self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
 
     def camera_for_lat_lng_bounds(
@@ -1008,7 +1047,12 @@ class MapHandle(NativeHandleMixin):
         delta_y: float,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space pan command."""
+        """Apply an animated screen-space pan command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the pan
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.move_by_animated(delta_x, delta_y, _animation_parts(animation))
 
     def scale_by(self, scale: float, anchor: ScreenPoint | None = None) -> None:
@@ -1022,7 +1066,12 @@ class MapHandle(NativeHandleMixin):
         anchor: ScreenPoint | None = None,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space zoom command."""
+        """Apply an animated screen-space zoom command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the zoom
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
         self._native.scale_by_animated(scale, raw_anchor, _animation_parts(animation))
 
@@ -1036,7 +1085,12 @@ class MapHandle(NativeHandleMixin):
         second: ScreenPoint,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space rotate command."""
+        """Apply an animated screen-space rotate command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the rotation
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.rotate_by_animated(
             (first.x, first.y),
             (second.x, second.y),
@@ -1052,7 +1106,12 @@ class MapHandle(NativeHandleMixin):
         pitch: float,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated pitch delta command."""
+        """Apply an animated pitch delta command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the pitch
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:

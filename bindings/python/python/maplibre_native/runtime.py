@@ -203,7 +203,15 @@ class RuntimeEventSource:
     """Copied runtime event source metadata."""
 
     source_type: RuntimeEventSourceType
+    """Kind of runtime object the event came from."""
+
     map_handle: MapHandle | None = None
+    """Source map when this binding can prove its identity.
+
+    The runtime holds its maps weakly, so a `MAP` event carries None here once
+    the caller drops its last reference to the source map or closes it. Keep a
+    reference to every map whose events you route by handle.
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -298,7 +306,15 @@ class RuntimeHandle(NativeHandleMixin):
         return map_handle
 
     def run_once(self) -> None:
-        """Run one pending owner-thread task for this runtime."""
+        """Run one iteration of this runtime's owner-thread run loop.
+
+        One iteration drains the high-priority task queue and then the default
+        task queue until both are empty, including tasks enqueued while the
+        drain runs, and also services expired timers and ready I/O. The call
+        returns without blocking on new work, yet its duration is unbounded: a
+        single iteration can span a whole style parse. Drive it from a pump
+        loop rather than budgeting it as a fixed per-frame slice.
+        """
         self._native.run_once()
 
     def _offline_operation(
@@ -433,7 +449,13 @@ class RuntimeHandle(NativeHandleMixin):
         )
 
     def poll_event(self) -> RuntimeEvent | None:
-        """Poll and copy one queued runtime event."""
+        """Poll and copy one queued runtime event.
+
+        Map-originated events resolve their source map through this runtime's
+        weakly held map table, so `RuntimeEvent.source.map_handle` is None once
+        the caller drops its last reference to that map. Keep a reference to
+        every map whose events you route by handle.
+        """
         event = self._native.poll_event()
         if event is None:
             return None

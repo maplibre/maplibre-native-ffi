@@ -307,6 +307,20 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
+def test_detached_session_leaves_the_map_free_to_close(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    session = opengl_owned_session.session
+
+    assert_invalid_state(opengl_owned_session.map.close)
+
+    detached = session.detach()
+    opengl_owned_session.map.close()
+    detached.close()
+
+    assert session.closed
+
+
 def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
