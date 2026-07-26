@@ -31,6 +31,11 @@ A map is independent of any particular render target. Host code can create,
 configure, query, and observe the map without tying that map state to a window,
 surface, or texture.
 
+Sources and layers are added as style-spec JSON, which keeps the API in step
+with the style specification across every layer type. Typed entry points exist
+where a layer needs a surface beyond construction, such as source-type
+validation or typed per-frame setters.
+
 ## Render Session
 
 A render session renders one map to one render target. Render targets are
@@ -52,6 +57,12 @@ events from the runtime.
 
 Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
+
+Queued events belong to their source. Destroying a map discards that map's
+queued events without a flush or a terminal event, so host state mirrored from
+events is only as current as the last drain before teardown. Snapshot the state
+a host needs synchronously while the map is live, and let teardown run to
+completion rather than waiting on an event from the map being destroyed.
 
 ## Language Bindings
 

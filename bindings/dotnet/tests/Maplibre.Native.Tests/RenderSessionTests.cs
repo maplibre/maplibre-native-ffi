@@ -289,7 +289,7 @@ public sealed unsafe class RenderSessionTests
         );
         Assert.Equal(6, metal.Texture.Address);
         metalScope.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => metal.Texture);
+        Assert.Throws<InvalidStateException>(() => metal.Texture);
 
         var vulkanScope = new FrameScope(nameof(VulkanOwnedTextureFrame));
         var vulkan = new VulkanOwnedTextureFrame(
@@ -307,7 +307,7 @@ public sealed unsafe class RenderSessionTests
         );
         Assert.Equal(7, vulkan.ImageView.Address);
         vulkanScope.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => vulkan.ImageView);
+        Assert.Throws<InvalidStateException>(() => vulkan.ImageView);
 
         var openglScope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
         var opengl = new OpenGLOwnedTextureFrame(
@@ -325,7 +325,7 @@ public sealed unsafe class RenderSessionTests
         );
         Assert.Equal(6u, opengl.Texture);
         openglScope.Dispose();
-        Assert.Throws<ObjectDisposedException>(() => opengl.Texture);
+        Assert.Throws<InvalidStateException>(() => opengl.Texture);
     }
 
     [BindingSpecTest("BND-169")]
@@ -361,7 +361,7 @@ public sealed unsafe class RenderSessionTests
             state.Close();
 
             Assert.True(state.IsClosed);
-            Assert.Throws<ObjectDisposedException>(scope.EnsureActive);
+            Assert.Throws<InvalidStateException>(scope.EnsureActive);
             Assert.Equal(2, releaseCalls);
             session.Close();
         }

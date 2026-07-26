@@ -190,6 +190,12 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Eases to the camera descriptor with animation options.</summary>
+    /// <remarks>
+    /// A <see langword="null" /> <paramref name="animation" />, or one with no
+    /// <c>Duration</c>, uses the native default duration of zero, so the camera
+    /// reaches the target immediately and nothing is animated. Set <c>Duration</c>
+    /// explicitly to animate.
+    /// </remarks>
     public void EaseTo(CameraOptions camera, AnimationOptions? animation)
     {
         var nativeCamera = MapStructs.ToNative(camera);
@@ -204,6 +210,13 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Flies to the camera descriptor with animation options.</summary>
+    /// <remarks>
+    /// <see cref="FlyTo" /> is the one camera command that derives a duration when
+    /// none is given: a <see langword="null" /> <paramref name="animation" />, or
+    /// one with no <c>Duration</c>, flies at a default velocity of 1.2 rho-screenfuls
+    /// per second, so the duration scales with the distance travelled. Set
+    /// <c>Duration</c> explicitly to pin it.
+    /// </remarks>
     public void FlyTo(CameraOptions camera, AnimationOptions? animation)
     {
         var nativeCamera = MapStructs.ToNative(camera);
@@ -224,6 +237,11 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Moves the map by a screen delta with animation options.</summary>
+    /// <remarks>
+    /// A <see langword="null" /> <paramref name="animation" />, or one with no
+    /// <c>Duration</c>, eases with the native default duration of zero, so the
+    /// change applies instantly; see <see cref="EaseTo" />.
+    /// </remarks>
     public void MoveByAnimated(double deltaX, double deltaY, AnimationOptions? animation)
     {
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
@@ -247,6 +265,11 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Scales the map around a screen anchor with animation options.</summary>
+    /// <remarks>
+    /// A <see langword="null" /> <paramref name="animation" />, or one with no
+    /// <c>Duration</c>, eases with the native default duration of zero, so the
+    /// change applies instantly; see <see cref="EaseTo" />.
+    /// </remarks>
     public void ScaleByAnimated(double scale, ScreenPoint? anchor, AnimationOptions? animation)
     {
         var nativeAnchor = anchor is { } anchorValue ? MapStructs.ToNative(anchorValue) : default;
@@ -270,6 +293,11 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Rotates around two screen points with animation options.</summary>
+    /// <remarks>
+    /// A <see langword="null" /> <paramref name="animation" />, or one with no
+    /// <c>Duration</c>, eases with the native default duration of zero, so the
+    /// change applies instantly; see <see cref="EaseTo" />.
+    /// </remarks>
     public void RotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions? animation)
     {
         var nativeFirst = MapStructs.ToNative(first);
@@ -292,6 +320,11 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
+    /// <remarks>
+    /// A <see langword="null" /> <paramref name="animation" />, or one with no
+    /// <c>Duration</c>, eases with the native default duration of zero, so the
+    /// change applies instantly; see <see cref="EaseTo" />.
+    /// </remarks>
     public void PitchByAnimated(double pitch, AnimationOptions? animation)
     {
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
@@ -548,6 +581,15 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
+    /// <remarks>
+    /// Loading is asynchronous, so a style that is missing, unreachable, or
+    /// malformed still returns normally here and reports through a
+    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. Watch the
+    /// runtime event queue to observe style load failures. A well-formed style
+    /// that MapLibre rejects semantically, such as an unknown <c>version</c> or a
+    /// layer naming a missing source, produces neither an exception nor an event:
+    /// MapLibre logs it and renders what it can.
+    /// </remarks>
     public void SetStyleUrl(string url)
     {
         ArgumentNullException.ThrowIfNull(url);
@@ -556,6 +598,15 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
+    /// <remarks>
+    /// Malformed JSON is reported twice: this call throws the parse error
+    /// synchronously, and the same message also arrives as a
+    /// <see cref="RuntimeEventType.MapLoadingFailed" /> runtime event. Handle both
+    /// so a queued failure event is not a surprise. A well-formed style that
+    /// MapLibre rejects semantically, such as an unknown <c>version</c> or a layer
+    /// naming a missing source, produces neither an exception nor an event:
+    /// MapLibre logs it and renders what it can.
+    /// </remarks>
     public void SetStyleJson(string json)
     {
         ArgumentNullException.ThrowIfNull(json);
@@ -1466,6 +1517,12 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Destroys the map on its owner thread.</summary>
+    /// <remarks>
+    /// Closing discards this map's queued runtime events and its recorded loading
+    /// failure without a flush and without a terminal event. Snapshot any mirrored
+    /// state you still need before closing, and drive teardown from the close
+    /// result rather than awaiting an event.
+    /// </remarks>
     public void Close()
     {
         state.Close();

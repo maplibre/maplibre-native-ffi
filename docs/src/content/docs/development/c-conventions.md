@@ -84,7 +84,10 @@ commands. Document that behavior on the function. Higher-level adapters build
 threaded models above the C API.
 
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop.
+one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop. One
+call drains the queued tasks, expired timers, and ready I/O it finds, including
+work enqueued while it runs, and returns without blocking for more. Document
+pump entry points as draining rather than as a bounded per-call budget.
 
 ## Status And Diagnostics
 
