@@ -23,7 +23,7 @@ const MapState = struct {
     id_value: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState),
-    active_render_sessions: std.atomic.Value(usize),
+    attached_render_sessions: std.atomic.Value(usize),
     closing: bool,
 };
 
@@ -141,7 +141,7 @@ pub const MapHandle = enum(u128) {
             .id_value = map_registration.id,
             .diagnostic_store = diagnostic_store,
             .custom_geometry_sources = custom_geometry_sources,
-            .active_render_sessions = std.atomic.Value(usize).init(0),
+            .attached_render_sessions = std.atomic.Value(usize).init(0),
             .closing = false,
         };
         errdefer std.heap.smp_allocator.destroy(map_state);
@@ -153,6 +153,15 @@ pub const MapHandle = enum(u128) {
         return mapIdForHandle(self);
     }
 
+    /// Loads inline style JSON through MapLibre Native style APIs.
+    ///
+    /// Malformed JSON is reported twice: this call returns the parse error
+    /// synchronously, and the same message also arrives as a map-loading-failed
+    /// runtime event. Handle both so a queued failure event is not a surprise.
+    ///
+    /// A well-formed style that MapLibre rejects semantically, such as an
+    /// unknown `version` or a layer naming a missing source, produces neither an
+    /// error nor an event: MapLibre logs it and renders what it can.
     pub fn setStyleJson(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -165,6 +174,16 @@ pub const MapHandle = enum(u128) {
         clearCustomGeometrySourceStates(self);
     }
 
+    /// Loads a style URL through MapLibre Native style APIs.
+    ///
+    /// Loading is asynchronous, so a style that is missing, unreachable, or
+    /// malformed still returns success here and reports through a
+    /// map-loading-failed runtime event. Watch the runtime event queue to
+    /// observe style load failures.
+    ///
+    /// A well-formed style that MapLibre rejects semantically, such as an
+    /// unknown `version` or a layer naming a missing source, produces neither an
+    /// error nor an event: MapLibre logs it and renders what it can.
     pub fn setStyleUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
@@ -1359,7 +1378,7 @@ pub const MapHandle = enum(u128) {
         const map_close = beginMapClose(self.*) catch |err| {
             if (err == error.InvalidState) {
                 if (diagnosticStore(self)) |store| {
-                    try status.setBindingDiagnostic(store, "map has live render sessions");
+                    try status.setBindingDiagnostic(store, "map has an attached render session");
                 }
             }
             return err;
@@ -1661,7 +1680,7 @@ fn beginMapClose(handle: MapHandle) status.BindingError!?MapClose {
     if (slot.generation != mapHandleGeneration(handle)) return null;
     const map_state = slot.state orelse return null;
     if (map_state.closing) return error.ActiveBorrow;
-    if (map_state.active_render_sessions.load(.seq_cst) != 0) return error.InvalidState;
+    if (map_state.attached_render_sessions.load(.seq_cst) != 0) return error.InvalidState;
     const map: *c.mln_map = @ptrCast(map_state.native orelse return null);
     map_state.closing = true;
     return .{
@@ -1724,7 +1743,7 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
     const map_state = mapStateLocked(handle.*) orelse return error.ClosedHandle;
     if (map_state.closing) return error.ActiveBorrow;
     const map: *c.mln_map = @ptrCast(map_state.native orelse return error.ClosedHandle);
-    _ = map_state.active_render_sessions.fetchAdd(1, .seq_cst);
+    _ = map_state.attached_render_sessions.fetchAdd(1, .seq_cst);
     return .{
         .native = map,
         .diagnostic_store = map_state.diagnostic_store,
@@ -1733,7 +1752,7 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
 
 pub fn unregisterRenderSession(handle: MapHandle) void {
     const map_state = mapState(handle) orelse return;
-    _ = map_state.active_render_sessions.fetchSub(1, .seq_cst);
+    _ = map_state.attached_render_sessions.fetchSub(1, .seq_cst);
 }
 
 fn customGeometrySourceCountForTesting(handle: *MapHandle) status.BindingError!usize {

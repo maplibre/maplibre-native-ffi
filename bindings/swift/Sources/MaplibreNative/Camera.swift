@@ -6,6 +6,9 @@ public struct CameraOptions: Equatable, Sendable {
   public var pitch: Double?
   public var centerAltitude: Double?
   public var padding: EdgeInsets?
+  /// Input-only screen point the camera pivots around. `jumpTo`, `easeTo`, and
+  /// `flyTo` honor it; MapLibre leaves it `nil` on every read path, including
+  /// camera snapshots and the camera-for-bounds helpers.
   public var anchor: ScreenPoint?
   public var roll: Double?
   public var fieldOfView: Double?
