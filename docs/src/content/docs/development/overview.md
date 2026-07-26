@@ -132,6 +132,11 @@ platform SDKs and system libraries where available, and acquires pinned native
 libraries that are not available from system package managers. Gradle selects
 CMake presets and packages Android applications.
 
+Native installs and CPack archives carry the notices for redistributed
+dependencies under `share/maplibre-native-c/licenses`. CMake collects notice
+files from the selected platform and render targets, and generates Rust
+dependency notices from the locked Cargo graph.
+
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
 Gradle owns Java and Kotlin dependencies, and Cargo owns Rust dependencies.

@@ -35,6 +35,11 @@ if [[ ! -f "$descriptor" ]]; then
   echo "Native package is missing its artifact descriptor: $descriptor" >&2
   exit 1
 fi
+license_dir="$package_root/share/maplibre-native-c/licenses"
+if [[ ! -d "$license_dir" ]] || [[ -z "$(find "$license_dir" -maxdepth 1 -type f -print -quit)" ]]; then
+  echo "Native package is missing its third-party license bundle: $license_dir" >&2
+  exit 1
+fi
 
 mv "$package_root" "$install_dir"
 rm -rf "$staging_dir"

@@ -1,5 +1,6 @@
 function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
+  find_program(CARGO_ABOUT_EXECUTABLE cargo-about REQUIRED)
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Android")
     if(ANDROID_ABI STREQUAL "arm64-v8a")
@@ -135,6 +136,34 @@ function(mln_link_rust_platform target)
   set_target_properties(
     maplibre_native_platform_rust
     PROPERTIES IMPORTED_LOCATION "${rust_library}")
+  set(rust_license_file
+      "${CMAKE_CURRENT_BINARY_DIR}/rust-third-party-licenses.md")
+  set(rust_license_config "${PROJECT_SOURCE_DIR}/src/platform/rust/about.toml")
+  set(rust_license_template "${PROJECT_SOURCE_DIR}/src/platform/rust/about.hbs")
+  set_property(
+    DIRECTORY
+    APPEND
+    PROPERTY
+      CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      "${rust_license_config}" "${rust_license_template}")
+  execute_process(
+    COMMAND
+      "${CARGO_ABOUT_EXECUTABLE}"
+      generate
+      --manifest-path
+      "${rust_manifest}"
+      --config
+      "${rust_license_config}"
+      --target
+      "${rust_target}"
+      --locked
+      --fail
+      --output-file
+      "${rust_license_file}"
+      "${rust_license_template}"
+    WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+    COMMAND_ERROR_IS_FATAL ANY)
+  mln_add_license(maplibre_native_platform_rust "${rust_license_file}" "rust.md")
   add_dependencies(maplibre_native_platform_rust
                    maplibre_native_platform_rust_build)
 

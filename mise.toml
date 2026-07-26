@@ -32,6 +32,7 @@ lockfile = true
 
 [vars]
 actionlint_version = "1.7.8"
+cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dotnet_version = "10.0.203"
 doxygen_version = "1.13.2"
@@ -65,6 +66,7 @@ zig_version = "0.16.0"
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
 "aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+"github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
 
 # Node.js ecosystem

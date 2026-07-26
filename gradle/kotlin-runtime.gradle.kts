@@ -1,11 +1,17 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import java.io.File
+import java.net.URI
+import java.nio.file.FileSystems
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import org.gradle.api.provider.Provider
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
@@ -15,6 +21,7 @@ import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
+import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 data class NativeTargetConfiguration(val definitionFileName: String, val targetPlatform: String)
 
@@ -38,6 +45,28 @@ fun String.capitalized(): String = replaceFirstChar(Char::uppercaseChar)
 
 fun String.taskSuffix(): String =
   split('-').joinToString("") { it.replaceFirstChar(Char::uppercaseChar) }
+
+fun embedLicenseBundle(archive: File, licenseDirectory: File) {
+  require(archive.isFile) { "KLIB does not exist: ${archive.absolutePath}" }
+  require(licenseDirectory.isDirectory) {
+    "Native license bundle does not exist: ${licenseDirectory.absolutePath}"
+  }
+
+  FileSystems.newFileSystem(URI.create("jar:${archive.toURI()}"), mapOf("create" to "false")).use {
+    klib ->
+    licenseDirectory.walkTopDown().filter(File::isFile).forEach { license ->
+      val relativePath =
+        licenseDirectory
+          .toPath()
+          .relativize(license.toPath())
+          .toString()
+          .replace(File.separatorChar, '/')
+      val destination = klib.getPath("/resources/licenses/maplibre-native-c/$relativePath")
+      Files.createDirectories(destination.parent)
+      Files.copy(license.toPath(), destination, StandardCopyOption.REPLACE_EXISTING)
+    }
+  }
+}
 
 fun nativeTargets(
   backend: MaplibreRuntimeBackend,
@@ -140,6 +169,9 @@ fun configureJvmRuntimeArtifacts(
         include("*.dll")
         into(resourcePath)
       }
+      from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/licenses")) {
+        into("META-INF/licenses/maplibre-native-c")
+      }
       from(rootProject.file("LICENSE")) { into("META-INF") }
     }
   }
@@ -205,6 +237,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     AndroidTarget.parseAbis(
       providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
     )
+  val selectedInstalls = mutableListOf<File>()
   androidTargets.forEach { target ->
     val preset = target.cmakePreset(backend.id)
     val propertyName =
@@ -218,6 +251,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         .map { rootProject.file(it).resolve(preset).resolve("install") }
         .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(preset) })
         .getOrElse(rootProject.file("build/$preset/install"))
+    selectedInstalls.add(selectedInstall)
     val verifyInput =
       registerRuntimeInstallVerification(
         taskName = "verifyAndroid${target.taskSuffix}RuntimePublicationInput",
@@ -229,6 +263,21 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         targetPlatform = target.targetPlatform,
       )
     verifyPublicationInputs.configure { dependsOn(verifyInput) }
+  }
+
+  val licenseInstall = selectedInstalls.first()
+  val androidNdkNotice =
+    rootProject.file(
+      "${requiredEnvironmentVariable("ANDROID_HOME")}/ndk/" +
+        "${requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")}/NOTICE"
+    )
+  tasks.withType<Zip>().configureEach {
+    if (name == "bundleAndroidMainAar") {
+      from(licenseInstall.resolve("share/maplibre-native-c/licenses")) {
+        into("META-INF/licenses/maplibre-native-c")
+      }
+      from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
+    }
   }
 
   tasks.configureEach {
@@ -276,8 +325,8 @@ extensions.configure<KotlinMultiplatformExtension> {
     val runtimeInstallDir =
       configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
 
-    compilations.getByName("main") {
-      cinterops.create("maplibreNativeRuntime") {
+    val runtimeInterop =
+      compilations.getByName("main").cinterops.create("maplibreNativeRuntime") {
         defFile(runtimeInteropDirectory.file(targetConfiguration.definitionFileName))
         includeDirs.headerFilterOnly(runtimeInteropDirectory.asFile)
         compilerOpts("-I${runtimeInteropDirectory.asFile}")
@@ -288,6 +337,11 @@ extensions.configure<KotlinMultiplatformExtension> {
           "libmaplibre-native-c.a",
         )
       }
+
+    val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
+    tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
+      inputs.dir(runtimeLicenseDirectory).withPropertyName("maplibreNativeCLicenses")
+      doLast { embedLicenseBundle(outputFileProvider.get(), runtimeLicenseDirectory) }
     }
 
     val verifyPublicationInput =
