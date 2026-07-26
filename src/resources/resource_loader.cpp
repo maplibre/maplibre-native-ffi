@@ -5,7 +5,6 @@
 #include <functional>
 #include <memory>
 #include <optional>
-#include <shared_mutex>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -238,15 +237,6 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     return runtime->resource_provider;
   }
 
-  static auto has_resource_transform(void* platform_context) -> bool {
-    const auto* runtime = find_runtime_for_platform_context(platform_context);
-    if (runtime == nullptr) {
-      return false;
-    }
-    const std::shared_lock lock(runtime->resource_transform_mutex);
-    return runtime->resource_transform_callback != nullptr;
-  }
-
   // Reports the scheme of a URL the online source is unable to serve. The
   // resource loader routes file, asset, mbtiles, and pmtiles URLs to their own
   // sources ahead of the network, so anything left here reaches an HTTP
@@ -254,7 +244,11 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   // source, so it keeps every scheme available.
   [[nodiscard]] auto unsupported_network_scheme(const std::string& url) const
     -> std::optional<std::string_view> {
-    if (has_resource_transform(resource_options_.platformContext())) {
+    if (
+      has_resource_transform_for_platform_context(
+        resource_options_.platformContext()
+      )
+    ) {
       return std::nullopt;
     }
     const auto scheme = url_scheme(url);
