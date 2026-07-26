@@ -110,6 +110,7 @@
 --include-constant MLN_BOUND_OPTION_MAX_ZOOM
 --include-constant MLN_BOUND_OPTION_MIN_PITCH
 --include-constant MLN_BOUND_OPTION_MIN_ZOOM
+--include-constant MLN_BOUND_OPTION_UNBOUNDED
 --include-constant MLN_CAMERA_FIT_OPTION_BEARING
 --include-constant MLN_CAMERA_FIT_OPTION_PADDING
 --include-constant MLN_CAMERA_FIT_OPTION_PITCH

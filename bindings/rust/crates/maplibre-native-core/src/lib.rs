@@ -33,8 +33,8 @@ pub mod values;
 
 pub use abi::{EXPECTED_C_ABI_VERSION, validate_abi_version, validate_abi_version_value};
 pub use camera::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
+    FreeCameraOptions, ProjectionMode,
 };
 pub use enums::{
     AmbientCacheOperation, ConstrainMode, LocationIndicatorImageKind, LogEvent, LogSeverity,

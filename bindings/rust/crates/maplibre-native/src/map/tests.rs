@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use crate::events::{RuntimeEventSource, RuntimeEventType, empty_runtime_event};
 use crate::{
-    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature, JsonMember, MapMode, ResourceKind,
-    ResourceProviderDecision, ResourceResponse, TextureImageInfo,
+    BoundsConstraint, CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature, JsonMember,
+    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -658,6 +658,52 @@ fn empty_coordinate_slice_is_rejected_before_calling_c() {
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), None);
     assert!(error.diagnostic().contains("at least one coordinate"));
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102, BND-103.
+fn unbounded_and_world_bounds_constrain_the_camera_differently() {
+    fn jumped_longitude(map: &MapHandle, longitude: f64) -> f64 {
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, longitude));
+        camera.zoom = Some(2.0);
+        map.jump_to(&camera).unwrap();
+        map.camera().unwrap().center.unwrap().longitude
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // A pristine map reports the unbounded constraint, not world bounds.
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Unbounded)
+    );
+    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
+
+    let world = LatLngBounds::new(LatLng::new(-90.0, -180.0), LatLng::new(90.0, 180.0));
+    let mut options = BoundOptions::default();
+    options.bounds = Some(BoundsConstraint::Bounded(world));
+    map.set_bounds(&options).unwrap();
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Bounded(world))
+    );
+    // World bounds clamp at the antimeridian instead of wrapping.
+    assert!((jumped_longitude(&map, 200.0) - 180.0).abs() < 1e-6);
+
+    let mut options = BoundOptions::default();
+    options.bounds = Some(BoundsConstraint::Unbounded);
+    map.set_bounds(&options).unwrap();
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Unbounded)
+    );
+    // Releasing the constraint restores antimeridian wrapping.
+    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
 
     map.close().unwrap();
     runtime.close().unwrap();

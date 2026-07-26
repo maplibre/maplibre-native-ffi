@@ -89,6 +89,50 @@ import Testing
   }
 }
 
+/// This verifies that the geographic constraint reports and applies the
+/// unbounded state distinctly from world bounds, which the southwest/northeast
+/// pair alone cannot express.
+@Test func cameraBoundsDistinguishUnboundedFromWorldBounds() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 256, height: 256)
+  )
+  defer { try? map.close() }
+
+  func longitudeAfterJump(to longitude: Double) throws -> Double {
+    try map.jump(to: CameraOptions(
+      center: LatLng(latitude: 0, longitude: longitude),
+      zoom: 2
+    ))
+    return try map.camera().center?.longitude ?? .nan
+  }
+
+  #expect(try map.bounds().bounds == .unbounded)
+  // An unbounded map wraps across the antimeridian.
+  #expect(try abs(longitudeAfterJump(to: 200) - -160) < 0.000001)
+
+  try map.setBounds(BoundOptions(bounds: .bounded(LatLngBounds(
+    southwest: LatLng(latitude: -90, longitude: -180),
+    northeast: LatLng(latitude: 90, longitude: 180)
+  ))))
+
+  if case let .bounded(reported) = try map.bounds().bounds {
+    #expect(abs(reported.northeast.longitude - 180) < 0.000001)
+  } else {
+    Issue.record("world bounds should report a bounded constraint")
+  }
+  // World bounds clamp at the antimeridian instead of wrapping.
+  #expect(try abs(longitudeAfterJump(to: 200) - 180) < 0.000001)
+
+  try map.setBounds(BoundOptions(bounds: .unbounded))
+  #expect(try map.bounds().bounds == .unbounded)
+  // Releasing the constraint restores antimeridian wrapping.
+  #expect(try abs(longitudeAfterJump(to: 200) - -160) < 0.000001)
+}
+
 @Test func closedMapReportsSwiftOwnedStateError() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

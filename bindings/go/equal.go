@@ -36,6 +36,18 @@ func equalStrings(left, right []string) bool {
 	return true
 }
 
+// equalBoundsConstraint reports whether two optional camera center constraints are equal. The
+// bounds value is compared for the bounded case, which is the case that reads it.
+func equalBoundsConstraint(left, right *BoundsConstraint) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	if left.Kind != right.Kind {
+		return false
+	}
+	return left.Kind != BoundsConstraintBounded || left.Bounds == right.Bounds
+}
+
 // equalJSON reports whether two optional JSON filters are equal.
 func equalJSON(left, right *JSONValue) bool {
 	if left == nil || right == nil {

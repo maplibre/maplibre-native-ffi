@@ -100,7 +100,7 @@ public sealed class MapCameraOptionsTests
         map.SetBounds(
             new BoundOptions
             {
-                Bounds = bounds,
+                Bounds = new BoundsConstraint.Bounded(bounds),
                 MinimumZoom = 1,
                 MaximumZoom = 12,
                 MinimumPitch = 0,
@@ -117,7 +117,7 @@ public sealed class MapCameraOptionsTests
         );
 
         var copiedBounds = map.GetBounds();
-        Assert.Equal(bounds, copiedBounds.Bounds);
+        Assert.Equal(new BoundsConstraint.Bounded(bounds), copiedBounds.Bounds);
         Assert.NotNull(copiedBounds.MinimumZoom);
         Assert.Equal(1, copiedBounds.MinimumZoom.Value, 12);
         Assert.NotNull(copiedBounds.MaximumZoom);
@@ -142,6 +142,48 @@ public sealed class MapCameraOptionsTests
         );
         Assert.True(visibleBounds.Southwest.Latitude <= visibleBounds.Northeast.Latitude);
         Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
+    }
+
+    // This verifies that the geographic constraint reports and applies the
+    // unbounded state distinctly from world bounds, which the southwest/northeast
+    // pair alone cannot express.
+    [BindingSpecTest("BND-102")]
+    [Fact]
+    public void CameraBoundsDistinguishUnboundedFromWorldBounds()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        double JumpedLongitude(double longitude)
+        {
+            map.JumpTo(new CameraOptions { Center = new LatLng(0, longitude), Zoom = 2 });
+            var camera = map.GetCamera();
+            Assert.NotNull(camera.Center);
+            return camera.Center.Value.Longitude;
+        }
+
+        Assert.Equal(BoundsConstraint.Unbounded.Instance, map.GetBounds().Bounds);
+        // An unbounded map wraps across the antimeridian.
+        Assert.Equal(-160, JumpedLongitude(200), 6);
+
+        map.SetBounds(
+            new BoundOptions
+            {
+                Bounds = new BoundsConstraint.Bounded(
+                    new LatLngBounds(new LatLng(-90, -180), new LatLng(90, 180))
+                ),
+            }
+        );
+
+        var world = Assert.IsType<BoundsConstraint.Bounded>(map.GetBounds().Bounds);
+        Assert.Equal(180, world.Bounds.Northeast.Longitude, 6);
+        // World bounds clamp at the antimeridian instead of wrapping.
+        Assert.Equal(180, JumpedLongitude(200), 6);
+
+        map.SetBounds(new BoundOptions { Bounds = BoundsConstraint.Unbounded.Instance });
+        Assert.Equal(BoundsConstraint.Unbounded.Instance, map.GetBounds().Bounds);
+        // Releasing the constraint restores antimeridian wrapping.
+        Assert.Equal(-160, JumpedLongitude(200), 6);
     }
 
     [BindingSpecTest("BND-104")]

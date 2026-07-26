@@ -68,8 +68,16 @@ pub const CameraFitOptions = struct {
     pitch: ?f64 = null,
 };
 
+/// Geographic constraint applied to the map camera center. The unbounded case leaves the camera
+/// center free, so the map pans across the antimeridian. This differs from world bounds of
+/// -90/-180 to 90/180, which clamp longitude to that range.
+pub const BoundsConstraint = union(enum) {
+    bounded: LatLngBounds,
+    unbounded,
+};
+
 pub const BoundOptions = struct {
-    bounds: ?LatLngBounds = null,
+    bounds: ?BoundsConstraint = null,
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
     min_pitch: ?f64 = null,
@@ -772,10 +780,13 @@ pub fn cameraFitOptionsToNative(value: CameraFitOptions) c.mln_camera_fit_option
 
 pub fn boundOptionsToNative(value: BoundOptions) c.mln_bound_options {
     var raw = c.mln_bound_options_default();
-    if (value.bounds) |bounds| {
-        raw.fields |= c.MLN_BOUND_OPTION_BOUNDS;
-        raw.bounds = latLngBoundsToNative(bounds);
-    }
+    if (value.bounds) |constraint| switch (constraint) {
+        .bounded => |bounds| {
+            raw.fields |= c.MLN_BOUND_OPTION_BOUNDS;
+            raw.bounds = latLngBoundsToNative(bounds);
+        },
+        .unbounded => raw.fields |= c.MLN_BOUND_OPTION_UNBOUNDED,
+    };
     if (value.min_zoom) |min_zoom| {
         raw.fields |= c.MLN_BOUND_OPTION_MIN_ZOOM;
         raw.min_zoom = min_zoom;
@@ -797,7 +808,12 @@ pub fn boundOptionsToNative(value: BoundOptions) c.mln_bound_options {
 
 pub fn boundOptionsFromNative(raw: c.mln_bound_options) BoundOptions {
     return .{
-        .bounds = if ((raw.fields & c.MLN_BOUND_OPTION_BOUNDS) != 0) latLngBoundsFromNative(raw.bounds) else null,
+        .bounds = if ((raw.fields & c.MLN_BOUND_OPTION_BOUNDS) != 0)
+            .{ .bounded = latLngBoundsFromNative(raw.bounds) }
+        else if ((raw.fields & c.MLN_BOUND_OPTION_UNBOUNDED) != 0)
+            .unbounded
+        else
+            null,
         .min_zoom = if ((raw.fields & c.MLN_BOUND_OPTION_MIN_ZOOM) != 0) raw.min_zoom else null,
         .max_zoom = if ((raw.fields & c.MLN_BOUND_OPTION_MAX_ZOOM) != 0) raw.max_zoom else null,
         .min_pitch = if ((raw.fields & c.MLN_BOUND_OPTION_MIN_PITCH) != 0) raw.min_pitch else null,

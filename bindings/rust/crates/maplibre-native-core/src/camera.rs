@@ -154,11 +154,22 @@ impl CameraFitOptions {
     }
 }
 
+/// Geographic constraint applied to the map camera center.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BoundsConstraint {
+    /// Keeps the camera center inside the given bounds.
+    Bounded(LatLngBounds),
+    /// Leaves the camera center unconstrained, so the map pans freely across
+    /// the antimeridian. This differs from world bounds of -90/-180 to 90/180,
+    /// which clamp longitude to that range.
+    Unbounded,
+}
+
 /// Optional map camera constraint fields.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
 pub struct BoundOptions {
-    pub bounds: Option<LatLngBounds>,
+    pub bounds: Option<BoundsConstraint>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub min_pitch: Option<f64>,
@@ -169,9 +180,15 @@ impl BoundOptions {
     fn to_native(&self) -> sys::mln_bound_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_bound_options_default() };
-        if let Some(bounds) = self.bounds {
-            raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
-            raw.bounds = lat_lng_bounds_to_native(bounds);
+        match self.bounds {
+            Some(BoundsConstraint::Bounded(bounds)) => {
+                raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+                raw.bounds = lat_lng_bounds_to_native(bounds);
+            }
+            Some(BoundsConstraint::Unbounded) => {
+                raw.fields |= sys::MLN_BOUND_OPTION_UNBOUNDED;
+            }
+            None => {}
         }
         if let Some(min_zoom) = self.min_zoom {
             raw.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
@@ -194,8 +211,15 @@ impl BoundOptions {
 
     fn from_native(raw: sys::mln_bound_options) -> Self {
         Self {
-            bounds: has(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS)
-                .then(|| lat_lng_bounds_from_native(raw.bounds)),
+            bounds: if has(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS) {
+                Some(BoundsConstraint::Bounded(lat_lng_bounds_from_native(
+                    raw.bounds,
+                )))
+            } else if has(raw.fields, sys::MLN_BOUND_OPTION_UNBOUNDED) {
+                Some(BoundsConstraint::Unbounded)
+            } else {
+                None
+            },
             min_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_ZOOM).then_some(raw.min_zoom),
             max_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MAX_ZOOM).then_some(raw.max_zoom),
             min_pitch: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_PITCH).then_some(raw.min_pitch),
@@ -487,10 +511,10 @@ mod tests {
     #[test]
     fn bound_free_camera_and_projection_modes_round_trip() {
         let bounds = BoundOptions {
-            bounds: Some(LatLngBounds::new(
+            bounds: Some(BoundsConstraint::Bounded(LatLngBounds::new(
                 LatLng::new(1.0, 2.0),
                 LatLng::new(3.0, 4.0),
-            )),
+            ))),
             min_zoom: Some(5.0),
             max_zoom: Some(6.0),
             min_pitch: Some(7.0),
@@ -502,6 +526,17 @@ mod tests {
             std::mem::size_of::<sys::mln_bound_options>() as u32
         );
         assert_eq!(bound_options_from_native(raw_bounds), bounds);
+        assert_ne!(raw_bounds.fields & sys::MLN_BOUND_OPTION_BOUNDS, 0);
+        assert_eq!(raw_bounds.fields & sys::MLN_BOUND_OPTION_UNBOUNDED, 0);
+
+        let unbounded = BoundOptions {
+            bounds: Some(BoundsConstraint::Unbounded),
+            ..BoundOptions::default()
+        };
+        let raw_unbounded = bound_options_to_native(&unbounded);
+        assert_ne!(raw_unbounded.fields & sys::MLN_BOUND_OPTION_UNBOUNDED, 0);
+        assert_eq!(raw_unbounded.fields & sys::MLN_BOUND_OPTION_BOUNDS, 0);
+        assert_eq!(bound_options_from_native(raw_unbounded), unbounded);
 
         let free = FreeCameraOptions {
             position: Some(Vec3::new(1.0, 2.0, 3.0)),

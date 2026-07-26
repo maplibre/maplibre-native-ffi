@@ -241,10 +241,15 @@ internal static class MapStructs
     {
         ArgumentNullException.ThrowIfNull(options);
         var native = NativeMethods.mln_bound_options_default();
-        if (options.Bounds is { } bounds)
+        switch (options.Bounds)
         {
-            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS;
-            native.bounds = ToNative(bounds);
+            case BoundsConstraint.Bounded bounded:
+                native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS;
+                native.bounds = ToNative(bounded.Bounds);
+                break;
+            case BoundsConstraint.Unbounded:
+                native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED;
+                break;
         }
         if (options.MinimumZoom is { } minimumZoom)
         {
@@ -274,7 +279,11 @@ internal static class MapStructs
         var options = new BoundOptions();
         if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS))
         {
-            options.Bounds = FromNative(native.bounds);
+            options.Bounds = new BoundsConstraint.Bounded(FromNative(native.bounds));
+        }
+        else if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED))
+        {
+            options.Bounds = BoundsConstraint.Unbounded.Instance;
         }
         if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM))
         {

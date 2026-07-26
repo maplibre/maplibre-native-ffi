@@ -178,6 +178,7 @@ class _MapHandle:
     def set_bounds(
         self,
         bounds: _Bounds | None,
+        unbounded: bool,
         min_zoom: float | None,
         max_zoom: float | None,
         min_pitch: float | None,

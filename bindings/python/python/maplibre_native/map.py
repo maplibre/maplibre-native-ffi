@@ -13,12 +13,14 @@ from . import _native
 from .camera import (
     AnimationOptions,
     BoundOptions,
+    Bounded,
     CameraFitOptions,
     CameraOptions,
     EdgeInsets,
     FreeCameraOptions,
     ProjectionMode,
     ScreenPoint,
+    Unbounded,
 )
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
@@ -240,21 +242,23 @@ def _bounds_parts(
     bounds: BoundOptions,
 ) -> tuple[
     tuple[tuple[float, float], tuple[float, float]] | None,
+    bool,
     float | None,
     float | None,
     float | None,
     float | None,
 ]:
-    raw_bounds = (
-        (
-            (bounds.bounds.southwest.latitude, bounds.bounds.southwest.longitude),
-            (bounds.bounds.northeast.latitude, bounds.bounds.northeast.longitude),
+    constraint = bounds.bounds
+    raw_bounds: tuple[tuple[float, float], tuple[float, float]] | None = None
+    if isinstance(constraint, Bounded):
+        box = constraint.bounds
+        raw_bounds = (
+            (box.southwest.latitude, box.southwest.longitude),
+            (box.northeast.latitude, box.northeast.longitude),
         )
-        if bounds.bounds is not None
-        else None
-    )
     return (
         raw_bounds,
+        isinstance(constraint, Unbounded),
         bounds.min_zoom,
         bounds.max_zoom,
         bounds.min_pitch,

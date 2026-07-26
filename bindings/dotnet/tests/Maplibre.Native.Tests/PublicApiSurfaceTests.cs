@@ -15,6 +15,9 @@ public sealed class PublicApiSurfaceTests
         {
             "Maplibre.Native.Camera.AnimationOptions",
             "Maplibre.Native.Camera.BoundOptions",
+            "Maplibre.Native.Camera.BoundsConstraint",
+            "Maplibre.Native.Camera.BoundsConstraint+Bounded",
+            "Maplibre.Native.Camera.BoundsConstraint+Unbounded",
             "Maplibre.Native.Camera.CameraFitOptions",
             "Maplibre.Native.Camera.CameraOptions",
             "Maplibre.Native.Camera.EdgeInsets",

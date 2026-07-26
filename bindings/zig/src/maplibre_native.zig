@@ -133,6 +133,7 @@ pub const UnitBezier = values.UnitBezier;
 pub const CameraOptions = values.CameraOptions;
 pub const AnimationOptions = values.AnimationOptions;
 pub const CameraFitOptions = values.CameraFitOptions;
+pub const BoundsConstraint = values.BoundsConstraint;
 pub const BoundOptions = values.BoundOptions;
 pub const Vec3 = values.Vec3;
 pub const Quaternion = values.Quaternion;

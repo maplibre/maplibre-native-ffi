@@ -9,6 +9,7 @@ import java.nio.file.Path
 import java.util.NoSuchElementException
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -3535,9 +3536,15 @@ internal object NativeAccess {
   private fun boundOptions(arena: Arena, value: BoundOptions): MemorySegment {
     val segment = boundOptionsDefault(arena)
     var fields = 0
-    value.bounds?.let {
-      fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()
-      mln_bound_options.bounds(segment).copyFrom(latLngBounds(arena, it))
+    when (val constraint = value.bounds) {
+      is BoundsConstraint.Bounded -> {
+        fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()
+        mln_bound_options.bounds(segment).copyFrom(latLngBounds(arena, constraint.bounds))
+      }
+      BoundsConstraint.Unbounded -> {
+        fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_UNBOUNDED()
+      }
+      null -> {}
     }
     value.minZoom?.let {
       fields = fields or MapLibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM()
@@ -3563,7 +3570,9 @@ internal object NativeAccess {
     val fields = mln_bound_options.fields(segment)
     return BoundOptions().apply {
       if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()) != 0) {
-        bounds = latLngBounds(mln_bound_options.bounds(segment))
+        bounds = BoundsConstraint.Bounded(latLngBounds(mln_bound_options.bounds(segment)))
+      } else if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_UNBOUNDED()) != 0) {
+        bounds = BoundsConstraint.Unbounded
       }
       if ((fields and MapLibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM()) != 0) {
         minZoom = mln_bound_options.min_zoom(segment)
