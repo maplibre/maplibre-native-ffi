@@ -28,14 +28,23 @@ typedef struct mln_metal_owned_texture_descriptor {
 /** Metal caller-owned texture session attachment options. */
 typedef struct mln_metal_borrowed_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
+  /**
+   * Logical texture extent. The map viewport uses width and height, and the
+   * renderer uses scale_factor. The physical size below is stated separately
+   * rather than derived from these.
+   */
   mln_render_target_extent extent;
+  /** Physical texture width in device pixels. Must be positive. */
+  uint32_t physical_width;
+  /** Physical texture height in device pixels. Must be positive. */
+  uint32_t physical_height;
   /**
    * Borrowed id<MTLTexture> / MTL::Texture*. Required.
    *
-   * The texture's physical pixel dimensions must match extent, and the texture
-   * must allow render-target usage. The caller owns the texture and must keep
-   * it valid until detach or destroy.
+   * The texture's pixel dimensions must equal physical_width and
+   * physical_height, and the texture must allow render-target usage. The
+   * session reads the texture's dimensions and rejects a mismatch. The caller
+   * owns the texture and must keep it valid until detach or destroy.
    */
   void* texture;
 } mln_metal_borrowed_texture_descriptor;
@@ -73,17 +82,30 @@ typedef struct mln_vulkan_owned_texture_descriptor {
 /** Vulkan caller-owned texture session attachment options. */
 typedef struct mln_vulkan_borrowed_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
+  /**
+   * Logical texture extent. The map viewport uses width and height, and the
+   * renderer uses scale_factor. The physical size below is stated separately
+   * rather than derived from these.
+   */
   mln_render_target_extent extent;
+  /** Physical image width in device pixels. Must be positive. */
+  uint32_t physical_width;
+  /** Physical image height in device pixels. Must be positive. */
+  uint32_t physical_height;
   /** Borrowed Vulkan context. All handles are required. */
   mln_vulkan_context_descriptor context;
   /**
    * Borrowed VkImage. Required.
    *
    * The image must be a 2D, single-sample color image with
-   * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Its physical dimensions must match
-   * extent. Include VK_IMAGE_USAGE_SAMPLED_BIT when the host will sample from
-   * the image after rendering.
+   * VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT. Its dimensions must equal
+   * physical_width and physical_height. Include VK_IMAGE_USAGE_SAMPLED_BIT when
+   * the host will sample from the image after rendering.
+   *
+   * A VkImage handle exposes no queryable extent, so the session takes the
+   * stated physical size as given and cannot detect a mismatch. The session
+   * builds a framebuffer at that size, and Vulkan leaves a framebuffer larger
+   * than its attachment undefined, so the caller guarantees this relationship.
    */
   void* image;
   /**
@@ -146,14 +168,34 @@ typedef struct mln_opengl_owned_texture_descriptor {
 /** OpenGL caller-owned texture session attachment options. */
 typedef struct mln_opengl_borrowed_texture_descriptor {
   uint32_t size;
-  /** Logical texture extent. */
+  /**
+   * Logical texture extent. The map viewport uses width and height, and the
+   * renderer uses scale_factor. The physical size below is stated separately
+   * rather than derived from these.
+   */
   mln_render_target_extent extent;
+  /** Physical texture width in device pixels. Must be positive. */
+  uint32_t physical_width;
+  /** Physical texture height in device pixels. Must be positive. */
+  uint32_t physical_height;
   /**
    * Borrowed OpenGL context provider data. The texture must belong to this
    * context or a context in the same share group.
    */
   mln_opengl_context_descriptor context;
-  /** Borrowed OpenGL texture object name. Required. */
+  /**
+   * Borrowed OpenGL texture object name. Required.
+   *
+   * The texture's level-0 dimensions must equal physical_width and
+   * physical_height.
+   *
+   * Querying texture dimensions needs glGetTexLevelParameteriv, which OpenGL ES
+   * provides from 3.1 onward, so the session takes the stated physical size as
+   * given on the ES 3.0 contexts it targets and cannot detect a mismatch. The
+   * session renders through a framebuffer at that size, and a texture smaller
+   * than the framebuffer clips or garbles output, so the caller guarantees this
+   * relationship.
+   */
   uint32_t texture;
   /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
   uint32_t target;
@@ -274,6 +316,10 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * session. On success, *out_session receives a handle the caller destroys with
  * mln_render_session_destroy().
  *
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
+ * Follow a resized host by destroying the session, recreating the texture at
+ * the new extent, and attaching again; see mln_render_session_resize().
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
@@ -333,6 +379,11 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * the submitted work to finish, and leaves the image in
  * descriptor->final_layout before mln_render_session_render_update() returns.
  *
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
+ * Follow a resized host by destroying the session, recreating the image and
+ * view at the new extent, and attaching again; see
+ * mln_render_session_resize().
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
@@ -385,6 +436,10 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * keeps it valid until detach or destroy, and synchronizes any use outside
  * this session. On success, *out_session receives a handle the caller destroys
  * with mln_render_session_destroy().
+ *
+ * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
+ * Follow a resized host by destroying the session, recreating the texture at
+ * the new extent, and attaching again; see mln_render_session_resize().
  *
  * Returns:
  * - MLN_STATUS_OK on success.

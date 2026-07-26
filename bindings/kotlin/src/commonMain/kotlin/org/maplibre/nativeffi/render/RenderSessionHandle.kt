@@ -16,9 +16,30 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun map(): MapHandle
 
+  /**
+   * Resizes this attached render session.
+   *
+   * Surface and owned-texture sessions resize in place. Borrowed texture targets are sized by their
+   * owner and throw `UnsupportedFeatureException`: [close] this session, recreate the texture, and
+   * attach a new session. A map holds at most one attached session, so close before attaching the
+   * replacement.
+   *
+   * Resizing discards the session renderer, so renderer-held state such as feature state does not
+   * survive. Map state such as camera, style, and sources lives on the map and survives both resize
+   * and reattach.
+   */
   public fun resize(width: Int, height: Int, scaleFactor: Double)
 
-  public fun renderUpdate()
+  /**
+   * Renders the latest available map render update.
+   *
+   * The map retains its latest update, so repeated calls re-render it and return true again; use
+   * this to redraw on demand after resize or surface expose, and gate frame loops on
+   * render-update-available events instead of the return value. Returns false when no frame was
+   * rendered, because the map has not published an update yet or the renderer skipped the frame;
+   * both are normal during startup, so keep pumping the runtime until an update is reported.
+   */
+  public fun renderUpdate(): Boolean
 
   public fun detach()
 
@@ -44,6 +65,17 @@ public expect class RenderSessionHandle : AutoCloseable {
     options: SourceFeatureQueryOptions?,
   ): List<QueriedFeature>
 
+  /**
+   * Queries a feature extension from the latest render session state.
+   *
+   * The `supercluster` extension reads the `cluster_id` feature property and the `limit` and
+   * `offset` arguments as [JsonValue.UInt]. Other numeric types are treated as absent: a
+   * `cluster_id` that is not [JsonValue.UInt] returns [FeatureExtensionResult.Value] holding
+   * [JsonValue.Null] instead of a feature collection, and a `limit` or `offset` that is not
+   * [JsonValue.UInt] leaves `leaves` at the native defaults of ten leaves at offset zero.
+   * [QueriedFeature] properties keep their JSON value type, so a queried cluster feature can be
+   * passed back unmodified.
+   */
   public fun queryFeatureExtension(
     sourceId: String,
     feature: Feature,

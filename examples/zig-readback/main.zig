@@ -519,11 +519,9 @@ fn renderTexture(
             if (owned_event.source_type != .map or owned_event.source_id == null or !std.meta.eql(owned_event.source_id.?, map_id)) continue;
             switch (owned_event.event_type) {
                 .map_render_update_available => {
-                    texture.renderUpdate() catch |err| switch (err) {
-                        error.InvalidState => continue,
-                        else => return err,
-                    };
-                    rendered_frame = true;
+                    if (try texture.renderUpdate()) {
+                        rendered_frame = true;
+                    }
                 },
                 .map_still_image_finished => {
                     if (!rendered_frame) return error.StillImageFinishedWithoutFrame;

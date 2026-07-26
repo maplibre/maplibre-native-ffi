@@ -41,18 +41,26 @@ function(mln_configure_render_dependencies target)
       TARGET ${target}
       PROPERTY MLN_FFI_VULKAN_ICD_FILE "${MLN_FFI_VULKAN_ICD_FILE}")
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    # The SDK keeps the loader under runtime/<architecture>. Requiring it here
+    # is what keeps the runtime directory honest: tests bind vulkan-1.dll at
+    # load time, so accepting a miss leaves this property on the import library
+    # directory and every test dies in the loader before reaching main.
+    set(MLN_FFI_VULKAN_RUNTIME_SUFFIXES runtime/x64 runtime/x86 Bin bin)
+    if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"
+       OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+      set(MLN_FFI_VULKAN_RUNTIME_SUFFIXES runtime/arm64 runtime/ARM64 Bin bin)
+    endif()
     find_file(
       MLN_FFI_VULKAN_RUNTIME
       NAMES vulkan-1.dll
-      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES Bin bin)
-    if(MLN_FFI_VULKAN_RUNTIME)
-      get_filename_component(
-        MLN_FFI_VULKAN_RUNTIME_DIR "${MLN_FFI_VULKAN_RUNTIME}"
-        DIRECTORY)
-      set_property(
-        TARGET ${target}
-        PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_RUNTIME_DIR}")
-    endif()
+      HINTS "$ENV{VULKAN_SDK}" PATH_SUFFIXES ${MLN_FFI_VULKAN_RUNTIME_SUFFIXES}
+      REQUIRED)
+    get_filename_component(
+      MLN_FFI_VULKAN_RUNTIME_DIR "${MLN_FFI_VULKAN_RUNTIME}"
+      DIRECTORY)
+    set_property(
+      TARGET ${target}
+      PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_RUNTIME_DIR}")
   endif()
 endfunction()
 

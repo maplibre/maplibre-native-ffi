@@ -1,33 +1,29 @@
 function(mln_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
-  find_path(MLN_FFI_ZLIB_INCLUDE_DIR NAMES zlib.h REQUIRED)
-  find_path(MLN_FFI_LIBUV_INCLUDE_DIR NAMES uv.h REQUIRED)
-  find_library(MLN_FFI_ZLIB_LIBRARY NAMES z REQUIRED)
-  find_library(MLN_FFI_LIBUV_LIBRARY NAMES uv REQUIRED)
-  find_library(MLN_FFI_ZLIB_STATIC_LIBRARY NAMES libz.a REQUIRED)
-  find_library(MLN_FFI_LIBUV_STATIC_LIBRARY NAMES uv_a libuv.a REQUIRED)
 
-  add_library(mln_ffi_zlib STATIC IMPORTED GLOBAL)
-  set_target_properties(
-    mln_ffi_zlib
-    PROPERTIES
-      IMPORTED_LOCATION "${MLN_FFI_ZLIB_STATIC_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${MLN_FFI_ZLIB_INCLUDE_DIR}")
-  add_library(mln_ffi_libuv STATIC IMPORTED GLOBAL)
-  set_target_properties(
-    mln_ffi_libuv
-    PROPERTIES
-      IMPORTED_LOCATION "${MLN_FFI_LIBUV_STATIC_LIBRARY}"
-      INTERFACE_INCLUDE_DIRECTORIES "${MLN_FFI_LIBUV_INCLUDE_DIR}")
+  include(FetchContent)
+  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+  fetchcontent_declare(
+    mln_ffi_zlib_source
+    URL
+      "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
+    URL_HASH
+      "SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+    EXCLUDE_FROM_ALL)
+  fetchcontent_declare(
+    mln_ffi_libuv_source
+    URL "https://dist.libuv.org/dist/v1.48.0/libuv-v1.48.0.tar.gz"
+    URL_HASH
+      "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
+    EXCLUDE_FROM_ALL)
+  fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
 
   target_link_libraries(
     ${target}
-    INTERFACE
-      Threads::Threads "${MLN_FFI_ZLIB_LIBRARY}" "${MLN_FFI_LIBUV_LIBRARY}"
-      ${CMAKE_DL_LIBS})
-  target_include_directories(
-    ${target}
-    INTERFACE "${MLN_FFI_ZLIB_INCLUDE_DIR}" "${MLN_FFI_LIBUV_INCLUDE_DIR}")
+    INTERFACE Threads::Threads zlibstatic uv_a ${CMAKE_DL_LIBS})
   set_target_properties(
     ${target}
     PROPERTIES
@@ -40,7 +36,7 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT
       elf
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;maplibre_native_platform_rust;mln_ffi_zlib;mln_ffi_libuv"
+      "mbgl-vendor-icu;maplibre_native_platform_rust;zlibstatic;uv_a"
       MLN_FFI_PKG_CONFIG_LIBS
       -ldl
       MLN_FFI_TEST_SUPPORTED

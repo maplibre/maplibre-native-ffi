@@ -260,6 +260,8 @@ class DescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
   ): VulkanBorrowedTextureDescriptor =
     VulkanBorrowedTextureDescriptor(
       RenderTargetExtent(1, 1, 1.0),
+      1,
+      1,
       vulkanContext(pointer),
       pointer,
       pointer,

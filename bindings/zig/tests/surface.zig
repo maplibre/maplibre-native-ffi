@@ -45,7 +45,7 @@ test "Metal surface renders to window-attached layer through public binding" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try surface.renderUpdate();
+    try testing.expect(try surface.renderUpdate());
 }
 
 test "Metal surface render acquires one drawable per frame through public binding" {
@@ -71,7 +71,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try testing.expectEqual(@as(u32, 0), metal_support.nextDrawableCount(window_layer.layer.?));
-    try surface.renderUpdate();
+    try testing.expect(try surface.renderUpdate());
     try testing.expectEqual(@as(u32, 1), metal_support.nextDrawableCount(window_layer.layer.?));
 }
 

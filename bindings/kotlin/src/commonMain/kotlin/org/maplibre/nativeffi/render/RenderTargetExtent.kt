@@ -32,3 +32,15 @@ public class RenderTargetExtent(width: Int, height: Int, scaleFactor: Double) {
     }
   }
 }
+
+/** Physical render target size in device pixels. */
+public class PhysicalRenderTargetSize(public val width: Int, public val height: Int)
+
+/**
+ * Returns this extent's physical device-pixel size as `ceil(logical * scaleFactor)` per dimension.
+ *
+ * Session-owned texture targets and surface targets are sized this way. Borrowed texture targets
+ * state their physical size instead, because not every physical size is reachable from a logical
+ * extent.
+ */
+public expect fun RenderTargetExtent.physicalSize(): PhysicalRenderTargetSize

@@ -73,6 +73,19 @@ type StyleTileSourceOptions struct {
 	RasterEncoding *StyleRasterDEMEncoding
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options StyleTileSourceOptions) Equal(other StyleTileSourceOptions) bool {
+	return equalPointer(options.MinZoom, other.MinZoom) &&
+		equalPointer(options.MaxZoom, other.MaxZoom) &&
+		equalPointer(options.Attribution, other.Attribution) &&
+		equalPointer(options.Scheme, other.Scheme) &&
+		equalPointer(options.Bounds, other.Bounds) &&
+		equalPointer(options.TileSize, other.TileSize) &&
+		equalPointer(options.VectorEncoding, other.VectorEncoding) &&
+		equalPointer(options.RasterEncoding, other.RasterEncoding)
+}
+
 // WithTileSize returns a copy that sets raster tile size.
 func (options StyleTileSourceOptions) WithTileSize(tileSize uint32) StyleTileSourceOptions {
 	options.TileSize = new(uint32)
@@ -229,6 +242,13 @@ type PremultipliedRGBA8Image struct {
 type StyleImageOptions struct {
 	PixelRatio *float32
 	SDF        *bool
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options StyleImageOptions) Equal(other StyleImageOptions) bool {
+	return equalPointer(options.PixelRatio, other.PixelRatio) &&
+		equalPointer(options.SDF, other.SDF)
 }
 
 func cStyleImageOptions(options StyleImageOptions) C.mln_style_image_options {

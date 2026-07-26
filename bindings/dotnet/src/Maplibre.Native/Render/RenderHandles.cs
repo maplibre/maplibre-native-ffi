@@ -36,7 +36,10 @@ internal unsafe delegate mln_status RenderSessionResize(
     double scaleFactor
 );
 
-internal unsafe delegate mln_status RenderSessionRenderUpdate(mln_render_session* session);
+internal unsafe delegate mln_status RenderSessionRenderUpdate(
+    mln_render_session* session,
+    bool* out_rendered
+);
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
     mln_render_session* session,
@@ -70,8 +73,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         height,
         scaleFactor
     ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
-    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static session =>
-        NativeMethods.mln_render_session_render_update(session);
+    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static (
+        session,
+        outRendered
+    ) => NativeMethods.mln_render_session_render_update(session, outRendered);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
     private static readonly StatusDestroy<mln_render_session> DefaultDestroy = static session =>
@@ -347,16 +352,36 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     public bool IsClosed => state.IsClosed;
 
+    /// <summary>
+    /// Resizes this attached render session. Surface and owned-texture sessions resize in place.
+    /// Borrowed texture targets are sized by their owner and throw an unsupported-feature error:
+    /// dispose this session, recreate the texture, and attach a new session. A map holds at most
+    /// one attached session, so dispose before attaching the replacement. Resizing discards the
+    /// session renderer, so renderer-held state such as feature state does not survive; map state
+    /// such as camera, style, and sources survives both resize and reattach.
+    /// </summary>
     public void Resize(uint width, uint height, double scaleFactor)
     {
         ThrowIfTextureFrameActive(nameof(Resize));
         NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
     }
 
-    public void RenderUpdate()
+    /// <summary>
+    /// Renders the latest available map render update. The map retains its
+    /// latest update, so repeated calls re-render it and return true again;
+    /// use this to redraw on demand after resize or surface expose, and gate
+    /// frame loops on render-update-available events instead of the return
+    /// value. Returns false when no frame was rendered,
+    /// because the map has not published an update yet or the renderer
+    /// skipped the frame; both are normal during startup, so keep pumping
+    /// the runtime until an update is reported.
+    /// </summary>
+    public bool RenderUpdate()
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
-        NativeStatus.Check(RenderUpdateNative(Pointer));
+        var rendered = false;
+        NativeStatus.Check(RenderUpdateNative(Pointer, &rendered));
+        return rendered;
     }
 
     public void Detach()
@@ -424,6 +449,21 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         SourceFeatureQueryOptions? options
     ) => QuerySourceFeaturesCore(sourceId, options);
 
+    /// <summary>
+    /// Queries a feature extension from the latest render session state.
+    /// </summary>
+    /// <remarks>
+    /// The <c>supercluster</c> extension reads the <c>cluster_id</c> feature
+    /// property and the <c>limit</c> and <c>offset</c> arguments as
+    /// <c>JsonValue.UInt</c>. Other numeric types are treated as absent: a
+    /// <c>cluster_id</c> that is not <c>JsonValue.UInt</c> returns a
+    /// <c>FeatureExtensionResult.Value</c> holding <c>JsonValue.Null</c>
+    /// instead of a feature collection, and a <c>limit</c> or <c>offset</c>
+    /// that is not <c>JsonValue.UInt</c> leaves <c>leaves</c> at the native
+    /// defaults of ten leaves at offset zero. Queried feature properties keep
+    /// their JSON value type, so a queried cluster feature can be passed back
+    /// unmodified.
+    /// </remarks>
     public FeatureExtensionResult QueryFeatureExtension(
         string sourceId,
         Feature feature,
@@ -1158,7 +1198,12 @@ internal sealed class FrameScope : IDisposable
     {
         if (IsClosed)
         {
-            throw new ObjectDisposedException(owner);
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{owner} is closed.",
+                null
+            );
         }
     }
 

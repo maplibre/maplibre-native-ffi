@@ -9,6 +9,7 @@ import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
+import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.runtime.NetworkStatus
 
 /** Process-global entry points for the Android JNI bridge. */
@@ -127,6 +128,22 @@ internal object NativeAccess {
 
   fun supportedOpenGLContextProviderMask(): Int =
     MaplibreNativeC.mln_opengl_supported_context_provider_mask()
+
+  fun renderTargetExtentPhysicalSize(extent: RenderTargetExtent): Pair<Int, Int> {
+    val nativeExtent =
+      MaplibreNativeC.mln_render_target_extent().apply {
+        size(sizeof())
+        width(extent.width)
+        height(extent.height)
+        scale_factor(extent.scaleFactor)
+      }
+    val outWidth = intArrayOf(0)
+    val outHeight = intArrayOf(0)
+    Status.check(
+      MaplibreNativeC.mln_render_target_extent_physical_size(nativeExtent, outWidth, outHeight)
+    )
+    return outWidth[0] to outHeight[0]
+  }
 
   fun networkStatus(): Int {
     val outStatus = intArrayOf(0)
