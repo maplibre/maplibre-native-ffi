@@ -334,28 +334,36 @@ export interface CameraFitOptions {
 }
 
 type NorthOrientationInput =
+  | { northOrientation?: null; northOrientationRaw?: null }
+  | { northOrientation: "up"; northOrientationRaw?: 0 | null }
+  | { northOrientation: "right"; northOrientationRaw?: 1 | null }
+  | { northOrientation: "down"; northOrientationRaw?: 2 | null }
+  | { northOrientation: "left"; northOrientationRaw?: 3 | null }
   | {
-      northOrientation?: "up" | "right" | "down" | "left" | null;
-      northOrientationRaw?: number | null;
+      northOrientation?: null;
+      northOrientationRaw: number;
     }
   | { northOrientation: "unknown"; northOrientationRaw: number };
 
 type ConstrainModeInput =
+  | { constrainMode?: null; constrainModeRaw?: null }
+  | { constrainMode: "none"; constrainModeRaw?: 0 | null }
+  | { constrainMode: "heightOnly"; constrainModeRaw?: 1 | null }
+  | { constrainMode: "widthAndHeight"; constrainModeRaw?: 2 | null }
+  | { constrainMode: "screen"; constrainModeRaw?: 3 | null }
   | {
-      constrainMode?:
-        | "none"
-        | "heightOnly"
-        | "widthAndHeight"
-        | "screen"
-        | null;
-      constrainModeRaw?: number | null;
+      constrainMode?: null;
+      constrainModeRaw: number;
     }
   | { constrainMode: "unknown"; constrainModeRaw: number };
 
 type ViewportModeInput =
+  | { viewportMode?: null; viewportModeRaw?: null }
+  | { viewportMode: "default"; viewportModeRaw?: 0 | null }
+  | { viewportMode: "flippedY"; viewportModeRaw?: 1 | null }
   | {
-      viewportMode?: "default" | "flippedY" | null;
-      viewportModeRaw?: number | null;
+      viewportMode?: null;
+      viewportModeRaw: number;
     }
   | { viewportMode: "unknown"; viewportModeRaw: number };
 
@@ -377,7 +385,10 @@ type MapTileOptionsInputFields = {
 
 export type MapTileOptionsInput = MapTileOptionsInputFields &
   (
-    | { lodMode?: "default" | "distance" | null; lodModeRaw?: number | null }
+    | { lodMode?: null; lodModeRaw?: null }
+    | { lodMode: "default"; lodModeRaw?: 0 | null }
+    | { lodMode: "distance"; lodModeRaw?: 1 | null }
+    | { lodMode?: null; lodModeRaw: number }
     | { lodMode: "unknown"; lodModeRaw: number }
   );
 
@@ -440,8 +451,18 @@ export type ResourceKind =
   | "sprite-json"
   | "image";
 
+export type ResourceKindValue =
+  | { kind: "unknown"; rawKind: number }
+  | { kind: "style"; rawKind: 1 }
+  | { kind: "source"; rawKind: 2 }
+  | { kind: "tile"; rawKind: 3 }
+  | { kind: "glyphs"; rawKind: 4 }
+  | { kind: "sprite-image"; rawKind: 5 }
+  | { kind: "sprite-json"; rawKind: 6 }
+  | { kind: "image"; rawKind: 7 };
+
 export interface ResourceRoute {
-  kind?: ResourceKind | null;
+  kind?: ResourceKind | ResourceKindValue | null;
   url?: string | null;
   urlPrefix?: string | null;
 }
@@ -543,7 +564,7 @@ export declare class RuntimeHandle {
   ): OfflineOperationHandle;
   offlineRegionSetDownloadState(
     regionId: bigint,
-    state: OfflineRegionDownloadState,
+    state: OfflineRegionDownloadState | OfflineRegionDownloadStateValue,
   ): OfflineOperationHandle;
   offlineRegionInvalidate(regionId: bigint): OfflineOperationHandle;
   offlineRegionDelete(regionId: bigint): OfflineOperationHandle;
@@ -614,9 +635,7 @@ export interface OfflineRegionInfo {
   metadata: Uint8Array;
 }
 
-export interface OfflineRegionStatus {
-  downloadState: OfflineRegionDownloadState | "unknown";
-  rawDownloadState: number;
+export type OfflineRegionStatus = OfflineRegionDownloadStateValue & {
   completedResourceCount: bigint;
   completedResourceSize: bigint;
   completedTileCount: bigint;
@@ -625,11 +644,25 @@ export interface OfflineRegionStatus {
   requiredResourceCount: bigint;
   requiredResourceCountIsPrecise: boolean;
   complete: boolean;
-}
+};
 
 export type OfflineOperationRef = OfflineOperationHandle;
 
 export type OfflineRegionDownloadState = "inactive" | "active";
+
+export type OfflineRegionDownloadStateValue =
+  | {
+      downloadState: "inactive";
+      rawDownloadState: 0;
+    }
+  | {
+      downloadState: "active";
+      rawDownloadState: 1;
+    }
+  | {
+      downloadState: "unknown";
+      rawDownloadState: number;
+    };
 
 export declare class OfflineOperationHandle {
   private constructor(nativeHandle: unknown);
@@ -808,12 +841,19 @@ export declare class OpenGLOwnedTextureFrame {
   [Symbol.dispose](): void;
 }
 
-export interface FeatureStateSelector {
-  sourceId: string;
-  sourceLayerId?: string | null;
-  featureId?: string | null;
-  stateKey?: string | null;
-}
+export type FeatureStateSelector =
+  | {
+      sourceId: string;
+      sourceLayerId?: string | null;
+      featureId: string;
+      stateKey?: string | null;
+    }
+  | {
+      sourceId: string;
+      sourceLayerId?: string | null;
+      featureId?: null;
+      stateKey?: null;
+    };
 
 export interface ScreenBox {
   min: ScreenPoint;

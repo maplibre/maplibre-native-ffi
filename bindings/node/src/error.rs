@@ -37,6 +37,15 @@ pub(crate) fn invalid_state(message: impl Into<String>) -> NapiError {
     ))
 }
 
+pub(crate) fn mark_offline_operation_consumed(mut error: NapiError) -> NapiError {
+    if error.reason.starts_with(NATIVE_ERROR_PREFIX)
+        && let Some(payload) = error.reason.strip_suffix('}')
+    {
+        error.reason = format!("{payload},\"offlineOperationConsumed\":true}}");
+    }
+    error
+}
+
 fn json_string(value: &str) -> String {
     let mut out = String::with_capacity(value.len() + 2);
     out.push('"');
@@ -64,5 +73,18 @@ mod tests {
     #[test]
     fn json_string_escapes_control_characters() {
         assert_eq!(json_string("a\"b\\c\n"), "\"a\\\"b\\\\c\\n\"");
+    }
+
+    #[test]
+    fn consumed_offline_operation_errors_include_transfer_marker() {
+        let error = mark_offline_operation_consumed(invalid_argument("copy failed"));
+        let payload: serde_json::Value = serde_json::from_str(
+            error
+                .reason
+                .strip_prefix(NATIVE_ERROR_PREFIX)
+                .expect("native error prefix"),
+        )
+        .expect("valid native error payload");
+        assert_eq!(payload["offlineOperationConsumed"], true);
     }
 }

@@ -1814,10 +1814,10 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "releaseDetachedCustomGeometrySources")]
-    pub fn release_detached_custom_geometry_sources(&self) {
+    pub fn release_detached_custom_geometry_sources(&self) -> Vec<String> {
         let source_ids = match self.custom_geometry_sources.lock() {
             Ok(sources) => sources.keys().cloned().collect::<Vec<_>>(),
-            Err(_) => return,
+            Err(_) => return Vec::new(),
         };
         let mut detached_sources = Vec::new();
         for source_id in source_ids {
@@ -1839,13 +1839,14 @@ impl NativeMapHandle {
             }
         }
         if detached_sources.is_empty() {
-            return;
+            return detached_sources;
         }
         if let Ok(mut sources) = self.custom_geometry_sources.lock() {
-            for source_id in detached_sources {
-                sources.remove(&source_id);
+            for source_id in &detached_sources {
+                sources.remove(source_id);
             }
         }
+        detached_sources
     }
 
     #[napi(js_name = "customGeometrySourceCountForTesting")]

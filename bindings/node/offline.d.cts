@@ -9,4 +9,5 @@ export {
   type OfflineRegionStatus,
   type OfflineOperationRef,
   type OfflineRegionDownloadState,
+  type OfflineRegionDownloadStateValue,
 } from "./index.cjs";

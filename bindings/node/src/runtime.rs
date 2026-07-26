@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
-use napi::bindgen_prelude::{BigInt, Result, Uint8Array};
+use napi::bindgen_prelude::{BigInt, Either, Result, Uint8Array};
 use napi::threadsafe_function::{ThreadsafeFunction, ThreadsafeFunctionCallMode};
 use napi_derive::napi;
 
@@ -184,14 +184,14 @@ pub struct UnknownRuntimeEventPayloadValue {
 
 #[napi(object)]
 pub struct ResourceRouteInput {
-    pub kind: Option<String>,
+    pub kind: Option<Either<String, u32>>,
     pub url: Option<String>,
     pub url_prefix: Option<String>,
 }
 
 #[napi(object)]
 pub struct ResourceTransformRuleInput {
-    pub kind: Option<String>,
+    pub kind: Option<Either<String, u32>>,
     pub url: Option<String>,
     pub url_prefix: Option<String>,
     pub replacement_url: Option<String>,
@@ -275,6 +275,7 @@ pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     has_created_map: AtomicBool,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
+    retired_resource_transforms: Mutex<Vec<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
     retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
 }
@@ -296,6 +297,7 @@ pub fn create_native_runtime_handle(
         state,
         has_created_map: AtomicBool::new(false),
         resource_transform: Mutex::new(None),
+        retired_resource_transforms: Mutex::new(Vec::new()),
         resource_provider: Mutex::new(None),
         retired_resource_providers: Mutex::new(Vec::new()),
     })
@@ -425,7 +427,12 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
         })
         .map_err(error::from_core)?;
-        drop(transform_slot.replace(transform));
+        if let Some(replaced) = transform_slot.replace(transform) {
+            match self.retired_resource_transforms.lock() {
+                Ok(mut retired) => retired.push(replaced),
+                Err(_) => std::mem::forget(replaced),
+            }
+        }
         Ok(())
     }
 
@@ -433,10 +440,17 @@ impl NativeRuntimeHandle {
     pub fn clear_resource_transform(&self) -> Result<()> {
         core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
             .map_err(error::from_core)?;
-        self.resource_transform
+        let replaced = self
+            .resource_transform
             .lock()
             .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?
             .take();
+        if let Some(replaced) = replaced {
+            match self.retired_resource_transforms.lock() {
+                Ok(mut retired) => retired.push(replaced),
+                Err(_) => std::mem::forget(replaced),
+            }
+        }
         Ok(())
     }
 
@@ -554,14 +568,18 @@ impl NativeRuntimeHandle {
     pub fn offline_region_set_download_state(
         &self,
         region_id: BigInt,
-        state: String,
+        state: Either<String, u32>,
     ) -> Result<OfflineOperationStart> {
+        let state = match state {
+            Either::A(state) => offline_region_download_state_from_string(&state)?,
+            Either::B(raw_state) => raw_state,
+        };
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_set_download_state_start(
                 self.state.as_ptr(),
                 bigint_to_i64(region_id, "regionId")?,
-                offline_region_download_state_from_string(&state)?,
+                state,
                 &mut operation_id,
             )
         })
@@ -638,7 +656,7 @@ impl NativeRuntimeHandle {
             )
         })
         .map_err(error::from_core)?;
-        copy_offline_region_snapshot_value(snapshot)
+        copy_offline_region_snapshot_value(snapshot).map_err(error::mark_offline_operation_consumed)
     }
 
     #[napi(js_name = "offlineRegionGetTakeResult")]
@@ -660,7 +678,10 @@ impl NativeRuntimeHandle {
         if !found {
             return Ok(None);
         }
-        Ok(Some(copy_offline_region_snapshot_value(snapshot)?))
+        Ok(Some(
+            copy_offline_region_snapshot_value(snapshot)
+                .map_err(error::mark_offline_operation_consumed)?,
+        ))
     }
 
     #[napi(js_name = "offlineRegionsListTakeResult")]
@@ -677,7 +698,7 @@ impl NativeRuntimeHandle {
             )
         })
         .map_err(error::from_core)?;
-        copy_offline_region_list_value(list)
+        copy_offline_region_list_value(list).map_err(error::mark_offline_operation_consumed)
     }
 
     #[napi(js_name = "offlineRegionsMergeDatabaseTakeResult")]
@@ -694,7 +715,7 @@ impl NativeRuntimeHandle {
             )
         })
         .map_err(error::from_core)?;
-        copy_offline_region_list_value(list)
+        copy_offline_region_list_value(list).map_err(error::mark_offline_operation_consumed)
     }
 
     #[napi(js_name = "offlineRegionUpdateMetadataTakeResult")]
@@ -711,7 +732,7 @@ impl NativeRuntimeHandle {
             )
         })
         .map_err(error::from_core)?;
-        copy_offline_region_snapshot_value(snapshot)
+        copy_offline_region_snapshot_value(snapshot).map_err(error::mark_offline_operation_consumed)
     }
 
     #[napi(js_name = "offlineRegionGetStatusTakeResult")]
@@ -967,14 +988,17 @@ fn unregister_resource_request_handle(
 
 fn resource_matcher_from_input(input: ResourceRouteInput) -> Result<ResourceMatcher> {
     Ok(ResourceMatcher {
-        kind: input
-            .kind
-            .as_deref()
-            .map(resource_kind_from_name)
-            .transpose()?,
+        kind: input.kind.map(resource_kind_from_input).transpose()?,
         url: input.url,
         url_prefix: input.url_prefix,
     })
+}
+
+fn resource_kind_from_input(kind: Either<String, u32>) -> Result<u32> {
+    match kind {
+        Either::A(kind) => resource_kind_from_name(&kind),
+        Either::B(raw_kind) => Ok(raw_kind),
+    }
 }
 
 fn resource_transform_rule_from_input(
@@ -1512,6 +1536,9 @@ impl NativeRuntimeHandle {
         if let Ok(mut transform) = self.resource_transform.lock() {
             *transform = None;
         }
+        if let Ok(mut retired) = self.retired_resource_transforms.lock() {
+            retired.clear();
+        }
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
         }
@@ -1548,6 +1575,11 @@ impl Drop for NativeRuntimeHandle {
                 && let Some(transform) = transform.take()
             {
                 std::mem::forget(transform);
+            }
+            if let Ok(mut retired) = self.retired_resource_transforms.lock() {
+                for transform in retired.drain(..) {
+                    std::mem::forget(transform);
+                }
             }
             if let Ok(mut provider) = self.resource_provider.lock()
                 && let Some(provider) = provider.take()

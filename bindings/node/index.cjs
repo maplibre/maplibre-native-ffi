@@ -108,6 +108,74 @@ const NETWORK_STATUS_RAW = Object.freeze({
   offline: 2,
 });
 
+const OFFLINE_REGION_DOWNLOAD_STATE_RAW = Object.freeze({
+  inactive: 0,
+  active: 1,
+});
+
+const RESOURCE_KIND_RAW = Object.freeze({
+  unknown: 0,
+  style: 1,
+  source: 2,
+  tile: 3,
+  glyphs: 4,
+  "sprite-image": 5,
+  "sprite-json": 6,
+  image: 7,
+});
+
+function resourceKindInput(kind) {
+  if (kind == null || typeof kind === "string") {
+    return kind;
+  }
+  if (
+    typeof kind === "object" &&
+    Number.isInteger(kind.rawKind) &&
+    kind.rawKind >= 0 &&
+    kind.rawKind <= 0xffff_ffff &&
+    (kind.kind === "unknown" ||
+      (kind.kind in RESOURCE_KIND_RAW &&
+        kind.rawKind === RESOURCE_KIND_RAW[kind.kind]))
+  ) {
+    return kind.rawKind;
+  }
+  throw new InvalidArgumentError(
+    null,
+    "resource kind must be a known name or a kind value with a matching unsigned 32-bit rawKind field",
+  );
+}
+
+function resourceMatcherInputs(matchers) {
+  return matchers.map((matcher) =>
+    Object.hasOwn(matcher ?? {}, "kind")
+      ? { ...matcher, kind: resourceKindInput(matcher.kind) }
+      : { ...matcher },
+  );
+}
+
+function offlineRegionDownloadStateInput(state) {
+  if (state === "inactive" || state === "active") {
+    return state;
+  }
+  if (
+    state != null &&
+    typeof state === "object" &&
+    Number.isInteger(state.rawDownloadState) &&
+    state.rawDownloadState >= 0 &&
+    state.rawDownloadState <= 0xffff_ffff &&
+    (state.downloadState === "unknown" ||
+      (state.downloadState in OFFLINE_REGION_DOWNLOAD_STATE_RAW &&
+        state.rawDownloadState ===
+          OFFLINE_REGION_DOWNLOAD_STATE_RAW[state.downloadState]))
+  ) {
+    return state.rawDownloadState;
+  }
+  throw new InvalidArgumentError(
+    null,
+    "offline region download state must be 'inactive', 'active', or a status value with a matching unsigned 32-bit rawDownloadState field",
+  );
+}
+
 function setNetworkStatus(status) {
   let raw;
   if (status === "online") {
@@ -718,7 +786,15 @@ function takeOfflineOperation(
     expectedOperationKind,
     expectedResultKind,
   );
-  const result = translateNativeErrors(() => take(operationId));
+  let result;
+  try {
+    result = translateNativeErrors(() => take(operationId));
+  } catch (error) {
+    if (error?.offlineOperationConsumed === true) {
+      operation._markConsumed();
+    }
+    throw error;
+  }
   operation._markConsumed();
   return translateOfflineOperationResult(result);
 }
@@ -1102,11 +1178,35 @@ class RuntimeHandle {
   }
 
   close() {
-    if (this.#offlineOperations.size > 0) {
+    let collectedCleanupError;
+    for (const registration of this.#offlineOperations) {
+      if (!registration.closed && registration.handle.deref() == null) {
+        try {
+          translateNativeErrors(() =>
+            liveNativeOf(this).discardOfflineOperation(
+              registration.operationId,
+            ),
+          );
+          registration.closed = true;
+          this.#offlineOperations.delete(registration);
+        } catch (error) {
+          collectedCleanupError ??= error;
+          // A later close call can retry cleanup of a collected operation.
+        }
+      }
+    }
+    if (
+      [...this.#offlineOperations].some(
+        (registration) => registration.handle.deref() != null,
+      )
+    ) {
       throw new InvalidStateError(
         null,
         "runtime has live offline operation handles",
       );
+    }
+    if (collectedCleanupError != null) {
+      throw collectedCleanupError;
     }
     const result = translateNativeErrors(() => nativeOf(this).close());
     this.#mapsByAddress.clear();
@@ -1134,7 +1234,9 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      liveNativeOf(this).setResourceTransformRules(rules),
+      liveNativeOf(this).setResourceTransformRules(
+        resourceMatcherInputs(rules),
+      ),
     );
   }
 
@@ -1152,31 +1254,34 @@ class RuntimeHandle {
       );
     }
     return translateNativeErrors(() =>
-      liveNativeOf(this).setResourceProviderRoutes(routes, (error, request) => {
-        if (error) {
-          throw error;
-        }
-        const handle = new ResourceRequestHandle(
-          CONSTRUCTION_TOKEN,
-          request.completionToken,
-          this,
-        );
-        const wrapped = {
-          ...request,
-          handle,
-        };
-        delete wrapped.completionToken;
-        try {
-          const result = callback(wrapped);
-          if (result && typeof result.then === "function") {
-            Promise.resolve(result).catch((error) => {
-              completeResourceRequestWithProviderError(handle, error);
-            });
+      liveNativeOf(this).setResourceProviderRoutes(
+        resourceMatcherInputs(routes),
+        (error, request) => {
+          if (error) {
+            throw error;
           }
-        } catch (error) {
-          completeResourceRequestWithProviderError(handle, error);
-        }
-      }),
+          const handle = new ResourceRequestHandle(
+            CONSTRUCTION_TOKEN,
+            request.completionToken,
+            this,
+          );
+          const wrapped = {
+            ...request,
+            handle,
+          };
+          delete wrapped.completionToken;
+          try {
+            const result = callback(wrapped);
+            if (result && typeof result.then === "function") {
+              Promise.resolve(result).catch((error) => {
+                completeResourceRequestWithProviderError(handle, error);
+              });
+            }
+          } catch (error) {
+            completeResourceRequestWithProviderError(handle, error);
+          }
+        },
+      ),
     );
   }
 
@@ -1249,7 +1354,11 @@ class RuntimeHandle {
 
   offlineRegionSetDownloadState(regionId, state) {
     return this.#offlineOperation(
-      () => liveNativeOf(this).offlineRegionSetDownloadState(regionId, state),
+      () =>
+        liveNativeOf(this).offlineRegionSetDownloadState(
+          regionId,
+          offlineRegionDownloadStateInput(state),
+        ),
       "regionSetDownloadState",
       "none",
     );
@@ -2344,15 +2453,17 @@ class MapHandle {
 
   _releaseDetachedCustomGeometrySources() {
     if (!this.closed) {
-      translateNativeErrors(() =>
+      return translateNativeErrors(() =>
         liveNativeOf(this).releaseDetachedCustomGeometrySources(),
       );
     }
+    return [];
   }
 
   _finishStyleReplacement() {
-    this._releaseDetachedCustomGeometrySources();
-    retireAllCustomGeometrySourceCallbacks(this);
+    for (const sourceId of this._releaseDetachedCustomGeometrySources()) {
+      retireCustomGeometrySourceCallbacks(this, sourceId);
+    }
   }
 
   _customGeometrySourceCountForTesting() {
@@ -2669,52 +2780,63 @@ function mapNativeError(error) {
   }
 
   const options = { cause: error };
+  let mapped;
   switch (payload.kind) {
     case "InvalidArgument":
-      return new InvalidArgumentError(
+      mapped = new InvalidArgumentError(
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     case "InvalidState":
-      return new InvalidStateError(
+      mapped = new InvalidStateError(
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     case "WrongThread":
-      return new WrongThreadError(
+      mapped = new WrongThreadError(
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     case "Unsupported":
-      return new UnsupportedFeatureError(
+      mapped = new UnsupportedFeatureError(
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     case "NativeError":
-      return new NativeError(
+      mapped = new NativeError(
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     case "AbiVersionMismatch":
-      return new MaplibreError(
+      mapped = new MaplibreError(
         MaplibreStatus.abiVersionMismatch,
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
+      break;
     default:
-      return new MaplibreError(
+      mapped = new MaplibreError(
         MaplibreStatus.unknownStatus,
         payload.nativeStatusCode,
         payload.diagnostic,
         options,
       );
   }
+  if (payload.offlineOperationConsumed) {
+    Object.defineProperty(mapped, "offlineOperationConsumed", { value: true });
+  }
+  return mapped;
 }
 
 function parseNativePayload(message) {
@@ -2737,6 +2859,7 @@ function parseNativePayload(message) {
           ? payload.nativeStatusCode
           : null,
       diagnostic: payload.diagnostic,
+      offlineOperationConsumed: payload.offlineOperationConsumed === true,
     };
   } catch {
     return null;

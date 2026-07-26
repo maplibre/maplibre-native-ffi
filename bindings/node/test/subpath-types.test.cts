@@ -17,6 +17,7 @@ import {
   type StyleSourceTypeValue,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
+import type { OfflineRegionDownloadStateValue } from "@maplibre/native-ffi-node/offline";
 import {
   NativeBuffer,
   NativePointer,
@@ -30,6 +31,7 @@ import {
 } from "@maplibre/native-ffi-node/render";
 import {
   ResourceRequestHandle,
+  type ResourceKindValue,
   type ResourceProviderCallback,
   type ResourceResponseInput,
   type ResourceRoute,
@@ -70,6 +72,14 @@ const geometry: RenderedQueryGeometry = {
 };
 const response: ResourceResponseInput = { status: "ok", modifiedUnixMs: 1n };
 const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
+const unknownResourceKind: ResourceKindValue = {
+  kind: "unknown",
+  rawKind: 1000,
+};
+const futureResourceRoute: ResourceRoute = {
+  urlPrefix: "future://",
+  kind: unknownResourceKind,
+};
 const providerCallback: ResourceProviderCallback = (request) => {
   request.handle.complete(response);
 };
@@ -82,6 +92,24 @@ RuntimeHandle.prototype.setResourceProviderRoutes.call(
 );
 const viewportOptions: MapViewportOptionsInput = { northOrientation: "up" };
 const tileOptions: MapTileOptionsInput = { lodMode: "distance" };
+const matchingViewportOptions: MapViewportOptionsInput = {
+  northOrientation: "right",
+  northOrientationRaw: 1,
+};
+const matchingTileOptions: MapTileOptionsInput = {
+  lodMode: "distance",
+  lodModeRaw: 1,
+};
+// @ts-expect-error known viewport names require the corresponding raw value.
+const mismatchedViewportOptions: MapViewportOptionsInput = {
+  northOrientation: "right",
+  northOrientationRaw: 2,
+};
+// @ts-expect-error known tile LOD names require the corresponding raw value.
+const mismatchedTileOptions: MapTileOptionsInput = {
+  lodMode: "distance",
+  lodModeRaw: 0,
+};
 const unknownViewportOptions: MapViewportOptionsInput = {
   viewportMode: "unknown",
   viewportModeRaw: 1000,
@@ -160,6 +188,22 @@ const metalOwnedTextureMissingDevice: MetalOwnedTextureDescriptor = {
 };
 const locationIndicatorKind: LocationIndicatorImageKind = "top";
 const featureSelector: FeatureStateSelector = { sourceId: "source" };
+const keyedFeatureSelector: FeatureStateSelector = {
+  sourceId: "source",
+  featureId: "feature",
+  stateKey: "selected",
+};
+// @ts-expect-error stateKey requires a featureId.
+const invalidKeyedFeatureSelector: FeatureStateSelector = {
+  sourceId: "source",
+  stateKey: "selected",
+};
+const unknownOfflineDownloadState: OfflineRegionDownloadStateValue = {
+  downloadState: "unknown",
+  rawDownloadState: 1000,
+};
+declare const offlineStatus: import("@maplibre/native-ffi-node/offline").OfflineRegionStatus;
+runtime.offlineRegionSetDownloadState(1n, offlineStatus);
 const queriedFeature: QueriedFeature = { feature: { type: "Feature" } };
 const json: JsonValue = { ok: true };
 void camera;
@@ -167,9 +211,15 @@ void descriptor;
 void geometry;
 void response;
 void route;
+void unknownResourceKind;
+void futureResourceRoute;
 void providerCallback;
 void viewportOptions;
 void tileOptions;
+void matchingViewportOptions;
+void matchingTileOptions;
+void mismatchedViewportOptions;
+void mismatchedTileOptions;
 void unknownViewportOptions;
 void unknownTileOptions;
 void incompleteUnknownViewportOptions;
@@ -186,5 +236,8 @@ void metalOwnedTexture;
 void metalOwnedTextureMissingDevice;
 void locationIndicatorKind;
 void featureSelector;
+void keyedFeatureSelector;
+void invalidKeyedFeatureSelector;
+void unknownOfflineDownloadState;
 void queriedFeature;
 void json;

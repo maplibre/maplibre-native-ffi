@@ -346,23 +346,63 @@ test("retired custom geometry sources discard queued callbacks", () => {
         urlFetchBridges.push(fetchTile);
       },
       setStyleUrl() {},
-      releaseDetachedCustomGeometrySources() {},
+      setStyleJson() {},
+      releaseDetachedCustomGeometrySources() {
+        return ["before", "late"];
+      },
     },
   });
-  let urlFetches = 0;
-  urlMap.addCustomGeometrySource("custom", {
+  let beforeUrlFetches = 0;
+  let lateUrlFetches = 0;
+  urlMap.addCustomGeometrySource("before", {
     fetchTile() {
-      urlFetches += 1;
+      beforeUrlFetches += 1;
     },
   });
 
   urlMap.setStyleUrl("custom://replacement");
+  urlMap.addCustomGeometrySource("late", {
+    fetchTile() {
+      lateUrlFetches += 1;
+    },
+  });
   urlFetchBridges[0](null, { z: 0, x: 0, y: 0 });
-  assert.equal(urlFetches, 1);
+  urlFetchBridges[1](null, { z: 0, x: 0, y: 0 });
+  assert.equal(beforeUrlFetches, 1);
+  assert.equal(lateUrlFetches, 1);
 
   urlMap._finishStyleReplacement();
   urlFetchBridges[0](null, { z: 0, x: 0, y: 0 });
-  assert.equal(urlFetches, 1);
+  urlFetchBridges[1](null, { z: 0, x: 0, y: 0 });
+  assert.equal(beforeUrlFetches, 1);
+  assert.equal(lateUrlFetches, 1);
+
+  /** @type {Function[]} */
+  const jsonFetchBridges = [];
+  const jsonMap = Object.create(MapHandle.prototype);
+  Object.defineProperty(jsonMap, "native", {
+    value: {
+      closed: false,
+      /** @param {string} _sourceId @param {unknown} _options @param {Function} fetchTile */
+      addCustomGeometrySource(_sourceId, _options, fetchTile) {
+        jsonFetchBridges.push(fetchTile);
+      },
+      setStyleJson() {},
+      releaseDetachedCustomGeometrySources() {
+        return [];
+      },
+    },
+  });
+  let replacementFetches = 0;
+  jsonMap.setStyleJson("{}");
+  jsonMap.addCustomGeometrySource("replacement", {
+    fetchTile() {
+      replacementFetches += 1;
+    },
+  });
+  jsonMap._finishStyleReplacement();
+  jsonFetchBridges[0](null, { z: 0, x: 0, y: 0 });
+  assert.equal(replacementFetches, 1);
 });
 
 test("log callback registration does not keep a process alive", () => {
@@ -427,10 +467,22 @@ test("finalizers release abandoned request and texture scopes", () => {
 
       let providerBridge;
       let requestCloses = 0;
+      let discardAttempts = 0;
       native.createNativeRuntimeHandle = () => ({
         closed: false,
         close() {
           this.closed = true;
+        },
+        runAmbientCacheOperation() {
+          return { operationId: 1n };
+        },
+        discardOfflineOperation() {
+          discardAttempts += 1;
+          if (discardAttempts <= 2) {
+            throw new Error(
+              'MaplibreNativeError:{"kind":"NativeError","nativeStatusCode":5,"diagnostic":"transient discard failure"}'
+            );
+          }
         },
         setResourceProviderRoutes(_routes, callback) {
           providerBridge = callback;
@@ -465,7 +517,13 @@ test("finalizers release abandoned request and texture scopes", () => {
         runtime._resourceRequestCountForTesting() === 0
       );
       assert.equal(requestCloses, 1);
+      let operation = runtime.runAmbientCacheOperation("clear");
+      operation = undefined;
+      await collectUntil(() => discardAttempts === 1);
+      assert.throws(() => runtime.close(), binding.NativeError);
+      assert.equal(discardAttempts, 2);
       runtime.close();
+      assert.equal(discardAttempts, 3);
     }
 
     main().catch((error) => {
@@ -795,6 +853,19 @@ test("offline operations expose discardable handles", () => {
         ),
       InvalidArgumentError,
     );
+    const active = runtime.offlineRegionSetDownloadState(1n, {
+      downloadState: "active",
+      rawDownloadState: 1,
+    });
+    active.close();
+    assert.throws(
+      () =>
+        runtime.offlineRegionSetDownloadState(1n, {
+          downloadState: "unknown",
+          rawDownloadState: 1000,
+        }),
+      InvalidArgumentError,
+    );
     assert.throws(
       () => runtime.runAmbientCacheOperation(/** @type {any} */ ("vacuum")),
       InvalidArgumentError,
@@ -833,6 +904,71 @@ test("offline operation handles validate runtime, kind, and consumption", () => 
     );
   } finally {
     runtime.close();
+  }
+});
+
+test("offline take errors preserve whether native ownership transferred", () => {
+  const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  /** @param {boolean} offlineOperationConsumed */
+  const nativeError = (offlineOperationConsumed) =>
+    new Error(
+      `MaplibreNativeError:${JSON.stringify({
+        kind: "InvalidArgument",
+        nativeStatusCode: 1,
+        diagnostic: "snapshot copy failed",
+        offlineOperationConsumed,
+      })}`,
+    );
+
+  try {
+    nativeAddon.createNativeRuntimeHandle =
+      /** @type {any} */ (
+        () => ({
+          closed: false,
+          close() {},
+          offlineRegionsList() {
+            return { operationId: 1n };
+          },
+          offlineRegionsListTakeResult() {
+            throw nativeError(true);
+          },
+        })
+      );
+    const consumedRuntime = new RuntimeHandle();
+    const consumed = consumedRuntime.offlineRegionsList();
+    assert.throws(
+      () => consumedRuntime.offlineRegionsListTakeResult(consumed),
+      InvalidArgumentError,
+    );
+    assert.equal(consumed.closed, true);
+    consumedRuntime.close();
+
+    nativeAddon.createNativeRuntimeHandle =
+      /** @type {any} */ (
+        () => ({
+          closed: false,
+          close() {},
+          offlineRegionsList() {
+            return { operationId: 2n };
+          },
+          offlineRegionsListTakeResult() {
+            throw nativeError(false);
+          },
+          discardOfflineOperation() {},
+        })
+      );
+    const retryableRuntime = new RuntimeHandle();
+    const retryable = retryableRuntime.offlineRegionsList();
+    assert.throws(
+      () => retryableRuntime.offlineRegionsListTakeResult(retryable),
+      InvalidArgumentError,
+    );
+    assert.equal(retryable.closed, false);
+    assert.throws(() => retryableRuntime.close(), InvalidStateError);
+    retryable.close();
+    retryableRuntime.close();
+  } finally {
+    nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
   }
 });
 
@@ -910,7 +1046,13 @@ test("resource provider routes validate Node handoff shape", async () => {
 
   try {
     runtime.setResourceProviderRoutes(
-      [{ urlPrefix: "custom://", kind: "source" }],
+      [
+        { urlPrefix: "custom://", kind: "source" },
+        {
+          urlPrefix: "future://",
+          kind: { kind: "unknown", rawKind: 1000 },
+        },
+      ],
       (request) => {
         assert.equal(typeof request.url, "string");
         assert.equal(typeof request.rawKind, "number");
@@ -924,6 +1066,19 @@ test("resource provider routes validate Node handoff shape", async () => {
     );
     assert.throws(
       () => runtime.setResourceProviderRoutes([], /** @type {any} */ (null)),
+      InvalidArgumentError,
+    );
+    assert.throws(
+      () =>
+        runtime.setResourceProviderRoutes(
+          [
+            {
+              kind: /** @type {any} */ ({ kind: "source", rawKind: 3 }),
+              urlPrefix: "mismatch://",
+            },
+          ],
+          () => {},
+        ),
       InvalidArgumentError,
     );
   } finally {
@@ -1358,8 +1513,23 @@ test("runtime handle supports options, resource transform, explicit close, and i
       url: "custom://style.json",
       replacementUrl: "https://example.test/style.json",
     },
+    {
+      kind: { kind: "unknown", rawKind: 1000 },
+      url: "future://style.json",
+      replacementUrl: "https://example.test/future.json",
+    },
   ]);
   runtime.clearResourceTransform();
+  assert.throws(
+    () =>
+      runtime.setResourceTransformRules([
+        {
+          kind: /** @type {any} */ ({ kind: "source", rawKind: 3 }),
+          replacementUrl: "https://example.test/mismatch.json",
+        },
+      ]),
+    InvalidArgumentError,
+  );
   assert.throws(
     () => runtime.setResourceTransformRules(/** @type {any} */ (null)),
     InvalidArgumentError,
@@ -1539,14 +1709,19 @@ test("map viewport and tile options map descriptor fields", () => {
     );
     assert.throws(
       () =>
-        map.setViewportOptions({
-          northOrientation: "right",
-          northOrientationRaw: 2,
-        }),
+        map.setViewportOptions(
+          /** @type {any} */ ({
+            northOrientation: "right",
+            northOrientationRaw: 2,
+          }),
+        ),
       InvalidArgumentError,
     );
     assert.throws(
-      () => map.setTileOptions({ lodMode: "distance", lodModeRaw: 0 }),
+      () =>
+        map.setTileOptions(
+          /** @type {any} */ ({ lodMode: "distance", lodModeRaw: 0 }),
+        ),
       InvalidArgumentError,
     );
     assert.throws(
