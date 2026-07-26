@@ -15,6 +15,8 @@ static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";
 static const char credentialed_unsupported_scheme_style_url[] =
   "jar://user:password@archive/packaged/style.json?access_token=secret#token";
+static const uint8_t inline_style_json[] =
+  "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
 static mln_runtime_event empty_event(void) {
   return (mln_runtime_event){
@@ -156,6 +158,32 @@ static uint32_t resource_provider_stub(
   (void)request;
   (void)handle;
   return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+typedef struct inline_release_provider_state {
+  atomic_bool callback_finished;
+  atomic_int completion_status;
+} inline_release_provider_state;
+
+static uint32_t inline_release_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) {
+  inline_release_provider_state* state = user_data;
+  const mln_resource_response response = {
+    .size = sizeof(mln_resource_response),
+    .status = MLN_RESOURCE_RESPONSE_STATUS_OK,
+    .error_reason = MLN_RESOURCE_ERROR_REASON_NONE,
+    .bytes = inline_style_json,
+    .byte_count = sizeof(inline_style_json) - 1,
+  };
+  (void)request;
+  atomic_store(
+    &state->completion_status, mln_resource_request_complete(handle, &response)
+  );
+  mln_resource_request_release(handle);
+  atomic_store(&state->callback_finished, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
 }
 
 static mln_status resource_transform_stub(
@@ -617,6 +645,38 @@ static void unsupported_style_url_names_declining_provider(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// This verifies inline release records the provider release and lets the native
+// callback return handled ownership before reclaiming that reference.
+static void resource_provider_defers_inline_release_until_callback_returns(
+  void
+) {
+  inline_release_provider_state state;
+  atomic_init(&state.callback_finished, false);
+  atomic_init(&state.completion_status, MLN_STATUS_NATIVE_ERROR);
+  mln_runtime* runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = inline_release_resource_provider,
+    .user_data = &state,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  mln_map* map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_url(map, "custom://inline-style.json")
+  );
+  for (size_t attempt = 0;
+       attempt < 5000 && !atomic_load(&state.callback_finished); attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_TRUE(atomic_load(&state.callback_finished));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.completion_status));
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_resources_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
@@ -631,4 +691,5 @@ void run_resources_abi_tests(void) {
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);
+  RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);
 }

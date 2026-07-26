@@ -419,7 +419,8 @@ Resource provider invocation follows this operation:
    or release.
 4. Treat inline completion during the provider callback as handled ownership,
    even if the callback return path would otherwise pass through.
-5. Allow deferred or cross-thread completion when the C API allows it, without
+5. Defer inline request release until the callback returns handled ownership.
+6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
 
 Handled request completion is terminal. A request can complete once; a

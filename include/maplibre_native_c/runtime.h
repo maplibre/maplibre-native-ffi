@@ -489,6 +489,8 @@ typedef struct mln_resource_response {
  *   release the handle.
  * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
  *   request through the handle inline or later.
+ * - A callback that returns HANDLE may release the handle during the callback.
+ *   The C API defers that release until the callback returns.
  * - Unknown decision values produce a provider error response. The C API
  *   releases the provided handle and does not pass the request through.
  * - The C API copies completion data, and mln_resource_request_complete() may
@@ -601,10 +603,11 @@ MLN_API mln_status mln_resource_request_cancelled(
 /**
  * Releases the provider's reference to a resource request handle.
  *
- * Providers own a releasable handle only after returning
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE from the callback. Release the handle
- * exactly once after completing the request or deciding not to complete it.
- * Passing null is a no-op. A released handle must not be used again.
+ * Release the handle exactly once after completing the request or deciding not
+ * to complete it. A provider callback that returns
+ * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline; the C
+ * API defers reclamation until the callback returns. Passing null is a no-op. A
+ * released handle must not be used again.
  */
 MLN_API void mln_resource_request_release(
   mln_resource_request_handle* handle
