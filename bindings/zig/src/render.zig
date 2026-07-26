@@ -260,6 +260,11 @@ pub const FeatureStateSelector = struct {
     state_key: ?[]const u8 = null,
 };
 
+/// Screen-space box in logical map pixels.
+///
+/// Corners may be given in any order, and may extend past the viewport.
+/// Rendered queries normalize the corners and clip the box to the viewport, so
+/// a box that over-covers the viewport queries everything visible.
 pub const ScreenBox = struct {
     min: values.ScreenPoint,
     max: values.ScreenPoint,

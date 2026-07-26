@@ -1761,6 +1761,71 @@ fn rendered_and_source_queries_copy_results() {
 
 #[test]
 // Spec coverage: BND-106.
+fn rendered_box_queries_clip_to_the_viewport() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    load_query_style(&runtime, &map, &session);
+    let mut options = RenderedFeatureQueryOptions::default();
+    options.layer_ids = Some(vec!["point-circle".into()]);
+
+    // Over-covering the viewport is the obvious way to ask for everything on
+    // screen, and must answer like the viewport itself.
+    let oversized = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(-4096.0, -4096.0),
+        ScreenPoint::new(4096.0, 4096.0),
+    ));
+    let rendered = wait_for_rendered_feature(
+        &runtime,
+        &session,
+        &oversized,
+        &options,
+        "over-covering box query",
+    );
+    assert_eq!(
+        rendered.feature.identifier,
+        FeatureIdentifier::String("feature-1".into())
+    );
+
+    // Corners in either order describe the same box.
+    let inverted = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(4096.0, 4096.0),
+        ScreenPoint::new(-4096.0, -4096.0),
+    ));
+    assert_eq!(
+        session
+            .query_rendered_features(&inverted, Some(&options))
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
+    // a viewport edge.
+    let offscreen = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(512.0, 512.0),
+        ScreenPoint::new(1024.0, 1024.0),
+    ));
+    assert!(
+        session
+            .query_rendered_features(&offscreen, Some(&options))
+            .unwrap()
+            .is_empty()
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-106.
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
