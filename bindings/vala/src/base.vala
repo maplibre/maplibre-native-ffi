@@ -639,6 +639,22 @@ namespace MaplibreNative {
             return copied;
         }
 
+        public StringList copy () {
+            return new StringList (to_utf8_array ());
+        }
+
+        public bool equal (StringList other) {
+            if (values.length != other.values.length) {
+                return false;
+            }
+            for (var index = 0; index < values.length; index++) {
+                if (!values[index].equal (other.values[index])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         public bool contains (string value) {
             return contains_utf8 (new Utf8String (value));
         }

@@ -403,6 +403,10 @@ namespace MaplibreNative {
             return matches;
         }
 
+        internal uint custom_geometry_source_registration_count {
+            get { return custom_geometry_sources.length; }
+        }
+
         private void retain_custom_geometry_source (CustomGeometrySourceRegistration registration) {
             Utf8String source_id = registration.source_id;
             release_custom_geometry_source (source_id);
@@ -443,6 +447,37 @@ namespace MaplibreNative {
             for (var index = 0; index < released.length; index++) {
                 released[index].close ();
             }
+        }
+
+        internal void release_replaced_custom_geometry_sources () throws Error {
+            var lease = require_live ();
+            var retained_flags = new bool[custom_geometry_sources.length];
+            uint retained_count = 0;
+            for (var index = 0; index < custom_geometry_sources.length; index++) {
+                uint32 source_type;
+                bool found;
+                check_status (Raw.map_get_style_source_type (
+                    lease.native,
+                    custom_geometry_sources[index].source_id.to_native (),
+                    out source_type,
+                    out found
+                ));
+                retained_flags[index] = found && source_type == (uint32) Raw.StyleSourceType.CUSTOM_VECTOR;
+                if (retained_flags[index]) {
+                    retained_count++;
+                }
+            }
+
+            var retained = new CustomGeometrySourceRegistration[retained_count];
+            uint output_index = 0;
+            for (var index = 0; index < custom_geometry_sources.length; index++) {
+                if (retained_flags[index]) {
+                    retained[output_index++] = custom_geometry_sources[index];
+                } else {
+                    custom_geometry_sources[index].close ();
+                }
+            }
+            custom_geometry_sources = retained;
         }
 
         public void close () throws Error {

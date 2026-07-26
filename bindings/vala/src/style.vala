@@ -317,11 +317,11 @@ namespace MaplibreNative {
         public uint32 stride { get; private set; }
         private uint8[] pixels;
 
-        public PremultipliedRgba8Image (uint32 width, uint32 height, uint32 stride, owned uint8[] pixels) {
+        public PremultipliedRgba8Image (uint32 width, uint32 height, uint32 stride, uint8[] pixels) {
             this.width = width;
             this.height = height;
             this.stride = stride;
-            this.pixels = (owned) pixels;
+            this.pixels = copy_byte_array (pixels);
         }
 
         internal Raw.PremultipliedRgba8Image to_native () {

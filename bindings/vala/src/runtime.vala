@@ -956,6 +956,9 @@ namespace MaplibreNative {
             source_type = runtime_event_source_type_from_raw (native.source_type);
             if (source_type == RuntimeEventSourceType.MAP) {
                 source_map = runtime.resolve_map (native.source);
+                if (event_type == RuntimeEventType.MAP_STYLE_LOADED && source_map != null) {
+                    source_map.release_replaced_custom_geometry_sources ();
+                }
             }
             code = native.code;
             payload_type = runtime_event_payload_type_from_raw (native.payload_type);

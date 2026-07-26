@@ -459,6 +459,38 @@ void exercise_json_null_rejection() throws MaplibreNative.Error {
     assert(error.message == "feature collection item at index 0 is null");
   }
 
+  MaplibreNative.CoordinateList[] null_lines = new MaplibreNative.CoordinateList[1];
+  try {
+    MaplibreNative.Geometry.multi_line_string(null_lines);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "multi-line string item at index 0 is null");
+  }
+
+  MaplibreNative.Polygon[] null_polygons = new MaplibreNative.Polygon[1];
+  try {
+    MaplibreNative.Geometry.multi_polygon(null_polygons);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "multi-polygon item at index 0 is null");
+  }
+
+  MaplibreNative.Geometry[] null_geometries = new MaplibreNative.Geometry[1];
+  try {
+    MaplibreNative.Geometry.geometry_collection(null_geometries);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "geometry collection item at index 0 is null");
+  }
+
+  MaplibreNative.CoordinateList[] null_rings = new MaplibreNative.CoordinateList[1];
+  try {
+    new MaplibreNative.Polygon(null_rings);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "polygon ring at index 0 is null");
+  }
+
   MaplibreNative.Raw.JsonValue native_array = {};
   native_array.type = (uint32) MaplibreNative.JsonValueType.ARRAY;
   native_array.array_value.value_count = 1;
@@ -483,6 +515,19 @@ void exercise_json_null_rejection() throws MaplibreNative.Error {
 }
 
 void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) throws MaplibreNative.Error {
+  uint8[] embedded_nul_bytes = { 0x61, 0x00, 0x62 };
+  var embedded_nul = new MaplibreNative.Utf8String.from_bytes(embedded_nul_bytes);
+  var string_list = new MaplibreNative.StringList({
+    embedded_nul,
+    new MaplibreNative.Utf8String("second")
+  });
+  assert(string_list.equal(string_list.copy()));
+  var reordered_string_list = new MaplibreNative.StringList({
+    new MaplibreNative.Utf8String("second"),
+    embedded_nul
+  });
+  assert(!string_list.equal(reordered_string_list));
+
   uint8[] prior_data = { 1, 2, 3 };
   MaplibreNative.Raw.ResourceRequest native_request = {};
   native_request.prior_data = prior_data;
@@ -1342,6 +1387,13 @@ int main() {
       map.set_style_url("maplibre://styles/vala-smoke");
     }
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    var lifetime_options = new MaplibreNative.CustomGeometrySourceOptions(fetch_custom_geometry_tile);
+    map.add_custom_geometry_source("transient-custom-geometry", lifetime_options);
+    assert(map.custom_geometry_source_registration_count == 1);
+    map.set_style_url("custom://style.json");
+    assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_STYLE_LOADED, 128));
+    assert(map.custom_geometry_source_registration_count == 0);
+    map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
     map.set_debug_options(MaplibreNative.MapDebugOptions.TILE_BORDERS | MaplibreNative.MapDebugOptions.PARSE_STATUS);
     assert((map.get_debug_options() & MaplibreNative.MapDebugOptions.TILE_BORDERS) != 0);
     map.set_debug_options(MaplibreNative.MapDebugOptions.NONE);
@@ -1387,6 +1439,8 @@ int main() {
 
     uint8[] image_pixels = { 255, 0, 0, 255 };
     var image = new MaplibreNative.PremultipliedRgba8Image(1, 1, 4, image_pixels);
+    image_pixels[0] = 0;
+    assert(image.copy_pixels()[0] == 255);
     var image_options = new MaplibreNative.StyleImageOptions();
     image_options.pixel_ratio = 1.0f;
     image_options.sdf = false;
@@ -1646,6 +1700,9 @@ int main() {
     assert(source_info.equal(source_info.copy()));
     assert(map.copy_style_source_attribution("points") == null);
     assert(map.list_style_source_ids().contains("points"));
+    var source_ids = map.list_style_source_ids();
+    assert(source_ids.equal(source_ids.copy()));
+    assert(source_ids.equal(map.list_style_source_ids()));
     map.set_geojson_source_url("points", "https://example.invalid/updated.geojson");
     assert(map.remove_style_source("points"));
     assert(!map.remove_style_source("points"));
@@ -1990,6 +2047,7 @@ int main() {
 
     if ((backends & MaplibreNative.RenderBackendFlags.METAL) != 0) {
       void* device = create_system_default_metal_device();
+      assert(device != null);
       if (device != null) {
         var texture = new MaplibreNative.MetalOwnedTextureDescriptor(MaplibreNative.NativePointer.borrowed((size_t) device));
         texture.width = 32;

@@ -98,6 +98,10 @@ namespace MaplibreNative {
         public Polygon (CoordinateList[] rings) throws Error {
             this.rings = new CoordinateList[rings.length];
             for (var index = 0; index < rings.length; index++) {
+                if (rings[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("polygon ring at index %d is null", index);
+                }
                 this.rings[index] = rings[index];
             }
         }
@@ -286,7 +290,11 @@ namespace MaplibreNative {
             return new Geometry (geometry, copy_coordinates (coordinates));
         }
 
-        public static Geometry polygon (Polygon polygon) {
+        public static Geometry polygon (Polygon polygon) throws Error {
+            if (polygon == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("polygon geometry is null");
+            }
             Raw.Geometry geometry = {};
             geometry.size = (uint32) sizeof (Raw.Geometry);
             geometry.type = (uint32) GeometryType.POLYGON;
@@ -294,6 +302,12 @@ namespace MaplibreNative {
         }
 
         public static Geometry multi_line_string (CoordinateList[] lines) throws Error {
+            for (var index = 0; index < lines.length; index++) {
+                if (lines[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("multi-line string item at index %d is null", index);
+                }
+            }
             Raw.Geometry geometry = {};
             geometry.size = (uint32) sizeof (Raw.Geometry);
             geometry.type = (uint32) GeometryType.MULTI_LINE_STRING;
@@ -301,6 +315,12 @@ namespace MaplibreNative {
         }
 
         public static Geometry multi_polygon (Polygon[] polygons) throws Error {
+            for (var index = 0; index < polygons.length; index++) {
+                if (polygons[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("multi-polygon item at index %d is null", index);
+                }
+            }
             Raw.Geometry geometry = {};
             geometry.size = (uint32) sizeof (Raw.Geometry);
             geometry.type = (uint32) GeometryType.MULTI_POLYGON;
@@ -308,6 +328,12 @@ namespace MaplibreNative {
         }
 
         public static Geometry geometry_collection (Geometry[] geometries) throws Error {
+            for (var index = 0; index < geometries.length; index++) {
+                if (geometries[index] == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("geometry collection item at index %d is null", index);
+                }
+            }
             Raw.Geometry geometry = {};
             geometry.size = (uint32) sizeof (Raw.Geometry);
             geometry.type = (uint32) GeometryType.GEOMETRY_COLLECTION;
