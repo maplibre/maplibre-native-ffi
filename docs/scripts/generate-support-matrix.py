@@ -26,20 +26,27 @@ from ci.workflow import (  # noqa: E402
 
 PLATFORM_LABELS = {
     "android": "Android",
+    "browser": "Browser",
     "ios": "iOS",
     "linux": "Linux",
     "macos": "macOS",
     "ohos": "OpenHarmony",
     "windows": "Windows",
 }
-BACKEND_LABELS = {"metal": "Metal", "opengl": "OpenGL", "vulkan": "Vulkan"}
-BACKEND_ORDER = ["vulkan", "opengl", "metal"]
+BACKEND_LABELS = {
+    "metal": "Metal",
+    "opengl": "OpenGL",
+    "vulkan": "Vulkan",
+    "webgpu": "WebGPU",
+}
+BACKEND_ORDER = ["vulkan", "opengl", "metal", "webgpu"]
 ENVIRONMENT_ORDER = [
     "linux-x64",
     "linux-arm64",
     "macos-arm64",
     "windows-x64",
     "windows-arm64",
+    "browser-wasm32",
     "android-arm64",
     "android-x64",
     "ios-arm64",
