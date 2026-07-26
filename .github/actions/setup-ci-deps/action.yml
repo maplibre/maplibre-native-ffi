@@ -259,10 +259,10 @@ runs:
         install_runtime: true
 
     # A machine with a Vulkan driver has the loader in System32, where every
-    # process finds it. A runner has it only inside the SDK, so put it on PATH
-    # for the whole job: each binding and example links the shared library that
-    # imports it, and a job-wide entry covers them the way a real machine does.
-    - name: Put the Vulkan loader on PATH
+    # process finds it. A runner can have it only inside the SDK, so expose its
+    # directory to both ordinary processes and runtimes with isolated DLL
+    # search paths, such as Python 3.8+.
+    - name: Expose the Vulkan loader
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
       shell: pwsh
       run: |
@@ -273,16 +273,18 @@ runs:
         # mirrors cmake/render/vulkan.cmake; the PATH fallback mirrors what
         # find_file there resolves on runners that already have the loader.
         $architecture = if ($env:RUNNER_ARCH -eq "ARM64") { "arm64" } else { "x64" }
-        $candidates = @("runtime\$architecture", "Bin", "bin") |
+        $sdkCandidates = @("runtime\$architecture", "Bin", "bin") |
           ForEach-Object { Join-Path $env:VULKAN_SDK $_ }
+        $candidates = @($sdkCandidates) + @($env:Path -split ';')
         $directory = $candidates |
+          Where-Object { $_ } |
           Where-Object { Test-Path (Join-Path $_ "vulkan-1.dll") } |
           Select-Object -First 1
-        if ($directory) {
-          $directory | Out-File -FilePath $env:GITHUB_PATH -Append
-        } elseif (-not (Get-Command vulkan-1.dll -ErrorAction SilentlyContinue)) {
+        if (-not $directory) {
           throw "no vulkan-1.dll in $($candidates -join ', ') or on PATH"
         }
+        $directory | Out-File -FilePath $env:GITHUB_PATH -Append
+        "MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS=$directory" >> $env:GITHUB_ENV
 
     - name: Bootstrap repository
       uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
