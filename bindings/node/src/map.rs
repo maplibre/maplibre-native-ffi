@@ -144,6 +144,12 @@ pub struct StyleSourceInfo {
 }
 
 #[napi(object)]
+pub struct StyleSourceTypeValue {
+    pub kind: String,
+    pub raw_type: u32,
+}
+
+#[napi(object)]
 pub struct TileSourceOptions {
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
@@ -828,7 +834,7 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "getStyleSourceType")]
-    pub fn get_style_source_type(&self, source_id: String) -> Result<Option<String>> {
+    pub fn get_style_source_type(&self, source_id: String) -> Result<Option<StyleSourceTypeValue>> {
         let source_id = core::string::string_view(&source_id);
         let mut raw_type = 0;
         let mut found = false;
@@ -841,7 +847,7 @@ impl NativeMapHandle {
             )
         })
         .map_err(error::from_core)?;
-        Ok(found.then(|| style_source_type_name(raw_type).to_owned()))
+        Ok(found.then(|| style_source_type_from_raw(raw_type)))
     }
 
     #[napi(js_name = "getStyleSourceInfo")]
@@ -2783,6 +2789,13 @@ fn style_source_type_name(raw_type: u32) -> &'static str {
     }
 }
 
+fn style_source_type_from_raw(raw_type: u32) -> StyleSourceTypeValue {
+    StyleSourceTypeValue {
+        kind: style_source_type_name(raw_type).to_owned(),
+        raw_type,
+    }
+}
+
 pub(crate) fn parse_json_value(value: String) -> Result<core::JsonValue> {
     let value: serde_json::Value = serde_json::from_str(&value).map_err(|parse_error| {
         error::invalid_argument(format!("JSON input is invalid: {parse_error}"))
@@ -3049,4 +3062,16 @@ fn json_value_from_serde(value: serde_json::Value) -> Result<core::JsonValue> {
 fn c_string(value: String, field_name: &str) -> Result<CString> {
     CString::new(value)
         .map_err(|_| error::invalid_argument(format!("{field_name} contains an embedded NUL byte")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::style_source_type_from_raw;
+
+    #[test]
+    fn unknown_style_source_type_preserves_raw_value() {
+        let value = style_source_type_from_raw(u32::MAX);
+        assert_eq!(value.kind, "unknown");
+        assert_eq!(value.raw_type, u32::MAX);
+    }
 }

@@ -3,7 +3,11 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" pnpm build
+# Invoke the installed CLI directly because pnpm's Windows ARM64 lifecycle shim
+# cannot reliably resolve executables from node_modules/.bin.
+MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+  node node_modules/@napi-rs/cli/dist/cli.js \
+  build --release --platform --manifest-path Cargo.toml
 '''
 
 [tasks.test]

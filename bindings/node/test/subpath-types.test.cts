@@ -14,6 +14,7 @@ import {
   type MapViewportOptionsInput,
   type StyleImageInfo,
   type StyleImageInput,
+  type StyleSourceTypeValue,
 } from "@maplibre/native-ffi-node/map";
 import { OfflineOperationHandle } from "@maplibre/native-ffi-node/offline";
 import {
@@ -112,6 +113,9 @@ const transformRule: ResourceTransformRule = {
 const readbackBuffer: TextureReadbackBuffer = NativeBuffer.allocate(4);
 declare const runtime: RuntimeHandle;
 declare const map: MapHandle;
+const styleSourceType: StyleSourceTypeValue | null =
+  map.getStyleSourceType("source");
+void styleSourceType?.rawType;
 // @ts-expect-error offline take-result APIs require typed handles, not raw ids.
 runtime.offlineRegionsListTakeResult(1n);
 map.addVectorSourceTiles("source", ["https://example.test/{z}/{x}/{y}"]);

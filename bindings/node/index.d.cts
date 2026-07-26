@@ -987,7 +987,7 @@ export declare class MapHandle {
   styleSourceExists(sourceId: string): boolean;
   removeStyleSource(sourceId: string): boolean;
   listStyleSourceIds(): string[];
-  getStyleSourceType(sourceId: string): StyleSourceType | null;
+  getStyleSourceType(sourceId: string): StyleSourceTypeValue | null;
   getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
   addGeoJsonSourceUrl(sourceId: string, url: string): void;
   addGeoJsonSourceData(sourceId: string, data: JsonValue): void;
@@ -1152,6 +1152,11 @@ export type StyleSourceType =
   | "video"
   | "annotations"
   | "custom-vector";
+
+export interface StyleSourceTypeValue {
+  kind: StyleSourceType;
+  rawType: number;
+}
 
 export interface StyleSourceInfo {
   sourceType: StyleSourceType;

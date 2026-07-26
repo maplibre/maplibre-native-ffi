@@ -1524,7 +1524,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
 
     assert.equal(map.styleSourceExists("empty-geojson"), true);
     assert.equal(map.listStyleSourceIds().includes("empty-geojson"), true);
-    assert.equal(map.getStyleSourceType("empty-geojson"), "geojson");
+    assert.deepEqual(map.getStyleSourceType("empty-geojson"), {
+      kind: "geojson",
+      rawType: 4,
+    });
     assert.equal(
       map.getStyleSourceInfo("empty-geojson")?.sourceType,
       "geojson",
@@ -1549,14 +1552,20 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       ],
     };
     map.addGeoJsonSourceUrl("geojson-url", "https://example.test/data.geojson");
-    assert.equal(map.getStyleSourceType("geojson-url"), "geojson");
+    assert.deepEqual(map.getStyleSourceType("geojson-url"), {
+      kind: "geojson",
+      rawType: 4,
+    });
     map.setGeoJsonSourceUrl(
       "geojson-url",
       "https://example.test/updated.geojson",
     );
     map.setGeoJsonSourceData("geojson-url", geojsonData);
     map.addGeoJsonSourceData("geojson-data", geojsonData);
-    assert.equal(map.getStyleSourceType("geojson-data"), "geojson");
+    assert.deepEqual(map.getStyleSourceType("geojson-data"), {
+      kind: "geojson",
+      rawType: 4,
+    });
     map.addVectorSourceUrl("vector-url", "https://example.test/vector.json", {
       minZoom: 0,
       maxZoom: 14,
@@ -1568,7 +1577,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       },
       vectorEncoding: "mvt",
     });
-    assert.equal(map.getStyleSourceType("vector-url"), "vector");
+    assert.deepEqual(map.getStyleSourceType("vector-url"), {
+      kind: "vector",
+      rawType: 1,
+    });
     map.addStyleSourceJson("vector-empty-attribution", {
       type: "vector",
       tiles: ["https://example.test/{z}/{x}/{y}.pbf"],
@@ -1584,29 +1596,44 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     map.addRasterSourceUrl("raster-url", "https://example.test/raster.json", {
       tileSize: 256,
     });
-    assert.equal(map.getStyleSourceType("raster-url"), "raster");
+    assert.deepEqual(map.getStyleSourceType("raster-url"), {
+      kind: "raster",
+      rawType: 2,
+    });
     map.addRasterDemSourceUrl(
       "raster-dem-url",
       "https://example.test/dem.json",
       { rasterDemEncoding: "mapbox" },
     );
-    assert.equal(map.getStyleSourceType("raster-dem-url"), "raster-dem");
+    assert.deepEqual(map.getStyleSourceType("raster-dem-url"), {
+      kind: "raster-dem",
+      rawType: 3,
+    });
     map.addVectorSourceTiles(
       "vector-tiles",
       ["https://example.test/vector/{z}/{x}/{y}.pbf"],
       { scheme: "tms", vectorEncoding: "mlt" },
     );
-    assert.equal(map.getStyleSourceType("vector-tiles"), "vector");
+    assert.deepEqual(map.getStyleSourceType("vector-tiles"), {
+      kind: "vector",
+      rawType: 1,
+    });
     map.addRasterSourceTiles("raster-tiles", [
       "https://example.test/raster/{z}/{x}/{y}.png",
     ]);
-    assert.equal(map.getStyleSourceType("raster-tiles"), "raster");
+    assert.deepEqual(map.getStyleSourceType("raster-tiles"), {
+      kind: "raster",
+      rawType: 2,
+    });
     map.addRasterDemSourceTiles(
       "raster-dem-tiles",
       ["https://example.test/dem/{z}/{x}/{y}.png"],
       { rasterDemEncoding: "terrarium", tileSize: 512 },
     );
-    assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
+    assert.deepEqual(map.getStyleSourceType("raster-dem-tiles"), {
+      kind: "raster-dem",
+      rawType: 3,
+    });
     assert.throws(
       () =>
         map.addVectorSourceTiles(
@@ -1682,7 +1709,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       imageCoordinates,
       "https://example.test/image.png",
     );
-    assert.equal(map.getStyleSourceType("image-source"), "image");
+    assert.deepEqual(map.getStyleSourceType("image-source"), {
+      kind: "image",
+      rawType: 5,
+    });
     map.setImageSourceUrl("image-source", "https://example.test/updated.png");
     map.setImageSourceImage("image-source", inlineImage);
     map.setImageSourceCoordinates("image-source", imageCoordinates);
@@ -1695,7 +1725,10 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       imageCoordinates,
       inlineImage,
     );
-    assert.equal(map.getStyleSourceType("inline-image-source"), "image");
+    assert.deepEqual(map.getStyleSourceType("inline-image-source"), {
+      kind: "image",
+      rawType: 5,
+    });
     assert.equal(map.getImageSourceCoordinates("missing-source"), null);
     assert.equal(map.removeStyleSource("inline-image-source"), true);
     assert.equal(map.removeStyleSource("image-source"), true);
@@ -1796,7 +1829,10 @@ test("custom geometry callback retention follows current style ownership", async
     );
 
     /** @type {any} */ (map)._releaseDetachedCustomGeometrySources();
-    assert.equal(map.getStyleSourceType("custom-geometry"), "custom-vector");
+    assert.deepEqual(map.getStyleSourceType("custom-geometry"), {
+      kind: "custom-vector",
+      rawType: 8,
+    });
     assert.equal(
       /** @type {any} */ (map)._customGeometrySourceCountForTesting(),
       1,

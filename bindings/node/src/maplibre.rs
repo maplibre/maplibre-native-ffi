@@ -1,7 +1,7 @@
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
 use napi::bindgen_prelude::{BigInt, Env, Result};
@@ -53,11 +53,12 @@ struct NativeLeakReportEntry {
 }
 
 static LOG_CALLBACK: OnceLock<Mutex<Option<Arc<LogCallbackState>>>> = OnceLock::new();
-static LOG_CALLBACK_IDS: AtomicU64 = AtomicU64::new(1);
+static LOG_CALLBACK_UPDATE: OnceLock<Mutex<()>> = OnceLock::new();
+static LOG_CALLBACK_IDS: AtomicUsize = AtomicUsize::new(1);
 static NATIVE_LEAK_REPORTS: OnceLock<Mutex<Vec<NativeLeakReportEntry>>> = OnceLock::new();
 
 struct LogCallbackState {
-    id: u64,
+    id: usize,
     callback: Arc<ThreadsafeFunction<LogRecord>>,
 }
 
@@ -133,19 +134,22 @@ pub fn set_network_status(status: String) -> Result<()> {
 #[napi(js_name = "nativeSetLogCallback")]
 pub fn native_set_log_callback(env: Env, callback: ThreadsafeFunction<LogRecord>) -> Result<()> {
     let state = Arc::new(LogCallbackState {
-        id: LOG_CALLBACK_IDS.fetch_add(1, Ordering::Relaxed),
+        id: next_log_callback_id(),
         callback: Arc::new(callback),
     });
     env.add_env_cleanup_hook(state.id, clear_log_callback_if_current)?;
-    let user_data = Arc::as_ptr(&state).cast_mut().cast::<c_void>();
+    let user_data = std::ptr::without_provenance_mut::<c_void>(state.id);
+    let _update = log_callback_update()
+        .lock()
+        .map_err(|_| error::invalid_argument("log callback update lock is poisoned"))?;
+    maplibre_native_core::check(unsafe {
+        maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), user_data)
+    })
+    .map_err(error::from_core)?;
     let previous = {
         let mut slot = log_callback_slot()
             .lock()
             .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))?;
-        maplibre_native_core::check(unsafe {
-            maplibre_native_sys::mln_log_set_callback(Some(log_trampoline), user_data)
-        })
-        .map_err(error::from_core)?;
         slot.replace(state)
     };
     drop(previous);
@@ -154,11 +158,14 @@ pub fn native_set_log_callback(env: Env, callback: ThreadsafeFunction<LogRecord>
 
 #[napi(js_name = "nativeClearLogCallback")]
 pub fn native_clear_log_callback() -> Result<()> {
+    let _update = log_callback_update()
+        .lock()
+        .map_err(|_| error::invalid_argument("log callback update lock is poisoned"))?;
+    clear_native_log_callback()?;
     let previous = {
         let mut slot = log_callback_slot()
             .lock()
             .map_err(|_| error::invalid_argument("log callback state lock is poisoned"))?;
-        clear_native_log_callback()?;
         slot.take()
     };
     drop(previous);
@@ -215,10 +222,16 @@ extern "C" fn log_trampoline(
         return 0;
     }
 
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        let state_ptr = user_data.cast::<LogCallbackState>();
-        unsafe { Arc::increment_strong_count(state_ptr) };
-        let state = unsafe { Arc::from_raw(state_ptr) };
+    let state = log_callback_slot().lock().ok().and_then(|slot| {
+        slot.as_ref()
+            .filter(|state| state.id == user_data.addr())
+            .cloned()
+    });
+    let Some(state) = state else {
+        return 0;
+    };
+
+    let result = catch_unwind(AssertUnwindSafe(|| {
         state.callback.call(
             Ok(LogRecord {
                 severity: log_severity_name(severity).to_owned(),
@@ -231,7 +244,7 @@ extern "C" fn log_trampoline(
             ThreadsafeFunctionCallMode::NonBlocking,
         );
     }));
-    1
+    u32::from(result.is_ok())
 }
 
 pub(crate) fn report_native_handle_leak(handle_type: &str, address: usize) {
@@ -251,11 +264,32 @@ fn log_callback_slot() -> &'static Mutex<Option<Arc<LogCallbackState>>> {
     LOG_CALLBACK.get_or_init(|| Mutex::new(None))
 }
 
-fn clear_log_callback_if_current(id: u64) {
-    let Ok(mut slot) = log_callback_slot().lock() else {
+fn log_callback_update() -> &'static Mutex<()> {
+    LOG_CALLBACK_UPDATE.get_or_init(|| Mutex::new(()))
+}
+
+fn next_log_callback_id() -> usize {
+    loop {
+        let id = LOG_CALLBACK_IDS.fetch_add(1, Ordering::Relaxed);
+        if id != 0 {
+            return id;
+        }
+    }
+}
+
+fn clear_log_callback_if_current(id: usize) {
+    let Ok(_update) = log_callback_update().lock() else {
         return;
     };
-    if slot.as_ref().is_some_and(|state| state.id == id) && clear_native_log_callback().is_ok() {
+    let is_current = log_callback_slot()
+        .lock()
+        .is_ok_and(|slot| slot.as_ref().is_some_and(|state| state.id == id));
+    if !is_current || clear_native_log_callback().is_err() {
+        return;
+    }
+    if let Ok(mut slot) = log_callback_slot().lock()
+        && slot.as_ref().is_some_and(|state| state.id == id)
+    {
         drop(slot.take());
     }
 }

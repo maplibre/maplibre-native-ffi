@@ -16,6 +16,7 @@ export {
   type StyleImageInput,
   type StyleImageInfo,
   type StyleImage,
+  type StyleSourceTypeValue,
   type StyleSourceInfo,
   type TileSourceOptions,
   type CustomGeometrySourceOptions,
