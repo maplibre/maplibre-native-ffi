@@ -163,7 +163,10 @@ final class CameraFitOptions {
   int get hashCode => Object.hash(padding, bearing, pitch);
 }
 
-/// Map north orientation values.
+/// Open native north-orientation values.
+///
+/// Known values use the named constants. Values added by a newer compatible
+/// native library retain their raw integer through [fromRawValue].
 final class NorthOrientation {
   const NorthOrientation._(this.rawValue, this.name);
 

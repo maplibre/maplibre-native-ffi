@@ -17,9 +17,10 @@ mise run //bindings/dart:ffigen-check
 ```
 
 The test task builds the selected CMake preset, loads the installed native
-library, analyzes the package, and runs the Dart tests. `ffigen-check`
-regenerates the ignored private raw declarations and verifies that the generated
-file is current.
+library, analyzes the package, and runs the Dart tests. The private raw
+declarations are checked in so Git and pub package consumers receive a complete
+library; `ffigen-check` regenerates them separately and verifies that the
+committed file is current.
 
 Applications may set `MLN_FFI_NATIVE_LIBRARY` to an absolute library path.
 Otherwise the loader uses the platform library name and the host's normal

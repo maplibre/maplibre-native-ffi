@@ -1,3 +1,0 @@
-# Keep publish contents independent from .gitignore so generated runtime sources
-# can be included in release archives after ffigen runs.
-.dart_tool/

@@ -23,7 +23,7 @@ sources = [
 outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
 
 [tasks.ffigen-check]
-depends = [":ffigen"]
+depends = [":pub-get"]
 run = """
 mkdir -p .dart_tool
 python3 - <<'PY'
@@ -47,7 +47,7 @@ cmp --silent .dart_tool/maplibre_native_c.check.g.dart lib/src/internal/c/maplib
 run = "dart format lib test"
 
 [tasks.analyze]
-depends = [":ffigen"]
+depends = [":ffigen-check"]
 run = "dart analyze"
 
 [tasks.build]

@@ -148,6 +148,19 @@ void main() {
     expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
   });
 
+  test('north orientation preserves unknown native values', () {
+    final unknown = NorthOrientation.fromRawValue(100);
+    final native = mapViewportOptionsToNative(
+      MapViewportOptions(northOrientation: unknown),
+      MaplibreNativeCApi.open().raw.mln_map_viewport_options_default(),
+    );
+    final copied = mapViewportOptionsFromNative(native);
+
+    expect(unknown.name, 'unknown(100)');
+    expect(native.north_orientation, 100);
+    expect(copied.northOrientation, unknown);
+  });
+
   test('animation options materialize field masks', () {
     final native = animationOptionsToNative(
       const AnimationOptions(
