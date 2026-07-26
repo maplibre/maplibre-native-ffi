@@ -70,6 +70,13 @@ public enum RuntimeEventType : uint
     OfflineOperationCompleted = 22,
 }
 
+/// <param name="MapSource">
+/// The map that raised this event, resolved from the runtime's weak map registry.
+/// Hold your own strong reference to a <see cref="MapHandle" /> for as long as you
+/// want to attribute its events: once the only remaining reference is the runtime's
+/// weak one, the map can be collected and this member is <see langword="null" />
+/// even though <see cref="SourceType" /> still reports a map source.
+/// </param>
 public sealed record RuntimeEvent(
     RuntimeEventType Type,
     uint RawType,
