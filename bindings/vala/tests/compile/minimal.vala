@@ -575,6 +575,14 @@ void exercise_option_value_semantics() {
   source_copy.set_source_layer_ids({ "changed" });
   assert(!source_options.equal(source_copy));
 
+  uint8[] response_source = { 1, 2, 3 };
+  var resource_response = MaplibreNative.ResourceResponse.data(response_source);
+  response_source[0] = 9;
+  assert(resource_response.bytes[0] == 1);
+  var returned_response_bytes = resource_response.bytes;
+  returned_response_bytes[1] = 9;
+  assert(resource_response.bytes[1] == 2);
+
   var tile_source_options = new MaplibreNative.StyleTileSourceOptions();
   assert(tile_source_options.equal(tile_source_options.copy()));
   var tile_source_changed = tile_source_options.copy();
@@ -1649,6 +1657,7 @@ int main() {
         if (source_query_count > 0) {
           var queried_feature = source_query_result[0];
           assert(queried_feature.feature.property_members.length > 0);
+          assert(queried_feature.equal(queried_feature.copy()));
         }
         if (GLib.Environment.get_variable("MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE") == "1") {
           var extension_payload = session.query_feature_extensions("state-source", feature, "supercluster", "children");
@@ -1720,6 +1729,8 @@ int main() {
           borrowed_descriptor.width = 32;
           borrowed_descriptor.height = 16;
           borrowed_descriptor.scale_factor = 1.0;
+          borrowed_descriptor.physical_width = 32;
+          borrowed_descriptor.physical_height = 16;
           var borrowed_session = map.attach_metal_borrowed_texture(borrowed_descriptor);
           map.request_repaint();
           assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 64));

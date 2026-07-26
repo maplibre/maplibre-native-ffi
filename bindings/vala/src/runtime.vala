@@ -123,8 +123,17 @@ namespace MaplibreNative {
         private OfflineOperationKind operation_kind;
         private OfflineOperationResultKind result_kind;
         private bool consumed;
+        private bool consuming;
+        private Mutex state_mutex;
 
-        public bool closed { get { return consumed; } }
+        public bool closed {
+            get {
+                state_mutex.lock ();
+                var value = consumed || consuming;
+                state_mutex.unlock ();
+                return value;
+            }
+        }
 
         internal OfflineOperationHandle (RuntimeHandle runtime, uint64 native_id, OfflineOperationKind operation_kind, OfflineOperationResultKind result_kind) {
             this.runtime = runtime;
@@ -134,7 +143,10 @@ namespace MaplibreNative {
         }
 
         ~OfflineOperationHandle () {
-            if (!consumed) {
+            state_mutex.lock ();
+            var live = !consumed && !consuming;
+            state_mutex.unlock ();
+            if (live) {
                 try {
                     runtime.discard_offline_operation (this);
                 } catch (Error error) {
@@ -144,35 +156,64 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
-            if (consumed) {
+            state_mutex.lock ();
+            var already_closed = consumed;
+            state_mutex.unlock ();
+            if (already_closed) {
                 return;
             }
             runtime.discard_offline_operation (this);
         }
 
-        internal uint64 require_live (RuntimeHandle expected_runtime) throws Error {
-            if (consumed) {
+        internal uint64 begin_consume (RuntimeHandle expected_runtime) throws Error {
+            state_mutex.lock ();
+            if (consumed || consuming) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("offline operation handle is closed");
             }
             if (runtime != expected_runtime) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("offline operation belongs to a different runtime");
             }
+            consuming = true;
+            state_mutex.unlock ();
             return native_id;
         }
 
-        internal uint64 require_result (RuntimeHandle expected_runtime, OfflineOperationKind expected_kind, OfflineOperationResultKind expected_result_kind) throws Error {
-            var value = require_live (expected_runtime);
+        internal uint64 begin_result (RuntimeHandle expected_runtime, OfflineOperationKind expected_kind, OfflineOperationResultKind expected_result_kind) throws Error {
+            state_mutex.lock ();
+            if (consumed || consuming) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("offline operation handle is closed");
+            }
+            if (runtime != expected_runtime) {
+                state_mutex.unlock ();
+                throw new Error.INVALID_STATE ("offline operation belongs to a different runtime");
+            }
             if (operation_kind != expected_kind) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("offline operation has the wrong operation kind");
             }
             if (result_kind != expected_result_kind) {
+                state_mutex.unlock ();
                 throw new Error.INVALID_STATE ("offline operation has the wrong result kind");
             }
-            return value;
+            consuming = true;
+            state_mutex.unlock ();
+            return native_id;
         }
 
-        internal void mark_consumed () {
+        internal void finish_consume () {
+            state_mutex.lock ();
             consumed = true;
+            consuming = false;
+            state_mutex.unlock ();
+        }
+
+        internal void cancel_consume () {
+            state_mutex.lock ();
+            consuming = false;
+            state_mutex.unlock ();
         }
     }
 
@@ -517,9 +558,18 @@ namespace MaplibreNative {
     }
 
     public class ResourceResponse {
+        private uint8[] bytes_storage = new uint8[0];
+
         public ResourceResponseStatus status { get; set; default = ResourceResponseStatus.OK; }
         public ResourceErrorReason error_reason { get; set; default = ResourceErrorReason.NONE; }
-        public uint8[] bytes { get; set; default = new uint8[0]; }
+        public uint8[] bytes {
+            owned get {
+                return copy_byte_array (bytes_storage);
+            }
+            set {
+                bytes_storage = copy_byte_array (value);
+            }
+        }
         public string? error_message { get; set; }
         public bool must_revalidate { get; set; }
         public int64? modified_unix_ms { get; set; }
@@ -549,8 +599,8 @@ namespace MaplibreNative {
             response.size = (uint32) sizeof (Raw.ResourceResponse);
             response.status = (uint32) status;
             response.error_reason = (uint32) error_reason;
-            response.bytes = bytes.length > 0 ? bytes : null;
-            response.byte_count = bytes.length;
+            response.bytes = bytes_storage.length > 0 ? bytes_storage : null;
+            response.byte_count = bytes_storage.length;
             response.error_message = optional_c_string (error_message);
             response.must_revalidate = must_revalidate;
             response.has_modified = modified_unix_ms != null;
@@ -1449,9 +1499,14 @@ namespace MaplibreNative {
 
         public void discard_offline_operation (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_live (this);
-            check_status (Raw.runtime_offline_operation_discard (lease.native, operation_id));
-            operation.mark_consumed ();
+            var operation_id = operation.begin_consume (this);
+            try {
+                check_status (Raw.runtime_offline_operation_discard (lease.native, operation_id));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
         }
 
@@ -1541,10 +1596,15 @@ namespace MaplibreNative {
 
         public OfflineRegionInfo offline_region_create_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
-            check_status (Raw.runtime_offline_region_create_take_result (lease.native, operation_id, out snapshot));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_region_create_take_result (lease.native, operation_id, out snapshot));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region create returned no snapshot");
@@ -1554,11 +1614,16 @@ namespace MaplibreNative {
 
         public OfflineRegionInfo? offline_region_get_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
             Raw.OfflineRegionSnapshot? snapshot;
             bool found;
-            check_status (Raw.runtime_offline_region_get_take_result (lease.native, operation_id, out snapshot, out found));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_region_get_take_result (lease.native, operation_id, out snapshot, out found));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             if (!found || snapshot == null) {
                 return null;
@@ -1568,10 +1633,15 @@ namespace MaplibreNative {
 
         public OfflineRegionInfo[] offline_regions_list_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
-            check_status (Raw.runtime_offline_regions_list_take_result (lease.native, operation_id, out list));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_regions_list_take_result (lease.native, operation_id, out list));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions list returned no list");
@@ -1581,10 +1651,15 @@ namespace MaplibreNative {
 
         public OfflineRegionInfo[] offline_regions_merge_database_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
             Raw.OfflineRegionList? list;
-            check_status (Raw.runtime_offline_regions_merge_database_take_result (lease.native, operation_id, out list));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_regions_merge_database_take_result (lease.native, operation_id, out list));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             if (list == null) {
                 throw new Error.INVALID_STATE ("offline regions merge returned no list");
@@ -1594,10 +1669,15 @@ namespace MaplibreNative {
 
         public OfflineRegionInfo offline_region_update_metadata_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
             Raw.OfflineRegionSnapshot? snapshot;
-            check_status (Raw.runtime_offline_region_update_metadata_take_result (lease.native, operation_id, out snapshot));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_region_update_metadata_take_result (lease.native, operation_id, out snapshot));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             if (snapshot == null) {
                 throw new Error.INVALID_STATE ("offline region metadata update returned no snapshot");
@@ -1607,11 +1687,16 @@ namespace MaplibreNative {
 
         public OfflineRegionStatus offline_region_get_status_take_result (OfflineOperationHandle operation) throws Error {
             var lease = require_live ();
-            var operation_id = operation.require_result (this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
+            var operation_id = operation.begin_result (this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
             Raw.OfflineRegionStatus status = {};
             status.size = (uint32) sizeof (Raw.OfflineRegionStatus);
-            check_status (Raw.runtime_offline_region_get_status_take_result (lease.native, operation_id, &status));
-            operation.mark_consumed ();
+            try {
+                check_status (Raw.runtime_offline_region_get_status_take_result (lease.native, operation_id, &status));
+            } catch (Error error) {
+                operation.cancel_consume ();
+                throw error;
+            }
+            operation.finish_consume ();
             unregister_offline_operation (operation_id);
             return OfflineRegionStatus.from_native (status);
         }

@@ -283,6 +283,24 @@ namespace MaplibreNative {
             }
             return new QueriedFeature (Feature.from_native (native.feature), source_id, source_layer_id, state);
         }
+
+        public QueriedFeature copy () throws Error {
+            return new QueriedFeature (
+                feature.copy (),
+                source_id,
+                source_layer_id,
+                state == null ? null : state.copy ()
+            );
+        }
+
+        public bool equal (QueriedFeature other) {
+            return feature.equal (other.feature)
+                && source_id == other.source_id
+                && source_layer_id == other.source_layer_id
+                && (state == null
+                    ? other.state == null
+                    : other.state != null && state.equal (other.state));
+        }
     }
 
     public class FeatureQueryResultHandle {

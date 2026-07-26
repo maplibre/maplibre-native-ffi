@@ -193,8 +193,10 @@ namespace MaplibreNative {
             Raw.RenderedQueryGeometry native_geometry = geometry.to_native ();
             Raw.RenderedFeatureQueryOptions native_options = {};
             Raw.RenderedFeatureQueryOptions* options_ptr = null;
+            RenderedFeatureQueryOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
@@ -206,8 +208,10 @@ namespace MaplibreNative {
         public QueriedFeature[] query_source_features (string source_id, SourceFeatureQueryOptions? options = null) throws Error {
             Raw.SourceFeatureQueryOptions native_options = {};
             Raw.SourceFeatureQueryOptions* options_ptr = null;
+            SourceFeatureQueryOptions? options_storage = null;
             if (options != null) {
-                native_options = options.to_native ();
+                options_storage = options.copy ();
+                native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
             Raw.FeatureQueryResult result;
@@ -217,11 +221,14 @@ namespace MaplibreNative {
         }
 
         public FeatureExtensionResult query_feature_extensions (string source_id, Feature feature, string extension, string extension_field, JsonValue? arguments = null) throws Error {
-            Raw.Feature native_feature = feature.to_native ();
+            var feature_storage = feature.copy ();
+            Raw.Feature native_feature = feature_storage.to_native ();
             Raw.JsonValue native_arguments = {};
             Raw.JsonValue* arguments_ptr = null;
+            JsonValue? arguments_storage = null;
             if (arguments != null) {
-                native_arguments = arguments.to_native ();
+                arguments_storage = arguments.copy ();
+                native_arguments = arguments_storage.to_native ();
                 arguments_ptr = &native_arguments;
             }
             Raw.FeatureExtensionResult result;
@@ -232,7 +239,8 @@ namespace MaplibreNative {
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
             Raw.FeatureStateSelector native_selector = selector.to_native ();
-            Raw.JsonValue native_state = state.to_native ();
+            var state_storage = state.copy ();
+            Raw.JsonValue native_state = state_storage.to_native ();
             var lease = require_available ();
             check_status (Raw.render_session_set_feature_state (lease.native, &native_selector, &native_state));
         }

@@ -1169,7 +1169,7 @@ namespace MaplibreNative {
             property_value_storage = new JsonValue[properties.length];
             property_value_natives = new Raw.JsonValue[properties.length];
             for (var i = 0; i < properties.length; i++) {
-                property_value_storage[i] = JsonValue.from_native (properties[i].value.to_native ());
+                property_value_storage[i] = properties[i].value.copy ();
                 property_value_natives[i] = property_value_storage[i].to_native ();
                 property_natives[i] = Raw.JsonMember () { key = properties[i].to_native_key (), value = (void*) &property_value_natives[i] };
             }
@@ -1232,7 +1232,7 @@ namespace MaplibreNative {
             native_feature_storage = new Feature[features.length];
             feature_natives = new Raw.Feature[features.length];
             for (var i = 0; i < features.length; i++) {
-                native_feature_storage[i] = Feature.from_native (features[i].to_native ());
+                native_feature_storage[i] = features[i].copy ();
                 feature_natives[i] = native_feature_storage[i].to_native ();
             }
             native = Raw.FeatureCollection () { features = feature_natives, feature_count = feature_natives.length };
@@ -1311,6 +1311,16 @@ namespace MaplibreNative {
 
         public static GeoJson feature_collection (FeatureCollection feature_collection) {
             return new GeoJson.for_feature_collection (feature_collection);
+        }
+
+        public GeoJson copy () throws Error {
+            if (native.type == (uint32) GeoJsonType.FEATURE) {
+                return GeoJson.feature (feature_ref.copy ());
+            }
+            if (native.type == (uint32) GeoJsonType.FEATURE_COLLECTION) {
+                return GeoJson.feature_collection (feature_collection_ref.copy ());
+            }
+            return GeoJson.geometry (geometry_ref.copy ());
         }
 
         internal Raw.GeoJson to_native () throws Error {

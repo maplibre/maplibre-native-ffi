@@ -870,7 +870,8 @@ namespace MaplibreNative {
         }
 
         public void add_geojson_source_data (string source_id, GeoJson data) throws Error {
-            var native_data = data.to_native ();
+            var data_storage = data.copy ();
+            var native_data = data_storage.to_native ();
             check_status (Raw.map_add_geojson_source_data (require_live ().native, string_view (source_id), &native_data));
         }
 
@@ -879,12 +880,14 @@ namespace MaplibreNative {
         }
 
         public void set_geojson_source_data (string source_id, GeoJson data) throws Error {
-            var native_data = data.to_native ();
+            var data_storage = data.copy ();
+            var native_data = data_storage.to_native ();
             check_status (Raw.map_set_geojson_source_data (require_live ().native, string_view (source_id), &native_data));
         }
 
         public void add_style_source_json (string source_id, JsonValue source_json) throws Error {
-            var native_source_json = source_json.to_native ();
+            var source_json_storage = source_json.copy ();
+            var native_source_json = source_json_storage.to_native ();
             check_status (Raw.map_add_style_source_json (require_live ().native, string_view (source_id), &native_source_json));
         }
 
@@ -959,7 +962,8 @@ namespace MaplibreNative {
         }
 
         public void set_custom_geometry_source_tile_data (string source_id, CanonicalTileId tile_id, GeoJson data) throws Error {
-            var native_data = data.to_native ();
+            var data_storage = data.copy ();
+            var native_data = data_storage.to_native ();
             check_status (Raw.map_set_custom_geometry_source_tile_data (require_live ().native, string_view (source_id), tile_id.to_native (), &native_data));
         }
 
@@ -1054,7 +1058,8 @@ namespace MaplibreNative {
         }
 
         public void add_style_layer_json (JsonValue layer_json, string before_layer_id = "") throws Error {
-            var native_layer_json = layer_json.to_native ();
+            var layer_json_storage = layer_json.copy ();
+            var native_layer_json = layer_json_storage.to_native ();
             check_status (Raw.map_add_style_layer_json (require_live ().native, &native_layer_json, string_view (before_layer_id)));
         }
 
@@ -1098,12 +1103,14 @@ namespace MaplibreNative {
         }
 
         public void set_style_light_json (JsonValue light_json) throws Error {
-            var native_light_json = light_json.to_native ();
+            var light_json_storage = light_json.copy ();
+            var native_light_json = light_json_storage.to_native ();
             check_status (Raw.map_set_style_light_json (require_live ().native, &native_light_json));
         }
 
         public void set_style_light_property (string property_name, JsonValue value) throws Error {
-            var native_value = value.to_native ();
+            var value_storage = value.copy ();
+            var native_value = value_storage.to_native ();
             check_status (Raw.map_set_style_light_property (require_live ().native, string_view (property_name), &native_value));
         }
 
@@ -1114,7 +1121,8 @@ namespace MaplibreNative {
         }
 
         public void set_layer_property (string layer_id, string property_name, JsonValue value) throws Error {
-            var native_value = value.to_native ();
+            var value_storage = value.copy ();
+            var native_value = value_storage.to_native ();
             check_status (Raw.map_set_layer_property (require_live ().native, string_view (layer_id), string_view (property_name), &native_value));
         }
 
@@ -1127,8 +1135,10 @@ namespace MaplibreNative {
         public void set_layer_filter (string layer_id, JsonValue? filter = null) throws Error {
             Raw.JsonValue native_filter = {};
             Raw.JsonValue* filter_ptr = null;
+            JsonValue? filter_storage = null;
             if (filter != null) {
-                native_filter = filter.to_native ();
+                filter_storage = filter.copy ();
+                native_filter = filter_storage.to_native ();
                 filter_ptr = &native_filter;
             }
             check_status (Raw.map_set_layer_filter (require_live ().native, string_view (layer_id), filter_ptr));
