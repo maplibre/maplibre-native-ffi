@@ -5,7 +5,9 @@ export {
   OpenGLOwnedTextureFrame,
   NativePointer,
   NativeBuffer,
+  renderTargetExtentPhysicalSize,
   type RenderTargetExtent,
+  type PhysicalSize,
   type MetalContextDescriptor,
   type MetalOwnedTextureDescriptor,
   type MetalBorrowedTextureDescriptor,
@@ -27,4 +29,5 @@ export {
   type RenderedFeatureQueryOptions,
   type SourceFeatureQueryOptions,
   type QueriedFeature,
+  type FeatureExtensionResult,
 } from "./index.cjs";

@@ -4,5 +4,6 @@ export {
   NativePointer,
   OpenGLOwnedTextureFrame,
   RenderSessionHandle,
+  renderTargetExtentPhysicalSize,
   VulkanOwnedTextureFrame,
 } from "./index.mjs";

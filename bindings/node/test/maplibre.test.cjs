@@ -24,6 +24,7 @@ const {
   networkStatus,
   projectedMetersForLatLng,
   restoreDefaultAsyncLogSeverities,
+  renderTargetExtentPhysicalSize,
   RenderSessionHandle,
   RuntimeHandle,
   setAsyncLogSeverities,
@@ -116,6 +117,14 @@ test("process-global APIs cross the native add-on", () => {
   assert.equal(typeof openglProviders.egl, "boolean");
 
   assert.equal(typeof threadLastErrorMessage(), "string");
+  assert.deepEqual(
+    renderTargetExtentPhysicalSize({
+      width: 65,
+      height: 33,
+      scaleFactor: 1.5,
+    }),
+    { width: 98, height: 50 },
+  );
   assert.deepEqual(takeNativeLeakReports(), []);
 
   const original = networkStatus();
@@ -1082,6 +1091,8 @@ test("render session attach descriptors translate native failures", () => {
       () =>
         map.attachMetalBorrowedTexture({
           extent: { width: 16, height: 16, scaleFactor: 1 },
+          physicalWidth: 16,
+          physicalHeight: 16,
           texture: /** @type {any} */ (0n),
         }),
       InvalidArgumentError,
@@ -1150,8 +1161,11 @@ test("map viewport and tile options map descriptor fields", () => {
     });
     const viewport = map.getViewportOptions();
     assert.equal(viewport.northOrientation, "right");
+    assert.equal(viewport.northOrientationRaw, 1);
     assert.equal(viewport.constrainMode, "screen");
+    assert.equal(viewport.constrainModeRaw, 3);
     assert.equal(viewport.viewportMode, "flippedY");
+    assert.equal(viewport.viewportModeRaw, 1);
     assert.deepEqual(viewport.frustumOffset, {
       top: 1,
       left: 2,
@@ -1240,21 +1254,29 @@ test("map camera fitting helpers copy camera and bounds values", () => {
   };
 
   try {
-    const camera = map.cameraForLatLngBounds(bounds);
+    const fitOptions = {
+      padding: { top: 1, left: 2, bottom: 3, right: 4 },
+      bearing: 5,
+      pitch: 6,
+    };
+    const camera = map.cameraForLatLngBounds(bounds, fitOptions);
     assert.equal(typeof camera.zoom, "number");
     assert.equal(typeof camera.center?.latitude, "number");
-    const cameraFromCoordinates = map.cameraForLatLngs([
-      bounds.southwest,
-      bounds.northeast,
-    ]);
+    const cameraFromCoordinates = map.cameraForLatLngs(
+      [bounds.southwest, bounds.northeast],
+      fitOptions,
+    );
     assert.equal(typeof cameraFromCoordinates.zoom, "number");
-    const cameraFromGeometry = map.cameraForGeometry({
-      type: "LineString",
-      coordinates: [
-        [-2, -1],
-        [2, 1],
-      ],
-    });
+    const cameraFromGeometry = map.cameraForGeometry(
+      {
+        type: "LineString",
+        coordinates: [
+          [-2, -1],
+          [2, 1],
+        ],
+      },
+      fitOptions,
+    );
     assert.equal(typeof cameraFromGeometry.zoom, "number");
     const visibleBounds = map.latLngBoundsForCamera(camera);
     const unwrappedBounds = map.latLngBoundsForCameraUnwrapped(camera);
@@ -1467,27 +1489,52 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
     map.setGeoJsonSourceData("geojson-url", geojsonData);
     map.addGeoJsonSourceData("geojson-data", geojsonData);
     assert.equal(map.getStyleSourceType("geojson-data"), "geojson");
-    map.addVectorSourceUrl("vector-url", "https://example.test/vector.json");
+    map.addVectorSourceUrl("vector-url", "https://example.test/vector.json", {
+      minZoom: 0,
+      maxZoom: 14,
+      attribution: "Example",
+      scheme: "xyz",
+      bounds: {
+        southwest: { latitude: -85, longitude: -180 },
+        northeast: { latitude: 85, longitude: 180 },
+      },
+      vectorEncoding: "mvt",
+    });
     assert.equal(map.getStyleSourceType("vector-url"), "vector");
-    map.addRasterSourceUrl("raster-url", "https://example.test/raster.json");
+    map.addRasterSourceUrl("raster-url", "https://example.test/raster.json", {
+      tileSize: 256,
+    });
     assert.equal(map.getStyleSourceType("raster-url"), "raster");
     map.addRasterDemSourceUrl(
       "raster-dem-url",
       "https://example.test/dem.json",
+      { rasterDemEncoding: "mapbox" },
     );
     assert.equal(map.getStyleSourceType("raster-dem-url"), "raster-dem");
-    map.addVectorSourceTiles("vector-tiles", [
-      "https://example.test/vector/{z}/{x}/{y}.pbf",
-    ]);
+    map.addVectorSourceTiles(
+      "vector-tiles",
+      ["https://example.test/vector/{z}/{x}/{y}.pbf"],
+      { scheme: "tms", vectorEncoding: "mlt" },
+    );
     assert.equal(map.getStyleSourceType("vector-tiles"), "vector");
     map.addRasterSourceTiles("raster-tiles", [
       "https://example.test/raster/{z}/{x}/{y}.png",
     ]);
     assert.equal(map.getStyleSourceType("raster-tiles"), "raster");
-    map.addRasterDemSourceTiles("raster-dem-tiles", [
-      "https://example.test/dem/{z}/{x}/{y}.png",
-    ]);
+    map.addRasterDemSourceTiles(
+      "raster-dem-tiles",
+      ["https://example.test/dem/{z}/{x}/{y}.png"],
+      { rasterDemEncoding: "terrarium", tileSize: 512 },
+    );
     assert.equal(map.getStyleSourceType("raster-dem-tiles"), "raster-dem");
+    assert.throws(
+      () =>
+        map.addStyleSourceJson("non-finite", {
+          type: "geojson",
+          data: { type: "Point", coordinates: [Number.NaN, 0] },
+        }),
+      /JSON numbers must be finite/,
+    );
     map.addCustomGeometrySource("custom-geometry", {
       fetchTile() {},
       cancelTile() {},

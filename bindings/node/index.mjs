@@ -22,6 +22,8 @@ export const cVersion = root.cVersion;
 export const supportedRenderBackends = root.supportedRenderBackends;
 export const supportedOpenGLContextProviders =
   root.supportedOpenGLContextProviders;
+export const renderTargetExtentPhysicalSize =
+  root.renderTargetExtentPhysicalSize;
 export const threadLastErrorMessage = root.threadLastErrorMessage;
 export const takeNativeLeakReports = root.takeNativeLeakReports;
 export const networkStatus = root.networkStatus;

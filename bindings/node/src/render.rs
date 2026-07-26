@@ -21,6 +21,24 @@ pub struct RenderTargetExtent {
 }
 
 #[napi(object)]
+pub struct PhysicalSize {
+    pub width: u32,
+    pub height: u32,
+}
+
+#[napi(js_name = "renderTargetExtentPhysicalSize")]
+pub fn render_target_extent_physical_size(extent: RenderTargetExtent) -> Result<PhysicalSize> {
+    let extent = extent.into_native();
+    let mut width = 0;
+    let mut height = 0;
+    core::check(unsafe {
+        sys::mln_render_target_extent_physical_size(&extent, &mut width, &mut height)
+    })
+    .map_err(error::from_core)?;
+    Ok(PhysicalSize { width, height })
+}
+
+#[napi(object)]
 pub struct MetalContextDescriptor {
     pub device_address: Option<BigInt>,
 }
@@ -34,6 +52,8 @@ pub struct MetalOwnedTextureDescriptor {
 #[napi(object)]
 pub struct MetalBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub texture_address: BigInt,
 }
 
@@ -86,6 +106,8 @@ pub struct VulkanOwnedTextureDescriptor {
 #[napi(object)]
 pub struct VulkanBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: VulkanContextDescriptor,
     pub image_address: BigInt,
     pub image_view_address: BigInt,
@@ -110,6 +132,8 @@ pub struct OpenGLOwnedTextureDescriptor {
 #[napi(object)]
 pub struct OpenGLBorrowedTextureDescriptor {
     pub extent: RenderTargetExtent,
+    pub physical_width: u32,
+    pub physical_height: u32,
     pub context: OpenGLContextDescriptor,
     pub texture: u32,
     pub target: u32,
@@ -238,6 +262,8 @@ pub fn create_metal_borrowed_texture_render_session(
 ) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.physical_width = descriptor.physical_width;
+    raw_descriptor.physical_height = descriptor.physical_height;
     raw_descriptor.texture = bigint_to_ptr(&descriptor.texture_address, "textureAddress")?;
     attach_render_session(map, |out_session| unsafe {
         sys::mln_metal_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
@@ -278,6 +304,8 @@ pub fn create_vulkan_borrowed_texture_render_session(
 ) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.physical_width = descriptor.physical_width;
+    raw_descriptor.physical_height = descriptor.physical_height;
     raw_descriptor.context = descriptor.context.into_native()?;
     raw_descriptor.image = bigint_to_ptr(&descriptor.image_address, "imageAddress")?;
     raw_descriptor.image_view = bigint_to_ptr(&descriptor.image_view_address, "imageViewAddress")?;
@@ -323,6 +351,8 @@ pub fn create_opengl_borrowed_texture_render_session(
 ) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
+    raw_descriptor.physical_width = descriptor.physical_width;
+    raw_descriptor.physical_height = descriptor.physical_height;
     raw_descriptor.context = descriptor.context.into_native()?;
     raw_descriptor.texture = descriptor.texture;
     raw_descriptor.target = descriptor.target;
@@ -369,10 +399,14 @@ impl NativeRenderSessionHandle {
     }
 
     #[napi(js_name = "renderUpdate")]
-    pub fn render_update(&self) -> Result<()> {
+    pub fn render_update(&self) -> Result<bool> {
         self.ensure_no_frame_acquired()?;
-        core::check(unsafe { sys::mln_render_session_render_update(self.state.as_ptr()) })
-            .map_err(error::from_core)
+        let mut rendered = false;
+        core::check(unsafe {
+            sys::mln_render_session_render_update(self.state.as_ptr(), &mut rendered)
+        })
+        .map_err(error::from_core)?;
+        Ok(rendered)
     }
 
     #[napi]
@@ -526,12 +560,15 @@ impl NativeRenderSessionHandle {
         let feature = feature_from_geojson_string(feature)?;
         let native_feature =
             core::geojson::feature_try_to_native(&feature, 0).map_err(error::from_core)?;
-        let arguments = arguments
-            .map(parse_json_value)
-            .transpose()?
-            .unwrap_or(core::JsonValue::Object(Vec::new()));
-        let native_arguments =
-            core::json::json_value_try_to_native(&arguments).map_err(error::from_core)?;
+        let arguments = arguments.map(parse_json_value).transpose()?;
+        let native_arguments = arguments
+            .as_ref()
+            .map(core::json::json_value_try_to_native)
+            .transpose()
+            .map_err(error::from_core)?;
+        let native_arguments_ptr = native_arguments
+            .as_ref()
+            .map_or(std::ptr::null(), |arguments| arguments.as_ref());
         let mut result = std::ptr::null_mut();
         core::check(unsafe {
             sys::mln_render_session_query_feature_extensions(
@@ -540,7 +577,7 @@ impl NativeRenderSessionHandle {
                 native_feature.as_ref(),
                 extension.raw(),
                 extension_field.raw(),
-                native_arguments.as_ref(),
+                native_arguments_ptr,
                 &mut result,
             )
         })
@@ -1042,14 +1079,24 @@ fn feature_extension_result_to_string(
     let result =
         unsafe { core::query::copy_feature_extension_result(result) }.map_err(error::from_core)?;
     let value = match result {
-        core::query::FeatureExtensionResult::Value(value) => json_value_to_serde(value),
+        core::query::FeatureExtensionResult::Value(value) => serde_json::json!({
+            "kind": "value",
+            "value": json_value_to_serde(value),
+        }),
         core::query::FeatureExtensionResult::FeatureCollection(features) => {
-            serde_json::Value::Array(features.into_iter().map(feature_to_serde).collect())
+            serde_json::json!({
+                "kind": "featureCollection",
+                "features": features.into_iter().map(feature_to_serde).collect::<Vec<_>>(),
+            })
         }
         core::query::FeatureExtensionResult::Unknown(raw) => serde_json::json!({
-            "unknownType": raw
+            "kind": "unknown",
+            "rawType": raw,
         }),
-        _ => serde_json::Value::Null,
+        _ => serde_json::json!({
+            "kind": "unknown",
+            "rawType": u32::MAX,
+        }),
     };
     serde_json::to_string(&value).map_err(|serialize_error| {
         error::invalid_argument(format!(

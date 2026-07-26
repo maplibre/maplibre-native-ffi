@@ -85,10 +85,20 @@ pub struct EdgeInsets {
 }
 
 #[napi(object)]
+pub struct CameraFitOptions {
+    pub padding: Option<EdgeInsets>,
+    pub bearing: Option<f64>,
+    pub pitch: Option<f64>,
+}
+
+#[napi(object)]
 pub struct MapViewportOptions {
     pub north_orientation: Option<String>,
+    pub north_orientation_raw: Option<u32>,
     pub constrain_mode: Option<String>,
+    pub constrain_mode_raw: Option<u32>,
     pub viewport_mode: Option<String>,
+    pub viewport_mode_raw: Option<u32>,
     pub frustum_offset: Option<EdgeInsets>,
 }
 
@@ -127,6 +137,18 @@ pub struct StyleSourceInfo {
     pub has_attribution: bool,
     pub attribution_size: i64,
     pub attribution: Option<String>,
+}
+
+#[napi(object)]
+pub struct TileSourceOptions {
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub attribution: Option<String>,
+    pub scheme: Option<String>,
+    pub bounds: Option<LatLngBounds>,
+    pub tile_size: Option<u32>,
+    pub vector_encoding: Option<String>,
+    pub raster_dem_encoding: Option<String>,
 }
 
 #[napi(object)]
@@ -528,14 +550,24 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "cameraForLatLngBounds")]
-    pub fn camera_for_lat_lng_bounds(&self, bounds: LatLngBounds) -> Result<CameraOptions> {
+    pub fn camera_for_lat_lng_bounds(
+        &self,
+        bounds: LatLngBounds,
+        fit_options: Option<CameraFitOptions>,
+    ) -> Result<CameraOptions> {
         let bounds = core::values::lat_lng_bounds_to_native(bounds.into_core());
+        let fit_options = fit_options
+            .map(CameraFitOptions::into_core)
+            .map(|options| core::camera::camera_fit_options_to_native(&options));
+        let fit_options_ptr = fit_options
+            .as_ref()
+            .map_or(std::ptr::null(), std::ptr::from_ref);
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_lat_lng_bounds(
                 self.state.as_ptr(),
                 bounds,
-                std::ptr::null(),
+                fit_options_ptr,
                 &mut raw_camera,
             )
         })
@@ -546,15 +578,25 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "cameraForLatLngs")]
-    pub fn camera_for_lat_lngs(&self, coordinates: Vec<LatLng>) -> Result<CameraOptions> {
+    pub fn camera_for_lat_lngs(
+        &self,
+        coordinates: Vec<LatLng>,
+        fit_options: Option<CameraFitOptions>,
+    ) -> Result<CameraOptions> {
         let coordinates = lat_lngs_to_native(coordinates);
+        let fit_options = fit_options
+            .map(CameraFitOptions::into_core)
+            .map(|options| core::camera::camera_fit_options_to_native(&options));
+        let fit_options_ptr = fit_options
+            .as_ref()
+            .map_or(std::ptr::null(), std::ptr::from_ref);
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_lat_lngs(
                 self.state.as_ptr(),
                 coordinates.as_ptr(),
                 coordinates.len(),
-                std::ptr::null(),
+                fit_options_ptr,
                 &mut raw_camera,
             )
         })
@@ -565,16 +607,26 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "cameraForGeometry")]
-    pub fn camera_for_geometry(&self, geometry: String) -> Result<CameraOptions> {
+    pub fn camera_for_geometry(
+        &self,
+        geometry: String,
+        fit_options: Option<CameraFitOptions>,
+    ) -> Result<CameraOptions> {
         let geometry = parse_geometry(geometry)?;
         let native_geometry =
             core::geometry::geometry_try_to_native(&geometry).map_err(error::from_core)?;
+        let fit_options = fit_options
+            .map(CameraFitOptions::into_core)
+            .map(|options| core::camera::camera_fit_options_to_native(&options));
+        let fit_options_ptr = fit_options
+            .as_ref()
+            .map_or(std::ptr::null(), std::ptr::from_ref);
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_geometry(
                 self.state.as_ptr(),
                 native_geometry.as_ref(),
-                std::ptr::null(),
+                fit_options_ptr,
                 &mut raw_camera,
             )
         })
@@ -880,93 +932,165 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "addVectorSourceUrl")]
-    pub fn add_vector_source_url(&self, source_id: String, url: String) -> Result<()> {
+    pub fn add_vector_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_vector_source_url(
                 self.state.as_ptr(),
                 source_id.raw(),
                 url.raw(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addRasterSourceUrl")]
-    pub fn add_raster_source_url(&self, source_id: String, url: String) -> Result<()> {
+    pub fn add_raster_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_source_url(
                 self.state.as_ptr(),
                 source_id.raw(),
                 url.raw(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addRasterDemSourceUrl")]
-    pub fn add_raster_dem_source_url(&self, source_id: String, url: String) -> Result<()> {
+    pub fn add_raster_dem_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_dem_source_url(
                 self.state.as_ptr(),
                 source_id.raw(),
                 url.raw(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addVectorSourceTiles")]
-    pub fn add_vector_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+    pub fn add_vector_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let tiles = StringViews::new(tiles);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_vector_source_tiles(
                 self.state.as_ptr(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addRasterSourceTiles")]
-    pub fn add_raster_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+    pub fn add_raster_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let tiles = StringViews::new(tiles);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_source_tiles(
                 self.state.as_ptr(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addRasterDemSourceTiles")]
-    pub fn add_raster_dem_source_tiles(&self, source_id: String, tiles: Vec<String>) -> Result<()> {
+    pub fn add_raster_dem_source_tiles(
+        &self,
+        source_id: String,
+        tiles: Vec<String>,
+        options: Option<TileSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let tiles = StringViews::new(tiles);
+        let options = options.map(TileSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::tile_source_options_to_native);
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_dem_source_tiles(
                 self.state.as_ptr(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
-                std::ptr::null(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
@@ -1751,16 +1875,47 @@ impl EdgeInsets {
     }
 }
 
+impl CameraFitOptions {
+    fn into_core(self) -> core::camera::CameraFitOptions {
+        let mut options = core::camera::CameraFitOptions::default();
+        options.padding = self.padding.map(EdgeInsets::into_core);
+        options.bearing = self.bearing;
+        options.pitch = self.pitch;
+        options
+    }
+}
+
 impl MapViewportOptions {
     fn into_core(self) -> Result<core::MapViewportOptions> {
         let mut options = core::MapViewportOptions::default();
-        if let Some(value) = self.north_orientation {
+        if self.north_orientation.is_some() && self.north_orientation_raw.is_some() {
+            return Err(error::invalid_argument(
+                "northOrientation and northOrientationRaw are mutually exclusive",
+            ));
+        }
+        if let Some(value) = self.north_orientation_raw {
+            options.north_orientation = Some(core::NorthOrientation::from_raw(value));
+        } else if let Some(value) = self.north_orientation {
             options.north_orientation = Some(north_orientation_from_string(&value)?);
         }
-        if let Some(value) = self.constrain_mode {
+        if self.constrain_mode.is_some() && self.constrain_mode_raw.is_some() {
+            return Err(error::invalid_argument(
+                "constrainMode and constrainModeRaw are mutually exclusive",
+            ));
+        }
+        if let Some(value) = self.constrain_mode_raw {
+            options.constrain_mode = Some(core::ConstrainMode::from_raw(value));
+        } else if let Some(value) = self.constrain_mode {
             options.constrain_mode = Some(constrain_mode_from_string(&value)?);
         }
-        if let Some(value) = self.viewport_mode {
+        if self.viewport_mode.is_some() && self.viewport_mode_raw.is_some() {
+            return Err(error::invalid_argument(
+                "viewportMode and viewportModeRaw are mutually exclusive",
+            ));
+        }
+        if let Some(value) = self.viewport_mode_raw {
+            options.viewport_mode = Some(core::ViewportMode::from_raw(value));
+        } else if let Some(value) = self.viewport_mode {
             options.viewport_mode = Some(viewport_mode_from_string(&value)?);
         }
         if let Some(value) = self.frustum_offset {
@@ -1772,10 +1927,45 @@ impl MapViewportOptions {
     fn from_core(options: core::MapViewportOptions) -> Self {
         Self {
             north_orientation: options.north_orientation.map(north_orientation_name),
+            north_orientation_raw: options
+                .north_orientation
+                .map(core::NorthOrientation::as_raw),
             constrain_mode: options.constrain_mode.map(constrain_mode_name),
+            constrain_mode_raw: options.constrain_mode.map(core::ConstrainMode::as_raw),
             viewport_mode: options.viewport_mode.map(viewport_mode_name),
+            viewport_mode_raw: options.viewport_mode.map(core::ViewportMode::as_raw),
             frustum_offset: options.frustum_offset.map(EdgeInsets::from_core),
         }
+    }
+}
+
+impl TileSourceOptions {
+    fn into_core(self) -> Result<core::style::TileSourceOptions> {
+        let scheme = self
+            .scheme
+            .as_deref()
+            .map(tile_scheme_from_string)
+            .transpose()?;
+        let vector_encoding = self
+            .vector_encoding
+            .as_deref()
+            .map(vector_tile_encoding_from_string)
+            .transpose()?;
+        let raster_dem_encoding = self
+            .raster_dem_encoding
+            .as_deref()
+            .map(raster_dem_encoding_from_string)
+            .transpose()?;
+        let mut options = core::style::TileSourceOptions::default();
+        options.min_zoom = self.min_zoom;
+        options.max_zoom = self.max_zoom;
+        options.attribution = self.attribution;
+        options.scheme = scheme;
+        options.bounds = self.bounds.map(LatLngBounds::into_core);
+        options.tile_size = self.tile_size;
+        options.vector_encoding = vector_encoding;
+        options.raster_dem_encoding = raster_dem_encoding;
+        Ok(options)
     }
 }
 
@@ -2112,6 +2302,36 @@ fn tile_lod_mode_name(value: core::TileLodMode) -> String {
         _ => "unknown",
     }
     .to_owned()
+}
+
+fn tile_scheme_from_string(value: &str) -> Result<core::TileScheme> {
+    match value {
+        "xyz" => Ok(core::TileScheme::Xyz),
+        "tms" => Ok(core::TileScheme::Tms),
+        other => Err(error::invalid_argument(format!(
+            "scheme must be 'xyz' or 'tms', got '{other}'"
+        ))),
+    }
+}
+
+fn vector_tile_encoding_from_string(value: &str) -> Result<core::VectorTileEncoding> {
+    match value {
+        "mvt" => Ok(core::VectorTileEncoding::Mvt),
+        "mlt" => Ok(core::VectorTileEncoding::Mlt),
+        other => Err(error::invalid_argument(format!(
+            "vectorEncoding must be 'mvt' or 'mlt', got '{other}'"
+        ))),
+    }
+}
+
+fn raster_dem_encoding_from_string(value: &str) -> Result<core::RasterDemEncoding> {
+    match value {
+        "mapbox" => Ok(core::RasterDemEncoding::Mapbox),
+        "terrarium" => Ok(core::RasterDemEncoding::Terrarium),
+        other => Err(error::invalid_argument(format!(
+            "rasterDemEncoding must be 'mapbox' or 'terrarium', got '{other}'"
+        ))),
+    }
 }
 
 fn map_mode_from_string(map_mode: &str) -> Result<core::MapMode> {

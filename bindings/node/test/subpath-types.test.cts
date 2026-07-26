@@ -58,6 +58,8 @@ void RuntimeHandle;
 void NativeBuffer;
 const descriptor: MetalBorrowedTextureDescriptor = {
   extent: { width: 1, height: 1, scaleFactor: 1 },
+  physicalWidth: 1,
+  physicalHeight: 1,
   texture: NativePointer.null,
 };
 const geometry: RenderedQueryGeometry = {

@@ -85,6 +85,12 @@ function supportedOpenGLContextProviders() {
   return native.supportedOpenGLContextProviders();
 }
 
+function renderTargetExtentPhysicalSize(extent) {
+  return translateNativeErrors(() =>
+    native.renderTargetExtentPhysicalSize(extent),
+  );
+}
+
 function threadLastErrorMessage() {
   return native.threadLastErrorMessage();
 }
@@ -630,26 +636,7 @@ function takeOfflineOperation(
 }
 
 function translateOfflineOperationResult(result) {
-  if (Array.isArray(result)) {
-    return result.map(translateOfflineRegionInfo);
-  }
-  return translateOfflineRegionInfo(result);
-}
-
-function translateOfflineRegionInfo(region) {
-  if (
-    region?.definition?.kind !== "geometry" ||
-    region.definition.geometry == null
-  ) {
-    return region;
-  }
-  return {
-    ...region,
-    definition: {
-      ...region.definition,
-      geometry: parseJson(region.definition.geometry),
-    },
-  };
+  return result;
 }
 
 function validateByteLength(byteLength) {
@@ -1382,6 +1369,8 @@ function normalizeMetalOwnedTextureDescriptor(descriptor) {
 function normalizeMetalBorrowedTextureDescriptor(descriptor) {
   return {
     extent: descriptor?.extent,
+    physicalWidth: descriptor?.physicalWidth,
+    physicalHeight: descriptor?.physicalHeight,
     textureAddress: nativePointerAddress(descriptor?.texture, "texture"),
   };
 }
@@ -1404,6 +1393,8 @@ function normalizeVulkanOwnedTextureDescriptor(descriptor) {
 function normalizeVulkanBorrowedTextureDescriptor(descriptor) {
   return {
     extent: descriptor?.extent,
+    physicalWidth: descriptor?.physicalWidth,
+    physicalHeight: descriptor?.physicalHeight,
     context: normalizeVulkanContext(descriptor?.context),
     imageAddress: nativePointerAddress(descriptor?.image, "image"),
     imageViewAddress: nativePointerAddress(descriptor?.imageView, "imageView"),
@@ -1431,6 +1422,8 @@ function normalizeOpenGLOwnedTextureDescriptor(descriptor) {
 function normalizeOpenGLBorrowedTextureDescriptor(descriptor) {
   return {
     extent: descriptor?.extent,
+    physicalWidth: descriptor?.physicalWidth,
+    physicalHeight: descriptor?.physicalHeight,
     context: normalizeOpenGLContext(descriptor?.context),
     texture: descriptor?.texture,
     target: descriptor?.target,
@@ -1890,21 +1883,24 @@ class MapHandle {
     );
   }
 
-  cameraForLatLngBounds(bounds) {
+  cameraForLatLngBounds(bounds, fitOptions) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForLatLngBounds(bounds),
+      liveNativeOf(this).cameraForLatLngBounds(bounds, fitOptions ?? null),
     );
   }
 
-  cameraForLatLngs(coordinates) {
+  cameraForLatLngs(coordinates, fitOptions) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForLatLngs(coordinates),
+      liveNativeOf(this).cameraForLatLngs(coordinates, fitOptions ?? null),
     );
   }
 
-  cameraForGeometry(geometry) {
+  cameraForGeometry(geometry, fitOptions) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).cameraForGeometry(stringifyJson(geometry)),
+      liveNativeOf(this).cameraForGeometry(
+        stringifyJson(geometry),
+        fitOptions ?? null,
+      ),
     );
   }
 
@@ -2014,39 +2010,51 @@ class MapHandle {
     );
   }
 
-  addVectorSourceUrl(sourceId, url) {
+  addVectorSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addVectorSourceUrl(sourceId, url),
+      liveNativeOf(this).addVectorSourceUrl(sourceId, url, options ?? null),
     );
   }
 
-  addRasterSourceUrl(sourceId, url) {
+  addRasterSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterSourceUrl(sourceId, url),
+      liveNativeOf(this).addRasterSourceUrl(sourceId, url, options ?? null),
     );
   }
 
-  addRasterDemSourceUrl(sourceId, url) {
+  addRasterDemSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterDemSourceUrl(sourceId, url),
+      liveNativeOf(this).addRasterDemSourceUrl(sourceId, url, options ?? null),
     );
   }
 
-  addVectorSourceTiles(sourceId, tiles) {
+  addVectorSourceTiles(sourceId, tiles, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addVectorSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addVectorSourceTiles(
+        sourceId,
+        Array.from(tiles),
+        options ?? null,
+      ),
     );
   }
 
-  addRasterSourceTiles(sourceId, tiles) {
+  addRasterSourceTiles(sourceId, tiles, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addRasterSourceTiles(
+        sourceId,
+        Array.from(tiles),
+        options ?? null,
+      ),
     );
   }
 
-  addRasterDemSourceTiles(sourceId, tiles) {
+  addRasterDemSourceTiles(sourceId, tiles, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addRasterDemSourceTiles(sourceId, Array.from(tiles)),
+      liveNativeOf(this).addRasterDemSourceTiles(
+        sourceId,
+        Array.from(tiles),
+        options ?? null,
+      ),
     );
   }
 
@@ -2336,7 +2344,23 @@ class MapHandle {
 }
 
 function stringifyJson(value) {
-  const json = JSON.stringify(value);
+  let json;
+  try {
+    json = JSON.stringify(value, (_key, item) => {
+      if (typeof item === "number" && !Number.isFinite(item)) {
+        throw new InvalidArgumentError(null, "JSON numbers must be finite");
+      }
+      return item;
+    });
+  } catch (error) {
+    if (error instanceof InvalidArgumentError) {
+      throw error;
+    }
+    throw new InvalidArgumentError(
+      null,
+      `JSON value is not serializable: ${error.message}`,
+    );
+  }
   if (json === undefined) {
     throw new InvalidArgumentError(
       null,
@@ -2483,6 +2507,7 @@ module.exports = {
   cVersion,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
+  renderTargetExtentPhysicalSize,
   threadLastErrorMessage,
   takeNativeLeakReports,
   networkStatus,
@@ -2517,6 +2542,7 @@ module.exports.cVersion = cVersion;
 module.exports.supportedRenderBackends = supportedRenderBackends;
 module.exports.supportedOpenGLContextProviders =
   supportedOpenGLContextProviders;
+module.exports.renderTargetExtentPhysicalSize = renderTargetExtentPhysicalSize;
 module.exports.threadLastErrorMessage = threadLastErrorMessage;
 module.exports.takeNativeLeakReports = takeNativeLeakReports;
 module.exports.networkStatus = networkStatus;

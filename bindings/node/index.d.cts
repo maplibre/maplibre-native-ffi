@@ -327,15 +327,25 @@ export interface EdgeInsets {
   right: number;
 }
 
+export interface CameraFitOptions {
+  padding?: EdgeInsets | null;
+  bearing?: number | null;
+  pitch?: number | null;
+}
+
 export interface MapViewportOptionsInput {
   northOrientation?: "up" | "right" | "down" | "left" | null;
+  northOrientationRaw?: number | null;
   constrainMode?: "none" | "heightOnly" | "widthAndHeight" | "screen" | null;
+  constrainModeRaw?: number | null;
   viewportMode?: "default" | "flippedY" | null;
+  viewportModeRaw?: number | null;
   frustumOffset?: EdgeInsets | null;
 }
 
 export interface MapViewportOptions {
   northOrientation?: "up" | "right" | "down" | "left" | "unknown" | null;
+  northOrientationRaw?: number | null;
   constrainMode?:
     | "none"
     | "heightOnly"
@@ -343,7 +353,9 @@ export interface MapViewportOptions {
     | "screen"
     | "unknown"
     | null;
+  constrainModeRaw?: number | null;
   viewportMode?: "default" | "flippedY" | "unknown" | null;
+  viewportModeRaw?: number | null;
   frustumOffset?: EdgeInsets | null;
 }
 
@@ -626,6 +638,15 @@ export interface RenderTargetExtent {
   scaleFactor: number;
 }
 
+export interface PhysicalSize {
+  width: number;
+  height: number;
+}
+
+export declare function renderTargetExtentPhysicalSize(
+  extent: RenderTargetExtent,
+): PhysicalSize;
+
 export interface MetalContextDescriptor {
   device?: NativePointer | null;
 }
@@ -637,6 +658,8 @@ export interface MetalOwnedTextureDescriptor {
 
 export interface MetalBorrowedTextureDescriptor {
   extent: RenderTargetExtent;
+  physicalWidth: number;
+  physicalHeight: number;
   texture: NativePointer;
 }
 
@@ -682,6 +705,8 @@ export interface VulkanOwnedTextureDescriptor {
 
 export interface VulkanBorrowedTextureDescriptor {
   extent: RenderTargetExtent;
+  physicalWidth: number;
+  physicalHeight: number;
   context: VulkanContextDescriptor;
   image: NativePointer;
   imageView: NativePointer;
@@ -703,6 +728,8 @@ export interface OpenGLOwnedTextureDescriptor {
 
 export interface OpenGLBorrowedTextureDescriptor {
   extent: RenderTargetExtent;
+  physicalWidth: number;
+  physicalHeight: number;
   context: OpenGLContextDescriptor;
   texture: number;
   target: number;
@@ -809,13 +836,18 @@ export interface QueriedFeature {
   state?: JsonValue | null;
 }
 
+export type FeatureExtensionResult =
+  | { kind: "value"; value: JsonValue }
+  | { kind: "featureCollection"; features: JsonValue[] }
+  | { kind: "unknown"; rawType: number };
+
 export declare class RenderSessionHandle {
   private constructor(nativeHandle: unknown, map: MapHandle);
   readonly map: MapHandle;
   readonly closed: boolean;
   close(): void;
   resize(width: number, height: number, scaleFactor: number): void;
-  renderUpdate(): void;
+  renderUpdate(): boolean;
   detach(): void;
   reduceMemoryUse(): void;
   clearData(): void;
@@ -837,7 +869,7 @@ export declare class RenderSessionHandle {
     extension: string,
     extensionField: string,
     args?: JsonValue | null,
-  ): JsonValue;
+  ): FeatureExtensionResult;
   acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrame;
   acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrame;
   acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrame;
@@ -926,9 +958,18 @@ export declare class MapHandle {
   jumpTo(camera: CameraOptions): void;
   easeTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
   flyTo(camera: CameraOptions, animation?: AnimationOptions | null): void;
-  cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions;
-  cameraForLatLngs(coordinates: LatLng[]): CameraOptions;
-  cameraForGeometry(geometry: JsonValue): CameraOptions;
+  cameraForLatLngBounds(
+    bounds: LatLngBounds,
+    fitOptions?: CameraFitOptions | null,
+  ): CameraOptions;
+  cameraForLatLngs(
+    coordinates: LatLng[],
+    fitOptions?: CameraFitOptions | null,
+  ): CameraOptions;
+  cameraForGeometry(
+    geometry: JsonValue,
+    fitOptions?: CameraFitOptions | null,
+  ): CameraOptions;
   latLngBoundsForCamera(camera: CameraOptions): LatLngBounds;
   latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds;
   pixelForLatLng(coordinate: LatLng): ScreenPoint;
@@ -945,12 +986,36 @@ export declare class MapHandle {
   addGeoJsonSourceData(sourceId: string, data: JsonValue): void;
   setGeoJsonSourceUrl(sourceId: string, url: string): void;
   setGeoJsonSourceData(sourceId: string, data: JsonValue): void;
-  addVectorSourceUrl(sourceId: string, url: string): void;
-  addRasterSourceUrl(sourceId: string, url: string): void;
-  addRasterDemSourceUrl(sourceId: string, url: string): void;
-  addVectorSourceTiles(sourceId: string, tiles: Iterable<string>): void;
-  addRasterSourceTiles(sourceId: string, tiles: Iterable<string>): void;
-  addRasterDemSourceTiles(sourceId: string, tiles: Iterable<string>): void;
+  addVectorSourceUrl(
+    sourceId: string,
+    url: string,
+    options?: TileSourceOptions | null,
+  ): void;
+  addRasterSourceUrl(
+    sourceId: string,
+    url: string,
+    options?: TileSourceOptions | null,
+  ): void;
+  addRasterDemSourceUrl(
+    sourceId: string,
+    url: string,
+    options?: TileSourceOptions | null,
+  ): void;
+  addVectorSourceTiles(
+    sourceId: string,
+    tiles: Iterable<string>,
+    options?: TileSourceOptions | null,
+  ): void;
+  addRasterSourceTiles(
+    sourceId: string,
+    tiles: Iterable<string>,
+    options?: TileSourceOptions | null,
+  ): void;
+  addRasterDemSourceTiles(
+    sourceId: string,
+    tiles: Iterable<string>,
+    options?: TileSourceOptions | null,
+  ): void;
   addCustomGeometrySource(
     sourceId: string,
     options?: CustomGeometrySourceOptions | null,
@@ -1089,6 +1154,17 @@ export interface StyleSourceInfo {
   hasAttribution: boolean;
   attributionSize: number;
   attribution?: string | null;
+}
+
+export interface TileSourceOptions {
+  minZoom?: number | null;
+  maxZoom?: number | null;
+  attribution?: string | null;
+  scheme?: "xyz" | "tms" | null;
+  bounds?: LatLngBounds | null;
+  tileSize?: number | null;
+  vectorEncoding?: "mvt" | "mlt" | null;
+  rasterDemEncoding?: "mapbox" | "terrarium" | null;
 }
 
 export interface CanonicalTileId {
