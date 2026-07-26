@@ -1189,31 +1189,44 @@ test "an ease pumped through rendered frames reports its transition finish once"
 
     var finished_count: usize = 0;
     var last_transition_id: ?u64 = null;
-    var settled_frames: usize = 0;
-    for (0..2000) |_| {
-        try runtime.runOnce();
-        var render_update_available = false;
+    var rendered_frames: usize = 0;
+    var remaining_work: usize = 10_000;
+    var post_finish_empty_drains: usize = 0;
+    pump: while (remaining_work > 0 and rendered_frames < 2000) {
+        var found_event = false;
         while (try runtime.pollEvent(testing.allocator)) |polled| {
+            found_event = true;
+            remaining_work -= 1;
             var event = polled;
             defer event.deinit();
             if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
-                render_update_available = true;
-                continue;
+                try testing.expect(try owned.session.renderUpdate());
+                rendered_frames += 1;
+            } else switch (event.payload) {
+                .camera_transition_finished => |payload| {
+                    try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
+                    finished_count += 1;
+                    last_transition_id = payload.transition_id;
+                },
+                else => {},
             }
-            const payload = switch (event.payload) {
-                .camera_transition_finished => |value| value,
-                else => continue,
-            };
-            try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
-            finished_count += 1;
-            last_transition_id = payload.transition_id;
+            if (remaining_work == 0 or rendered_frames == 2000) break :pump;
         }
-        if (render_update_available) _ = try owned.session.renderUpdate();
+        // easeTo and each completed render can synchronously queue the next
+        // update. Pump native work only after consuming all queued host work;
+        // Darwin's runOnce drains tasks recursively until its queue is empty.
+        if (found_event) {
+            if (finished_count > 0) post_finish_empty_drains = 0;
+            continue;
+        }
         if (finished_count > 0) {
-            settled_frames += 1;
-            if (settled_frames == 100) break;
+            post_finish_empty_drains += 1;
+            // One quiescent native pump after the finish event proves that no
+            // second finish was queued without re-entering an active transition.
+            if (post_finish_empty_drains == 2) break;
         }
-        try testing.io.sleep(.fromMilliseconds(5), .awake);
+        remaining_work -= 1;
+        try runtime.runOnce();
     }
 
     try testing.expectEqual(@as(usize, 1), finished_count);
