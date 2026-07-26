@@ -851,6 +851,40 @@ test("resource provider routes validate Node handoff shape", async () => {
     });
 
     /** @type {any} */
+    let nulErrorHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /** @param {any} _routes @param {(error: any, request: any) => void} callback */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:nul-error",
+                "custom://nul-error",
+              ),
+            );
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        nulErrorHandle = request.handle;
+        throw new Error("provider\0rejected");
+      },
+    );
+    assert.ok(nulErrorHandle);
+    assert.equal(nulErrorHandle.closed, true);
+    assert.deepEqual(completions[3], {
+      completionToken: "resource-request:nul-error",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "provider\uFFFDrejected",
+      },
+    });
+
+    /** @type {any} */
     let mutatedHandle;
     RuntimeHandle.prototype.setResourceProviderRoutes.call(
       {
@@ -878,7 +912,7 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.ok(mutatedHandle);
     assert.equal(mutatedHandle.closed, true);
     assert.equal(mutatedHandle.completionToken, undefined);
-    assert.deepEqual(completions[3], {
+    assert.deepEqual(completions[4], {
       completionToken: "resource-request:5",
       response: {
         status: "error",
@@ -928,7 +962,7 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.equal(invalidResponseHandle.closed, false);
     invalidResponseHandle.complete({ bytes: new Uint8Array([1]) });
     assert.equal(invalidResponseHandle.closed, true);
-    assert.deepEqual(completions[4], {
+    assert.deepEqual(completions[5], {
       completionToken: "resource-request:6",
       response: { bytes: new Uint8Array([1]) },
     });
@@ -1609,7 +1643,11 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       InvalidArgumentError,
     );
     assert.throws(
-      () => map.addCustomGeometrySource("custom-geometry-missing-fetch"),
+      () =>
+        map.addCustomGeometrySource(
+          "custom-geometry-missing-fetch",
+          /** @type {any} */ ({}),
+        ),
       InvalidArgumentError,
     );
     map.setCustomGeometrySourceTileData(
@@ -1840,11 +1878,23 @@ test("map debug options map stable strings to native bitmasks", () => {
   try {
     map.setDebugOptions(["tileBorders", "collision"]);
     assert.deepEqual(map.getDebugOptions(), ["tileBorders", "collision"]);
+    assert.equal(typeof map.getDebugOptionsRawMask(), "number");
     map.setDebugOptions([]);
     assert.deepEqual(map.getDebugOptions(), []);
     assert.throws(
       () => map.setDebugOptions([/** @type {any} */ ("wireframe")]),
       InvalidArgumentError,
+    );
+    assert.equal(
+      MapHandle.prototype.getDebugOptionsRawMask.call({
+        native: {
+          closed: false,
+          getDebugOptionsRaw() {
+            return 0x40000000;
+          },
+        },
+      }),
+      0x40000000,
     );
   } finally {
     map.close();

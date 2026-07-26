@@ -659,7 +659,7 @@ export interface MetalContextDescriptor {
 
 export interface MetalOwnedTextureDescriptor {
   extent: RenderTargetExtent;
-  context: MetalContextDescriptor;
+  context: MetalContextDescriptor & { device: NativePointer };
 }
 
 export interface MetalBorrowedTextureDescriptor {
@@ -928,6 +928,7 @@ export declare class MapHandle {
   isFullyLoaded(): boolean;
   dumpDebugLogs(): void;
   getDebugOptions(): MapDebugOption[];
+  getDebugOptionsRawMask(): number;
   setDebugOptions(options: Iterable<MapDebugOption>): void;
   getViewportOptions(): MapViewportOptions;
   setViewportOptions(options: MapViewportOptionsInput): void;
@@ -1009,22 +1010,22 @@ export declare class MapHandle {
   ): void;
   addVectorSourceTiles(
     sourceId: string,
-    tiles: Iterable<string>,
+    tiles: readonly string[],
     options?: TileSourceOptions | null,
   ): void;
   addRasterSourceTiles(
     sourceId: string,
-    tiles: Iterable<string>,
+    tiles: readonly string[],
     options?: TileSourceOptions | null,
   ): void;
   addRasterDemSourceTiles(
     sourceId: string,
-    tiles: Iterable<string>,
+    tiles: readonly string[],
     options?: TileSourceOptions | null,
   ): void;
   addCustomGeometrySource(
     sourceId: string,
-    options?: CustomGeometrySourceOptions | null,
+    options: CustomGeometrySourceOptions,
   ): void;
   setCustomGeometrySourceTileData(
     sourceId: string,

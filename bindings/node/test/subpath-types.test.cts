@@ -22,6 +22,7 @@ import {
   RenderSessionHandle,
   type FeatureStateSelector,
   type MetalBorrowedTextureDescriptor,
+  type MetalOwnedTextureDescriptor,
   type QueriedFeature,
   type RenderedQueryGeometry,
   type TextureReadbackBuffer,
@@ -110,8 +111,14 @@ const transformRule: ResourceTransformRule = {
 };
 const readbackBuffer: TextureReadbackBuffer = NativeBuffer.allocate(4);
 declare const runtime: RuntimeHandle;
+declare const map: MapHandle;
 // @ts-expect-error offline take-result APIs require typed handles, not raw ids.
 runtime.offlineRegionsListTakeResult(1n);
+map.addVectorSourceTiles("source", ["https://example.test/{z}/{x}/{y}"]);
+// @ts-expect-error tile templates must use the array shape accepted at runtime.
+map.addVectorSourceTiles("source", new Set<string>());
+// @ts-expect-error custom geometry sources require a fetchTile callback.
+map.addCustomGeometrySource("custom");
 // @ts-expect-error prefix replacements require a matched URL prefix.
 const invalidTransformRuleMissingPrefix: ResourceTransformRule = {
   replacementUrlPrefix: "https://example.test/",
@@ -138,6 +145,15 @@ const imageInfo: StyleImageInfo = {
 const customGeometryOptions: CustomGeometrySourceOptions = {
   fetchTile: (tileId) => void tileId.z,
 };
+const metalOwnedTexture: MetalOwnedTextureDescriptor = {
+  extent: { width: 1, height: 1, scaleFactor: 1 },
+  context: { device: NativePointer.null },
+};
+const metalOwnedTextureMissingDevice: MetalOwnedTextureDescriptor = {
+  extent: { width: 1, height: 1, scaleFactor: 1 },
+  // @ts-expect-error owned Metal textures require the device used to create them.
+  context: {},
+};
 const locationIndicatorKind: LocationIndicatorImageKind = "top";
 const featureSelector: FeatureStateSelector = { sourceId: "source" };
 const queriedFeature: QueriedFeature = { feature: { type: "Feature" } };
@@ -162,6 +178,8 @@ void invalidTransformRuleBothReplacements;
 void image;
 void imageInfo;
 void customGeometryOptions;
+void metalOwnedTexture;
+void metalOwnedTextureMissingDevice;
 void locationIndicatorKind;
 void featureSelector;
 void queriedFeature;

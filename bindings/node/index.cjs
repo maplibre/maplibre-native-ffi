@@ -677,10 +677,11 @@ const resourceRequestFinalizer =
     : null;
 
 function resourceProviderErrorResponse(error) {
-  const message =
+  const unsafeMessage =
     error && typeof error.message === "string"
       ? error.message
       : "resource provider callback failed";
+  const message = unsafeMessage.replaceAll("\0", "\uFFFD");
   return {
     status: "error",
     errorReason: "other",
@@ -1804,6 +1805,10 @@ class MapHandle {
     );
   }
 
+  getDebugOptionsRawMask() {
+    return translateNativeErrors(() => liveNativeOf(this).getDebugOptionsRaw());
+  }
+
   setDebugOptions(options) {
     let mask = 0;
     for (const option of options) {
@@ -2127,7 +2132,7 @@ class MapHandle {
     );
   }
 
-  addCustomGeometrySource(sourceId, options = null) {
+  addCustomGeometrySource(sourceId, options) {
     const { fetchTile, cancelTile, ...nativeOptions } = options ?? {};
     if (typeof fetchTile !== "function") {
       throw new InvalidArgumentError(
