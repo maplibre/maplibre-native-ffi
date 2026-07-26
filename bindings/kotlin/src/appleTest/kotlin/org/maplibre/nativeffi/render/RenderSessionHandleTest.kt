@@ -131,6 +131,9 @@ class RenderSessionHandleTest {
             )
           )
         try {
+          val featureCoordinate = LatLng(37.7749, -122.4194)
+          // Rendered box queries clip to the viewport, so put the fixture feature on screen.
+          map.jumpTo(CameraOptions().apply { center = featureCoordinate })
           assertSame(map, session.map())
           assertFailsWith<InvalidStateException> { session.textureImageInfo() }
           assertFailsWith<InvalidStateException> {
@@ -189,7 +192,7 @@ class RenderSessionHandleTest {
             assertEquals(info.byteLength.toInt(), buffer.toByteArray().size)
           }
 
-          val queryPoint = map.pixelForLatLng(LatLng(37.7749, -122.4194))
+          val queryPoint = map.pixelForLatLng(featureCoordinate)
           val queryGeometry =
             RenderedQueryGeometry.Box(
               ScreenBox(
