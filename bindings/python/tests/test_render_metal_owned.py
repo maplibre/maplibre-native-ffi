@@ -179,10 +179,10 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
-def test_render_update_without_pending_update_keeps_session_live(
+def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     metal_owned_session: MetalOwnedSession,
 ) -> None:
-    assert_invalid_state(metal_owned_session.session.render_update)
+    assert metal_owned_session.session.render_update() is False
 
     assert not metal_owned_session.session.closed
     metal_owned_session.session.resize(32, 16, 1.0)

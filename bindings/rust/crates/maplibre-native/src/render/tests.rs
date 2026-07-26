@@ -1218,7 +1218,7 @@ fn load_feature_state_style(
         runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 }
 
 fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
@@ -1379,7 +1379,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
@@ -1435,7 +1435,7 @@ fn opengl_surface_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     #[cfg(target_os = "windows")]
     {
@@ -1466,7 +1466,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -1954,7 +1954,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
 
 #[test]
 // Spec coverage: BND-164.
-fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_live() {
+fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -1964,9 +1964,7 @@ fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_liv
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    let error = session.render_update().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_STATE));
+    assert!(!session.render_update().unwrap());
 
     session.close().unwrap();
     map.close().unwrap();

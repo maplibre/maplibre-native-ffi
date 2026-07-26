@@ -113,10 +113,10 @@ enum MetalRenderTarget {
     }
   }
 
-  func renderUpdate() throws {
+  func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
-      try session.renderUpdate()
+      guard try session.renderUpdate() else { return false }
       let frame = try session.acquireMetalOwnedTextureFrame()
       var firstError: Error?
       do {
@@ -132,11 +132,13 @@ enum MetalRenderTarget {
       if let firstError {
         throw firstError
       }
+      return true
     case let .borrowedTexture(session, compositor, texture):
-      try session.renderUpdate()
+      guard try session.renderUpdate() else { return false }
       try compositor.draw(texture: texture.texture)
+      return true
     case let .nativeSurface(session):
-      try session.renderUpdate()
+      return try session.renderUpdate()
     }
   }
 

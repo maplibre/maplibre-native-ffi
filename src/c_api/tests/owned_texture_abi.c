@@ -27,8 +27,10 @@ static void render_session_rejects_stale_raw_handles(void) {
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
   mln_render_session* stale_session = fixture.session;
   mln_test_render_fixture_destroy(&fixture);
+  bool rendered = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_render_session_render_update(stale_session)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_render_session_render_update(stale_session, &rendered)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_render_session_destroy(stale_session)

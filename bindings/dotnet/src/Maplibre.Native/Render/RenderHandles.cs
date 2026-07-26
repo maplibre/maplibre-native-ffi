@@ -36,7 +36,10 @@ internal unsafe delegate mln_status RenderSessionResize(
     double scaleFactor
 );
 
-internal unsafe delegate mln_status RenderSessionRenderUpdate(mln_render_session* session);
+internal unsafe delegate mln_status RenderSessionRenderUpdate(
+    mln_render_session* session,
+    bool* out_rendered
+);
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
     mln_render_session* session,
@@ -70,8 +73,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         height,
         scaleFactor
     ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
-    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static session =>
-        NativeMethods.mln_render_session_render_update(session);
+    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static (
+        session,
+        outRendered
+    ) => NativeMethods.mln_render_session_render_update(session, outRendered);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
     private static readonly StatusDestroy<mln_render_session> DefaultDestroy = static session =>
@@ -353,10 +358,22 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
     }
 
-    public void RenderUpdate()
+    /// <summary>
+    /// Renders the latest available map render update. The map retains its
+    /// latest update, so repeated calls re-render it and return true again;
+    /// use this to redraw on demand after resize or surface expose, and gate
+    /// frame loops on render-update-available events instead of the return
+    /// value. Returns false when no frame was rendered,
+    /// because the map has not published an update yet or the renderer
+    /// skipped the frame; both are normal during startup, so keep pumping
+    /// the runtime until an update is reported.
+    /// </summary>
+    public bool RenderUpdate()
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
-        NativeStatus.Check(RenderUpdateNative(Pointer));
+        var rendered = false;
+        NativeStatus.Check(RenderUpdateNative(Pointer, &rendered));
+        return rendered;
     }
 
     public void Detach()

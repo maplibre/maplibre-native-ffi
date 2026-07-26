@@ -681,20 +681,32 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	})
 }
 
-// RenderUpdate renders one frame/update into the attached render target.
-func (session *RenderSessionHandle) RenderUpdate() error {
+// RenderUpdate renders the latest available map render update into the
+// attached render target. The map retains its latest update, so repeated
+// calls re-render it and report true again; use this to redraw on demand
+// after resize or surface expose, and gate frame loops on
+// render-update-available events instead of the return value. It reports
+// false when no frame was rendered, because the map has not published an
+// update yet or the renderer skipped the frame; both are normal during
+// startup, so keep pumping the runtime until an update is reported.
+func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return session.withNoAcquiredFrame(func() error {
+	var rendered C.bool
+	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr)), &rendered))
 		})
 	})
+	if err != nil {
+		return false, err
+	}
+	return bool(rendered), nil
 }
 
 // Detach detaches the render target from the session.

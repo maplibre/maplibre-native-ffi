@@ -73,18 +73,20 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<()> {
+    pub fn render_update(&mut self, _graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
             } => {
-                session.render_update()?;
+                if !session.render_update()? {
+                    return Ok(false);
+                }
                 let frame = session.acquire_vulkan_owned_texture_frame()?;
                 let draw_result = compositor.draw(&frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    (Ok(()), Ok(())) => Ok(()),
+                    (Ok(()), Ok(())) => Ok(true),
                     (Err(draw_error), Ok(())) => Err(draw_error),
                     (Ok(()), Err(close_error)) => Err(close_error),
                     (Err(draw_error), Err(close_error)) => Err(Error::new(
@@ -99,10 +101,13 @@ impl RenderTarget {
                 compositor,
                 image,
             } => {
-                session.render_update()?;
+                if !session.render_update()? {
+                    return Ok(false);
+                }
                 compositor.draw_image_view(image.view()).map_err(|error| {
                     compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
-                })
+                })?;
+                Ok(true)
             }
             Self::Surface { session } => session.render_update(),
         }

@@ -405,10 +405,24 @@ public final class RenderSessionHandle {
     }
   }
 
-  public func renderUpdate() throws {
+  /// Renders the latest available map render update.
+  ///
+  /// The map retains its latest update, so repeated calls re-render it and
+  /// return true again; use this to redraw on demand after resize or surface
+  /// expose, and gate frame loops on render-update-available events instead
+  /// of the return value. Returns false when no frame was rendered,
+  /// because the map has not published an update yet or the renderer skipped
+  /// the frame; both are normal during startup, so keep pumping the runtime
+  /// until an update is reported.
+  @discardableResult
+  public func renderUpdate() throws -> Bool {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_render_update(handle
-          .requireLive()))
+      var rendered = false
+      try checkStatus(mln_render_session_render_update(
+        handle.requireLive(),
+        &rendered
+      ))
+      return rendered
     }
   }
 
