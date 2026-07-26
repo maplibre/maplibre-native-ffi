@@ -4,6 +4,7 @@ import java.lang.ref.PhantomReference
 import java.lang.ref.ReferenceQueue
 import java.util.concurrent.ConcurrentHashMap
 import org.maplibre.nativeffi.render.OwnedTextureFrameHandleCore
+import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
 
 /**
  * Reports owner-thread-affine native handles that become unreachable before explicit release.
@@ -39,6 +40,11 @@ internal object HandleLeakCleaner {
   /** Reports [frameCore] when [handle] becomes unreachable before explicit release. */
   fun registerFrame(handle: Any, frameCore: OwnedTextureFrameHandleCore) {
     pending.add(LeakRegistration(handle, queue) { frameCore.reportLeak() })
+  }
+
+  /** Reports [leakReport] when an offline operation becomes unreachable. */
+  fun registerOfflineOperation(handle: Any, leakReport: OfflineOperationLeakReport) {
+    pending.add(LeakRegistration(handle, queue) { leakReport.report() })
   }
 
   private fun drain() {

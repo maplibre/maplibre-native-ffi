@@ -4,6 +4,9 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.runtime.OfflineOperationKind
+import org.maplibre.nativeffi.runtime.OfflineOperationLeakReport
+import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 
 class HandleLeakCleanerTest {
   // BND-044: non-deterministic cleanup hooks report leaked thread-affine handles rather than
@@ -34,6 +37,25 @@ class HandleLeakCleanerTest {
 
     assertTrue(awaitReport(liveReports), "expected the cleaner to run")
     assertEquals(emptyList(), reports)
+  }
+
+  @Test
+  fun unreachableOfflineOperationReportsLeak() {
+    val reports = CopyOnWriteArrayList<String>()
+    val kind = OfflineOperationKind.AMBIENT_CACHE
+    val resultKind = OfflineOperationResultKind.NONE
+
+    HandleLeakCleaner.registerOfflineOperation(
+      Any(),
+      OfflineOperationLeakReport(42L, kind, resultKind, reports::add),
+    )
+
+    assertTrue(awaitReport(reports), "expected the cleaner to report the offline operation")
+    assertEquals(
+      "Leaked OfflineOperationHandle id=42 kind=$kind resultKind=$resultKind; " +
+        "take or discard operations explicitly on the runtime owner thread.",
+      reports.single(),
+    )
   }
 
   /** Registers a handle that is unreachable once this call returns. */

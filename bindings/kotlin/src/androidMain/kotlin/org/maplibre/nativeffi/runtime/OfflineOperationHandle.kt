@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.runtime
 
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 
 /** Owner-thread offline database operation backed by the Android JNI bridge. */
@@ -14,10 +15,12 @@ internal constructor(
 ) : AutoCloseable {
   private val runtimeRetention: HandleStateCore.ChildRetention =
     runtime.retainChild("OfflineOperationHandle")
+  private val leakReport = OfflineOperationLeakReport(id, kind, resultKind)
   private var closed = false
 
   init {
     require(id != 0L) { "offline operation id must not be zero" }
+    HandleLeakCleaner.registerOfflineOperation(this, leakReport)
   }
 
   public actual val isClosed: Boolean
@@ -57,6 +60,7 @@ internal constructor(
   internal fun markConsumed() {
     if (closed) return
     closed = true
+    leakReport.markClosed()
     runtimeRetention.close()
   }
 
