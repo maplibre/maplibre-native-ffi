@@ -662,11 +662,14 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    effective.cluster_properties != nullptr &&
-    !mln::core::validate_style_json_value(effective.cluster_properties)
-  ) {
-    return MLN_STATUS_INVALID_ARGUMENT;
+  if (effective.cluster_properties != nullptr) {
+    if (!mln::core::validate_style_json_value(effective.cluster_properties)) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (effective.cluster_properties->type != MLN_JSON_VALUE_TYPE_OBJECT) {
+      mln::core::set_thread_error("cluster_properties must be a JSON object");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
   }
   return MLN_STATUS_OK;
 }

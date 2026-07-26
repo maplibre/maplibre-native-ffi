@@ -80,6 +80,24 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
     )
   );
 
+  mln_json_value json_null_cluster_properties = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_NULL,
+  };
+  mln_geojson_source_options non_object_cluster_properties =
+    mln_geojson_source_options_default();
+  non_object_cluster_properties.fields =
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  non_object_cluster_properties.cluster_properties =
+    &json_null_cluster_properties;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "json-null-properties", .size = 20}, url,
+      &non_object_cluster_properties
+    )
+  );
+
   // A rejected descriptor leaves the source ID free for a later valid add.
   mln_geojson_source_options clustered = mln_geojson_source_options_default();
   clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
