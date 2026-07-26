@@ -425,6 +425,8 @@ const WglBorrowedTexture = if (supports_wgl) struct {
     pub fn descriptor(self: *const WglBorrowedTexture) maplibre.OpenGLBorrowedTextureDescriptor {
         return .{
             .extent = .{ .width = self.width, .height = self.height },
+            .physical_width = self.width,
+            .physical_height = self.height,
             .context = self.context.descriptor(),
             .texture = self.texture,
             .target = gl.TEXTURE_2D,
@@ -665,6 +667,8 @@ const OpenGLBorrowedTexture = if (supports_wgl) WglBorrowedTexture else if (supp
     pub fn descriptor(self: *const @This()) maplibre.OpenGLBorrowedTextureDescriptor {
         return .{
             .extent = .{ .width = self.width, .height = self.height },
+            .physical_width = self.width,
+            .physical_height = self.height,
             .context = self.context.descriptor(),
             .texture = self.texture,
             .target = gl.TEXTURE_2D,
@@ -1038,6 +1042,8 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
     pub fn descriptor(self: *const VulkanBorrowedImage) maplibre.VulkanBorrowedTextureDescriptor {
         return .{
             .extent = .{ .width = self.width, .height = self.height },
+            .physical_width = self.width,
+            .physical_height = self.height,
             .context = self.context.descriptor(),
             .image = maplibre.NativePointer.fromPtr(@ptrCast(self.image.?)),
             .image_view = maplibre.NativePointer.fromPtr(@ptrCast(self.image_view.?)),
@@ -1497,6 +1503,8 @@ test "unsupported backend owned texture attachment reports unsupported" {
             .context = context,
         }));
         try testing.expectError(error.Unsupported, maplibre.attachOpenGLBorrowedTexture(&map, .{
+            .physical_width = 512,
+            .physical_height = 512,
             .context = context,
             .texture = 1,
             .target = gl_texture_2d,
@@ -1521,11 +1529,15 @@ test "OpenGL texture and surface descriptors validate through public bindings" {
         .context = context,
     }));
     try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
+        .physical_width = 512,
+        .physical_height = 512,
         .context = context,
         .texture = 0,
         .target = gl_texture_2d,
     }));
     try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
+        .physical_width = 512,
+        .physical_height = 512,
         .context = context,
         .texture = 1,
         .target = 0,

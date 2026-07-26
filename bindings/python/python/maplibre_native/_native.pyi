@@ -534,6 +534,9 @@ def expected_c_abi_version() -> int: ...
 def c_version() -> int: ...
 def supported_render_backends_raw() -> int: ...
 def supported_opengl_context_providers_raw() -> int: ...
+def render_target_extent_physical_size(
+    width: int, height: int, scale_factor: float
+) -> tuple[int, int]: ...
 def network_status_raw() -> int: ...
 def set_network_status_raw(raw_status: int) -> None: ...
 def set_network_status_raw_unchecked_for_test(raw_status: int) -> None: ...
@@ -585,7 +588,13 @@ def attach_metal_owned_texture(
     map: _MapHandle, width: int, height: int, scale_factor: float, device_address: int
 ) -> _RenderSessionHandle: ...
 def attach_metal_borrowed_texture(
-    map: _MapHandle, width: int, height: int, scale_factor: float, texture_address: int
+    map: _MapHandle,
+    width: int,
+    height: int,
+    scale_factor: float,
+    physical_width: int,
+    physical_height: int,
+    texture_address: int,
 ) -> _RenderSessionHandle: ...
 def attach_vulkan_owned_texture(
     map: _MapHandle,
@@ -605,6 +614,8 @@ def attach_vulkan_borrowed_texture(
     width: int,
     height: int,
     scale_factor: float,
+    physical_width: int,
+    physical_height: int,
     instance_address: int,
     physical_device_address: int,
     device_address: int,
@@ -646,6 +657,8 @@ def attach_opengl_borrowed_texture(
     width: int,
     height: int,
     scale_factor: float,
+    physical_width: int,
+    physical_height: int,
     context_platform: int,
     context_address_1: int,
     context_address_2: int,

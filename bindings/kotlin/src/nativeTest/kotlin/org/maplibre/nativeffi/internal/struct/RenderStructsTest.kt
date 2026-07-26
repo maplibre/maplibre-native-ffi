@@ -76,11 +76,18 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
 
       val borrowed =
         RenderStructs.metalBorrowedTextureDescriptor(
-            MetalBorrowedTextureDescriptor(extent, NativePointer.ofAddress(0x20L)),
+            MetalBorrowedTextureDescriptor(
+              extent,
+              physicalWidth = 65,
+              physicalHeight = 33,
+              texture = NativePointer.ofAddress(0x20L),
+            ),
             this,
           )
           .pointed
       assertFalse(borrowed.texture == null)
+      assertEquals(65U, borrowed.physical_width)
+      assertEquals(33U, borrowed.physical_height)
 
       val surface =
         RenderStructs.metalSurfaceDescriptor(
@@ -113,6 +120,8 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
         RenderStructs.vulkanBorrowedTextureDescriptor(
             VulkanBorrowedTextureDescriptor(
                 RenderTargetExtent(256, 256, 1.0),
+                65,
+                33,
                 context,
                 NativePointer.ofAddress(0x50L),
                 NativePointer.ofAddress(0x60L),
@@ -167,12 +176,21 @@ class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
 
       val borrowed =
         RenderStructs.openglBorrowedTextureDescriptor(
-            OpenGLBorrowedTextureDescriptor(extent, wglContext, texture = 17, target = 3553),
+            OpenGLBorrowedTextureDescriptor(
+              extent,
+              physicalWidth = 65,
+              physicalHeight = 33,
+              context = wglContext,
+              texture = 17,
+              target = 3553,
+            ),
             this,
           )
           .pointed
       assertEquals(17U, borrowed.texture)
       assertEquals(3553U, borrowed.target)
+      assertEquals(65U, borrowed.physical_width)
+      assertEquals(33U, borrowed.physical_height)
 
       val eglContext =
         EglContextDescriptor(

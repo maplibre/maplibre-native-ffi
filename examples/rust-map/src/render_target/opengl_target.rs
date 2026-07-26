@@ -79,6 +79,8 @@ impl RenderTarget {
         })?;
         let descriptor = OpenGLBorrowedTextureDescriptor::new(
             extent(viewport),
+            viewport.physical_width,
+            viewport.physical_height,
             context,
             texture.texture(),
             texture.target(),

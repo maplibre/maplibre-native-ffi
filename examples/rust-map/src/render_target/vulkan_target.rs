@@ -196,6 +196,8 @@ fn attach_borrowed_texture(
     })?;
     let descriptor = VulkanBorrowedTextureDescriptor::new(
         extent(viewport),
+        viewport.physical_width,
+        viewport.physical_height,
         context_descriptor(vulkan),
         image.image_pointer(),
         image.view_pointer(),

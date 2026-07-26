@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from . import _native
 from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from enum import IntFlag
@@ -143,6 +144,17 @@ class RenderTargetExtent:
     height: int = 256
     scale_factor: float = 1.0
 
+    def physical_size(self) -> tuple[int, int]:
+        """Return the physical device-pixel size as ceil(logical * scale_factor).
+
+        Session-owned texture targets and surface targets are sized this way.
+        Borrowed texture targets state their physical size instead, because not
+        every physical size is reachable from a logical extent.
+        """
+        return _native.render_target_extent_physical_size(
+            self.width, self.height, self.scale_factor
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class MetalContextDescriptor:
@@ -225,7 +237,11 @@ class MetalOwnedTextureDescriptor:
 class MetalBorrowedTextureDescriptor:
     """Metal caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     texture: NativePointer = NativePointer(0)
 
 
@@ -241,7 +257,11 @@ class VulkanOwnedTextureDescriptor:
 class VulkanBorrowedTextureDescriptor:
     """Vulkan caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The image is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     context: VulkanContextDescriptor = VulkanContextDescriptor()
     image: NativePointer = NativePointer(0)
     image_view: NativePointer = NativePointer(0)
@@ -262,7 +282,11 @@ class OpenGLOwnedTextureDescriptor:
 class OpenGLBorrowedTextureDescriptor:
     """OpenGL caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     context: OpenGLContextDescriptor = EglContextDescriptor()
     texture: int = 0
     target: int = 0

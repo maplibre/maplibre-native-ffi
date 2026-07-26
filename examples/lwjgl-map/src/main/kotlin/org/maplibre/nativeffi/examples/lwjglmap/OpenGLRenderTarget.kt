@@ -83,6 +83,8 @@ internal object OpenGLRenderTarget {
       val descriptor =
         OpenGLBorrowedTextureDescriptor(
           MapState.extent(viewport),
+          viewport.framebufferWidth(),
+          viewport.framebufferHeight(),
           descriptor(context),
           texture.texture(),
           texture.target(),

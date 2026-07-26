@@ -23,7 +23,9 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/geojson.hpp>
+#include <mbgl/util/logging.hpp>
 #include <mbgl/util/size.hpp>
+#include <mbgl/util/string.hpp>
 
 #include "render/render_session_common.hpp"
 
@@ -48,6 +50,36 @@ struct OwnedQueriedFeatureDescriptor {
   std::string source_layer_id;
   std::unique_ptr<OwnedJsonDescriptor> state;
 };
+
+auto render_target_extent_physical_size(
+  const mln_render_target_extent* extent, uint32_t* out_width,
+  uint32_t* out_height
+) -> mln_status {
+  if (extent == nullptr) {
+    set_thread_error("extent must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (out_width == nullptr || out_height == nullptr) {
+    set_thread_error("out_width and out_height must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = validate_render_target_extent(
+    *extent, "extent dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto physical_status = validate_physical_size(
+    extent->width, extent->height, extent->scale_factor,
+    "scaled extent dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  *out_width = physical_dimension(extent->width, extent->scale_factor);
+  *out_height = physical_dimension(extent->height, extent->scale_factor);
+  return MLN_STATUS_OK;
+}
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
 #if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
@@ -113,6 +145,8 @@ auto opengl_borrowed_texture_descriptor_default() noexcept
         .height = 256,
         .scale_factor = 1.0,
       },
+    .physical_width = 256,
+    .physical_height = 256,
     .context = opengl_context_descriptor_default(),
     .texture = 0,
     .target = 0,
@@ -848,6 +882,29 @@ auto find_feature_extension_result_locked(
   return found->second.get();
 }
 
+// The map's scale factor is fixed at creation and still selects sprites,
+// glyphs, and raster tiles, while the session's scale factor drives geometry
+// and shaders. A mismatch renders correctly sized geometry against imagery
+// chosen for a different density, so warn instead of failing the call.
+auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
+  constexpr auto tolerance = 1e-6;
+  const auto map_scale_factor = static_cast<double>(
+    mln::core::map_native(map)->getMapOptions().pixelRatio()
+  );
+  if (std::abs(map_scale_factor - scale_factor) <= tolerance) {
+    return;
+  }
+  mbgl::Log::Warning(
+    mbgl::Event::Render,
+    "render target scale_factor " + mbgl::util::toString(scale_factor) +
+      " differs from the map scale_factor " +
+      mbgl::util::toString(map_scale_factor) +
+      "; the map value is fixed at creation and still selects sprites, glyphs, "
+      "and raster tiles, so styled imagery will not match the rendered "
+      "geometry. Create the map with the scale factor you intend to render at."
+  );
+}
+
 }  // namespace
 
 namespace mln::core {
@@ -924,6 +981,7 @@ auto attach_render_session(
   }
   try {
     map_native(map)->setSize(mbgl::Size{session->width, session->height});
+    warn_on_scale_factor_mismatch(map, session->scale_factor);
     session->kind = kind;
     register_render_session(handle, std::move(session));
   } catch (...) {
@@ -990,6 +1048,7 @@ auto render_session_resize(
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
   map_native(session->map)->setSize(mbgl::Size{width, height});
+  warn_on_scale_factor_mismatch(session->map, scale_factor);
   session->renderer.reset();
   session->rendered_generation = 0;
   session->width = width;

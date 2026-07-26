@@ -16,6 +16,18 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun map(): MapHandle
 
+  /**
+   * Resizes this attached render session.
+   *
+   * Surface and owned-texture sessions resize in place. Borrowed texture targets are sized by their
+   * owner and throw `UnsupportedFeatureException`: [close] this session, recreate the texture, and
+   * attach a new session. A map holds at most one attached session, so close before attaching the
+   * replacement.
+   *
+   * Resizing discards the session renderer, so renderer-held state such as feature state does not
+   * survive. Map state such as camera, style, and sources lives on the map and survives both resize
+   * and reattach.
+   */
   public fun resize(width: Int, height: Int, scaleFactor: Double)
 
   /**

@@ -141,8 +141,28 @@ typedef enum mln_map_mode : uint32_t {
 /** Options used when creating a map. */
 typedef struct mln_map_options {
   uint32_t size;
+  /**
+   * Initial logical map width in UI pixels. Must be positive.
+   *
+   * Attaching a render session replaces this with the render target extent, and
+   * mln_render_session_resize() replaces it again. Until the first attach it is
+   * the viewport that camera and projection queries such as
+   * mln_map_camera_for_lat_lng_bounds() and mln_map_pixel_for_lat_lng() are
+   * answered against.
+   */
   uint32_t width;
+  /** Initial logical map height in UI pixels. See width. */
   uint32_t height;
+  /**
+   * UI-to-device pixel scale. Must be positive and finite.
+   *
+   * Unlike width and height, this is fixed for the lifetime of the map and
+   * selects sprites, glyphs, and raster tiles for every frame the map renders.
+   * Render targets carry their own scale factor for geometry and shaders, so
+   * create the map with the scale factor you intend to render at. A render
+   * session attached or resized with a different scale factor logs a warning
+   * and renders styled imagery chosen for the map's density.
+   */
   double scale_factor;
   /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
   uint32_t map_mode;

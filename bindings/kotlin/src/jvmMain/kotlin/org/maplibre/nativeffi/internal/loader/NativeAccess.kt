@@ -255,6 +255,19 @@ internal object NativeAccess {
   internal fun supportedOpenGLContextProviderMask(): Int =
     intFunction("mln_opengl_supported_context_provider_mask").invokeWithArguments() as Int
 
+  internal fun renderTargetExtentPhysicalSize(extent: RenderTargetExtent): Pair<Int, Int> =
+    Arena.ofConfined().use { arena ->
+      val nativeExtent = mln_render_target_extent.allocate(arena)
+      fillRenderTargetExtent(nativeExtent, extent)
+      val outWidth = arena.allocate(ValueLayout.JAVA_INT)
+      val outHeight = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(
+        statusOutFunction("mln_render_target_extent_physical_size")
+          .invokeWithArguments(nativeExtent, outWidth, outHeight) as Int
+      )
+      outWidth.get(ValueLayout.JAVA_INT, 0) to outHeight.get(ValueLayout.JAVA_INT, 0)
+    }
+
   internal fun networkStatus(): Int =
     Arena.ofConfined().use { arena ->
       val outStatus = arena.allocate(ValueLayout.JAVA_INT)
@@ -2201,6 +2214,8 @@ internal object NativeAccess {
         mln_metal_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_metal_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_metal_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       mln_metal_borrowed_texture_descriptor.texture(segment, nativePointer(descriptor.texture))
     }
   }
@@ -2222,6 +2237,8 @@ internal object NativeAccess {
         mln_vulkan_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_vulkan_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_vulkan_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillVulkanContext(mln_vulkan_borrowed_texture_descriptor.context(segment), descriptor.context)
       mln_vulkan_borrowed_texture_descriptor.image(segment, nativePointer(descriptor.image))
       mln_vulkan_borrowed_texture_descriptor.image_view(
@@ -2253,6 +2270,8 @@ internal object NativeAccess {
         mln_opengl_borrowed_texture_descriptor.extent(segment),
         descriptor.extent,
       )
+      mln_opengl_borrowed_texture_descriptor.physical_width(segment, descriptor.physicalWidth)
+      mln_opengl_borrowed_texture_descriptor.physical_height(segment, descriptor.physicalHeight)
       fillOpenGLContext(mln_opengl_borrowed_texture_descriptor.context(segment), descriptor.context)
       mln_opengl_borrowed_texture_descriptor.texture(segment, descriptor.texture)
       mln_opengl_borrowed_texture_descriptor.target(segment, descriptor.target)

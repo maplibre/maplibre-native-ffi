@@ -1,3 +1,8 @@
+using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Loader;
+using Maplibre.Native.Internal.Status;
+using Maplibre.Native.Internal.Struct;
+
 namespace Maplibre.Native.Render;
 
 public enum RenderMode : uint
@@ -25,7 +30,26 @@ public enum OpenGLContextProvider : uint
     Egl = 1u << 1,
 }
 
-public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor);
+public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor)
+{
+    /// <summary>
+    /// Returns the physical device-pixel size as ceil(logical * <see cref="ScaleFactor"/>) per
+    /// dimension. Session-owned texture targets and surface targets are sized this way. Borrowed
+    /// texture targets state their physical size instead, because not every physical size is
+    /// reachable from a logical extent.
+    /// </summary>
+    public unsafe (uint Width, uint Height) PhysicalSize()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        var native = RenderStructs.ToNative(this);
+        uint width;
+        uint height;
+        NativeStatus.Check(
+            NativeMethods.mln_render_target_extent_physical_size(&native, &width, &height)
+        );
+        return (width, height);
+    }
+}
 
 public readonly record struct TextureImageInfo(
     uint Width,
@@ -126,6 +150,13 @@ public sealed class MetalOwnedTextureDescriptor
 public sealed class MetalBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical texture size in device pixels. The texture is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public NativePointer Texture { get; set; }
 }
 
@@ -138,6 +169,13 @@ public sealed class VulkanOwnedTextureDescriptor
 public sealed class VulkanBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical image size in device pixels. The image is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public NativePointer Image { get; set; }
     public NativePointer ImageView { get; set; }
     public VulkanContextDescriptor? Context { get; set; }
@@ -155,6 +193,13 @@ public sealed class OpenGLOwnedTextureDescriptor
 public sealed class OpenGLBorrowedTextureDescriptor
 {
     public RenderTargetExtent Extent { get; set; }
+
+    /// <summary>
+    /// Physical texture size in device pixels. The texture is sized by its owner, so this is
+    /// stated rather than derived from <see cref="Extent"/>.
+    /// </summary>
+    public uint PhysicalWidth { get; set; }
+    public uint PhysicalHeight { get; set; }
     public OpenGLContextDescriptor? Context { get; set; }
     public uint Texture { get; set; }
     public uint Target { get; set; }

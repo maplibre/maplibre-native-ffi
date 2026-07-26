@@ -46,8 +46,17 @@ func (options MapDebugOptions) Has(requested MapDebugOptions) bool {
 
 // MapOptions configures map creation.
 type MapOptions struct {
-	Width       uint32
-	Height      uint32
+	// Width is the initial logical width in UI pixels, replaced by the extent of
+	// the first attached render session.
+	Width uint32
+	// Height is the initial logical height in UI pixels, replaced by the extent
+	// of the first attached render session.
+	Height uint32
+	// ScaleFactor is the UI-to-device pixel scale, fixed for the lifetime of the
+	// map. It selects sprites, glyphs, and raster tiles for every frame. Render
+	// targets carry their own scale factor for geometry, so attaching or
+	// resizing a session with a different one logs a warning and renders styled
+	// imagery chosen for this density.
 	ScaleFactor float64
 	Mode        MapMode
 }

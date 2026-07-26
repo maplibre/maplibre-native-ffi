@@ -236,6 +236,8 @@ struct NativeMetalOwnedTextureDescriptorInput: Equatable {
 
 struct NativeMetalBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
+  let physicalWidth: UInt32
+  let physicalHeight: UInt32
   let textureAddress: UInt
 
   func withNativeDescriptor<Result>(
@@ -244,6 +246,8 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable {
   ) throws -> Result {
     var descriptor = mln_metal_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
+    descriptor.physical_width = physicalWidth
+    descriptor.physical_height = physicalHeight
     descriptor.texture = UnsafeMutableRawPointer(bitPattern: textureAddress)
     return try withUnsafePointer(to: &descriptor, body)
   }
@@ -266,6 +270,8 @@ struct NativeVulkanOwnedTextureDescriptorInput: Equatable {
 
 struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
+  let physicalWidth: UInt32
+  let physicalHeight: UInt32
   let context: NativeVulkanContextDescriptor
   let imageAddress: UInt
   let imageViewAddress: UInt
@@ -279,6 +285,8 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable {
   ) throws -> Result {
     var descriptor = mln_vulkan_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
+    descriptor.physical_width = physicalWidth
+    descriptor.physical_height = physicalHeight
     descriptor.context = context.native
     descriptor.image = UnsafeMutableRawPointer(bitPattern: imageAddress)
     descriptor
@@ -307,6 +315,8 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable {
 
 struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
   let extent: NativeRenderTargetExtent
+  let physicalWidth: UInt32
+  let physicalHeight: UInt32
   let context: NativeOpenGLContextDescriptor
   let texture: UInt32
   let target: UInt32
@@ -317,6 +327,8 @@ struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable {
   ) throws -> Result {
     var descriptor = mln_opengl_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
+    descriptor.physical_width = physicalWidth
+    descriptor.physical_height = physicalHeight
     descriptor.context = context.native
     descriptor.texture = texture
     descriptor.target = target

@@ -362,6 +362,8 @@ class VulkanBorrowedImage:
                 self.height,
                 self.scale_factor,
             ),
+            physical_width=self.width,
+            physical_height=self.height,
             context=self.context.descriptor(),
             image=_pointer(self.image, "VkImage"),
             image_view=_pointer(self.image_view, "VkImageView"),

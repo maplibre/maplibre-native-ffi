@@ -157,6 +157,26 @@ pub const RenderTargetExtent = struct {
     width: u32 = 512,
     height: u32 = 512,
     scale_factor: f64 = 1.0,
+
+    /// Returns the physical device-pixel size as `ceil(logical * scale_factor)`
+    /// per dimension.
+    ///
+    /// Session-owned texture targets and surface targets are sized this way.
+    /// Borrowed texture targets state their physical size instead, because not
+    /// every physical size is reachable from a logical extent.
+    pub fn physicalSize(
+        self: RenderTargetExtent,
+        diagnostic_store: ?*diagnostics.DiagnosticStore,
+    ) status.Error!struct { width: u32, height: u32 } {
+        const raw = renderTargetExtentToNative(self);
+        var width: u32 = 0;
+        var height: u32 = 0;
+        try status.checkStatus(
+            c.mln_render_target_extent_physical_size(&raw, &width, &height),
+            diagnostic_store,
+        );
+        return .{ .width = width, .height = height };
+    }
 };
 
 pub const MetalContextDescriptor = struct {
@@ -198,6 +218,10 @@ pub const MetalOwnedTextureDescriptor = struct {
 
 pub const MetalBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     texture: NativePointer,
 };
 
@@ -208,6 +232,10 @@ pub const VulkanOwnedTextureDescriptor = struct {
 
 pub const VulkanBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical image size in device pixels. The image is sized by its owner,
+    /// so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     context: VulkanContextDescriptor,
     image: NativePointer,
     image_view: NativePointer,
@@ -223,6 +251,10 @@ pub const OpenGLOwnedTextureDescriptor = struct {
 
 pub const OpenGLBorrowedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
+    /// Physical texture size in device pixels. The texture is sized by its
+    /// owner, so this is stated rather than derived from `extent`.
+    physical_width: u32,
+    physical_height: u32,
     context: OpenGLContextDescriptor,
     texture: u32,
     target: u32,
@@ -395,6 +427,17 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
 pub const RenderSessionHandle = enum(u128) {
     _,
 
+    /// Resizes this attached render session.
+    ///
+    /// Surface and owned-texture sessions resize in place. Borrowed texture
+    /// targets are sized by their owner and return `error.Unsupported`: close
+    /// this session, recreate the texture, and attach a new session. A map
+    /// holds at most one attached session, so close before attaching the
+    /// replacement.
+    ///
+    /// Resizing discards the session renderer, so renderer-held state such as
+    /// feature state does not survive. Map state such as camera, style, and
+    /// sources lives on the map and survives both resize and reattach.
     pub fn resize(self: *RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
@@ -868,6 +911,8 @@ pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwne
 pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.texture = descriptor.texture.toPtr();
     return try attach(map, c.mln_metal_borrowed_texture_attach, &raw);
 }
@@ -882,6 +927,8 @@ pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOw
 pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.context = vulkanContextToNative(descriptor.context);
     raw.image = descriptor.image.toPtr();
     raw.image_view = descriptor.image_view.toPtr();
@@ -901,6 +948,8 @@ pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOw
 pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_opengl_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.physical_width = descriptor.physical_width;
+    raw.physical_height = descriptor.physical_height;
     raw.context = openglContextToNative(descriptor.context);
     raw.texture = descriptor.texture;
     raw.target = descriptor.target;
