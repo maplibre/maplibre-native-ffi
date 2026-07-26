@@ -362,10 +362,11 @@ impl MapHandle {
 
     /// Applies a camera fly transition command.
     ///
-    /// Fly is the one camera command that animates by default: an absent
-    /// `animation`, or an animation with no duration, derives a duration from a
-    /// default velocity of 1.2 screenfuls per second, so the camera is still en
-    /// route when this call returns and advances as the runtime is pumped.
+    /// Fly is the one camera command that animates by default. When duration is
+    /// absent, native derives it from `AnimationOptions::velocity`; when
+    /// velocity is absent too, native defaults to 1.2 screenfuls per second.
+    /// The camera is therefore still en route when this call returns and
+    /// advances as the runtime is pumped.
     pub fn fly_to(
         &self,
         camera: &CameraOptions,

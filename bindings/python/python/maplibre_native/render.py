@@ -441,7 +441,7 @@ class RenderSessionHandle(NativeHandleMixin):
             msg = "RenderSessionHandle instances are created by MapHandle"
             raise TypeError(msg)
         self._native = native
-        self._map = map_handle
+        self._map: MapHandle | None = map_handle
 
     @classmethod
     def _from_native(cls, native: Any, map_handle: MapHandle) -> "RenderSessionHandle":
@@ -477,7 +477,11 @@ class RenderSessionHandle(NativeHandleMixin):
         suits the host; it stays destroyable after the map closes because a
         detached session no longer reaches its map.
         """
-        return DetachedRenderSessionHandle._from_native(self._native.detach())  # noqa: SLF001
+        native = self._native.detach()
+        # The original wrapper can remain observable through `detached`, but it
+        # no longer retains the map after native detach succeeds.
+        self._map = None
+        return DetachedRenderSessionHandle._from_native(native)  # noqa: SLF001
 
     def reduce_memory_use(self) -> None:
         """Ask the session renderer to release cached resources where possible."""
