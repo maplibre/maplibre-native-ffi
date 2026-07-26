@@ -19,7 +19,11 @@ const (
 	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 )
 
-// ScreenBox is a screen-space query rectangle.
+// ScreenBox is a screen-space query rectangle in logical map pixels.
+//
+// Corners may be given in any order, and may extend past the viewport. Rendered
+// queries normalize the corners and clip the box to the viewport, so a box that
+// over-covers the viewport queries everything visible.
 type ScreenBox struct {
 	Min ScreenPoint
 	Max ScreenPoint

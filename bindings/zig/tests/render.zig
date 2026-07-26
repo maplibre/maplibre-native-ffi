@@ -1320,6 +1320,51 @@ test "render session queries rendered and source features" {
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
 }
 
+test "render session clips rendered box queries to the viewport" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{});
+    defer owned.close() catch {};
+    const session = &owned.session;
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try session.renderUpdate();
+
+    const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
+
+    // Over-covering the viewport is the obvious way to ask for everything on
+    // screen, and must answer like the viewport itself.
+    var oversized = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
+        .min = .{ .x = -8192, .y = -8192 },
+        .max = .{ .x = 8192, .y = 8192 },
+    } }, options);
+    defer oversized.deinit();
+    try expectFeaturePropertyString(&oversized.features[0], "kind", "capital");
+
+    // Corners in either order describe the same box.
+    var inverted = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
+        .min = .{ .x = 8192, .y = 8192 },
+        .max = .{ .x = -8192, .y = -8192 },
+    } }, options);
+    defer inverted.deinit();
+    try testing.expectEqual(@as(usize, 1), inverted.features.len);
+
+    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
+    // a viewport edge.
+    var offscreen = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
+        .min = .{ .x = 2048, .y = 2048 },
+        .max = .{ .x = 4096, .y = 4096 },
+    } }, options);
+    defer offscreen.deinit();
+    try testing.expectEqual(@as(usize, 0), offscreen.features.len);
+}
+
 test "render session queries cluster feature extensions" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
