@@ -2503,6 +2503,24 @@ auto find_runtime_for_platform_context(void* platform_context) noexcept
   return runtime_registry().contains(runtime) ? runtime : nullptr;
 }
 
+auto has_resource_transform_for_platform_context(
+  void* platform_context
+) noexcept -> bool {
+  if (platform_context == nullptr) {
+    return false;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  // The registry lock stays held across the read: releasing it first would
+  // leave an unowned pointer, and this locks a mutex inside the runtime.
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    return false;
+  }
+  const std::shared_lock transform_lock(runtime->resource_transform_mutex);
+  return runtime->resource_transform_callback != nullptr;
+}
+
 auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,
   std::string& out_replacement_url

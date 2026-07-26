@@ -203,6 +203,11 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions;
 auto find_runtime_for_platform_context(void* platform_context) noexcept
   -> mln_runtime*;
+// Reads resource transform presence under the registry lock, so MapLibre-owned
+// threads observe a value instead of a runtime pointer teardown may retire.
+auto has_resource_transform_for_platform_context(
+  void* platform_context
+) noexcept -> bool;
 auto push_runtime_map_event(
   mln_runtime* runtime, mln_map* map, uint32_t type, int32_t code = 0,
   const char* message = nullptr
