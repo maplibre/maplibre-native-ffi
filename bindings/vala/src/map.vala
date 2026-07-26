@@ -406,7 +406,7 @@ namespace MaplibreNative {
         }
 
         private void retain_custom_geometry_source (CustomGeometrySourceRegistration registration) {
-            string source_id = registration.source_id;
+            Utf8String source_id = registration.source_id;
             release_custom_geometry_source (source_id);
             var retained = new CustomGeometrySourceRegistration[custom_geometry_sources.length + 1];
             for (var index = 0; index < custom_geometry_sources.length; index++) {
@@ -416,18 +416,18 @@ namespace MaplibreNative {
             custom_geometry_sources = retained;
         }
 
-        private void release_custom_geometry_source (string source_id) {
+        private void release_custom_geometry_source (Utf8String source_id) {
             CustomGeometrySourceRegistration? released = null;
             uint retained_count = 0;
             for (var index = 0; index < custom_geometry_sources.length; index++) {
-                if (custom_geometry_sources[index].source_id != source_id) {
+                if (!custom_geometry_sources[index].source_id.equal (source_id)) {
                     retained_count++;
                 }
             }
             var retained = new CustomGeometrySourceRegistration[retained_count];
             uint output_index = 0;
             for (var index = 0; index < custom_geometry_sources.length; index++) {
-                if (custom_geometry_sources[index].source_id != source_id) {
+                if (!custom_geometry_sources[index].source_id.equal (source_id)) {
                     retained[output_index++] = custom_geometry_sources[index];
                 } else {
                     released = custom_geometry_sources[index];
@@ -693,7 +693,8 @@ namespace MaplibreNative {
         }
 
         public CameraOptions camera_for_geometry (Geometry geometry, CameraFitOptions? fit_options = null) throws Error {
-            Raw.Geometry native_geometry = geometry.to_native ();
+            var geometry_storage = geometry.copy ();
+            Raw.Geometry native_geometry = geometry_storage.to_native ();
             Raw.CameraFitOptions native_fit_options = {};
             Raw.CameraFitOptions* fit_options_ptr = null;
             if (fit_options != null) {
@@ -866,118 +867,203 @@ namespace MaplibreNative {
         }
 
         public void add_geojson_source_url (string source_id, string url) throws Error {
-            check_status (Raw.map_add_geojson_source_url (require_live ().native, string_view (source_id), string_view (url)));
+            add_geojson_source_url_utf8 (new Utf8String (source_id), new Utf8String (url));
+        }
+
+        public void add_geojson_source_url_utf8 (Utf8String source_id, Utf8String url) throws Error {
+            check_status (Raw.map_add_geojson_source_url (require_live ().native, source_id.to_native (), url.to_native ()));
         }
 
         public void add_geojson_source_data (string source_id, GeoJson data) throws Error {
+            add_geojson_source_data_utf8 (new Utf8String (source_id), data);
+        }
+
+        public void add_geojson_source_data_utf8 (Utf8String source_id, GeoJson data) throws Error {
             var data_storage = data.copy ();
             var native_data = data_storage.to_native ();
-            check_status (Raw.map_add_geojson_source_data (require_live ().native, string_view (source_id), &native_data));
+            check_status (Raw.map_add_geojson_source_data (require_live ().native, source_id.to_native (), &native_data));
         }
 
         public void set_geojson_source_url (string source_id, string url) throws Error {
-            check_status (Raw.map_set_geojson_source_url (require_live ().native, string_view (source_id), string_view (url)));
+            set_geojson_source_url_utf8 (new Utf8String (source_id), new Utf8String (url));
+        }
+
+        public void set_geojson_source_url_utf8 (Utf8String source_id, Utf8String url) throws Error {
+            check_status (Raw.map_set_geojson_source_url (require_live ().native, source_id.to_native (), url.to_native ()));
         }
 
         public void set_geojson_source_data (string source_id, GeoJson data) throws Error {
+            set_geojson_source_data_utf8 (new Utf8String (source_id), data);
+        }
+
+        public void set_geojson_source_data_utf8 (Utf8String source_id, GeoJson data) throws Error {
             var data_storage = data.copy ();
             var native_data = data_storage.to_native ();
-            check_status (Raw.map_set_geojson_source_data (require_live ().native, string_view (source_id), &native_data));
+            check_status (Raw.map_set_geojson_source_data (require_live ().native, source_id.to_native (), &native_data));
         }
 
         public void add_style_source_json (string source_id, JsonValue source_json) throws Error {
+            add_style_source_json_utf8 (new Utf8String (source_id), source_json);
+        }
+
+        public void add_style_source_json_utf8 (Utf8String source_id, JsonValue source_json) throws Error {
             var source_json_storage = source_json.copy ();
             var native_source_json = source_json_storage.to_native ();
-            check_status (Raw.map_add_style_source_json (require_live ().native, string_view (source_id), &native_source_json));
+            check_status (Raw.map_add_style_source_json (require_live ().native, source_id.to_native (), &native_source_json));
         }
 
         public void add_vector_source_url (string source_id, string url, StyleTileSourceOptions? options = null) throws Error {
+            add_vector_source_url_utf8 (new Utf8String (source_id), new Utf8String (url), options);
+        }
+
+        public void add_vector_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_vector_source_url (require_live ().native, string_view (source_id), string_view (url), options_ptr));
+            check_status (Raw.map_add_vector_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
         }
 
         public void add_vector_source_tiles (string source_id, string[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles (tiles);
+            Utf8String[] utf8_tiles = new Utf8String[tiles.length];
+            for (var index = 0; index < tiles.length; index++) {
+                if (tiles[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("tile URL is null");
+                }
+                utf8_tiles[index] = new Utf8String (tiles[index]);
+            }
+            add_vector_source_tiles_utf8 (new Utf8String (source_id), utf8_tiles, options);
+        }
+
+        public void add_vector_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_vector_source_tiles (require_live ().native, string_view (source_id), tile_views, tile_views.length, options_ptr));
+            check_status (Raw.map_add_vector_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
         }
 
         public void add_raster_source_url (string source_id, string url, StyleTileSourceOptions? options = null) throws Error {
+            add_raster_source_url_utf8 (new Utf8String (source_id), new Utf8String (url), options);
+        }
+
+        public void add_raster_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_raster_source_url (require_live ().native, string_view (source_id), string_view (url), options_ptr));
+            check_status (Raw.map_add_raster_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
         }
 
         public void add_raster_source_tiles (string source_id, string[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles (tiles);
+            Utf8String[] utf8_tiles = new Utf8String[tiles.length];
+            for (var index = 0; index < tiles.length; index++) {
+                if (tiles[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("tile URL is null");
+                }
+                utf8_tiles[index] = new Utf8String (tiles[index]);
+            }
+            add_raster_source_tiles_utf8 (new Utf8String (source_id), utf8_tiles, options);
+        }
+
+        public void add_raster_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_raster_source_tiles (require_live ().native, string_view (source_id), tile_views, tile_views.length, options_ptr));
+            check_status (Raw.map_add_raster_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
         }
 
         public void add_raster_dem_source_url (string source_id, string url, StyleTileSourceOptions? options = null) throws Error {
+            add_raster_dem_source_url_utf8 (new Utf8String (source_id), new Utf8String (url), options);
+        }
+
+        public void add_raster_dem_source_url_utf8 (Utf8String source_id, Utf8String url, StyleTileSourceOptions? options = null) throws Error {
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_raster_dem_source_url (require_live ().native, string_view (source_id), string_view (url), options_ptr));
+            check_status (Raw.map_add_raster_dem_source_url (require_live ().native, source_id.to_native (), url.to_native (), options_ptr));
         }
 
         public void add_raster_dem_source_tiles (string source_id, string[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles (tiles);
+            Utf8String[] utf8_tiles = new Utf8String[tiles.length];
+            for (var index = 0; index < tiles.length; index++) {
+                if (tiles[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("tile URL is null");
+                }
+                utf8_tiles[index] = new Utf8String (tiles[index]);
+            }
+            add_raster_dem_source_tiles_utf8 (new Utf8String (source_id), utf8_tiles, options);
+        }
+
+        public void add_raster_dem_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             if (options != null) {
                 native_options = options.to_native ();
                 options_ptr = &native_options;
             }
-            check_status (Raw.map_add_raster_dem_source_tiles (require_live ().native, string_view (source_id), tile_views, tile_views.length, options_ptr));
+            check_status (Raw.map_add_raster_dem_source_tiles (require_live ().native, source_id.to_native (), tile_views, tile_views.length, options_ptr));
         }
 
         public void add_custom_geometry_source (string source_id, CustomGeometrySourceOptions options) throws Error {
+            add_custom_geometry_source_utf8 (new Utf8String (source_id), options);
+        }
+
+        public void add_custom_geometry_source_utf8 (Utf8String source_id, CustomGeometrySourceOptions options) throws Error {
             var registration = new CustomGeometrySourceRegistration (source_id, options);
             var native_options = options.to_native (registration);
-            check_status (Raw.map_add_custom_geometry_source (require_live ().native, string_view (source_id), &native_options));
+            check_status (Raw.map_add_custom_geometry_source (require_live ().native, source_id.to_native (), &native_options));
             retain_custom_geometry_source (registration);
         }
 
         public void set_custom_geometry_source_tile_data (string source_id, CanonicalTileId tile_id, GeoJson data) throws Error {
+            set_custom_geometry_source_tile_data_utf8 (new Utf8String (source_id), tile_id, data);
+        }
+
+        public void set_custom_geometry_source_tile_data_utf8 (Utf8String source_id, CanonicalTileId tile_id, GeoJson data) throws Error {
             var data_storage = data.copy ();
             var native_data = data_storage.to_native ();
-            check_status (Raw.map_set_custom_geometry_source_tile_data (require_live ().native, string_view (source_id), tile_id.to_native (), &native_data));
+            check_status (Raw.map_set_custom_geometry_source_tile_data (require_live ().native, source_id.to_native (), tile_id.to_native (), &native_data));
         }
 
         public void invalidate_custom_geometry_source_tile (string source_id, CanonicalTileId tile_id) throws Error {
-            check_status (Raw.map_invalidate_custom_geometry_source_tile (require_live ().native, string_view (source_id), tile_id.to_native ()));
+            invalidate_custom_geometry_source_tile_utf8 (new Utf8String (source_id), tile_id);
+        }
+
+        public void invalidate_custom_geometry_source_tile_utf8 (Utf8String source_id, CanonicalTileId tile_id) throws Error {
+            check_status (Raw.map_invalidate_custom_geometry_source_tile (require_live ().native, source_id.to_native (), tile_id.to_native ()));
         }
 
         public void invalidate_custom_geometry_source_region (string source_id, LatLngBounds bounds) throws Error {
-            check_status (Raw.map_invalidate_custom_geometry_source_region (require_live ().native, string_view (source_id), bounds.to_native ()));
+            invalidate_custom_geometry_source_region_utf8 (new Utf8String (source_id), bounds);
+        }
+
+        public void invalidate_custom_geometry_source_region_utf8 (Utf8String source_id, LatLngBounds bounds) throws Error {
+            check_status (Raw.map_invalidate_custom_geometry_source_region (require_live ().native, source_id.to_native (), bounds.to_native ()));
         }
 
         public bool remove_style_source (string source_id) throws Error {
+            return remove_style_source_utf8 (new Utf8String (source_id));
+        }
+
+        public bool remove_style_source_utf8 (Utf8String source_id) throws Error {
             bool removed;
-            check_status (Raw.map_remove_style_source (require_live ().native, string_view (source_id), out removed));
+            check_status (Raw.map_remove_style_source (require_live ().native, source_id.to_native (), out removed));
             if (removed) {
                 release_custom_geometry_source (source_id);
             }
@@ -985,15 +1071,23 @@ namespace MaplibreNative {
         }
 
         public bool style_source_exists (string source_id) throws Error {
+            return style_source_exists_utf8 (new Utf8String (source_id));
+        }
+
+        public bool style_source_exists_utf8 (Utf8String source_id) throws Error {
             bool exists;
-            check_status (Raw.map_style_source_exists (require_live ().native, string_view (source_id), out exists));
+            check_status (Raw.map_style_source_exists (require_live ().native, source_id.to_native (), out exists));
             return exists;
         }
 
         public StyleSourceType? get_style_source_type (string source_id) throws Error {
+            return get_style_source_type_utf8 (new Utf8String (source_id));
+        }
+
+        public StyleSourceType? get_style_source_type_utf8 (Utf8String source_id) throws Error {
             uint32 source_type;
             bool found;
-            check_status (Raw.map_get_style_source_type (require_live ().native, string_view (source_id), out source_type, out found));
+            check_status (Raw.map_get_style_source_type (require_live ().native, source_id.to_native (), out source_type, out found));
             if (!found) {
                 return null;
             }
@@ -1001,26 +1095,39 @@ namespace MaplibreNative {
         }
 
         public StyleSourceInfo? get_style_source_info (string source_id) throws Error {
+            return get_style_source_info_utf8 (new Utf8String (source_id));
+        }
+
+        public StyleSourceInfo? get_style_source_info_utf8 (Utf8String source_id) throws Error {
             Raw.StyleSourceInfo info = {};
             info.size = (uint32) sizeof (Raw.StyleSourceInfo);
             bool found;
-            check_status (Raw.map_get_style_source_info (require_live ().native, string_view (source_id), &info, out found));
+            check_status (Raw.map_get_style_source_info (require_live ().native, source_id.to_native (), &info, out found));
             return found ? new StyleSourceInfo (info) : null;
         }
 
         public string? copy_style_source_attribution (string source_id) throws Error {
-            var info = get_style_source_info (source_id);
+            var copied = copy_style_source_attribution_utf8 (new Utf8String (source_id));
+            return copied == null ? null : copied.to_string ();
+        }
+
+        public Utf8String? copy_style_source_attribution_utf8 (Utf8String source_id) throws Error {
+            var info = get_style_source_info_utf8 (source_id);
             if (info == null || !info.has_attribution) {
                 return null;
             }
             uint8[] bytes = new uint8[info.attribution_byte_length + 1];
             size_t attribution_size;
             bool found;
-            check_status (Raw.map_copy_style_source_attribution (require_live ().native, string_view (source_id), (char*) bytes, bytes.length, out attribution_size, out found));
+            check_status (Raw.map_copy_style_source_attribution (require_live ().native, source_id.to_native (), (char*) bytes, bytes.length, out attribution_size, out found));
             if (!found) {
                 return null;
             }
-            return ((string) ((char*) bytes)).substring (0, (long) attribution_size);
+            uint8[] attribution = new uint8[attribution_size];
+            for (var index = 0; index < attribution_size; index++) {
+                attribution[index] = bytes[index];
+            }
+            return new Utf8String.from_bytes (attribution);
         }
 
         public StringList list_style_source_ids () throws Error {
@@ -1030,56 +1137,105 @@ namespace MaplibreNative {
         }
 
         public void add_hillshade_layer (string layer_id, string source_id, string before_layer_id = "") throws Error {
-            check_status (Raw.map_add_hillshade_layer (require_live ().native, string_view (layer_id), string_view (source_id), string_view (before_layer_id)));
+            add_hillshade_layer_utf8 (new Utf8String (layer_id), new Utf8String (source_id), new Utf8String (before_layer_id));
+        }
+
+        public void add_hillshade_layer_utf8 (Utf8String layer_id, Utf8String source_id, Utf8String? before_layer_id = null) throws Error {
+            var before = before_layer_id ?? new Utf8String ("");
+            check_status (Raw.map_add_hillshade_layer (require_live ().native, layer_id.to_native (), source_id.to_native (), before.to_native ()));
         }
 
         public void add_color_relief_layer (string layer_id, string source_id, string before_layer_id = "") throws Error {
-            check_status (Raw.map_add_color_relief_layer (require_live ().native, string_view (layer_id), string_view (source_id), string_view (before_layer_id)));
+            add_color_relief_layer_utf8 (new Utf8String (layer_id), new Utf8String (source_id), new Utf8String (before_layer_id));
+        }
+
+        public void add_color_relief_layer_utf8 (Utf8String layer_id, Utf8String source_id, Utf8String? before_layer_id = null) throws Error {
+            var before = before_layer_id ?? new Utf8String ("");
+            check_status (Raw.map_add_color_relief_layer (require_live ().native, layer_id.to_native (), source_id.to_native (), before.to_native ()));
         }
 
         public void add_location_indicator_layer (string layer_id, string before_layer_id = "") throws Error {
-            check_status (Raw.map_add_location_indicator_layer (require_live ().native, string_view (layer_id), string_view (before_layer_id)));
+            add_location_indicator_layer_utf8 (new Utf8String (layer_id), new Utf8String (before_layer_id));
+        }
+
+        public void add_location_indicator_layer_utf8 (Utf8String layer_id, Utf8String? before_layer_id = null) throws Error {
+            var before = before_layer_id ?? new Utf8String ("");
+            check_status (Raw.map_add_location_indicator_layer (require_live ().native, layer_id.to_native (), before.to_native ()));
         }
 
         public void set_location_indicator_location (string layer_id, LatLng coordinate, double altitude) throws Error {
-            check_status (Raw.map_set_location_indicator_location (require_live ().native, string_view (layer_id), coordinate.to_native (), altitude));
+            set_location_indicator_location_utf8 (new Utf8String (layer_id), coordinate, altitude);
+        }
+
+        public void set_location_indicator_location_utf8 (Utf8String layer_id, LatLng coordinate, double altitude) throws Error {
+            check_status (Raw.map_set_location_indicator_location (require_live ().native, layer_id.to_native (), coordinate.to_native (), altitude));
         }
 
         public void set_location_indicator_bearing (string layer_id, double bearing) throws Error {
-            check_status (Raw.map_set_location_indicator_bearing (require_live ().native, string_view (layer_id), bearing));
+            set_location_indicator_bearing_utf8 (new Utf8String (layer_id), bearing);
+        }
+
+        public void set_location_indicator_bearing_utf8 (Utf8String layer_id, double bearing) throws Error {
+            check_status (Raw.map_set_location_indicator_bearing (require_live ().native, layer_id.to_native (), bearing));
         }
 
         public void set_location_indicator_accuracy_radius (string layer_id, double radius) throws Error {
-            check_status (Raw.map_set_location_indicator_accuracy_radius (require_live ().native, string_view (layer_id), radius));
+            set_location_indicator_accuracy_radius_utf8 (new Utf8String (layer_id), radius);
+        }
+
+        public void set_location_indicator_accuracy_radius_utf8 (Utf8String layer_id, double radius) throws Error {
+            check_status (Raw.map_set_location_indicator_accuracy_radius (require_live ().native, layer_id.to_native (), radius));
         }
 
         public void set_location_indicator_image_name (string layer_id, LocationIndicatorImageKind image_kind, string image_id) throws Error {
-            check_status (Raw.map_set_location_indicator_image_name (require_live ().native, string_view (layer_id), (uint32) image_kind, string_view (image_id)));
+            set_location_indicator_image_name_utf8 (new Utf8String (layer_id), image_kind, new Utf8String (image_id));
+        }
+
+        public void set_location_indicator_image_name_utf8 (Utf8String layer_id, LocationIndicatorImageKind image_kind, Utf8String image_id) throws Error {
+            check_status (Raw.map_set_location_indicator_image_name (require_live ().native, layer_id.to_native (), (uint32) image_kind, image_id.to_native ()));
         }
 
         public void add_style_layer_json (JsonValue layer_json, string before_layer_id = "") throws Error {
+            add_style_layer_json_utf8 (layer_json, new Utf8String (before_layer_id));
+        }
+
+        public void add_style_layer_json_utf8 (JsonValue layer_json, Utf8String? before_layer_id = null) throws Error {
             var layer_json_storage = layer_json.copy ();
             var native_layer_json = layer_json_storage.to_native ();
-            check_status (Raw.map_add_style_layer_json (require_live ().native, &native_layer_json, string_view (before_layer_id)));
+            var before = before_layer_id ?? new Utf8String ("");
+            check_status (Raw.map_add_style_layer_json (require_live ().native, &native_layer_json, before.to_native ()));
         }
 
         public bool remove_style_layer (string layer_id) throws Error {
+            return remove_style_layer_utf8 (new Utf8String (layer_id));
+        }
+
+        public bool remove_style_layer_utf8 (Utf8String layer_id) throws Error {
             bool removed;
-            check_status (Raw.map_remove_style_layer (require_live ().native, string_view (layer_id), out removed));
+            check_status (Raw.map_remove_style_layer (require_live ().native, layer_id.to_native (), out removed));
             return removed;
         }
 
         public bool style_layer_exists (string layer_id) throws Error {
+            return style_layer_exists_utf8 (new Utf8String (layer_id));
+        }
+
+        public bool style_layer_exists_utf8 (Utf8String layer_id) throws Error {
             bool exists;
-            check_status (Raw.map_style_layer_exists (require_live ().native, string_view (layer_id), out exists));
+            check_status (Raw.map_style_layer_exists (require_live ().native, layer_id.to_native (), out exists));
             return exists;
         }
 
         public string? get_style_layer_type (string layer_id) throws Error {
+            var copied = get_style_layer_type_utf8 (new Utf8String (layer_id));
+            return copied == null ? null : copied.to_string ();
+        }
+
+        public Utf8String? get_style_layer_type_utf8 (Utf8String layer_id) throws Error {
             Raw.StringView layer_type;
             bool found;
-            check_status (Raw.map_get_style_layer_type (require_live ().native, string_view (layer_id), out layer_type, out found));
-            return found ? copy_string_view (layer_type) : null;
+            check_status (Raw.map_get_style_layer_type (require_live ().native, layer_id.to_native (), out layer_type, out found));
+            return found ? new Utf8String.from_bytes (copy_string_view_bytes (layer_type)) : null;
         }
 
         public StringList list_style_layer_ids () throws Error {
@@ -1089,13 +1245,22 @@ namespace MaplibreNative {
         }
 
         public void move_style_layer (string layer_id, string before_layer_id = "") throws Error {
-            check_status (Raw.map_move_style_layer (require_live ().native, string_view (layer_id), string_view (before_layer_id)));
+            move_style_layer_utf8 (new Utf8String (layer_id), new Utf8String (before_layer_id));
+        }
+
+        public void move_style_layer_utf8 (Utf8String layer_id, Utf8String? before_layer_id = null) throws Error {
+            var before = before_layer_id ?? new Utf8String ("");
+            check_status (Raw.map_move_style_layer (require_live ().native, layer_id.to_native (), before.to_native ()));
         }
 
         public JsonValue? get_style_layer_json (string layer_id) throws Error {
+            return get_style_layer_json_utf8 (new Utf8String (layer_id));
+        }
+
+        public JsonValue? get_style_layer_json_utf8 (Utf8String layer_id) throws Error {
             Raw.JsonSnapshot? snapshot;
             bool found;
-            check_status (Raw.map_get_style_layer_json (require_live ().native, string_view (layer_id), out snapshot, out found));
+            check_status (Raw.map_get_style_layer_json (require_live ().native, layer_id.to_native (), out snapshot, out found));
             if (!found) {
                 return copy_json_snapshot ((owned) snapshot);
             }
@@ -1109,30 +1274,50 @@ namespace MaplibreNative {
         }
 
         public void set_style_light_property (string property_name, JsonValue value) throws Error {
+            set_style_light_property_utf8 (new Utf8String (property_name), value);
+        }
+
+        public void set_style_light_property_utf8 (Utf8String property_name, JsonValue value) throws Error {
             var value_storage = value.copy ();
             var native_value = value_storage.to_native ();
-            check_status (Raw.map_set_style_light_property (require_live ().native, string_view (property_name), &native_value));
+            check_status (Raw.map_set_style_light_property (require_live ().native, property_name.to_native (), &native_value));
         }
 
         public JsonValue? get_style_light_property (string property_name) throws Error {
+            return get_style_light_property_utf8 (new Utf8String (property_name));
+        }
+
+        public JsonValue? get_style_light_property_utf8 (Utf8String property_name) throws Error {
             Raw.JsonSnapshot? snapshot;
-            check_status (Raw.map_get_style_light_property (require_live ().native, string_view (property_name), out snapshot));
+            check_status (Raw.map_get_style_light_property (require_live ().native, property_name.to_native (), out snapshot));
             return copy_json_snapshot ((owned) snapshot);
         }
 
         public void set_layer_property (string layer_id, string property_name, JsonValue value) throws Error {
+            set_layer_property_utf8 (new Utf8String (layer_id), new Utf8String (property_name), value);
+        }
+
+        public void set_layer_property_utf8 (Utf8String layer_id, Utf8String property_name, JsonValue value) throws Error {
             var value_storage = value.copy ();
             var native_value = value_storage.to_native ();
-            check_status (Raw.map_set_layer_property (require_live ().native, string_view (layer_id), string_view (property_name), &native_value));
+            check_status (Raw.map_set_layer_property (require_live ().native, layer_id.to_native (), property_name.to_native (), &native_value));
         }
 
         public JsonValue? get_layer_property (string layer_id, string property_name) throws Error {
+            return get_layer_property_utf8 (new Utf8String (layer_id), new Utf8String (property_name));
+        }
+
+        public JsonValue? get_layer_property_utf8 (Utf8String layer_id, Utf8String property_name) throws Error {
             Raw.JsonSnapshot? snapshot;
-            check_status (Raw.map_get_layer_property (require_live ().native, string_view (layer_id), string_view (property_name), out snapshot));
+            check_status (Raw.map_get_layer_property (require_live ().native, layer_id.to_native (), property_name.to_native (), out snapshot));
             return copy_json_snapshot ((owned) snapshot);
         }
 
         public void set_layer_filter (string layer_id, JsonValue? filter = null) throws Error {
+            set_layer_filter_utf8 (new Utf8String (layer_id), filter);
+        }
+
+        public void set_layer_filter_utf8 (Utf8String layer_id, JsonValue? filter = null) throws Error {
             Raw.JsonValue native_filter = {};
             Raw.JsonValue* filter_ptr = null;
             JsonValue? filter_storage = null;
@@ -1141,82 +1326,130 @@ namespace MaplibreNative {
                 native_filter = filter_storage.to_native ();
                 filter_ptr = &native_filter;
             }
-            check_status (Raw.map_set_layer_filter (require_live ().native, string_view (layer_id), filter_ptr));
+            check_status (Raw.map_set_layer_filter (require_live ().native, layer_id.to_native (), filter_ptr));
         }
 
         public JsonValue? get_layer_filter (string layer_id) throws Error {
+            return get_layer_filter_utf8 (new Utf8String (layer_id));
+        }
+
+        public JsonValue? get_layer_filter_utf8 (Utf8String layer_id) throws Error {
             Raw.JsonSnapshot? snapshot;
-            check_status (Raw.map_get_layer_filter (require_live ().native, string_view (layer_id), out snapshot));
+            check_status (Raw.map_get_layer_filter (require_live ().native, layer_id.to_native (), out snapshot));
             return copy_json_snapshot ((owned) snapshot);
         }
 
         public void set_style_image (string image_id, PremultipliedRgba8Image image, StyleImageOptions? options = null) throws Error {
+            set_style_image_utf8 (new Utf8String (image_id), image, options);
+        }
+
+        public void set_style_image_utf8 (Utf8String image_id, PremultipliedRgba8Image image, StyleImageOptions? options = null) throws Error {
             var native_image = image.to_native ();
             var native_options = (options ?? new StyleImageOptions ()).to_native ();
-            check_status (Raw.map_set_style_image (require_live ().native, string_view (image_id), &native_image, &native_options));
+            check_status (Raw.map_set_style_image (require_live ().native, image_id.to_native (), &native_image, &native_options));
         }
 
         public bool remove_style_image (string image_id) throws Error {
+            return remove_style_image_utf8 (new Utf8String (image_id));
+        }
+
+        public bool remove_style_image_utf8 (Utf8String image_id) throws Error {
             bool removed;
-            check_status (Raw.map_remove_style_image (require_live ().native, string_view (image_id), out removed));
+            check_status (Raw.map_remove_style_image (require_live ().native, image_id.to_native (), out removed));
             return removed;
         }
 
         public bool style_image_exists (string image_id) throws Error {
+            return style_image_exists_utf8 (new Utf8String (image_id));
+        }
+
+        public bool style_image_exists_utf8 (Utf8String image_id) throws Error {
             bool exists;
-            check_status (Raw.map_style_image_exists (require_live ().native, string_view (image_id), out exists));
+            check_status (Raw.map_style_image_exists (require_live ().native, image_id.to_native (), out exists));
             return exists;
         }
 
         public StyleImageInfo? get_style_image_info (string image_id) throws Error {
+            return get_style_image_info_utf8 (new Utf8String (image_id));
+        }
+
+        public StyleImageInfo? get_style_image_info_utf8 (Utf8String image_id) throws Error {
             Raw.StyleImageInfo info = Raw.style_image_info_default ();
             bool found;
-            check_status (Raw.map_get_style_image_info (require_live ().native, string_view (image_id), &info, out found));
+            check_status (Raw.map_get_style_image_info (require_live ().native, image_id.to_native (), &info, out found));
             return found ? new StyleImageInfo (info) : null;
         }
 
         public uint8[]? copy_style_image_premultiplied_rgba8 (string image_id) throws Error {
-            var info = get_style_image_info (image_id);
+            return copy_style_image_premultiplied_rgba8_utf8 (new Utf8String (image_id));
+        }
+
+        public uint8[]? copy_style_image_premultiplied_rgba8_utf8 (Utf8String image_id) throws Error {
+            var info = get_style_image_info_utf8 (image_id);
             if (info == null) {
                 return null;
             }
             uint8[] pixels = new uint8[info.byte_length];
             size_t byte_length;
             bool found;
-            check_status (Raw.map_copy_style_image_premultiplied_rgba8 (require_live ().native, string_view (image_id), pixels, pixels.length, out byte_length, out found));
+            check_status (Raw.map_copy_style_image_premultiplied_rgba8 (require_live ().native, image_id.to_native (), pixels, pixels.length, out byte_length, out found));
             return found ? pixels : null;
         }
 
         public void add_image_source_url (string source_id, LatLng[] coordinates, string url) throws Error {
+            add_image_source_url_utf8 (new Utf8String (source_id), coordinates, new Utf8String (url));
+        }
+
+        public void add_image_source_url_utf8 (Utf8String source_id, LatLng[] coordinates, Utf8String url) throws Error {
             Raw.LatLng[] native_coordinates = image_source_coordinates_to_native (coordinates);
-            check_status (Raw.map_add_image_source_url (require_live ().native, string_view (source_id), native_coordinates, native_coordinates.length, string_view (url)));
+            check_status (Raw.map_add_image_source_url (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, url.to_native ()));
         }
 
         public void add_image_source_image (string source_id, LatLng[] coordinates, PremultipliedRgba8Image image) throws Error {
+            add_image_source_image_utf8 (new Utf8String (source_id), coordinates, image);
+        }
+
+        public void add_image_source_image_utf8 (Utf8String source_id, LatLng[] coordinates, PremultipliedRgba8Image image) throws Error {
             Raw.LatLng[] native_coordinates = image_source_coordinates_to_native (coordinates);
             var native_image = image.to_native ();
-            check_status (Raw.map_add_image_source_image (require_live ().native, string_view (source_id), native_coordinates, native_coordinates.length, &native_image));
+            check_status (Raw.map_add_image_source_image (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, &native_image));
         }
 
         public void set_image_source_url (string source_id, string url) throws Error {
-            check_status (Raw.map_set_image_source_url (require_live ().native, string_view (source_id), string_view (url)));
+            set_image_source_url_utf8 (new Utf8String (source_id), new Utf8String (url));
+        }
+
+        public void set_image_source_url_utf8 (Utf8String source_id, Utf8String url) throws Error {
+            check_status (Raw.map_set_image_source_url (require_live ().native, source_id.to_native (), url.to_native ()));
         }
 
         public void set_image_source_image (string source_id, PremultipliedRgba8Image image) throws Error {
+            set_image_source_image_utf8 (new Utf8String (source_id), image);
+        }
+
+        public void set_image_source_image_utf8 (Utf8String source_id, PremultipliedRgba8Image image) throws Error {
             var native_image = image.to_native ();
-            check_status (Raw.map_set_image_source_image (require_live ().native, string_view (source_id), &native_image));
+            check_status (Raw.map_set_image_source_image (require_live ().native, source_id.to_native (), &native_image));
         }
 
         public void set_image_source_coordinates (string source_id, LatLng[] coordinates) throws Error {
+            set_image_source_coordinates_utf8 (new Utf8String (source_id), coordinates);
+        }
+
+        public void set_image_source_coordinates_utf8 (Utf8String source_id, LatLng[] coordinates) throws Error {
             Raw.LatLng[] native_coordinates = image_source_coordinates_to_native (coordinates);
-            check_status (Raw.map_set_image_source_coordinates (require_live ().native, string_view (source_id), native_coordinates, native_coordinates.length));
+            check_status (Raw.map_set_image_source_coordinates (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length));
         }
 
         public LatLng[]? get_image_source_coordinates (string source_id) throws Error {
+            return get_image_source_coordinates_utf8 (new Utf8String (source_id));
+        }
+
+        public LatLng[]? get_image_source_coordinates_utf8 (Utf8String source_id) throws Error {
             Raw.LatLng[] native_coordinates = new Raw.LatLng[4];
             size_t coordinate_count;
             bool found;
-            check_status (Raw.map_get_image_source_coordinates (require_live ().native, string_view (source_id), native_coordinates, native_coordinates.length, out coordinate_count, out found));
+            check_status (Raw.map_get_image_source_coordinates (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, out coordinate_count, out found));
             if (!found) {
                 return null;
             }

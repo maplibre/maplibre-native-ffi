@@ -373,7 +373,7 @@ namespace MaplibreNative {
         }
 
         public Geometry copy () throws Error {
-            return Geometry.from_native (to_native ());
+            return copy_for_native ();
         }
 
         public bool equal (Geometry other) {
@@ -534,12 +534,14 @@ namespace MaplibreNative {
             return json;
         }
 
-        public static JsonValue string_utf8_bytes (uint8[] value) {
+        public static JsonValue string_utf8_bytes (uint8[] value) throws Error {
+            Utf8String.validate_bytes (value);
+            return JsonValue.string_utf8_bytes_unchecked (value);
+        }
+
+        private static JsonValue string_utf8_bytes_unchecked (uint8[] value) {
             var json = new JsonValue (JsonValueType.STRING);
-            json.string_storage = new uint8[value.length];
-            for (var index = 0; index < value.length; index++) {
-                json.string_storage[index] = value[index];
-            }
+            json.string_storage = copy_byte_array (value);
             return json;
         }
 
@@ -642,7 +644,7 @@ namespace MaplibreNative {
             case JsonValueType.DOUBLE:
                 return JsonValue.double_value (double_storage);
             case JsonValueType.STRING:
-                return JsonValue.string_utf8_bytes (string_storage);
+                return JsonValue.string_utf8_bytes_unchecked (string_storage);
             case JsonValueType.ARRAY:
                 JsonValue[] values = new JsonValue[array_values.length];
                 for (var index = 0; index < array_values.length; index++) {
@@ -738,8 +740,9 @@ namespace MaplibreNative {
                 }
                 return JsonValue.object_value (members);
             case JsonValueType.NULL:
-            default:
                 return JsonValue.null_value ();
+            default:
+                throw new Error.UNSUPPORTED ("unknown native JSON value type %u", native.type);
             }
         }
 
@@ -811,11 +814,14 @@ namespace MaplibreNative {
             this.value = value;
         }
 
-        public JsonMember.from_utf8_bytes (uint8[] key, JsonValue value) {
-            key_storage = new uint8[key.length];
-            for (var index = 0; index < key.length; index++) {
-                key_storage[index] = key[index];
-            }
+        public JsonMember.from_utf8_bytes (uint8[] key, JsonValue value) throws Error {
+            Utf8String.validate_bytes (key);
+            key_storage = copy_byte_array (key);
+            this.value = value;
+        }
+
+        private JsonMember.from_utf8_bytes_unchecked (uint8[] key, JsonValue value) {
+            key_storage = copy_byte_array (key);
             this.value = value;
         }
 
@@ -832,7 +838,7 @@ namespace MaplibreNative {
         }
 
         public JsonMember copy () {
-            return new JsonMember.from_utf8_bytes (key_storage, value.copy ());
+            return new JsonMember.from_utf8_bytes_unchecked (key_storage, value.copy ());
         }
 
         public bool equal (JsonMember other) {
@@ -903,12 +909,14 @@ namespace MaplibreNative {
             return identifier;
         }
 
-        public static FeatureIdentifier string_utf8_bytes (uint8[] value) {
+        public static FeatureIdentifier string_utf8_bytes (uint8[] value) throws Error {
+            Utf8String.validate_bytes (value);
+            return FeatureIdentifier.string_utf8_bytes_unchecked (value);
+        }
+
+        private static FeatureIdentifier string_utf8_bytes_unchecked (uint8[] value) {
             var identifier = new FeatureIdentifier (FeatureIdentifierType.STRING);
-            identifier.string_storage = new uint8[value.length];
-            for (var index = 0; index < value.length; index++) {
-                identifier.string_storage[index] = value[index];
-            }
+            identifier.string_storage = copy_byte_array (value);
             return identifier;
         }
 
@@ -974,7 +982,7 @@ namespace MaplibreNative {
             case FeatureIdentifierType.DOUBLE:
                 return FeatureIdentifier.double_value (double_storage);
             case FeatureIdentifierType.STRING:
-                return FeatureIdentifier.string_utf8_bytes (string_storage);
+                return FeatureIdentifier.string_utf8_bytes_unchecked (string_storage);
             case FeatureIdentifierType.NULL:
                 return FeatureIdentifier.none ();
             default:
@@ -1072,42 +1080,58 @@ namespace MaplibreNative {
     }
 
     public class FeatureStateSelector {
-        private string source_id;
-        private string? source_layer_id;
-        private string? feature_id;
-        private string? state_key;
+        private Utf8String source_id;
+        private Utf8String? source_layer_id;
+        private Utf8String? feature_id;
+        private Utf8String? state_key;
 
         public FeatureStateSelector (string source_id) {
-            this.source_id = source_id;
+            this.source_id = new Utf8String (source_id);
+        }
+
+        public FeatureStateSelector.from_utf8 (Utf8String source_id) {
+            this.source_id = source_id.copy ();
         }
 
         public void set_source_layer_id (string value) {
-            source_layer_id = value;
+            source_layer_id = new Utf8String (value);
+        }
+
+        public void set_source_layer_id_utf8 (Utf8String value) {
+            source_layer_id = value.copy ();
         }
 
         public void set_feature_id (string value) {
-            feature_id = value;
+            feature_id = new Utf8String (value);
+        }
+
+        public void set_feature_id_utf8 (Utf8String value) {
+            feature_id = value.copy ();
         }
 
         public void set_state_key (string value) {
-            state_key = value;
+            state_key = new Utf8String (value);
+        }
+
+        public void set_state_key_utf8 (Utf8String value) {
+            state_key = value.copy ();
         }
 
         internal Raw.FeatureStateSelector to_native () throws Error {
             Raw.FeatureStateSelector native = {};
             native.size = (uint32) sizeof (Raw.FeatureStateSelector);
-            native.source_id = string_view (source_id);
+            native.source_id = source_id.to_native ();
             if (source_layer_id != null) {
                 native.fields |= (uint32) Raw.FeatureStateSelectorField.SOURCE_LAYER_ID;
-                native.source_layer_id = string_view (source_layer_id);
+                native.source_layer_id = source_layer_id.to_native ();
             }
             if (feature_id != null) {
                 native.fields |= (uint32) Raw.FeatureStateSelectorField.FEATURE_ID;
-                native.feature_id = string_view (feature_id);
+                native.feature_id = feature_id.to_native ();
             }
             if (state_key != null) {
                 native.fields |= (uint32) Raw.FeatureStateSelectorField.STATE_KEY;
-                native.state_key = string_view (state_key);
+                native.state_key = state_key.to_native ();
             }
             return native;
         }
@@ -1321,6 +1345,19 @@ namespace MaplibreNative {
                 return GeoJson.feature_collection (feature_collection_ref.copy ());
             }
             return GeoJson.geometry (geometry_ref.copy ());
+        }
+
+        public bool equal (GeoJson other) {
+            if (native.type != other.native.type) {
+                return false;
+            }
+            if (native.type == (uint32) GeoJsonType.FEATURE) {
+                return feature_ref.equal (other.feature_ref);
+            }
+            if (native.type == (uint32) GeoJsonType.FEATURE_COLLECTION) {
+                return feature_collection_ref.equal (other.feature_collection_ref);
+            }
+            return geometry_ref.equal (other.geometry_ref);
         }
 
         internal Raw.GeoJson to_native () throws Error {

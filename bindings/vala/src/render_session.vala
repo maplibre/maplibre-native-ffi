@@ -206,6 +206,10 @@ namespace MaplibreNative {
         }
 
         public QueriedFeature[] query_source_features (string source_id, SourceFeatureQueryOptions? options = null) throws Error {
+            return query_source_features_utf8 (new Utf8String (source_id), options);
+        }
+
+        public QueriedFeature[] query_source_features_utf8 (Utf8String source_id, SourceFeatureQueryOptions? options = null) throws Error {
             Raw.SourceFeatureQueryOptions native_options = {};
             Raw.SourceFeatureQueryOptions* options_ptr = null;
             SourceFeatureQueryOptions? options_storage = null;
@@ -216,11 +220,21 @@ namespace MaplibreNative {
             }
             Raw.FeatureQueryResult result;
             var lease = require_available ();
-            check_status (Raw.render_session_query_source_features (lease.native, string_view (source_id), options_ptr, out result));
+            check_status (Raw.render_session_query_source_features (lease.native, source_id.to_native (), options_ptr, out result));
             return FeatureQueryResultHandle.copy_from_native ((owned) result);
         }
 
         public FeatureExtensionResult query_feature_extensions (string source_id, Feature feature, string extension, string extension_field, JsonValue? arguments = null) throws Error {
+            return query_feature_extensions_utf8 (
+                new Utf8String (source_id),
+                feature,
+                new Utf8String (extension),
+                new Utf8String (extension_field),
+                arguments
+            );
+        }
+
+        public FeatureExtensionResult query_feature_extensions_utf8 (Utf8String source_id, Feature feature, Utf8String extension, Utf8String extension_field, JsonValue? arguments = null) throws Error {
             var feature_storage = feature.copy ();
             Raw.Feature native_feature = feature_storage.to_native ();
             Raw.JsonValue native_arguments = {};
@@ -233,7 +247,7 @@ namespace MaplibreNative {
             }
             Raw.FeatureExtensionResult result;
             var lease = require_available ();
-            check_status (Raw.render_session_query_feature_extensions (lease.native, string_view (source_id), &native_feature, string_view (extension), string_view (extension_field), arguments_ptr, out result));
+            check_status (Raw.render_session_query_feature_extensions (lease.native, source_id.to_native (), &native_feature, extension.to_native (), extension_field.to_native (), arguments_ptr, out result));
             return FeatureExtensionResultHandle.copy_from_native ((owned) result);
         }
 

@@ -55,15 +55,15 @@ namespace MaplibreNative {
     public delegate void CustomGeometryTileCallback (CanonicalTileId tile_id);
 
     internal class CustomGeometrySourceRegistration {
-        public string source_id { get; private set; }
+        public Utf8String source_id { get; private set; }
         public CustomGeometrySourceOptions options { get; private set; }
         private Mutex mutex;
         private Cond idle;
         private bool closing;
         private uint active_callbacks;
 
-        public CustomGeometrySourceRegistration (string source_id, CustomGeometrySourceOptions options) {
-            this.source_id = source_id;
+        public CustomGeometrySourceRegistration (Utf8String source_id, CustomGeometrySourceOptions options) {
+            this.source_id = source_id.copy ();
             this.options = options;
         }
 
@@ -199,20 +199,37 @@ namespace MaplibreNative {
     }
 
     public class StyleTileSourceOptions {
+        private Utf8String? attribution_storage;
+
         public double? min_zoom { get; set; }
         public double? max_zoom { get; set; }
-        public string? attribution { get; set; }
+        public string? attribution {
+            owned get {
+                return attribution_storage == null ? null : attribution_storage.to_string_or_null ();
+            }
+            set {
+                attribution_storage = value == null ? null : new Utf8String (value);
+            }
+        }
         public StyleTileScheme? scheme { get; set; }
         public LatLngBounds? bounds { get; set; }
         public uint32? tile_size { get; set; }
         public StyleVectorTileEncoding? vector_encoding { get; set; }
         public StyleRasterDemEncoding? raster_encoding { get; set; }
 
+        public void set_attribution_utf8 (Utf8String? value) {
+            attribution_storage = value == null ? null : value.copy ();
+        }
+
+        public Utf8String? get_attribution_utf8 () {
+            return attribution_storage == null ? null : attribution_storage.copy ();
+        }
+
         public StyleTileSourceOptions copy () {
             var copied = new StyleTileSourceOptions ();
             copied.min_zoom = min_zoom;
             copied.max_zoom = max_zoom;
-            copied.attribution = attribution;
+            copied.attribution_storage = attribution_storage == null ? null : attribution_storage.copy ();
             copied.scheme = scheme;
             copied.bounds = bounds;
             copied.tile_size = tile_size;
@@ -224,12 +241,17 @@ namespace MaplibreNative {
         public bool equal (StyleTileSourceOptions other) {
             if (min_zoom != other.min_zoom
                 || max_zoom != other.max_zoom
-                || attribution != other.attribution
+                || (attribution_storage == null) != (other.attribution_storage == null)
                 || scheme != other.scheme
                 || tile_size != other.tile_size
                 || vector_encoding != other.vector_encoding
                 || raster_encoding != other.raster_encoding
                 || (bounds == null) != (other.bounds == null)) {
+                return false;
+            }
+            if (attribution_storage != null
+                && other.attribution_storage != null
+                && !attribution_storage.equal (other.attribution_storage)) {
                 return false;
             }
             if (bounds != null && other.bounds != null) {
@@ -251,8 +273,8 @@ namespace MaplibreNative {
                 options.max_zoom = max_zoom;
                 options.fields |= (uint32) Raw.StyleTileSourceOptionField.MAX_ZOOM;
             }
-            if (attribution != null) {
-                options.attribution = string_view (attribution);
+            if (attribution_storage != null) {
+                options.attribution = attribution_storage.to_native ();
                 options.fields |= (uint32) Raw.StyleTileSourceOptionField.ATTRIBUTION;
             }
             if (scheme != null) {
@@ -374,13 +396,16 @@ namespace MaplibreNative {
         }
     }
 
-    internal Raw.StringView[] string_views_for_tiles (string[] tiles) throws Error {
+    internal Raw.StringView[] string_views_for_tiles_utf8 (Utf8String[] tiles) throws Error {
         if (tiles.length == 0) {
             throw new Error.INVALID_ARGUMENT ("tile URL list is empty");
         }
         Raw.StringView[] views = new Raw.StringView[tiles.length];
         for (var index = 0; index < tiles.length; index++) {
-            views[index] = string_view (tiles[index]);
+            if (tiles[index] == null) {
+                throw new Error.INVALID_ARGUMENT ("tile URL is null");
+            }
+            views[index] = tiles[index].to_native ();
         }
         return views;
     }

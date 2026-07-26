@@ -489,10 +489,101 @@ namespace MaplibreNative {
         }
     }
 
-    public class StringList {
-        private string[] values;
+    public class Utf8String {
+        private uint8[] bytes;
 
-        internal StringList (owned string[] values) {
+        public Utf8String (string value) {
+            bytes = copy_string_bytes (value);
+        }
+
+        public Utf8String.from_bytes (uint8[] value) throws Error {
+            validate_bytes (value);
+            bytes = copy_byte_array (value);
+        }
+
+        private Utf8String.from_owned_bytes (owned uint8[] value) {
+            bytes = (owned) value;
+        }
+
+        internal static void validate_bytes (uint8[] value) throws Error {
+            var index = 0;
+            while (index < value.length) {
+                uint8 first = value[index];
+                var count = 0;
+                if (first <= 0x7f) {
+                    count = 1;
+                } else if (first >= 0xc2 && first <= 0xdf) {
+                    count = 2;
+                } else if (first >= 0xe0 && first <= 0xef) {
+                    count = 3;
+                } else if (first >= 0xf0 && first <= 0xf4) {
+                    count = 4;
+                } else {
+                    throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid leading byte");
+                }
+                if (index + count > value.length) {
+                    throw new Error.INVALID_ARGUMENT ("UTF-8 input ends inside a code point");
+                }
+                for (var continuation = 1; continuation < count; continuation++) {
+                    if ((value[index + continuation] & 0xc0) != 0x80) {
+                        throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid continuation byte");
+                    }
+                }
+                if ((first == 0xe0 && value[index + 1] < 0xa0)
+                    || (first == 0xed && value[index + 1] >= 0xa0)
+                    || (first == 0xf0 && value[index + 1] < 0x90)
+                    || (first == 0xf4 && value[index + 1] >= 0x90)) {
+                    throw new Error.INVALID_ARGUMENT ("UTF-8 input contains an invalid code point");
+                }
+                index += count;
+            }
+        }
+
+        public uint length {
+            get { return bytes.length; }
+        }
+
+        public uint8[] to_bytes () {
+            return copy_byte_array (bytes);
+        }
+
+        public string to_string () throws Error {
+            return string_from_bytes (bytes);
+        }
+
+        public string? to_string_or_null () {
+            try {
+                return string_from_bytes (bytes);
+            } catch (Error error) {
+                return null;
+            }
+        }
+
+        public Utf8String copy () {
+            return new Utf8String.from_owned_bytes (copy_byte_array (bytes));
+        }
+
+        public bool equal (Utf8String other) {
+            if (bytes.length != other.bytes.length) {
+                return false;
+            }
+            for (var index = 0; index < bytes.length; index++) {
+                if (bytes[index] != other.bytes[index]) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        internal Raw.StringView to_native () {
+            return byte_string_view (bytes);
+        }
+    }
+
+    public class StringList {
+        private Utf8String[] values;
+
+        internal StringList (owned Utf8String[] values) {
             this.values = (owned) values;
         }
 
@@ -504,16 +595,39 @@ namespace MaplibreNative {
             if (index >= values.length) {
                 throw new Error.INVALID_ARGUMENT ("string list index is out of range");
             }
-            return values[index];
+            return values[index].to_string ();
         }
 
-        public string[] to_array () {
-            return values;
+        public Utf8String get_utf8 (uint index) throws Error {
+            if (index >= values.length) {
+                throw new Error.INVALID_ARGUMENT ("string list index is out of range");
+            }
+            return values[index].copy ();
+        }
+
+        public string[] to_array () throws Error {
+            string[] copied = new string[values.length];
+            for (var index = 0; index < values.length; index++) {
+                copied[index] = values[index].to_string ();
+            }
+            return copied;
+        }
+
+        public Utf8String[] to_utf8_array () {
+            Utf8String[] copied = new Utf8String[values.length];
+            for (var index = 0; index < values.length; index++) {
+                copied[index] = values[index].copy ();
+            }
+            return copied;
         }
 
         public bool contains (string value) {
+            return contains_utf8 (new Utf8String (value));
+        }
+
+        public bool contains_utf8 (Utf8String value) {
             foreach (var item in values) {
-                if (item == value) {
+                if (item.equal (value)) {
                     return true;
                 }
             }

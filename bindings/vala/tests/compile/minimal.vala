@@ -419,7 +419,7 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   assert(event.payload_bytes[0] == 4);
 }
 
-void exercise_option_value_semantics() {
+void exercise_option_value_semantics() throws MaplibreNative.Error {
   var map_options = new MaplibreNative.MapOptions();
   assert(map_options.equal(map_options.copy()));
   var map_options_changed = map_options.copy();
@@ -539,6 +539,37 @@ void exercise_option_value_semantics() {
   runtime_changed.maximum_cache_size = 0;
   assert(!runtime_options.equal(runtime_changed));
 
+  uint8[] utf8_source = { 'a', 0, 'b' };
+  var utf8_value = new MaplibreNative.Utf8String.from_bytes(utf8_source);
+  utf8_source[0] = 'z';
+  assert(utf8_value.to_bytes()[0] == 'a');
+  var returned_utf8 = utf8_value.to_bytes();
+  returned_utf8[2] = 'z';
+  assert(utf8_value.to_bytes()[2] == 'b');
+  assert(utf8_value.equal(utf8_value.copy()));
+  assert(utf8_value.to_string_or_null() == null);
+  var multibyte_utf8 = new MaplibreNative.Utf8String("é");
+  assert(multibyte_utf8.length == 2);
+  assert(multibyte_utf8.to_bytes()[0] == 0xc3 && multibyte_utf8.to_bytes()[1] == 0xa9);
+  try {
+    utf8_value.to_string();
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    assert(error.message != "");
+  }
+  try {
+    new MaplibreNative.Utf8String.from_bytes({ 0xc0, 0x80 });
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message != "");
+  }
+  try {
+    MaplibreNative.JsonValue.string_utf8_bytes({ 0xff });
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message != "");
+  }
+
   var rendered_options = new MaplibreNative.RenderedFeatureQueryOptions();
   assert(rendered_options.equal(rendered_options.copy()));
   var rendered_changed = rendered_options.copy();
@@ -557,6 +588,8 @@ void exercise_option_value_semantics() {
   assert(rendered_options.equal(rendered_copy));
   rendered_copy.set_layer_ids({ "changed" });
   assert(!rendered_options.equal(rendered_copy));
+  rendered_options.set_layer_ids_utf8({ utf8_value });
+  assert(rendered_options.equal(rendered_options.copy()));
 
   var source_options = new MaplibreNative.SourceFeatureQueryOptions();
   assert(source_options.equal(source_options.copy()));
@@ -574,6 +607,8 @@ void exercise_option_value_semantics() {
   assert(source_options.equal(source_copy));
   source_copy.set_source_layer_ids({ "changed" });
   assert(!source_options.equal(source_copy));
+  source_options.set_source_layer_ids_utf8({ utf8_value });
+  assert(source_options.equal(source_options.copy()));
 
   uint8[] response_source = { 1, 2, 3 };
   var resource_response = MaplibreNative.ResourceResponse.data(response_source);
@@ -593,6 +628,11 @@ void exercise_option_value_semantics() {
   assert(!tile_source_options.equal(tile_source_changed));
   tile_source_changed = tile_source_options.copy();
   tile_source_changed.attribution = "";
+  assert(!tile_source_options.equal(tile_source_changed));
+  tile_source_changed = tile_source_options.copy();
+  tile_source_changed.set_attribution_utf8(utf8_value);
+  assert(tile_source_changed.get_attribution_utf8().equal(utf8_value));
+  assert(tile_source_changed.attribution == null);
   assert(!tile_source_options.equal(tile_source_changed));
   tile_source_changed = tile_source_options.copy();
   tile_source_changed.scheme = (MaplibreNative.StyleTileScheme) 0;
@@ -829,6 +869,96 @@ void compile_style_light_wrappers(MaplibreNative.MapHandle map) throws MaplibreN
   }));
   map.set_style_light_property("intensity", MaplibreNative.JsonValue.double_value(0.75));
   map.get_style_light_property("intensity");
+}
+
+void compile_utf8_string_view_wrappers(
+  MaplibreNative.MapHandle map,
+  MaplibreNative.RenderSessionHandle session,
+  MaplibreNative.GeoJson geojson,
+  MaplibreNative.Feature feature,
+  MaplibreNative.PremultipliedRgba8Image image,
+  MaplibreNative.CustomGeometrySourceOptions custom_options) throws MaplibreNative.Error {
+  var id = new MaplibreNative.Utf8String("id");
+  var other = new MaplibreNative.Utf8String("other");
+  var url = new MaplibreNative.Utf8String("https://example.invalid/{z}/{x}/{y}");
+  MaplibreNative.Utf8String[] tiles = { url };
+  var json = MaplibreNative.JsonValue.null_value();
+  var tile_options = new MaplibreNative.StyleTileSourceOptions();
+  tile_options.set_attribution_utf8(id);
+  var tile_id = MaplibreNative.CanonicalTileId(0, 0, 0);
+  var bounds = MaplibreNative.LatLngBounds(
+    MaplibreNative.LatLng(-1.0, -1.0),
+    MaplibreNative.LatLng(1.0, 1.0));
+  MaplibreNative.LatLng[] coordinates = {
+    MaplibreNative.LatLng(-1.0, -1.0),
+    MaplibreNative.LatLng(1.0, -1.0),
+    MaplibreNative.LatLng(1.0, 1.0),
+    MaplibreNative.LatLng(-1.0, 1.0)
+  };
+
+  map.add_geojson_source_url_utf8(id, url);
+  map.add_geojson_source_data_utf8(id, geojson);
+  map.set_geojson_source_url_utf8(id, url);
+  map.set_geojson_source_data_utf8(id, geojson);
+  map.add_style_source_json_utf8(id, json);
+  map.add_vector_source_url_utf8(id, url, tile_options);
+  map.add_vector_source_tiles_utf8(id, tiles, tile_options);
+  map.add_raster_source_url_utf8(id, url, tile_options);
+  map.add_raster_source_tiles_utf8(id, tiles, tile_options);
+  map.add_raster_dem_source_url_utf8(id, url, tile_options);
+  map.add_raster_dem_source_tiles_utf8(id, tiles, tile_options);
+  map.add_custom_geometry_source_utf8(id, custom_options);
+  map.set_custom_geometry_source_tile_data_utf8(id, tile_id, geojson);
+  map.invalidate_custom_geometry_source_tile_utf8(id, tile_id);
+  map.invalidate_custom_geometry_source_region_utf8(id, bounds);
+  map.remove_style_source_utf8(id);
+  map.style_source_exists_utf8(id);
+  map.get_style_source_type_utf8(id);
+  map.get_style_source_info_utf8(id);
+  map.copy_style_source_attribution_utf8(id);
+
+  map.add_hillshade_layer_utf8(id, other);
+  map.add_color_relief_layer_utf8(id, other, null);
+  map.add_location_indicator_layer_utf8(id, null);
+  map.set_location_indicator_location_utf8(id, MaplibreNative.LatLng(0.0, 0.0), 0.0);
+  map.set_location_indicator_bearing_utf8(id, 0.0);
+  map.set_location_indicator_accuracy_radius_utf8(id, 0.0);
+  map.set_location_indicator_image_name_utf8(id, MaplibreNative.LocationIndicatorImageKind.TOP, other);
+  map.add_style_layer_json_utf8(json, null);
+  map.remove_style_layer_utf8(id);
+  map.style_layer_exists_utf8(id);
+  map.get_style_layer_type_utf8(id);
+  map.move_style_layer_utf8(id, null);
+  map.get_style_layer_json_utf8(id);
+  map.set_style_light_property_utf8(id, json);
+  map.get_style_light_property_utf8(id);
+  map.set_layer_property_utf8(id, other, json);
+  map.get_layer_property_utf8(id, other);
+  map.set_layer_filter_utf8(id, json);
+  map.get_layer_filter_utf8(id);
+  map.set_style_image_utf8(id, image);
+  map.remove_style_image_utf8(id);
+  map.style_image_exists_utf8(id);
+  map.get_style_image_info_utf8(id);
+  map.copy_style_image_premultiplied_rgba8_utf8(id);
+
+  map.add_image_source_url_utf8(id, coordinates, url);
+  map.add_image_source_image_utf8(id, coordinates, image);
+  map.set_image_source_url_utf8(id, url);
+  map.set_image_source_image_utf8(id, image);
+  map.set_image_source_coordinates_utf8(id, coordinates);
+  map.get_image_source_coordinates_utf8(id);
+
+  var selector = new MaplibreNative.FeatureStateSelector.from_utf8(id);
+  selector.set_source_layer_id_utf8(other);
+  selector.set_feature_id_utf8(other);
+  selector.set_state_key_utf8(other);
+  var rendered_options = new MaplibreNative.RenderedFeatureQueryOptions();
+  rendered_options.set_layer_ids_utf8({ id, other });
+  var source_options = new MaplibreNative.SourceFeatureQueryOptions();
+  source_options.set_source_layer_ids_utf8({ id, other });
+  session.query_source_features_utf8(id, source_options);
+  session.query_feature_extensions_utf8(id, feature, other, other, json);
 }
 
 void compile_texture_backend_wrappers() throws MaplibreNative.Error {
@@ -1187,10 +1317,26 @@ int main() {
     assert(map_coordinates.length == 2);
 
     var inline_geojson = MaplibreNative.GeoJson.geometry(MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0)));
+    assert(inline_geojson.equal(inline_geojson.copy()));
     map.add_geojson_source_data("inline-point", inline_geojson);
     assert(map.style_source_exists("inline-point"));
     map.set_geojson_source_data("inline-point", inline_geojson);
     assert(map.remove_style_source("inline-point"));
+
+    var nul_source_id = new MaplibreNative.Utf8String.from_bytes({ 'n', 0, 's' });
+    map.add_geojson_source_data_utf8(nul_source_id, inline_geojson);
+    assert(map.style_source_exists_utf8(nul_source_id));
+    assert(map.get_style_source_type_utf8(nul_source_id) == MaplibreNative.StyleSourceType.GEOJSON);
+    var source_ids_with_nul = map.list_style_source_ids();
+    assert(source_ids_with_nul.contains_utf8(nul_source_id));
+    assert(source_ids_with_nul.to_utf8_array().length == source_ids_with_nul.length);
+    for (uint source_index = 0; source_index < source_ids_with_nul.length; source_index++) {
+      var listed_source_id = source_ids_with_nul.get_utf8(source_index);
+      if (listed_source_id.equal(nul_source_id)) {
+        assert(listed_source_id.to_bytes()[1] == 0);
+      }
+    }
+    assert(map.remove_style_source_utf8(nul_source_id));
 
     var shared_json_subtree = MaplibreNative.JsonValue.array_value({ MaplibreNative.JsonValue.string_value("shared") });
     var repeated_json_subtree = MaplibreNative.JsonValue.array_value({ shared_json_subtree, shared_json_subtree });
@@ -1262,12 +1408,14 @@ int main() {
     returned_json_values[0] = MaplibreNative.JsonValue.string_value("changed again");
     assert(copied_json_array.get_array_values()[0].get_string() == "kept");
     var feature_geojson = MaplibreNative.GeoJson.feature(feature);
+    assert(feature_geojson.equal(feature_geojson.copy()));
     map.add_geojson_source_data("inline-feature", feature_geojson);
     assert(map.style_source_exists("inline-feature"));
     map.set_geojson_source_data("inline-feature", feature_geojson);
     assert(map.remove_style_source("inline-feature"));
 
     var feature_collection_geojson = MaplibreNative.GeoJson.feature_collection(feature_collection);
+    assert(feature_collection_geojson.equal(feature_collection_geojson.copy()));
     map.add_geojson_source_data("inline-feature-collection", feature_collection_geojson);
     assert(map.style_source_exists("inline-feature-collection"));
     map.set_geojson_source_data("inline-feature-collection", feature_collection_geojson);
@@ -1284,6 +1432,10 @@ int main() {
     custom_options.buffer = 128;
     custom_options.clip = true;
     custom_options.wrap = false;
+    var nul_custom_source = new MaplibreNative.Utf8String.from_bytes({ 'c', 0, 'g' });
+    map.add_custom_geometry_source_utf8(nul_custom_source, custom_options);
+    assert(map.style_source_exists_utf8(nul_custom_source));
+    assert(map.remove_style_source_utf8(nul_custom_source));
     map.add_custom_geometry_source("custom-geometry", custom_options);
     assert(map.style_source_exists("custom-geometry"));
     var custom_layer_json = MaplibreNative.JsonValue.object_value({
@@ -1333,6 +1485,17 @@ int main() {
     var dem_source_options = new MaplibreNative.StyleTileSourceOptions();
     dem_source_options.tile_size = 256;
     dem_source_options.raster_encoding = MaplibreNative.StyleRasterDemEncoding.MAPBOX;
+
+    var nul_attribution = new MaplibreNative.Utf8String.from_bytes({ 'a', 0, 't' });
+    var nul_attribution_options = new MaplibreNative.StyleTileSourceOptions();
+    nul_attribution_options.set_attribution_utf8(nul_attribution);
+    var nul_attribution_source = new MaplibreNative.Utf8String("vector-nul-attribution");
+    map.add_vector_source_tiles_utf8(
+      nul_attribution_source,
+      { new MaplibreNative.Utf8String("https://example.invalid/{z}/{x}/{y}.pbf") },
+      nul_attribution_options);
+    assert(map.copy_style_source_attribution_utf8(nul_attribution_source).equal(nul_attribution));
+    assert(map.remove_style_source_utf8(nul_attribution_source));
 
     map.add_vector_source_url("vector-url", "https://example.invalid/vector.json", vector_source_options);
     assert(map.get_style_source_type("vector-url") == MaplibreNative.StyleSourceType.VECTOR);
@@ -1630,6 +1793,9 @@ int main() {
         if (GLib.Environment.get_variable("MLN_VALA_RUN_TEXTURE_BACKEND_COMPILE_SMOKE") == "1") {
           compile_texture_backend_wrappers();
         }
+        if (GLib.Environment.get_variable("MLN_VALA_RUN_UTF8_API_COMPILE_SMOKE") == "1") {
+          compile_utf8_string_view_wrappers(map, session, feature_geojson, feature, image, custom_options);
+        }
         session.resize(32, 16, 1.0);
         assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE, 64));
         session.render_update();
@@ -1657,6 +1823,8 @@ int main() {
         if (source_query_count > 0) {
           var queried_feature = source_query_result[0];
           assert(queried_feature.feature.property_members.length > 0);
+          queried_feature.get_source_id_utf8();
+          queried_feature.get_source_layer_id_utf8();
           assert(queried_feature.equal(queried_feature.copy()));
         }
         if (GLib.Environment.get_variable("MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE") == "1") {

@@ -64,11 +64,6 @@ namespace MaplibreNative {
         return copy_utf8_bytes ((uint8*) value, size);
     }
 
-    internal Raw.StringView string_view (string value) throws Error {
-        reject_embedded_nul (value);
-        return Raw.StringView () { data = (char*) value, size = value.length };
-    }
-
     internal uint8[] copy_string_bytes (string value) {
         uint8[] copied = new uint8[value.length];
         for (var index = 0; index < value.length; index++) {
@@ -147,16 +142,6 @@ namespace MaplibreNative {
         return ((string) copied).dup ();
     }
 
-    internal string copy_string_view (Raw.StringView view) throws Error {
-        if (view.data == null && view.size == 0) {
-            return "";
-        }
-        if (view.data == null) {
-            throw new Error.INVALID_ARGUMENT ("string view data is null");
-        }
-        return copy_utf8_bytes ((uint8*) view.data, view.size);
-    }
-
     internal uint8[]? copy_bytes (uint8* data, size_t size) {
         if (data == null) {
             return null;
@@ -172,11 +157,11 @@ namespace MaplibreNative {
         try {
             size_t count;
             check_status (Raw.style_id_list_count (list, out count));
-            string[] values = new string[count];
+            Utf8String[] values = new Utf8String[count];
             for (size_t index = 0; index < count; index++) {
                 Raw.StringView item;
                 check_status (Raw.style_id_list_get (list, index, out item));
-                values[index] = copy_string_view (item);
+                values[index] = new Utf8String.from_bytes (copy_string_view_bytes (item));
             }
             return new StringList ((owned) values);
         } finally {

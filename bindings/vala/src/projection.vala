@@ -145,7 +145,8 @@ namespace MaplibreNative {
         }
 
         public void set_visible_geometry (Geometry geometry, EdgeInsets padding) throws Error {
-            var native_geometry = geometry.to_native ();
+            var geometry_storage = geometry.copy ();
+            var native_geometry = geometry_storage.to_native ();
             var lease = require_live ();
             check_status (Raw.map_projection_set_visible_geometry (lease.native, &native_geometry, padding.to_native ()));
         }

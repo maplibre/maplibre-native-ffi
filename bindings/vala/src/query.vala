@@ -30,7 +30,7 @@ namespace MaplibreNative {
         }
     }
 
-    public class FeatureExtensionResultHandle {
+    internal class FeatureExtensionResultHandle {
         private Raw.FeatureExtensionResult? native;
 
         public bool closed { get { return native == null; } }
@@ -121,21 +121,37 @@ namespace MaplibreNative {
     }
 
     public class RenderedFeatureQueryOptions {
-        private string[] layer_ids;
+        private Utf8String[] layer_ids;
         private bool has_layer_ids;
         private JsonValue? filter;
         private Raw.StringView[] layer_id_views;
         private Raw.JsonValue filter_native;
 
         public RenderedFeatureQueryOptions () {
-            layer_ids = new string[0];
+            layer_ids = new Utf8String[0];
         }
 
-        public void set_layer_ids (string[] layer_ids) {
-            this.layer_ids = new string[layer_ids.length];
+        public void set_layer_ids (string[] layer_ids) throws Error {
+            var copied = new Utf8String[layer_ids.length];
             for (var index = 0; index < layer_ids.length; index++) {
-                this.layer_ids[index] = layer_ids[index];
+                if (layer_ids[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("layer ID is null");
+                }
+                copied[index] = new Utf8String (layer_ids[index]);
             }
+            this.layer_ids = copied;
+            has_layer_ids = true;
+        }
+
+        public void set_layer_ids_utf8 (Utf8String[] layer_ids) throws Error {
+            var copied = new Utf8String[layer_ids.length];
+            for (var index = 0; index < layer_ids.length; index++) {
+                if (layer_ids[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("layer ID is null");
+                }
+                copied[index] = layer_ids[index].copy ();
+            }
+            this.layer_ids = copied;
             has_layer_ids = true;
         }
 
@@ -146,9 +162,9 @@ namespace MaplibreNative {
         public RenderedFeatureQueryOptions copy () {
             var copied = new RenderedFeatureQueryOptions ();
             copied.has_layer_ids = has_layer_ids;
-            copied.layer_ids = new string[layer_ids.length];
+            copied.layer_ids = new Utf8String[layer_ids.length];
             for (var index = 0; index < layer_ids.length; index++) {
-                copied.layer_ids[index] = layer_ids[index];
+                copied.layer_ids[index] = layer_ids[index].copy ();
             }
             copied.filter = filter == null ? null : filter.copy ();
             return copied;
@@ -159,7 +175,7 @@ namespace MaplibreNative {
                 return false;
             }
             for (var index = 0; index < layer_ids.length; index++) {
-                if (layer_ids[index] != other.layer_ids[index]) {
+                if (!layer_ids[index].equal (other.layer_ids[index])) {
                     return false;
                 }
             }
@@ -173,7 +189,7 @@ namespace MaplibreNative {
             if (has_layer_ids) {
                 layer_id_views = new Raw.StringView[layer_ids.length];
                 for (var i = 0; i < layer_ids.length; i++) {
-                    layer_id_views[i] = string_view (layer_ids[i]);
+                    layer_id_views[i] = layer_ids[i].to_native ();
                 }
                 native.fields |= (uint32) Raw.RenderedFeatureQueryOptionField.LAYER_IDS;
                 native.layer_ids = layer_id_views;
@@ -188,21 +204,37 @@ namespace MaplibreNative {
     }
 
     public class SourceFeatureQueryOptions {
-        private string[] source_layer_ids;
+        private Utf8String[] source_layer_ids;
         private bool has_source_layer_ids;
         private JsonValue? filter;
         private Raw.StringView[] source_layer_id_views;
         private Raw.JsonValue filter_native;
 
         public SourceFeatureQueryOptions () {
-            source_layer_ids = new string[0];
+            source_layer_ids = new Utf8String[0];
         }
 
-        public void set_source_layer_ids (string[] source_layer_ids) {
-            this.source_layer_ids = new string[source_layer_ids.length];
+        public void set_source_layer_ids (string[] source_layer_ids) throws Error {
+            var copied = new Utf8String[source_layer_ids.length];
             for (var index = 0; index < source_layer_ids.length; index++) {
-                this.source_layer_ids[index] = source_layer_ids[index];
+                if (source_layer_ids[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("source layer ID is null");
+                }
+                copied[index] = new Utf8String (source_layer_ids[index]);
             }
+            this.source_layer_ids = copied;
+            has_source_layer_ids = true;
+        }
+
+        public void set_source_layer_ids_utf8 (Utf8String[] source_layer_ids) throws Error {
+            var copied = new Utf8String[source_layer_ids.length];
+            for (var index = 0; index < source_layer_ids.length; index++) {
+                if (source_layer_ids[index] == null) {
+                    throw new Error.INVALID_ARGUMENT ("source layer ID is null");
+                }
+                copied[index] = source_layer_ids[index].copy ();
+            }
+            this.source_layer_ids = copied;
             has_source_layer_ids = true;
         }
 
@@ -213,9 +245,9 @@ namespace MaplibreNative {
         public SourceFeatureQueryOptions copy () {
             var copied = new SourceFeatureQueryOptions ();
             copied.has_source_layer_ids = has_source_layer_ids;
-            copied.source_layer_ids = new string[source_layer_ids.length];
+            copied.source_layer_ids = new Utf8String[source_layer_ids.length];
             for (var index = 0; index < source_layer_ids.length; index++) {
-                copied.source_layer_ids[index] = source_layer_ids[index];
+                copied.source_layer_ids[index] = source_layer_ids[index].copy ();
             }
             copied.filter = filter == null ? null : filter.copy ();
             return copied;
@@ -227,7 +259,7 @@ namespace MaplibreNative {
                 return false;
             }
             for (var index = 0; index < source_layer_ids.length; index++) {
-                if (source_layer_ids[index] != other.source_layer_ids[index]) {
+                if (!source_layer_ids[index].equal (other.source_layer_ids[index])) {
                     return false;
                 }
             }
@@ -241,7 +273,7 @@ namespace MaplibreNative {
             if (has_source_layer_ids) {
                 source_layer_id_views = new Raw.StringView[source_layer_ids.length];
                 for (var i = 0; i < source_layer_ids.length; i++) {
-                    source_layer_id_views[i] = string_view (source_layer_ids[i]);
+                    source_layer_id_views[i] = source_layer_ids[i].to_native ();
                 }
                 native.fields |= (uint32) Raw.SourceFeatureQueryOptionField.SOURCE_LAYER_IDS;
                 native.source_layer_ids = source_layer_id_views;
@@ -256,27 +288,38 @@ namespace MaplibreNative {
     }
 
     public class QueriedFeature {
+        private Utf8String? source_id_storage;
+        private Utf8String? source_layer_id_storage;
+
         public Feature feature { get; private set; }
-        public string? source_id { get; private set; }
-        public string? source_layer_id { get; private set; }
+        public string? source_id {
+            owned get {
+                return source_id_storage == null ? null : source_id_storage.to_string_or_null ();
+            }
+        }
+        public string? source_layer_id {
+            owned get {
+                return source_layer_id_storage == null ? null : source_layer_id_storage.to_string_or_null ();
+            }
+        }
         public JsonValue? state { get; private set; }
 
-        private QueriedFeature (Feature feature, string? source_id, string? source_layer_id, JsonValue? state) {
+        private QueriedFeature (Feature feature, Utf8String? source_id, Utf8String? source_layer_id, JsonValue? state) {
             this.feature = feature;
-            this.source_id = source_id;
-            this.source_layer_id = source_layer_id;
+            source_id_storage = source_id;
+            source_layer_id_storage = source_layer_id;
             this.state = state;
         }
 
         internal static QueriedFeature from_native (Raw.QueriedFeature native) throws Error {
-            string? source_id = null;
-            string? source_layer_id = null;
+            Utf8String? source_id = null;
+            Utf8String? source_layer_id = null;
             JsonValue? state = null;
             if ((native.fields & (uint32) Raw.QueriedFeatureField.SOURCE_ID) != 0) {
-                source_id = copy_string_view (native.source_id);
+                source_id = new Utf8String.from_bytes (copy_string_view_bytes (native.source_id));
             }
             if ((native.fields & (uint32) Raw.QueriedFeatureField.SOURCE_LAYER_ID) != 0) {
-                source_layer_id = copy_string_view (native.source_layer_id);
+                source_layer_id = new Utf8String.from_bytes (copy_string_view_bytes (native.source_layer_id));
             }
             if ((native.fields & (uint32) Raw.QueriedFeatureField.STATE) != 0 && native.state != null) {
                 state = JsonValue.from_native (native.state[0]);
@@ -284,26 +327,38 @@ namespace MaplibreNative {
             return new QueriedFeature (Feature.from_native (native.feature), source_id, source_layer_id, state);
         }
 
+        public Utf8String? get_source_id_utf8 () {
+            return source_id_storage == null ? null : source_id_storage.copy ();
+        }
+
+        public Utf8String? get_source_layer_id_utf8 () {
+            return source_layer_id_storage == null ? null : source_layer_id_storage.copy ();
+        }
+
         public QueriedFeature copy () throws Error {
             return new QueriedFeature (
                 feature.copy (),
-                source_id,
-                source_layer_id,
+                source_id_storage == null ? null : source_id_storage.copy (),
+                source_layer_id_storage == null ? null : source_layer_id_storage.copy (),
                 state == null ? null : state.copy ()
             );
         }
 
         public bool equal (QueriedFeature other) {
             return feature.equal (other.feature)
-                && source_id == other.source_id
-                && source_layer_id == other.source_layer_id
+                && (source_id_storage == null
+                    ? other.source_id_storage == null
+                    : other.source_id_storage != null && source_id_storage.equal (other.source_id_storage))
+                && (source_layer_id_storage == null
+                    ? other.source_layer_id_storage == null
+                    : other.source_layer_id_storage != null && source_layer_id_storage.equal (other.source_layer_id_storage))
                 && (state == null
                     ? other.state == null
                     : other.state != null && state.equal (other.state));
         }
     }
 
-    public class FeatureQueryResultHandle {
+    internal class FeatureQueryResultHandle {
         private Raw.FeatureQueryResult? native;
 
         public bool closed { get { return native == null; } }
