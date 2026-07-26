@@ -1785,6 +1785,8 @@ test "Metal borrowed texture renders through public bindings" {
 
     var session = try maplibre.attachMetalBorrowedTexture(&map, .{
         .extent = .{ .width = 128, .height = 128 },
+        .physical_width = 128,
+        .physical_height = 128,
         .texture = maplibre.NativePointer.fromPtr(borrowed),
     });
     defer session.close() catch {};
