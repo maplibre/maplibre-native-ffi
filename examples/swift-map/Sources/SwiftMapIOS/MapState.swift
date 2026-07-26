@@ -149,11 +149,6 @@ final class MapState {
 
   func render() throws -> Bool {
     guard let renderTarget else { return false }
-    do {
-      try renderTarget.renderUpdate()
-      return true
-    } catch let error as MaplibreError where error.kind == .invalidState {
-      return false
-    }
+    return try renderTarget.renderUpdate()
   }
 }

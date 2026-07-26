@@ -400,11 +400,19 @@ pub const RenderSessionHandle = enum(u128) {
         );
     }
 
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!void {
+    /// Renders the latest available map render update. Returns false when the
+    /// map has not published a render update yet; pump the runtime and call
+    /// again when a render-update-available event is reported.
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
-        try status.checkStatus(c.mln_render_session_render_update(lease.native), lease.diagnostic_store);
+        var rendered: bool = false;
+        try status.checkStatus(
+            c.mln_render_session_render_update(lease.native, &rendered),
+            lease.diagnostic_store,
+        );
+        return rendered;
     }
 
     pub fn detach(self: *RenderSessionHandle) status.Error!void {

@@ -53,7 +53,8 @@ func TestRenderSessionWrongThreadReturnsWrongThreadDarwin(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		errCh <- session.RenderUpdate()
+		_, err := session.RenderUpdate()
+		errCh <- err
 	}()
 	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
 		t.Fatalf("RenderUpdate() from another thread error = %v, want ErrWrongThread", err)

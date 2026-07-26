@@ -35,6 +35,7 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.query.FeatureStateSelector
 import org.maplibre.nativeffi.query.QueriedFeature
@@ -62,6 +63,44 @@ class RenderSessionHandleTest {
   // BND-160, BND-161, BND-163, BND-164, BND-165, BND-166, BND-167, BND-168,
   // BND-169, BND-170: owned-texture rendering, readback, queries, frames, and
   // owner-thread checks.
+
+  @Test
+  fun renderUpdateWithoutPendingUpdateReportsFalseAndKeepsSessionLive() {
+    if (!metalSupportedOrInapplicable()) return
+    val device =
+      MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            mapMode = MapMode.STATIC
+          },
+        )
+      try {
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          assertFalse(session.renderUpdate())
+          session.resize(32, 16, 1.0)
+        } finally {
+          session.close()
+        }
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
 
   @Test
   fun metalOwnedTextureSessionRendersReadsBackAcquiresFrameAndDetaches() {
@@ -108,7 +147,7 @@ class RenderSessionHandleTest {
 
           map.setStyleJson(QUERY_STYLE_JSON)
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
 
           val sessionCallError = AtomicReference<Throwable?>(null)
           spawnSessionRenderOnNativeThread(session, sessionCallError)
@@ -120,7 +159,7 @@ class RenderSessionHandleTest {
           assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
           assertTrue(sessionCallDiagnostic.isNotBlank())
 
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
 
           assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
 
@@ -276,7 +315,7 @@ class RenderSessionHandleTest {
           assertFailsWith<IllegalStateException> { frame.width() }
 
           session.resize(16, 8, 2.0)
-          session.renderUpdate()
+          assertTrue(session.renderUpdate())
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
           assertFalse(session.isClosed)
@@ -329,7 +368,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            session.renderUpdate()
+            assertTrue(session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -364,7 +403,7 @@ class RenderSessionHandleTest {
             assertTrue(
               waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
             )
-            session.renderUpdate()
+            assertTrue(session.renderUpdate())
             assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
             assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
           } finally {
@@ -447,7 +486,7 @@ class RenderSessionHandleTest {
     repeat(100) {
       val event = runtime.pollEvent() ?: return
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        session.renderUpdate()
+        assertTrue(session.renderUpdate())
         return
       }
     }

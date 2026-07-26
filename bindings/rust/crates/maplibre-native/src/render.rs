@@ -1207,11 +1207,20 @@ impl RenderSessionHandle {
     }
 
     /// Processes the latest map render update for this render target.
-    pub fn render_update(&self) -> Result<()> {
+    ///
+    /// Returns `false` when the map has not published a render update yet,
+    /// which is normal before the map first invalidates; pump the runtime and
+    /// call again when a render-update-available event is reported.
+    pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
-        // SAFETY: session is a live render session handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_render_session_render_update(session) })
+        let mut rendered = false;
+        // SAFETY: session is a live render session handle owned by this wrapper,
+        // and rendered points to caller-owned output storage.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_render_update(session, &raw mut rendered)
+        })?;
+        Ok(rendered)
     }
 
     /// Detaches backend-bound render resources from the map.

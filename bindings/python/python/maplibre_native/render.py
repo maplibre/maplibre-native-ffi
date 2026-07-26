@@ -428,9 +428,14 @@ class RenderSessionHandle(NativeHandleMixin):
         """Resize this attached render session."""
         self._native.resize(width, height, scale_factor)
 
-    def render_update(self) -> None:
-        """Process the latest map render update for this target."""
-        self._native.render_update()
+    def render_update(self) -> bool:
+        """Process the latest map render update for this target.
+
+        Returns False when the map has not published a render update yet, which
+        is normal before the map first invalidates; pump the runtime and call
+        again when a render-update-available event is reported.
+        """
+        return bool(self._native.render_update())
 
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle."""

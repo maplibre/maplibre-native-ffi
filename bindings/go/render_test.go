@@ -15,7 +15,7 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	if err := nilSession.Close(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle Close() error = %v, want ErrInvalidArgument", err)
 	}
-	if err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle RenderUpdate() error = %v, want ErrInvalidArgument", err)
 	}
 	if _, err := nilSession.ReadPremultipliedRGBA8Into(nil); !errors.Is(err, ErrInvalidArgument) {
@@ -191,7 +191,10 @@ func TestRenderSessionOperationsRejectActiveFrame(t *testing.T) {
 		call func() error
 	}{
 		{name: "Resize", call: func() error { return session.Resize(RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}) }},
-		{name: "RenderUpdate", call: session.RenderUpdate},
+		{name: "RenderUpdate", call: func() error {
+			_, err := session.RenderUpdate()
+			return err
+		}},
 		{name: "Detach", call: session.Detach},
 		{name: "ReduceMemoryUse", call: session.ReduceMemoryUse},
 		{name: "ClearData", call: session.ClearData},

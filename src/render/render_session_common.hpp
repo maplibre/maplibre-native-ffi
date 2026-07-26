@@ -246,7 +246,9 @@ auto render_session_resize(
   mln_render_session* session, uint32_t width, uint32_t height,
   double scale_factor
 ) -> mln_status;
-auto render_session_render_update(mln_render_session* session) -> mln_status;
+auto render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) -> mln_status;
 auto render_session_detach(mln_render_session* session) -> mln_status;
 auto render_session_destroy(mln_render_session* session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session* session)

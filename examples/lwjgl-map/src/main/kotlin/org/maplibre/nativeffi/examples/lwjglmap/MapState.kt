@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.examples.lwjglmap
 
 import org.lwjgl.vulkan.VK10
 import org.maplibre.nativeffi.camera.CameraOptions
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
@@ -50,16 +49,13 @@ private constructor(
     if (!renderPending) {
       return false
     }
-    try {
+    val rendered =
       if (renderTarget.needsMetalAutoreleasePool()) {
         MacObjectiveC.autoreleasePool().use { renderTarget.renderUpdate() }
       } else {
         renderTarget.renderUpdate()
       }
-      renderPending = false
-    } catch (_: InvalidStateException) {
-      renderPending = true
-    }
+    renderPending = !rendered
     return true
   }
 
@@ -310,9 +306,7 @@ private constructor(
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
-    }
+    override fun renderUpdate(): Boolean = session.renderUpdate()
 
     override fun close() {
       session.close()
@@ -326,9 +320,7 @@ private constructor(
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
-    }
+    override fun renderUpdate(): Boolean = session.renderUpdate()
 
     override fun close() {
       session.close()
@@ -344,8 +336,10 @@ private constructor(
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
+    override fun renderUpdate(): Boolean {
+      if (!session.renderUpdate()) {
+        return false
+      }
       session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
         val frame = frameHandle.frame()
         check(frame.width() > 0 && frame.height() > 0) {
@@ -356,6 +350,7 @@ private constructor(
         }
         compositor.drawImageView(frame.imageView().address)
       }
+      return true
     }
 
     override fun close() {
@@ -377,8 +372,10 @@ private constructor(
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
+    override fun renderUpdate(): Boolean {
+      if (!session.renderUpdate()) {
+        return false
+      }
       session.acquireMetalOwnedTextureFrame().use { frameHandle ->
         val frame = frameHandle.frame()
         check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
@@ -386,6 +383,7 @@ private constructor(
         }
         compositor.drawTexture(frame.texture().address)
       }
+      return true
     }
 
     override fun close() {
@@ -425,13 +423,16 @@ private constructor(
       error("borrowed texture resize requires render target reattachment")
     }
 
-    override fun renderUpdate() {
+    override fun renderUpdate(): Boolean {
       val currentSession = checkNotNull(session) { "Vulkan borrowed texture session is detached" }
       val currentCompositor =
         checkNotNull(compositor) { "Vulkan borrowed texture compositor is detached" }
       val currentImage = checkNotNull(image) { "Vulkan borrowed image is detached" }
-      currentSession.renderUpdate()
+      if (!currentSession.renderUpdate()) {
+        return false
+      }
       currentCompositor.drawImageView(currentImage.view())
+      return true
     }
 
     override fun close() {
@@ -483,13 +484,16 @@ private constructor(
       error("borrowed texture resize requires render target reattachment")
     }
 
-    override fun renderUpdate() {
+    override fun renderUpdate(): Boolean {
       val currentSession = checkNotNull(session) { "Metal borrowed texture session is detached" }
       val currentCompositor =
         checkNotNull(compositor) { "Metal borrowed texture compositor is detached" }
       val currentTexture = checkNotNull(texture) { "Metal borrowed texture is detached" }
-      currentSession.renderUpdate()
+      if (!currentSession.renderUpdate()) {
+        return false
+      }
       currentCompositor.drawTexture(currentTexture.texture())
+      return true
     }
 
     override fun close() {

@@ -119,9 +119,7 @@ internal object OpenGLRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
-    }
+    override fun renderUpdate(): Boolean = session.renderUpdate()
 
     override fun close() {
       session.close()
@@ -137,8 +135,10 @@ internal object OpenGLRenderTarget {
       session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
     }
 
-    override fun renderUpdate() {
-      session.renderUpdate()
+    override fun renderUpdate(): Boolean {
+      if (!session.renderUpdate()) {
+        return false
+      }
       session.acquireOpenGLOwnedTextureFrame().use { frameHandle ->
         val frame = frameHandle.frame()
         check(frame.width() > 0 && frame.height() > 0) {
@@ -149,6 +149,7 @@ internal object OpenGLRenderTarget {
         }
         compositor.drawTexture(frame.texture())
       }
+      return true
     }
 
     override fun close() {
@@ -188,13 +189,16 @@ internal object OpenGLRenderTarget {
       error("borrowed texture resize requires render target reattachment")
     }
 
-    override fun renderUpdate() {
+    override fun renderUpdate(): Boolean {
       val currentSession = checkNotNull(session) { "OpenGL borrowed texture session is detached" }
       val currentCompositor =
         checkNotNull(compositor) { "OpenGL borrowed texture compositor is detached" }
       val currentTexture = checkNotNull(texture) { "OpenGL borrowed texture is detached" }
-      currentSession.renderUpdate()
+      if (!currentSession.renderUpdate()) {
+        return false
+      }
       currentCompositor.drawTexture(currentTexture.texture())
+      return true
     }
 
     override fun close() {

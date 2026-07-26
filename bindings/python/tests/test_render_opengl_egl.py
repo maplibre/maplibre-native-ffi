@@ -306,10 +306,10 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
-def test_render_update_without_pending_update_keeps_session_live(
+def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
-    assert_invalid_state(opengl_owned_session.session.render_update)
+    assert opengl_owned_session.session.render_update() is False
 
     assert not opengl_owned_session.session.closed
     opengl_owned_session.session.resize(32, 16, 1.0)

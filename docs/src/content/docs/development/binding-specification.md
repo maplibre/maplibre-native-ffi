@@ -504,7 +504,8 @@ window.
 The public handle exposes:
 
 - `resize` for session kinds that support resize;
-- `render_update` for the latest available map render update;
+- `render_update` for the latest available map render update, reporting whether
+  an update was rendered;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation.
 
@@ -685,7 +686,7 @@ that a real native failure would expose.
 | BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
 | BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
 | BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
-| BND-164 | `render_update` maps invalid state without closing the session.                                                                                           |
+| BND-164 | `render_update` reports no-update-available as a false result without closing the session.                                                                |
 | BND-165 | Resize updates extent through the public render session API.                                                                                              |
 | BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
 | BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |

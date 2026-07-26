@@ -36,7 +36,10 @@ internal unsafe delegate mln_status RenderSessionResize(
     double scaleFactor
 );
 
-internal unsafe delegate mln_status RenderSessionRenderUpdate(mln_render_session* session);
+internal unsafe delegate mln_status RenderSessionRenderUpdate(
+    mln_render_session* session,
+    bool* out_rendered
+);
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
     mln_render_session* session,
@@ -70,8 +73,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         height,
         scaleFactor
     ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
-    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static session =>
-        NativeMethods.mln_render_session_render_update(session);
+    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static (
+        session,
+        outRendered
+    ) => NativeMethods.mln_render_session_render_update(session, outRendered);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
     private static readonly StatusDestroy<mln_render_session> DefaultDestroy = static session =>
@@ -353,10 +358,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
     }
 
-    public void RenderUpdate()
+    /// <summary>
+    /// Renders the latest available map render update. Returns false when the
+    /// map has not published a render update yet, which is normal before the
+    /// map first invalidates; pump the runtime and call again when a
+    /// render-update-available event is reported.
+    /// </summary>
+    public bool RenderUpdate()
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
-        NativeStatus.Check(RenderUpdateNative(Pointer));
+        var rendered = false;
+        NativeStatus.Check(RenderUpdateNative(Pointer, &rendered));
+        return rendered;
     }
 
     public void Detach()

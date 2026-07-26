@@ -18,7 +18,14 @@ public expect class RenderSessionHandle : AutoCloseable {
 
   public fun resize(width: Int, height: Int, scaleFactor: Double)
 
-  public fun renderUpdate()
+  /**
+   * Renders the latest available map render update.
+   *
+   * Returns false when the map has not published a render update yet, which is normal before the
+   * map first invalidates; pump the runtime and call again when a render-update-available event is
+   * reported.
+   */
+  public fun renderUpdate(): Boolean
 
   public fun detach()
 

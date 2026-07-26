@@ -681,20 +681,28 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	})
 }
 
-// RenderUpdate renders one frame/update into the attached render target.
-func (session *RenderSessionHandle) RenderUpdate() error {
+// RenderUpdate renders the latest available map render update into the
+// attached render target. It reports false when the map has not published a
+// render update yet, which is normal before the map first invalidates; pump
+// the runtime and call again when a render-update-available event is reported.
+func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return session.withNoAcquiredFrame(func() error {
+	var rendered C.bool
+	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr)), &rendered))
 		})
 	})
+	if err != nil {
+		return false, err
+	}
+	return bool(rendered), nil
 }
 
 // Detach detaches the render target from the session.

@@ -405,10 +405,20 @@ public final class RenderSessionHandle {
     }
   }
 
-  public func renderUpdate() throws {
+  /// Renders the latest available map render update.
+  ///
+  /// Returns false when the map has not published a render update yet, which
+  /// is normal before the map first invalidates; pump the runtime and call
+  /// again when a render-update-available event is reported.
+  @discardableResult
+  public func renderUpdate() throws -> Bool {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_render_update(handle
-          .requireLive()))
+      var rendered = false
+      try checkStatus(mln_render_session_render_update(
+        handle.requireLive(),
+        &rendered
+      ))
+      return rendered
     }
   }
 

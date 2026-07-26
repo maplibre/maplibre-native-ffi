@@ -976,11 +976,18 @@ auto render_session_resize(
   return MLN_STATUS_OK;
 }
 
-auto render_session_render_update(mln_render_session* session) -> mln_status {
+auto render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) -> mln_status {
   const auto status = validate_live_attached_render_session(session);
   if (status != MLN_STATUS_OK) {
     return status;
   }
+  if (out_rendered == nullptr) {
+    set_thread_error("out_rendered must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  *out_rendered = false;
   if (
     session->kind == RenderSessionKind::Texture && session->texture.acquired
   ) {
@@ -990,8 +997,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
 
   auto update = map_latest_update(session->map);
   if (!update) {
-    set_thread_error("no map render update is available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_OK;
   }
 
   if (session->kind == RenderSessionKind::Texture) {
@@ -1029,6 +1035,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     }
   }
   session->rendered_generation = session->generation;
+  *out_rendered = true;
   return MLN_STATUS_OK;
 }
 
