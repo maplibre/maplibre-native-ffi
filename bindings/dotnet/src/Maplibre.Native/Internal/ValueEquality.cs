@@ -1,12 +1,30 @@
 namespace Maplibre.Native.Internal;
 
 /// <summary>
-/// Structural comparison helpers for public value types that hold list-valued members. Record
-/// synthesis compares such members by reference, so types holding them supply their own
-/// <c>Equals</c> and <c>GetHashCode</c> built on these helpers.
+/// Structural comparison and snapshot helpers for public value types that hold list-valued
+/// members. Record synthesis compares such members by reference and stores the caller's list, so
+/// types holding them supply their own <c>Equals</c>, <c>GetHashCode</c>, and <c>init</c>
+/// accessors built on these helpers.
 /// </summary>
 internal static class ValueEquality
 {
+    /// <summary>Copies a caller-owned list into storage the caller cannot mutate.</summary>
+    internal static IReadOnlyList<T> Snapshot<T>(IReadOnlyList<T>? values) =>
+        values is null || values.Count == 0 ? [] : Array.AsReadOnly([.. values]);
+
+    /// <summary>Copies a caller-owned list of lists at both levels.</summary>
+    internal static IReadOnlyList<IReadOnlyList<T>> NestedSnapshot<T>(
+        IReadOnlyList<IReadOnlyList<T>>? values
+    ) => values is null || values.Count == 0 ? [] : Array.AsReadOnly([.. values.Select(Snapshot)]);
+
+    /// <summary>Copies a caller-owned list of lists of lists at all three levels.</summary>
+    internal static IReadOnlyList<IReadOnlyList<IReadOnlyList<T>>> DeepNestedSnapshot<T>(
+        IReadOnlyList<IReadOnlyList<IReadOnlyList<T>>>? values
+    ) =>
+        values is null || values.Count == 0
+            ? []
+            : Array.AsReadOnly([.. values.Select(NestedSnapshot)]);
+
     internal static bool SequenceEquals<T>(IReadOnlyList<T>? left, IReadOnlyList<T>? right) =>
         SequenceEquals(left, right, static (a, b) => EqualityComparer<T>.Default.Equals(a, b));
 

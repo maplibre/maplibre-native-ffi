@@ -28,18 +28,34 @@ public abstract record JsonValue
 
     public sealed record Array(IReadOnlyList<JsonValue> Values) : JsonValue
     {
-        public bool Equals(Array? other) =>
-            other is not null && ValueEquality.SequenceEquals(Values, other.Values);
+        private readonly IReadOnlyList<JsonValue> values = ValueEquality.Snapshot(Values);
 
-        public override int GetHashCode() => ValueEquality.SequenceHashCode(Values);
+        public IReadOnlyList<JsonValue> Values
+        {
+            get => values;
+            init => values = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(Array? other) =>
+            other is not null && ValueEquality.SequenceEquals(values, other.values);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(values);
     }
 
     public sealed record Object(IReadOnlyList<JsonMember> Members) : JsonValue
     {
-        public bool Equals(Object? other) =>
-            other is not null && ValueEquality.SequenceEquals(Members, other.Members);
+        private readonly IReadOnlyList<JsonMember> members = ValueEquality.Snapshot(Members);
 
-        public override int GetHashCode() => ValueEquality.SequenceHashCode(Members);
+        public IReadOnlyList<JsonMember> Members
+        {
+            get => members;
+            init => members = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(Object? other) =>
+            other is not null && ValueEquality.SequenceEquals(members, other.members);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(members);
     }
 }
 
