@@ -431,9 +431,12 @@ class RenderSessionHandle(NativeHandleMixin):
     def render_update(self) -> bool:
         """Process the latest map render update for this target.
 
-        Returns False when the map has not published a render update yet, which
-        is normal before the map first invalidates; pump the runtime and call
-        again when a render-update-available event is reported.
+        The map retains its latest update, so repeated calls re-render it and
+        return True again; use this to redraw on demand after resize or surface
+        expose, and gate frame loops on render-update-available events instead
+        of the return value. Returns False when the map has not published a
+        render update yet, which is normal before the map first invalidates;
+        keep pumping the runtime until an update is reported.
         """
         return bool(self._native.render_update())
 

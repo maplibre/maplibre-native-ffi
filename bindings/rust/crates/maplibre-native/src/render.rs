@@ -1208,9 +1208,12 @@ impl RenderSessionHandle {
 
     /// Processes the latest map render update for this render target.
     ///
-    /// Returns `false` when the map has not published a render update yet,
-    /// which is normal before the map first invalidates; pump the runtime and
-    /// call again when a render-update-available event is reported.
+    /// The map retains its latest update, so repeated calls re-render it and
+    /// return `true` again; use this to redraw on demand after resize or
+    /// surface expose, and gate frame loops on render-update-available events
+    /// instead of the return value. Returns `false` when the map has not
+    /// published a render update yet, which is normal before the map first
+    /// invalidates; keep pumping the runtime until an update is reported.
     pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;

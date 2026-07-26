@@ -46,10 +46,14 @@ MLN_API mln_status mln_render_session_resize(
  * Surface sessions render and present through their native surface. Texture
  * sessions render into their texture target.
  *
- * On success, *out_rendered reports whether an update was rendered. It is
- * false when the map has not published a render update yet, which is normal
- * before the map first invalidates; keep pumping the runtime and call again
- * when MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE is reported.
+ * On success, *out_rendered reports whether the latest available map render
+ * update was rendered. The map retains its latest update, so repeated calls
+ * re-render it and report true again; hosts use this to redraw on demand
+ * after resize or surface expose, and gate frame-driven loops on
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE instead of the return value.
+ * *out_rendered is false when the map has not published a render update yet,
+ * which is normal before the map first invalidates; keep pumping the runtime
+ * and call again when an update is reported.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_rendered set.
