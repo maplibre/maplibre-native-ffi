@@ -394,7 +394,7 @@ public sealed unsafe class RenderSessionTests
                 resizeCalls++;
                 return mln_status.MLN_STATUS_OK;
             },
-            _ =>
+            (_, _) =>
             {
                 renderUpdateCalls++;
                 return mln_status.MLN_STATUS_OK;
@@ -447,7 +447,7 @@ public sealed unsafe class RenderSessionTests
         try
         {
             AssertActiveFrameError(() => session.Resize(64, 64, 1));
-            AssertActiveFrameError(session.RenderUpdate);
+            AssertActiveFrameError(() => _ = session.RenderUpdate());
             AssertActiveFrameError(session.Detach);
             AssertActiveFrameError(() => _ = session.TextureImageInfo());
             using var buffer = new NativeBuffer(4);
@@ -521,7 +521,7 @@ public sealed unsafe class RenderSessionTests
         );
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            _ => mln_status.MLN_STATUS_OK,
+            (_, _) => mln_status.MLN_STATUS_OK,
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             session =>
             {
@@ -607,7 +607,7 @@ public sealed unsafe class RenderSessionTests
         );
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
-            _ => mln_status.MLN_STATUS_OK,
+            (_, _) => mln_status.MLN_STATUS_OK,
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
@@ -636,10 +636,10 @@ public sealed unsafe class RenderSessionTests
 
     [BindingSpecTest("BND-164", "BND-165")]
     [Fact]
-    public void RenderUpdateInvalidStateDoesNotCloseSessionAndResizePassesExtent()
+    public void RenderUpdateWithoutPendingUpdateReportsFalseAndResizePassesExtent()
     {
         // Support invariant for BND-164 and BND-165: resize/update assertions target
-        // public wrapper behavior while native invalid-state timing is deterministic.
+        // public wrapper behavior while native no-update timing is deterministic.
         uint resizedWidth = 0;
         uint resizedHeight = 0;
         double resizedScale = 0;
@@ -651,19 +651,22 @@ public sealed unsafe class RenderSessionTests
                 resizedScale = scale;
                 return mln_status.MLN_STATUS_OK;
             },
-            _ => mln_status.MLN_STATUS_INVALID_STATE,
+            (_, outRendered) =>
+            {
+                *outRendered = false;
+                return mln_status.MLN_STATUS_OK;
+            },
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
         var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
 
         session.Resize(320, 240, 2);
-        var error = Assert.Throws<InvalidStateException>(session.RenderUpdate);
+        Assert.False(session.RenderUpdate());
 
         Assert.Equal(320u, resizedWidth);
         Assert.Equal(240u, resizedHeight);
         Assert.Equal(2, resizedScale);
-        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.False(session.IsClosed);
         session.Close();
     }

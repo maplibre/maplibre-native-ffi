@@ -89,7 +89,7 @@ fn waitForRenderedFeatureQuery(
         if (result.features.len > 0) return result;
         result.deinit();
         try runtime.runOnce();
-        try session.renderUpdate();
+        _ = try session.renderUpdate();
         try std.Thread.yield();
     }
     return error.RenderedFeatureNotQueryable;
@@ -110,7 +110,7 @@ fn waitForSourceFeatureQuery(
         if (result.features.len > 0) return result;
         result.deinit();
         try runtime.runOnce();
-        try session.renderUpdate();
+        _ = try session.renderUpdate();
         try std.Thread.yield();
     }
     return error.SourceFeatureNotQueryable;
@@ -221,7 +221,10 @@ const RenderSessionThreadCall = enum {
 
 fn callRenderSessionOnThread(session: *maplibre.RenderSessionHandle, call: RenderSessionThreadCall, out_error: *?anyerror) void {
     const result = switch (call) {
-        .render_update => session.renderUpdate(),
+        .render_update => blk: {
+            _ = session.renderUpdate() catch |err| break :blk err;
+            break :blk {};
+        },
         .resize => session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }),
         .detach => session.detach(),
         .reduce_memory_use => session.reduceMemoryUse(),
@@ -761,7 +764,7 @@ fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     const frame = try session.acquireMetalOwnedTextureFrame();
     return .{ .runtime = runtime, .map = map, .session = session, .frame = frame };
@@ -1069,6 +1072,23 @@ fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (bu
     return error.NoSuitableVulkanMemoryType;
 }
 
+test "render update without pending update reports false and keeps session live" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 64, .mode = .static });
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+
+    try testing.expect(!try owned.session.renderUpdate());
+    try owned.session.resize(.{ .width = 32, .height = 16, .scale_factor = 1.0 });
+}
+
 test "owned texture render session lifecycle and readback" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
@@ -1088,7 +1108,7 @@ test "owned texture render session lifecycle and readback" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
     try session.reduceMemoryUse();
     try session.dumpDebugLogs();
     try session.clearData();
@@ -1149,7 +1169,7 @@ test "owned texture frame wrapper allocation failure releases native frame" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     test_hooks.failNextOwnedTextureFrameWrapperAllocation();
     if (build_options.supports_vulkan) {
@@ -1234,7 +1254,7 @@ test "render session feature state set get and remove" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     try session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] });
     var snapshot = try session.getFeatureState(testing.allocator, selector);
@@ -1260,7 +1280,7 @@ test "render session feature state set get and remove" {
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     var after_remove = try session.getFeatureState(testing.allocator, selector);
     defer after_remove.deinit(testing.allocator);
@@ -1291,7 +1311,7 @@ test "render session queries rendered and source features" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     const query_point = try map.pixelForLatLng(.{ .latitude = 37.7749, .longitude = -122.4194 });
     var rendered = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
@@ -1326,6 +1346,51 @@ test "render session queries rendered and source features" {
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
 }
 
+test "render session clips rendered box queries to the viewport" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{});
+    defer owned.close() catch {};
+    const session = &owned.session;
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try testing.expect(try session.renderUpdate());
+
+    const options = maplibre.RenderedFeatureQueryOptions{ .layer_ids = &.{"point-circle"} };
+
+    // Over-covering the viewport is the obvious way to ask for everything on
+    // screen, and must answer like the viewport itself.
+    var oversized = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
+        .min = .{ .x = -8192, .y = -8192 },
+        .max = .{ .x = 8192, .y = 8192 },
+    } }, options);
+    defer oversized.deinit();
+    try expectFeaturePropertyString(&oversized.features[0], "kind", "capital");
+
+    // Corners in either order describe the same box.
+    var inverted = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
+        .min = .{ .x = 8192, .y = 8192 },
+        .max = .{ .x = -8192, .y = -8192 },
+    } }, options);
+    defer inverted.deinit();
+    try testing.expectEqual(@as(usize, 1), inverted.features.len);
+
+    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
+    // a viewport edge.
+    var offscreen = try session.queryRenderedFeatures(testing.allocator, .{ .box = .{
+        .min = .{ .x = 2048, .y = 2048 },
+        .max = .{ .x = 4096, .y = 4096 },
+    } }, options);
+    defer offscreen.deinit();
+    try testing.expectEqual(@as(usize, 0), offscreen.features.len);
+}
+
 test "render session queries cluster feature extensions" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
@@ -1342,7 +1407,7 @@ test "render session queries cluster feature extensions" {
     try map.setStyleJson(testing.allocator, cluster_style_json);
     for (0..5) |_| {
         if (!try waitForEvent(&runtime, .map_render_update_available)) break;
-        try session.renderUpdate();
+        _ = try session.renderUpdate();
     }
 
     const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
@@ -1482,7 +1547,7 @@ test "OpenGL owned texture frame scopes public binding access" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -1532,7 +1597,7 @@ test "OpenGL borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
     defer testing.allocator.free(pixels);
@@ -1566,7 +1631,7 @@ test "OpenGL surface renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     const pixels = try testing.allocator.alloc(u8, 128 * 128 * 4);
     defer testing.allocator.free(pixels);
@@ -1597,7 +1662,7 @@ test "Metal owned texture frame handle scopes native pointers" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -1625,7 +1690,7 @@ test "Metal owned texture frame handle scopes native pointers" {
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
     var resized_frame = try session.acquireMetalOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
@@ -1704,7 +1769,7 @@ test "Metal borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 
     try testing.expectError(error.Unsupported, session.acquireMetalOwnedTextureFrame());
@@ -1733,7 +1798,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     var image = try readTestImage(&session, testing.allocator, 32 * 32 * 4);
     defer image.deinit();
@@ -1761,7 +1826,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
     var resized_frame = try session.acquireVulkanOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
@@ -1791,7 +1856,7 @@ test "Vulkan borrowed texture renders through public bindings" {
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
-    try session.renderUpdate();
+    try testing.expect(try session.renderUpdate());
 
     try testing.expectError(error.Unsupported, session.acquireVulkanOwnedTextureFrame());
     try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));

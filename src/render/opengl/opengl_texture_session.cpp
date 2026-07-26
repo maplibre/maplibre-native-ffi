@@ -601,9 +601,11 @@ class OpenGLTextureSessionBackend final
     return backend_;
   }
 
-  auto after_render(mln_render_session& texture) -> mln_status override {
+  auto after_render(mln_render_session& texture, bool& out_rendered)
+    -> mln_status override {
     texture.texture.rendered_native_texture =
       reinterpret_cast<void*>(static_cast<uintptr_t>(backend_.texture()));
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
 

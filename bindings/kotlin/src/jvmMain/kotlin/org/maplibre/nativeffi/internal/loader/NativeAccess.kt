@@ -1731,12 +1731,14 @@ internal object NativeAccess {
     )
   }
 
-  internal fun renderUpdate(session: MemorySegment) {
-    Status.check(
-      renderSessionStatusFunction("mln_render_session_render_update").invokeWithArguments(session)
-        as Int
-    )
-  }
+  internal fun renderUpdate(session: MemorySegment): Boolean =
+    Arena.ofConfined().use { arena ->
+      val outRendered = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        renderSessionRenderUpdateFunction().invokeWithArguments(session, outRendered) as Int
+      )
+      outRendered.get(ValueLayout.JAVA_BOOLEAN, 0)
+    }
 
   internal fun detachRenderSession(session: MemorySegment) {
     Status.check(
@@ -2790,6 +2792,9 @@ internal object NativeAccess {
     mapScreenPointAddressStatusFunction(name)
 
   private fun renderSessionStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun renderSessionRenderUpdateFunction(): MethodHandle =
+    downcall("mln_render_session_render_update")
 
   private fun renderSessionResizeFunction(): MethodHandle = downcall("mln_render_session_resize")
 

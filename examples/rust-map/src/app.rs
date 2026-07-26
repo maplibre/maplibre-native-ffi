@@ -243,8 +243,7 @@ impl App {
                 .expect("render target is open")
                 .render_update(&self.graphics)
             {
-                Ok(()) => self.render_pending = false,
-                Err(error) if error.kind() == maplibre_native::ErrorKind::InvalidState => {}
+                Ok(rendered) => self.render_pending = !rendered,
                 Err(error) => return Err(error.into()),
             }
         }

@@ -292,6 +292,11 @@ pub const FeatureStateSelector = struct {
     state_key: ?[]const u8 = null,
 };
 
+/// Screen-space box in logical map pixels.
+///
+/// Corners may be given in any order, and may extend past the viewport.
+/// Rendered queries normalize the corners and clip the box to the viewport, so
+/// a box that over-covers the viewport queries everything visible.
 pub const ScreenBox = struct {
     min: values.ScreenPoint,
     max: values.ScreenPoint,
@@ -443,11 +448,24 @@ pub const RenderSessionHandle = enum(u128) {
         );
     }
 
-    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!void {
+    /// Renders the latest available map render update. The map retains its
+    /// latest update, so repeated calls re-render it and return true again;
+    /// use this to redraw on demand after resize or surface expose, and gate
+    /// frame loops on render-update-available events instead of the return
+    /// value. Returns false when no frame was rendered, because the map has
+    /// not published an update yet or the renderer skipped the frame; both are
+    /// normal during startup, so keep pumping the runtime until an update is
+    /// reported.
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!bool {
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try ensureNoActiveOwnedFrame(lease);
-        try status.checkStatus(c.mln_render_session_render_update(lease.native), lease.diagnostic_store);
+        var rendered: bool = false;
+        try status.checkStatus(
+            c.mln_render_session_render_update(lease.native, &rendered),
+            lease.diagnostic_store,
+        );
+        return rendered;
     }
 
     pub fn detach(self: *RenderSessionHandle) status.Error!void {

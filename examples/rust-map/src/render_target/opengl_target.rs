@@ -155,19 +155,21 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<()> {
+    pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<bool> {
         let opengl = graphics.opengl();
         match self {
             Self::OwnedTexture {
                 session,
                 compositor,
             } => {
-                session.render_update()?;
+                if !session.render_update()? {
+                    return Ok(false);
+                }
                 let frame = session.acquire_opengl_owned_texture_frame()?;
                 let draw_result = compositor.draw_frame(opengl, &frame);
                 let close_result = frame.close().map_err(|error| error.into_error());
                 match (draw_result, close_result) {
-                    (Ok(()), Ok(())) => Ok(()),
+                    (Ok(()), Ok(())) => Ok(true),
                     (Err(draw_error), Ok(())) => Err(draw_error),
                     (Ok(()), Err(close_error)) => Err(close_error),
                     (Err(draw_error), Err(close_error)) => Err(Error::new(
@@ -182,8 +184,11 @@ impl RenderTarget {
                 compositor,
                 texture,
             } => {
-                session.render_update()?;
-                compositor.draw_texture(opengl, texture.texture())
+                if !session.render_update()? {
+                    return Ok(false);
+                }
+                compositor.draw_texture(opengl, texture.texture())?;
+                Ok(true)
             }
             Self::Surface { session } => session.render_update(),
         }

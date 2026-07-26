@@ -158,6 +158,14 @@ type RuntimeOptions struct {
 	MaximumCacheSize *uint64
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options RuntimeOptions) Equal(other RuntimeOptions) bool {
+	return options.AssetPath == other.AssetPath &&
+		options.CachePath == other.CachePath &&
+		equalPointer(options.MaximumCacheSize, other.MaximumCacheSize)
+}
+
 // WithMaximumCacheSize returns a copy with an explicit maximum ambient cache
 // size.
 func (options RuntimeOptions) WithMaximumCacheSize(size uint64) RuntimeOptions {

@@ -26,7 +26,13 @@ typedef enum mln_rendered_query_geometry_type : uint32_t {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3,
 } mln_rendered_query_geometry_type;
 
-/** Screen-space box in logical map pixels. */
+/**
+ * Screen-space box in logical map pixels.
+ *
+ * Corners may be given in any order, and may extend past the viewport. Rendered
+ * queries normalize the corners and clip the box to the viewport, so a box that
+ * over-covers the viewport queries everything visible.
+ */
 typedef struct mln_screen_box {
   mln_screen_point min;
   mln_screen_point max;
@@ -154,6 +160,11 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  * for the duration of the call. Passing null for options uses default options.
  * On success, *out_result receives an owned result handle. Destroy it with
  * mln_feature_query_result_destroy().
+ *
+ * Box geometry is normalized and clipped to the viewport, so a box that
+ * over-covers the viewport queries everything visible. A box that lies entirely
+ * outside the viewport yields an empty result. Point and line-string geometry
+ * are queried as given.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

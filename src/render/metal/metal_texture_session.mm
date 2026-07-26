@@ -209,15 +209,17 @@ class MetalTextureSessionBackend final
     return backend_;
   }
 
-  auto after_render(mln_render_session& texture) -> mln_status override {
+  auto after_render(mln_render_session& texture, bool& out_rendered)
+    -> mln_status override {
     auto* rendered_texture = backend_.metal_texture();
     if (rendered_texture == nullptr) {
-      mln::core::set_thread_error(
-        "render update did not produce a Metal texture"
-      );
-      return MLN_STATUS_INVALID_STATE;
+      // The Metal backend creates its texture on the first real draw; a
+      // renderer pass can complete without one before content is ready.
+      out_rendered = false;
+      return MLN_STATUS_OK;
     }
     texture.texture.rendered_native_texture = rendered_texture;
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
 

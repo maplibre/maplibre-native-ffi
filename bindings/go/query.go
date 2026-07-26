@@ -19,7 +19,11 @@ const (
 	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 )
 
-// ScreenBox is a screen-space query rectangle.
+// ScreenBox is a screen-space query rectangle in logical map pixels.
+//
+// Corners may be given in any order, and may extend past the viewport. Rendered
+// queries normalize the corners and clip the box to the viewport, so a box that
+// over-covers the viewport queries everything visible.
 type ScreenBox struct {
 	Min ScreenPoint
 	Max ScreenPoint
@@ -54,10 +58,24 @@ type RenderedFeatureQueryOptions struct {
 	Filter   *JSONValue
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// does not compile for structs holding slices.
+func (options RenderedFeatureQueryOptions) Equal(other RenderedFeatureQueryOptions) bool {
+	return equalStrings(options.LayerIDs, other.LayerIDs) &&
+		equalJSON(options.Filter, other.Filter)
+}
+
 // SourceFeatureQueryOptions configures source feature queries.
 type SourceFeatureQueryOptions struct {
 	SourceLayerIDs []string
 	Filter         *JSONValue
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// does not compile for structs holding slices.
+func (options SourceFeatureQueryOptions) Equal(other SourceFeatureQueryOptions) bool {
+	return equalStrings(options.SourceLayerIDs, other.SourceLayerIDs) &&
+		equalJSON(options.Filter, other.Filter)
 }
 
 // QueriedFeature contains one copied feature query result.

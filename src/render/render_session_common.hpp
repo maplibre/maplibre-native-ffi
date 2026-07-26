@@ -57,8 +57,10 @@ class TextureSessionBackend {
     return headless_backend().getRendererBackend();
   }
   virtual void prepare_render_resources() {}
-  virtual auto after_render(mln_render_session& session) -> mln_status {
+  virtual auto after_render(mln_render_session& session, bool& out_rendered)
+    -> mln_status {
     (void)session;
+    out_rendered = true;
     return MLN_STATUS_OK;
   }
   virtual auto acquire_vulkan_owned_frame(
@@ -275,7 +277,9 @@ auto render_session_resize(
   mln_render_session* session, uint32_t width, uint32_t height,
   double scale_factor
 ) -> mln_status;
-auto render_session_render_update(mln_render_session* session) -> mln_status;
+auto render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) -> mln_status;
 auto render_session_detach(mln_render_session* session) -> mln_status;
 auto render_session_destroy(mln_render_session* session) -> mln_status;
 auto render_session_reduce_memory_use(mln_render_session* session)

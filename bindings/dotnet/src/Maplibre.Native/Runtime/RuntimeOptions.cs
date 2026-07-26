@@ -4,7 +4,11 @@ using Maplibre.Native.Internal.Memory;
 namespace Maplibre.Native.Runtime;
 
 /// <summary>Runtime creation options.</summary>
-public sealed class RuntimeOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record RuntimeOptions
 {
     /// <summary>Filesystem root for <c>asset://</c> URLs.</summary>
     public string? AssetPath { get; set; }

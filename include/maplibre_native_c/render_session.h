@@ -6,6 +6,7 @@
 #ifndef MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 #define MAPLIBRE_NATIVE_C_RENDER_SESSION_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "base.h"
@@ -63,17 +64,30 @@ MLN_API mln_status mln_render_session_resize(
  * Surface sessions render and present through their native surface. Texture
  * sessions render into their texture target.
  *
+ * On success, *out_rendered reports whether the latest available map render
+ * update was rendered. The map retains its latest update, so repeated calls
+ * re-render it and report true again; hosts use this to redraw on demand
+ * after resize or surface expose, and gate frame-driven loops on
+ * MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE instead of the return value.
+ * *out_rendered is false when no frame was rendered: the map has not
+ * published a render update yet, or the renderer skipped producing a frame
+ * for the latest update (for example the Metal texture backend before content
+ * is ready). Both are normal during startup; keep pumping the runtime and
+ * call again when an update is reported.
+ *
  * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live.
- * - MLN_STATUS_INVALID_STATE when no render update is available or the session
- *   is detached, or a texture frame is currently acquired.
+ * - MLN_STATUS_OK on success, with *out_rendered set.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, or
+ *   out_rendered is null.
+ * - MLN_STATUS_INVALID_STATE when the session is detached or a texture frame
+ *   is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_render_update(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_render_update(
+  mln_render_session* session, bool* out_rendered
+) MLN_NOEXCEPT;
 
 /**
  * Detaches backend-bound render resources from the map while keeping the

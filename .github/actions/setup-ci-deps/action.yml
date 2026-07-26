@@ -35,6 +35,20 @@ runs:
       shell: pwsh
       run: git config --global core.longpaths true
 
+    # A hard error, such as a DLL the loader cannot resolve, raises a modal
+    # dialog. No one is here to dismiss it, so the process waits behind it until
+    # the job times out. Make the call fail and report instead.
+    - name: Fail Windows hard errors instead of waiting on a dialog
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        Set-ItemProperty `
+          -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Windows" `
+          -Name ErrorMode -Value 2 -Type DWord
+        $reporting = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
+        New-Item -Path $reporting -Force | Out-Null
+        Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
+
     - name: Cache MapLibre Native source
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -232,9 +246,41 @@ runs:
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
       with:
-        vulkan_version: 1.4.341.0
+        # The action's cache key is the OS, architecture and this version, and a
+        # hit returns before the runtime is installed, so the entry saved
+        # without a runtime keeps every later run from getting one. The version
+        # is the only part of that key this action exposes, so a patch bump is
+        # what retires the entry.
+        vulkan_version: 1.4.341.1
         cache: true
         stripdown: true
+        # The SDK alone carries vulkan-1.lib but not the loader it imports, so
+        # the tests linked against it fail in the loader at startup.
+        install_runtime: true
+
+    # A machine with a Vulkan driver has the loader in System32, where every
+    # process finds it. A runner has it only inside the SDK, so put it on PATH
+    # for the whole job: each binding and example links the shared library that
+    # imports it, and a job-wide entry covers them the way a real machine does.
+    - name: Put the Vulkan loader on PATH
+      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      shell: pwsh
+      run: |
+        # Where the loader sits differs by SDK: the x64 SDK groups it under
+        # runtime by architecture, while the ARM64 SDK carries it in Bin. Both
+        # folders belong to the SDK being installed, so neither can offer a
+        # loader built for another architecture. This is the search
+        # cmake/render/vulkan.cmake performs for the same file.
+        $architecture = if ($env:RUNNER_ARCH -eq "ARM64") { "arm64" } else { "x64" }
+        $candidates = @("runtime\$architecture", "Bin", "bin") |
+          ForEach-Object { Join-Path $env:VULKAN_SDK $_ }
+        $directory = $candidates |
+          Where-Object { Test-Path (Join-Path $_ "vulkan-1.dll") } |
+          Select-Object -First 1
+        if (-not $directory) {
+          throw "no vulkan-1.dll in $($candidates -join ', ')"
+        }
+        $directory | Out-File -FilePath $env:GITHUB_PATH -Append
 
     - name: Bootstrap repository
       uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0

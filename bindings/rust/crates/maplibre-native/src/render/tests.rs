@@ -1223,7 +1223,7 @@ fn load_feature_state_style(
         runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 }
 
 fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
@@ -1384,7 +1384,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
@@ -1440,7 +1440,7 @@ fn opengl_surface_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     #[cfg(target_os = "windows")]
     {
@@ -1471,7 +1471,7 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
         &runtime,
         RuntimeEventType::MapRenderUpdateAvailable
     ));
-    session.render_update().unwrap();
+    assert!(session.render_update().unwrap());
 
     let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
@@ -1812,6 +1812,71 @@ fn rendered_and_source_queries_copy_results() {
 
 #[test]
 // Spec coverage: BND-106.
+fn rendered_box_queries_clip_to_the_viewport() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    load_query_style(&runtime, &map, &session);
+    let mut options = RenderedFeatureQueryOptions::default();
+    options.layer_ids = Some(vec!["point-circle".into()]);
+
+    // Over-covering the viewport is the obvious way to ask for everything on
+    // screen, and must answer like the viewport itself.
+    let oversized = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(-4096.0, -4096.0),
+        ScreenPoint::new(4096.0, 4096.0),
+    ));
+    let rendered = wait_for_rendered_feature(
+        &runtime,
+        &session,
+        &oversized,
+        &options,
+        "over-covering box query",
+    );
+    assert_eq!(
+        rendered.feature.identifier,
+        FeatureIdentifier::String("feature-1".into())
+    );
+
+    // Corners in either order describe the same box.
+    let inverted = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(4096.0, 4096.0),
+        ScreenPoint::new(-4096.0, -4096.0),
+    ));
+    assert_eq!(
+        session
+            .query_rendered_features(&inverted, Some(&options))
+            .unwrap()
+            .len(),
+        1
+    );
+
+    // Clipping keeps a fully off-screen box empty instead of collapsing it onto
+    // a viewport edge.
+    let offscreen = RenderedQueryGeometry::box_(ScreenBox::new(
+        ScreenPoint::new(512.0, 512.0),
+        ScreenPoint::new(1024.0, 1024.0),
+    ));
+    assert!(
+        session
+            .query_rendered_features(&offscreen, Some(&options))
+            .unwrap()
+            .is_empty()
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-106.
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -2005,7 +2070,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
 
 #[test]
 // Spec coverage: BND-164.
-fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_live() {
+fn render_update_without_pending_update_reports_false_and_keeps_session_live() {
     if !has_test_owned_texture_session_backend() {
         return;
     }
@@ -2015,9 +2080,7 @@ fn render_update_without_pending_update_maps_invalid_state_and_keeps_session_liv
         create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
             .expect("Metal or Vulkan owned texture test session should attach when supported");
 
-    let error = session.render_update().unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
-    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_STATE));
+    assert!(!session.render_update().unwrap());
 
     session.close().unwrap();
     map.close().unwrap();

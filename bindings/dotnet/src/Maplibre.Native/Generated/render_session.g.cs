@@ -8,7 +8,7 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_render_session_resize(mln_render_session* session, [NativeTypeName("uint32_t")] uint width, [NativeTypeName("uint32_t")] uint height, double scale_factor);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_render_update(mln_render_session* session);
+        public static extern mln_status mln_render_session_render_update(mln_render_session* session, bool* out_rendered);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_render_session_detach(mln_render_session* session);

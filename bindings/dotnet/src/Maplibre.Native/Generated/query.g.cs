@@ -42,7 +42,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_query_L47_C3")]
+        [NativeTypeName("__AnonymousRecord_query_L53_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -148,7 +148,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_query_L119_C3")]
+        [NativeTypeName("__AnonymousRecord_query_L125_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

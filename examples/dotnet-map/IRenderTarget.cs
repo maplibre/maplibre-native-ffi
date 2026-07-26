@@ -156,7 +156,10 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        session.RenderUpdate();
+        if (!session.RenderUpdate())
+        {
+            return false;
+        }
         var presented = false;
         switch (graphics)
         {
@@ -269,7 +272,10 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        session.RenderUpdate();
+        if (!session.RenderUpdate())
+        {
+            return false;
+        }
         var presented = true;
         switch (texture)
         {
@@ -511,8 +517,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
 
     public bool Render()
     {
-        session.RenderUpdate();
-        return true;
+        return session.RenderUpdate();
     }
 
     public void Resize(Viewport viewport)

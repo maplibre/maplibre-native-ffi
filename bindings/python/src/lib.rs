@@ -3269,15 +3269,20 @@ impl RenderSessionHandle {
         .map_err(map_error)
     }
 
-    fn render_update(&self) -> PyResult<()> {
+    fn render_update(&self) -> PyResult<bool> {
         let state = self
             .state
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
-        // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_render_update(state.as_ptr()) })
-            .map_err(map_error)
+        let mut rendered = false;
+        // SAFETY: The C API validates the render-session pointer and state, and
+        // rendered points to caller-owned output storage.
+        maplibre_core::check(unsafe {
+            sys::mln_render_session_render_update(state.as_ptr(), &raw mut rendered)
+        })
+        .map_err(map_error)?;
+        Ok(rendered)
     }
 
     fn detach(&self) -> PyResult<DetachedRenderSessionHandle> {

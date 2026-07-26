@@ -150,5 +150,18 @@ public abstract record RuntimeEventPayload
 
         public uint RawPayloadType { get; }
         public byte[] PayloadBytes => (byte[])payloadBytes.Clone();
+
+        public bool Equals(Unknown? other) =>
+            other is not null
+            && RawPayloadType == other.RawPayloadType
+            && payloadBytes.AsSpan().SequenceEqual(other.payloadBytes);
+
+        public override int GetHashCode()
+        {
+            var hash = new HashCode();
+            hash.Add(RawPayloadType);
+            hash.AddBytes(payloadBytes);
+            return hash.ToHashCode();
+        }
     }
 }

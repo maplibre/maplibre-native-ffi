@@ -70,4 +70,4 @@ def render_until_update(
         iterations=iterations,
     )
     assert event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
-    session.render_update()
+    assert session.render_update()

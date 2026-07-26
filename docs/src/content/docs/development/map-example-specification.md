@@ -295,12 +295,14 @@ Requirements:
     transitions).
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true.
-- MUST clear `render_pending` after `render_update` returns success.
-- On `invalid_state` from `render_update`, leave `render_pending` set and
-  continue the pump loop (no frame was drawn yet).
+- MUST clear `render_pending` after `render_update` reports an update was
+  rendered.
+- When `render_update` reports no update was available, leave `render_pending`
+  set and continue the pump loop (no frame was drawn yet).
 
-Texture modes: after a successful `render_update`, MUST run the compositor pass
-to copy the map texture into the host swapchain before present.
+Texture modes: after `render_update` reports an update was rendered, MUST run
+the compositor pass to copy the map texture into the host swapchain before
+present.
 
 ### Viewport
 

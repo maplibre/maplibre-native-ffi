@@ -71,6 +71,17 @@ public sealed record PremultipliedRgba8Image
     public byte[] Bytes => (byte[])bytes.Clone();
 
     public TextureImageInfo Info { get; }
+
+    public bool Equals(PremultipliedRgba8Image? other) =>
+        other is not null && Info == other.Info && bytes.AsSpan().SequenceEqual(other.bytes);
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Info);
+        hash.AddBytes(bytes);
+        return hash.ToHashCode();
+    }
 }
 
 public sealed class MetalContextDescriptor

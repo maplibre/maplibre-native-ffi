@@ -41,24 +41,16 @@ pub const Session = union(enum) {
         switch (self.*) {
             .none => return false,
             .texture => |*texture| {
-                texture.renderUpdate() catch |err| switch (err) {
-                    error.InvalidState => return false,
-                    else => {
-                        diagnostics.logError("texture render failed", err, diagnostic_store);
-                        return types.AppError.TextureRenderFailed;
-                    },
+                return texture.renderUpdate() catch |err| {
+                    diagnostics.logError("texture render failed", err, diagnostic_store);
+                    return types.AppError.TextureRenderFailed;
                 };
-                return true;
             },
             .surface => |*surface| {
-                surface.renderUpdate() catch |err| switch (err) {
-                    error.InvalidState => return false,
-                    else => {
-                        diagnostics.logError("surface render failed", err, diagnostic_store);
-                        return types.AppError.SurfaceRenderFailed;
-                    },
+                return surface.renderUpdate() catch |err| {
+                    diagnostics.logError("surface render failed", err, diagnostic_store);
+                    return types.AppError.SurfaceRenderFailed;
                 };
-                return true;
             },
         }
     }

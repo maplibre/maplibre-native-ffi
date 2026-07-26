@@ -61,6 +61,12 @@ type MapOptions struct {
 	Mode        MapMode
 }
 
+// Equal reports whether two descriptors hold the same field values, matching the Equal methods on
+// the other option structs.
+func (options MapOptions) Equal(other MapOptions) bool {
+	return options == other
+}
+
 // NewMapOptions returns map creation options for a viewport size and scale.
 func NewMapOptions(width, height uint32, scaleFactor float64) MapOptions {
 	return MapOptions{Width: width, Height: height, ScaleFactor: scaleFactor, Mode: MapModeContinuous}

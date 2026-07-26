@@ -55,9 +55,7 @@ private constructor(
     }
   }
 
-  fun renderUpdate() {
-    renderTarget?.renderUpdate()
-  }
+  fun renderUpdate(): Boolean = renderTarget?.renderUpdate() ?: false
 
   override fun close() {
     try {
@@ -115,9 +113,7 @@ private class SurfaceRenderTarget(private val session: RenderSessionHandle) : Au
     session.resize(viewport.logicalWidth, viewport.logicalHeight, viewport.scaleFactor)
   }
 
-  fun renderUpdate() {
-    session.renderUpdate()
-  }
+  fun renderUpdate(): Boolean = session.renderUpdate()
 
   override fun close() {
     session.close()

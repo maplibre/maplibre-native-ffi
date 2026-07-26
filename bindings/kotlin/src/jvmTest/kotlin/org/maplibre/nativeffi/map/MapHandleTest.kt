@@ -525,6 +525,8 @@ class MapHandleTest {
       map.jumpTo(camera)
       assertNear(requireNotNull(camera.center), requireNotNull(map.camera.center))
       assertEquals(3.0, map.camera.zoom ?: 0.0, 1e-6)
+      // BND-070: successive snapshots of an unchanged camera compare equal.
+      assertEquals(map.camera, map.camera)
 
       val animation =
         AnimationOptions().apply {
