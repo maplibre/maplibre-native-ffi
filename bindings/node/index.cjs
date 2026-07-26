@@ -291,20 +291,28 @@ function resourceKindInput(kind) {
 
 function resourceMatcherInputs(matchers) {
   return matchers.map((matcher) => {
-    if (
-      matcher == null ||
-      typeof matcher !== "object" ||
-      Array.isArray(matcher)
-    ) {
+    if (!isResourceMatcherRecord(matcher)) {
       throw new InvalidArgumentError(
         null,
-        "resource matcher entries must be objects",
+        "resource matcher entries must be plain or null-prototype objects",
       );
     }
     return Object.hasOwn(matcher, "kind")
       ? { ...matcher, kind: resourceKindInput(matcher.kind) }
       : { ...matcher };
   });
+}
+
+function isResourceMatcherRecord(value) {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+  try {
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+  } catch {
+    return false;
+  }
 }
 
 function offlineRegionDownloadStateInput(state) {

@@ -1398,6 +1398,9 @@ test("resource provider routes validate Node handoff shape", async () => {
           urlPrefix: "future://",
           kind: { kind: "unknown", rawKind: 1000 },
         },
+        Object.assign(Object.create(null), {
+          urlPrefix: "null-prototype://",
+        }),
       ],
       (request) => {
         assert.equal(typeof request.url, "string");
@@ -1414,7 +1417,7 @@ test("resource provider routes validate Node handoff shape", async () => {
       () => runtime.setResourceProviderRoutes([], /** @type {any} */ (null)),
       InvalidArgumentError,
     );
-    for (const invalidRoute of [null, "catch-all", 42, []]) {
+    for (const invalidRoute of [null, "catch-all", 42, [], new Date(0)]) {
       assert.throws(
         () =>
           runtime.setResourceProviderRoutes(
@@ -1423,7 +1426,8 @@ test("resource provider routes validate Node handoff shape", async () => {
           ),
         {
           constructor: InvalidArgumentError,
-          diagnostic: "resource matcher entries must be objects",
+          diagnostic:
+            "resource matcher entries must be plain or null-prototype objects",
         },
       );
     }
