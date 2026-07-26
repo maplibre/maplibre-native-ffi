@@ -12,7 +12,8 @@ internal constructor(
   public actual val kind: OfflineOperationKind,
   public actual val resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
-  private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
+  private val runtimeRetention: HandleStateCore.ChildRetention =
+    runtime.retainChild("OfflineOperationHandle")
   private var closed = false
 
   init {

@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -29,8 +30,13 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 /** Owned Android JNI render session handle. Close it on the map owner thread. */
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, private val handleAddress: Long) : AutoCloseable {
-  private val mapRetention = map.retainChild()
+  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val core = HandleStateCore("RenderSessionHandle", handleAddress, map)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private val activeFrame = ActiveFrameState()
 
   public actual val isClosed: Boolean
@@ -72,6 +78,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("detach")
     Status.check(MaplibreNativeC.mln_render_session_detach(renderSession(requireLiveAddress())))
+    mapRetention.close()
   }
 
   public actual fun reduceMemoryUse() {

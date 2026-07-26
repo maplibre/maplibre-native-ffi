@@ -73,7 +73,7 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, handle: CPointer<mln_render_session>) :
   AutoCloseable {
-  private val mapRetention = map.retainChild()
+  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val state = HandleState("RenderSessionHandle", handle, map)
   private val activeFrame = ActiveFrameState()
 
@@ -97,6 +97,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   public actual fun detach() {
     activeFrame.ensureInactive("detach")
     Status.check(mln_render_session_detach(state.requireLive()))
+    mapRetention.close()
   }
 
   public actual fun reduceMemoryUse() {

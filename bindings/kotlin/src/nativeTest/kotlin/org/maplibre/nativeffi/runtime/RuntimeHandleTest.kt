@@ -786,7 +786,10 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       val error = assertFailsWith<InvalidStateException> { runtime.close() }
       assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-      assertEquals("RuntimeHandle has 1 live child handle(s)", error.diagnostic)
+      assertEquals(
+        "RuntimeHandle has 1 live child handle(s): OfflineOperationHandle",
+        error.diagnostic,
+      )
       assertFalse(operation.isClosed)
     } finally {
       operation.markConsumed()

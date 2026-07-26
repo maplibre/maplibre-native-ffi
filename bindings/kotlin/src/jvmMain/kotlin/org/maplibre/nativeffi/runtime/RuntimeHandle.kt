@@ -5,6 +5,7 @@ import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.loader.NativeAccess.NativeRuntimeEvent
@@ -21,6 +22,11 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handle: MemorySegment) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handle.address())
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
@@ -325,7 +331,8 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     operation.markConsumed()
   }
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun nativeHandle(): MemorySegment = requireLiveHandle()
 

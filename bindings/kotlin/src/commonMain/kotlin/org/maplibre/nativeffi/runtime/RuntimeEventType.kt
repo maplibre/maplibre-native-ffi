@@ -2,7 +2,13 @@ package org.maplibre.nativeffi.runtime
 
 import kotlin.jvm.JvmInline
 
-/** Runtime event type copied from the native event queue. */
+/**
+ * Runtime event type copied from the native event queue.
+ *
+ * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
+ * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
+ * [nativeValue] rather than collapsed to a known constant.
+ */
 @JvmInline
 public value class RuntimeEventType(public val nativeValue: Int) {
   public companion object {

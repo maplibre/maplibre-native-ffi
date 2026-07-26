@@ -2,7 +2,13 @@ package org.maplibre.nativeffi.error
 
 import kotlin.jvm.JvmInline
 
-/** Status categories reported by the native MapLibre C ABI. */
+/**
+ * Status categories reported by the native MapLibre C ABI.
+ *
+ * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
+ * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
+ * [nativeCode] rather than collapsed to a known constant.
+ */
 @JvmInline
 public value class MaplibreStatus(public val nativeCode: Int) {
   public companion object {

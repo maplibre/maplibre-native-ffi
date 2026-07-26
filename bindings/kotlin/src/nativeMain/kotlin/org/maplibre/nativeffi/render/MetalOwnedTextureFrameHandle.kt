@@ -18,11 +18,7 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: MetalOwnedTextureFrame,
 ) : AutoCloseable {
-  private val core =
-    OwnedTextureFrameHandleCore(
-      "MetalOwnedTextureFrameHandle",
-      "Metal owned texture frame handle is closed",
-    )
+  private val core = OwnedTextureFrameHandleCore("MetalOwnedTextureFrameHandle")
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
   public actual fun frame(): MetalOwnedTextureFrame {

@@ -19,7 +19,8 @@ internal constructor(
 ) : AutoCloseable {
   /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
   public actual val id: Long = uint64BitsToLong(nativeId)
-  private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
+  private val runtimeRetention: HandleStateCore.ChildRetention =
+    runtime.retainChild("OfflineOperationHandle")
   private val leakReport = LeakReport(id, kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
   private var closed = false
