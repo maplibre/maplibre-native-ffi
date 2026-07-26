@@ -19,6 +19,29 @@ public struct RenderTargetExtent: Equatable, Sendable {
       scaleFactor: scaleFactor
     )
   }
+
+  /// Returns the physical device-pixel size as `ceil(logical * scaleFactor)`
+  /// per
+  /// dimension.
+  ///
+  /// Session-owned texture targets and surface targets are sized this way.
+  /// Borrowed texture targets state their physical size instead, because not
+  /// every physical size is reachable from a logical extent.
+  public func physicalSize() throws -> (width: UInt32, height: UInt32) {
+    try mapNativeFailure {
+      var native = nativeInput.native
+      var physicalWidth: UInt32 = 0
+      var physicalHeight: UInt32 = 0
+      try checkStatus(
+        mln_render_target_extent_physical_size(
+          &native,
+          &physicalWidth,
+          &physicalHeight
+        )
+      )
+      return (width: physicalWidth, height: physicalHeight)
+    }
+  }
 }
 
 public struct MetalContextDescriptor: Equatable, Sendable {

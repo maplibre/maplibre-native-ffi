@@ -320,6 +320,23 @@ func (extent RenderTargetExtent) toC() C.mln_render_target_extent {
 	}
 }
 
+// PhysicalSize returns the extent's physical device-pixel size as
+// ceil(logical * ScaleFactor) per dimension.
+//
+// Session-owned texture targets and surface targets are sized this way. Borrowed
+// texture targets state their physical size instead, because not every physical
+// size is reachable from a logical extent.
+func (extent RenderTargetExtent) PhysicalSize() (width uint32, height uint32, err error) {
+	raw := extent.toC()
+	var rawWidth, rawHeight C.uint32_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_target_extent_physical_size(&raw, &rawWidth, &rawHeight))
+	}); err != nil {
+		return 0, 0, err
+	}
+	return uint32(rawWidth), uint32(rawHeight), nil
+}
+
 func textureImageInfoFromC(info C.mln_texture_image_info) TextureImageInfo {
 	return TextureImageInfo{Width: uint32(info.width), Height: uint32(info.height), Stride: uint32(info.stride), ByteLength: uint64(info.byte_length)}
 }

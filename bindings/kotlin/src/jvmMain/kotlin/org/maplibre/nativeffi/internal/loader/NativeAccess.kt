@@ -255,6 +255,19 @@ internal object NativeAccess {
   internal fun supportedOpenGLContextProviderMask(): Int =
     intFunction("mln_opengl_supported_context_provider_mask").invokeWithArguments() as Int
 
+  internal fun renderTargetExtentPhysicalSize(extent: RenderTargetExtent): Pair<Int, Int> =
+    Arena.ofConfined().use { arena ->
+      val nativeExtent = mln_render_target_extent.allocate(arena)
+      fillRenderTargetExtent(nativeExtent, extent)
+      val outWidth = arena.allocate(ValueLayout.JAVA_INT)
+      val outHeight = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(
+        statusOutFunction("mln_render_target_extent_physical_size")
+          .invokeWithArguments(nativeExtent, outWidth, outHeight) as Int
+      )
+      outWidth.get(ValueLayout.JAVA_INT, 0) to outHeight.get(ValueLayout.JAVA_INT, 0)
+    }
+
   internal fun networkStatus(): Int =
     Arena.ofConfined().use { arena ->
       val outStatus = arena.allocate(ValueLayout.JAVA_INT)

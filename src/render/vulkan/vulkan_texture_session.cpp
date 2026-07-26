@@ -644,9 +644,8 @@ auto metal_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -705,9 +704,8 @@ auto opengl_borrowed_texture_attach(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  const auto physical_status = validate_borrowed_physical_size(
+    descriptor->physical_width, descriptor->physical_height
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;

@@ -164,13 +164,16 @@ pub const RenderTargetExtent = struct {
     /// Session-owned texture targets and surface targets are sized this way.
     /// Borrowed texture targets state their physical size instead, because not
     /// every physical size is reachable from a logical extent.
-    pub fn physicalSize(self: RenderTargetExtent) status.Error!struct { width: u32, height: u32 } {
+    pub fn physicalSize(
+        self: RenderTargetExtent,
+        diagnostic_store: ?*diagnostics.DiagnosticStore,
+    ) status.Error!struct { width: u32, height: u32 } {
         const raw = renderTargetExtentToNative(self);
         var width: u32 = 0;
         var height: u32 = 0;
         try status.checkStatus(
             c.mln_render_target_extent_physical_size(&raw, &width, &height),
-            null,
+            diagnostic_store,
         );
         return .{ .width = width, .height = height };
     }

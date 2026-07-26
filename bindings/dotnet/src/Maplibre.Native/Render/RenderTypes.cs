@@ -1,3 +1,8 @@
+using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Loader;
+using Maplibre.Native.Internal.Status;
+using Maplibre.Native.Internal.Struct;
+
 namespace Maplibre.Native.Render;
 
 public enum RenderMode : uint
@@ -25,7 +30,26 @@ public enum OpenGLContextProvider : uint
     Egl = 1u << 1,
 }
 
-public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor);
+public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor)
+{
+    /// <summary>
+    /// Returns the physical device-pixel size as ceil(logical * <see cref="ScaleFactor"/>) per
+    /// dimension. Session-owned texture targets and surface targets are sized this way. Borrowed
+    /// texture targets state their physical size instead, because not every physical size is
+    /// reachable from a logical extent.
+    /// </summary>
+    public unsafe (uint Width, uint Height) PhysicalSize()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        var native = RenderStructs.ToNative(this);
+        uint width;
+        uint height;
+        NativeStatus.Check(
+            NativeMethods.mln_render_target_extent_physical_size(&native, &width, &height)
+        );
+        return (width, height);
+    }
+}
 
 public readonly record struct TextureImageInfo(
     uint Width,
