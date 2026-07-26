@@ -103,6 +103,11 @@ function networkStatus() {
   return translateNativeErrors(() => native.networkStatus());
 }
 
+const NETWORK_STATUS_RAW = Object.freeze({
+  online: 1,
+  offline: 2,
+});
+
 function setNetworkStatus(status) {
   let raw;
   if (status === "online") {
@@ -114,7 +119,10 @@ function setNetworkStatus(status) {
     typeof status === "object" &&
     Number.isInteger(status.raw) &&
     status.raw >= 0 &&
-    status.raw <= 0xffff_ffff
+    status.raw <= 0xffff_ffff &&
+    (status.kind === "unknown" ||
+      (status.kind in NETWORK_STATUS_RAW &&
+        status.raw === NETWORK_STATUS_RAW[status.kind]))
   ) {
     raw = status.raw;
   } else {
@@ -359,9 +367,47 @@ class NativeBuffer {
   }
 }
 
+const ownedTextureFrameFinalizer =
+  typeof FinalizationRegistry === "function"
+    ? new FinalizationRegistry((registration) => {
+        if (registration.closed) {
+          return;
+        }
+        try {
+          liveNativeOf(registration.session)[registration.releaseMethod](
+            registration.raw,
+          );
+          registration.closed = true;
+        } catch (error) {
+          process.emitWarning(
+            `Leaked ${registration.kind} texture frame could not be released: ${String(error)}`,
+          );
+        }
+      })
+    : null;
+
+function ownedTextureFrameRegistration(
+  frame,
+  session,
+  raw,
+  releaseMethod,
+  kind,
+) {
+  const registration = {
+    session,
+    raw,
+    releaseMethod,
+    kind,
+    closed: false,
+  };
+  ownedTextureFrameFinalizer?.register(frame, registration, frame);
+  return registration;
+}
+
 class MetalOwnedTextureFrame {
   #active = true;
   #raw;
+  #registration;
   #session;
 
   constructor(token, raw, session) {
@@ -373,6 +419,13 @@ class MetalOwnedTextureFrame {
     }
     this.#raw = raw;
     this.#session = session;
+    this.#registration = ownedTextureFrameRegistration(
+      this,
+      session,
+      raw,
+      "releaseMetalOwnedTextureFrame",
+      "Metal",
+    );
     Object.freeze(this);
   }
 
@@ -431,6 +484,8 @@ class MetalOwnedTextureFrame {
       liveNativeOf(this.#session).releaseMetalOwnedTextureFrame(this.#raw),
     );
     this.#active = false;
+    this.#registration.closed = true;
+    ownedTextureFrameFinalizer?.unregister(this);
   }
 
   get closed() {
@@ -445,6 +500,7 @@ class MetalOwnedTextureFrame {
 class OpenGLOwnedTextureFrame {
   #active = true;
   #raw;
+  #registration;
   #session;
 
   constructor(token, raw, session) {
@@ -456,6 +512,13 @@ class OpenGLOwnedTextureFrame {
     }
     this.#raw = raw;
     this.#session = session;
+    this.#registration = ownedTextureFrameRegistration(
+      this,
+      session,
+      raw,
+      "releaseOpenGLOwnedTextureFrame",
+      "OpenGL",
+    );
     Object.freeze(this);
   }
 
@@ -505,6 +568,8 @@ class OpenGLOwnedTextureFrame {
       liveNativeOf(this.#session).releaseOpenGLOwnedTextureFrame(this.#raw),
     );
     this.#active = false;
+    this.#registration.closed = true;
+    ownedTextureFrameFinalizer?.unregister(this);
   }
 
   get closed() {
@@ -519,6 +584,7 @@ class OpenGLOwnedTextureFrame {
 class VulkanOwnedTextureFrame {
   #active = true;
   #raw;
+  #registration;
   #session;
 
   constructor(token, raw, session) {
@@ -530,6 +596,13 @@ class VulkanOwnedTextureFrame {
     }
     this.#raw = raw;
     this.#session = session;
+    this.#registration = ownedTextureFrameRegistration(
+      this,
+      session,
+      raw,
+      "releaseVulkanOwnedTextureFrame",
+      "Vulkan",
+    );
     Object.freeze(this);
   }
 
@@ -600,6 +673,8 @@ class VulkanOwnedTextureFrame {
       liveNativeOf(this.#session).releaseVulkanOwnedTextureFrame(this.#raw),
     );
     this.#active = false;
+    this.#registration.closed = true;
+    ownedTextureFrameFinalizer?.unregister(this);
   }
 
   get closed() {
@@ -680,11 +755,13 @@ function mutableUint8Array(data, fieldName) {
 
 const resourceRequestFinalizer =
   typeof FinalizationRegistry === "function"
-    ? new FinalizationRegistry((completionToken) => {
+    ? new FinalizationRegistry((registration) => {
         try {
-          native.nativeResourceRequestClose(completionToken);
+          native.nativeResourceRequestClose(registration.completionToken);
         } catch {
           // Finalizers are best-effort cleanup only.
+        } finally {
+          unregisterRuntimeResourceRequest(registration.runtime, registration);
         }
       })
     : null;
@@ -802,9 +879,13 @@ class ResourceRequestHandle {
     recordHandleEnvironment(this);
     this.#completionToken = completionToken;
     this.#runtime = runtime;
-    this.#registration = { handle: new WeakRef(this) };
+    this.#registration = {
+      handle: new WeakRef(this),
+      completionToken,
+      runtime,
+    };
     registerRuntimeResourceRequest(runtime, this.#registration);
-    resourceRequestFinalizer?.register(this, completionToken, this);
+    resourceRequestFinalizer?.register(this, this.#registration, this);
     Object.preventExtensions(this);
   }
 
@@ -1287,9 +1368,7 @@ class RuntimeHandle {
       return null;
     }
     if (event?.eventType === "map-style-loaded" && event.sourceType === "map") {
-      this.#mapsByAddress
-        .get(event.sourceAddress)
-        ?._releaseDetachedCustomGeometrySources();
+      this.#mapsByAddress.get(event.sourceAddress)?._finishStyleReplacement();
     }
     event.sourceMap =
       event.sourceType === "map"
@@ -1331,6 +1410,11 @@ class RuntimeHandle {
   _unregisterOfflineOperation(registration) {
     assertHandleEnvironment(this);
     this.#offlineOperations.delete(registration);
+  }
+
+  _resourceRequestCountForTesting() {
+    assertHandleEnvironment(this);
+    return runtimeResourceRequests.get(this)?.size ?? 0;
   }
 
   [Symbol.dispose]() {
@@ -2266,6 +2350,11 @@ class MapHandle {
     }
   }
 
+  _finishStyleReplacement() {
+    this._releaseDetachedCustomGeometrySources();
+    retireAllCustomGeometrySourceCallbacks(this);
+  }
+
   _customGeometrySourceCountForTesting() {
     return translateNativeErrors(() =>
       liveNativeOf(this).customGeometrySourceCountForTesting(),
@@ -2515,11 +2604,7 @@ class MapHandle {
   }
 
   setStyleUrl(url) {
-    const result = translateNativeErrors(() =>
-      liveNativeOf(this).setStyleUrl(url),
-    );
-    retireAllCustomGeometrySourceCallbacks(this);
-    return result;
+    return translateNativeErrors(() => liveNativeOf(this).setStyleUrl(url));
   }
 
   [Symbol.dispose]() {

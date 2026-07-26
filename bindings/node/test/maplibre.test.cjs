@@ -334,6 +334,35 @@ test("retired custom geometry sources discard queued callbacks", () => {
   fetchBridges[1](null, { z: 0, x: 0, y: 0 });
   assert.equal(firstFetches, 0);
   assert.equal(secondFetches, 1);
+
+  /** @type {Function[]} */
+  const urlFetchBridges = [];
+  const urlMap = Object.create(MapHandle.prototype);
+  Object.defineProperty(urlMap, "native", {
+    value: {
+      closed: false,
+      /** @param {string} _sourceId @param {unknown} _options @param {Function} fetchTile */
+      addCustomGeometrySource(_sourceId, _options, fetchTile) {
+        urlFetchBridges.push(fetchTile);
+      },
+      setStyleUrl() {},
+      releaseDetachedCustomGeometrySources() {},
+    },
+  });
+  let urlFetches = 0;
+  urlMap.addCustomGeometrySource("custom", {
+    fetchTile() {
+      urlFetches += 1;
+    },
+  });
+
+  urlMap.setStyleUrl("custom://replacement");
+  urlFetchBridges[0](null, { z: 0, x: 0, y: 0 });
+  assert.equal(urlFetches, 1);
+
+  urlMap._finishStyleReplacement();
+  urlFetchBridges[0](null, { z: 0, x: 0, y: 0 });
+  assert.equal(urlFetches, 1);
 });
 
 test("log callback registration does not keep a process alive", () => {
@@ -350,6 +379,104 @@ test("log callback registration does not keep a process alive", () => {
       timeout: 3_000,
     },
   );
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("finalizers release abandoned request and texture scopes", () => {
+  const packageRoot = path.join(__dirname, "..");
+  const script = `
+    process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
+    const assert = require("node:assert/strict");
+    const binding = require(${JSON.stringify(packageRoot)});
+    const native = require(${JSON.stringify(path.join(packageRoot, "index.js"))});
+
+    async function collectUntil(predicate) {
+      for (let attempt = 0; attempt < 100 && !predicate(); attempt += 1) {
+        global.gc();
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      assert.equal(predicate(), true);
+    }
+
+    async function main() {
+      let frameReleases = 0;
+      let frame = binding.RenderSessionHandle.prototype
+        .acquireMetalOwnedTextureFrame.call({
+          native: {
+            closed: false,
+            acquireMetalOwnedTextureFrame() {
+              return {
+                generation: 1n,
+                width: 1,
+                height: 1,
+                scaleFactor: 1,
+                frameId: 1n,
+                textureAddress: 1n,
+                deviceAddress: 2n,
+                pixelFormat: 80n,
+              };
+            },
+            releaseMetalOwnedTextureFrame() {
+              frameReleases += 1;
+            },
+          },
+        });
+      frame = undefined;
+      await collectUntil(() => frameReleases === 1);
+
+      let providerBridge;
+      let requestCloses = 0;
+      native.createNativeRuntimeHandle = () => ({
+        closed: false,
+        close() {
+          this.closed = true;
+        },
+        setResourceProviderRoutes(_routes, callback) {
+          providerBridge = callback;
+        },
+      });
+      const runtime = new binding.RuntimeHandle();
+      native.nativeResourceRequestClose = () => {
+        requestCloses += 1;
+      };
+      let requestHandle;
+      runtime.setResourceProviderRoutes([{ urlPrefix: "custom://" }], (request) => {
+        requestHandle = request.handle;
+      });
+      providerBridge(null, {
+        url: "custom://pending",
+        kind: "source",
+        rawKind: 2,
+        loadingMethod: "all",
+        rawLoadingMethod: 0,
+        priority: "regular",
+        rawPriority: 0,
+        usage: "online",
+        rawUsage: 0,
+        storagePolicy: "permanent",
+        rawStoragePolicy: 0,
+        priorData: new Uint8Array(),
+        completionToken: "resource-request:finalizer",
+      });
+      assert.equal(runtime._resourceRequestCountForTesting(), 1);
+      requestHandle = undefined;
+      await collectUntil(() =>
+        runtime._resourceRequestCountForTesting() === 0
+      );
+      assert.equal(requestCloses, 1);
+      runtime.close();
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+  const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
+    encoding: "utf8",
+    timeout: 5_000,
+  });
   assert.equal(result.signal, null, result.stderr);
   assert.equal(result.status, 0, result.stderr);
 });
@@ -2162,6 +2289,10 @@ test("binding-owned validation rejects unknown network status strings", () => {
       setNetworkStatus(
         /** @type {any} */ ({ kind: "unknown", raw: 0x1_0000_0000 }),
       ),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () => setNetworkStatus(/** @type {any} */ ({ kind: "offline", raw: 1 })),
     InvalidArgumentError,
   );
 });

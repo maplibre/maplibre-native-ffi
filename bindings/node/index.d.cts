@@ -77,10 +77,10 @@ export interface OpenGLContextProviders {
   egl: boolean;
 }
 
-export interface NetworkStatusValue {
-  kind: "online" | "offline" | "unknown";
-  raw: number;
-}
+export type NetworkStatusValue =
+  | { kind: "online"; raw: 1 }
+  | { kind: "offline"; raw: 2 }
+  | { kind: "unknown"; raw: number };
 
 export interface NativeLeakReport {
   handleType: string;
