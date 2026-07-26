@@ -169,6 +169,48 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
     return false;
 }
 
+const TransitionFramePump = struct {
+    finished_count: usize = 0,
+    last_transition_id: ?u64 = null,
+};
+
+fn pumpTransitionFrame(
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    session: *maplibre.RenderSessionHandle,
+) !TransitionFramePump {
+    // Metal hosts drain autoreleased backend objects once per frame-loop
+    // iteration. The other backends need no platform scope here.
+    const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+    defer if (build_options.supports_metal) pool.deinit();
+
+    // Match the public host loop: camera invalidation, one native pump, event
+    // coalescing, and at most one render of the latest update.
+    try map.requestRepaint();
+    try runtime.runOnce();
+
+    var result = TransitionFramePump{};
+    var render_update_available = false;
+    while (try runtime.pollEvent(testing.allocator)) |polled| {
+        var event = polled;
+        defer event.deinit();
+        if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
+            render_update_available = true;
+            continue;
+        }
+        switch (event.payload) {
+            .camera_transition_finished => |payload| {
+                try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
+                result.finished_count += 1;
+                result.last_transition_id = payload.transition_id;
+            },
+            else => {},
+        }
+    }
+    if (render_update_available) try testing.expect(try session.renderUpdate());
+    return result;
+}
+
 fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
     for (actual, expected) |actual_channel, expected_channel| {
         const delta = if (actual_channel > expected_channel)
@@ -1178,10 +1220,13 @@ test "an ease pumped through rendered frames reports its transition finish once"
     try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     // Consume the style frame before starting the transition. Leaving it
     // pending suppresses the next update event that drives the eased frame.
-    try testing.expect(try owned.session.renderUpdate());
+    {
+        const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+        defer if (build_options.supports_metal) pool.deinit();
+        try testing.expect(try owned.session.renderUpdate());
+    }
 
-    // A camera transition advances on rendered frames, so completion needs a
-    // live render session pumped alongside the runtime.
+    // A camera transition advances when the host requests and renders frames.
     try map.easeTo(
         .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
         .{ .duration_ms = 50, .transition_id = 31 },
@@ -1189,48 +1234,25 @@ test "an ease pumped through rendered frames reports its transition finish once"
 
     var finished_count: usize = 0;
     var last_transition_id: ?u64 = null;
-    var rendered_frames: usize = 0;
-    var remaining_work: usize = 10_000;
-    var post_finish_empty_drains: usize = 0;
-    pump: while (remaining_work > 0 and rendered_frames < 2000) {
-        var found_event = false;
-        while (try runtime.pollEvent(testing.allocator)) |polled| {
-            found_event = true;
-            remaining_work -= 1;
-            var event = polled;
-            defer event.deinit();
-            if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
-                try testing.expect(try owned.session.renderUpdate());
-                rendered_frames += 1;
-            } else switch (event.payload) {
-                .camera_transition_finished => |payload| {
-                    try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
-                    finished_count += 1;
-                    last_transition_id = payload.transition_id;
-                },
-                else => {},
-            }
-            if (remaining_work == 0 or rendered_frames == 2000) break :pump;
-        }
-        // easeTo and each completed render can synchronously queue the next
-        // update. Pump native work only after consuming all queued host work;
-        // Darwin's runOnce drains tasks recursively until its queue is empty.
-        if (found_event) {
-            if (finished_count > 0) post_finish_empty_drains = 0;
-            continue;
-        }
-        if (finished_count > 0) {
-            post_finish_empty_drains += 1;
-            // One quiescent native pump after the finish event proves that no
-            // second finish was queued without re-entering an active transition.
-            if (post_finish_empty_drains == 2) break;
-        }
-        remaining_work -= 1;
-        try runtime.runOnce();
+    for (0..200) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        finished_count += frame.finished_count;
+        if (frame.last_transition_id) |transition_id| last_transition_id = transition_id;
+        if (finished_count > 0) break;
+        try testing.io.sleep(.fromMilliseconds(1), .awake);
     }
 
     try testing.expectEqual(@as(usize, 1), finished_count);
     try testing.expectEqual(@as(?u64, 31), last_transition_id);
+
+    // A completed transform cannot report the same transition again.
+    var trailing_finished_count: usize = 0;
+    for (0..8) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        trailing_finished_count += frame.finished_count;
+    }
+    try testing.expectEqual(@as(usize, 0), trailing_finished_count);
+
     const settled_camera = try map.getCamera();
     try testing.expectApproxEqAbs(@as(f64, 4.0), settled_camera.zoom.?, 0.000001);
 }
