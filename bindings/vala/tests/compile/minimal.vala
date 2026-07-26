@@ -912,6 +912,8 @@ int main() {
           vulkan_borrowed_texture.width = 32;
           vulkan_borrowed_texture.height = 16;
           vulkan_borrowed_texture.scale_factor = 1.0;
+          vulkan_borrowed_texture.physical_width = 32;
+          vulkan_borrowed_texture.physical_height = 16;
           vulkan_borrowed_texture.format = vulkan_borrowed_storage.format;
           vulkan_borrowed_texture.initial_layout = vulkan_borrowed_storage.initial_layout;
           vulkan_borrowed_texture.final_layout = vulkan_borrowed_storage.final_layout;
