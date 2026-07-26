@@ -3,12 +3,16 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-# Resolve the target before Node starts because Windows ARM64 cmd children
-# cannot reliably resolve package shims or Bash-activated Rust tools.
-rust_target="$(rustc -vV | sed -n 's/^host: //p')"
+# Pass Windows targets explicitly because cmd children cannot reliably resolve
+# package shims or Bash-activated Rust tools to discover the host target.
+napi_target_args=()
+case "$usage_preset" in
+  windows-arm64-*) napi_target_args=(--target aarch64-pc-windows-msvc) ;;
+  windows-x64-*) napi_target_args=(--target x86_64-pc-windows-msvc) ;;
+esac
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   node node_modules/@napi-rs/cli/dist/cli.js build \
-  --release --platform --manifest-path Cargo.toml --target "$rust_target"
+  --release --platform --manifest-path Cargo.toml "${napi_target_args[@]}"
 '''
 
 [tasks.test]
