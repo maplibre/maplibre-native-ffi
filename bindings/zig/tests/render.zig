@@ -1189,10 +1189,14 @@ test "an ease pumped through rendered frames reports its transition finish once"
     var settled_frames: usize = 0;
     for (0..2000) |_| {
         try runtime.runOnce();
-        _ = try owned.session.renderUpdate();
+        var render_update_available = false;
         while (try runtime.pollEvent(testing.allocator)) |polled| {
             var event = polled;
             defer event.deinit();
+            if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
+                render_update_available = true;
+                continue;
+            }
             const payload = switch (event.payload) {
                 .camera_transition_finished => |value| value,
                 else => continue,
@@ -1201,11 +1205,12 @@ test "an ease pumped through rendered frames reports its transition finish once"
             finished_count += 1;
             last_transition_id = payload.transition_id;
         }
+        if (render_update_available) _ = try owned.session.renderUpdate();
         if (finished_count > 0) {
             settled_frames += 1;
-            if (settled_frames == 50) break;
+            if (settled_frames == 100) break;
         }
-        try std.Thread.yield();
+        try testing.io.sleep(.fromMilliseconds(5), .awake);
     }
 
     try testing.expectEqual(@as(usize, 1), finished_count);
