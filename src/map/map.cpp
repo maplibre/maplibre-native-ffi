@@ -1288,6 +1288,18 @@ auto payload_bytes(const Payload& payload) -> std::vector<std::byte> {
   return result;
 }
 
+auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
+  -> int32_t {
+  switch (mode) {
+    case mbgl::MapObserver::CameraChangeMode::Immediate:
+      return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+    case mbgl::MapObserver::CameraChangeMode::Animated:
+      return MLN_CAMERA_CHANGE_MODE_ANIMATED;
+  }
+  assert(false);
+  return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+}
+
 auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
   switch (mode) {
     case mbgl::MapObserver::RenderMode::Partial:
@@ -1389,7 +1401,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
       : runtime_(runtime), map_(map) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onCameraIsChanging() override {
@@ -1397,7 +1411,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
   }
 
   void onCameraDidChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onWillStartLoadingMap() override {
@@ -1701,7 +1717,7 @@ auto validate_animation_options(const mln_animation_options* animation)
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
-    MLN_ANIMATION_OPTION_EASING;
+    MLN_ANIMATION_OPTION_EASING | MLN_ANIMATION_OPTION_TRANSITION_ID;
   if ((animation->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_animation_options.fields contains unknown bits"
@@ -2308,11 +2324,35 @@ auto from_native_camera(const mbgl::CameraOptions& camera)
   return result;
 }
 
-auto to_native_animation(const mln_animation_options* animation)
-  -> mbgl::AnimationOptions {
+auto camera_transition_finished_payload(uint64_t transition_id)
+  -> mln_runtime_event_camera_transition_finished {
+  return mln_runtime_event_camera_transition_finished{
+    .size = sizeof(mln_runtime_event_camera_transition_finished),
+    .transition_id = transition_id
+  };
+}
+
+// MapLibre Native owns the returned AnimationOptions for the lifetime of the
+// transition it starts, and Transform invokes transitionFinishFn on the map
+// owner thread. Enqueuing the finish event therefore uses the same push path as
+// the map observer. Events for a destroyed map are discarded by the push, so a
+// transition still holding this callback during map teardown enqueues nothing.
+auto to_native_animation(
+  mln_runtime* runtime, mln_map* map, const mln_animation_options* animation
+) -> mbgl::AnimationOptions {
   auto result = mbgl::AnimationOptions{};
   if (animation == nullptr) {
     return result;
+  }
+  if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
+    result.transitionFinishFn = [runtime, map,
+                                 transition_id = animation->transition_id] {
+      mln::core::push_runtime_map_event_payload(
+        runtime, map, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+        payload_bytes(camera_transition_finished_payload(transition_id))
+      );
+    };
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
     result.duration = std::chrono::duration_cast<mbgl::Duration>(
@@ -2798,7 +2838,8 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .duration_ms = 0,
     .velocity = 0,
     .min_zoom = 0,
-    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1}
+    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
+    .transition_id = 0
   };
 }
 
@@ -5297,7 +5338,9 @@ auto map_ease_to(
     return animation_status;
   }
 
-  map->map->easeTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->easeTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5318,7 +5361,9 @@ auto map_fly_to(
     return animation_status;
   }
 
-  map->map->flyTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->flyTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5926,7 +5971,8 @@ auto map_move_by_animated(
   }
 
   map->map->moveBy(
-    mbgl::ScreenCoordinate{delta_x, delta_y}, to_native_animation(animation)
+    mbgl::ScreenCoordinate{delta_x, delta_y},
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -5961,7 +6007,9 @@ auto map_scale_by_animated(
     return animation_status;
   }
 
-  map->map->scaleBy(scale, native_anchor, to_native_animation(animation));
+  map->map->scaleBy(
+    scale, native_anchor, to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5993,7 +6041,8 @@ auto map_rotate_by_animated(
   }
 
   map->map->rotateBy(
-    screen_point(first), screen_point(second), to_native_animation(animation)
+    screen_point(first), screen_point(second),
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -6018,7 +6067,7 @@ auto map_pitch_by_animated(
     return animation_status;
   }
 
-  map->map->pitchBy(pitch, to_native_animation(animation));
+  map->map->pitchBy(pitch, to_native_animation(map->runtime, map, animation));
   return MLN_STATUS_OK;
 }
 
