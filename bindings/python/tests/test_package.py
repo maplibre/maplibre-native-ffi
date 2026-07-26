@@ -720,7 +720,7 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
                 feature,
                 "supercluster",
                 "leaves",
-                json.JsonObject((json.JsonMember("limit", json.JsonInt(10)),)),
+                json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),)),
             )
         ),
         "set_feature_state": (
@@ -1585,12 +1585,15 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
 
     rendered = session.query_rendered_features(geometry, rendered_options)
     source = session.query_source_features("points", source_options)
+    # Supercluster reads "limit" as an unsigned value; json.from_python would
+    # convert the Python int to JsonInt, which native treats as absent.
+    leaves_arguments = json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),))
     extension = session.query_feature_extensions(
         "points",
         feature,
         "supercluster",
         "leaves",
-        _json_object({"limit": 10}),
+        leaves_arguments,
     )
 
     assert fake_native.rendered_call == (
@@ -1607,7 +1610,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         feature,
         "supercluster",
         "leaves",
-        _json_object({"limit": 10}),
+        leaves_arguments,
     )
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 

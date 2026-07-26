@@ -1301,6 +1301,27 @@ fn wait_for_source_feature(
     panic!("timed out waiting for {description}");
 }
 
+fn single_cluster_leaf(session: &RenderSessionHandle, feature: &Feature, offset: u64) -> Feature {
+    let arguments = JsonValue::Object(vec![
+        JsonMember::new("limit", JsonValue::UInt(1)),
+        JsonMember::new("offset", JsonValue::UInt(offset)),
+    ]);
+    let result = session
+        .query_feature_extension(
+            "cluster-source",
+            feature,
+            "supercluster",
+            "leaves",
+            Some(&arguments),
+        )
+        .unwrap();
+    let FeatureExtensionResult::FeatureCollection(leaves) = result else {
+        panic!("expected leaves feature collection");
+    };
+    assert_eq!(leaves.len(), 1);
+    leaves.into_iter().next().unwrap()
+}
+
 fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
     feature
         .properties
@@ -1825,7 +1846,7 @@ fn rendered_box_queries_clip_to_the_viewport() {
 }
 
 #[test]
-// Spec coverage: BND-106.
+// Spec coverage: BND-106 and BND-107.
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     if !has_test_owned_texture_session_backend() {
         return;
@@ -1847,6 +1868,13 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let cluster =
         wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
 
+    // Native matches cluster_id by exact JSON value type, so the copied feature
+    // must keep the unsigned alternative to resolve on the way back in.
+    assert!(matches!(
+        feature_member(&cluster.feature, "cluster_id"),
+        Some(&JsonValue::UInt(_))
+    ));
+
     let children = session
         .query_feature_extension(
             "cluster-source",
@@ -1860,6 +1888,16 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         panic!("expected children feature collection");
     };
     assert!(!children.is_empty());
+
+    // An unsigned limit bounds the collection, and an unsigned offset selects a
+    // later leaf. Native ignores arguments of another type and falls back to ten
+    // leaves at offset zero, so both bounds must move the observed result.
+    let first = single_cluster_leaf(&session, &cluster.feature, 0);
+    let second = single_cluster_leaf(&session, &cluster.feature, 1);
+    assert_ne!(
+        feature_member(&first, "name"),
+        feature_member(&second, "name")
+    );
 
     let expansion_zoom = session
         .query_feature_extension(

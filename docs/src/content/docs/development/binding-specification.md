@@ -725,7 +725,7 @@ that a real native failure would expose.
 ### Conditional tests
 
 The following tests apply only when a binding has the named host-language
-mechanic or helper.
+mechanic, helper, or test fixture.
 
 #### Host cleanup hooks
 
@@ -746,6 +746,19 @@ thread or race release on the same owner-thread handle, include:
 | BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
 | BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
 | BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+
+#### Live render session queries
+
+When the binding's test suite attaches a render session on a configured render
+backend, include:
+
+| ID      | Test                                                                                                                                                                                    |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-107 | A queried cluster feature passed back to a feature-extension query resolves its unsigned `cluster_id`, and unsigned `limit` and `offset` arguments bound and shift the returned leaves. |
+
+Bindings without live render-session fixtures cover the binding-owned half of
+this behavior through BND-067, which requires JSON values to preserve unsigned
+integer width across the boundary.
 
 #### Owner-thread execution adapters
 

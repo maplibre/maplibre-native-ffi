@@ -581,6 +581,13 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 }
 
 // QueryFeatureExtensions queries a feature extension from the latest render session state.
+//
+// The "supercluster" extension reads the "cluster_id" feature property and the "limit" and
+// "offset" arguments as JSONUint. Other numeric types are treated as absent: a "cluster_id"
+// that is not JSONUint returns a JSONValueTypeNull value result instead of a feature
+// collection, and a "limit" or "offset" that is not JSONUint leaves "leaves" at the native
+// defaults of ten leaves at offset zero. Queried feature properties keep their JSON value
+// type, so a queried cluster feature can be passed back unmodified.
 func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feature Feature, extension string, extensionField string, arguments *JSONValue) (FeatureExtensionResult, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {

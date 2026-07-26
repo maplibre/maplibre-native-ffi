@@ -12,6 +12,7 @@ from maplibre_native import camera, geo, json, query, render
 
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
+    assert_cluster_feature_extensions,
     skip_or_fail_fixture_setup,
 )
 
@@ -413,3 +414,13 @@ def test_real_metal_render_session_reports_wrong_thread_errors(
         assert isinstance(observed[0], mln.WrongThreadError)
         assert observed[0].status == mln.MaplibreStatus.WRONG_THREAD
         assert not metal_owned_session.session.closed
+
+
+def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    assert_cluster_feature_extensions(
+        metal_owned_session.runtime,
+        metal_owned_session.map,
+        metal_owned_session.session,
+    )

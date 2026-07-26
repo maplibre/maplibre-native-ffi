@@ -31,6 +31,15 @@ The public C header targets C23. ABI-crossing enum types use C23
 fixed-underlying enum syntax: `int32_t` for status values and `uint32_t` for
 non-negative domains and masks unless a native ABI field requires another width.
 
+`mln_json_value` carries the native value alternative, not just a number. Keep
+`MLN_JSON_VALUE_TYPE_UINT`, `MLN_JSON_VALUE_TYPE_INT`, and
+`MLN_JSON_VALUE_TYPE_DOUBLE` distinct in both directions, because native
+consumers match on the exact alternative. `mbgl` reads supercluster
+`cluster_id`, `limit`, and `offset` as unsigned and treats another alternative
+as absent, so a value that loses its tag produces an empty result with
+`MLN_STATUS_OK`. Document the required alternative on any function whose native
+behavior depends on it.
+
 Shape structs for future ABI stability. Option and output structs that may grow
 use `uint32_t size` fields. Default constructors populate them. Use field masks
 or presence booleans for optional values when zero is valid.

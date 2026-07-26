@@ -217,6 +217,24 @@ MLN_API mln_status mln_render_session_query_source_features(
  * descriptor. On success, *out_result receives an owned result handle. Destroy
  * it with mln_feature_extension_result_destroy().
  *
+ * Native extensions match numeric inputs by exact JSON value type. The
+ * "supercluster" extension reads the "cluster_id" feature property and the
+ * "limit" and "offset" arguments as MLN_JSON_VALUE_TYPE_UINT. Other numeric
+ * types are treated as absent and produce MLN_STATUS_OK:
+ * - A "cluster_id" property that is missing or not
+ *   MLN_JSON_VALUE_TYPE_UINT yields a MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
+ *   result holding MLN_JSON_VALUE_TYPE_NULL, for every extension field. A
+ *   cluster that resolves and has no matching features yields a
+ *   MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION result with zero
+ *   features instead.
+ * - A "limit" or "offset" argument that is not MLN_JSON_VALUE_TYPE_UINT is
+ *   ignored, and the "leaves" field falls back to the native defaults of ten
+ *   leaves at offset zero.
+ *
+ * Feature descriptors copied out of mln_feature_query_result preserve the JSON
+ * value type of every property, so a queried cluster feature can be passed back
+ * unmodified.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, source_id,
