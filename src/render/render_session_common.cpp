@@ -583,6 +583,31 @@ auto to_screen_line_string(
   return true;
 }
 
+// Normalizes a query box and intersects it with the viewport. Native tile-space
+// query geometry saturates at a few tiles past a tile's own bounds, so a box
+// that over-covers the viewport can degrade into an empty answer instead of the
+// visible features. Clipping to the viewport is lossless for a box: the
+// intersection of a screen-space box with the viewport is the same box over the
+// only region that can hold rendered features. Returns nullopt when the box
+// lies entirely outside the viewport, which holds no rendered features.
+auto clip_screen_box_to_viewport(
+  mln_screen_box box, uint32_t width, uint32_t height
+) -> std::optional<mbgl::ScreenBox> {
+  const auto view_width = static_cast<double>(width);
+  const auto view_height = static_cast<double>(height);
+  const auto min_x = std::min(box.min.x, box.max.x);
+  const auto min_y = std::min(box.min.y, box.max.y);
+  const auto max_x = std::max(box.min.x, box.max.x);
+  const auto max_y = std::max(box.min.y, box.max.y);
+  if (min_x > view_width || min_y > view_height || max_x < 0.0 || max_y < 0.0) {
+    return std::nullopt;
+  }
+  return mbgl::ScreenBox{
+    {std::max(min_x, 0.0), std::max(min_y, 0.0)},
+    {std::min(max_x, view_width), std::min(max_y, view_height)}
+  };
+}
+
 auto feature_identifier_type(
   const mbgl::FeatureIdentifier& identifier,
   mln::core::OwnedQueriedFeatureDescriptor& storage
@@ -1247,20 +1272,25 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto line_string = mbgl::ScreenLineString{};
+  auto clipped_box = std::optional<mbgl::ScreenBox>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
       if (!validate_screen_point(geometry->data.point)) {
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       break;
-    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
+    case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX: {
       if (
         !validate_screen_point(geometry->data.box.min) ||
         !validate_screen_point(geometry->data.box.max)
       ) {
         return MLN_STATUS_INVALID_ARGUMENT;
       }
+      clipped_box = clip_screen_box_to_viewport(
+        geometry->data.box, session->width, session->height
+      );
       break;
+    }
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING: {
       if (!to_screen_line_string(geometry->data.line_string, line_string)) {
         return MLN_STATUS_INVALID_ARGUMENT;
@@ -1287,13 +1317,11 @@ auto render_session_query_rendered_features(
       );
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
-      features = session->renderer->queryRenderedFeatures(
-        mbgl::ScreenBox{
-          {geometry->data.box.min.x, geometry->data.box.min.y},
-          {geometry->data.box.max.x, geometry->data.box.max.y}
-        },
-        *native_options
-      );
+      if (clipped_box) {
+        features = session->renderer->queryRenderedFeatures(
+          *clipped_box, *native_options
+        );
+      }
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING:
       features =
