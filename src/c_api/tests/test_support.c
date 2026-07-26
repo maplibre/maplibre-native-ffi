@@ -13,6 +13,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #else
+#include <pthread.h>
 #include <time.h>
 #endif
 
@@ -51,13 +52,71 @@ void mln_test_destroy_map(mln_map* map) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
 }
 
-void mln_test_sleep_millisecond(void) {
+void mln_test_sleep_millisecond(void) { mln_test_sleep_milliseconds(1); }
+
+void mln_test_sleep_milliseconds(unsigned int milliseconds) {
 #if defined(_WIN32)
-  Sleep(1);
+  Sleep(milliseconds);
 #else
-  const struct timespec duration = {.tv_sec = 0, .tv_nsec = 1000000};
+  const struct timespec duration = {
+    .tv_sec = (time_t)(milliseconds / 1000u),
+    .tv_nsec = (long)(milliseconds % 1000u) * 1000000L,
+  };
   nanosleep(&duration, NULL);
 #endif
+}
+
+struct mln_test_thread {
+  void (*entry)(void*);
+  void* argument;
+#if defined(_WIN32)
+  HANDLE handle;
+#else
+  pthread_t handle;
+#endif
+};
+
+#if defined(_WIN32)
+static DWORD WINAPI thread_trampoline(LPVOID argument) {
+  mln_test_thread* thread = argument;
+  thread->entry(thread->argument);
+  return 0;
+}
+#else
+static void* thread_trampoline(void* argument) {
+  mln_test_thread* thread = argument;
+  thread->entry(thread->argument);
+  return NULL;
+}
+#endif
+
+mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
+  mln_test_thread* thread = calloc(1, sizeof(*thread));
+  TEST_ASSERT_NOT_NULL(thread);
+  thread->entry = entry;
+  thread->argument = argument;
+#if defined(_WIN32)
+  thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
+  TEST_ASSERT_NOT_NULL(thread->handle);
+#else
+  TEST_ASSERT_EQUAL_INT(
+    0, pthread_create(&thread->handle, NULL, thread_trampoline, thread)
+  );
+#endif
+  return thread;
+}
+
+void mln_test_thread_join(mln_test_thread* thread) {
+  if (thread == NULL) {
+    return;
+  }
+#if defined(_WIN32)
+  WaitForSingleObject(thread->handle, INFINITE);
+  CloseHandle(thread->handle);
+#else
+  pthread_join(thread->handle, NULL);
+#endif
+  free(thread);
 }
 
 #if defined(MLN_TEST_BACKEND_METAL)

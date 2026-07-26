@@ -9,3 +9,8 @@ construct: null input or output pointers, undersized structs, unknown raw enum
 or flag values, preinitialized output handles, and stale raw handles. Semantic
 behavior belongs in each applicable binding's test suite whenever its public API
 can express the scenario.
+
+Process-global invariants shared by every binding also belong here, such as the
+lock scope that keeps one runtime's teardown from stalling calls on another
+runtime. Each binding sits on the same C implementation, so one C test covers
+the invariant for all of them.
