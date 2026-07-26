@@ -1,9 +1,5 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import java.io.File
-import java.net.URI
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import org.gradle.api.provider.Provider
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -21,6 +17,7 @@ import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
+import org.maplibre.nativeffi.gradle.embedMaplibreLicenseBundle
 import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 data class NativeTargetConfiguration(val definitionFileName: String, val targetPlatform: String)
@@ -45,28 +42,6 @@ fun String.capitalized(): String = replaceFirstChar(Char::uppercaseChar)
 
 fun String.taskSuffix(): String =
   split('-').joinToString("") { it.replaceFirstChar(Char::uppercaseChar) }
-
-fun embedLicenseBundle(archive: File, licenseDirectory: File) {
-  require(archive.isFile) { "KLIB does not exist: ${archive.absolutePath}" }
-  require(licenseDirectory.isDirectory) {
-    "Native license bundle does not exist: ${licenseDirectory.absolutePath}"
-  }
-
-  FileSystems.newFileSystem(URI.create("jar:${archive.toURI()}"), mapOf("create" to "false")).use {
-    klib ->
-    licenseDirectory.walkTopDown().filter(File::isFile).forEach { license ->
-      val relativePath =
-        licenseDirectory
-          .toPath()
-          .relativize(license.toPath())
-          .toString()
-          .replace(File.separatorChar, '/')
-      val destination = klib.getPath("/resources/licenses/maplibre-native-c/$relativePath")
-      Files.createDirectories(destination.parent)
-      Files.copy(license.toPath(), destination, StandardCopyOption.REPLACE_EXISTING)
-    }
-  }
-}
 
 fun nativeTargets(
   backend: MaplibreRuntimeBackend,
@@ -340,8 +315,7 @@ extensions.configure<KotlinMultiplatformExtension> {
 
     val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
     tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
-      inputs.dir(runtimeLicenseDirectory).withPropertyName("maplibreNativeCLicenses")
-      doLast { embedLicenseBundle(outputFileProvider.get(), runtimeLicenseDirectory) }
+      embedMaplibreLicenseBundle(runtimeLicenseDirectory)
     }
 
     val verifyPublicationInput =
