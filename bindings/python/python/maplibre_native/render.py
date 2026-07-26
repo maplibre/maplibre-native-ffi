@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from . import _native
 from ._lifecycle import NativeHandleMixin
 from dataclasses import dataclass
 from enum import IntFlag
@@ -143,6 +144,17 @@ class RenderTargetExtent:
     height: int = 256
     scale_factor: float = 1.0
 
+    def physical_size(self) -> tuple[int, int]:
+        """Return the physical device-pixel size as ceil(logical * scale_factor).
+
+        Session-owned texture targets and surface targets are sized this way.
+        Borrowed texture targets state their physical size instead, because not
+        every physical size is reachable from a logical extent.
+        """
+        return _native.render_target_extent_physical_size(
+            self.width, self.height, self.scale_factor
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class MetalContextDescriptor:
@@ -225,7 +237,11 @@ class MetalOwnedTextureDescriptor:
 class MetalBorrowedTextureDescriptor:
     """Metal caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     texture: NativePointer = NativePointer(0)
 
 
@@ -241,7 +257,11 @@ class VulkanOwnedTextureDescriptor:
 class VulkanBorrowedTextureDescriptor:
     """Vulkan caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The image is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     context: VulkanContextDescriptor = VulkanContextDescriptor()
     image: NativePointer = NativePointer(0)
     image_view: NativePointer = NativePointer(0)
@@ -262,7 +282,11 @@ class OpenGLOwnedTextureDescriptor:
 class OpenGLBorrowedTextureDescriptor:
     """OpenGL caller-owned texture attachment descriptor."""
 
-    extent: RenderTargetExtent = RenderTargetExtent()
+    extent: RenderTargetExtent
+    # The texture is sized by its owner, so the physical size is stated rather
+    # than derived from extent.
+    physical_width: int
+    physical_height: int
     context: OpenGLContextDescriptor = EglContextDescriptor()
     texture: int = 0
     target: int = 0
@@ -428,9 +452,18 @@ class RenderSessionHandle(NativeHandleMixin):
         """Resize this attached render session."""
         self._native.resize(width, height, scale_factor)
 
-    def render_update(self) -> None:
-        """Process the latest map render update for this target."""
-        self._native.render_update()
+    def render_update(self) -> bool:
+        """Process the latest map render update for this target.
+
+        The map retains its latest update, so repeated calls re-render it and
+        return True again; use this to redraw on demand after resize or surface
+        expose, and gate frame loops on render-update-available events instead
+        of the return value. Returns False when no frame was rendered,
+        because the map has not published an update yet or the renderer skipped
+        the frame; both are normal during startup, so keep pumping the runtime
+        until an update is reported.
+        """
+        return bool(self._native.render_update())
 
     def detach(self) -> DetachedRenderSessionHandle:
         """Detach backend resources and return a close-only handle."""
@@ -519,7 +552,19 @@ class RenderSessionHandle(NativeHandleMixin):
         extension_field: str,
         arguments: JsonObject | None = None,
     ) -> FeatureExtensionResult:
-        """Query a feature extension from the latest render session state."""
+        """Query a feature extension from the latest render session state.
+
+        The `supercluster` extension reads the `cluster_id` feature property and
+        the `limit` and `offset` arguments as `JsonUInt`. Other numeric types are
+        treated as absent: a `cluster_id` that is not `JsonUInt` returns a
+        `FeatureExtensionResultType.VALUE` result holding `None` instead of a
+        `FeatureExtensionResultType.FEATURE_COLLECTION` result,
+        and a `limit` or `offset` that is not `JsonUInt` leaves `leaves` at the
+        native defaults of ten leaves at offset zero. Note that
+        `json.from_python` converts a Python `int` to `JsonInt`; build these
+        arguments with `JsonUInt`. Queried feature properties keep their JSON
+        value type, so a queried cluster feature can be passed back unmodified.
+        """
         from .query import FeatureExtensionResult
 
         raw = self._native.query_feature_extensions(

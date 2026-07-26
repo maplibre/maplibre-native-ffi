@@ -315,6 +315,7 @@
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL
 --include-function mln_opengl_supported_context_provider_mask
+--include-function mln_render_target_extent_physical_size
 --include-struct mln_egl_context_descriptor
 --include-struct mln_metal_context_descriptor
 --include-struct mln_opengl_context_descriptor

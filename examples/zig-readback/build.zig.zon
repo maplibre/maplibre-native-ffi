@@ -4,8 +4,8 @@
     .dependencies = .{
         .maplibre_native = .{ .path = "../../bindings/zig" },
         .sdl = .{
-            .url = "git+https://github.com/allyourcodebase/SDL3.git#2112c226de02434111c8a7337fb83d5e5a270d76",
-            .hash = "sdl-1.0.1+3.4.4-i4QD0YeSqQCDkGoyRgfZH6_05GyutM6wfeECig3-STNj",
+            .url = "git+https://github.com/castholm/SDL.git#1b67d371a531ecb0499d4b80a865631c299f472a",
+            .hash = "sdl-0.5.2+3.4.12-SDL--qPKpwHc40bqAlYs7W9pXJVyLwsGDNa4shNXbOZr",
         },
     },
     .paths = .{""},

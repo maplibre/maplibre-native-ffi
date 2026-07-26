@@ -87,6 +87,7 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 		t.Fatalf("AddHillshadeLayer(missing source) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -187,6 +188,7 @@ func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 		t.Fatalf("LayerProperty(missing layer) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -239,6 +241,7 @@ func TestStyleLightPropertyJSONSnapshots(t *testing.T) {
 		t.Fatalf("SetStyleLightProperty(non-finite JSON double) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 	lockOSThreadForTest(t)
 

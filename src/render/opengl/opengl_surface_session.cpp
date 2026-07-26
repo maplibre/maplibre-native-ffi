@@ -144,7 +144,17 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   OpenGLSurfaceBackend(OpenGLSurfaceBackend&&) = delete;
   auto operator=(OpenGLSurfaceBackend&&) -> OpenGLSurfaceBackend& = delete;
 
-  ~OpenGLSurfaceBackend() override {
+  ~OpenGLSurfaceBackend() noexcept override {
+    try {
+      destroy_backend();
+    } catch (const std::exception& exception) {
+      mln::core::set_thread_error(exception);
+    } catch (...) {
+      mln::core::set_thread_error("destroying OpenGL surface backend failed");
+    }
+  }
+
+  void destroy_backend() {
     auto cleanup = [this] {
       resource.reset();
       context.reset();

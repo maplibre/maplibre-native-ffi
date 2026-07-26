@@ -1,3 +1,5 @@
+using Maplibre.Native.Internal;
+
 namespace Maplibre.Native.Json;
 
 /// <summary>JSON-like value tree that preserves integer width and object order.</summary>
@@ -24,9 +26,37 @@ public abstract record JsonValue
 
     public sealed record String(string Value) : JsonValue;
 
-    public sealed record Array(IReadOnlyList<JsonValue> Values) : JsonValue;
+    public sealed record Array(IReadOnlyList<JsonValue> Values) : JsonValue
+    {
+        private readonly IReadOnlyList<JsonValue> values = ValueEquality.Snapshot(Values);
 
-    public sealed record Object(IReadOnlyList<JsonMember> Members) : JsonValue;
+        public IReadOnlyList<JsonValue> Values
+        {
+            get => values;
+            init => values = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(Array? other) =>
+            other is not null && ValueEquality.SequenceEquals(values, other.values);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(values);
+    }
+
+    public sealed record Object(IReadOnlyList<JsonMember> Members) : JsonValue
+    {
+        private readonly IReadOnlyList<JsonMember> members = ValueEquality.Snapshot(Members);
+
+        public IReadOnlyList<JsonMember> Members
+        {
+            get => members;
+            init => members = ValueEquality.Snapshot(value);
+        }
+
+        public bool Equals(Object? other) =>
+            other is not null && ValueEquality.SequenceEquals(members, other.members);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(members);
+    }
 }
 
 /// <summary>JSON object member.</summary>

@@ -8,6 +8,7 @@ on:
       - .mise/**
       - .miserc.toml
       - .github/workflows/devcontainer-image.yml
+      - mise.linux.toml
       - mise.lock
       - mise.toml
   pull_request:
@@ -17,6 +18,7 @@ on:
       - .mise/**
       - .miserc.toml
       - .github/workflows/devcontainer-image.yml
+      - mise.linux.toml
       - mise.lock
       - mise.toml
   workflow_dispatch:
@@ -45,8 +47,11 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-ci-deps
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - name: Install image tooling
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes skopeo
       - name: Build image
@@ -55,6 +60,7 @@ jobs:
   release:
     name: release / ${{ matrix.arch }}
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: sccache
     permissions:
       contents: read
       packages: write
@@ -69,8 +75,11 @@ jobs:
           - arch: arm64
             runner: ubuntu-24.04-arm
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./.github/actions/setup-ci-deps
+        with:
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - name: Install image tooling
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes skopeo
       - name: Log in to GHCR

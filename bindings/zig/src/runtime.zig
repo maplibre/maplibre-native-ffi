@@ -1006,12 +1006,29 @@ pub const RuntimeHandle = enum(u128) {
         return createNative(&native_options, diagnostic_store);
     }
 
+    /// Runs one iteration of this runtime's owner-thread run loop.
+    ///
+    /// The iteration drains the high-priority task queue and then the default
+    /// queue until both are empty, including tasks enqueued during the drain,
+    /// and also dispatches expired timers and ready I/O.
+    ///
+    /// `runOnce` returns without blocking on new work, but its duration is
+    /// unbounded: a single iteration can span a style parse. Treat it as "make
+    /// progress now" rather than as a fixed per-frame time slice.
     pub fn runOnce(self: *RuntimeHandle) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         try status.checkStatus(c.mln_runtime_run_once(runtime_lease.native), runtime_lease.diagnostic_store);
     }
 
+    /// Polls and copies the next queued runtime event, returning null when the
+    /// queue is empty. The caller owns the returned event and deinits it.
+    ///
+    /// Polling also advances binding-owned state: on a map-style-loaded event
+    /// this binding releases the map's detached custom geometry sources, closing
+    /// the upcall stubs for sources the new style dropped. That release happens
+    /// when the event is polled, so drain the queue to keep dropped sources from
+    /// lingering.
     pub fn pollEvent(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();

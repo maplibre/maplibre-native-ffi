@@ -15,7 +15,7 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	if err := nilSession.Close(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle Close() error = %v, want ErrInvalidArgument", err)
 	}
-	if err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
+	if _, err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle RenderUpdate() error = %v, want ErrInvalidArgument", err)
 	}
 	if _, err := nilSession.ReadPremultipliedRGBA8Into(nil); !errors.Is(err, ErrInvalidArgument) {
@@ -150,6 +150,62 @@ func TestMapCloseFailsWhileRenderSessionIsLive(t *testing.T) {
 	}
 }
 
+func TestMapCloseSucceedsAfterRenderSessionDetach(t *testing.T) {
+	mapState, err := handle.New(&nativeMap{}, "MapHandle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := &MapHandle{state: mapState}
+	session, err := newRenderSessionHandle(m, &nativeRenderSession{})
+	if err != nil {
+		t.Fatalf("newRenderSessionHandle(): %v", err)
+	}
+
+	oldDestroyMap := destroyMapHandle
+	oldDestroySession := destroyRenderSessionHandle
+	oldDetachSession := detachRenderSessionHandle
+	defer func() {
+		destroyMapHandle = oldDestroyMap
+		destroyRenderSessionHandle = oldDestroySession
+		detachRenderSessionHandle = oldDetachSession
+	}()
+	var mapDestroyCalls atomic.Int32
+	var sessionDestroyCalls atomic.Int32
+	var detachCalls atomic.Int32
+	destroyMapHandle = func(*nativeMap) int32 {
+		mapDestroyCalls.Add(1)
+		return 0
+	}
+	destroyRenderSessionHandle = func(*nativeRenderSession) int32 {
+		sessionDestroyCalls.Add(1)
+		return 0
+	}
+	detachRenderSessionHandle = func(*nativeRenderSession) int32 {
+		detachCalls.Add(1)
+		return 0
+	}
+
+	if err := session.Detach(); err != nil {
+		t.Fatalf("RenderSession Detach(): %v", err)
+	}
+	// Detaching releases the map, so the map closes while the session is open.
+	if err := m.Close(); err != nil {
+		t.Fatalf("Map Close() after detach: %v", err)
+	}
+	if got := mapDestroyCalls.Load(); got != 1 {
+		t.Fatalf("map destroy calls after detach = %d, want 1", got)
+	}
+	if err := session.Close(); err != nil {
+		t.Fatalf("RenderSession Close() after map close: %v", err)
+	}
+	if got := sessionDestroyCalls.Load(); got != 1 {
+		t.Fatalf("render session destroy calls = %d, want 1", got)
+	}
+	if got := detachCalls.Load(); got != 1 {
+		t.Fatalf("detach calls = %d, want 1", got)
+	}
+}
+
 func newActiveFrameTestSession(t *testing.T) *RenderSessionHandle {
 	t.Helper()
 
@@ -191,7 +247,10 @@ func TestRenderSessionOperationsRejectActiveFrame(t *testing.T) {
 		call func() error
 	}{
 		{name: "Resize", call: func() error { return session.Resize(RenderTargetExtent{Width: 1, Height: 1, ScaleFactor: 1}) }},
-		{name: "RenderUpdate", call: session.RenderUpdate},
+		{name: "RenderUpdate", call: func() error {
+			_, err := session.RenderUpdate()
+			return err
+		}},
 		{name: "Detach", call: session.Detach},
 		{name: "ReduceMemoryUse", call: session.ReduceMemoryUse},
 		{name: "ClearData", call: session.ClearData},

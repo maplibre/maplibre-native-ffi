@@ -1,7 +1,21 @@
+[tools]
+"core:java" = "{{vars.java_version}}"
+
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:compose-map:build"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  :examples:compose-map:build
+'''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:compose-map:run"
+depends = ["//:build"]
+dir = "../.."
+run = '''
+./gradlew \
+  -PmaplibreNativeCInstallDir="build/{{vars.host_native_preset}}/install" \
+  :examples:compose-map:run
+'''

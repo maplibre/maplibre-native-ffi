@@ -16,8 +16,18 @@ public enum MapMode: UInt32, Sendable, Hashable {
 }
 
 public struct MapOptions: Equatable, Sendable {
+  /// Initial logical width in UI pixels, replaced by the extent of the first
+  /// attached render session.
   public var width: UInt32
+  /// Initial logical height in UI pixels, replaced by the extent of the first
+  /// attached render session.
   public var height: UInt32
+  /// UI-to-device pixel scale, fixed for the lifetime of the map.
+  ///
+  /// This selects sprites, glyphs, and raster tiles for every frame. Render
+  /// targets carry their own scale factor for geometry, so attaching or
+  /// resizing a session with a different one logs a warning and renders styled
+  /// imagery chosen for this density.
   public var scaleFactor: Double
   public var mode: MapMode
 
@@ -166,6 +176,16 @@ public final class MapHandle {
     resetCallbackRetentionState()
   }
 
+  /// Loads a style URL through MapLibre Native style APIs.
+  ///
+  /// Loading is asynchronous, so a style that is missing, unreachable, or
+  /// malformed still returns normally here and reports through a
+  /// map-loading-failed runtime event. Watch the runtime event queue to observe
+  /// style load failures.
+  ///
+  /// A well-formed style that MapLibre rejects semantically, such as an
+  /// unknown `version` or a layer naming a missing source, produces neither
+  /// an error nor an event: MapLibre logs it and renders what it can.
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(url) { url in
@@ -175,6 +195,15 @@ public final class MapHandle {
     }
   }
 
+  /// Loads inline style JSON through MapLibre Native style APIs.
+  ///
+  /// Malformed JSON is reported twice: this call throws the parse error
+  /// synchronously, and the same message also arrives as a map-loading-failed
+  /// runtime event. Handle both so a queued failure event is not a surprise.
+  ///
+  /// A well-formed style that MapLibre rejects semantically, such as an
+  /// unknown `version` or a layer naming a missing source, produces neither
+  /// an error nor an event: MapLibre logs it and renders what it can.
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(json) { json in

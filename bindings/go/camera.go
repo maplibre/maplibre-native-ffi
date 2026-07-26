@@ -10,12 +10,29 @@ type CameraOptions struct {
 	Center         *LatLng
 	CenterAltitude *float64
 	Padding        *EdgeInsets
-	Anchor         *ScreenPoint
-	Zoom           *float64
-	Bearing        *float64
-	Pitch          *float64
-	Roll           *float64
-	FieldOfView    *float64
+	// Anchor is input-only: JumpTo, EaseTo, and FlyTo honor it as the screen
+	// point the camera pivots around, and MapLibre leaves it nil on every read
+	// path, including Camera and the CameraFor* fit helpers.
+	Anchor      *ScreenPoint
+	Zoom        *float64
+	Bearing     *float64
+	Pitch       *float64
+	Roll        *float64
+	FieldOfView *float64
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options CameraOptions) Equal(other CameraOptions) bool {
+	return equalPointer(options.Center, other.Center) &&
+		equalPointer(options.CenterAltitude, other.CenterAltitude) &&
+		equalPointer(options.Padding, other.Padding) &&
+		equalPointer(options.Anchor, other.Anchor) &&
+		equalPointer(options.Zoom, other.Zoom) &&
+		equalPointer(options.Bearing, other.Bearing) &&
+		equalPointer(options.Pitch, other.Pitch) &&
+		equalPointer(options.Roll, other.Roll) &&
+		equalPointer(options.FieldOfView, other.FieldOfView)
 }
 
 // WithCenter returns a copy that sets the center coordinate.
@@ -145,6 +162,15 @@ type AnimationOptions struct {
 	Easing     *UnitBezier
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options AnimationOptions) Equal(other AnimationOptions) bool {
+	return equalPointer(options.DurationMS, other.DurationMS) &&
+		equalPointer(options.Velocity, other.Velocity) &&
+		equalPointer(options.MinZoom, other.MinZoom) &&
+		equalPointer(options.Easing, other.Easing)
+}
+
 // WithDurationMS returns a copy that sets the duration in milliseconds.
 func (options AnimationOptions) WithDurationMS(durationMS float64) AnimationOptions {
 	options.DurationMS = new(float64)
@@ -215,6 +241,14 @@ type CameraFitOptions struct {
 	Pitch   *float64
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options CameraFitOptions) Equal(other CameraFitOptions) bool {
+	return equalPointer(options.Padding, other.Padding) &&
+		equalPointer(options.Bearing, other.Bearing) &&
+		equalPointer(options.Pitch, other.Pitch)
+}
+
 // WithPadding returns a copy that sets fit padding.
 func (options CameraFitOptions) WithPadding(padding EdgeInsets) CameraFitOptions {
 	options.Padding = new(EdgeInsets)
@@ -268,6 +302,16 @@ type BoundOptions struct {
 	MaxZoom  *float64
 	MinPitch *float64
 	MaxPitch *float64
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options BoundOptions) Equal(other BoundOptions) bool {
+	return equalPointer(options.Bounds, other.Bounds) &&
+		equalPointer(options.MinZoom, other.MinZoom) &&
+		equalPointer(options.MaxZoom, other.MaxZoom) &&
+		equalPointer(options.MinPitch, other.MinPitch) &&
+		equalPointer(options.MaxPitch, other.MaxPitch)
 }
 
 // WithBounds returns a copy that sets geographic camera constraints.
@@ -361,6 +405,13 @@ type FreeCameraOptions struct {
 	Orientation *Quaternion
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options FreeCameraOptions) Equal(other FreeCameraOptions) bool {
+	return equalPointer(options.Position, other.Position) &&
+		equalPointer(options.Orientation, other.Orientation)
+}
+
 // WithPosition returns a copy that sets free camera position.
 func (options FreeCameraOptions) WithPosition(position Vec3) FreeCameraOptions {
 	options.Position = new(Vec3)
@@ -445,6 +496,15 @@ type ViewportOptions struct {
 	FrustumOffset    *EdgeInsets
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options ViewportOptions) Equal(other ViewportOptions) bool {
+	return equalPointer(options.NorthOrientation, other.NorthOrientation) &&
+		equalPointer(options.ConstrainMode, other.ConstrainMode) &&
+		equalPointer(options.ViewportMode, other.ViewportMode) &&
+		equalPointer(options.FrustumOffset, other.FrustumOffset)
+}
+
 // WithNorthOrientation returns a copy that sets the north orientation field.
 func (options ViewportOptions) WithNorthOrientation(value NorthOrientation) ViewportOptions {
 	options.NorthOrientation = new(NorthOrientation)
@@ -525,6 +585,17 @@ type TileOptions struct {
 	LODMode           *TileLODMode
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options TileOptions) Equal(other TileOptions) bool {
+	return equalPointer(options.PrefetchZoomDelta, other.PrefetchZoomDelta) &&
+		equalPointer(options.LODMinRadius, other.LODMinRadius) &&
+		equalPointer(options.LODScale, other.LODScale) &&
+		equalPointer(options.LODPitchThreshold, other.LODPitchThreshold) &&
+		equalPointer(options.LODZoomShift, other.LODZoomShift) &&
+		equalPointer(options.LODMode, other.LODMode)
+}
+
 // WithPrefetchZoomDelta returns a copy that sets prefetch zoom delta.
 func (options TileOptions) WithPrefetchZoomDelta(value uint32) TileOptions {
 	options.PrefetchZoomDelta = new(uint32)
@@ -602,6 +673,14 @@ type ProjectionModeOptions struct {
 	Axonometric *bool
 	XSkew       *float64
 	YSkew       *float64
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares the optional fields by pointer identity.
+func (options ProjectionModeOptions) Equal(other ProjectionModeOptions) bool {
+	return equalPointer(options.Axonometric, other.Axonometric) &&
+		equalPointer(options.XSkew, other.XSkew) &&
+		equalPointer(options.YSkew, other.YSkew)
 }
 
 // WithAxonometric returns a copy that sets the axonometric field.

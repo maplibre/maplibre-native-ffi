@@ -26,7 +26,13 @@ typedef enum mln_rendered_query_geometry_type : uint32_t {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING = 3,
 } mln_rendered_query_geometry_type;
 
-/** Screen-space box in logical map pixels. */
+/**
+ * Screen-space box in logical map pixels.
+ *
+ * Corners may be given in any order, and may extend past the viewport. Rendered
+ * queries normalize the corners and clip the box to the viewport, so a box that
+ * over-covers the viewport queries everything visible.
+ */
 typedef struct mln_screen_box {
   mln_screen_point min;
   mln_screen_point max;
@@ -155,6 +161,11 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  * On success, *out_result receives an owned result handle. Destroy it with
  * mln_feature_query_result_destroy().
  *
+ * Box geometry is normalized and clipped to the viewport, so a box that
+ * over-covers the viewport queries everything visible. A box that lies entirely
+ * outside the viewport yields an empty result. Point and line-string geometry
+ * are queried as given.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, geometry is
@@ -200,11 +211,34 @@ MLN_API mln_status mln_render_session_query_source_features(
 /**
  * Queries a feature extension from the latest render session state.
  *
+ * Feature extensions are renderer-scoped in MapLibre Native: the cluster index
+ * an extension reads lives on the render-side source inside a live renderer,
+ * not on the style source, which is why this query hangs off the session rather
+ * than off a map or a source ID.
+ *
  * The session renderer must already exist. source_id, feature, extension,
  * extension_field, and arguments are borrowed for the duration of the call.
  * arguments may be null. When non-null, arguments must be a JSON object
  * descriptor. On success, *out_result receives an owned result handle. Destroy
  * it with mln_feature_extension_result_destroy().
+ *
+ * Native extensions match numeric inputs by exact JSON value type. The
+ * "supercluster" extension reads the "cluster_id" feature property and the
+ * "limit" and "offset" arguments as MLN_JSON_VALUE_TYPE_UINT. Other numeric
+ * types are treated as absent and produce MLN_STATUS_OK:
+ * - A "cluster_id" property that is missing or not
+ *   MLN_JSON_VALUE_TYPE_UINT yields a MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
+ *   result holding MLN_JSON_VALUE_TYPE_NULL, for every extension field. A
+ *   cluster that resolves and has no matching features yields a
+ *   MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION result with zero
+ *   features instead.
+ * - A "limit" or "offset" argument that is not MLN_JSON_VALUE_TYPE_UINT is
+ *   ignored, and the "leaves" field falls back to the native defaults of ten
+ *   leaves at offset zero.
+ *
+ * Feature descriptors copied out of mln_feature_query_result preserve the JSON
+ * value type of every property, so a queried cluster feature can be passed back
+ * unmodified.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -1,7 +1,61 @@
-function(mln_configure_linux_platform target)
-  include(mln_rust)
+function(mln_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
-  find_package(ZLIB REQUIRED)
+
+  include(FetchContent)
+  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
+  fetchcontent_declare(
+    mln_ffi_zlib_source
+    URL
+      "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
+    URL_HASH
+      "SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
+    EXCLUDE_FROM_ALL)
+  fetchcontent_declare(
+    mln_ffi_libuv_source
+    URL "https://dist.libuv.org/dist/v1.48.0/libuv-v1.48.0.tar.gz"
+    URL_HASH
+      "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
+    EXCLUDE_FROM_ALL)
+  fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
+
+  target_link_libraries(
+    ${target}
+    INTERFACE Threads::Threads zlibstatic uv_a ${CMAKE_DL_LIBS})
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_DEFAULT_LOGGING_STDERR
+      TRUE
+      MLN_FFI_DEFAULT_THREAD_LOCAL
+      TRUE
+      MLN_FFI_SHARED_SUPPORTED
+      TRUE
+      MLN_FFI_ARCHIVE_FORMAT
+      elf
+      MLN_FFI_STATIC_ARCHIVES
+      "mbgl-vendor-icu;maplibre_native_platform_rust;zlibstatic;uv_a"
+      MLN_FFI_PKG_CONFIG_LIBS
+      -ldl
+      MLN_FFI_TEST_SUPPORTED
+      TRUE)
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM linux-arm64 MLN_FFI_ZIG_TARGET aarch64-linux-gnu)
+  else()
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        MLN_FFI_TARGET_PLATFORM linux-x64 MLN_FFI_ZIG_TARGET x86_64-linux-gnu)
+  endif()
+endfunction()
+
+function(mln_configure_platform target)
+  include(mln_rust)
 
   include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
@@ -34,17 +88,9 @@ function(mln_configure_linux_platform target)
     BEFORE
     PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
 
-  target_include_directories(
-    ${target}
-    SYSTEM
-    PRIVATE ${ZLIB_INCLUDE_DIR} "$ENV{MLN_FFI_DEPENDENCY_INCLUDE_DIR}")
-
   target_link_libraries(
     ${target}
-    PRIVATE
-      mbgl-vendor-icu Threads::Threads
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libz.a"
-      "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}/libuv.a" dl)
+    PRIVATE mbgl-vendor-icu MLN_FFI::PlatformDependencies)
 
   mln_link_rust_platform(${target})
 endfunction()

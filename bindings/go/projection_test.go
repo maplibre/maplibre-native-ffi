@@ -59,6 +59,7 @@ func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 		t.Fatalf("SetVisibleCoordinates(nil) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
 	lockOSThreadForTest(t)
 

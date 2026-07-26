@@ -1,6 +1,0 @@
-[requires]
-backend = ["opengl"]
-os = ["linux", "macos"]
-
-[ci]
-check = "//examples/go-map:check"

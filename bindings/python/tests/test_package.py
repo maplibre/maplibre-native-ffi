@@ -720,7 +720,7 @@ def test_render_session_methods_propagate_wrong_thread_errors() -> None:
                 feature,
                 "supercluster",
                 "leaves",
-                json.JsonObject((json.JsonMember("limit", json.JsonInt(10)),)),
+                json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),)),
             )
         ),
         "set_feature_state": (
@@ -1460,6 +1460,8 @@ def test_render_descriptors_are_public_python_values() -> None:
     )
     vulkan = render.VulkanBorrowedTextureDescriptor(
         extent=extent,
+        physical_width=641,
+        physical_height=481,
         context=render.VulkanContextDescriptor(
             graphics_queue_family_index=7,
             get_instance_proc_addr=render.NativePointer(0x1111),
@@ -1485,6 +1487,8 @@ def test_render_descriptors_are_public_python_values() -> None:
     )
     opengl_wgl = render.OpenGLBorrowedTextureDescriptor(
         extent=extent,
+        physical_width=641,
+        physical_height=481,
         context=render.WglContextDescriptor(
             device_context=pointer,
             share_context=render.NativePointer(0x8888),
@@ -1494,6 +1498,9 @@ def test_render_descriptors_are_public_python_values() -> None:
         target=0x0DE1,
     )
 
+    # Odd sizes no logical extent maps onto, so these must survive as stated.
+    assert (vulkan.physical_width, vulkan.physical_height) == (641, 481)
+    assert (opengl_wgl.physical_width, opengl_wgl.physical_height) == (641, 481)
     assert vulkan.context.graphics_queue_family_index == 7
     assert vulkan.context.get_instance_proc_addr.address == 0x1111
     assert vulkan.context.get_device_proc_addr.address == 0x2222
@@ -1585,12 +1592,15 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
 
     rendered = session.query_rendered_features(geometry, rendered_options)
     source = session.query_source_features("points", source_options)
+    # Supercluster reads "limit" as an unsigned value; json.from_python would
+    # convert the Python int to JsonInt, which native treats as absent.
+    leaves_arguments = json.JsonObject((json.JsonMember("limit", json.JsonUInt(10)),))
     extension = session.query_feature_extensions(
         "points",
         feature,
         "supercluster",
         "leaves",
-        _json_object({"limit": 10}),
+        leaves_arguments,
     )
 
     assert fake_native.rendered_call == (
@@ -1607,7 +1617,7 @@ def test_render_session_query_public_api_uses_query_and_geojson_wire_values() ->
         feature,
         "supercluster",
         "leaves",
-        _json_object({"limit": 10}),
+        leaves_arguments,
     )
     assert extension == query.FeatureExtensionResult.value_result(json.JsonUInt(7))
 

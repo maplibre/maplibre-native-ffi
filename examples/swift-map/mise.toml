@@ -1,33 +1,28 @@
+[tools]
+"core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+"github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
+
 [tasks.build]
-depends = ["//:ensure-native-library"]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-if [[ "$MISE_ENV" == ios-* ]]; then
-  swift build \
-    --product swift-map-ios \
-    --scratch-path ".build/$MISE_ENV" \
-    --sdk "$MLN_FFI_SYSTEM_ROOT" \
-    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE"
-else
-  swift build --product swift-map --scratch-path ".build/$MISE_ENV"
-fi
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
+swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
+swift build "${swift_args[@]}"
 '''
 
 [tasks.run]
-usage = 'arg "[render-target]"'
+depends = [":build"]
+usage = '''
+arg "[render-target]" default="owned-texture" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
 run = '''
-if [[ "$MISE_ENV" == ios-simulator-* ]]; then
-  exec mise run run:ios-simulator
-fi
-if [[ "$MISE_ENV" == ios-* ]]; then
-  echo "swift-map run is only supported for iOS simulator environments, not $MISE_ENV" >&2
-  exit 1
-fi
-if [[ -z "{{ usage.render_target }}" ]]; then
-  echo "Usage: mise run //examples/swift-map:run -- <render-target>" >&2
-  exit 1
-fi
-mise run build
-exec ".build/$MISE_ENV/debug/swift-map" "{{ usage.render_target }}"
+exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
+  "{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]
@@ -38,3 +33,45 @@ run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
 run = [{ task = "run", args = ["native-surface"] }]
+
+[tasks."build:ios-simulator"]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+swift build \
+  --product swift-map-ios \
+  --scratch-path .build/ios-simulator \
+  {{ "--swift-sdk arm64-apple-ios-simulator" if os() == "linux" else "--sdk \"$(xcrun --sdk iphonesimulator --show-sdk-path)\"" }} \
+  --triple arm64-apple-ios14.3-simulator
+'''
+
+[tasks."build:ios"]
+depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+{% if os() == "linux" %}
+MLN_FFI_XTOOL_BUILD=1 xtool.AppImage dev build
+{% elif os() == "macos" %}
+swift build \
+  --product swift-map-ios \
+  --scratch-path .build/ios \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --triple arm64-apple-ios14.3
+{% endif %}
+'''
+
+[tasks."run:ios"]
+depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
+run = '''
+{% if os() == "linux" %}
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export MLN_FFI_XTOOL_BUILD=1
+exec xtool.AppImage dev run --usb
+{% else %}
+echo "run:ios is currently implemented by xtool on Linux" >&2
+exit 1
+{% endif %}
+'''

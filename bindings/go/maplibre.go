@@ -9,6 +9,7 @@
 package maplibre
 
 /*
+#cgo pkg-config: maplibre-native-c
 #include "maplibre_native_c.h"
 */
 import "C"

@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+#MISE description="Verify staged Kotlin Maven snapshot payloads."
+
+import json
+import pathlib
+import sys
+import zipfile
+import xml.etree.ElementTree as element_tree
+
+MODULES = {
+    "maplibre-native-ffi",
+    "maplibre-native-ffi-android",
+    "maplibre-native-ffi-iosarm64",
+    "maplibre-native-ffi-iossimulatorarm64",
+    "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-macosarm64",
+    "maplibre-native-ffi-runtime-metal",
+    "maplibre-native-ffi-runtime-metal-iosarm64",
+    "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
+    "maplibre-native-ffi-runtime-metal-jvm",
+    "maplibre-native-ffi-runtime-metal-macosarm64",
+    "maplibre-native-ffi-runtime-opengl",
+    "maplibre-native-ffi-runtime-opengl-android",
+    "maplibre-native-ffi-runtime-opengl-jvm",
+    "maplibre-native-ffi-runtime-vulkan",
+    "maplibre-native-ffi-runtime-vulkan-android",
+    "maplibre-native-ffi-runtime-vulkan-jvm",
+}
+
+# Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
+# not the manifest-only placeholders Maven Central tolerates for API-free modules.
+API_BEARING_MODULES = {
+    "maplibre-native-ffi",
+    "maplibre-native-ffi-android",
+    "maplibre-native-ffi-iosarm64",
+    "maplibre-native-ffi-iossimulatorarm64",
+    "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-macosarm64",
+}
+
+ROOT_TARGET_MODULES = {
+    "maplibre-native-ffi": {
+        "android": "maplibre-native-ffi-android",
+        "iosArm64": "maplibre-native-ffi-iosarm64",
+        "iosSimulatorArm64": "maplibre-native-ffi-iossimulatorarm64",
+        "jvm": "maplibre-native-ffi-jvm",
+        "macosArm64": "maplibre-native-ffi-macosarm64",
+    },
+    "maplibre-native-ffi-runtime-opengl": {
+        "android": "maplibre-native-ffi-runtime-opengl-android",
+        "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
+    },
+    "maplibre-native-ffi-runtime-vulkan": {
+        "android": "maplibre-native-ffi-runtime-vulkan-android",
+        "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
+    },
+    "maplibre-native-ffi-runtime-metal": {
+        "iosArm64": "maplibre-native-ffi-runtime-metal-iosarm64",
+        "iosSimulatorArm64": "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
+        "jvm": "maplibre-native-ffi-runtime-metal-jvm",
+        "macosArm64": "maplibre-native-ffi-runtime-metal-macosarm64",
+    },
+}
+
+
+def one(paths: list[pathlib.Path], description: str) -> pathlib.Path:
+    if len(paths) != 1:
+        raise SystemExit(f"expected one {description}, found {len(paths)}: {paths}")
+    return paths[0]
+
+
+def module_files(root: pathlib.Path, module: str, suffix: str) -> list[pathlib.Path]:
+    module_root = root / "org" / "maplibre" / "nativeffi" / module
+    return sorted(path for path in module_root.rglob(f"*{suffix}") if path.is_file())
+
+
+def verify_metadata(root: pathlib.Path) -> None:
+    for module in MODULES:
+        pom = one(module_files(root, module, ".pom"), f"{module} POM")
+        metadata = one(
+            module_files(root, module, ".module"), f"{module} Gradle metadata"
+        )
+        element_tree.parse(pom)
+        with metadata.open(encoding="utf-8") as stream:
+            json.load(stream)
+
+    for root_module, target_modules in ROOT_TARGET_MODULES.items():
+        metadata_path = one(
+            module_files(root, root_module, ".module"),
+            f"{root_module} Gradle metadata",
+        )
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        component = metadata["component"]
+        version = component["version"]
+        if component["group"] != "org.maplibre.nativeffi":
+            raise SystemExit(f"{metadata_path} has invalid group {component['group']}")
+        if component["module"] != root_module:
+            raise SystemExit(
+                f"{metadata_path} has invalid module {component['module']}"
+            )
+
+        referenced_targets = set()
+        for variant in metadata["variants"]:
+            available_at = variant.get("available-at")
+            if available_at is None:
+                continue
+            target = next(
+                (name for name in target_modules if variant["name"].startswith(name)),
+                None,
+            )
+            if target is None:
+                raise SystemExit(
+                    f"{metadata_path} has no target mapping for {variant['name']}"
+                )
+            referenced_targets.add(target)
+            target_module = target_modules[target]
+            expected = {
+                "url": f"../../{target_module}/{version}/{target_module}-{version}.module",
+                "group": "org.maplibre.nativeffi",
+                "module": target_module,
+                "version": version,
+            }
+            if available_at != expected:
+                raise SystemExit(
+                    f"{metadata_path} has invalid {variant['name']} coordinates: "
+                    f"{available_at}; expected {expected}"
+                )
+            one(
+                module_files(root, target_module, ".module"),
+                f"referenced {target_module} Gradle metadata",
+            )
+        if referenced_targets != set(target_modules):
+            raise SystemExit(
+                f"{metadata_path} references {referenced_targets}; "
+                f"expected {set(target_modules)}"
+            )
+
+
+def verify_javadoc(root: pathlib.Path) -> None:
+    for module in API_BEARING_MODULES:
+        javadoc = one(
+            module_files(root, module, "-javadoc.jar"), f"{module} javadoc JAR"
+        )
+        with zipfile.ZipFile(javadoc) as jar:
+            names = set(jar.namelist())
+            if "index.html" not in names:
+                raise SystemExit(
+                    f"{javadoc} does not contain generated documentation"
+                )
+            if not any(
+                name.startswith("maplibre-native-ffi/org.maplibre.nativeffi")
+                and name.endswith(".html")
+                for name in names
+            ):
+                raise SystemExit(
+                    f"{javadoc} does not contain generated API pages"
+                )
+
+
+def verify_android(root: pathlib.Path) -> None:
+    core = one(
+        module_files(root, "maplibre-native-ffi-android", ".aar"),
+        "core Android AAR",
+    )
+    with zipfile.ZipFile(core) as aar:
+        names = set(aar.namelist())
+        if any(name.startswith("jni/") for name in names):
+            raise SystemExit("the core Android AAR contains backend native libraries")
+        rustls_jar = "libs/rustls-platform-verifier-android.jar"
+        if rustls_jar not in names:
+            raise SystemExit(f"the core Android AAR is missing {rustls_jar}")
+        rules = [name for name in names if name.endswith((".pro", "proguard.txt"))]
+        if not any(b"org.rustls.platformverifier" in aar.read(name) for name in rules):
+            raise SystemExit(
+                "the core Android AAR is missing the Rustls consumer keep rule"
+            )
+        for license_name in ("LICENSE-APACHE", "LICENSE-MIT"):
+            expected = "META-INF/licenses/rustls-platform-verifier/" + license_name
+            if expected not in names:
+                raise SystemExit(f"the core Android AAR is missing {expected}")
+
+    for backend in ("opengl", "vulkan"):
+        runtime = one(
+            module_files(
+                root, f"maplibre-native-ffi-runtime-{backend}-android", ".aar"
+            ),
+            f"{backend} Android runtime AAR",
+        )
+        with zipfile.ZipFile(runtime) as aar:
+            names = set(aar.namelist())
+            for abi in ("arm64-v8a", "x86_64"):
+                for library in (
+                    "libmaplibre-native-c.so",
+                    "libjniMaplibreNativeC.so",
+                    "libc++_shared.so",
+                ):
+                    expected = f"jni/{abi}/{library}"
+                    if expected not in names:
+                        raise SystemExit(f"{runtime} is missing {expected}")
+                    payload = aar.read(expected)
+                    if not payload.startswith(b"\x7fELF"):
+                        raise SystemExit(f"{runtime} {expected} is not an ELF shared library")
+                    if library == "libc++_shared.so" and b".debug_info" in payload:
+                        raise SystemExit(
+                            f"{runtime} packages unstripped {expected}"
+                        )
+
+
+def verify_jvm(root: pathlib.Path) -> None:
+    expected = {
+        "opengl": {
+            "natives-linux-x64",
+            "natives-linux-arm64",
+            "natives-macos-arm64",
+            "natives-windows-x64",
+            "natives-windows-arm64",
+        },
+        "vulkan": {
+            "natives-linux-x64",
+            "natives-linux-arm64",
+            "natives-macos-arm64",
+            "natives-windows-x64",
+            "natives-windows-arm64",
+        },
+        "metal": {"natives-macos-arm64"},
+    }
+    for backend, classifiers in expected.items():
+        module = f"maplibre-native-ffi-runtime-{backend}-jvm"
+        jars = module_files(root, module, ".jar")
+        for classifier in classifiers:
+            runtime = one(
+                [path for path in jars if f"-{classifier}.jar" in path.name],
+                f"{backend} {classifier} JVM runtime JAR",
+            )
+            with zipfile.ZipFile(runtime) as jar:
+                prefix = f"META-INF/maplibre-native-ffi/{classifier}/"
+                native_libraries = [
+                    name
+                    for name in jar.namelist()
+                    if name.startswith(prefix)
+                    and name.endswith((".dll", ".dylib", ".so"))
+                ]
+                if not any("maplibre-native-c" in name for name in native_libraries):
+                    raise SystemExit(f"{runtime} does not contain the C API library")
+
+
+def verify_native(root: pathlib.Path) -> None:
+    modules = {
+        "maplibre-native-ffi-runtime-metal-macosarm64",
+        "maplibre-native-ffi-runtime-metal-iosarm64",
+        "maplibre-native-ffi-runtime-metal-iossimulatorarm64",
+    }
+    for module in modules:
+        interop = one(
+            [
+                path
+                for path in module_files(root, module, ".klib")
+                if "cinterop-maplibreNativeRuntime" in path.name
+            ],
+            f"{module} runtime cinterop KLIB",
+        )
+        with zipfile.ZipFile(interop) as klib:
+            if not any(
+                name.endswith("/included/libmaplibre-native-c.a")
+                for name in klib.namelist()
+            ):
+                raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(
+            f"usage: {pathlib.Path(sys.argv[0]).name} <maven-staging>", file=sys.stderr
+        )
+        return 2
+    root = pathlib.Path(sys.argv[1])
+    verify_metadata(root)
+    verify_javadoc(root)
+    verify_android(root)
+    verify_jvm(root)
+    verify_native(root)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

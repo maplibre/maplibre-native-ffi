@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="${MISE_MONOREPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+
+if [[ "${MLN_DPRINT_SCOPED_TOOLS:-}" == "1" ]]; then
+  if ! ktfmt_path="$(command -v ktfmt)"; then
+    echo "$(basename "$0"): ktfmt is missing from the bindings/kotlin tool scope" >&2
+    exit 1
+  fi
+  if [[ "${OS:-}" == "Windows_NT" ]]; then
+    exec cmd /c java -jar "$ktfmt_path" "$@"
+  fi
+  exec java -jar "$ktfmt_path" "$@"
+fi
+
+exec mise -C "$repo_root/bindings/kotlin" x -- \
+  env MLN_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-ktfmt" "$@"

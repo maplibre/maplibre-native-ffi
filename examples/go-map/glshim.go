@@ -202,9 +202,11 @@ func glActiveTexture(texture uint32) { C.wrap_glActiveTexture(C.GLenum(texture))
 func glAttachShader(program, shader uint32) {
 	C.wrap_glAttachShader(C.GLuint(program), C.GLuint(shader))
 }
+
 func glBindFramebuffer(target, framebuffer uint32) {
 	C.wrap_glBindFramebuffer(C.GLenum(target), C.GLuint(framebuffer))
 }
+
 func glBindTexture(target, texture uint32) { C.wrap_glBindTexture(C.GLenum(target), C.GLuint(texture)) }
 func glBindVertexArray(array uint32)       { C.wrap_glBindVertexArray(C.GLuint(array)) }
 func glClear(mask uint32)                  { C.wrap_glClear(C.GLbitfield(mask)) }
@@ -229,9 +231,11 @@ func glGetError() uint32       { return uint32(C.wrap_glGetError()) }
 func glGetProgramiv(program uint32, pname uint32) int32 {
 	return int32(C.wrap_glGetProgramiv(C.GLuint(program), C.GLenum(pname)))
 }
+
 func glGetShaderiv(shader uint32, pname uint32) int32 {
 	return int32(C.wrap_glGetShaderiv(C.GLuint(shader), C.GLenum(pname)))
 }
+
 func glGetUniformLocation(program uint32, name string) int32 {
 	cName := C.CString(name)
 	defer C.free(unsafe.Pointer(cName))
@@ -243,12 +247,15 @@ func glShaderSource(shader uint32, source string) {
 	defer C.free(unsafe.Pointer(cSource))
 	C.wrap_glShaderSource(C.GLuint(shader), (*C.GLchar)(unsafe.Pointer(cSource)), C.GLint(len(source)))
 }
+
 func glTexImage2D(target uint32, level int32, internalFormat int32, width int32, height int32, border int32, format uint32, typ uint32) {
 	C.wrap_glTexImage2D(C.GLenum(target), C.GLint(level), C.GLint(internalFormat), C.GLsizei(width), C.GLsizei(height), C.GLint(border), C.GLenum(format), C.GLenum(typ))
 }
+
 func glTexParameteri(target uint32, pname uint32, param int32) {
 	C.wrap_glTexParameteri(C.GLenum(target), C.GLenum(pname), C.GLint(param))
 }
+
 func glUniform1i(location int32, value int32) {
 	C.wrap_glUniform1i(C.GLint(location), C.GLint(value))
 }

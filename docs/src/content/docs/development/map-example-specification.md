@@ -26,7 +26,7 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 | Example                | Profile | Binding    | Toolkit         | Platforms             | Backends              |
 | ---------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
 | `examples/zig-map`     | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/go-map`      | Desktop | Go         | SDL3            | Linux, macOS, Windows | OpenGL                |
+| `examples/go-map`      | Desktop | Go         | SDL3            | Linux                 | OpenGL                |
 | `examples/rust-map`    | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/lwjgl-map`   | Desktop | Kotlin/JVM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/android-map` | Mobile  | Kotlin     | Android view    | Android               | OpenGL/EGL            |
@@ -221,7 +221,9 @@ On host termination or fatal error, close resources in order:
 
 The C API treats runtime pumping and presentation as separate concerns.
 `run_once` advances native scheduler work and fills the event queue; it is not
-display-driven. `render_update` draws only when `render_pending` is true.
+display-driven. One call drains the work it finds instead of running a fixed
+slice, so a single call can take as long as a style parse. `render_update` draws
+only when `render_pending` is true.
 
 `*-map` examples integrate both through a **display-paced host loop** on the
 owner thread: each iteration always pumps the runtime; it renders only when
@@ -296,12 +298,14 @@ Requirements:
     transitions).
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true.
-- MUST clear `render_pending` after `render_update` returns success.
-- On `invalid_state` from `render_update`, leave `render_pending` set and
-  continue the pump loop (no frame was drawn yet).
+- MUST clear `render_pending` after `render_update` reports an update was
+  rendered.
+- When `render_update` reports no update was available, leave `render_pending`
+  set and continue the pump loop (no frame was drawn yet).
 
-Texture modes: after a successful `render_update`, MUST run the compositor pass
-to copy the map texture into the host swapchain before present.
+Texture modes: after `render_update` reports an update was rendered, MUST run
+the compositor pass to copy the map texture into the host swapchain before
+present.
 
 ### Viewport
 

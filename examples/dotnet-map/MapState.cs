@@ -98,29 +98,22 @@ internal sealed class MapState : IDisposable
             return false;
         }
 
-        try
+        if (graphics is MetalContext)
         {
-            if (graphics is MetalContext)
+            using var pool = MacObjectiveC.AutoreleasePool();
+            if (!CurrentRenderTarget().Render())
             {
-                using var pool = MacObjectiveC.AutoreleasePool();
-                if (!CurrentRenderTarget().Render())
-                {
-                    return true;
-                }
+                return true;
             }
-            else
-            {
-                if (!CurrentRenderTarget().Render())
-                {
-                    return true;
-                }
-            }
-            RenderPending = false;
         }
-        catch (InvalidStateException)
+        else
         {
-            RenderPending = true;
+            if (!CurrentRenderTarget().Render())
+            {
+                return true;
+            }
         }
+        RenderPending = false;
 
         return true;
     }

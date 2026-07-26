@@ -146,8 +146,13 @@ type MetalOwnedTextureDescriptor struct {
 // target. The caller keeps Texture valid until detach or session close and
 // synchronizes all use outside this session.
 type MetalBorrowedTextureDescriptor struct {
-	Extent  RenderTargetExtent
-	Texture NativePointer
+	Extent RenderTargetExtent
+	// PhysicalWidth and PhysicalHeight are the texture's size in device pixels.
+	// The texture is sized by its owner, so these are stated rather than derived
+	// from Extent.
+	PhysicalWidth  uint32
+	PhysicalHeight uint32
+	Texture        NativePointer
 }
 
 // VulkanOwnedTextureDescriptor describes a Vulkan session-owned texture render
@@ -164,13 +169,18 @@ type VulkanOwnedTextureDescriptor struct {
 // InitialLayout before each RenderUpdate, avoids concurrent use during the
 // update, and observes FinalLayout after RenderUpdate returns.
 type VulkanBorrowedTextureDescriptor struct {
-	Extent        RenderTargetExtent
-	Context       VulkanContextDescriptor
-	Image         NativePointer
-	ImageView     NativePointer
-	Format        uint32
-	InitialLayout uint32
-	FinalLayout   uint32
+	Extent RenderTargetExtent
+	// PhysicalWidth and PhysicalHeight are the image's size in device pixels.
+	// The image is sized by its owner, so these are stated rather than derived
+	// from Extent.
+	PhysicalWidth  uint32
+	PhysicalHeight uint32
+	Context        VulkanContextDescriptor
+	Image          NativePointer
+	ImageView      NativePointer
+	Format         uint32
+	InitialLayout  uint32
+	FinalLayout    uint32
 }
 
 // OpenGLOwnedTextureDescriptor describes an OpenGL session-owned texture render target.
@@ -181,10 +191,15 @@ type OpenGLOwnedTextureDescriptor struct {
 
 // OpenGLBorrowedTextureDescriptor describes an OpenGL caller-owned texture render target.
 type OpenGLBorrowedTextureDescriptor struct {
-	Extent  RenderTargetExtent
-	Context OpenGLContextDescriptor
-	Texture uint32
-	Target  uint32
+	Extent RenderTargetExtent
+	// PhysicalWidth and PhysicalHeight are the texture's size in device pixels.
+	// The texture is sized by its owner, so these are stated rather than derived
+	// from Extent.
+	PhysicalWidth  uint32
+	PhysicalHeight uint32
+	Context        OpenGLContextDescriptor
+	Texture        uint32
+	Target         uint32
 }
 
 // RenderSessionHandle owns a map render session.
@@ -198,6 +213,10 @@ type RenderSessionHandle struct {
 
 var destroyRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
 	return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
+}
+
+var detachRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
+	return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr))))
 }
 
 type metalOwnedTextureFrameState struct {
@@ -305,6 +324,23 @@ func (extent RenderTargetExtent) toC() C.mln_render_target_extent {
 	}
 }
 
+// PhysicalSize returns the extent's physical device-pixel size as
+// ceil(logical * ScaleFactor) per dimension.
+//
+// Session-owned texture targets and surface targets are sized this way. Borrowed
+// texture targets state their physical size instead, because not every physical
+// size is reachable from a logical extent.
+func (extent RenderTargetExtent) PhysicalSize() (width uint32, height uint32, err error) {
+	raw := extent.toC()
+	var rawWidth, rawHeight C.uint32_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_target_extent_physical_size(&raw, &rawWidth, &rawHeight))
+	}); err != nil {
+		return 0, 0, err
+	}
+	return uint32(rawWidth), uint32(rawHeight), nil
+}
+
 func textureImageInfoFromC(info C.mln_texture_image_info) TextureImageInfo {
 	return TextureImageInfo{Width: uint32(info.width), Height: uint32(info.height), Stride: uint32(info.stride), ByteLength: uint64(info.byte_length)}
 }
@@ -347,6 +383,8 @@ func (descriptor MetalOwnedTextureDescriptor) toC() C.mln_metal_owned_texture_de
 func (descriptor MetalBorrowedTextureDescriptor) toC() C.mln_metal_borrowed_texture_descriptor {
 	raw := C.mln_metal_borrowed_texture_descriptor_default()
 	raw.extent = descriptor.Extent.toC()
+	raw.physical_width = C.uint32_t(descriptor.PhysicalWidth)
+	raw.physical_height = C.uint32_t(descriptor.PhysicalHeight)
 	raw.texture = cPointer(descriptor.Texture)
 	return raw
 }
@@ -361,6 +399,8 @@ func (descriptor VulkanOwnedTextureDescriptor) toC() C.mln_vulkan_owned_texture_
 func (descriptor VulkanBorrowedTextureDescriptor) toC() C.mln_vulkan_borrowed_texture_descriptor {
 	raw := C.mln_vulkan_borrowed_texture_descriptor_default()
 	raw.extent = descriptor.Extent.toC()
+	raw.physical_width = C.uint32_t(descriptor.PhysicalWidth)
+	raw.physical_height = C.uint32_t(descriptor.PhysicalHeight)
 	raw.context = descriptor.Context.toC()
 	raw.image = cPointer(descriptor.Image)
 	raw.image_view = cPointer(descriptor.ImageView)
@@ -380,6 +420,8 @@ func (descriptor OpenGLOwnedTextureDescriptor) toC() C.mln_opengl_owned_texture_
 func (descriptor OpenGLBorrowedTextureDescriptor) toC() C.mln_opengl_borrowed_texture_descriptor {
 	raw := C.mln_opengl_borrowed_texture_descriptor_default()
 	raw.extent = descriptor.Extent.toC()
+	raw.physical_width = C.uint32_t(descriptor.PhysicalWidth)
+	raw.physical_height = C.uint32_t(descriptor.PhysicalHeight)
 	raw.context = descriptor.Context.toC()
 	raw.texture = C.uint32_t(descriptor.Texture)
 	raw.target = C.uint32_t(descriptor.Target)
@@ -663,6 +705,15 @@ func (session *RenderSessionHandle) markFrameReleased() {
 }
 
 // Resize changes the render session target extent.
+//
+// Surface and owned-texture sessions resize in place. Borrowed texture targets
+// are sized by their owner and report an unsupported-feature error: close this
+// session, recreate the texture, and attach a new session. A map holds at most
+// one attached session, so close before attaching the replacement.
+//
+// Resizing discards the session renderer, so renderer-held state such as
+// feature state does not survive. Map state such as camera, style, and sources
+// lives on the map and survives both resize and reattach.
 func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	if err := extent.validate(); err != nil {
 		return err
@@ -681,23 +732,41 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	})
 }
 
-// RenderUpdate renders one frame/update into the attached render target.
-func (session *RenderSessionHandle) RenderUpdate() error {
+// RenderUpdate renders the latest available map render update into the
+// attached render target. The map retains its latest update, so repeated
+// calls re-render it and report true again; use this to redraw on demand
+// after resize or surface expose, and gate frame loops on
+// render-update-available events instead of the return value. It reports
+// false when no frame was rendered, because the map has not published an
+// update yet or the renderer skipped the frame; both are normal during
+// startup, so keep pumping the runtime until an update is reported.
+func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	ptr, release, err := session.ptr()
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer release()
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return session.withNoAcquiredFrame(func() error {
+	var rendered C.bool
+	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr)), &rendered))
 		})
 	})
+	if err != nil {
+		return false, err
+	}
+	return bool(rendered), nil
 }
 
-// Detach detaches the render target from the session.
+// Detach detaches the render target from the session. The session stays live
+// and still needs Close, but it no longer holds its map: after a successful
+// detach the map can be closed while this session is still open, and every
+// session operation that needs an attached target reports a native error.
+//
+// A detached session stays detached. Attach a new session on the map to render
+// again.
 func (session *RenderSessionHandle) Detach() error {
 	ptr, release, err := session.ptr()
 	if err != nil {
@@ -707,7 +776,13 @@ func (session *RenderSessionHandle) Detach() error {
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() int32 { return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr)))) })
+		if err := checkNative(func() int32 {
+			return detachRenderSessionHandle(ptr)
+		}); err != nil {
+			return err
+		}
+		session.parentChild.Release()
+		return nil
 	})
 }
 

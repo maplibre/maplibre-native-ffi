@@ -165,6 +165,8 @@ class MetalBorrowedTexture:
                 self.height,
                 self.scale_factor,
             ),
+            physical_width=self.width,
+            physical_height=self.height,
             texture=_pointer(self.texture, "MTLTexture"),
         )
 

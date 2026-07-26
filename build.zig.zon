@@ -1,7 +1,0 @@
-.{
-    .name = .maplibre_native_ffi,
-    .version = "0.16.0",
-    .dependencies = .{},
-    .paths = .{""},
-    .fingerprint = 0x4a5753fec41abf42,
-}

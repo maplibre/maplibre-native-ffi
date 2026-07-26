@@ -314,11 +314,12 @@ func (*openGLOwnedTextureTarget) NeedsReattachOnResize() bool { return false }
 func (target *openGLOwnedTextureTarget) FinishFrame() error { return target.compositor.FinishFrame() }
 
 func (target *openGLOwnedTextureTarget) RenderUpdate() (bool, error) {
-	if err := target.session.RenderUpdate(); err != nil {
-		if errors.Is(err, maplibre.ErrInvalidState) {
-			return false, nil
-		}
+	rendered, err := target.session.RenderUpdate()
+	if err != nil {
 		return false, fmt.Errorf("OpenGL texture render failed: %w", err)
+	}
+	if !rendered {
+		return false, nil
 	}
 	frame, err := target.session.AcquireOpenGLTextureFrame()
 	if err != nil {
@@ -395,11 +396,12 @@ func (target *openGLBorrowedTextureTarget) FinishFrame() error {
 }
 
 func (target *openGLBorrowedTextureTarget) RenderUpdate() (bool, error) {
-	if err := target.session.RenderUpdate(); err != nil {
-		if errors.Is(err, maplibre.ErrInvalidState) {
-			return false, nil
-		}
+	rendered, err := target.session.RenderUpdate()
+	if err != nil {
 		return false, fmt.Errorf("OpenGL borrowed texture render failed: %w", err)
+	}
+	if !rendered {
+		return false, nil
 	}
 	return true, target.compositor.DrawTexture(glTexture2D, target.texture)
 }
@@ -466,13 +468,11 @@ func (target *openGLSurfaceTarget) FinishFrame() error {
 }
 
 func (target *openGLSurfaceTarget) RenderUpdate() (bool, error) {
-	if err := target.session.RenderUpdate(); err != nil {
-		if errors.Is(err, maplibre.ErrInvalidState) {
-			return false, nil
-		}
+	rendered, err := target.session.RenderUpdate()
+	if err != nil {
 		return false, fmt.Errorf("OpenGL surface render failed: %w", err)
 	}
-	return true, nil
+	return rendered, nil
 }
 
 func createTextureProgram() (uint32, error) {

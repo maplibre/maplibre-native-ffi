@@ -11,7 +11,8 @@ internal interface RenderTarget : AutoCloseable {
 
   fun resize(viewport: Viewport)
 
-  fun renderUpdate()
+  /** Renders the latest map update. Returns false when no update is available yet. */
+  fun renderUpdate(): Boolean
 
   override fun close()
 }

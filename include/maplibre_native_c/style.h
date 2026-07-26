@@ -1036,6 +1036,15 @@ MLN_API mln_status mln_map_set_location_indicator_image_name(
 /**
  * Adds one style layer from a full style-spec layer JSON object.
  *
+ * This is the primary insertion path for every style-spec layer type, and it
+ * stays in step with the style specification without new C API surface. The
+ * typed adders above cover the three cases that need a dedicated surface for
+ * reasons beyond construction: mln_map_add_hillshade_layer() and
+ * mln_map_add_color_relief_layer() validate that the source is a raster DEM
+ * source, and mln_map_add_location_indicator_layer() pairs with typed
+ * per-frame setters that take coordinates in C API order. Use this function for
+ * the remaining layer types.
+ *
  * layer_json and before_layer_id are borrowed for the call. layer_json must
  * contain id and type members. Passing an empty before_layer_id appends the
  * layer; otherwise the layer is inserted before that existing layer.

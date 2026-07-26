@@ -2,10 +2,14 @@
 # Mise is the contributor entrypoint: it pins tools, installs hooks, and runs
 # repository tasks.
 
-experimental_monorepo_root = true
+monorepo_root = true
+min_version = "2026.7.10"
 
 [settings]
 lockfile = true
+# The submodules provider checks Git state directly and intentionally runs on
+# every dependency pass, so suppress its perpetual shell stale warning.
+status.show_deps_stale = false
 lockfile_platforms = [
   "linux-x64",
   "linux-arm64",
@@ -15,182 +19,176 @@ lockfile_platforms = [
 ]
 pin = true
 experimental = true
-python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
-windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
+windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
+windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "bash -e -lc"
+unix_default_inline_shell_args = "bash -e -c"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
+# The repository pins one SDK. Isolated mode keeps project-scoped .NET installs
+# under MISE_DATA_DIR instead of a user-home-specific shared DOTNET_ROOT.
+dotnet.isolated = true
 
 [monorepo]
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
+lockfile = true
+
+[vars]
+actionlint_version = "1.7.8"
+cmake_version = "4.3.3"
+dotnet_version = "10.0.203"
+doxygen_version = "1.13.2"
+dprint_version = "0.53.2"
+go_version = "1.26.3"
+gofumpt_version = "0.10.0"
+google_java_format_version = "1.35.0"
+hk_version = "1.45.0"
+java_version = "zulu-25.34.17.0"
+jvl_version = "2026.05.03"
+ktfmt_version = "0.62"
+node_version = "24.11.0"
+pkl_version = "0.31.0"
+pnpm_version = "10.33.2"
+python_version = "3.14.4"
+rust_version = "1.95.0"
+sccache_version = "0.16.0"
+shellcheck_version = "0.11.0"
+swift_version = "6.3.1"
+swiftformat_version = "0.61.1"
+uv_version = "0.11.11"
+xtool_version = "1.17.0"
+zig_version = "0.16.0"
 
 [tools]
-# General tooling
-"aqua:jdx/hk" = "1.45.0" # Linter orchestration
-"aqua:apple/pkl" = "0.31.0" # hk config dependency
-"aqua:dprint/dprint" = "0.53.2" # Formatter orchestration
-"github:sargunv/jvl" = "2026.05.03" # JSON validator
-"aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
-"aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
-
-# C/C++ ecosystem
-"github:prefix-dev/pixi" = "0.68.1"
-"aqua:Kitware/CMake" = "4.3.3"
-"aqua:ninja-build/ninja" = "1.13.2"
-"conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
+# Repository and native tooling
+"aqua:jdx/hk" = "{{vars.hk_version}}" # Linter orchestration
+"aqua:apple/pkl" = "{{vars.pkl_version}}" # hk config dependency
+"aqua:dprint/dprint" = "{{vars.dprint_version}}" # Formatter orchestration
+"github:sargunv/jvl" = "{{vars.jvl_version}}" # JSON validator
+"aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
+"aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
+"aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+sccache = "{{vars.sccache_version}}"
 
 # Node.js ecosystem
-"core:node" = "24.11.0"
-"aqua:pnpm/pnpm" = "10.33.2"
-
-# Java/Kotlin ecosystem
-"core:java" = "zulu-25.34.17.0"
-"aqua:facebook/ktfmt" = "0.62"
-"aqua:google/google-java-format" = "1.35.0"
+"core:node" = "{{vars.node_version}}"
+"aqua:pnpm/pnpm" = "{{vars.pnpm_version}}"
 
 # Python ecosystem
-"core:python" = "3.14.4"
-"aqua:astral-sh/uv" = "0.11.11"
+"core:python" = "{{vars.python_version}}"
+"aqua:astral-sh/uv" = "{{vars.uv_version}}"
 
-# Swift ecosystem
-"core:swift" = { version = "6.3.1", os = ["linux", "macos"] }
-swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
+# SwiftFormat is a standalone repository formatter and does not require the
+# Swift compiler.
+swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
-# Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
-"core:zig" = { version = "0.16.0", os = ["linux", "macos", "windows/x64"] }
-# Zig's native Windows ARM64 0.16.0 build crashes while loading build.zig, so
-# Windows ARM64 uses the x64 host compiler under emulation to cross-build ARM64.
-"http:zig" = { version = "0.16.0", os = ["windows/arm64"], url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip", checksum = "sha256:68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e", bin_path = "zig-x86_64-windows-0.16.0" }
-"core:go" = "1.26.3"
-"core:dotnet" = "10.0.203"
+# The native CMake build compiles the Rust platform support library, so Rust is
+# part of the repository-wide native toolchain.
+"core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
 
 [env]
-UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
-MLN_FFI_REPO_ROOT = "{{config_root}}"
-MLN_FFI_RENDER_BACKEND = { required = true }
-MLN_FFI_BUILD_DIR = { required = true }
-MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
-MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
-MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
-MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
-MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
-MLN_FFI_ZIG_BUILD_ARGS = { required = true }
-MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
-LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
+MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
+MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
+
+# Public sccache reads via the R2 custom domain (no credentials). CI pushes
+# override these with write credentials in .github/actions/setup-ci-deps.
+SCCACHE_BUCKET = "maplibre-native-ffi-sccache"
+SCCACHE_ENDPOINT = { default = "https://sccache.sargunv.dev" }
+SCCACHE_REGION = "auto"
+SCCACHE_S3_USE_SSL = "true"
+SCCACHE_S3_NO_CREDENTIALS = { default = "1" }
+CMAKE_C_COMPILER_LAUNCHER = "sccache"
+CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
+RUSTC_WRAPPER = "sccache"
+
+[deps.uv]
+auto = true
+run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
+
+[deps.pnpm]
+# The built-in provider runs pnpm directly. A `run` script would go through Git
+# Bash, and on Windows ARM64 the lifecycle scripts pnpm spawns through cmd then
+# fail to resolve mise's node, so the workspace-wide install stays.
+auto = true
+
+[deps.submodules]
+auto = true
+run = ".mise/bin/sync-submodules"
 
 [hooks]
 postinstall = [
-  { task = "sync-submodules" },
   "hk install --mise --quiet",
-  "pixi install --locked --quiet",
-  "uv sync --locked --quiet",
-  "pnpm install --frozen-lockfile --loglevel warn",
-  "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
-  "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet",
-  # Generated docs data is imported by Astro components and checked by vp.
-  { task = "docs:generate-support-matrix" },
-  # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
-  "pnpm --filter docs exec astro sync",
 ]
 
 [tasks.configure]
-depends = ["//:deps"]
-run = [
-  '''
-  cmake_args=(
-    -S .
-    -B "$MLN_FFI_BUILD_DIR"
-    -G Ninja
-    -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
-    -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
-    -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
-    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
-  )
-
-  while IFS= read -r cmake_arg; do
-    [[ -n "$cmake_arg" ]] && cmake_args+=("$cmake_arg")
-  done <<< "${MLN_FFI_CMAKE_ARGS:-}"
-
-  cmake "${cmake_args[@]}"
-  ''',
-  '''
-  if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
-    mkdir -p build/clangd
-    compile_commands_link="build/clangd/compile_commands.json"
-    compile_commands_tmp="${compile_commands_link}.tmp"
-    rm -f "$compile_commands_tmp"
-    ln -s "$MLN_FFI_BUILD_DIR/compile_commands.json" "$compile_commands_tmp"
-    mv -f "$compile_commands_tmp" "$compile_commands_link"
-  fi
-  ''',
-]
+description = "Configure a native CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'cmake --preset "$usage_preset"'
 
 [tasks.build]
-depends = ["//:configure"]
-run = '''
-build_args=(
-  --build "$MLN_FFI_BUILD_DIR"
-  --parallel
-)
-
-cmake "${build_args[@]}"'''
-
-[tasks.ensure-native-library]
-depends = ["//:build"]
-run = { task = "//:native-metadata" }
+description = "Configure, build, and install a native CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+sources = [
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "Cargo.lock",
+  "Cargo.toml",
+  "LICENSE",
+  "build/*/.native-package-install",
+  "cmake/**/*",
+  "include/**/*",
+  "src/**/*",
+  "third_party/**/*",
+]
+outputs = { auto = true }
+run = 'cmake --workflow --preset "$usage_preset"'
 
 [tasks.clean]
-run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
+description = "Remove one native preset build tree."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
 
-[tasks.deps]
-description = "Install variant-specific managed dependencies."
-run = '''
-if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
-  mise run deps:angle
-fi
-'''
+[tasks.package-native]
+description = "Build and archive a native CMake preset."
+usage = 'arg "<preset>"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
+
+[tasks.archive-native]
+description = "Archive an already-built native CMake preset."
+usage = 'arg "<preset>"'
+run = 'cpack --preset "$usage_preset"'
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
+description = "Build and run C API tests for a CMake preset."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
-(
-  cd src/c_api/tests/zig
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
-)
+if [[ "$usage_preset" == ios-simulator-* ]]; then
+  mise run //:ios-simulator:boot
+fi
+ctest --preset "$usage_preset"
 '''
 
 [tasks.check]
-run = "hk check --all"
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+run = '''
+mise -C bindings/dotnet deps install dotnet-tools
+mise run //docs:install
+hk check --all
+'''
 
 [tasks.fix]
-run = "hk fix --all"
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
+run = '''
+mise -C bindings/dotnet deps install dotnet-tools
+mise run //docs:install
+hk fix --all
+'''
 
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"
-
-[tasks._ktfmt]
-description = "Called by dprint.jsonc"
-hide = true
-run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
-# ktfmt on windows doesn't work in git bash for some reason
-shell = '{% if os() == "windows" %}cmd /c{% else %}sh -c -o errexit{% endif %}'
-
-[tasks."ci:lint"]
-run = [
-  # Warm process-plugin cache before hk runs parallel dprint batches.
-  "dprint output-resolved-config > /dev/null",
-  "hk fix --all",
-  "git update-index -q --refresh",
-  # Lockfile drift is common across different mise builds
-  "git diff --exit-code -- . ':(exclude)mise.lock'",
-  "git diff --cached --exit-code -- . ':(exclude)mise.lock'",
-]

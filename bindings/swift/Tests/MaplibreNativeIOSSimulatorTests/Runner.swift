@@ -1,3 +1,4 @@
+import MaplibreNativeTestCases
 import Testing
 
 @main

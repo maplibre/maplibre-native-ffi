@@ -1,5 +1,31 @@
 name: Setup CI deps
-description: Install sccache and mise toolchain
+description: Install the toolchain and target-specific CI prerequisites
+
+inputs:
+  target:
+    description: Native target name
+    required: false
+    default: host
+  sccache-access-key-id:
+    description: R2 S3 access key ID with Object Read & Write (push jobs only)
+    required: false
+    default: ""
+  sccache-secret-access-key:
+    description: R2 S3 secret access key with Object Read & Write (push jobs only)
+    required: false
+    default: ""
+  zig:
+    description: Restore the Zig package cache and expose its key for a later save
+    required: false
+    default: "false"
+
+outputs:
+  zig-cache-key:
+    description: Key the job saves the Zig package cache under once its checks pass
+    value: ${{ steps.zig-cache-key.outputs.key }}
+  zig-cache-hit:
+    description: Whether the Zig package cache was restored from an exact key match
+    value: ${{ steps.zig-packages.outputs.cache-hit }}
 
 runs:
   using: composite
@@ -9,6 +35,20 @@ runs:
       shell: pwsh
       run: git config --global core.longpaths true
 
+    # A hard error, such as a DLL the loader cannot resolve, raises a modal
+    # dialog. No one is here to dismiss it, so the process waits behind it until
+    # the job times out. Make the call fail and report instead.
+    - name: Fail Windows hard errors instead of waiting on a dialog
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        Set-ItemProperty `
+          -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Windows" `
+          -Name ErrorMode -Value 2 -Type DWord
+        $reporting = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting"
+        New-Item -Path $reporting -Force | Out-Null
+        Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
+
     - name: Cache MapLibre Native source
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -16,12 +56,16 @@ runs:
           third_party/maplibre-native
           .git/modules/third_party/maplibre-native
         key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+        # sync-submodules re-syncs whatever it restores, so an older checkout
+        # turns a pin bump into an incremental fetch instead of a fresh clone.
+        restore-keys: |
+          mln-src-v2-
 
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
     - name: Use Linux software graphics drivers
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && startsWith(inputs.target, 'linux-') }}
       shell: bash
       run: |
         sudo apt-get update
@@ -38,11 +82,11 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Use Windows Vulkan software driver
-      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-vulkan') }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
       uses: ./.github/actions/setup-windows-vulkan-software
 
     - name: Use Windows OpenGL software driver
-      if: ${{ runner.os == 'Windows' && endsWith(env.MISE_ENV, '-wgl') }}
+      if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-wgl') }}
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
@@ -53,16 +97,75 @@ runs:
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-
 
-    - name: Cache OpenHarmony SDK
-      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+    # uv, pnpm, NuGet, and Go each default to a different per-OS cache location,
+    # and some of those paths carry a tool-version suffix. Pinning them under
+    # one directory keeps a single cache entry accurate on every runner. Windows
+    # tools need a native path, so prefer USERPROFILE with forward slashes.
+    - name: Pin package download caches
+      shell: bash
+      run: |
+        if [[ -n "${USERPROFILE:-}" ]]; then
+          home="${USERPROFILE//\\//}"
+        else
+          home="$HOME"
+        fi
+        cache_root="$home/.ci-package-cache"
+        {
+          echo "UV_CACHE_DIR=$cache_root/uv"
+          echo "npm_config_store_dir=$cache_root/pnpm"
+          echo "NUGET_PACKAGES=$cache_root/nuget"
+          # bindings/go declares no module requirements, so only the build cache
+          # is worth carrying between jobs.
+          echo "GOCACHE=$cache_root/go-build"
+        } >> "$GITHUB_ENV"
+
+    - name: Cache package downloads
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
-        path: ~/setup-ohos-sdk
-        key: ohos-sdk-v1-v6.1-${{ runner.os }}-${{ runner.arch }}
+        path: ~/.ci-package-cache
+        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v1-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', '**/dotnet-tools.json', '**/go.mod') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-pkg-v1-
 
+    # Zig's global cache holds downloaded package tarballs, which keeps SDL's
+    # source dependencies off the network. Windows resolves it under
+    # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
+    #
+    # Restore only. `actions/cache` saves in a post step even when the job
+    # failed, so a fetch that died partway published an incomplete cache under
+    # the exact key — and because a key is never overwritten, every later run
+    # restored the same gaps and retried the same downloads, turning one
+    # transient network error into a permanent one. The job saves this cache
+    # itself, after the checks that populate it pass.
+    - name: Compute Zig package cache key
+      if: ${{ inputs.zig == 'true' }}
+      id: zig-cache-key
+      shell: bash
+      run: >-
+        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}"
+        >> "$GITHUB_OUTPUT"
+
+    - name: Restore Zig packages
+      if: ${{ inputs.zig == 'true' }}
+      id: zig-packages
+      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          ~/.cache/zig
+          ~/AppData/Local/zig
+        key: ${{ steps.zig-cache-key.outputs.key }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
+
+    # Downloading and extracting the SDK takes about 40 seconds, which is not
+    # worth the ~1 GB it occupied in a 10 GB repository cache shared with every
+    # other target. The entry was evicted between runs anyway, so the two OHOS
+    # jobs paid the download and the upload.
     - name: Setup OpenHarmony SDK
-      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
       env:
         GH_TOKEN: ${{ github.token }}
@@ -77,40 +180,46 @@ runs:
             --repo openharmony-rs/ohos-sdk \
             --pattern "${archive}*"
 
-          cat "${archive}".a* > "$archive"
-          expected_sha="$(tr -d '[:space:]' < "${archive}.sha256")"
-          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          # Stream the parts through sha256sum and tar; holding the parts, a
+          # joined copy, and the extracted tree at once overflows the disk,
+          # which kills the runner agent rather than failing the step.
+          expected_sha="b833b75a64ee46bbd7880921abbb49b733ec5c8171b6684c9b524d57f624cee0"
+          actual_sha="$(cat "${archive}".a* | sha256sum | awk '{print $1}')"
           if [[ "$actual_sha" != "$expected_sha" ]]; then
             echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
             exit 1
           fi
-          tar -xf "$archive"
+          # tar cannot sniff compression from a pipe, so -z is required here.
+          cat "${archive}".a* | tar -xzf -
+          rm -f "${archive}".a*
           unzip -q linux/native-*.zip -d linux
+          rm -f linux/native-*.zip
         fi
 
         echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
 
-    - name: Cache Gradle
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+    # Caches Gradle User Home and stops the daemons in its post-action, before
+    # the cache is saved. Daemons that outlive the job keep Windows file locks
+    # on `caches/*/**/*.lock`, which a plain archive step cannot read. The
+    # project uses the wrapper, so no `gradle-version` is requested and the
+    # mise-managed JDK stays in charge.
+    - name: Cache Gradle User Home
+      uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
       with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-${{ runner.arch }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-gradle-
+        add-job-summary: on-failure
 
     - name: Trim Windows PATH before mise activation
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
         $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
-        # Git Bash maps /tmp to the checkout drive; create it before mise hooks run.
+        # Git Bash maps /tmp to the checkout drive; create it before mise tasks run.
         New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
 
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
+          "C:\Program Files\LLVM\bin",
           "C:\Program Files\Git\bin",
           "C:\Program Files\Git\usr\bin",
           "$env:SystemRoot\System32",
@@ -122,6 +231,9 @@ runs:
         ) | Where-Object { $_ -and (Test-Path $_) }
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
+        if (Test-Path "C:\Program Files\LLVM\bin\libclang.dll") {
+          "LIBCLANG_PATH=C:\Program Files\LLVM\bin" >> $env:GITHUB_ENV
+        }
 
         $gradleTemp = $env:RUNNER_TEMP -replace '\\', '/'
         $gradleOptions = "-Djava.io.tmpdir=$gradleTemp"
@@ -130,38 +242,114 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
-    # Windows ARM64 gets Vulkan libraries through mise/pixi, but glslangValidator
-    # is not available there yet; the Vulkan examples need it to precompile shaders.
-    - name: Install Windows ARM64 Vulkan SDK
-      if: ${{ env.MISE_ENV == 'windows-arm64-vulkan' }}
+    - name: Install Windows Vulkan SDK
+      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
       with:
-        vulkan_version: 1.4.341.0
+        # The action's cache key is the OS, architecture and this version, and a
+        # hit returns before the runtime is installed, so the entry saved
+        # without a runtime keeps every later run from getting one. The version
+        # is the only part of that key this action exposes, so a patch bump is
+        # what retires the entry.
+        vulkan_version: 1.4.341.1
         cache: true
         stripdown: true
+        # The SDK alone carries vulkan-1.lib but not the loader it imports, so
+        # the tests linked against it fail in the loader at startup.
+        install_runtime: true
 
-    - name: Install mise toolchain
-      uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+    # A machine with a Vulkan driver has the loader in System32, where every
+    # process finds it. A runner can have it only inside the SDK, so expose its
+    # directory to both ordinary processes and runtimes with isolated DLL
+    # search paths, such as Python 3.8+.
+    - name: Expose the Vulkan loader
+      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      shell: pwsh
+      run: |
+        # Where the loader sits differs by runner: the x64 SDK groups it under
+        # runtime by architecture, while the ARM64 runner carries it in
+        # System32 rather than anywhere inside the SDK. Neither location can
+        # offer a loader built for another architecture. The SDK search
+        # mirrors cmake/render/vulkan.cmake; the PATH fallback mirrors what
+        # find_file there resolves on runners that already have the loader.
+        $architecture = if ($env:RUNNER_ARCH -eq "ARM64") { "arm64" } else { "x64" }
+        $candidates = @("runtime\$architecture", "Bin", "bin") |
+          ForEach-Object { Join-Path $env:VULKAN_SDK $_ }
+        $directory = $candidates |
+          Where-Object { Test-Path (Join-Path $_ "vulkan-1.dll") } |
+          Select-Object -First 1
+        if ($directory) {
+          $directory | Out-File -FilePath $env:GITHUB_PATH -Append
+          "MAPLIBRE_NATIVE_C_RUNTIME_LIBRARY_DIRS=$directory" >> $env:GITHUB_ENV
+        } elseif (-not (Get-Command vulkan-1.dll -ErrorAction SilentlyContinue)) {
+          throw "no vulkan-1.dll in $($candidates -join ', ') or on PATH"
+        }
+
+    - name: Bootstrap repository
+      uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
       with:
         cache: true
-        cache_key_prefix: mise-v2
-        install: true
-
-    - name: Wire sccache into CMake
-      shell: bash
-      run: |
-        mise_env="${MISE_ENV:-$(mise exec -- printenv MISE_ENV)}"
-        {
-          echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=${mise_env%-*}"
-          echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
-          echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
-        } >> "$GITHUB_ENV"
+        cache_key_prefix: mise-v4
+        bootstrap: true
 
     # The mise action may restore Rust install metadata without the rustup
-    # toolchain, components, or cross targets from mise.toml. Reinstall rust
-    # from mise config instead of redeclaring components/targets here.
-    - name: Ensure Rust toolchain
+    # toolchain, components, or cross targets declared in mise.toml.
+    - name: Repair cached Rust toolchain
       shell: bash
       run: MISE_NO_HOOKS=1 mise install --force rust
+
+    # Project tools live in each project's config, so the root install covers
+    # only the repository-wide set. Installing the rest lazily would leave every
+    # job holding a different subset when the shared mise cache key is saved,
+    # and the winner would decide what later jobs restore. The devcontainer
+    # aggregate is the same set the published image bakes.
+    - name: Install project toolchains
+      shell: bash
+      run: MISE_NO_HOOKS=1 mise -C .devcontainer install
+
+    # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
+    # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
+    # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>
+    - name: Wire sccache into CMake
+      shell: bash
+      env:
+        SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
+      run: |
+        bucket="maplibre-native-ffi-sccache"
+        account_id="6cda5be3bf367f2885f3696d3c9b2653"
+        public_endpoint="https://sccache.sargunv.dev"
+        write_endpoint="https://${account_id}.r2.cloudflarestorage.com"
+
+        {
+          echo "SCCACHE_BUCKET=${bucket}"
+          echo "SCCACHE_REGION=auto"
+          echo "SCCACHE_S3_USE_SSL=true"
+          echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
+          echo "SCCACHE_IDLE_TIMEOUT=0"
+          echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+          echo "RUSTC_WRAPPER=sccache"
+          # sccache declines to cache incrementally compiled crates, which is
+          # the cargo default for the dev profile that `cargo test` uses.
+          echo "CARGO_INCREMENTAL=0"
+        } >> "$GITHUB_ENV"
+
+        if [[ "${GITHUB_EVENT_NAME}" != "pull_request" && -n "${SCCACHE_ACCESS_KEY_ID}" && -n "${SCCACHE_SECRET_ACCESS_KEY}" ]]; then
+          {
+            echo "SCCACHE_ENDPOINT=${write_endpoint}"
+            echo "SCCACHE_S3_KEY_PREFIX=${bucket}/"
+            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
+            # clear it so authenticated writes are not rejected by sccache.
+            echo "SCCACHE_S3_NO_CREDENTIALS=0"
+            echo "AWS_ACCESS_KEY_ID=${SCCACHE_ACCESS_KEY_ID}"
+            echo "AWS_SECRET_ACCESS_KEY=${SCCACHE_SECRET_ACCESS_KEY}"
+          } >> "$GITHUB_ENV"
+          echo "Configured sccache R2 backend (read-write)"
+        else
+          {
+            echo "SCCACHE_ENDPOINT=${public_endpoint}"
+            echo "SCCACHE_S3_NO_CREDENTIALS=1"
+          } >> "$GITHUB_ENV"
+          echo "Configured sccache R2 backend (public read-only)"
+        fi

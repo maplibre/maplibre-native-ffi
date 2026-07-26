@@ -41,6 +41,14 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 	if gotCamera.Center == nil || gotCamera.Zoom == nil {
 		t.Fatalf("Camera() missing expected fields: %#v", gotCamera)
 	}
+	// BND-070: successive snapshots of an unchanged camera compare equal.
+	secondCamera, err := m.Camera()
+	if err != nil {
+		t.Fatalf("Camera(): %v", err)
+	}
+	if !gotCamera.Equal(secondCamera) {
+		t.Errorf("successive camera snapshots differ: %#v vs %#v", gotCamera, secondCamera)
+	}
 	if err := m.MoveBy(ScreenPoint{X: 1, Y: 2}); err != nil {
 		t.Fatalf("MoveBy(): %v", err)
 	}
@@ -58,6 +66,7 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 		t.Fatalf("CancelTransitions(): %v", err)
 	}
 }
+
 func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -110,6 +119,7 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 		t.Fatalf("PitchByAnimated(): %v", err)
 	}
 }
+
 func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -178,6 +188,7 @@ func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 		t.Fatalf("Bounds().Bounds = %#v, want %#v", gotConstraints.Bounds, bounds)
 	}
 }
+
 func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -212,6 +223,7 @@ func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
 		t.Fatalf("SetFreeCameraOptions(current values): %v", err)
 	}
 }
+
 func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -252,6 +264,7 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 		t.Fatalf("SetFreeCameraOptions(invalid orientation) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
 func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -320,6 +333,7 @@ func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 		t.Fatalf("ProjectionMode().Axonometric = %v", gotProjectionMode.Axonometric)
 	}
 }
+
 func TestTileOptionsRejectInvalidPrefetchZoomDelta(t *testing.T) {
 	lockOSThreadForTest(t)
 

@@ -1,0 +1,20 @@
+tasks:
+  install-dependencies:
+    name: Install dependencies
+    description: Install pinned shared tools; project tasks install their scoped tools on demand.
+    command: |
+      mise trust -y
+      mise install
+    triggeredBy:
+      - manual
+      - postDevcontainerStart
+      - prebuild
+
+  build:
+    name: Build
+    description: Configure, build, and install the host native library.
+    command: mise run build
+    triggeredBy:
+      - manual
+    dependsOn:
+      - install-dependencies

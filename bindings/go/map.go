@@ -46,10 +46,25 @@ func (options MapDebugOptions) Has(requested MapDebugOptions) bool {
 
 // MapOptions configures map creation.
 type MapOptions struct {
-	Width       uint32
-	Height      uint32
+	// Width is the initial logical width in UI pixels, replaced by the extent of
+	// the first attached render session.
+	Width uint32
+	// Height is the initial logical height in UI pixels, replaced by the extent
+	// of the first attached render session.
+	Height uint32
+	// ScaleFactor is the UI-to-device pixel scale, fixed for the lifetime of the
+	// map. It selects sprites, glyphs, and raster tiles for every frame. Render
+	// targets carry their own scale factor for geometry, so attaching or
+	// resizing a session with a different one logs a warning and renders styled
+	// imagery chosen for this density.
 	ScaleFactor float64
 	Mode        MapMode
+}
+
+// Equal reports whether two descriptors hold the same field values, matching the Equal methods on
+// the other option structs.
+func (options MapOptions) Equal(other MapOptions) bool {
+	return options == other
 }
 
 // NewMapOptions returns map creation options for a viewport size and scale.
@@ -116,7 +131,14 @@ func (m *MapHandle) RequestStillImage() error {
 	return checkNative(func() int32 { return int32(C.mln_map_request_still_image((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
-// SetStyleURL loads a style URL through MapLibre Native style APIs.
+// SetStyleURL loads a style URL through MapLibre Native style APIs. Loading is
+// asynchronous, so a style that is missing, unreachable, or malformed still
+// returns success here and reports through a map-loading-failed runtime event.
+// Watch the runtime event queue to observe style load failures.
+//
+// A well-formed style that MapLibre rejects semantically, such as an unknown
+// "version" or a layer naming a missing source, produces neither an error nor
+// an event: MapLibre logs it and renders what it can.
 func (m *MapHandle) SetStyleURL(url string) error {
 	if err := validateCStringArgument("style URL", url); err != nil {
 		return err
@@ -133,6 +155,13 @@ func (m *MapHandle) SetStyleURL(url string) error {
 }
 
 // SetStyleJSON loads inline style JSON through MapLibre Native style APIs.
+// Malformed JSON is reported twice: this call returns the parse error
+// synchronously, and the same message also arrives as a map-loading-failed
+// runtime event. Handle both so a queued failure event is not a surprise.
+//
+// A well-formed style that MapLibre rejects semantically, such as an unknown
+// "version" or a layer naming a missing source, produces neither an error nor
+// an event: MapLibre logs it and renders what it can.
 func (m *MapHandle) SetStyleJSON(json string) error {
 	if err := validateCStringArgument("style JSON", json); err != nil {
 		return err
@@ -274,8 +303,12 @@ func (m *MapHandle) JumpTo(camera CameraOptions) error {
 	})
 }
 
-// EaseTo applies a camera ease transition command. Passing nil animation uses
-// the native default animation options.
+// EaseTo applies a camera ease transition command. Passing nil animation, or an
+// animation with no Duration, uses the native default duration of zero, so the
+// camera reaches the target immediately and no transition is animated. Set
+// Duration explicitly to animate.
+//
+// Camera anchor comes from camera.Anchor; see CameraOptions.
 func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -291,8 +324,11 @@ func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) er
 	})
 }
 
-// FlyTo applies a camera fly transition command. Passing nil animation uses the
-// native default animation options.
+// FlyTo applies a camera fly transition command. FlyTo is the one camera
+// command that derives a duration when none is given: passing nil animation, or
+// an animation with no Duration, flies at a default velocity of 1.2 ρ-screenfuls
+// per second, so the duration scales with the distance travelled. Set Duration
+// explicitly to pin it.
 func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -322,7 +358,8 @@ func (m *MapHandle) MoveBy(delta ScreenPoint) error {
 }
 
 // MoveByAnimated applies an animated screen-space pan command. Passing nil
-// animation uses the native default animation options.
+// animation, or an animation with no Duration, eases with the native default
+// duration of zero, so the change applies instantly; see EaseTo.
 func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -403,7 +440,8 @@ func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
 }
 
 // RotateByAnimated applies an animated screen-space rotate command. Passing nil
-// animation uses the native default animation options.
+// animation, or an animation with no Duration, eases with the native default
+// duration of zero, so the change applies instantly; see EaseTo.
 func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, animation *AnimationOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -437,7 +475,8 @@ func (m *MapHandle) PitchBy(pitch float64) error {
 }
 
 // PitchByAnimated applies an animated pitch delta command. Passing nil
-// animation uses the native default animation options.
+// animation, or an animation with no Duration, eases with the native default
+// duration of zero, so the change applies instantly; see EaseTo.
 func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) error {
 	ptr, release, err := m.ptr()
 	if err != nil {
@@ -908,6 +947,11 @@ func (m *MapHandle) releaseCustomGeometrySources() {
 // Close destroys this map. A successful close makes later calls no-ops. A
 // failed close leaves the native handle live so callers can retry on the owner
 // thread.
+//
+// Close discards this map's queued runtime events and its recorded loading
+// failure without a flush and without a terminal event. Snapshot any mirrored
+// state you still need before closing, and drive teardown from the close result
+// rather than awaiting an event.
 func (m *MapHandle) Close() error {
 	if m == nil || m.state == nil {
 		return newBindingError(ErrInvalidArgument, "MapHandle is nil")

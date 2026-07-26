@@ -368,12 +368,30 @@ public final class RuntimeHandle {
     try handle.requireLive()
   }
 
+  /// Runs one iteration of this runtime's owner-thread run loop.
+  ///
+  /// The iteration drains the high-priority task queue and then the default
+  /// queue until both are empty, including tasks enqueued during the drain, and
+  /// also dispatches expired timers and ready I/O.
+  ///
+  /// `runOnce` returns without blocking on new work, but its duration is
+  /// unbounded: a single iteration can span a style parse. Treat it as "make
+  /// progress now" rather than as a fixed per-frame time slice.
   public func runOnce() throws {
     try mapNativeFailure {
       try checkStatus(mln_runtime_run_once(handle.requireLive()))
     }
   }
 
+  /// Polls and copies the next queued runtime event, returning `nil` when the
+  /// queue is empty.
+  ///
+  /// Polling also advances binding-owned state: on a map-style-loaded event
+  /// this
+  /// binding releases the map's detached custom geometry sources, closing the
+  /// upcall stubs for sources the new style dropped. That release happens when
+  /// the event is polled, so drain the queue to keep dropped sources from
+  /// lingering.
   public func pollEvent() throws -> RuntimeEvent? {
     try mapNativeFailure {
       guard let event = try NativeRuntime.pollEvent(handle.requireLive()) else {

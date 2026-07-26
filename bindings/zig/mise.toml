@@ -1,7 +1,58 @@
+[tools]
+# Zig 0.16.0 has no working Windows ARM64 story: the native aarch64 build exits
+# non-zero with no diagnostic while loading build.zig, and the x64 build under
+# emulation hangs in `zig build` until the job timeout. The Zig binding and
+# examples are skipped there; the C API tests are plain C and do not need Zig.
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+
+[deps.zig]
+auto = true
+description = "Fetch Zig package dependencies."
+sources = ["build.zig", "build.zig.zon"]
+outputs = ["zig-pkg"]
+timeout = "10m"
+run = "zig build --fetch=needed"
+
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+zig build \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+'''
 
 [tasks.test]
-depends = [":build"]
-run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+zig build test \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  --test-timeout 30s \
+  --summary all \
+  --verbose
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+zig build test \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  --test-timeout 30s \
+  --summary all \
+  --verbose
+'''
+
+[tasks."test:ios-simulator"]
+depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
+zig build test \
+  -Dtarget=aarch64-ios-simulator \
+  -Dnative-install-dir="$native_install_dir" \
+  -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
+  -Dsystem-root="$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+  --libc "$native_install_dir/share/maplibre-native-c/zig-libc" \
+  --test-timeout 120s --summary all --verbose
+'''

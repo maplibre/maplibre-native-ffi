@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="${MISE_MONOREPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+
+if [[ "${MLN_DPRINT_SCOPED_TOOLS:-}" == "1" ]]; then
+  exec gofmt "$@"
+fi
+
+exec mise -C "$repo_root/bindings/go" x -- \
+  env MLN_DPRINT_SCOPED_TOOLS=1 "$repo_root/.mise/bin/dprint-go" "$@"

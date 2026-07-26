@@ -72,6 +72,8 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(0.0, assertNotNull(camera.center).latitude, 0.000001)
         assertEquals(0.0, assertNotNull(camera.center).longitude, 0.000001)
         assertEquals(1.0, assertNotNull(camera.zoom), 0.000001)
+        // BND-070: successive snapshots of an unchanged camera compare equal.
+        assertEquals(camera, map.camera)
         map.easeTo(cameraOptions, animation)
         map.flyTo(cameraOptions, animation)
         map.moveBy(0.0, 0.0)

@@ -10,7 +10,6 @@ import sys
 
 if sys.platform == "darwin":
     os.environ.setdefault("PYOPENGL_PLATFORM", "egl")
-    _egl_root = Path(os.environ.get("MLN_FFI_EGL_ROOT", "")).expanduser()
     _cdll = ctypes.CDLL
 
     class _MacAngleCDLL(_cdll):  # type: ignore[misc]
@@ -19,11 +18,16 @@ if sys.platform == "darwin":
             super().__init__(name, *args, **kwargs)
 
     def _macos_angle_library_path(name: Any) -> Any:
-        if name in {"EGL", "GLESv2"} and _egl_root.is_dir():
-            library_path = _egl_root / f"lib{name}.dylib"
-            if library_path.is_file():
-                return str(library_path)
+        if name in {"EGL", "GLESv2"}:
+            return str(_macos_angle_runtime_library_path(name))
         return name
+
+    def _macos_angle_runtime_library_path(name: str) -> Path:
+        install_dir = os.environ.get("MAPLIBRE_NATIVE_C_INSTALL_DIR")
+        library_path = Path(install_dir or "") / "lib" / f"lib{name}.dylib"
+        if install_dir and library_path.is_file():
+            return library_path
+        raise RuntimeError(f"missing packaged ANGLE runtime library {library_path}")
 
     ctypes.CDLL = _MacAngleCDLL  # type: ignore[assignment]
     ctypes.cdll._dlltype = _MacAngleCDLL  # type: ignore[attr-defined]
@@ -288,6 +292,8 @@ class EglBorrowedTexture:
                 self.height,
                 self.scale_factor,
             ),
+            physical_width=self.width,
+            physical_height=self.height,
             context=self.context.descriptor(),
             texture=self.texture,
             target=GL.GL_TEXTURE_2D,

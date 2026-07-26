@@ -417,6 +417,8 @@ const VulkanBorrowedTextureBackend = struct {
     ) !render_target.Session {
         const texture = maplibre.attachVulkanBorrowedTexture(map, .{
             .extent = render_target.extent(viewport),
+            .physical_width = viewport.physical_width,
+            .physical_height = viewport.physical_height,
             .context = vulkanContextDescriptor(&self.compositor.context),
             .image = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.image.?)),
             .image_view = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.view.?)),
