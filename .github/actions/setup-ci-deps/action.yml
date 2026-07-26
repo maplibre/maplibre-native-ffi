@@ -258,6 +258,30 @@ runs:
         # the tests linked against it fail in the loader at startup.
         install_runtime: true
 
+    # A machine with a Vulkan driver has the loader in System32, where every
+    # process finds it. A runner has it only inside the SDK, so put it on PATH
+    # for the whole job: each binding and example links the shared library that
+    # imports it, and a job-wide entry covers them the way a real machine does.
+    - name: Put the Vulkan loader on PATH
+      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      shell: pwsh
+      run: |
+        # Where the loader sits differs by SDK: the x64 SDK groups it under
+        # runtime by architecture, while the ARM64 SDK carries it in Bin. Both
+        # folders belong to the SDK being installed, so neither can offer a
+        # loader built for another architecture. This is the search
+        # cmake/render/vulkan.cmake performs for the same file.
+        $architecture = if ($env:RUNNER_ARCH -eq "ARM64") { "arm64" } else { "x64" }
+        $candidates = @("runtime\$architecture", "Bin", "bin") |
+          ForEach-Object { Join-Path $env:VULKAN_SDK $_ }
+        $directory = $candidates |
+          Where-Object { Test-Path (Join-Path $_ "vulkan-1.dll") } |
+          Select-Object -First 1
+        if (-not $directory) {
+          throw "no vulkan-1.dll in $($candidates -join ', ')"
+        }
+        $directory | Out-File -FilePath $env:GITHUB_PATH -Append
+
     - name: Bootstrap repository
       uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
       with:
