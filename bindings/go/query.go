@@ -54,10 +54,24 @@ type RenderedFeatureQueryOptions struct {
 	Filter   *JSONValue
 }
 
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// does not compile for structs holding slices.
+func (options RenderedFeatureQueryOptions) Equal(other RenderedFeatureQueryOptions) bool {
+	return equalStrings(options.LayerIDs, other.LayerIDs) &&
+		equalJSON(options.Filter, other.Filter)
+}
+
 // SourceFeatureQueryOptions configures source feature queries.
 type SourceFeatureQueryOptions struct {
 	SourceLayerIDs []string
 	Filter         *JSONValue
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// does not compile for structs holding slices.
+func (options SourceFeatureQueryOptions) Equal(other SourceFeatureQueryOptions) bool {
+	return equalStrings(options.SourceLayerIDs, other.SourceLayerIDs) &&
+		equalJSON(options.Filter, other.Filter)
 }
 
 // QueriedFeature contains one copied feature query result.

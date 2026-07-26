@@ -1,4 +1,5 @@
 using Maplibre.Native.Geo;
+using Maplibre.Native.Internal;
 using Maplibre.Native.Json;
 
 namespace Maplibre.Native.Query;
@@ -19,19 +20,67 @@ public abstract record RenderedQueryGeometry
 
     public sealed record Box(ScreenBox Value) : RenderedQueryGeometry;
 
-    public sealed record LineString(IReadOnlyList<ScreenPoint> Points) : RenderedQueryGeometry;
+    public sealed record LineString(IReadOnlyList<ScreenPoint> Points) : RenderedQueryGeometry
+    {
+        public bool Equals(LineString? other) =>
+            other is not null && ValueEquality.SequenceEquals(Points, other.Points);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(Points);
+    }
 }
 
-public sealed class RenderedFeatureQueryOptions
+/// <remarks>
+/// Compares and hashes by property value, comparing <see cref="LayerIds"/> element by element;
+/// <c>with</c> returns an independent instance. Assigning <see cref="LayerIds"/> snapshots the
+/// caller's list, so later caller mutation does not change this descriptor. Keep an instance
+/// unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record RenderedFeatureQueryOptions
 {
-    public IReadOnlyList<string>? LayerIds { get; set; }
+    private IReadOnlyList<string>? layerIds;
+
+    public IReadOnlyList<string>? LayerIds
+    {
+        get => layerIds;
+        set => layerIds = value is null ? null : Array.AsReadOnly([.. value]);
+    }
+
     public JsonValue? Filter { get; set; }
+
+    public bool Equals(RenderedFeatureQueryOptions? other) =>
+        other is not null
+        && ValueEquality.SequenceEquals(LayerIds, other.LayerIds)
+        && Equals(Filter, other.Filter);
+
+    public override int GetHashCode() =>
+        HashCode.Combine(ValueEquality.SequenceHashCode(LayerIds), Filter);
 }
 
-public sealed class SourceFeatureQueryOptions
+/// <remarks>
+/// Compares and hashes by property value, comparing <see cref="SourceLayerIds"/> element by
+/// element; <c>with</c> returns an independent instance. Assigning <see cref="SourceLayerIds"/>
+/// snapshots the caller's list, so later caller mutation does not change this descriptor. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record SourceFeatureQueryOptions
 {
-    public IReadOnlyList<string>? SourceLayerIds { get; set; }
+    private IReadOnlyList<string>? sourceLayerIds;
+
+    public IReadOnlyList<string>? SourceLayerIds
+    {
+        get => sourceLayerIds;
+        set => sourceLayerIds = value is null ? null : Array.AsReadOnly([.. value]);
+    }
+
     public JsonValue? Filter { get; set; }
+
+    public bool Equals(SourceFeatureQueryOptions? other) =>
+        other is not null
+        && ValueEquality.SequenceEquals(SourceLayerIds, other.SourceLayerIds)
+        && Equals(Filter, other.Filter);
+
+    public override int GetHashCode() =>
+        HashCode.Combine(ValueEquality.SequenceHashCode(SourceLayerIds), Filter);
 }
 
 public sealed record QueriedFeature(
@@ -47,8 +96,13 @@ public abstract record FeatureExtensionResult
 
     public sealed record Value(JsonValue Json) : FeatureExtensionResult;
 
-    public sealed record FeatureCollection(IReadOnlyList<Feature> Features)
-        : FeatureExtensionResult;
+    public sealed record FeatureCollection(IReadOnlyList<Feature> Features) : FeatureExtensionResult
+    {
+        public bool Equals(FeatureCollection? other) =>
+            other is not null && ValueEquality.SequenceEquals(Features, other.Features);
+
+        public override int GetHashCode() => ValueEquality.SequenceHashCode(Features);
+    }
 
     public sealed record Unknown(uint RawType) : FeatureExtensionResult;
 }

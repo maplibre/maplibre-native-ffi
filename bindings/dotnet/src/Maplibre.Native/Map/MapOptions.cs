@@ -3,7 +3,11 @@ using Maplibre.Native.Internal.C;
 namespace Maplibre.Native.Map;
 
 /// <summary>Map creation options.</summary>
-public sealed class MapOptions
+/// <remarks>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </remarks>
+public sealed record MapOptions
 {
     /// <summary>Initial logical width in pixels.</summary>
     public uint? Width { get; set; }

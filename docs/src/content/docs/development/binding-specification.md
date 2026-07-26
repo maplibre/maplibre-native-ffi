@@ -239,6 +239,29 @@ C struct materialization follows this operation:
 
 Structs that C fills and returns by value become copied language values.
 
+### Value semantics
+
+Public option types, copied result values, geometry and feature trees, and
+values wrapping copied byte buffers compare by field value using the target
+language's ordinary equality operation. Option types additionally expose a copy
+operation that produces an independent instance. Callers diff successive
+snapshots and derive modified descriptors without reaching for reference
+identity.
+
+Equality covers every semantic field the value carries, including private copied
+storage, list-valued fields, and nested value trees, and distinguishes an absent
+optional field from a present empty or zero value. Languages whose default
+equality compares collection, array, or pointer members by identity supply the
+comparison that inspects the contents instead, at every level of nesting.
+
+Values that hold callbacks, delegates, or native handles keep identity
+semantics, because behavior rather than field values determines whether two such
+values are interchangeable.
+
+Where the target language hashes values, the hash covers the same fields as
+equality. Values that stay mutable document that an instance in a hash-based
+collection stays unmodified while it is a key.
+
 ### Enums and masks
 
 Public enum values expose named cases for known C values and keep the
@@ -611,18 +634,20 @@ that a real native failure would expose.
 
 ### Input Structs, Values, and Copied Data
 
-| ID      | Test                                                                                                                                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                |
-| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                     |
-| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                   |
-| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                        |
-| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                       |
-| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                      |
-| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                           |
-| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                        |
-| BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                   |
-| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value. |
+| ID      | Test                                                                                                                                                                                                       |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                        |
+| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                             |
+| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                           |
+| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                                |
+| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                               |
+| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                              |
+| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                                   |
+| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                                |
+| BND-068 | Unknown enum values preserve their raw value, and public input APIs report the C API's status and diagnostic unless the binding owns a stricter pre-C invariant.                                           |
+| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value.         |
+| BND-070 | Option types compare and hash by field value, separate absent optional fields from present empty or zero values, and copy to an independent instance; one case per option type mutates each field in turn. |
+| BND-071 | Copied result values, nested geometry and feature trees, and values wrapping copied byte buffers compare by content when built from distinct list or array instances holding equal contents.               |
 
 ### Runtime and events
 
