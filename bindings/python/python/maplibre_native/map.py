@@ -41,6 +41,7 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    GeoJsonSourceOptions,
     LocationIndicatorImageKind,
     StyleImage,
     StyleImageInfo,
@@ -333,6 +334,50 @@ def _tile_source_parts(
     )
 
 
+def _geojson_source_parts(
+    options: GeoJsonSourceOptions | None,
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    JsonValue | None,
+    int | None,
+    int | None,
+    int | None,
+    int | None,
+    bool | None,
+    bool | None,
+]:
+    if options is None:
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    return (
+        options.min_zoom,
+        options.max_zoom,
+        options.tolerance,
+        options.cluster_max_zoom,
+        options.cluster_properties,
+        options.tile_size,
+        options.buffer,
+        options.cluster_radius,
+        options.cluster_min_points,
+        options.line_metrics,
+        options.cluster,
+    )
+
+
 def projected_meters_for_lat_lng(coordinate: LatLng) -> ProjectedMeters:
     """Convert a geographic coordinate to spherical Mercator projected meters."""
     raw = _native.projected_meters_for_lat_lng(
@@ -577,13 +622,27 @@ class MapHandle(NativeHandleMixin):
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)
 
-    def add_geojson_source_url(self, source_id: str, url: str) -> None:
+    def add_geojson_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source that loads data from a URL."""
-        self._native.add_geojson_source_url(source_id, url)
+        self._native.add_geojson_source_url(
+            source_id, url, *_geojson_source_parts(options)
+        )
 
-    def add_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+    def add_geojson_source_data(
+        self,
+        source_id: str,
+        data: GeoJson,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source with inline data."""
-        self._native.add_geojson_source_data(source_id, data)
+        self._native.add_geojson_source_data(
+            source_id, data, *_geojson_source_parts(options)
+        )
 
     def set_geojson_source_url(self, source_id: str, url: str) -> None:
         """Update one GeoJSON source to load data from a URL."""

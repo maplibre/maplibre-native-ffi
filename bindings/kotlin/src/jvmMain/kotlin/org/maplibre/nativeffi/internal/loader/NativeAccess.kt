@@ -44,6 +44,7 @@ import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_info
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_geojson
+import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_geometry
 import org.maplibre.nativeffi.internal.c.mln_geometry_collection
 import org.maplibre.nativeffi.internal.c.mln_json_member
@@ -172,6 +173,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -599,20 +601,40 @@ internal object NativeAccess {
       styleIdList(outList.get(ValueLayout.ADDRESS, 0))
     }
 
-  internal fun addGeoJsonSourceUrl(map: MemorySegment, sourceId: String, url: String) {
+  internal fun addGeoJsonSourceUrl(
+    map: MemorySegment,
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapTwoStringViewsStatusFunction("mln_map_add_geojson_source_url")
-          .invokeWithArguments(map, stringView(arena, sourceId), stringView(arena, url)) as Int
+        mapTwoStringViewsAddressStatusFunction("mln_map_add_geojson_source_url")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            stringView(arena, url),
+            geoJsonSourceOptions(arena, options),
+          ) as Int
       )
     }
   }
 
-  internal fun addGeoJsonSourceData(map: MemorySegment, sourceId: String, data: GeoJson) {
+  internal fun addGeoJsonSourceData(
+    map: MemorySegment,
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     Arena.ofConfined().use { arena ->
       Status.check(
-        mapStringViewAddressStatusFunction("mln_map_add_geojson_source_data")
-          .invokeWithArguments(map, stringView(arena, sourceId), geoJson(arena, data)) as Int
+        mapStringViewTwoAddressStatusFunction("mln_map_add_geojson_source_data")
+          .invokeWithArguments(
+            map,
+            stringView(arena, sourceId),
+            geoJson(arena, data),
+            geoJsonSourceOptions(arena, options),
+          ) as Int
       )
     }
   }
@@ -3111,6 +3133,69 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun geoJsonSourceOptions(arena: Arena, value: GeoJsonSourceOptions?): MemorySegment {
+    if (value == null) {
+      return MemorySegment.NULL
+    }
+    val segment = arena.allocate(GEOJSON_SOURCE_OPTIONS_SIZE)
+    var fields = 0
+    segment.set(
+      ValueLayout.JAVA_INT,
+      GEOJSON_SOURCE_OPTIONS_SIZE_OFFSET,
+      GEOJSON_SOURCE_OPTIONS_SIZE.toInt(),
+    )
+    value.minZoom?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_MIN_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, GEOJSON_SOURCE_OPTIONS_MIN_ZOOM_OFFSET, it)
+    }
+    value.maxZoom?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, GEOJSON_SOURCE_OPTIONS_MAX_ZOOM_OFFSET, it)
+    }
+    value.tolerance?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_TOLERANCE
+      segment.set(ValueLayout.JAVA_DOUBLE, GEOJSON_SOURCE_OPTIONS_TOLERANCE_OFFSET, it)
+    }
+    value.clusterMaxZoom?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      segment.set(ValueLayout.JAVA_DOUBLE, GEOJSON_SOURCE_OPTIONS_CLUSTER_MAX_ZOOM_OFFSET, it)
+    }
+    value.clusterProperties?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+      segment.set(
+        ValueLayout.ADDRESS,
+        GEOJSON_SOURCE_OPTIONS_CLUSTER_PROPERTIES_OFFSET,
+        jsonValue(arena, it),
+      )
+    }
+    value.tileSize?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_TILE_SIZE
+      segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_TILE_SIZE_OFFSET, it)
+    }
+    value.buffer?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_BUFFER
+      segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_BUFFER_OFFSET, it)
+    }
+    value.clusterRadius?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+      segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_CLUSTER_RADIUS_OFFSET, it)
+    }
+    value.clusterMinPoints?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_CLUSTER_MIN_POINTS_OFFSET, it)
+    }
+    value.lineMetrics?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_LINE_METRICS
+      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_LINE_METRICS_OFFSET, it)
+    }
+    value.cluster?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER
+      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
   private fun edgeInsets(segment: MemorySegment): EdgeInsets =
     EdgeInsets(
       segment.get(ValueLayout.JAVA_DOUBLE, EDGE_INSETS_TOP_OFFSET),
@@ -5313,6 +5398,45 @@ internal object NativeAccess {
     mln_style_tile_source_options.`vector_encoding$offset`()
   private val TILE_SOURCE_OPTIONS_RASTER_ENCODING_OFFSET: Long =
     mln_style_tile_source_options.`raster_encoding$offset`()
+
+  private const val GEOJSON_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
+  private const val GEOJSON_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
+  private const val GEOJSON_SOURCE_OPTION_TOLERANCE: Int = 1 shl 2
+  private const val GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM: Int = 1 shl 3
+  private const val GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES: Int = 1 shl 4
+  private const val GEOJSON_SOURCE_OPTION_TILE_SIZE: Int = 1 shl 5
+  private const val GEOJSON_SOURCE_OPTION_BUFFER: Int = 1 shl 6
+  private const val GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS: Int = 1 shl 7
+  private const val GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: Int = 1 shl 8
+  private const val GEOJSON_SOURCE_OPTION_LINE_METRICS: Int = 1 shl 9
+  private const val GEOJSON_SOURCE_OPTION_CLUSTER: Int = 1 shl 10
+
+  private val GEOJSON_SOURCE_OPTIONS_SIZE: Long = mln_geojson_source_options.sizeof()
+  private val GEOJSON_SOURCE_OPTIONS_SIZE_OFFSET: Long = mln_geojson_source_options.`size$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_FIELDS_OFFSET: Long =
+    mln_geojson_source_options.`fields$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_MIN_ZOOM_OFFSET: Long =
+    mln_geojson_source_options.`min_zoom$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_MAX_ZOOM_OFFSET: Long =
+    mln_geojson_source_options.`max_zoom$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_TOLERANCE_OFFSET: Long =
+    mln_geojson_source_options.`tolerance$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_CLUSTER_MAX_ZOOM_OFFSET: Long =
+    mln_geojson_source_options.`cluster_max_zoom$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_CLUSTER_PROPERTIES_OFFSET: Long =
+    mln_geojson_source_options.`cluster_properties$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_TILE_SIZE_OFFSET: Long =
+    mln_geojson_source_options.`tile_size$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_BUFFER_OFFSET: Long =
+    mln_geojson_source_options.`buffer$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_CLUSTER_RADIUS_OFFSET: Long =
+    mln_geojson_source_options.`cluster_radius$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_CLUSTER_MIN_POINTS_OFFSET: Long =
+    mln_geojson_source_options.`cluster_min_points$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_LINE_METRICS_OFFSET: Long =
+    mln_geojson_source_options.`line_metrics$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET: Long =
+    mln_geojson_source_options.`cluster$offset`()
 
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1

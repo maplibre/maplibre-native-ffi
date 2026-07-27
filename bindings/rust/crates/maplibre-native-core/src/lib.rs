@@ -69,7 +69,9 @@ pub use runtime::{
     OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions, network_status, set_network_status,
     set_network_status_raw,
 };
-pub use style::{SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions};
+pub use style::{
+    GeoJsonSourceOptions, SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions,
+};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,
     ScreenBox, ScreenPoint, StyleImageInfo, TextureImageInfo, UnitBezier, Vec3,

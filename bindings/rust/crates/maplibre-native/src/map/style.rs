@@ -1,11 +1,13 @@
 use std::ptr;
 
 pub(crate) use maplibre_core::style::{
-    NativeTileSourceOptions, NativeTileUrls, StyleImageOptionsNativeExt, TileSourceOptionsNativeExt,
+    GeoJsonSourceOptionsNativeExt, NativeGeoJsonSourceOptions, NativeTileSourceOptions,
+    NativeTileUrls, StyleImageOptionsNativeExt, TileSourceOptionsNativeExt,
 };
 pub use maplibre_core::{
-    LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
-    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType,
+    StyleImage, StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::const_ptr_or_null;
@@ -715,19 +717,78 @@ impl super::MapHandle {
         })
     }
 
+    /// Adds a GeoJSON source that loads data from a URL.
+    ///
+    /// MapLibre Native fixes `options` when the source is created, so
+    /// [`Self::set_geojson_source_url`] and [`Self::set_geojson_source_data`]
+    /// keep the options the source was added with.
+    pub fn add_geojson_source_url(
+        &self,
+        source_id: &str,
+        url: &str,
+        options: Option<&GeoJsonSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let url = maplibre_core::string::string_view(url);
+        let options = options
+            .map(GeoJsonSourceOptions::try_to_native)
+            .transpose()?;
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeGeoJsonSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id and url are valid for this call, and
+        // options_ptr is null or points to call-scoped native options that own
+        // any cluster-properties descriptor graph.
+        maplibre_core::check(unsafe {
+            sys::mln_map_add_geojson_source_url(map, source_id.raw(), url.raw(), options_ptr)
+        })
+    }
+
     /// Adds a GeoJSON source with inline data.
-    pub fn add_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
+    ///
+    /// MapLibre Native fixes `options` when the source is created, so
+    /// [`Self::set_geojson_source_url`] and [`Self::set_geojson_source_data`]
+    /// keep the options the source was added with.
+    pub fn add_geojson_source_data(
+        &self,
+        source_id: &str,
+        data: &GeoJson,
+        options: Option<&GeoJsonSourceOptions>,
+    ) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = data.try_to_native()?;
-        // SAFETY: map is live, source_id is valid for this call, and data owns
-        // the descriptor graph for this call.
+        let options = options
+            .map(GeoJsonSourceOptions::try_to_native)
+            .transpose()?;
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeGeoJsonSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id is valid for this call, data owns the
+        // descriptor graph for this call, and options_ptr is null or points to
+        // call-scoped native options that own any cluster-properties graph.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data.as_ptr())
+            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data.as_ptr(), options_ptr)
+        })
+    }
+
+    /// Updates one GeoJSON source to load data from a URL.
+    ///
+    /// The source keeps the options it was added with.
+    pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = maplibre_core::string::string_view(source_id);
+        let url = maplibre_core::string::string_view(url);
+        // SAFETY: map is live and source_id and url are valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_geojson_source_url(map, source_id.raw(), url.raw())
         })
     }
 
     /// Updates one GeoJSON source with inline data.
+    ///
+    /// The source keeps the options it was added with.
     pub fn set_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let source_id = maplibre_core::string::string_view(source_id);

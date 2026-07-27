@@ -5,9 +5,26 @@ import time
 import pytest
 
 import maplibre_native as mln
-from maplibre_native import camera, geo, json, query, render
+from maplibre_native import camera, geo, json, query, render, style
 
 EMPTY_STYLE_JSON = '{"version":8,"sources":{},"layers":[]}'
+
+CLUSTER_POINTS = geo.FeatureCollection(
+    tuple(
+        geo.Feature(
+            geometry=geo.Point(geo.LatLng(offset, offset)),
+            properties=(
+                json.JsonMember("name", name),
+                json.JsonMember("weight", json.JsonInt(weight)),
+            ),
+        )
+        for offset, name, weight in (
+            (0.0, "one", 1),
+            (0.001, "two", 2),
+            (0.002, "three", 3),
+        )
+    )
+)
 
 CLUSTER_STYLE_JSON = (
     '{"version":8,"name":"python-cluster-query-test",'
@@ -98,16 +115,15 @@ def request_still_image_if_needed(map_handle: mln.MapHandle) -> None:
             raise
 
 
-def wait_for_rendered_cluster(
+def wait_for_rendered_layer_feature(
     runtime: mln.RuntimeHandle,
     map_handle: mln.MapHandle,
     session: render.RenderSessionHandle,
+    layer_id: str,
     *,
     iterations: int = 5000,
 ) -> query.QueriedFeature:
-    """Load the cluster style and return the first rendered cluster feature."""
-    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
-    map_handle.set_style_json(CLUSTER_STYLE_JSON)
+    """Render until one feature of `layer_id` covers the map center."""
     query_point = map_handle.pixel_for_lat_lng(geo.LatLng(0.0, 0.0))
     geometry = query.RenderedQueryGeometry.box_geometry(
         query.ScreenBox(
@@ -115,7 +131,7 @@ def wait_for_rendered_cluster(
             camera.ScreenPoint(query_point.x + 30.0, query_point.y + 30.0),
         )
     )
-    options = query.RenderedFeatureQueryOptions(layer_ids=("cluster-circle",))
+    options = query.RenderedFeatureQueryOptions(layer_ids=(layer_id,))
     for _ in range(iterations):
         request_still_image_if_needed(map_handle)
         runtime.run_once()
@@ -132,7 +148,26 @@ def wait_for_rendered_cluster(
         if features:
             return features[0]
         time.sleep(0.001)
-    raise AssertionError("cluster feature query returned no features")
+    raise AssertionError(f"rendered feature query for {layer_id} returned no features")
+
+
+def wait_for_rendered_cluster(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    session: render.RenderSessionHandle,
+    *,
+    iterations: int = 5000,
+) -> query.QueriedFeature:
+    """Load the cluster style and return the first rendered cluster feature."""
+    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
+    map_handle.set_style_json(CLUSTER_STYLE_JSON)
+    return wait_for_rendered_layer_feature(
+        runtime,
+        map_handle,
+        session,
+        "cluster-circle",
+        iterations=iterations,
+    )
 
 
 def feature_member(feature: geo.Feature, key: str) -> json.JsonValue:
@@ -162,6 +197,51 @@ def single_cluster_leaf(
     assert leaves.feature_collection is not None
     assert len(leaves.feature_collection) == 1
     return leaves.feature_collection[0]
+
+
+def assert_typed_geojson_cluster_source(
+    runtime: mln.RuntimeHandle,
+    map_handle: mln.MapHandle,
+    session: render.RenderSessionHandle,
+) -> None:
+    """Cluster nearby points added through the typed GeoJSON source adder."""
+    map_handle.jump_to(camera.CameraOptions(center=geo.LatLng(0.0, 0.0), zoom=0.0))
+    map_handle.set_style_json(EMPTY_STYLE_JSON)
+    map_handle.add_geojson_source_data(
+        "typed-cluster-source",
+        CLUSTER_POINTS,
+        style.GeoJsonSourceOptions(
+            cluster=True,
+            cluster_radius=60,
+            cluster_min_points=2,
+            cluster_max_zoom=20.0,
+            # ["+", <map expression>] accumulates the mapped value per cluster.
+            cluster_properties=json.from_python(
+                {"weight_sum": ["+", ["get", "weight"]]}
+            ),
+        ),
+    )
+    map_handle.add_style_layer_json(
+        json.from_python(
+            {
+                "id": "typed-cluster-circle",
+                "type": "circle",
+                "source": "typed-cluster-source",
+                "filter": ["has", "point_count"],
+                "paint": {"circle-color": "#2563eb", "circle-radius": 20},
+            }
+        )
+    )
+
+    queried = wait_for_rendered_layer_feature(
+        runtime, map_handle, session, "typed-cluster-circle"
+    )
+    # The three source points only collapse into one feature when the options
+    # reach MapLibre Native, and weight_sum only appears with cluster
+    # properties.
+    assert json.to_python(feature_member(queried.feature, "cluster")) is True
+    assert json.to_python(feature_member(queried.feature, "point_count")) == 3
+    assert json.to_python(feature_member(queried.feature, "weight_sum")) == 6
 
 
 def assert_cluster_feature_extensions(

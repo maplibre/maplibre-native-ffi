@@ -869,6 +869,19 @@ def test_style_url_rejects_embedded_nul_before_native_call() -> None:
     assert raised.value.diagnostic != stale
 
 
+@pytest.mark.parametrize(
+    "field",
+    ("tile_size", "buffer", "cluster_radius", "cluster_min_points"),
+)
+def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> None:
+    with pytest.raises(mln.InvalidArgumentError) as raised:
+        style.GeoJsonSourceOptions(**{field: -1})
+
+    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
+    assert raised.value.native_status_code is None
+    assert field in raised.value.diagnostic
+
+
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
@@ -886,7 +899,16 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 ),
             )
             map_handle.add_geojson_source_url(
-                "points", "https://example.test/points.geojson"
+                "points",
+                "https://example.test/points.geojson",
+                style.GeoJsonSourceOptions(
+                    min_zoom=1.0,
+                    max_zoom=14.0,
+                    tolerance=0.5,
+                    tile_size=256,
+                    buffer=64,
+                    line_metrics=True,
+                ),
             )
             inline_points = geo.FeatureCollection(
                 (
@@ -897,7 +919,19 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                     ),
                 )
             )
-            map_handle.add_geojson_source_data("inline-points", inline_points)
+            map_handle.add_geojson_source_data(
+                "inline-points",
+                inline_points,
+                style.GeoJsonSourceOptions(
+                    cluster=True,
+                    cluster_radius=40,
+                    cluster_max_zoom=12.0,
+                    cluster_min_points=3,
+                    cluster_properties=json.from_python(
+                        {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
+                    ),
+                ),
+            )
             map_handle.set_geojson_source_url(
                 "inline-points",
                 "https://example.test/inline-points.geojson",

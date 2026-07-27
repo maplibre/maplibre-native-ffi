@@ -39,7 +39,119 @@ static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Bindings always emit a full struct header, so only raw C callers can present
+// a short size or unknown field bits to the GeoJSON source adders.
+static void geojson_source_options_reject_unsafe_raw_headers(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+  const mln_string_view url = {
+    .data = "https://example.com/points.geojson", .size = 34
+  };
+
+  mln_geojson_source_options short_size = mln_geojson_source_options_default();
+  short_size.size = (uint32_t)(sizeof(mln_geojson_source_options) - 1);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "short-header", .size = 12}, url,
+      &short_size
+    )
+  );
+
+  mln_geojson_source_options unknown_field =
+    mln_geojson_source_options_default();
+  unknown_field.fields = 1U << 31U;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "unknown-field", .size = 13}, url,
+      &unknown_field
+    )
+  );
+
+  mln_geojson_source_options fractional_min_zoom =
+    mln_geojson_source_options_default();
+  fractional_min_zoom.fields = MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+  fractional_min_zoom.min_zoom = 1.5;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-min", .size = 14}, url,
+      &fractional_min_zoom
+    )
+  );
+
+  mln_geojson_source_options fractional_max_zoom =
+    mln_geojson_source_options_default();
+  fractional_max_zoom.fields = MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+  fractional_max_zoom.max_zoom = 17.9;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-max", .size = 14}, url,
+      &fractional_max_zoom
+    )
+  );
+
+  mln_geojson_source_options fractional_cluster_max_zoom =
+    mln_geojson_source_options_default();
+  fractional_cluster_max_zoom.fields =
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+  fractional_cluster_max_zoom.cluster_max_zoom = 12.25;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-cluster", .size = 18}, url,
+      &fractional_cluster_max_zoom
+    )
+  );
+
+  mln_geojson_source_options null_cluster_properties =
+    mln_geojson_source_options_default();
+  null_cluster_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "null-properties", .size = 15}, url,
+      &null_cluster_properties
+    )
+  );
+
+  mln_json_value json_null_cluster_properties = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_NULL,
+  };
+  mln_geojson_source_options non_object_cluster_properties =
+    mln_geojson_source_options_default();
+  non_object_cluster_properties.fields =
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+  non_object_cluster_properties.cluster_properties =
+    &json_null_cluster_properties;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "json-null-properties", .size = 20}, url,
+      &non_object_cluster_properties
+    )
+  );
+
+  // A rejected descriptor leaves the source ID free for a later valid add.
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_add_geojson_source_url(
+                     map, (mln_string_view){.data = "short-header", .size = 12},
+                     url, &clustered
+                   )
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
+  RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
 }

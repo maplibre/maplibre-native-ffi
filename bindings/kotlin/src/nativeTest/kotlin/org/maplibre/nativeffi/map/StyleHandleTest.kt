@@ -29,6 +29,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
@@ -527,9 +528,51 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
             )
           )
         ),
+        GeoJsonSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 14.0
+          tolerance = 0.5
+          tileSize = 256
+          buffer = 64
+          lineMetrics = true
+          cluster = true
+          clusterRadius = 40
+          clusterMaxZoom = 13.0
+          clusterMinPoints = 2
+          clusterProperties =
+            JsonValue.ObjectValue(
+              listOf(
+                JsonValue.Member(
+                  "total",
+                  JsonValue.Array(
+                    listOf(
+                      JsonValue.StringValue("+"),
+                      JsonValue.Array(
+                        listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
+                      ),
+                    )
+                  ),
+                )
+              )
+            )
+        },
       )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("points"))
       map.setGeoJsonSourceData("points", GeoJson.GeometryValue(Geometry.Point(LatLng(1.0, 1.0))))
+
+      // Option values reach native validation rather than being dropped by the binding.
+      assertFailsWith<InvalidArgumentException> {
+        map.addGeoJsonSourceUrl(
+          "invalid-zooms",
+          "https://example.com/places.geojson",
+          GeoJsonSourceOptions().apply {
+            minZoom = 12.0
+            maxZoom = 4.0
+          },
+        )
+      }
+      assertFalse(map.styleSourceExists("invalid-zooms"))
+
       assertTrue(map.removeStyleSource("points"))
     } finally {
       map.close()

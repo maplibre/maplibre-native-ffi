@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -93,14 +94,22 @@ private constructor(
     return NativeAccess.styleSourceIds(requireLiveHandle())
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
+    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data)
+    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data, options)
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {

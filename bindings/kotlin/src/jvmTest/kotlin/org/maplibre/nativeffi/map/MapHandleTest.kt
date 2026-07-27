@@ -37,6 +37,7 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -150,16 +151,52 @@ class MapHandleTest {
 
     try {
       map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
-      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson")
+      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson", null)
       assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
       map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
 
-      map.addGeoJsonSourceData("inline-places", geoJsonData())
+      map.addGeoJsonSourceData(
+        "inline-places",
+        geoJsonData(),
+        GeoJsonSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 14.0
+          tolerance = 0.5
+          tileSize = 256
+          buffer = 64
+          lineMetrics = true
+        },
+      )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
       map.setGeoJsonSourceData(
         "inline-places",
         GeoJson.GeometryValue(Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
       )
+
+      map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions())
+      assertEquals(SourceType.GEOJSON, map.styleSourceType("clustered-places"))
+
+      // Option values reach native validation rather than being dropped by the binding.
+      assertFailsWith<InvalidArgumentException> {
+        map.addGeoJsonSourceUrl(
+          "invalid-zooms",
+          "https://example.com/places.geojson",
+          GeoJsonSourceOptions().apply {
+            minZoom = 12.0
+            maxZoom = 4.0
+          },
+        )
+      }
+      assertFalse(map.styleSourceExists("invalid-zooms"))
+      assertFailsWith<InvalidArgumentException> {
+        map.addGeoJsonSourceUrl(
+          "invalid-cluster-properties",
+          "https://example.com/places.geojson",
+          GeoJsonSourceOptions().apply {
+            clusterProperties = JsonValue.StringValue("not an object")
+          },
+        )
+      }
     } finally {
       map.close()
       runtime.close()
@@ -714,6 +751,42 @@ class MapHandleTest {
         ),
       )
     )
+
+  /** Point features close enough together to collapse into one cluster at low zoom. */
+  private fun nearbyPoints(): GeoJson =
+    GeoJson.FeatureCollection(
+      List(4) { index ->
+        Feature(
+          Geometry.Point(LatLng(index * 0.001, index * 0.001)),
+          listOf(JsonValue.Member("weight", JsonValue.UInt(1))),
+          FeatureIdentifier.UInt(index.toLong()),
+        )
+      }
+    )
+
+  private fun clusterOptions(): GeoJsonSourceOptions =
+    GeoJsonSourceOptions().apply {
+      cluster = true
+      clusterRadius = 50
+      clusterMaxZoom = 14.0
+      clusterMinPoints = 2
+      clusterProperties =
+        JsonValue.ObjectValue(
+          listOf(
+            JsonValue.Member(
+              "total",
+              JsonValue.Array(
+                listOf(
+                  JsonValue.StringValue("+"),
+                  JsonValue.Array(
+                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
+                  ),
+                )
+              ),
+            )
+          )
+        )
+    }
 
   private fun geoJsonData(): GeoJson =
     GeoJson.FeatureCollection(

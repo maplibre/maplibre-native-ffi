@@ -15,6 +15,17 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toCValues
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.CanonicalTileId
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_BUFFER
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_SDF
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
@@ -26,6 +37,8 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
+import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
+import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
@@ -40,6 +53,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options_default
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
@@ -158,6 +172,60 @@ internal object StyleStructs {
     value.rasterDemEncoding?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
       native.raster_encoding = it.nativeValue.toUInt()
+    }
+    return native.ptr
+  }
+
+  fun geoJsonSourceOptions(
+    value: GeoJsonSourceOptions?,
+    scope: MemScope,
+  ): CPointer<mln_geojson_source_options>? {
+    if (value == null) return null
+    val native = scope.alloc<mln_geojson_source_options>()
+    mln_geojson_source_options_default().place(native.ptr)
+    value.minZoom?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+      native.min_zoom = it
+    }
+    value.maxZoom?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+      native.max_zoom = it
+    }
+    value.tolerance?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+      native.tolerance = it
+    }
+    value.clusterMaxZoom?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      native.cluster_max_zoom = it
+    }
+    value.clusterProperties?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+      native.cluster_properties = ValueStructs.jsonValue(it, scope)
+    }
+    value.tileSize?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+      native.tile_size = it.toUInt()
+    }
+    value.buffer?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_BUFFER
+      native.buffer = it.toUInt()
+    }
+    value.clusterRadius?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+      native.cluster_radius = it.toUInt()
+    }
+    value.clusterMinPoints?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      native.cluster_min_points = it.toUInt()
+    }
+    value.lineMetrics?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+      native.line_metrics = it
+    }
+    value.cluster?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+      native.cluster = it
     }
     return native.ptr
   }

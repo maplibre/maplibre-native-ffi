@@ -472,6 +472,17 @@
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+--include-constant MLN_GEOJSON_SOURCE_OPTION_BUFFER
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+--include-constant MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP
@@ -501,6 +512,7 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MLT
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-function mln_custom_geometry_source_options_default
+--include-function mln_geojson_source_options_default
 --include-function mln_map_add_color_relief_layer
 --include-function mln_map_add_custom_geometry_source
 --include-function mln_map_add_geojson_source_data
@@ -563,6 +575,7 @@
 --include-function mln_style_tile_source_options_default
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
+--include-struct mln_geojson_source_options
 --include-struct mln_premultiplied_rgba8_image
 --include-struct mln_style_image_info
 --include-struct mln_style_image_options

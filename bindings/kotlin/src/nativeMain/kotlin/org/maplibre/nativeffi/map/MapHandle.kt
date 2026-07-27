@@ -169,6 +169,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -272,25 +273,35 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
+          StyleStructs.geoJsonSourceOptions(options, this),
         )
       )
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_data(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
           ValueStructs.geoJson(data, this),
+          StyleStructs.geoJsonSourceOptions(options, this),
         )
       )
     }

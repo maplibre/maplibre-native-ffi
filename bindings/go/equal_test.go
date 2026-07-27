@@ -288,6 +288,68 @@ func TestStyleTileSourceOptionsEqualComparesFieldValues(t *testing.T) {
 	)
 }
 
+func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"StyleGeoJSONSourceOptions",
+		func() StyleGeoJSONSourceOptions {
+			return StyleGeoJSONSourceOptions{
+				MinZoom:        optionPtr(1.0),
+				MaxZoom:        optionPtr(2.0),
+				Tolerance:      optionPtr(0.5),
+				ClusterMaxZoom: optionPtr(14.0),
+				ClusterProperties: optionPtr(JSONObject(
+					JSONMember{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("rank")))},
+				)),
+				TileSize:         optionPtr(uint32(256)),
+				Buffer:           optionPtr(uint32(64)),
+				ClusterRadius:    optionPtr(uint32(0)),
+				ClusterMinPoints: optionPtr(uint32(2)),
+				LineMetrics:      optionPtr(true),
+				Cluster:          optionPtr(true),
+			}
+		},
+		StyleGeoJSONSourceOptions.Equal,
+		[]func(*StyleGeoJSONSourceOptions){
+			func(o *StyleGeoJSONSourceOptions) { o.MinZoom = optionPtr(10.0) },
+			func(o *StyleGeoJSONSourceOptions) { o.MaxZoom = optionPtr(20.0) },
+			func(o *StyleGeoJSONSourceOptions) { o.Tolerance = optionPtr(0.25) },
+			func(o *StyleGeoJSONSourceOptions) { o.ClusterMaxZoom = optionPtr(15.0) },
+			func(o *StyleGeoJSONSourceOptions) {
+				o.ClusterProperties = optionPtr(JSONObject(
+					JSONMember{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("score")))},
+				))
+			},
+			func(o *StyleGeoJSONSourceOptions) { o.TileSize = optionPtr(uint32(512)) },
+			func(o *StyleGeoJSONSourceOptions) { o.Buffer = optionPtr(uint32(128)) },
+			func(o *StyleGeoJSONSourceOptions) { o.ClusterRadius = optionPtr(uint32(50)) },
+			func(o *StyleGeoJSONSourceOptions) { o.ClusterMinPoints = optionPtr(uint32(3)) },
+			func(o *StyleGeoJSONSourceOptions) { o.LineMetrics = optionPtr(false) },
+			func(o *StyleGeoJSONSourceOptions) { o.Cluster = optionPtr(false) },
+		},
+	)
+}
+
+func TestStyleGeoJSONSourceOptionsBuildersDeepCopyRetainedFields(t *testing.T) {
+	original := StyleGeoJSONSourceOptions{}.
+		WithMinZoom(1).
+		WithClusterProperties(JSONObject(JSONMember{
+			Name:  "total",
+			Value: JSONArray(JSONString("+"), JSONInt(1)),
+		}))
+	updated := original.WithMaxZoom(2)
+
+	*updated.MinZoom = 9
+	updated.ClusterProperties.Object[0].Value.Array[1] = JSONInt(7)
+
+	if *original.MinZoom != 1 {
+		t.Fatalf("original MinZoom = %v, want 1", *original.MinZoom)
+	}
+	if got := original.ClusterProperties.Object[0].Value.Array[1]; !got.Equal(JSONInt(1)) {
+		t.Fatalf("original nested cluster property = %#v, want JSON int 1", got)
+	}
+}
+
 func TestStyleImageOptionsEqualComparesFieldValues(t *testing.T) {
 	assertValueSemantics(
 		t,

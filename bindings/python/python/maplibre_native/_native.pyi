@@ -211,8 +211,38 @@ class _MapHandle:
     def pixels_for_lat_lngs(self, coordinates: Sequence[_Point]) -> list[_WireDict]: ...
     def lat_lngs_for_pixels(self, points: Sequence[_Point]) -> list[_WireDict]: ...
     def add_style_source_json(self, source_id: str, source_json: object) -> None: ...
-    def add_geojson_source_url(self, source_id: str, url: str) -> None: ...
-    def add_geojson_source_data(self, source_id: str, data: object) -> None: ...
+    def add_geojson_source_url(
+        self,
+        source_id: str,
+        url: str,
+        min_zoom: float | None,
+        max_zoom: float | None,
+        tolerance: float | None,
+        cluster_max_zoom: float | None,
+        cluster_properties: object | None,
+        tile_size: int | None,
+        buffer: int | None,
+        cluster_radius: int | None,
+        cluster_min_points: int | None,
+        line_metrics: bool | None,
+        cluster: bool | None,
+    ) -> None: ...
+    def add_geojson_source_data(
+        self,
+        source_id: str,
+        data: object,
+        min_zoom: float | None,
+        max_zoom: float | None,
+        tolerance: float | None,
+        cluster_max_zoom: float | None,
+        cluster_properties: object | None,
+        tile_size: int | None,
+        buffer: int | None,
+        cluster_radius: int | None,
+        cluster_min_points: int | None,
+        line_metrics: bool | None,
+        cluster: bool | None,
+    ) -> None: ...
     def set_geojson_source_url(self, source_id: str, url: str) -> None: ...
     def set_geojson_source_data(self, source_id: str, data: object) -> None: ...
     def add_vector_source_url(

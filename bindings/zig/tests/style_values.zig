@@ -72,7 +72,7 @@ test "style layer JSON helpers manage lifecycle and order" {
     defer map.close() catch @panic("map close failed");
 
     const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] });
+    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] }, null);
 
     const layer_members = [_]maplibre.JsonMember{
         .{ .key = "id", .value = .{ .string = "empty-circle" } },

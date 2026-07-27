@@ -26,6 +26,7 @@ auto map_viewport_options_default() noexcept -> mln_map_viewport_options;
 auto map_tile_options_default() noexcept -> mln_map_tile_options;
 auto style_tile_source_options_default() noexcept
   -> mln_style_tile_source_options;
+auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
 auto premultiplied_rgba8_image_default() noexcept
@@ -70,10 +71,12 @@ auto map_copy_style_source_attribution(
 auto map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids)
   -> mln_status;
 auto map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_set_geojson_source_url(
   mln_map* map, mln_string_view source_id, mln_string_view url

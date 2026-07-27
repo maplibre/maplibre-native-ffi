@@ -176,6 +176,41 @@ pub const StyleTileSourceOptions = struct {
     raster_encoding: ?StyleRasterDemEncoding = null,
 };
 
+/// Options for GeoJSON sources. MapLibre Native fixes these options when the source is created, so
+/// setGeoJsonSourceUrl and setGeoJsonSourceData keep the options the source was added with.
+pub const StyleGeoJsonSourceOptions = struct {
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+    tolerance: ?f64 = null,
+    cluster_max_zoom: ?f64 = null,
+    /// Cluster aggregation expressions keyed by property name, as a JSON object whose members
+    /// follow the MapLibre Style Spec clusterProperties form.
+    cluster_properties: ?JsonValue = null,
+    tile_size: ?u32 = null,
+    buffer: ?u32 = null,
+    cluster_radius: ?u32 = null,
+    cluster_min_points: ?u32 = null,
+    line_metrics: ?bool = null,
+    cluster: ?bool = null,
+
+    /// Copies this descriptor and recursively owns all nested cluster-property storage.
+    pub fn copy(self: StyleGeoJsonSourceOptions, allocator: std.mem.Allocator) std.mem.Allocator.Error!OwnedStyleGeoJsonSourceOptions {
+        var copied = self;
+        copied.cluster_properties = if (self.cluster_properties) |value| try copyJsonValue(allocator, value) else null;
+        return .{ .allocator = allocator, .options = copied };
+    }
+};
+
+pub const OwnedStyleGeoJsonSourceOptions = struct {
+    allocator: std.mem.Allocator,
+    options: StyleGeoJsonSourceOptions,
+
+    pub fn deinit(self: *OwnedStyleGeoJsonSourceOptions) void {
+        if (self.options.cluster_properties) |value| deinitCopiedJsonValue(self.allocator, value);
+        self.options.cluster_properties = null;
+    }
+};
+
 pub const PremultipliedRgba8Image = struct {
     width: u32,
     height: u32,
@@ -230,6 +265,66 @@ pub const JsonValue = union(enum) {
     array: []const JsonValue,
     object: []const JsonMember,
 };
+
+fn copyJsonValue(allocator: std.mem.Allocator, value: JsonValue) std.mem.Allocator.Error!JsonValue {
+    return switch (value) {
+        .null => .null,
+        .bool => |item| .{ .bool = item },
+        .uint => |item| .{ .uint = item },
+        .int => |item| .{ .int = item },
+        .double => |item| .{ .double = item },
+        .string => |item| .{ .string = try allocator.dupe(u8, item) },
+        .array => |items| blk: {
+            const copied = try allocator.alloc(JsonValue, items.len);
+            var initialized: usize = 0;
+            errdefer {
+                for (copied[0..initialized]) |item| deinitCopiedJsonValue(allocator, item);
+                allocator.free(copied);
+            }
+            for (items, copied) |item, *out| {
+                out.* = try copyJsonValue(allocator, item);
+                initialized += 1;
+            }
+            break :blk .{ .array = copied };
+        },
+        .object => |members| blk: {
+            const copied = try allocator.alloc(JsonMember, members.len);
+            var initialized: usize = 0;
+            errdefer {
+                for (copied[0..initialized]) |*member| {
+                    allocator.free(member.key);
+                    deinitCopiedJsonValue(allocator, member.value);
+                }
+                allocator.free(copied);
+            }
+            for (members, copied) |member, *out| {
+                out.key = try allocator.dupe(u8, member.key);
+                errdefer allocator.free(out.key);
+                out.value = try copyJsonValue(allocator, member.value);
+                initialized += 1;
+            }
+            break :blk .{ .object = copied };
+        },
+    };
+}
+
+fn deinitCopiedJsonValue(allocator: std.mem.Allocator, value: JsonValue) void {
+    switch (value) {
+        .null, .bool, .uint, .int, .double => {},
+        .string => |item| allocator.free(item),
+        .array => |items| {
+            for (items) |item| deinitCopiedJsonValue(allocator, item);
+            allocator.free(items);
+        },
+        .object => |members| {
+            for (members) |member| {
+                allocator.free(member.key);
+                deinitCopiedJsonValue(allocator, member.value);
+            }
+            allocator.free(members);
+        },
+    }
+}
 
 pub const OwnedJsonMember = struct {
     key: []const u8,
@@ -1011,4 +1106,35 @@ test "owned JSON copy handles empty native arrays and objects" {
     var copied_object = try ownedJsonValueFromNative(std.testing.allocator, &empty_object);
     defer copied_object.deinit(std.testing.allocator);
     try std.testing.expectEqual(@as(usize, 0), copied_object.object.len);
+}
+
+test "GeoJSON source option copy owns nested cluster properties" {
+    var property_name = [_]u8{ 't', 'o', 't', 'a', 'l' };
+    var operator = [_]u8{'+'};
+    var expression = [_]JsonValue{
+        .{ .string = operator[0..] },
+        .{ .uint = 1 },
+    };
+    var members = [_]JsonMember{.{
+        .key = property_name[0..],
+        .value = .{ .array = expression[0..] },
+    }};
+    const original = StyleGeoJsonSourceOptions{
+        .max_zoom = 18,
+        .cluster_properties = .{ .object = members[0..] },
+    };
+
+    var copied = try original.copy(std.testing.allocator);
+    defer copied.deinit();
+    copied.options.max_zoom = 12;
+    property_name[0] = 'x';
+    operator[0] = '-';
+    expression[1] = .{ .uint = 2 };
+
+    try std.testing.expectEqual(@as(f64, 18), original.max_zoom.?);
+    try std.testing.expectEqual(@as(f64, 12), copied.options.max_zoom.?);
+    const copied_member = copied.options.cluster_properties.?.object[0];
+    try std.testing.expectEqualStrings("total", copied_member.key);
+    try std.testing.expectEqualStrings("+", copied_member.value.array[0].string);
+    try std.testing.expectEqual(@as(u64, 1), copied_member.value.array[1].uint);
 }
