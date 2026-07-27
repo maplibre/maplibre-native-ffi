@@ -1,6 +1,8 @@
 // Raw C ABI coverage: malformed descriptor counts and unknown enum values are
 // hidden by binding-owned style values.
 
+#include <string.h>
+
 #include "test_support.h"
 #include "unity.h"
 
@@ -150,8 +152,87 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Supercluster reads every feature geometry as a point, so clustered data
+// carrying other geometry used to surface a bare variant access message. The
+// C API rejects it up front and names the source, feature, and constraint.
+static void clustered_geojson_data_reports_non_point_geometry(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+
+  const mln_geometry child = {
+    .size = sizeof(mln_geometry),
+    .type = MLN_GEOMETRY_TYPE_POINT,
+    .data = {.point = {.latitude = 37.8, .longitude = -122.4}}
+  };
+  const mln_geometry point = {
+    .size = sizeof(mln_geometry),
+    .type = MLN_GEOMETRY_TYPE_POINT,
+    .data = {.point = {.latitude = 37.7, .longitude = -122.5}}
+  };
+  const mln_geometry collection = {
+    .size = sizeof(mln_geometry),
+    .type = MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION,
+    .data = {.geometry_collection = {.geometries = &child, .geometry_count = 1}}
+  };
+  const mln_feature features[] = {
+    {.size = sizeof(mln_feature), .geometry = &point},
+    {.size = sizeof(mln_feature), .geometry = &collection},
+  };
+  const mln_geojson data = {
+    .size = sizeof(mln_geojson),
+    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
+    .data = {.feature_collection = {.features = features, .feature_count = 2}}
+  };
+
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+  const mln_string_view clustered_id = {.data = "quakes", .size = 6};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_data(map, clustered_id, &data, &clustered)
+  );
+
+  const char* message = mln_thread_last_error_message();
+  TEST_ASSERT_NOT_NULL(message);
+  TEST_ASSERT_NOT_NULL(strstr(message, "\"quakes\""));
+  TEST_ASSERT_NOT_NULL(strstr(message, "point geometry on every feature"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "feature 1"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "geometry collection"));
+
+  // The constraint belongs to clustering alone, so the same data tiles fine on
+  // an unclustered source, and the rejected ID stays free.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, clustered_id, &data, NULL)
+  );
+
+  // A source added with clustering rejects the same data on update.
+  const mln_string_view updated_id = {.data = "clustered-quakes", .size = 16};
+  const mln_geojson points = {
+    .size = sizeof(mln_geojson),
+    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
+    .data = {.feature_collection = {.features = features, .feature_count = 1}}
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, updated_id, &points, &clustered)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_geojson_source_data(map, updated_id, &data)
+  );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_thread_last_error_message(), "\"clustered-quakes\"")
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
   RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
+  RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
 }

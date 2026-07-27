@@ -169,7 +169,15 @@ typedef struct mln_geojson_source_options {
   uint32_t cluster_min_points;
   /** Adds line distance metrics to line features. Defaults to false. */
   bool line_metrics;
-  /** Clusters point features. Defaults to false. */
+  /**
+   * Clusters point features. Defaults to false.
+   *
+   * Clustering applies to feature collections whose every feature carries point
+   * geometry. Feature collections that mix in other geometry are rejected by
+   * mln_map_add_geojson_source_data() and mln_map_set_geojson_source_data().
+   * MapLibre Native clusters feature collections only, so a source given a bare
+   * geometry or a single feature tiles that data without clustering it.
+   */
   bool cluster;
 } mln_geojson_source_options;
 
@@ -458,11 +466,17 @@ MLN_API mln_status mln_map_add_geojson_source_url(
  * descriptor is copied into MapLibre Native before return. options may be null
  * for defaults, and the options are fixed for the lifetime of the source.
  *
+ * When options enable clustering, every feature in a feature collection must
+ * carry point geometry. This call checks that before handing the data to
+ * MapLibre Native and names the source, the feature, and the constraint in the
+ * thread-local diagnostic when a feature carries other geometry.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, options is invalid, or the
- *   source ID already exists.
+ *   invalid or empty, data is null or invalid, options is invalid, the source
+ *   ID already exists, or clustering is enabled and a feature carries geometry
+ *   other than a point.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -498,11 +512,18 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * is copied into MapLibre Native before return. The source keeps the
  * mln_geojson_source_options it was added with.
  *
+ * When the source was added with clustering enabled, every feature in a feature
+ * collection must carry point geometry. This call checks that before handing
+ * the data to MapLibre Native and names the source, the feature, and the
+ * constraint in the thread-local diagnostic when a feature carries other
+ * geometry.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, the source does not exist, or
- *   the source is not a GeoJSON source.
+ *   invalid or empty, data is null or invalid, the source does not exist, the
+ *   source is not a GeoJSON source, or the source clusters and a feature
+ *   carries geometry other than a point.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
