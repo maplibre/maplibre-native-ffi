@@ -12,6 +12,9 @@ function(mln_configure_render_dependencies target)
      OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
     set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib/arm64 Lib Lib32)
   endif()
+  # The loader belongs to the test harness, which drives Vulkan directly the way
+  # a host does. The library resolves it at runtime, so build-host loader paths
+  # stay out of the shipped binary.
   find_library(
     MLN_FFI_VULKAN_LOADER_LIBRARY
     NAMES vulkan vulkan-1 vulkan.1
@@ -21,7 +24,9 @@ function(mln_configure_render_dependencies target)
   set_target_properties(
     mln_ffi_vulkan_loader
     PROPERTIES IMPORTED_LOCATION "${MLN_FFI_VULKAN_LOADER_LIBRARY}")
-  target_link_libraries(${target} INTERFACE mln_ffi_vulkan_loader)
+  set_property(
+    TARGET ${target}
+    PROPERTY MLN_FFI_TEST_LINK_LIBRARIES mln_ffi_vulkan_loader)
 
   get_filename_component(
     MLN_FFI_VULKAN_LOADER_DIR "${MLN_FFI_VULKAN_LOADER_LIBRARY}"
@@ -76,6 +81,7 @@ function(mln_configure_renderer target)
   set(MLN_FFI_VENDOR_VULKAN_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
   set(MLN_FFI_VULKAN_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_dispatch.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)

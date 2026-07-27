@@ -156,7 +156,10 @@ run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
 [tasks.archive-native]
 description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
-run = 'cpack --preset "$usage_preset"'
+run = [
+  'cpack --preset "$usage_preset"',
+  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+]
 
 [tasks.test]
 description = "Build and run C API tests for a CMake preset."
