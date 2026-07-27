@@ -122,6 +122,7 @@ namespace Maplibre.Native.Internal.C
         MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
         MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
         MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
+        MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
     }
 
     [NativeTypeName("uint32_t")]
@@ -143,6 +144,14 @@ namespace Maplibre.Native.Internal.C
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_camera_change_mode : uint
+    {
+        MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
+        MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
     }
 
     [NativeTypeName("uint32_t")]
@@ -343,6 +352,15 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("size_t")]
         public nuint source_id_size;
+    }
+
+    internal partial struct mln_runtime_event_camera_transition_finished
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint64_t")]
+        public ulong transition_id;
     }
 
     internal partial struct mln_runtime_event_offline_region_status

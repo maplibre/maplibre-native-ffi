@@ -161,6 +161,11 @@ internal static class MapStructs
                 y2 = easing.Y2,
             };
         }
+        if (options.TransitionId is { } transitionId)
+        {
+            native.fields |= (uint)mln_animation_option_field.MLN_ANIMATION_OPTION_TRANSITION_ID;
+            native.transition_id = transitionId;
+        }
         return native;
     }
 

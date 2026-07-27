@@ -249,6 +249,11 @@ mln_map_jump_to(mln_map* map, const mln_camera_options* camera) MLN_NOEXCEPT;
  * immediately and reports it on the next snapshot without any pumping. Set
  * MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id. A zero-duration ease reports its end
+ * during this call, so the event is already queued when the call returns.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
@@ -274,6 +279,10 @@ MLN_API mln_status mln_map_ease_to(
  * duration from the flight distance and the velocity, which defaults to 1.2
  * screenfuls per second, so the camera reaches the target over several pumped
  * frames.
+ *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -309,6 +318,10 @@ mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
  *
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
+ *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -348,6 +361,10 @@ MLN_API mln_status mln_map_scale_by(
  * command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
@@ -384,6 +401,10 @@ MLN_API mln_status mln_map_rotate_by(
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a point contains
@@ -417,6 +438,10 @@ MLN_API mln_status mln_map_pitch_by(mln_map* map, double pitch) MLN_NOEXCEPT;
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, pitch is
@@ -432,6 +457,10 @@ MLN_API mln_status mln_map_pitch_by_animated(
 
 /**
  * Cancels active camera transitions.
+ *
+ * A cancelled transition that carried MLN_ANIMATION_OPTION_TRANSITION_ID
+ * reports its end through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, the
+ * same way a completed one does.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

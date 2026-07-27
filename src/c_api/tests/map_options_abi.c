@@ -80,6 +80,117 @@ static void camera_rejects_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
+typedef struct transition_event_tally {
+  uint32_t finished_count;
+  uint64_t last_transition_id;
+  bool did_change_followed_finish;
+  int32_t last_did_change_code;
+} transition_event_tally;
+
+static transition_event_tally drain_transition_events(mln_runtime* runtime) {
+  transition_event_tally tally = {0, 0, false, -1};
+  for (;;) {
+    mln_runtime_event event = {.size = sizeof(mln_runtime_event)};
+    bool has_event = false;
+    TEST_ASSERT_EQUAL_INT(
+      MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
+    );
+    if (!has_event) {
+      return tally;
+    }
+    if (event.type == MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED) {
+      TEST_ASSERT_EQUAL_UINT32(
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED, event.payload_type
+      );
+      TEST_ASSERT_NOT_NULL(event.payload);
+      TEST_ASSERT_EQUAL_size_t(
+        sizeof(mln_runtime_event_camera_transition_finished), event.payload_size
+      );
+      const mln_runtime_event_camera_transition_finished* payload =
+        (const mln_runtime_event_camera_transition_finished*)event.payload;
+      tally.finished_count += 1;
+      tally.last_transition_id = payload->transition_id;
+    } else if (event.type == MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE) {
+      tally.last_did_change_code = event.code;
+      if (tally.finished_count > 0) {
+        tally.did_change_followed_finish = true;
+      }
+    }
+  }
+}
+
+static mln_animation_options transition_animation(
+  uint64_t transition_id, double duration_ms
+) {
+  mln_animation_options animation = mln_animation_options_default();
+  animation.fields =
+    MLN_ANIMATION_OPTION_TRANSITION_ID | MLN_ANIMATION_OPTION_DURATION;
+  animation.transition_id = transition_id;
+  animation.duration_ms = duration_ms;
+  return animation;
+}
+
+// This verifies the raw transition-finished payload struct and the once-per
+// -transition guarantee for the terminal outcomes a headless map can reach
+// without pumping render frames.
+static void camera_transition_id_reports_every_terminal_outcome(void) {
+  map_fixture fixture = create_map_fixture();
+  mln_camera_options camera = test_camera();
+
+  // A zero-duration ease resolves inside the call, so the event is queued
+  // before mln_map_ease_to() returns and lands ahead of the did-change event.
+  mln_animation_options animation = transition_animation(7, 0.0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_ease_to(fixture.map, &camera, &animation)
+  );
+  transition_event_tally tally = drain_transition_events(fixture.runtime);
+  TEST_ASSERT_EQUAL_UINT32(1, tally.finished_count);
+  TEST_ASSERT_EQUAL_UINT64(7, tally.last_transition_id);
+  TEST_ASSERT_TRUE(tally.did_change_followed_finish);
+  TEST_ASSERT_EQUAL_INT32(
+    MLN_CAMERA_CHANGE_MODE_IMMEDIATE, tally.last_did_change_code
+  );
+
+  // A running transition reports its end when a later camera command
+  // supersedes it, and the superseding transition reports its own end when it
+  // is cancelled.
+  camera.zoom = 12.0;
+  animation = transition_animation(11, 5000.0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_ease_to(fixture.map, &camera, &animation)
+  );
+  tally = drain_transition_events(fixture.runtime);
+  TEST_ASSERT_EQUAL_UINT32(0, tally.finished_count);
+
+  camera.zoom = 13.0;
+  animation = transition_animation(12, 5000.0);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_ease_to(fixture.map, &camera, &animation)
+  );
+  tally = drain_transition_events(fixture.runtime);
+  TEST_ASSERT_EQUAL_UINT32(1, tally.finished_count);
+  TEST_ASSERT_EQUAL_UINT64(11, tally.last_transition_id);
+  TEST_ASSERT_EQUAL_INT32(
+    MLN_CAMERA_CHANGE_MODE_ANIMATED, tally.last_did_change_code
+  );
+
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_cancel_transitions(fixture.map));
+  tally = drain_transition_events(fixture.runtime);
+  TEST_ASSERT_EQUAL_UINT32(1, tally.finished_count);
+  TEST_ASSERT_EQUAL_UINT64(12, tally.last_transition_id);
+
+  // Omitting the field leaves the transition silent.
+  animation = mln_animation_options_default();
+  camera.zoom = 14.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_ease_to(fixture.map, &camera, &animation)
+  );
+  tally = drain_transition_events(fixture.runtime);
+  TEST_ASSERT_EQUAL_UINT32(0, tally.finished_count);
+
+  destroy_map_fixture(fixture);
+}
+
 // This verifies raw null arrays, null outputs, and undersized fit descriptors
 // hidden by binding collections.
 static void camera_fitting_rejects_invalid_arguments(void) {
@@ -561,6 +672,7 @@ static void map_tile_options_reject_invalid_arguments(void) {
 void run_map_options_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(camera_rejects_invalid_arguments);
+  RUN_TEST(camera_transition_id_reports_every_terminal_outcome);
   RUN_TEST(camera_fitting_rejects_invalid_arguments);
   RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
   RUN_TEST(camera_bounds_distinguish_unbounded_from_world);

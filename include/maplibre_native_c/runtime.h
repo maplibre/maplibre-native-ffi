@@ -89,7 +89,47 @@ typedef struct mln_offline_region_status {
   bool complete;
 } mln_offline_region_status;
 
-/** Runtime event types returned by mln_runtime_poll_event(). */
+/**
+ * Runtime event types returned by mln_runtime_poll_event().
+ *
+ * The event type selects the meaning of mln_runtime_event.code and the struct
+ * behind mln_runtime_event.payload. Event type names below omit their
+ * MLN_RUNTIME_EVENT_ prefix and payload type names omit their
+ * MLN_RUNTIME_EVENT_PAYLOAD_ prefix.
+ *
+ * - MAP_CAMERA_WILL_CHANGE: code is an mln_camera_change_mode; payload NONE.
+ * - MAP_CAMERA_IS_CHANGING: code is 0; payload NONE.
+ * - MAP_CAMERA_DID_CHANGE: code is an mln_camera_change_mode; payload NONE.
+ * - MAP_CAMERA_TRANSITION_FINISHED: code is 0; payload
+ *   CAMERA_TRANSITION_FINISHED.
+ * - MAP_STYLE_LOADED: code is 0; payload NONE.
+ * - MAP_LOADING_STARTED: code is 0; payload NONE.
+ * - MAP_LOADING_FINISHED: code is 0; payload NONE.
+ * - MAP_LOADING_FAILED: code is the ordinal of MapLibre Native's internal map
+ *   load error kind, which this API does not name as an enum, and is 0 when the
+ *   failure came from a style-loading exception raised inside a C API call.
+ *   Read message for the failure text in both cases; payload NONE.
+ * - MAP_IDLE: code is 0; payload NONE.
+ * - MAP_RENDER_UPDATE_AVAILABLE: code is 0; payload NONE.
+ * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
+ * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
+ * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
+ *   NONE.
+ * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
+ * - MAP_RENDER_FRAME_FINISHED: code is 0; payload RENDER_FRAME.
+ * - MAP_RENDER_MAP_STARTED: code is 0; payload NONE.
+ * - MAP_RENDER_MAP_FINISHED: code is 0; payload RENDER_MAP.
+ * - MAP_STYLE_IMAGE_MISSING: code is 0; payload STYLE_IMAGE_MISSING.
+ * - MAP_TILE_ACTION: code is 0; payload TILE_ACTION.
+ * - OFFLINE_REGION_STATUS_CHANGED: code is 0; payload OFFLINE_REGION_STATUS.
+ * - OFFLINE_REGION_RESPONSE_ERROR: code is 0; payload
+ *   OFFLINE_REGION_RESPONSE_ERROR.
+ * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
+ *   OFFLINE_REGION_TILE_COUNT_LIMIT.
+ * - OFFLINE_OPERATION_COMPLETED: code is the operation result as an mln_status
+ *   value, the same value the payload reports in result_status; payload
+ *   OFFLINE_OPERATION_COMPLETED.
+ */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2,
@@ -113,6 +153,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
   MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
 } mln_runtime_event_type;
 
 /** Source kinds used by mln_runtime_event.source_type. */
@@ -132,7 +173,16 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
+
+/** Camera change kinds reported by camera will-change and did-change events. */
+typedef enum mln_camera_change_mode : uint32_t {
+  /** The camera reached its new value without an animated transition. */
+  MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
+  /** The camera moved as part of an animated transition. */
+  MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
+} mln_camera_change_mode;
 
 /** Render modes reported by render observer events. */
 typedef enum mln_render_mode : uint32_t {
@@ -314,6 +364,21 @@ typedef struct mln_runtime_event_tile_action {
   size_t source_id_size;
 } mln_runtime_event_tile_action;
 
+/**
+ * Payload for MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
+ *
+ * See mln_animation_options.transition_id for how a caller stamps an identity
+ * onto a camera transition and what terminal outcomes this event covers.
+ */
+typedef struct mln_runtime_event_camera_transition_finished {
+  uint32_t size;
+  /**
+   * The transition_id the caller set on the mln_animation_options that started
+   * this transition.
+   */
+  uint64_t transition_id;
+} mln_runtime_event_camera_transition_finished;
+
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   uint32_t size;
@@ -362,6 +427,11 @@ typedef struct mln_runtime_event {
    * valid while the source handle remains live.
    */
   void* source;
+  /**
+   * Secondary event detail whose meaning type selects. Depending on type it
+   * carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
+   * ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
+   */
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
   uint32_t payload_type;
@@ -794,6 +864,9 @@ MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
  * destroyed. Copy those bytes before then when they must outlive that window.
  * For style-image-missing and tile-action events, out_event->message contains
  * the same ID string exposed by the typed payload.
+ *
+ * out_event->code carries a secondary detail whose meaning out_event->type
+ * selects. mln_runtime_event_type lists the meaning for every event type.
  *
  * Destroying a map discards that map's queued events, so this function returns
  * events only for maps that are still live. Read the state a host mirrors from

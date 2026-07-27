@@ -33,10 +33,11 @@ pub use camera::{
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    MapId, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, MapId, OfflineOperationCompletedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
+    TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
@@ -48,12 +49,13 @@ pub use map::{
     VectorTileEncoding,
 };
 pub use maplibre_core::{
-    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
-    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
-    NorthOrientation, OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    OpenGLContextProviderMask, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
-    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
-    ResourceUsage, Result, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
+    LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
+    MapViewportOptions, NetworkStatus, NorthOrientation, OfflineOperationKind,
+    OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLContextProviderMask,
+    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
+    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
 pub use render::{

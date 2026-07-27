@@ -74,6 +74,33 @@ public sealed unsafe class RuntimeEventTests
         );
     }
 
+    [BindingSpecTest("BND-083", "BND-087")]
+    [Fact]
+    public void UndersizedCameraTransitionFinishedPayloadBecomesUnknown()
+    {
+        var payload = new mln_runtime_event_camera_transition_finished
+        {
+            size = (uint)Unsafe.SizeOf<mln_runtime_event_camera_transition_finished>(),
+            transition_id = 7,
+        };
+        var raw = RuntimeStructs.EmptyNativeEvent();
+        raw.type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED;
+        raw.payload_type = (uint)
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED;
+        raw.payload = &payload;
+        raw.payload_size = (nuint)Unsafe.SizeOf<mln_runtime_event_camera_transition_finished>() - 1;
+
+        var copied = RuntimeStructs.ReadEvent(raw);
+
+        Assert.Equal(RuntimeEventType.MapCameraTransitionFinished, copied.Type);
+        var unknown = Assert.IsType<RuntimeEventPayload.Unknown>(copied.Payload);
+        Assert.Equal(
+            (uint)
+                mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+            unknown.RawPayloadType
+        );
+    }
+
     [BindingSpecTest("BND-069", "BND-083")]
     [Fact]
     public void UnknownRuntimePayloadSnapshotsBytesAndReturnsCopies()

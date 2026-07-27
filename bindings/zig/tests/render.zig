@@ -169,6 +169,48 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
     return false;
 }
 
+const TransitionFramePump = struct {
+    finished_count: usize = 0,
+    last_transition_id: ?u64 = null,
+};
+
+fn pumpTransitionFrame(
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    session: *maplibre.RenderSessionHandle,
+) !TransitionFramePump {
+    // Metal hosts drain autoreleased backend objects once per frame-loop
+    // iteration. The other backends need no platform scope here.
+    const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+    defer if (build_options.supports_metal) pool.deinit();
+
+    // Match the public host loop: camera invalidation, one native pump, event
+    // coalescing, and at most one render of the latest update.
+    try map.requestRepaint();
+    try runtime.runOnce();
+
+    var result = TransitionFramePump{};
+    var render_update_available = false;
+    while (try runtime.pollEvent(testing.allocator)) |polled| {
+        var event = polled;
+        defer event.deinit();
+        if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
+            render_update_available = true;
+            continue;
+        }
+        switch (event.payload) {
+            .camera_transition_finished => |payload| {
+                try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
+                result.finished_count += 1;
+                result.last_transition_id = payload.transition_id;
+            },
+            else => {},
+        }
+    }
+    if (render_update_available) try testing.expect(try session.renderUpdate());
+    return result;
+}
+
 fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
     for (actual, expected) |actual_channel, expected_channel| {
         const delta = if (actual_channel > expected_channel)
@@ -1159,6 +1201,60 @@ test "map size follows attach and resize and keeps the creation scale factor" {
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 24), resized.height);
     try testing.expectEqual(@as(f64, 2.0), resized.scale_factor);
+}
+
+test "an ease pumped through rendered frames reports its transition finish once" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    // Consume the style frame before starting the transition. Leaving it
+    // pending suppresses the next update event that drives the eased frame.
+    {
+        const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+        defer if (build_options.supports_metal) pool.deinit();
+        try testing.expect(try owned.session.renderUpdate());
+    }
+
+    // A camera transition advances when the host requests and renders frames.
+    try map.easeTo(
+        .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
+        .{ .duration_ms = 50, .transition_id = 31 },
+    );
+
+    var finished_count: usize = 0;
+    var last_transition_id: ?u64 = null;
+    for (0..200) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        finished_count += frame.finished_count;
+        if (frame.last_transition_id) |transition_id| last_transition_id = transition_id;
+        if (finished_count > 0) break;
+        try testing.io.sleep(.fromMilliseconds(1), .awake);
+    }
+
+    try testing.expectEqual(@as(usize, 1), finished_count);
+    try testing.expectEqual(@as(?u64, 31), last_transition_id);
+
+    // A completed transform cannot report the same transition again.
+    var trailing_finished_count: usize = 0;
+    for (0..8) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        trailing_finished_count += frame.finished_count;
+    }
+    try testing.expectEqual(@as(usize, 0), trailing_finished_count);
+
+    const settled_camera = try map.getCamera();
+    try testing.expectApproxEqAbs(@as(f64, 4.0), settled_camera.zoom.?, 0.000001);
 }
 
 test "map close rejects live render session through public bindings" {

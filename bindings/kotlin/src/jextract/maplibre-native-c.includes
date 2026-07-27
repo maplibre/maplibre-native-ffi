@@ -104,6 +104,7 @@
 --include-constant MLN_ANIMATION_OPTION_DURATION
 --include-constant MLN_ANIMATION_OPTION_EASING
 --include-constant MLN_ANIMATION_OPTION_MIN_ZOOM
+--include-constant MLN_ANIMATION_OPTION_TRANSITION_ID
 --include-constant MLN_ANIMATION_OPTION_VELOCITY
 --include-constant MLN_BOUND_OPTION_BOUNDS
 --include-constant MLN_BOUND_OPTION_MAX_PITCH
@@ -451,6 +452,7 @@
 --include-struct mln_resource_transform
 --include-struct mln_resource_transform_response
 --include-struct mln_runtime_event
+--include-struct mln_runtime_event_camera_transition_finished
 --include-struct mln_runtime_event_offline_operation_completed
 --include-struct mln_runtime_event_offline_region_response_error
 --include-struct mln_runtime_event_offline_region_status

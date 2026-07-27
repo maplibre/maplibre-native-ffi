@@ -283,6 +283,7 @@ def _animation_parts(
         float | None,
         float | None,
         tuple[float, float, float, float] | None,
+        int | None,
     ]
     | None
 ):
@@ -298,7 +299,22 @@ def _animation_parts(
         if animation.easing is not None
         else None
     )
-    return animation.duration_ms, animation.velocity, animation.min_zoom, easing
+    transition_id = animation.transition_id
+    if transition_id is not None and not 0 <= transition_id < 2**64:
+        # PyO3 extracts this as `Option<u64>` and raises a bare OverflowError
+        # before the binding's error conversion runs, so range-check it here to
+        # keep invalid binding-owned input on the documented error shape.
+        raise InvalidArgumentError(
+            f"AnimationOptions.transition_id must fit in 64 unsigned bits, "
+            f"not {transition_id}"
+        )
+    return (
+        animation.duration_ms,
+        animation.velocity,
+        animation.min_zoom,
+        easing,
+        transition_id,
+    )
 
 
 def _coordinate_parts(
@@ -1197,7 +1213,13 @@ class MapHandle(NativeHandleMixin):
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
-        """Cancel active camera transitions."""
+        """Cancel active camera transitions.
+
+        A cancelled transition that carried an ``AnimationOptions``
+        ``transition_id`` reports its end through a
+        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, the same event a
+        transition that runs to completion reports.
+        """
         self._native.cancel_transitions()
 
     def get_free_camera_options(self) -> FreeCameraOptions:

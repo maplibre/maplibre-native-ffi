@@ -548,12 +548,22 @@ const RuntimeEvent = struct {
     code: i32,
 };
 
+/// One polled runtime event, copied into storage this value owns.
 pub const OwnedRuntimeEvent = struct {
     allocator: std.mem.Allocator,
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
     source_id: ?values.MapId,
     payload_type: RuntimeEventPayloadType,
+    /// Secondary detail whose meaning `event_type` selects.
+    ///
+    /// For `map_camera_will_change` and `map_camera_did_change` it is a
+    /// `CameraChangeMode` raw value, decoded with `CameraChangeMode.fromRaw`.
+    /// For `map_loading_failed` it is the ordinal of MapLibre Native's internal
+    /// map load error kind, with the failure text in `message`. For
+    /// `offline_operation_completed` it is the raw native status of the
+    /// operation, the same value the payload reports in `result_status`. Every
+    /// other event type reports 0.
     code: i32,
     message: []const u8,
     payload: RuntimeEventPayload,
@@ -576,6 +586,7 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_response_error: OfflineRegionResponseErrorPayload,
     offline_region_tile_count_limit: OfflineRegionTileCountLimitPayload,
     offline_operation_completed: OfflineOperationCompletedPayload,
+    camera_transition_finished: CameraTransitionFinishedPayload,
     unknown: UnknownPayload,
 
     pub fn deinit(self: *RuntimeEventPayload, allocator: std.mem.Allocator) void {
@@ -586,6 +597,26 @@ pub const RuntimeEventPayload = union(enum) {
             else => {},
         }
         self.* = .none;
+    }
+};
+
+/// Camera change kind carried by the `code` of camera change events.
+pub const CameraChangeMode = union(enum) {
+    /// The camera reached its new value without an animated transition.
+    immediate,
+    /// The camera moved as part of an animated transition.
+    animated,
+    /// A change mode this binding does not name yet, kept as its raw value.
+    unknown: i32,
+
+    /// Decodes the `code` of a `map_camera_will_change` or
+    /// `map_camera_did_change` event.
+    pub fn fromRaw(raw: i32) CameraChangeMode {
+        return switch (raw) {
+            c.MLN_CAMERA_CHANGE_MODE_IMMEDIATE => .immediate,
+            c.MLN_CAMERA_CHANGE_MODE_ANIMATED => .animated,
+            else => .{ .unknown = raw },
+        };
     }
 };
 
@@ -781,6 +812,25 @@ pub const OfflineOperationCompletedPayload = struct {
     found: bool,
 };
 
+/// Payload for `map_camera_transition_finished` events.
+///
+/// A camera command that carries `AnimationOptions.transition_id` reports this
+/// payload once for the transition it starts, whichever way that transition
+/// ends: running to completion, being superseded by a later camera command,
+/// being cancelled by `cancelTransitions`, or completing instantly as a
+/// zero-duration jump. A command this API rejects, such as one carrying a
+/// non-finite enabled camera field, starts no transition and emits no such
+/// event. MapLibre Native reports the moment a transition releases
+/// the camera and leaves the outcome unreported, so this payload establishes
+/// transition identity rather than a completion reason. A host that needs to
+/// tell completion from cancellation compares the resulting camera against the
+/// requested one, or tracks which transition ID is current.
+pub const CameraTransitionFinishedPayload = struct {
+    /// The `AnimationOptions.transition_id` of the command that started this
+    /// transition.
+    transition_id: u64,
+};
+
 pub const UnknownPayload = struct {
     payload_type: u32,
     bytes: []const u8,
@@ -809,6 +859,7 @@ pub const RuntimeEventType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit_exceeded,
     offline_operation_completed,
+    map_camera_transition_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventType {
@@ -835,6 +886,7 @@ pub const RuntimeEventType = union(enum) {
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => .offline_region_tile_count_limit_exceeded,
             c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
+            c.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED => .map_camera_transition_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -958,6 +1010,7 @@ pub const RuntimeEventPayloadType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit,
     offline_operation_completed,
+    camera_transition_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventPayloadType {
@@ -971,6 +1024,7 @@ pub const RuntimeEventPayloadType = union(enum) {
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .offline_region_tile_count_limit,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
+            c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .camera_transition_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -1995,6 +2049,10 @@ fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) 
                 .found = payload.found,
             } };
         },
+        c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => blk: {
+            const payload = try payloadAs(c.mln_runtime_event_camera_transition_finished, native_event.payload, native_event.payload_size);
+            break :blk .{ .camera_transition_finished = .{ .transition_id = payload.transition_id } };
+        },
         else => .{ .unknown = .{
             .payload_type = native_event.payload_type,
             .bytes = try copyOptionalOpaqueBytes(allocator, native_event.payload, native_event.payload_size),
@@ -2273,6 +2331,7 @@ test "runtime event raw domains preserve unknown values" {
     try std.testing.expect(std.meta.eql(RuntimeEventType.fromRaw(0xfeed), RuntimeEventType{ .unknown = 0xfeed }));
     try std.testing.expect(std.meta.eql(RuntimeEventSourceType.fromRaw(0xbeef), RuntimeEventSourceType{ .unknown = 0xbeef }));
     try std.testing.expect(std.meta.eql(RuntimeEventPayloadType.fromRaw(0xace), RuntimeEventPayloadType{ .unknown = 0xace }));
+    try std.testing.expect(std.meta.eql(CameraChangeMode.fromRaw(0x7ace), CameraChangeMode{ .unknown = 0x7ace }));
     try std.testing.expect(std.meta.eql(RenderMode.fromRaw(0xbad), RenderMode{ .unknown = 0xbad }));
     try std.testing.expect(std.meta.eql(TileOperation.fromRaw(0xcafe), TileOperation{ .unknown = 0xcafe }));
     try std.testing.expect(std.meta.eql(OfflineRegionDownloadState.fromRaw(0xd00d), OfflineRegionDownloadState{ .unknown = 0xd00d }));

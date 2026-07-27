@@ -99,6 +99,28 @@ pub struct AnimationOptions {
     pub velocity: Option<f64>,
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
+    /// Caller-chosen identity for the transition these options start.
+    ///
+    /// When set, the transition emits exactly one runtime event of type
+    /// `RuntimeEventType::MapCameraTransitionFinished` carrying this value in
+    /// its [`CameraTransitionFinishedEvent`](crate::CameraTransitionFinishedEvent)
+    /// payload. The value passes through uninterpreted, so callers pick their
+    /// own scheme, such as a monotonically increasing counter.
+    ///
+    /// The event arrives for every terminal outcome: running to completion,
+    /// being superseded by a later camera command, being cancelled by
+    /// `cancel_transitions`, or completing instantly as a zero-duration jump. A
+    /// command this API rejects, such as one carrying a non-finite enabled
+    /// camera field, starts no transition and emits no such event. MapLibre
+    /// Native reports the
+    /// moment the transition releases the camera without naming which outcome
+    /// occurred, so the event establishes transition identity rather than a
+    /// completion reason. A host that needs to tell completion from
+    /// cancellation compares the resulting camera against the requested one,
+    /// or tracks which transition ID is current.
+    ///
+    /// Leaving this field absent emits no such event.
+    pub transition_id: Option<u64>,
 }
 
 impl AnimationOptions {
@@ -120,6 +142,10 @@ impl AnimationOptions {
         if let Some(easing) = self.easing {
             raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;
             raw.easing = unit_bezier_to_native(easing);
+        }
+        if let Some(transition_id) = self.transition_id {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_TRANSITION_ID;
+            raw.transition_id = transition_id;
         }
         raw
     }
@@ -476,6 +502,7 @@ mod tests {
             velocity: Some(2.0),
             min_zoom: Some(3.0),
             easing: Some(UnitBezier::new(0.0, 0.1, 0.2, 1.0)),
+            transition_id: Some(0),
         };
         let raw_animation = animation_options_to_native(&animation);
         assert_eq!(
@@ -488,6 +515,17 @@ mod tests {
                 | sys::MLN_ANIMATION_OPTION_VELOCITY
                 | sys::MLN_ANIMATION_OPTION_MIN_ZOOM
                 | sys::MLN_ANIMATION_OPTION_EASING
+                | sys::MLN_ANIMATION_OPTION_TRANSITION_ID
+        );
+        assert_eq!(raw_animation.transition_id, 0);
+
+        // A present zero transition ID stays distinguishable from an absent
+        // one, which leaves the mask bit clear.
+        let absent = AnimationOptions::default();
+        let raw_absent = animation_options_to_native(&absent);
+        assert_eq!(
+            raw_absent.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
+            0
         );
 
         let fit = CameraFitOptions {

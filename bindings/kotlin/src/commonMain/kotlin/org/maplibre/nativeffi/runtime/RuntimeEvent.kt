@@ -22,6 +22,16 @@ public data class RuntimeEvent(
   public val sourceType: RuntimeEventSourceType,
   public val runtimeSource: RuntimeHandle?,
   public val mapSource: MapHandle?,
+  /**
+   * Secondary event detail whose meaning [type] selects, and which is 0 for the types that carry no
+   * detail:
+   * - [RuntimeEventType.MAP_CAMERA_WILL_CHANGE] and [RuntimeEventType.MAP_CAMERA_DID_CHANGE] carry
+   *   a [CameraChangeMode], read as `CameraChangeMode(event.code)`.
+   * - [RuntimeEventType.MAP_LOADING_FAILED] carries the ordinal of MapLibre Native's internal map
+   *   load error kind, which the C API leaves unnamed.
+   * - [RuntimeEventType.OFFLINE_OPERATION_COMPLETED] carries the operation result as a native
+   *   status value.
+   */
   public val code: Int,
   public val payload: RuntimeEventPayload,
   public val message: String,

@@ -17,6 +17,18 @@ use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
+/// Wire shape for `maplibre_native.camera.AnimationOptions`.
+///
+/// Ordered as duration in milliseconds, velocity, minimum zoom, easing control
+/// points, and the caller-chosen transition ID.
+type AnimationParts = (
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<(f64, f64, f64, f64)>,
+    Option<u64>,
+);
+
 mod py_errors {
     pyo3::import_exception!(maplibre_native.errors, InvalidArgumentError);
     pyo3::import_exception!(maplibre_native.errors, InvalidStateError);
@@ -1575,12 +1587,7 @@ impl MapHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let camera = camera_options_from_parts(
@@ -1619,12 +1626,7 @@ impl MapHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let camera = camera_options_from_parts(
@@ -1806,12 +1808,7 @@ impl MapHandle {
         &self,
         delta_x: f64,
         delta_y: f64,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
@@ -1842,12 +1839,7 @@ impl MapHandle {
         &self,
         scale: f64,
         anchor: Option<(f64, f64)>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let anchor = anchor.map(screen_point_from_tuple);
@@ -1882,12 +1874,7 @@ impl MapHandle {
         &self,
         first: (f64, f64),
         second: (f64, f64),
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
@@ -1911,16 +1898,7 @@ impl MapHandle {
             .map_err(map_error)
     }
 
-    fn pitch_by_animated(
-        &self,
-        pitch: f64,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
-    ) -> PyResult<()> {
+    fn pitch_by_animated(&self, pitch: f64, animation: Option<AnimationParts>) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
         // SAFETY: The C API validates the map pointer, pitch value, and optional
@@ -4253,6 +4231,10 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("result_status", payload.result_status)?;
             dict.set_item("found", payload.found)?;
         }
+        RuntimeEventPayload::CameraTransitionFinished(payload) => {
+            dict.set_item("kind", "camera_transition_finished")?;
+            dict.set_item("transition_id", payload.transition_id)?;
+        }
         RuntimeEventPayload::Unknown(payload) => {
             dict.set_item("kind", "unknown")?;
             dict.set_item("raw_type", payload.raw_type)?;
@@ -4354,6 +4336,9 @@ fn event_type_raw(event_type: RuntimeEventType) -> u32 {
         RuntimeEventType::MapCameraWillChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
         RuntimeEventType::MapCameraIsChanging => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
         RuntimeEventType::MapCameraDidChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
+        RuntimeEventType::MapCameraTransitionFinished => {
+            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+        }
         RuntimeEventType::MapStyleLoaded => sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
         RuntimeEventType::MapLoadingStarted => sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
         RuntimeEventType::MapLoadingFinished => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
@@ -4789,18 +4774,14 @@ fn projection_mode_from_parts(
 }
 
 fn animation_options_from_parts(
-    (duration_ms, velocity, min_zoom, easing): (
-        Option<f64>,
-        Option<f64>,
-        Option<f64>,
-        Option<(f64, f64, f64, f64)>,
-    ),
+    (duration_ms, velocity, min_zoom, easing, transition_id): AnimationParts,
 ) -> sys::mln_animation_options {
     let mut options = maplibre_core::AnimationOptions::default();
     options.duration_ms = duration_ms;
     options.velocity = velocity;
     options.min_zoom = min_zoom;
     options.easing = easing.map(|(x1, y1, x2, y2)| maplibre_core::UnitBezier::new(x1, y1, x2, y2));
+    options.transition_id = transition_id;
     maplibre_core::camera::animation_options_to_native(&options)
 }
 
@@ -6965,6 +6946,41 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
     Ok(out.into_any().unbind())
 }
 
+/// Copies a camera transition-finished event whose native payload reports
+/// `missing_payload_bytes` fewer bytes than the payload struct holds.
+///
+/// Live transitions always report the full payload size, so this seam is the
+/// only way to reach the payload-size validation that guards reading typed
+/// payload fields.
+#[pyfunction]
+fn camera_transition_finished_event_for_test(
+    py: Python<'_>,
+    transition_id: u64,
+    missing_payload_bytes: usize,
+) -> PyResult<Py<PyAny>> {
+    let payload = sys::mln_runtime_event_camera_transition_finished {
+        size: std::mem::size_of::<sys::mln_runtime_event_camera_transition_finished>() as u32,
+        transition_id,
+    };
+    let event = sys::mln_runtime_event {
+        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        type_: sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+        source: ptr::null_mut(),
+        code: 0,
+        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+        payload: ptr::addr_of!(payload).cast(),
+        payload_size: std::mem::size_of_val(&payload).saturating_sub(missing_payload_bytes),
+        message: ptr::null(),
+        message_size: 0,
+    };
+    // SAFETY: The raw event and its payload are built in this function and
+    // remain live for the duration of the copy.
+    let copied =
+        unsafe { maplibre_core::events::runtime_event_from_native(&event) }.map_err(map_error)?;
+    event_to_py(py, copied)
+}
+
 /// Creates a runtime handle on the current thread.
 #[pyfunction]
 fn create_runtime(
@@ -7488,6 +7504,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(
         runtime_event_payload_wire_shapes_for_test,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        camera_transition_finished_event_for_test,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(create_runtime, module)?)?;

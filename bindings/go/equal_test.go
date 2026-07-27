@@ -68,10 +68,11 @@ func TestAnimationOptionsEqualComparesFieldValues(t *testing.T) {
 		"AnimationOptions",
 		func() AnimationOptions {
 			return AnimationOptions{
-				DurationMS: optionPtr(1.0),
-				Velocity:   optionPtr(2.0),
-				MinZoom:    optionPtr(3.0),
-				Easing:     optionPtr(UnitBezier{X1: 0.1, Y1: 0.2, X2: 0.3, Y2: 0.4}),
+				DurationMS:   optionPtr(1.0),
+				Velocity:     optionPtr(2.0),
+				MinZoom:      optionPtr(3.0),
+				Easing:       optionPtr(UnitBezier{X1: 0.1, Y1: 0.2, X2: 0.3, Y2: 0.4}),
+				TransitionID: optionPtr(uint64(4)),
 			}
 		},
 		AnimationOptions.Equal,
@@ -82,6 +83,7 @@ func TestAnimationOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *AnimationOptions) {
 				o.Easing = optionPtr(UnitBezier{X1: 0.9, Y1: 0.8, X2: 0.7, Y2: 0.6})
 			},
+			func(o *AnimationOptions) { o.TransitionID = optionPtr(uint64(40)) },
 		},
 	)
 }

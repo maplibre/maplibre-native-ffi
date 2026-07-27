@@ -26,10 +26,10 @@ use static_assertions::assert_not_impl_any;
 use super::*;
 use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    CameraOptions, ErrorKind, FeatureIdentifier, GeoJson, GeoJsonSourceOptions, Geometry,
-    JsonMember, LatLng, LogSeverity, LogSeverityMask, MapMode, MapOptions,
-    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventType, RuntimeHandle, ScreenBox,
-    ScreenPoint,
+    AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, FeatureIdentifier, GeoJson,
+    GeoJsonSourceOptions, Geometry, JsonMember, LatLng, LogSeverity, LogSeverityMask, MapMode,
+    MapOptions, OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload,
+    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
@@ -2514,6 +2514,77 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     assert_eq!(error.kind(), ErrorKind::Unsupported);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
 
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102. Rendered frames are what advance a camera
+// transition, so a session-backed map is the fixture that can run an ease to
+// completion instead of ending it early.
+fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::new(64, 64, 1.0);
+    options.mode = MapMode::Continuous;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    load_query_style(&runtime, &map, &session);
+
+    let mut animation = AnimationOptions::default();
+    animation.transition_id = Some(31);
+    animation.duration_ms = Some(200.0);
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(37.0, -122.0));
+    camera.zoom = Some(12.0);
+    map.ease_to(&camera, Some(&animation)).unwrap();
+
+    // Keep rendering for a while after the transition ends so a repeated
+    // report would show up in the tally.
+    let mut finished_transition_ids = Vec::new();
+    let mut saw_animated_did_change = false;
+    let mut finished_at: Option<Instant> = None;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        let _ = runtime.run_once();
+        while let Ok(Some(event)) = runtime.poll_event() {
+            match event.event_type {
+                RuntimeEventType::MapCameraTransitionFinished => {
+                    let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload
+                    else {
+                        panic!("transition-finished event should carry its typed payload");
+                    };
+                    finished_transition_ids.push(payload.transition_id);
+                    finished_at.get_or_insert_with(Instant::now);
+                }
+                RuntimeEventType::MapCameraDidChange => {
+                    saw_animated_did_change |=
+                        CameraChangeMode::from_raw(event.code as u32) == CameraChangeMode::Animated;
+                }
+                RuntimeEventType::MapRenderUpdateAvailable => {
+                    let _ = session.render_update();
+                }
+                _ => {}
+            }
+        }
+        if finished_at.is_some_and(|at| at.elapsed() >= Duration::from_millis(500)) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+
+    assert_eq!(finished_transition_ids, vec![31]);
+    assert!(saw_animated_did_change);
+    // The transition reached the requested camera, so it ended by running to
+    // completion rather than by being superseded or cancelled.
+    let settled = map.camera().unwrap();
+    assert!((settled.zoom.unwrap() - 12.0).abs() < 1e-6);
+
+    session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
 }

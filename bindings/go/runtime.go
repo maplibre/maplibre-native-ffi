@@ -216,6 +216,7 @@ const (
 	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED)
+	RuntimeEventMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
 )
 
 // RuntimeEventSourceType identifies the native handle kind that emitted an event.
@@ -239,6 +240,7 @@ const (
 	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
+	RuntimeEventPayloadCameraTransitionFinished    RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
 )
 
 // MapID identifies a map within one RuntimeHandle.
@@ -254,9 +256,18 @@ type RuntimeEventSource struct {
 // RuntimeEvent is a copied runtime event. Unknown payloads preserve raw
 // metadata and bytes.
 type RuntimeEvent struct {
-	Type        RuntimeEventType
-	SourceType  RuntimeEventSourceType
-	Source      RuntimeEventSource
+	Type       RuntimeEventType
+	SourceType RuntimeEventSourceType
+	Source     RuntimeEventSource
+	// Code is a secondary event detail whose meaning Type selects.
+	//
+	// For RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange it
+	// is a CameraChangeMode. For RuntimeEventMapLoadingFailed it is the ordinal
+	// of MapLibre Native's internal map load error kind, which this binding does
+	// not name as a type; Message carries the failure text. For
+	// RuntimeEventOfflineOperationCompleted it is the operation result as a
+	// native status value, the same value the payload reports in ResultStatus.
+	// Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	PayloadSize uintptr
@@ -265,6 +276,22 @@ type RuntimeEvent struct {
 
 	rawSource uintptr
 }
+
+// CameraChangeMode reports whether a camera change belongs to an animated
+// transition. It is the meaning of RuntimeEvent.Code for
+// RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange, so a host
+// reads it as CameraChangeMode(event.Code). Values outside the named constants
+// stay readable as the raw code.
+type CameraChangeMode uint32
+
+const (
+	// CameraChangeModeImmediate marks a camera that reached its new value
+	// without an animated transition.
+	CameraChangeModeImmediate CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_IMMEDIATE)
+	// CameraChangeModeAnimated marks a camera that moved as part of an animated
+	// transition.
+	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
+)
 
 // RenderMode identifies a render observer mode.
 type RenderMode uint32
@@ -333,6 +360,14 @@ type RuntimeEventTileActionPayload struct {
 	RawOperation uint32
 	TileID       TileID
 	SourceID     string
+}
+
+// RuntimeEventCameraTransitionFinishedPayload is a copied camera
+// transition-finished event payload. It carries the identity the caller stamped
+// on the transition through AnimationOptions.TransitionID, which also documents
+// the terminal outcomes this event covers.
+type RuntimeEventCameraTransitionFinishedPayload struct {
+	TransitionID uint64
 }
 
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
@@ -679,6 +714,12 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			TileID:       tileIDFromC(payload.tile_id),
 			SourceID:     goCharBytes(payload.source_id, payload.source_id_size),
 		}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED):
+		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_camera_transition_finished{})) {
+			return runtimeEventUnknownPayloadFromC(event)
+		}
+		payload := (*C.mln_runtime_event_camera_transition_finished)(event.payload)
+		return RuntimeEventCameraTransitionFinishedPayload{TransitionID: uint64(payload.transition_id)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS):
 		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_region_status{})) {
 			return runtimeEventUnknownPayloadFromC(event)

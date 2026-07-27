@@ -27,6 +27,8 @@ from .render import (
     RenderBackend,
 )
 from .runtime import (
+    CameraChangeMode,
+    CameraTransitionFinishedPayload,
     NetworkStatus,
     RenderFramePayload,
     RenderMapPayload,
@@ -48,6 +50,8 @@ from .runtime import (
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
+    "CameraChangeMode",
+    "CameraTransitionFinishedPayload",
     "FrameOpenGLTextureName",
     "InvalidArgumentError",
     "InvalidStateError",

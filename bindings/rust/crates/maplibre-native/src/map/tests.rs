@@ -1,10 +1,13 @@
 use super::*;
 use std::time::Duration;
 
-use crate::events::{RuntimeEventSource, RuntimeEventType, empty_runtime_event};
+use crate::events::{
+    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, empty_runtime_event,
+};
 use crate::{
-    BoundsConstraint, CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature, JsonMember,
-    MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse, TextureImageInfo,
+    BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
+    Feature, JsonMember, MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse,
+    TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -727,6 +730,102 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
     assert_eq!(points.len(), 1);
     assert!((coordinates[0].latitude - center.latitude).abs() < 1e-7);
     assert!((coordinates[0].longitude - center.longitude).abs() < 1e-7);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+/// Camera events drained from one runtime queue, in arrival order.
+#[derive(Default)]
+struct CameraEventTally {
+    finished_transition_ids: Vec<u64>,
+    did_change_modes: Vec<CameraChangeMode>,
+    did_change_followed_finish: bool,
+}
+
+/// Drains the queued runtime events and tallies the camera events among them.
+///
+/// The transition-finished event is queued while the camera command that ends
+/// the transition runs, so polling alone observes it.
+fn drain_camera_events(runtime: &RuntimeHandle) -> CameraEventTally {
+    let mut tally = CameraEventTally::default();
+    while let Some(event) = runtime.poll_event().unwrap() {
+        match event.event_type {
+            RuntimeEventType::MapCameraTransitionFinished => {
+                let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload else {
+                    panic!("transition-finished event should carry its typed payload");
+                };
+                tally.finished_transition_ids.push(payload.transition_id);
+            }
+            RuntimeEventType::MapCameraDidChange => {
+                tally
+                    .did_change_modes
+                    .push(CameraChangeMode::from_raw(event.code as u32));
+                tally.did_change_followed_finish |= !tally.finished_transition_ids.is_empty();
+            }
+            _ => {}
+        }
+    }
+    tally
+}
+
+fn identified_ease(transition_id: u64, duration_ms: f64) -> AnimationOptions {
+    let mut animation = AnimationOptions::default();
+    animation.transition_id = Some(transition_id);
+    animation.duration_ms = Some(duration_ms);
+    animation
+}
+
+#[test]
+// Spec coverage: BND-061, BND-102, and BND-087.
+fn identified_camera_transitions_report_each_terminal_outcome_once() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::new(512, 512, 1.0);
+    options.mode = MapMode::Continuous;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(45.0, -122.0));
+    camera.zoom = Some(4.0);
+    // Map construction queues its own camera events, so start from an empty
+    // queue.
+    let _ = drain_camera_events(&runtime);
+
+    // A zero-duration ease resolves inside the call, so its end is reported
+    // ahead of the did-change event for the same instant jump.
+    map.ease_to(&camera, Some(&identified_ease(0, 0.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![0]);
+    assert!(tally.did_change_followed_finish);
+    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Immediate]);
+
+    // A running transition stays silent until something ends it.
+    camera.zoom = Some(12.0);
+    map.ease_to(&camera, Some(&identified_ease(11, 5_000.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert!(tally.finished_transition_ids.is_empty());
+
+    // A later camera command supersedes the running transition.
+    camera.zoom = Some(13.0);
+    map.ease_to(&camera, Some(&identified_ease(12, 5_000.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![11]);
+    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Animated]);
+
+    // Cancelling ends the superseding transition.
+    map.cancel_transitions().unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![12]);
+
+    // Leaving the identity absent keeps the transition silent, so the present
+    // zero ID above stayed distinguishable from an omitted one.
+    camera.zoom = Some(14.0);
+    map.ease_to(&camera, Some(&AnimationOptions::default()))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert!(tally.finished_transition_ids.is_empty());
 
     map.close().unwrap();
     runtime.close().unwrap();

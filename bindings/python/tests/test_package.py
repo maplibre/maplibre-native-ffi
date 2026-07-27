@@ -1455,6 +1455,157 @@ def test_camera_transition_commands_accept_public_values() -> None:
             map_handle.cancel_transitions()
 
 
+def _drain_runtime_events(runtime: mln.RuntimeHandle) -> list[mln.RuntimeEvent]:
+    events: list[mln.RuntimeEvent] = []
+    while (event := runtime.poll_event()) is not None:
+        events.append(event)
+    return events
+
+
+def _finished_transition_ids(events: list[mln.RuntimeEvent]) -> list[int]:
+    ids: list[int] = []
+    for event in events:
+        if event.event_type != mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED:
+            continue
+        assert isinstance(event.payload, mln.CameraTransitionFinishedPayload)
+        ids.append(event.payload.transition_id)
+    return ids
+
+
+def _camera_change_modes(
+    events: list[mln.RuntimeEvent], event_type: mln.RuntimeEventType
+) -> list[mln.CameraChangeMode]:
+    return [
+        mln.CameraChangeMode(event.code)
+        for event in events
+        if event.event_type == event_type
+    ]
+
+
+def test_zero_duration_ease_reports_transition_finished_once() -> None:
+    target = camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0)
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=0.0, transition_id=101),
+            )
+            events = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(events) == [101]
+    assert _camera_change_modes(events, mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE) == [
+        mln.CameraChangeMode.IMMEDIATE
+    ]
+
+
+def test_superseded_transition_reports_transition_finished_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
+                camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
+            )
+            started = _drain_runtime_events(runtime)
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
+            )
+            superseded = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(started) == []
+    assert _finished_transition_ids(superseded) == [201]
+
+
+def test_cancelled_transition_reports_transition_finished_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.fly_to(
+                camera.CameraOptions(center=geo.LatLng(30.0, 60.0), zoom=8.0),
+                camera.AnimationOptions(duration_ms=5_000.0, transition_id=301),
+            )
+            started = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            cancelled = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            cancelled_again = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(started) == []
+    assert _finished_transition_ids(cancelled) == [301]
+    assert _finished_transition_ids(cancelled_again) == []
+
+
+def test_completed_ease_reports_transition_finished_once() -> None:
+    target = camera.CameraOptions(center=geo.LatLng(5.0, 10.0), zoom=3.0)
+    deadline = time.monotonic() + 10.0
+    events: list[mln.RuntimeEvent] = []
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+            )
+            while not _finished_transition_ids(events):
+                assert time.monotonic() < deadline, (
+                    "ease did not finish while the runtime was pumped"
+                )
+                map_handle.request_repaint()
+                runtime.run_once()
+                events.extend(_drain_runtime_events(runtime))
+
+            trailing: list[mln.RuntimeEvent] = []
+            for _ in range(8):
+                map_handle.request_repaint()
+                runtime.run_once()
+                trailing.extend(_drain_runtime_events(runtime))
+
+    assert _finished_transition_ids(events) == [401]
+    assert _finished_transition_ids(trailing) == []
+    assert mln.CameraChangeMode.ANIMATED in _camera_change_modes(
+        events, mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
+    )
+
+
+def test_camera_change_events_report_immediate_and_animated_modes() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
+            )
+            jumped = _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
+                camera.AnimationOptions(duration_ms=5_000.0),
+            )
+            eased = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            eased.extend(_drain_runtime_events(runtime))
+
+    will_change = mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE
+    did_change = mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
+    assert _camera_change_modes(jumped, will_change) == [mln.CameraChangeMode.IMMEDIATE]
+    assert _camera_change_modes(jumped, did_change) == [mln.CameraChangeMode.IMMEDIATE]
+    assert _camera_change_modes(eased, will_change) == [mln.CameraChangeMode.ANIMATED]
+    assert _camera_change_modes(eased, did_change) == [mln.CameraChangeMode.ANIMATED]
+
+
+def test_camera_transition_finished_payload_validates_native_payload_size() -> None:
+    event = mln.RuntimeEvent._from_native(
+        _native.camera_transition_finished_event_for_test(909, 0)
+    )
+    assert event.event_type == mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
+    assert isinstance(event.payload, mln.CameraTransitionFinishedPayload)
+    assert event.payload.transition_id == 909
+
+    with pytest.raises(mln.InvalidArgumentError):
+        _native.camera_transition_finished_event_for_test(909, 1)
+
+
 def test_poll_event_returns_none_when_queue_is_empty() -> None:
     with mln.RuntimeHandle() as runtime:
         assert runtime.poll_event() is None
@@ -3271,3 +3422,18 @@ def test_set_bounds_rejects_unsupported_constraint() -> None:
                     camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
                 )
             assert map_handle.get_bounds().bounds == camera.Unbounded()
+
+
+@pytest.mark.parametrize("transition_id", [-1, 2**64])
+def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> None:
+    # PyO3 extracts this as Option<u64>, so without a range check the caller
+    # would see a bare OverflowError instead of the binding's error shape.
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.ease_to(
+                    camera.CameraOptions(zoom=2.0),
+                    camera.AnimationOptions(
+                        duration_ms=0.0, transition_id=transition_id
+                    ),
+                )

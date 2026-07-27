@@ -40,6 +40,7 @@ typedef enum mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_VELOCITY = 1U << 1U,
   MLN_ANIMATION_OPTION_MIN_ZOOM = 1U << 2U,
   MLN_ANIMATION_OPTION_EASING = 1U << 3U,
+  MLN_ANIMATION_OPTION_TRANSITION_ID = 1U << 4U,
 } mln_animation_option_field;
 
 /** Field mask values for mln_camera_fit_options. */
@@ -248,6 +249,35 @@ typedef struct mln_animation_options {
   /** Peak zoom for flyTo transitions. */
   double min_zoom;
   mln_unit_bezier easing;
+  /**
+   * Caller-chosen identity for the transition this options struct starts.
+   *
+   * When MLN_ANIMATION_OPTION_TRANSITION_ID is set, the transition emits one
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED event carrying this value
+   * in its mln_runtime_event_camera_transition_finished payload. The C API
+   * passes the value through without interpreting it, so callers pick their own
+   * scheme, such as a monotonically increasing counter.
+   *
+   * Each transition emits that event exactly once, whichever way it ends:
+   * running to completion, being superseded by a later camera command, being
+   * cancelled by mln_map_cancel_transitions(), or completing instantly as a
+   * zero-duration jump. A command this API rejects -- one carrying a non-finite
+   * enabled camera field, for example -- starts no transition and emits no such
+   * event. MapLibre Native reports the moment a transition
+   * releases the camera and does not report which of those outcomes occurred,
+   * so this event establishes transition identity rather than a completion
+   * reason. A host that needs to tell completion from cancellation compares the
+   * resulting camera against the requested one, or tracks which transition ID
+   * is current.
+   *
+   * The event is queued on the runtime that owns the map and is drained by
+   * mln_runtime_poll_event(). For a transition that runs to completion, it is
+   * queued immediately before that transition's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event.
+   *
+   * When this field is omitted, the transition emits no such event.
+   */
+  uint64_t transition_id;
 } mln_animation_options;
 
 /** Optional fitting controls for camera-for-viewport queries. */

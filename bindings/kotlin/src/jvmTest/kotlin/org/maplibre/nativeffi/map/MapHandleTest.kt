@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
@@ -35,6 +36,9 @@ import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.runtime.CameraChangeMode
+import org.maplibre.nativeffi.runtime.RuntimeEventPayload
+import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
@@ -664,6 +668,122 @@ class MapHandleTest {
     } finally {
       map.close()
       runtime.close()
+    }
+  }
+
+  // BND-087, BND-102: camera transitions report their identity through runtime events, and
+  // camera change events type their code.
+
+  @Test
+  fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+        },
+      )
+
+    try {
+      // A zero-duration ease resolves inside the call and reports its end right away. An id above
+      // Long.MAX_VALUE round-trips as the unsigned bit pattern the caller passed in.
+      val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
+      map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
+      val instant = drainCameraEvents(runtime)
+      assertEquals(listOf(instantId), instant.finishedTransitionIds)
+      assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
+
+      // A running transition stays silent until it releases the camera.
+      map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
+      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+
+      // A later camera command supersedes it, ending the transition it replaced.
+      map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
+      val superseded = drainCameraEvents(runtime)
+      assertEquals(listOf(11L), superseded.finishedTransitionIds)
+      assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
+
+      // Cancellation ends the superseding transition.
+      map.cancelTransitions()
+      assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
+
+      // Omitting the id leaves the transition silent.
+      map.easeTo(
+        CameraOptions().apply { zoom = 14.0 },
+        AnimationOptions().apply { durationMs = 0.0 },
+      )
+      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun completedCameraTransitionReportsItsIdOnceAndReachesTheRequestedCamera() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.easeTo(CameraOptions().apply { zoom = 5.0 }, transitionAnimation(21L, 5_000.0))
+      // A still-image request runs a static map's pending transitions to their end.
+      map.requestStillImage()
+
+      val finished = mutableListOf<Long>()
+      var rounds = 0
+      while (finished.isEmpty() && rounds < 10_000) {
+        runtime.runOnce()
+        finished += drainCameraEvents(runtime).finishedTransitionIds
+        rounds++
+        Thread.sleep(1)
+      }
+      assertEquals(listOf(21L), finished)
+      assertEquals(5.0, map.camera.zoom ?: 0.0, 1e-6)
+
+      // The completed transition reports its end once; later pumping adds nothing.
+      repeat(100) {
+        runtime.runOnce()
+        finished += drainCameraEvents(runtime).finishedTransitionIds
+      }
+      assertEquals(listOf(21L), finished)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  private fun transitionAnimation(transitionId: Long, durationMs: Double): AnimationOptions =
+    AnimationOptions().apply {
+      this.transitionId = transitionId
+      this.durationMs = durationMs
+    }
+
+  private class CameraEvents(
+    val finishedTransitionIds: List<Long>,
+    val lastChangeMode: CameraChangeMode?,
+  )
+
+  private fun drainCameraEvents(runtime: RuntimeHandle): CameraEvents {
+    val finished = mutableListOf<Long>()
+    var lastChangeMode: CameraChangeMode? = null
+    while (true) {
+      val event = runtime.pollEvent() ?: return CameraEvents(finished, lastChangeMode)
+      when (event.type) {
+        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED ->
+          finished +=
+            assertIs<RuntimeEventPayload.CameraTransitionFinished>(event.payload).transitionId
+        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> lastChangeMode = CameraChangeMode(event.code)
+      }
     }
   }
 

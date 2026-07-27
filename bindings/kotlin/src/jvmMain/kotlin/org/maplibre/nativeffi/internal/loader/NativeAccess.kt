@@ -85,6 +85,7 @@ import org.maplibre.nativeffi.internal.c.mln_rendering_stats
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
@@ -3478,6 +3479,10 @@ internal object NativeAccess {
       fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_EASING()
       mln_animation_options.easing(segment).copyFrom(unitBezier(it, arena))
     }
+    value.transitionId?.let {
+      fields = fields or MapLibreNativeC.MLN_ANIMATION_OPTION_TRANSITION_ID()
+      mln_animation_options.transition_id(segment, it)
+    }
     mln_animation_options.fields(segment, fields)
     return segment
   }
@@ -5018,6 +5023,10 @@ internal object NativeAccess {
         if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_SIZE)) {
           offlineOperationCompletedPayload(payload)
         } else unknownPayload(payloadType, payload, payloadSize)
+      PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+        if (hasPayloadSize(payload, payloadSize, RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_SIZE)) {
+          cameraTransitionFinishedPayload(payload)
+        } else unknownPayload(payloadType, payload, payloadSize)
       else -> unknownPayload(payloadType, payload, payloadSize)
     }
 
@@ -5142,6 +5151,16 @@ internal object NativeAccess {
       ),
       payload.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_STATUS_OFFSET),
       payload.get(ValueLayout.JAVA_BOOLEAN, RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET),
+    )
+
+  private fun cameraTransitionFinishedPayload(
+    payload: MemorySegment
+  ): RuntimeEventPayload.CameraTransitionFinished =
+    RuntimeEventPayload.CameraTransitionFinished(
+      payload.get(
+        ValueLayout.JAVA_LONG,
+        RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET,
+      )
     )
 
   private fun downcall(name: String): MethodHandle =
@@ -5600,6 +5619,7 @@ internal object NativeAccess {
   private const val PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR: Int = 6
   private const val PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT: Int = 7
   private const val PAYLOAD_OFFLINE_OPERATION_COMPLETED: Int = 8
+  private const val PAYLOAD_CAMERA_TRANSITION_FINISHED: Int = 9
 
   private val OFFLINE_REGION_STATUS_SIZE: Long = mln_offline_region_status.sizeof()
   private val OFFLINE_REGION_STATUS_SIZE_OFFSET: Long = mln_offline_region_status.`size$offset`()
@@ -5703,6 +5723,11 @@ internal object NativeAccess {
     mln_runtime_event_offline_operation_completed.`result_status$offset`()
   private val RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED_FOUND_OFFSET: Long =
     mln_runtime_event_offline_operation_completed.`found$offset`()
+
+  private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_SIZE: Long =
+    mln_runtime_event_camera_transition_finished.sizeof()
+  private val RUNTIME_EVENT_CAMERA_TRANSITION_FINISHED_TRANSITION_ID_OFFSET: Long =
+    mln_runtime_event_camera_transition_finished.`transition_id$offset`()
 
   private const val OFFLINE_REGION_DEFINITION_TYPE_TILE_PYRAMID: Int = 1
   private const val OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY: Int = 2
