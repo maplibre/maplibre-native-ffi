@@ -31,10 +31,10 @@ MACHO_ALLOWED_PREFIXES = (
     "/usr/lib/",
     "/System/Library/",
 )
-# Run paths carry no absolute component, so the bundle stays relocatable.
-MACHO_ALLOWED_RUN_PATHS = ("@loader_path", "@executable_path")
-# ELF search paths resolve against the loading object for the same reason.
-ELF_ALLOWED_SEARCH_PATH_PREFIXES = ("$ORIGIN", "${ORIGIN}")
+# Search paths anchor to the loading binary, either exactly or as the root of a
+# relative path, so the bundle stays relocatable.
+MACHO_SEARCH_PATH_ROOTS = ("@loader_path", "@executable_path")
+ELF_SEARCH_PATH_ROOTS = ("$ORIGIN", "${ORIGIN}")
 
 MACHO_NAME = re.compile(r"^\s*name (?P<name>\S+) \(offset \d+\)$")
 MACHO_PATH = re.compile(r"^\s*path (?P<path>\S+) \(offset \d+\)$")
@@ -49,6 +49,11 @@ def run(command: list[str]) -> str:
             f"{command[0]} failed for {command[-1]}:\n{result.stderr.strip()}"
         )
     return result.stdout
+
+
+def anchored(path: str, roots: tuple[str, ...]) -> bool:
+    """Whether a search path resolves against the binary that loads it."""
+    return any(path == root or path.startswith(f"{root}/") for root in roots)
 
 
 def macho_problems(binary: pathlib.Path) -> list[str]:
@@ -68,7 +73,7 @@ def macho_problems(binary: pathlib.Path) -> list[str]:
                 problems.append(f"{command} {name.group('name')}")
         elif command == "LC_RPATH":
             path = MACHO_PATH.match(line)
-            if path and path.group("path") not in MACHO_ALLOWED_RUN_PATHS:
+            if path and not anchored(path.group("path"), MACHO_SEARCH_PATH_ROOTS):
                 problems.append(f"LC_RPATH {path.group('path')}")
     return problems
 
@@ -89,7 +94,7 @@ def elf_problems(binary: pathlib.Path) -> list[str]:
             problems.extend(
                 f"DT_{tag} {entry}"
                 for entry in value.split(":")
-                if entry and not entry.startswith(ELF_ALLOWED_SEARCH_PATH_PREFIXES)
+                if entry and not anchored(entry, ELF_SEARCH_PATH_ROOTS)
             )
     return problems
 
