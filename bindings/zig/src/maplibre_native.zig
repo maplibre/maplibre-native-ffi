@@ -150,6 +150,7 @@ pub const StyleVectorTileEncoding = values.StyleVectorTileEncoding;
 pub const StyleRasterDemEncoding = values.StyleRasterDemEncoding;
 pub const StyleTileSourceOptions = values.StyleTileSourceOptions;
 pub const StyleGeoJsonSourceOptions = values.StyleGeoJsonSourceOptions;
+pub const OwnedStyleGeoJsonSourceOptions = values.OwnedStyleGeoJsonSourceOptions;
 pub const PremultipliedRgba8Image = values.PremultipliedRgba8Image;
 pub const StyleImageOptions = values.StyleImageOptions;
 pub const StyleImageInfo = values.StyleImageInfo;

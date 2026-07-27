@@ -623,8 +623,11 @@ auto validate_geojson_source_options(const mln_geojson_source_options* options)
          std::pair{effective.max_zoom, "max_zoom"},
          std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
        }) {
-    if (!std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0) {
-      auto message = std::string{name} + " must be within [0, 255]";
+    if (
+      !std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0 ||
+      std::floor(zoom) != zoom
+    ) {
+      auto message = std::string{name} + " must be an integer within [0, 255]";
       mln::core::set_thread_error(message.c_str());
       return MLN_STATUS_INVALID_ARGUMENT;
     }

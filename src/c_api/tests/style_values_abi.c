@@ -69,6 +69,43 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
     )
   );
 
+  mln_geojson_source_options fractional_min_zoom =
+    mln_geojson_source_options_default();
+  fractional_min_zoom.fields = MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+  fractional_min_zoom.min_zoom = 1.5;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-min", .size = 14}, url,
+      &fractional_min_zoom
+    )
+  );
+
+  mln_geojson_source_options fractional_max_zoom =
+    mln_geojson_source_options_default();
+  fractional_max_zoom.fields = MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+  fractional_max_zoom.max_zoom = 17.9;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-max", .size = 14}, url,
+      &fractional_max_zoom
+    )
+  );
+
+  mln_geojson_source_options fractional_cluster_max_zoom =
+    mln_geojson_source_options_default();
+  fractional_cluster_max_zoom.fields =
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+  fractional_cluster_max_zoom.cluster_max_zoom = 12.25;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_add_geojson_source_url(
+      map, (mln_string_view){.data = "fractional-cluster", .size = 18}, url,
+      &fractional_cluster_max_zoom
+    )
+  );
+
   mln_geojson_source_options null_cluster_properties =
     mln_geojson_source_options_default();
   null_cluster_properties.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
