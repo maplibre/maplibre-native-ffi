@@ -27,8 +27,8 @@ raw.mln_lat_lng_bounds latLngBoundsToNative(LatLngBounds value) {
 /// Converts a native bounds value to Dart.
 LatLngBounds latLngBoundsFromNative(raw.mln_lat_lng_bounds value) =>
     LatLngBounds(
-      latLngFromNative(value.southwest),
-      latLngFromNative(value.northeast),
+      southwest: latLngFromNative(value.southwest),
+      northeast: latLngFromNative(value.northeast),
     );
 
 /// Converts Dart projected meters to the native C value shape.
@@ -41,7 +41,7 @@ raw.mln_projected_meters projectedMetersToNative(ProjectedMeters value) {
 
 /// Converts native projected meters to Dart.
 ProjectedMeters projectedMetersFromNative(raw.mln_projected_meters value) =>
-    ProjectedMeters(value.northing, value.easting);
+    ProjectedMeters(northing: value.northing, easting: value.easting);
 
 /// Converts Dart screen point to the native C value shape.
 raw.mln_screen_point screenPointToNative(ScreenPoint value) {

@@ -27,7 +27,7 @@ final class LatLng {
 /// Geographic bounds in degrees.
 final class LatLngBounds {
   /// Creates geographic bounds.
-  const LatLngBounds(this.southwest, this.northeast);
+  const LatLngBounds({required this.southwest, required this.northeast});
 
   /// Southwest corner.
   final LatLng southwest;
@@ -48,7 +48,7 @@ final class LatLngBounds {
 /// Lower-level Spherical Mercator projected-meter coordinate.
 final class ProjectedMeters {
   /// Creates projected meters.
-  const ProjectedMeters(this.northing, this.easting);
+  const ProjectedMeters({required this.northing, required this.easting});
 
   /// Distance measured northward from the equator, in meters.
   final double northing;
@@ -88,7 +88,7 @@ final class ScreenPoint {
 /// Screen-space box in logical map pixels.
 final class ScreenBox {
   /// Creates a screen-space box.
-  const ScreenBox(this.min, this.max);
+  const ScreenBox({required this.min, required this.max});
 
   /// Minimum corner.
   final ScreenPoint min;

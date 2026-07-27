@@ -668,7 +668,10 @@ void main() {
     final offlineCreateOperation = runtime.createOfflineRegion(
       const OfflineTilePyramidRegionDefinition(
         styleUrl: 'https://example.com/style.json',
-        bounds: LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+        bounds: LatLngBounds(
+          southwest: LatLng(-1, -1),
+          northeast: LatLng(1, 1),
+        ),
         minZoom: 0,
         maxZoom: 1,
         pixelRatio: 1,
@@ -751,7 +754,10 @@ void main() {
     expect(
       map
           .cameraForLatLngBounds(
-            const LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+            const LatLngBounds(
+              southwest: LatLng(-1, -1),
+              northeast: LatLng(1, 1),
+            ),
           )
           .zoom,
       isNotNull,
@@ -1064,7 +1070,7 @@ void main() {
     );
     map.invalidateCustomGeometrySourceRegion(
       'dart-custom-source',
-      const LatLngBounds(LatLng(-1, -1), LatLng(1, 1)),
+      const LatLngBounds(southwest: LatLng(-1, -1), northeast: LatLng(1, 1)),
     );
     expect(map.removeStyleSource('dart-custom-source'), isTrue);
     map.addCustomGeometrySource(

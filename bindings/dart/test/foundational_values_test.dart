@@ -22,7 +22,7 @@ void main() {
     expect(latLngFromNative(native), coordinate);
     expect(
       latLngBoundsToNative(
-        const LatLngBounds(LatLng(1, 2), LatLng(3, 4)),
+        const LatLngBounds(southwest: LatLng(1, 2), northeast: LatLng(3, 4)),
       ).northeast.longitude,
       4,
     );
