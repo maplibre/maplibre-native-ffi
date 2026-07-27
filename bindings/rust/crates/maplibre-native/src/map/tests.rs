@@ -276,6 +276,45 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
 }
 
 #[test]
+// Spec coverage: BND-060 and BND-061.
+fn clustered_geojson_source_reports_non_point_geometry() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+
+    let mixed = GeoJson::FeatureCollection(vec![
+        Feature::new(Geometry::Point(LatLng::new(0.0, 0.0)), Vec::new()),
+        Feature::new(
+            Geometry::GeometryCollection(vec![Geometry::Point(LatLng::new(1.0, 1.0))]),
+            Vec::new(),
+        ),
+    ]);
+
+    // Supercluster reads every feature geometry as a point, so this used to
+    // surface a bare variant access message from inside MapLibre Native.
+    let error = map
+        .add_geojson_source_data("quakes", &mixed, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(message.contains("quakes"), "{message}");
+    assert!(
+        message.contains("point geometry on every feature"),
+        "{message}"
+    );
+    assert!(message.contains("geometry collection"), "{message}");
+
+    // The constraint belongs to clustering alone, and the rejected ID stays free.
+    map.add_geojson_source_data("quakes", &mixed, None).unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 // Spec coverage: BND-105.
 fn style_source_type_and_info_call_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
