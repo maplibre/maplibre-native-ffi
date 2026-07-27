@@ -558,7 +558,27 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         },
       )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("points"))
-      map.setGeoJsonSourceData("points", GeoJson.GeometryValue(Geometry.Point(LatLng(1.0, 1.0))))
+
+      // A clustered source indexes every feature as a point, so native rejects
+      // replacement data that is not a feature collection.
+      assertFailsWith<InvalidArgumentException> {
+        map.setGeoJsonSourceData("points", GeoJson.GeometryValue(Geometry.Point(LatLng(1.0, 1.0))))
+      }
+      map.setGeoJsonSourceData(
+        "points",
+        GeoJson.FeatureCollection(
+          listOf(Feature(Geometry.Point(LatLng(1.0, 1.0)), emptyList(), FeatureIdentifier.Null))
+        ),
+      )
+
+      // An unclustered source still materializes a bare geometry descriptor.
+      map.addGeoJsonSourceData(
+        "bare",
+        GeoJson.GeometryValue(Geometry.Point(LatLng(2.0, 2.0))),
+        null,
+      )
+      map.setGeoJsonSourceData("bare", GeoJson.GeometryValue(Geometry.Point(LatLng(3.0, 3.0))))
+      assertTrue(map.removeStyleSource("bare"))
 
       // Option values reach native validation rather than being dropped by the binding.
       assertFailsWith<InvalidArgumentException> {
