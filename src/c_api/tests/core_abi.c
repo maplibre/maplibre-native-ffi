@@ -61,7 +61,7 @@ static void runtime_rejects_unknown_flags(void) {
 // binding-owned handle state prevents.
 static void runtime_rejects_stale_handles(void) {
   mln_runtime* runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
+  mln_test_destroy_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(runtime)
   );
@@ -128,7 +128,7 @@ static void map_create_rejects_invalid_arguments(void) {
 static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   mln_map* map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_map_destroy(map));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(map, "{}")
