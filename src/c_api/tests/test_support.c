@@ -56,10 +56,17 @@ static MLN_TEST_THREAD_LOCAL tracked_session
 static MLN_TEST_THREAD_LOCAL size_t tracked_session_count;
 
 static void track_map(mln_map* map) {
-  if (tracked_map_count < MLN_TEST_TRACKED_CAPACITY) {
-    tracked_maps[tracked_map_count] = map;
-    tracked_map_count += 1;
+  // Dropping the overflow silently would leave a live map outside teardown,
+  // which keeps the runtime alive and cascades into every later test. Failing
+  // here names the real problem instead.
+  if (tracked_map_count >= MLN_TEST_TRACKED_CAPACITY) {
+    TEST_FAIL_MESSAGE(
+      "This test holds more live maps than the suite can track. Destroy maps "
+      "as the test finishes with them, or raise MLN_TEST_TRACKED_CAPACITY."
+    );
   }
+  tracked_maps[tracked_map_count] = map;
+  tracked_map_count += 1;
 }
 
 static void untrack_map(const mln_map* map) {
@@ -73,12 +80,17 @@ static void untrack_map(const mln_map* map) {
 }
 
 static void track_session(const mln_test_render_fixture* fixture) {
-  if (tracked_session_count < MLN_TEST_TRACKED_CAPACITY) {
-    tracked_sessions[tracked_session_count] = (tracked_session){
-      .session = fixture->session, .backend_state = fixture->backend_state
-    };
-    tracked_session_count += 1;
+  if (tracked_session_count >= MLN_TEST_TRACKED_CAPACITY) {
+    TEST_FAIL_MESSAGE(
+      "This test holds more live render sessions than the suite can track. "
+      "Destroy sessions as the test finishes with them, or raise "
+      "MLN_TEST_TRACKED_CAPACITY."
+    );
   }
+  tracked_sessions[tracked_session_count] = (tracked_session){
+    .session = fixture->session, .backend_state = fixture->backend_state
+  };
+  tracked_session_count += 1;
 }
 
 static void untrack_session(const mln_render_session* session) {
@@ -125,16 +137,20 @@ mln_map* mln_test_create_map(mln_runtime* runtime) {
   return mln_test_create_map_with_options(runtime, &options);
 }
 
+// Untracking happens only after the destroy succeeds. A destroy that is
+// temporarily invalid -- destroying a map that still has a render session
+// attached -- longjmps out of the assertion below, and the handle has to stay
+// tracked so teardown can still reclaim it.
 void mln_test_destroy_runtime(mln_runtime* runtime) {
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
   if (tracked_runtime == runtime) {
     tracked_runtime = NULL;
   }
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
 }
 
 void mln_test_destroy_map(mln_map* map) {
-  untrack_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  untrack_map(map);
 }
 
 void mln_test_sleep_millisecond(void) { mln_test_sleep_milliseconds(1); }
@@ -699,12 +715,12 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
   if (fixture == NULL) {
     return;
   }
-  untrack_session(fixture->session);
   if (fixture->session != NULL) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
   }
+  untrack_session(fixture->session);
   destroy_backend_state(fixture->backend_state);
   *fixture = (mln_test_render_fixture){0};
 }

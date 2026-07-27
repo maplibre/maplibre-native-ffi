@@ -50,8 +50,13 @@ function(mln_add_c_api_test)
 
   # Each *_abi.c reaches the runner through one run_<file>_tests() call in
   # main.c. main.c carries no preprocessor guards, so a plain text match is
-  # exact here. See src/c_api/tests/README.md for the full contract.
+  # exact here once comments are stripped -- otherwise a commented-out call
+  # would satisfy the guard while its tests never run. See
+  # src/c_api/tests/README.md for the full contract.
   file(READ ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c test_main_contents)
+  string(REGEX REPLACE "/\\*([^*]|\\*+[^*/])*\\*+/" "" test_main_contents
+         "${test_main_contents}")
+  string(REGEX REPLACE "//[^\n]*" "" test_main_contents "${test_main_contents}")
   foreach(test_abi_source IN LISTS test_abi_sources)
     get_filename_component(test_abi_name ${test_abi_source} NAME_WE)
     if(NOT test_main_contents MATCHES "run_${test_abi_name}_tests\\(\\)")
