@@ -1,3 +1,5 @@
+# Git Bash carries the repository's Bash contract on Windows, where the platform
+# default is `cmd`.
 [task_config]
 shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 
@@ -10,3 +12,8 @@ host_native_preset = "windows-{{ arch() }}-vulkan"
 # The script caches the resolved environment so only the first shell pays for it.
 MLN_FFI_WINDOWS_HOST_ARCHITECTURE = "{{ arch() }}"
 BASH_ENV = "{{config_root}}/.mise/bin/windows-msvc-env.sh"
+
+[deps.submodules]
+# Dependency providers run through the platform shell rather than
+# `task_config.shell`, so name the Bash interpreter for the sync script here.
+run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-submodules'
