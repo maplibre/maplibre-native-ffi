@@ -48,6 +48,61 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 	}
 }
 
+func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	first, err := runtime.NewMap()
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	second, err := runtime.NewMap()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("second NewMap(): %v", err)
+	}
+	defer func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("second Map Close(): %v", err)
+		}
+	}()
+
+	firstID, err := first.ID()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("ID(): %v", err)
+	}
+	secondID, err := second.ID()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("second ID(): %v", err)
+	}
+	if firstID == 0 || firstID == secondID {
+		_ = first.Close()
+		t.Fatalf("map IDs = %d and %d, want distinct nonzero IDs", firstID, secondID)
+	}
+	if repeated, err := first.ID(); err != nil || repeated != firstID {
+		_ = first.Close()
+		t.Fatalf("repeated ID() = %d, %v, want %d, nil", repeated, err, firstID)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if _, err := first.ID(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ID() after Close error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
 	state, err := handle.New(&nativeMap{}, "MapHandle")
 	if err != nil {
