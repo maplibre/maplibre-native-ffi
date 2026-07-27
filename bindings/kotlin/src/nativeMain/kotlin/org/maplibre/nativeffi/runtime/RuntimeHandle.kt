@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
@@ -440,6 +441,14 @@ internal constructor(
       replacement.close()
       throw error
     }
+    previous?.close()
+  }
+
+  public actual fun clearResourceProvider() {
+    resourceProviderState?.checkCanClose()
+    Status.check(mln_runtime_clear_resource_provider(state.requireLive()))
+    val previous = resourceProviderState
+    resourceProviderState = null
     previous?.close()
   }
 

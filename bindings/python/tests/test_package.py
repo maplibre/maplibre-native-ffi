@@ -2683,14 +2683,22 @@ def test_resource_callback_registration_validates_bounds_and_lifecycle() -> None
         handle.close()
         return resource.ResourceProviderDecision.PASS_THROUGH
 
-    with mln.RuntimeHandle() as runtime:
-        with pytest.raises(mln.InvalidArgumentError):
-            runtime.set_resource_provider(provider, max_pending_callbacks=0)
+    runtime = mln.RuntimeHandle()
+    with pytest.raises(mln.InvalidArgumentError):
+        runtime.set_resource_provider(provider, max_pending_callbacks=0)
 
+    runtime.set_resource_provider(provider, max_pending_callbacks=1)
+    runtime.close()
+
+    with pytest.raises(mln.InvalidStateError) as replaced:
         runtime.set_resource_provider(provider, max_pending_callbacks=1)
-        with runtime.create_map():
-            with pytest.raises(mln.InvalidStateError):
-                runtime.set_resource_provider(provider, max_pending_callbacks=1)
+    assert replaced.value.native_status_code is None
+    assert replaced.value.diagnostic == "runtime handle is closed"
+
+    with pytest.raises(mln.InvalidStateError) as cleared:
+        runtime.clear_resource_provider()
+    assert cleared.value.native_status_code is None
+    assert cleared.value.diagnostic == "runtime handle is closed"
 
 
 def test_resource_provider_pass_through_delegates_to_native_http() -> None:
@@ -2763,6 +2771,67 @@ def test_resource_transform_can_be_cleared_after_map_creation() -> None:
 
     assert served.is_set()
     assert calls == []
+
+
+def test_resource_provider_replacement_and_clear_retire_previous_callback() -> None:
+    first_urls: list[str] = []
+    second_urls: list[str] = []
+
+    def counting_provider(seen: list[str]) -> resource.ResourceProviderCallback:
+        def provider(
+            request: resource.ResourceRequest,
+            handle: resource.ResourceRequestHandle,
+        ) -> resource.ResourceProviderDecision:
+            seen.append(request.url)
+            return resource.ResourceProviderDecision.PASS_THROUGH
+
+        return provider
+
+    def load_unservable_style(
+        runtime: mln.RuntimeHandle,
+        map_handle: mln.MapHandle,
+        style_url: str,
+    ) -> None:
+        # No file source serves the jar scheme, so a loading failure naming this
+        # style URL proves the request reached the network file source.
+        map_handle.set_style_url(style_url)
+        for _ in range(5000):
+            runtime.run_once()
+            while event := runtime.poll_event():
+                if (
+                    event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+                    and event.message is not None
+                    and style_url in event.message
+                    and '"jar"' in event.message
+                ):
+                    return
+            time.sleep(0.001)
+        raise AssertionError(f"style {style_url!r} did not report a loading failure")
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(
+            counting_provider(first_urls), max_pending_callbacks=4
+        )
+        with runtime.create_map() as map_handle:
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/first.json")
+            assert "jar:file:/packaged/first.json" in first_urls
+
+            runtime.set_resource_provider(
+                counting_provider(second_urls), max_pending_callbacks=4
+            )
+            first_urls_after_replace = list(first_urls)
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/second.json")
+            assert "jar:file:/packaged/second.json" in second_urls
+            assert first_urls == first_urls_after_replace
+
+            runtime.clear_resource_provider()
+            second_urls_after_clear = list(second_urls)
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/third.json")
+            assert first_urls == first_urls_after_replace
+            assert second_urls == second_urls_after_clear
+
+            # Clearing an already cleared provider stays a successful no-op.
+            runtime.clear_resource_provider()
 
 
 def test_resource_provider_inline_completion_overrides_pass_through_return() -> None:

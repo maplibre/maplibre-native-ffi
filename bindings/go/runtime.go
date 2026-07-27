@@ -785,9 +785,11 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
-// provider. Configure it before creating maps from this runtime. Native code may
-// invoke the provider on worker or network threads, so callbacks must be
-// thread-safe and must not call MapLibre map/runtime APIs.
+// provider. It may be called while maps are live. Native code may invoke the
+// provider on worker or network threads, so callbacks must be thread-safe and
+// must not call MapLibre map/runtime APIs. Once this call returns, a replaced
+// provider is no longer invoked; requests it already took a handle for keep that
+// handle, so complete or close each one as usual.
 func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
 	if provider == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
@@ -833,6 +835,26 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	runtime.resourceProvider = replacement
 	runtime.resourceProviderMu.Unlock()
 	previous.Release()
+	return nil
+}
+
+// ClearResourceProvider clears the runtime-scoped network resource provider.
+// Requests that reach the C API network file source then go to MapLibre's online
+// file source. Once this call returns, the cleared provider is no longer invoked;
+// requests it already took a handle for keep that handle, so complete or close
+// each one as usual.
+func (runtime *RuntimeHandle) ClearResourceProvider() error {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	if err := checkNative(func() int32 { return callback.ClearResourceProvider(unsafe.Pointer(ptr)) }); err != nil {
+		return err
+	}
+	runtime.releaseResourceProvider()
 	return nil
 }
 

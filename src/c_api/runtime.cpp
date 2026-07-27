@@ -35,6 +35,13 @@ auto mln_runtime_set_resource_provider(
   });
 }
 
+auto mln_runtime_clear_resource_provider(mln_runtime* runtime) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::clear_resource_provider(runtime);
+  });
+}
+
 auto mln_resource_request_complete(
   mln_resource_request_handle* handle, const mln_resource_response* response
 ) noexcept -> mln_status {

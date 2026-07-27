@@ -132,6 +132,8 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       runtime.setResourceProvider(
         ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
       )
+      runtime.clearResourceProvider()
+      runtime.clearResourceProvider()
     } finally {
       runtime.close()
     }
@@ -272,6 +274,65 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(RuntimeEventType.MAP_LOADING_FAILED, failure.type)
         assertEquals(map, failure.mapSource)
         assertEquals(1, calls.load())
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  // BND-154: an installed provider is consulted, a replacement takes over while a
+  // map is live, and a cleared provider leaves requests to the network file source.
+  @Test
+  fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val firstCalls = AtomicInt(0)
+    val secondCalls = AtomicInt(0)
+    try {
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, _ ->
+          firstCalls.addAndFetch(1)
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+      val firstProvider = runtime.resourceProviderStateForTesting()
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+          },
+        )
+      try {
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
+        assertTrue(firstCalls.load() > 0)
+
+        // Replacing the provider while a map is live is part of the C API contract.
+        runtime.setResourceProvider(
+          ResourceProviderCallback { _, _ ->
+            secondCalls.addAndFetch(1)
+            ResourceProviderDecision.PASS_THROUGH
+          }
+        )
+        val secondProvider = runtime.resourceProviderStateForTesting()
+        assertTrue(firstProvider?.isClosedForTesting() == true)
+        val firstCallsAfterReplace = firstCalls.load()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/second.json")
+        assertTrue(secondCalls.load() > 0)
+        assertEquals(firstCallsAfterReplace, firstCalls.load())
+
+        runtime.clearResourceProvider()
+        assertNull(runtime.resourceProviderStateForTesting())
+        assertTrue(secondProvider?.isClosedForTesting() == true)
+        val secondCallsAfterClear = secondCalls.load()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/third.json")
+        assertEquals(firstCallsAfterReplace, firstCalls.load())
+        assertEquals(secondCallsAfterClear, secondCalls.load())
+
+        // Clearing an already cleared provider stays a successful no-op.
+        runtime.clearResourceProvider()
       } finally {
         map.close()
       }
@@ -834,6 +895,38 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       usleep(1_000U)
     }
     error("runtime event $eventType did not arrive")
+  }
+
+  /**
+   * Loads a style URL whose scheme no file source serves, so the loading failure that names the
+   * scheme and the URL proves the request reached the network file source.
+   */
+  private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
+    map.setStyleUrl(styleUrl)
+    val message = waitForMapLoadingFailure(runtime, map, styleUrl)
+    assertTrue(message.contains("\"jar\""), "unexpected loading failure message: $message")
+  }
+
+  private fun waitForMapLoadingFailure(
+    runtime: RuntimeHandle,
+    map: MapHandle,
+    styleUrl: String,
+  ): String {
+    repeat(10_000) {
+      runtime.runOnce()
+      while (true) {
+        val event = runtime.pollEvent() ?: break
+        if (
+          event.type == RuntimeEventType.MAP_LOADING_FAILED &&
+            event.mapSource == map &&
+            event.message.contains(styleUrl)
+        ) {
+          return event.message
+        }
+      }
+      usleep(1_000U)
+    }
+    error("map loading failure for $styleUrl did not arrive")
   }
 
   private fun waitForTransformCall(runtime: RuntimeHandle, calls: AtomicInt): Boolean {

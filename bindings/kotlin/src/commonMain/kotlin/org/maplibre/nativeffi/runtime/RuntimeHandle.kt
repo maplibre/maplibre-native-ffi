@@ -87,6 +87,8 @@ public expect class RuntimeHandle : AutoCloseable {
 
   public fun setResourceProvider(callback: ResourceProviderCallback)
 
+  public fun clearResourceProvider()
+
   public fun setResourceTransform(callback: ResourceTransformCallback)
 
   public fun clearResourceTransform()

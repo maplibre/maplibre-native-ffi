@@ -1297,6 +1297,13 @@ pub const RuntimeHandle = enum(u128) {
         return offlineStatusFromNative(native_status_value);
     }
 
+    /// Registers, replaces, or clears the runtime-scoped URL transform for
+    /// network resources; passing null clears it.
+    ///
+    /// Registering and clearing are both available for the whole life of the
+    /// runtime, including while maps exist. The binding keeps the handler and
+    /// context alive until the call that replaces or clears them returns, and
+    /// releases them when the runtime closes.
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1330,25 +1337,46 @@ pub const RuntimeHandle = enum(u128) {
         }
     }
 
-    pub fn setResourceProvider(self: *RuntimeHandle, provider: ResourceProvider) status.Error!void {
+    /// Registers, replaces, or clears the runtime-scoped network resource
+    /// provider; passing null clears it.
+    ///
+    /// Registering and clearing are both available for the whole life of the
+    /// runtime, including while maps exist. The binding keeps the handler and
+    /// context alive until the call that replaces or clears them returns, and
+    /// releases them when the runtime closes. Requests the previous provider
+    /// already took a handle for keep that handle: complete and release each
+    /// one as usual.
+    pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const runtime_state = runtime_lease.state;
-        const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
-        errdefer std.heap.smp_allocator.destroy(replacement);
-        replacement.* = .{ .provider = provider, .diagnostic_store = runtime_lease.diagnostic_store };
-        var native_provider = c.mln_resource_provider{
-            .size = @sizeOf(c.mln_resource_provider),
-            .callback = resourceProviderTrampoline,
-            .user_data = replacement,
-        };
+        if (provider) |value| {
+            const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
+            errdefer std.heap.smp_allocator.destroy(replacement);
+            replacement.* = .{ .provider = value, .diagnostic_store = runtime_lease.diagnostic_store };
+            var native_provider = c.mln_resource_provider{
+                .size = @sizeOf(c.mln_resource_provider),
+                .callback = resourceProviderTrampoline,
+                .user_data = replacement,
+            };
+            try status.checkStatus(
+                c.mln_runtime_set_resource_provider(runtime_lease.native, &native_provider),
+                runtime_lease.diagnostic_store,
+            );
+            const previous = runtime_state.resource_provider;
+            runtime_state.resource_provider = replacement;
+            if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
+            return;
+        }
+
         try status.checkStatus(
-            c.mln_runtime_set_resource_provider(runtime_lease.native, &native_provider),
+            c.mln_runtime_clear_resource_provider(runtime_lease.native),
             runtime_lease.diagnostic_store,
         );
-        const previous = runtime_state.resource_provider;
-        runtime_state.resource_provider = replacement;
-        if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
+        if (runtime_state.resource_provider) |old_provider| {
+            runtime_state.resource_provider = null;
+            std.heap.smp_allocator.destroy(old_provider);
+        }
     }
 
     pub fn close(self: *RuntimeHandle) status.Error!void {

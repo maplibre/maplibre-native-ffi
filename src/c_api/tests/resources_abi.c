@@ -411,7 +411,17 @@ enum {
   teardown_probe_wait_attempts = 10000,
   teardown_transform_block_attempts = 3000,
   teardown_call_delay_milliseconds = 200,
+  provider_callback_block_milliseconds = 200,
 };
+
+// Shared state for the provider quiescence test below. The provider callback
+// runs on a MapLibre file source thread while the owner thread clears the
+// provider, so every field crosses a thread boundary.
+typedef struct provider_quiescence_probe {
+  atomic_bool entered;
+  atomic_bool clear_started;
+  atomic_bool callback_returned;
+} provider_quiescence_probe;
 
 static bool wait_for_flag(atomic_bool* flag) {
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
@@ -765,6 +775,122 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_set_resource_provider(runtime, &provider)
   );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_clear_resource_provider(NULL)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
+// Blocks inside the provider callback so the per-runtime provider lock stays
+// held while the owner thread clears the provider. It calls no C API function
+// while blocked.
+static uint32_t blocking_resource_provider_for_clear(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) {
+  (void)request;
+  (void)handle;
+  provider_quiescence_probe* probe = user_data;
+  atomic_store(&probe->entered, true);
+  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->clear_started)) {
+      break;
+    }
+    mln_test_sleep_millisecond();
+  }
+  // Keep running past the clear call so a clear that skips the wait returns
+  // while this callback is still using its user data.
+  mln_test_sleep_milliseconds(provider_callback_block_milliseconds);
+  atomic_store(&probe->callback_returned, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+// Drives an offline region download until the provider callback runs. Offline
+// downloads request the region style from a MapLibre file source thread, which
+// is where the provider callback runs, and they need no live map.
+static bool wait_for_clear_provider_callback(
+  mln_runtime* runtime, provider_quiescence_probe* probe
+) {
+  const mln_offline_region_definition definition = offline_tile_definition();
+  const uint8_t metadata[] = {1, 2, 3};
+  mln_offline_operation_id operation_id = 0;
+  if (
+    mln_runtime_offline_region_create_start(
+      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    ) != MLN_STATUS_OK ||
+    !wait_for_offline_completion(runtime, operation_id)
+  ) {
+    return false;
+  }
+
+  mln_offline_region_snapshot* snapshot = NULL;
+  if (
+    mln_runtime_offline_region_create_take_result(
+      runtime, operation_id, &snapshot
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
+  const mln_status info_status =
+    mln_offline_region_snapshot_get(snapshot, &info);
+  const mln_offline_region_id region_id = info.id;
+  mln_offline_region_snapshot_destroy(snapshot);
+  if (info_status != MLN_STATUS_OK) {
+    return false;
+  }
+
+  mln_offline_operation_id download_operation_id = 0;
+  if (
+    mln_runtime_offline_region_set_download_state_start(
+      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
+      &download_operation_id
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+
+  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->entered)) {
+      return true;
+    }
+    if (mln_runtime_run_once(runtime) != MLN_STATUS_OK) {
+      return false;
+    }
+    mln_test_sleep_millisecond();
+  }
+  return false;
+}
+
+// This verifies the quiescence guarantee every binding inherits: clearing the
+// resource provider waits for a provider callback that is already running, so
+// the callback and its user data are unreferenced once the clear returns.
+static void clearing_resource_provider_waits_for_in_flight_callback(void) {
+  provider_quiescence_probe probe = {0};
+  mln_runtime* runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = blocking_resource_provider_for_clear,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  TEST_ASSERT_TRUE(wait_for_clear_provider_callback(runtime, &probe));
+
+  atomic_store(&probe.clear_started, true);
+  // The clear blocks here until the provider callback returns.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_clear_resource_provider(runtime)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    atomic_load(&probe.callback_returned),
+    "clearing the resource provider returned while a provider callback was "
+    "still running"
+  );
+
   mln_test_destroy_runtime(runtime);
 }
 
@@ -995,6 +1121,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
   RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
+  RUN_TEST(clearing_resource_provider_waits_for_in_flight_callback);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);

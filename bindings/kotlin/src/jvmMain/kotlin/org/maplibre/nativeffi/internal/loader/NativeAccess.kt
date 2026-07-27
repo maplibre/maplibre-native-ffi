@@ -352,6 +352,9 @@ internal object NativeAccess {
   internal fun setResourceProvider(runtime: MemorySegment, provider: MemorySegment): Int =
     runtimeSetResourceProviderFunction().invokeWithArguments(runtime, provider) as Int
 
+  internal fun clearResourceProvider(runtime: MemorySegment): Int =
+    runtimeClearResourceProviderFunction().invokeWithArguments(runtime) as Int
+
   internal fun startAmbientCacheOperation(runtime: MemorySegment, operation: Int): Long =
     Arena.ofConfined().use { arena ->
       val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
@@ -2739,6 +2742,9 @@ internal object NativeAccess {
 
   private fun runtimeSetResourceProviderFunction(): MethodHandle =
     downcall("mln_runtime_set_resource_provider")
+
+  private fun runtimeClearResourceProviderFunction(): MethodHandle =
+    downcall("mln_runtime_clear_resource_provider")
 
   private fun runtimeSetResourceTransformFunction(): MethodHandle =
     downcall("mln_runtime_set_resource_transform")

@@ -537,24 +537,28 @@ MLN_API mln_status mln_runtime_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets a runtime-scoped network resource provider.
+ * Registers or replaces a runtime-scoped network resource provider.
  *
- * The provider must be set before any map is created from the runtime. It is
- * invoked for requests that reach the C API network file source. Built-in
+ * It is invoked for requests that reach the C API network file source. Built-in
  * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
- * native MainResourceLoader before this extension point. Native
- * OnlineFileSource claims every remaining scheme, so a URL with a scheme
- * MapLibre does not recognize, such as jar:file:, is treated as a network
- * request, reaches this callback, and completes as an HTTP error when the
- * provider passes it through. Serving those schemes from host storage is what
- * this extension point is for. The callback and user_data are stored by
- * reference and must remain valid until the runtime is destroyed.
+ * native MainResourceLoader before this extension point.
+ *
+ * This call may replace an existing provider while maps exist. The callback and
+ * user_data are stored by reference and must remain valid until this call
+ * returns having replaced them, mln_runtime_clear_resource_provider() returns,
+ * or the runtime is destroyed. When this call returns, no in-flight request can
+ * still invoke the previous provider. Requests the previous provider already
+ * took a handle for keep that handle: complete and release each one as usual.
+ * Native OnlineFileSource claims every remaining scheme, so a URL with a
+ * scheme MapLibre does not recognize, such as jar:file:, is treated as a
+ * network request, reaches this callback, and completes as an HTTP error when
+ * the provider passes it through. Hosts use this extension point to serve
+ * those schemes from host storage.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
  *   null, provider->size is too small, or callback is null.
- * - MLN_STATUS_INVALID_STATE when runtime already owns live maps.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -562,6 +566,26 @@ MLN_API mln_status mln_runtime_create(
 MLN_API mln_status mln_runtime_set_resource_provider(
   mln_runtime* runtime, const mln_resource_provider* provider
 ) MLN_NOEXCEPT;
+
+/**
+ * Clears the runtime-scoped network resource provider.
+ *
+ * After this call succeeds, requests that reach the C API network file source
+ * go to MapLibre's online file source. When it returns, no in-flight request
+ * can still invoke the previous provider, and the C API holds no further
+ * reference to its callback or user_data. Requests the previous provider
+ * already took a handle for keep that handle: complete and release each one as
+ * usual.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_runtime_clear_resource_provider(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
  * Completes a C API resource provider request.
