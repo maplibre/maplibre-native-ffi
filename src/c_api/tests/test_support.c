@@ -55,16 +55,19 @@ static MLN_TEST_THREAD_LOCAL tracked_session
   tracked_sessions[MLN_TEST_TRACKED_CAPACITY];
 static MLN_TEST_THREAD_LOCAL size_t tracked_session_count;
 
-static void track_map(mln_map* map) {
-  // Dropping the overflow silently would leave a live map outside teardown,
-  // which keeps the runtime alive and cascades into every later test. Failing
-  // here names the real problem instead.
+// Fails before the caller creates the handle. Dropping an overflow silently
+// would leave a live map outside teardown, and failing after creation would
+// strand the very handle that overflowed, so both cascade the same way.
+static void reserve_map_slot(void) {
   if (tracked_map_count >= MLN_TEST_TRACKED_CAPACITY) {
     TEST_FAIL_MESSAGE(
       "This test holds more live maps than the suite can track. Destroy maps "
       "as the test finishes with them, or raise MLN_TEST_TRACKED_CAPACITY."
     );
   }
+}
+
+static void track_map(mln_map* map) {
   tracked_maps[tracked_map_count] = map;
   tracked_map_count += 1;
 }
@@ -79,7 +82,8 @@ static void untrack_map(const mln_map* map) {
   }
 }
 
-static void track_session(const mln_test_render_fixture* fixture) {
+// Fails before the caller attaches, for the same reason as reserve_map_slot().
+static void reserve_session_slot(void) {
   if (tracked_session_count >= MLN_TEST_TRACKED_CAPACITY) {
     TEST_FAIL_MESSAGE(
       "This test holds more live render sessions than the suite can track. "
@@ -87,6 +91,9 @@ static void track_session(const mln_test_render_fixture* fixture) {
       "MLN_TEST_TRACKED_CAPACITY."
     );
   }
+}
+
+static void track_session(const mln_test_render_fixture* fixture) {
   tracked_sessions[tracked_session_count] = (tracked_session){
     .session = fixture->session, .backend_state = fixture->backend_state
   };
@@ -124,6 +131,7 @@ mln_map* mln_test_create_map_with_options(
   mln_runtime* runtime, const mln_map_options* options
 ) {
   mln_map* map = NULL;
+  reserve_map_slot();
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, options, &map));
   TEST_ASSERT_NOT_NULL(map);
   track_map(map);
@@ -666,6 +674,7 @@ bool mln_test_render_fixture_create(
   if (map == NULL || fixture == NULL) {
     return false;
   }
+  reserve_session_slot();
   *fixture = (mln_test_render_fixture){0};
 #if defined(MLN_TEST_BACKEND_METAL)
   mln_metal_context_descriptor context = {0};

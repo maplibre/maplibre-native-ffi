@@ -57,6 +57,10 @@ function(mln_add_c_api_test)
   string(REGEX REPLACE "/\\*([^*]|\\*+[^*/])*\\*+/" "" test_main_contents
          "${test_main_contents}")
   string(REGEX REPLACE "//[^\n]*" "" test_main_contents "${test_main_contents}")
+  # String literals too, so a runner named only inside a diagnostic message
+  # cannot stand in for the call that runs it.
+  string(REGEX REPLACE "\"([^\"\\\\]|\\\\.)*\"" "" test_main_contents
+         "${test_main_contents}")
   foreach(test_abi_source IN LISTS test_abi_sources)
     get_filename_component(test_abi_name ${test_abi_source} NAME_WE)
     if(NOT test_main_contents MATCHES "run_${test_abi_name}_tests\\(\\)")
