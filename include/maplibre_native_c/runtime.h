@@ -729,6 +729,18 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  * returns quickly and calls no C API function other than
  * mln_resource_transform_response_set_url().
  *
+ * A registered resource provider is waited on the same way: this call blocks
+ * until every in-flight mln_resource_provider_callback invocation returns,
+ * matching mln_runtime_set_resource_provider() and
+ * mln_runtime_clear_resource_provider(). The callback and its user_data stay
+ * valid until that point and are unreferenced once this call returns, so a
+ * host frees provider-owned state only after it does.
+ *
+ * Both waits run with no runtime-internal lock that other runtimes need, so a
+ * slow callback delays only this runtime. Do not call this while holding a
+ * host lock that a provider or transform callback also acquires; the callback
+ * cannot finish, and this call cannot return.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
