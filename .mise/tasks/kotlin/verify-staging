@@ -62,6 +62,28 @@ ROOT_TARGET_MODULES = {
     },
 }
 
+COMMON_NATIVE_LICENSES = {
+    "icu.txt",
+    "maplibre-native.md",
+    "nunicode.txt",
+    "pmtiles.txt",
+}
+
+
+def native_licenses(backend: str, target: str) -> set[str]:
+    licenses = set(COMMON_NATIVE_LICENSES)
+    if target.startswith(("android-", "linux-", "windows-")):
+        licenses.add("rust.md")
+    if target.startswith(("linux-", "windows-")):
+        licenses.update({"libuv-extra.txt", "libuv.txt", "zlib.txt"})
+    if backend == "vulkan":
+        licenses.update(
+            {"glslang.txt", "vulkan-headers.md", "vulkan-memory-allocator.txt"}
+        )
+    if backend == "opengl" and target.startswith("macos-"):
+        licenses.add("angle.txt")
+    return licenses
+
 
 def one(paths: list[pathlib.Path], description: str) -> pathlib.Path:
     if len(paths) != 1:
@@ -188,6 +210,14 @@ def verify_android(root: pathlib.Path) -> None:
         )
         with zipfile.ZipFile(runtime) as aar:
             names = set(aar.namelist())
+            for license_name in native_licenses(backend, "android-arm64"):
+                expected = f"META-INF/licenses/maplibre-native-c/{license_name}"
+                if expected not in names:
+                    raise SystemExit(f"{runtime} is missing {expected}")
+            if "META-INF/licenses/android-ndk/NOTICE" not in names:
+                raise SystemExit(
+                    f"{runtime} is missing META-INF/licenses/android-ndk/NOTICE"
+                )
             for abi in ("arm64-v8a", "x86_64"):
                 for library in (
                     "libmaplibre-native-c.so",
@@ -234,6 +264,7 @@ def verify_jvm(root: pathlib.Path) -> None:
             )
             with zipfile.ZipFile(runtime) as jar:
                 prefix = f"META-INF/maplibre-native-ffi/{classifier}/"
+                license_prefix = "META-INF/licenses/maplibre-native-c/"
                 native_libraries = [
                     name
                     for name in jar.namelist()
@@ -242,6 +273,12 @@ def verify_jvm(root: pathlib.Path) -> None:
                 ]
                 if not any("maplibre-native-c" in name for name in native_libraries):
                     raise SystemExit(f"{runtime} does not contain the C API library")
+                target = classifier.removeprefix("natives-")
+                for license_name in native_licenses(backend, target):
+                    if f"{license_prefix}{license_name}" not in jar.namelist():
+                        raise SystemExit(
+                            f"{runtime} is missing {license_prefix}{license_name}"
+                        )
 
 
 def verify_native(root: pathlib.Path) -> None:
@@ -260,11 +297,16 @@ def verify_native(root: pathlib.Path) -> None:
             f"{module} runtime cinterop KLIB",
         )
         with zipfile.ZipFile(interop) as klib:
+            names = set(klib.namelist())
             if not any(
                 name.endswith("/included/libmaplibre-native-c.a")
-                for name in klib.namelist()
+                for name in names
             ):
                 raise SystemExit(f"{interop} does not embed libmaplibre-native-c.a")
+            for license_name in COMMON_NATIVE_LICENSES:
+                expected = f"resources/licenses/maplibre-native-c/{license_name}"
+                if expected not in names:
+                    raise SystemExit(f"{interop} is missing {expected}")
 
 
 def main() -> int:

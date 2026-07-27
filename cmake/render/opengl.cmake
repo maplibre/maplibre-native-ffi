@@ -19,6 +19,7 @@ function(mln_configure_render_dependencies target)
           MLN_FFI_INCLUDE_DIRS "${MLN_FFI_EGL_INCLUDE_DIRS}"
           MLN_FFI_RUNTIME_DIRS "${MLN_FFI_EGL_LIBRARY_DIR}")
       if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        mln_add_license(${target} "${MLN_FFI_EGL_ROOT}/LICENSE" "angle.txt")
         set_target_properties(
           ${target}
           PROPERTIES

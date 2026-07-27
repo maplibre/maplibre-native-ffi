@@ -26,9 +26,12 @@ for preset in "${presets[@]}"; do
   archive_root="maplibre-native-c-${preset}"
   (
     cd "$install_root"
+    # The AAR bundles the native notices, and assembly now rejects an install
+    # without them, so extract the license directory alongside the library.
     cmake -E tar xzf "$archive" -- \
       "${archive_root}/lib/libmaplibre-native-c.so" \
-      "${archive_root}/share/maplibre-native-c/artifact.json"
+      "${archive_root}/share/maplibre-native-c/artifact.json" \
+      "${archive_root}/share/maplibre-native-c/licenses"
   )
   mv "${install_root}/${archive_root}" "${install_root}/${preset}"
 done

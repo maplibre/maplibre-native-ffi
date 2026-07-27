@@ -1,4 +1,12 @@
 function(mln_configure_render_dependencies target)
+  mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/Vulkan-Headers/LICENSE.md"
+                  "vulkan-headers.md")
+  mln_add_license(
+    ${target} "${MLN_SOURCE_DIR}/vendor/VulkanMemoryAllocator/LICENSE.txt"
+    "vulkan-memory-allocator.txt")
+  mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
+                  "glslang.txt")
+
   set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
   if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"
      OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
