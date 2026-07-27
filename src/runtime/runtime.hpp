@@ -50,17 +50,35 @@ struct ResourceTransformState {
   void* user_data = nullptr;
 };
 
+// Holds the resource provider registration in its own reference-counted object,
+// mirroring `ResourceTransformState`.
+//
+// A file-source lookup copies the runtime's handle to this state under the
+// process-global registry lock, which proves the runtime is live, and takes
+// `mutex` only after releasing it. Acquiring the shared lock while still
+// holding the registry lock would queue behind a pending writer and stall every
+// unrelated runtime for the duration of the in-flight callback, because
+// `validate_runtime()` and every other file-source lookup need that same
+// process-global mutex.
+struct ResourceProviderState {
+  std::shared_mutex mutex;
+  bool registered = false;
+  ResourceProvider provider;
+};
+
 // Borrows the resource provider registered on a runtime for the duration of one
-// provider callback. The lease holds a shared lock on the runtime's provider
-// mutex, so `set_resource_provider()`, `clear_resource_provider()`, and
+// provider callback. The lease holds a shared lock on the state's mutex, so
+// `set_resource_provider()`, `clear_resource_provider()`, and
 // `destroy_runtime()` wait for every live lease before they retire a callback
-// and its `user_data`.
+// and its `user_data`. The lease also retains the state itself, so it stays
+// readable even after the runtime it came from is gone.
 class ResourceProviderLease {
  public:
   ResourceProviderLease(
+    std::shared_ptr<ResourceProviderState> state,
     std::shared_lock<std::shared_mutex> lock, ResourceProvider provider
   )
-      : lock_(std::move(lock)), provider_(provider) {}
+      : state_(std::move(state)), lock_(std::move(lock)), provider_(provider) {}
 
   [[nodiscard]] auto callback() const -> mln_resource_provider_callback {
     return provider_.callback;
@@ -68,6 +86,7 @@ class ResourceProviderLease {
   [[nodiscard]] auto user_data() const -> void* { return provider_.user_data; }
 
  private:
+  std::shared_ptr<ResourceProviderState> state_;
   std::shared_lock<std::shared_mutex> lock_;
   ResourceProvider provider_;
 };
@@ -105,9 +124,7 @@ struct mln_runtime {
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
   bool has_maximum_cache_size = false;
   std::uint64_t maximum_cache_size = 0;
-  mutable std::shared_mutex resource_provider_mutex;
-  bool has_resource_provider = false;
-  mln::core::ResourceProvider resource_provider;
+  std::shared_ptr<mln::core::ResourceProviderState> resource_provider_state;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
   std::shared_ptr<mln::core::OfflineOperationEventState>
     offline_operation_state;

@@ -119,6 +119,23 @@ auto lease_resource_transform_state(void* platform_context) noexcept
   return runtime->resource_transform_state;
 }
 
+// Leases the resource provider registration, matching the transform lookup:
+// the registry lock covers only a reference count increment, and the caller
+// takes the state's lock after it is released.
+auto lease_resource_provider_state(void* platform_context) noexcept
+  -> std::shared_ptr<mln::core::ResourceProviderState> {
+  if (platform_context == nullptr) {
+    return nullptr;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    return nullptr;
+  }
+  return runtime->resource_provider_state;
+}
+
 using OfflineRegionSnapshotRegistry = std::unordered_map<
   const mln_offline_region_snapshot*,
   std::unique_ptr<mln_offline_region_snapshot>>;
@@ -1033,6 +1050,8 @@ auto create_runtime(
   owned_runtime->offline_operation_state->alive = true;
   owned_runtime->resource_transform_state =
     std::make_shared<ResourceTransformState>();
+  owned_runtime->resource_provider_state =
+    std::make_shared<ResourceProviderState>();
   auto* runtime = owned_runtime.get();
   {
     const std::scoped_lock lock(runtime_registry_mutex());
@@ -2337,9 +2356,10 @@ auto set_resource_provider(
   // that already leased the previous provider, so the previous callback and its
   // `user_data` are unreferenced once this returns. The registry lock is not
   // held across that wait, so one runtime's callback cannot stall others.
-  const std::unique_lock lock(runtime->resource_provider_mutex);
-  runtime->has_resource_provider = true;
-  runtime->resource_provider = ResourceProvider{
+  auto& state = *runtime->resource_provider_state;
+  const std::unique_lock lock(state.mutex);
+  state.registered = true;
+  state.provider = ResourceProvider{
     .callback = provider->callback,
     .user_data = provider->user_data,
   };
@@ -2352,9 +2372,10 @@ auto clear_resource_provider(mln_runtime* runtime) -> mln_status {
     return status;
   }
 
-  const std::unique_lock lock(runtime->resource_provider_mutex);
-  runtime->has_resource_provider = false;
-  runtime->resource_provider = ResourceProvider{};
+  auto& state = *runtime->resource_provider_state;
+  const std::unique_lock lock(state.mutex);
+  state.registered = false;
+  state.provider = ResourceProvider{};
   return MLN_STATUS_OK;
 }
 
@@ -2392,17 +2413,6 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
     runtime_registry().erase(found);
   }
 
-  {
-    // A file-source thread that found this runtime under the registry lock
-    // holds a shared provider lock through the callback. Taking the exclusive
-    // lock here keeps callback and user_data lifetime inside runtime lifetime.
-    const std::unique_lock provider_lock(
-      owned_runtime->resource_provider_mutex
-    );
-    owned_runtime->has_resource_provider = false;
-    owned_runtime->resource_provider = ResourceProvider{};
-  }
-
   // A resource transform callback that entered `invoke_resource_transform()`
   // before the erase above holds a shared transform lock, so this wait covers
   // every callback that can still observe the runtime. A lookup that leased
@@ -2420,11 +2430,10 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
   // above holds a shared provider lock, so this wait covers every callback that
   // can still observe the runtime.
   {
-    const std::unique_lock provider_lock(
-      owned_runtime->resource_provider_mutex
-    );
-    owned_runtime->has_resource_provider = false;
-    owned_runtime->resource_provider = ResourceProvider{};
+    auto& provider_state = *owned_runtime->resource_provider_state;
+    const std::unique_lock provider_lock(provider_state.mutex);
+    provider_state.registered = false;
+    provider_state.provider = ResourceProvider{};
   }
 
   {
@@ -2576,31 +2585,22 @@ auto resource_options_for_runtime(mln_runtime* runtime)
 auto acquire_resource_provider_for_platform_context(
   void* platform_context
 ) noexcept -> std::optional<ResourceProviderLease> {
-  if (platform_context == nullptr) {
+  const auto state = lease_resource_provider_state(platform_context);
+  if (state == nullptr) {
     return std::nullopt;
   }
 
-  auto* runtime = static_cast<mln_runtime*>(platform_context);
-  std::shared_lock<std::shared_mutex> provider_lock;
-  {
-    // Taking the shared provider lock while the registry lock is held is the
-    // handoff that keeps the runtime alive for the callback:
-    // `destroy_runtime()` removes the registry entry under the same registry
-    // lock and then waits for the exclusive provider lock. A caller that
-    // reaches the shared lock first holds teardown until the lease ends, and
-    // one that arrives after the erase finds no entry and skips the provider.
-    const std::scoped_lock registry_lock(runtime_registry_mutex());
-    if (!runtime_registry().contains(runtime)) {
-      return std::nullopt;
-    }
-    provider_lock = std::shared_lock{runtime->resource_provider_mutex};
-  }
-
-  if (!runtime->has_resource_provider) {
+  // The lease keeps this state readable on its own, so the shared lock is
+  // taken with the registry lock released. `destroy_runtime()` erases the
+  // registry entry and then clears the registration under the exclusive lock,
+  // so a callback that reaches the shared lock first holds teardown until it
+  // returns, and one that arrives later finds an empty registration.
+  std::shared_lock provider_lock(state->mutex);
+  if (!state->registered) {
     return std::nullopt;
   }
   return ResourceProviderLease{
-    std::move(provider_lock), runtime->resource_provider
+    state, std::move(provider_lock), state->provider
   };
 }
 
