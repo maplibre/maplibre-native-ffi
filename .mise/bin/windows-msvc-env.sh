@@ -8,7 +8,7 @@ esac
 windows_host_architecture="${MLN_FFI_WINDOWS_HOST_ARCHITECTURE:-$(uname -m)}"
 case "$windows_host_architecture" in
   aarch64 | arm64) msvc_arch=arm64 ;;
-  x86_64 | amd64) msvc_arch=x64 ;;
+  x64 | x86_64 | amd64) msvc_arch=x64 ;;
   *) echo "Unsupported Windows host architecture: $windows_host_architecture" >&2; return 1 ;;
 esac
 
