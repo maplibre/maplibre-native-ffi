@@ -108,9 +108,13 @@ fi
 if [[ -z "$cache_complete" ]]; then
   vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
   loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
+  # `set` is what cmd.exe reports the status of, so a failed call has to stop the
+  # script before it runs. Without this a half-initialized environment reads as
+  # success, and now that the result is cached it would be replayed all job.
   cat > "$loader" <<EOF
 @echo off
 call "$vs_dev_cmd" -arch=$msvc_arch -host_arch=$msvc_arch >nul
+if errorlevel 1 exit /b 1
 set
 EOF
 
@@ -128,13 +132,23 @@ EOF
     case "$name" in
       Path | PATH) msvc_path="$(cygpath -u -p "$value")" ;;
       *)
-        export "$name=$value"
+        # Compare before exporting: the test reads the variable's current value,
+        # which an export on this line would have already overwritten.
         if is_vsdevcmd_contribution "$name" "$value"; then
           cache_body+="export $name=$(printf '%q' "$value")"$'\n'
         fi
+        export "$name=$value"
         ;;
     esac
   done < <(tr -d '\r' <<< "$environment")
+
+  # clang-cl locates MSVC, and derives the _MSC_VER that decides which language
+  # dialects CMake will offer, from these. Refuse to publish an entry without
+  # them rather than hand every later shell a toolchain it cannot find.
+  if [[ -z "${VCToolsInstallDir:-}" || -z "${INCLUDE:-}" ]]; then
+    echo "VsDevCmd.bat did not set VCToolsInstallDir and INCLUDE" >&2
+    return 1
+  fi
 
   # cmd.exe inherited this shell's PATH, so its Path is those entries plus
   # VsDevCmd's. Keep the additions for the same reason the variables above are
