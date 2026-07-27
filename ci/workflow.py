@@ -7,6 +7,20 @@ import tomllib
 
 DESKTOP = {"linux", "macos", "windows"}
 
+# CI bootstraps the root providers during setup. Project providers stay scoped
+# to jobs that run their tasks, but are prepared once before those tasks so each
+# later mise invocation can skip automatic dependency checks.
+PROJECT_DEPENDENCIES = (
+    ("//bindings/dotnet:", "//bindings/dotnet:dotnet-tools"),
+    ("//bindings/zig:", "//bindings/zig:zig"),
+    ("//examples/zig-map:", "//examples/zig-map:zig"),
+    ("//examples/zig-readback:", "//examples/zig-readback:zig"),
+)
+
+
+def mise_run(task: str, *arguments: str) -> str:
+    return " ".join(("mise", "run", "--no-deps", task, *arguments))
+
 
 def load_configuration(
     root: pathlib.Path,
@@ -72,26 +86,28 @@ def suite_commands(source: dict[str, object], preset: str) -> list[str]:
                 continue
             if preset in command.get("exclude", []):
                 continue
-            commands.append(f"mise run {command['task']} {preset}")
+            commands.append(mise_run(command["task"], preset))
     return commands
 
 
 def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
     arguments = f"{render_backend} {abi}"
-    commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
+    commands = [mise_run("//bindings/kotlin:androidBuild", arguments, "--prebuilt")]
     if build_map:
-        commands.append(f"mise run //examples/android-map:build {arguments} --prebuilt")
+        commands.append(
+            mise_run("//examples/android-map:build", arguments, "--prebuilt")
+        )
     return commands
 
 
 def native_commands(preset: str, tested: set[str]) -> list[str]:
     target_platform = platform(preset)
     if target_platform == "ohos":
-        return [f"mise run //bindings/rust:build:ohos {preset}"]
-    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+        return [mise_run("//bindings/rust:build:ohos", preset)]
+    commands = [mise_run("test" if preset in tested else "build", preset)]
     if target_platform == "linux":
-        commands.append(f"mise run check-glibc-floor {preset}")
+        commands.append(mise_run("check-glibc-floor", preset))
     return commands
 
 
@@ -104,19 +120,19 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     elif target_platform == "ios":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
-                "mise run //bindings/swift:build:ios",
-                "mise run //examples/swift-map:build:ios",
+                mise_run("//bindings/kotlin:iosBuild", preset),
+                mise_run("//bindings/swift:build:ios"),
+                mise_run("//examples/swift-map:build:ios"),
             ]
         )
     elif target_platform == "ios-simulator":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
-                "mise run //bindings/swift:build:ios-simulator",
-                "mise run //bindings/zig:test:ios-simulator",
+                mise_run("//bindings/kotlin:iosBuild", preset),
+                mise_run("//bindings/swift:build:ios-simulator"),
+                mise_run("//bindings/zig:test:ios-simulator"),
                 "bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120",
-                "mise run //examples/swift-map:build:ios-simulator",
+                mise_run("//examples/swift-map:build:ios-simulator"),
             ]
         )
     elif target_platform in DESKTOP:
@@ -125,10 +141,18 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
 
 
 ZIG_PROJECTS = (
-    "mise run //bindings/zig:",
-    "mise run //examples/zig-map:",
-    "mise run //examples/zig-readback:",
+    "//bindings/zig:",
+    "//examples/zig-map:",
+    "//examples/zig-readback:",
 )
+
+
+def project_dependencies(commands: list[str]) -> list[str]:
+    return [
+        provider
+        for task_prefix, provider in PROJECT_DEPENDENCIES
+        if any(f" {task_prefix}" in command for command in commands)
+    ]
 
 
 def uses_zig(commands: list[str]) -> bool:
@@ -141,7 +165,7 @@ def uses_zig(commands: list[str]) -> bool:
     run the examples would then fail whenever an upstream host is unavailable.
     """
     return all(
-        any(command.startswith(project) for command in commands)
+        any(f" {project}" in command for command in commands)
         for project in ZIG_PROJECTS
     )
 
@@ -187,6 +211,7 @@ def target_rows(
             "runner": runner(preset),
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
+            "project_dependencies": project_dependencies(native + consumers),
             "native_commands": native if preset in packaged else native + consumers,
         }
         if preset in packaged:

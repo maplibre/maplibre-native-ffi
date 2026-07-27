@@ -12,7 +12,7 @@ OUTPUT = ROOT / ".github" / "workflows" / "ci.yml"
 sys.path.insert(0, str(ROOT))
 
 from ci.action_pins import load_pins  # noqa: E402
-from ci.workflow import load_configuration, target_rows  # noqa: E402
+from ci.workflow import load_configuration, mise_run, target_rows  # noqa: E402
 
 # Pins come from `.github/workflows/action-pins.yml` so Dependabot updates them.
 PINS = load_pins(ROOT)
@@ -64,6 +64,18 @@ def run_step(command: str, *, env: dict[str, str] | None = None) -> list[str]:
     return lines
 
 
+def prepare_project_dependencies(providers: list[str]) -> list[str]:
+    if not providers:
+        return []
+    lines = [
+        "      - name: Prepare project dependencies",
+        "        run: >-",
+        "          mise deps --monorepo",
+    ]
+    lines.extend(f"          --only {provider}" for provider in providers)
+    return lines
+
+
 CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
 
 
@@ -71,6 +83,7 @@ def target_job(row: dict[str, object]) -> list[str]:
     preset = str(row["preset"])
     package = bool(row["package"])
     zig = bool(row["zig"])
+    project_dependencies = list(row["project_dependencies"])
     native = list(row["native_commands"])
     consumers = list(row.get("consumer_commands", []))
 
@@ -82,6 +95,7 @@ def target_job(row: dict[str, object]) -> list[str]:
         SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(preset, zig=zig),
+        *prepare_project_dependencies(project_dependencies),
     ]
     for command in native:
         lines.extend(run_step(command))
@@ -89,10 +103,10 @@ def target_job(row: dict[str, object]) -> list[str]:
         lines.extend(
             [
                 "      - name: Archive native artifact",
-                f"        run: mise run archive-native {preset}",
+                f"        run: {mise_run('archive-native', preset)}",
                 "      - name: Install packaged native artifact",
                 "        run: >-",
-                "          mise run install-native-package",
+                "          mise run --no-deps install-native-package",
                 f"          {preset}",
                 f"          build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
             ]
@@ -169,12 +183,12 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(),
-        "      - run: mise run ci:generate-workflow --check",
-        "      - run: mise run ci:generate-devcontainer-tools --check",
+        f"      - run: {mise_run('ci:generate-workflow', '--check')}",
+        f"      - run: {mise_run('ci:generate-devcontainer-tools', '--check')}",
         "      - run: dprint output-resolved-config > /dev/null",
         # `mise run fix` provides the project-scoped formatter tools that the
         # dprint wrappers expect; calling hk directly leaves them uninstalled.
-        "      - run: mise run fix",
+        f"      - run: {mise_run('fix')}",
         "      - name: Check generated and formatted files",
         "        run: |",
         "          git update-index -q --refresh",
@@ -188,7 +202,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(),
-        "      - run: mise run //docs:build",
+        f"      - run: {mise_run('//docs:build')}",
         "",
     ]
     for row in rows:
@@ -211,7 +225,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "          pattern: native-package-android-*-${{ github.sha }}",
             "          path: build/packages/native/android-multi-input",
             "      - run: >-",
-            "          mise run //:kotlin:verify-android-multi-abi",
+            "          mise run --no-deps //:kotlin:verify-android-multi-abi",
             "          build/packages/native/android-multi-input",
             "",
             "  required:",
