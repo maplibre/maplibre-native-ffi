@@ -67,7 +67,7 @@ as the camera moves. Query the underlying dataset directly when you need
 whole-source coverage.
 
 ```c
-const mln_string_view layers[] = {sv("pois")};
+const mln_string_view layers[] = {{.data = "pois", .size = 4}};
 mln_source_feature_query_options options =
     mln_source_feature_query_options_default();
 options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
@@ -75,8 +75,10 @@ options.source_layer_ids = layers;
 options.source_layer_id_count = 1;
 
 mln_feature_query_result* result = NULL;
-mln_render_session_query_source_features(session, sv("points"), &options,
-                                         &result);
+mln_render_session_query_source_features(
+    session, (mln_string_view){.data = "points", .size = 6}, &options, &result);
+// Read the features the same way as the rendered query above, then:
+mln_feature_query_result_destroy(result);
 ```
 
 ## Feature extensions (supercluster)
@@ -109,8 +111,8 @@ const mln_json_value offset = {.size = sizeof(offset),
                                .type = MLN_JSON_VALUE_TYPE_UINT,
                                .data = {.uint_value = 0}};
 const mln_json_member members[] = {
-    {.key = sv("limit"), .value = &limit},
-    {.key = sv("offset"), .value = &offset},
+    {.key = {.data = "limit", .size = 5}, .value = &limit},
+    {.key = {.data = "offset", .size = 6}, .value = &offset},
 };
 const mln_json_value arguments = {
     .size = sizeof(arguments),
@@ -118,9 +120,12 @@ const mln_json_value arguments = {
     .data = {.object_value = {.members = members, .member_count = 2}}};
 
 mln_feature_extension_result* result = NULL;
-mln_render_session_query_feature_extensions(session, sv("points"),
-                                            cluster_feature, sv("supercluster"),
-                                            sv("leaves"), &arguments, &result);
+mln_render_session_query_feature_extensions(
+    session, (mln_string_view){.data = "points", .size = 6}, cluster_feature,
+    (mln_string_view){.data = "supercluster", .size = 12},
+    (mln_string_view){.data = "leaves", .size = 6}, &arguments, &result);
+// Inspect the result, then release it.
+mln_feature_extension_result_destroy(result);
 ```
 
 ## Feature state
@@ -144,13 +149,15 @@ mln_feature_state_selector selector = {
     .size = sizeof(selector),
     .fields = MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
               MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-    .source_id = sv("points"),
-    .source_layer_id = sv("pois"),
-    .feature_id = sv("station-42"),
+    .source_id = {.data = "points", .size = 6},
+    .source_layer_id = {.data = "pois", .size = 4},
+    .feature_id = {.data = "station-42", .size = 10},
 };
 
 mln_render_session_set_feature_state(session, &selector, &selected_json);
 mln_json_snapshot* state = NULL;
 mln_render_session_get_feature_state(session, &selector, &state);
+// The snapshot is owned; release it once read.
+mln_json_snapshot_destroy(state);
 mln_render_session_remove_feature_state(session, &selector);
 ```

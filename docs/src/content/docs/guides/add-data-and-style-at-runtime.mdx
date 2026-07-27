@@ -36,7 +36,10 @@ than construction:
 * **Custom geometry** — `add_custom_geometry_source` registers `fetch_tile`
   and `cancel_tile` callbacks that run on native worker threads. Feed tiles
   back with `set_custom_geometry_source_tile_data`, and poke the source with
-  the invalidate functions when your data changes. The callbacks must stay
+  the invalidate functions when your data changes. Those are thread-affine:
+  queue the call back to the map owner thread, because calling them from the
+  callback thread returns `MLN_STATUS_WRONG_THREAD` and leaves the tile
+  unpopulated. The callbacks must stay
   valid until the source is removed, the style is replaced, or the map is
   destroyed.
 

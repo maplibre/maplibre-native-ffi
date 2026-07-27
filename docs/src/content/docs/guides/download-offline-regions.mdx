@@ -131,8 +131,9 @@ while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
 * `update_metadata(region_id, metadata)` — replace the stored bytes.
 * `merge_database(path)` — import regions from a side database (for example,
   one bundled with the app); the result lists the merged regions.
-* `invalidate(region_id)` — drop the region's cached resources but keep the
-  region, so the next activation refetches them.
+* `invalidate(region_id)` — mark the region's cached resources stale so the
+  next use revalidates them against the server. This reclaims no storage:
+  the bytes stay and are reused when revalidation succeeds.
 * `delete(region_id)` — remove the region and its resources.
 
 Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE`
