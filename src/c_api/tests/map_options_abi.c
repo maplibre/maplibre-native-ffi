@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 

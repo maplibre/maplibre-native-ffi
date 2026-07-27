@@ -10,6 +10,7 @@
 #include <pthread.h>
 #endif
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 

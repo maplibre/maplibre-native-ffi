@@ -1,6 +1,7 @@
 // Raw C ABI coverage: malformed descriptor counts and unknown enum values are
 // hidden by binding-owned style values.
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 
