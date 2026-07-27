@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# MISE description="Reject build-host paths in a packaged native artifact."
-# MISE shell="python3"
+# [MISE] description="Reject build-host paths in a packaged native artifact."
+# [MISE] shell="python3"
 # USAGE arg "<preset>" help="Native CMake preset"
 
 """Check that a packaged shared library only names portable dependencies.

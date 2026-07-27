@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# MISE description="Prepare native package snapshot release assets."
-# MISE shell="python3"
+# [MISE] description="Prepare native package snapshot release assets."
+# [MISE] shell="python3"
 
 import hashlib
 import os
