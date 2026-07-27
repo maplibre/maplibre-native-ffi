@@ -6,14 +6,9 @@ run = "dart pub get"
 
 [tasks.ffigen]
 depends = [":pub-get"]
-run = '''
-clang_resource_dir="$(clang -print-resource-dir)"
-dart run ffigen \
-  --config ffigen.yaml \
-  --compiler-opts "-isystem '$clang_resource_dir/include'"
-'''
+run = "dart run tool/ffigen.dart"
 sources = [
-  "ffigen.yaml",
+  "tool/ffigen.dart",
   "pubspec.yaml",
   "pubspec.lock",
   "../../include/maplibre_native_c.h",
@@ -26,25 +21,13 @@ outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
 depends = [":pub-get"]
 run = """
 mkdir -p .dart_tool
-python3 - <<'PY'
-from pathlib import Path
-config = Path('ffigen.yaml').read_text()
-config = config.replace(
-    'output: lib/src/internal/c/maplibre_native_c.g.dart',
-    'output: .dart_tool/maplibre_native_c.check.g.dart',
-)
-Path('ffigen.check.yaml').write_text(config)
-PY
-trap 'rm -f ffigen.check.yaml .dart_tool/maplibre_native_c.check.g.dart' EXIT
-clang_resource_dir="$(clang -print-resource-dir)"
-dart run ffigen \
-  --config ffigen.check.yaml \
-  --compiler-opts "-isystem '$clang_resource_dir/include'"
+trap 'rm -f .dart_tool/maplibre_native_c.check.g.dart' EXIT
+dart run tool/ffigen.dart --output .dart_tool/maplibre_native_c.check.g.dart
 cmp --silent .dart_tool/maplibre_native_c.check.g.dart lib/src/internal/c/maplibre_native_c.g.dart
 """
 
 [tasks.format]
-run = "dart format lib test"
+run = "dart format lib test tool"
 
 [tasks.analyze]
 depends = [":ffigen-check"]
