@@ -318,19 +318,6 @@ runs:
           throw "no vulkan-1.dll in $($candidates -join ', ') or on PATH"
         }
 
-    # mise 2026.7.14 made project-local default shell settings global-only.
-    # Keep CI on the repository's Bash contract until a trusted project-scoped
-    # replacement is available: https://github.com/maplibre/maplibre-native-ffi/issues/366
-    - name: Configure mise shells
-      shell: bash
-      run: |
-        {
-          echo 'MISE_UNIX_DEFAULT_FILE_SHELL_ARGS=bash'
-          echo 'MISE_UNIX_DEFAULT_INLINE_SHELL_ARGS=bash -e -c'
-          echo 'MISE_WINDOWS_DEFAULT_FILE_SHELL_ARGS="C:/Program Files/Git/bin/bash.exe"'
-          echo 'MISE_WINDOWS_DEFAULT_INLINE_SHELL_ARGS="C:/Program Files/Git/bin/bash.exe" -e -lc'
-        } >> "$GITHUB_ENV"
-
     # `mise-action` saves its cache inline, at the end of its own step, so
     # anything installed after it — the project toolchains below, and the rustup
     # tree that `core:rust` installs outside the mise data directory — was never
