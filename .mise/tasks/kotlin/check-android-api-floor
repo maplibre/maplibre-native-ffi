@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # MISE description="Verify compiled androidMain bytecode stays on the android-minSdk floor."
+# MISE shell="python3"
 
 """Reject Android platform APIs introduced above the ``android-minSdk`` floor.
 

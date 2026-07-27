@@ -30,11 +30,14 @@ dotnet.isolated = true
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
 
-# Task scripts across the workspace are Bash. Cascading the shell gives every
-# monorepo config root the same contract without repeating it, and keeps the
-# choice scoped to tasks: hooks, tool installs, and dependency providers still
-# use the platform shell. File tasks take their arguments through `#USAGE`
-# variables, which stay available under this shell on every platform.
+# Inline task scripts across the workspace are Bash. Cascading the shell gives
+# every monorepo config root the same contract without repeating it, and keeps
+# the choice scoped to tasks: hooks, tool installs, and dependency providers
+# still use the platform shell.
+#
+# This default reaches file tasks too, and on Windows mise applies it in place
+# of the shebang, so each file task names its own interpreter with
+# `#MISE shell=`.
 [task_config]
 cascade = true
 shell = "bash -e -c"
