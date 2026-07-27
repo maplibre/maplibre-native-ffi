@@ -307,9 +307,23 @@ runs:
 
     # The mise action may restore Rust install metadata without the rustup
     # toolchain, components, or cross targets declared in mise.toml.
+    #
+    # `--force` uninstalls the toolchain before it reinstalls one, so a single
+    # transient failure leaves the runner with no Rust at all and fails the job.
+    # ARM64 runners kill freshly spawned processes often enough to hit this:
+    # rustup has died by signal milliseconds after exec, having written nothing.
+    # Retry so the second attempt restores what the first one removed.
     - name: Repair cached Rust toolchain
       shell: bash
-      run: MISE_NO_HOOKS=1 mise install --force rust
+      run: |
+        for attempt in 1 2 3; do
+          if MISE_NO_HOOKS=1 mise install --force rust; then
+            exit 0
+          fi
+          echo "::warning::mise install --force rust failed (attempt ${attempt}/3)"
+          sleep $((attempt * 5))
+        done
+        exit 1
 
     # Project tools live in each project's config, so the root install covers
     # only the repository-wide set. Installing the rest lazily would leave every
