@@ -127,6 +127,8 @@ fi
 description = "Verify the Android binding stays on the android-minSdk floor."
 dir = "../.."
 run = '''
-./gradlew :bindings:kotlin:compileAndroidMain
+./gradlew \
+  :bindings:kotlin:compileAndroidMain \
+  :bindings:kotlin:compileAndroidMainJavaWithJavac
 mise run //:kotlin:check-android-api-floor
 '''

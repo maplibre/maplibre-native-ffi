@@ -63,6 +63,17 @@ FIXED_WIDTH_TAGS = {
 
 WIDE_TAGS = {TAG_LONG, TAG_DOUBLE}
 
+# Object types inside a JVM descriptor or generic signature: `Lpkg/Name;`.
+DESCRIPTOR_TYPE = re.compile(r"L([a-zA-Z_$][\w$]*(?:/[a-zA-Z_$][\w$]*)+);")
+
+# D8 desugars every `invokedynamic` -- Kotlin lambdas, SAM conversions, and
+# string concatenation -- into anonymous classes below API 26, so the bootstrap
+# types these call sites name in the class file never reach the dex. Verified by
+# dexing `androidMain` at `--min-api 24`: the class files reference
+# `java/lang/invoke/{CallSite,MethodHandle,MethodHandles$Lookup,MethodType}`
+# while the resulting dex contains no `java/lang/invoke` reference at all.
+DESUGARED_TYPE_PREFIXES = ("java/lang/invoke/",)
+
 # D8 rewrites static helpers on these JDK types into inline code or synthetic
 # methods at every min-api level, so calling them stays safe below their
 # documented `since`. Verified by dexing at `--min-api 24`: the class file
@@ -109,7 +120,8 @@ def repository_root():
     root = os.environ.get("MISE_MONOREPO_ROOT")
     if root:
         return pathlib.Path(root)
-    return pathlib.Path(__file__).resolve().parents[2]
+    # This file lives at <root>/.mise/tasks/kotlin/check-android-api-floor.
+    return pathlib.Path(__file__).resolve().parents[3]
 
 
 def catalog_version(root, key):
@@ -122,6 +134,36 @@ def catalog_version(root, key):
     return match.group(1)
 
 
+def unescape_properties_value(value):
+    """Decode a java.util.Properties value.
+
+    Gradle writes ``local.properties`` with properties escaping, so a Windows
+    SDK path arrives as ``C\\:\\\\Users\\\\name\\\\Android\\\\Sdk``. A backslash
+    escapes the character after it, and ``\\t``/``\\n``/``\\r``/``\\f`` carry
+    their usual meaning.
+    """
+    specials = {"t": "\t", "n": "\n", "r": "\r", "f": "\f"}
+    out = []
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if character != "\\" or index + 1 >= len(value):
+            out.append(character)
+            index += 1
+            continue
+        following = value[index + 1]
+        if following == "u" and index + 5 < len(value):
+            try:
+                out.append(chr(int(value[index + 2 : index + 6], 16)))
+                index += 6
+                continue
+            except ValueError:
+                pass
+        out.append(specials.get(following, following))
+        index += 2
+    return "".join(out)
+
+
 def android_sdk_directory(root):
     """Resolve the SDK the same way settings.gradle.kts does."""
     local_properties = root / "local.properties"
@@ -132,7 +174,7 @@ def android_sdk_directory(root):
             re.MULTILINE,
         )
         if match:
-            candidate = pathlib.Path(match.group(1).strip().replace("\\\\", "\\"))
+            candidate = pathlib.Path(unescape_properties_value(match.group(1).strip()))
             if candidate.is_dir():
                 return candidate
     for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
@@ -145,20 +187,37 @@ def android_sdk_directory(root):
     )
 
 
+def platform_api_level(path):
+    """Return the numeric API level of a ``platforms/android-<level>`` path."""
+    name = path.parts[-3].removeprefix("android-")
+    try:
+        # Preview and extension platforms use names like `android-37.0`.
+        return int(name.split(".", 1)[0])
+    except ValueError:
+        return None
+
+
 def api_database_path(sdk_directory, compile_sdk):
-    """Prefer the compileSdk platform, then the newest platform installed."""
+    """Resolve the compileSdk platform database, or a newer one.
+
+    An older database omits every API introduced since, which would silently
+    accept calls above the floor, so this fails rather than falling back to one.
+    """
     preferred = sdk_directory / "platforms" / f"android-{compile_sdk}" / "data" / "api-versions.xml"
     if preferred.is_file():
         return preferred
-    candidates = sorted(
-        (sdk_directory / "platforms").glob("android-*/data/api-versions.xml"),
-        key=lambda path: path.parts,
-    )
+    wanted = int(compile_sdk.split(".", 1)[0])
+    candidates = [
+        (level, path)
+        for path in (sdk_directory / "platforms").glob("android-*/data/api-versions.xml")
+        for level in [platform_api_level(path)]
+        if level is not None and level >= wanted
+    ]
     if candidates:
-        return candidates[-1]
+        return min(candidates)[1]
     fail(
-        f"no api-versions.xml under {sdk_directory / 'platforms'}; "
-        f"install the android-{compile_sdk} platform"
+        f"no api-versions.xml for android-{compile_sdk} or newer under "
+        f"{sdk_directory / 'platforms'}; install the android-{compile_sdk} platform"
     )
 
 
@@ -176,7 +235,10 @@ def load_api_database(path):
             if relation.tag in ("extends", "implements"):
                 target = relation.get("name")
                 if target:
-                    entry.supers.append(target)
+                    # A relationship carries its own `since` when the type
+                    # gained the supertype after being introduced, so an
+                    # inherited member is only reachable from that level up.
+                    entry.supers.append((target, int(relation.get("since", entry.since))))
             elif relation.tag in ("method", "field"):
                 member = relation.get("name")
                 if member is None:
@@ -210,22 +272,29 @@ def resolve_member(classes, owner, member, kind):
         cut = member.rfind(")")
         if cut != -1:
             candidates.append(member[: cut + 1])
-    seen = set()
-    pending = [owner]
+    # Each entry carries the level at which this owner can reach that class, so
+    # a member inherited through a late `implements` is judged at that level.
+    seen = {}
+    pending = [(owner, 0)]
+    best = None
     while pending:
-        name = pending.pop(0)
-        if name in seen:
+        name, reachable_since = pending.pop(0)
+        if seen.get(name, sys.maxsize) <= reachable_since:
             continue
-        seen.add(name)
+        seen[name] = reachable_since
         entry = classes.get(name)
         if entry is None:
             continue
         table = entry.methods if kind == "method" else entry.fields
         for candidate in candidates:
             if candidate in table:
-                return table[candidate], name
-        pending.extend(entry.supers)
-    return None
+                since = max(table[candidate], reachable_since)
+                if best is None or since < best[0]:
+                    best = (since, name)
+                break
+        for super_name, super_since in entry.supers:
+            pending.append((super_name, max(reachable_since, super_since)))
+    return best
 
 
 def read_constant_pool(data):
@@ -294,6 +363,14 @@ def parse_references(data):
         name = entries.get(name_index)
         if isinstance(name, str) and not name.startswith("["):
             references.append(("class", name))
+    # A platform type named only in a field or method signature never reaches
+    # the pool as a CONSTANT_Class entry, so mine the descriptors too. Every
+    # descriptor lives in the pool as a UTF-8 entry, which also covers the
+    # signature attributes and the field/method tables without parsing them.
+    for value in entries.values():
+        if isinstance(value, str):
+            for name in DESCRIPTOR_TYPE.findall(value):
+                references.append(("class", name))
     for tag, class_index, name_and_type_index in members:
         owner = entries.get(classes.get(class_index, -1))
         pair = name_and_types.get(name_and_type_index)
@@ -325,14 +402,23 @@ def main(argv):
     if not roots:
         roots = [
             root / "bindings/kotlin/build/classes/kotlin/android/main",
-            root / "bindings/kotlin/build/classes/java/androidMain",
+            root
+            / "bindings/kotlin/build/intermediates/javac/androidMain"
+            / "compileAndroidMainJavaWithJavac/classes",
         ]
+        # Both halves of androidMain must be present. Scanning only the Kotlin
+        # output would report success while the Java sources went unchecked.
+        missing = [path for path in roots if not path.is_dir()]
+        if missing:
+            fail(
+                "no compiled androidMain classes at "
+                + ", ".join(str(path) for path in missing)
+                + "; run ./gradlew :bindings:kotlin:compileAndroidMain "
+                ":bindings:kotlin:compileAndroidMainJavaWithJavac first"
+            )
     roots = [path for path in roots if path.is_dir()]
     if not roots:
-        fail(
-            "no compiled androidMain classes found; run "
-            "./gradlew :bindings:kotlin:compileAndroidMain first"
-        )
+        fail("no compiled androidMain classes found in the requested directories")
 
     database = load_api_database(api_database_path(android_sdk_directory(root), compile_sdk))
 
@@ -343,6 +429,8 @@ def main(argv):
             scanned += 1
             data = class_file.read_bytes()
             for reference in parse_references(data):
+                if reference[1].startswith(DESUGARED_TYPE_PREFIXES):
+                    continue
                 if reference[0] == "class":
                     entry = database.get(reference[1])
                     if entry is None or entry.since <= floor:
