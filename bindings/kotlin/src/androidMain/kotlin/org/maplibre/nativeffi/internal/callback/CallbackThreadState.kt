@@ -1,7 +1,12 @@
 package org.maplibre.nativeffi.internal.callback
 
 internal actual class CallbackThreadState actual constructor() {
-  private val depth = ThreadLocal.withInitial { 0 }
+  // `ThreadLocal.withInitial` arrives at API 26 while this binding supports API 24, so the initial
+  // value comes from the override that covers the whole supported range.
+  private val depth =
+    object : ThreadLocal<Int>() {
+      override fun initialValue(): Int = 0
+    }
 
   actual fun enter() {
     depth.set((depth.get() ?: 0) + 1)

@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -58,6 +60,23 @@ class HandleLeakCleanerTest {
     )
   }
 
+  @Test
+  fun blockedLeakReportDoesNotBlockNativeReclamationWorker() {
+    val reportStarted = CountDownLatch(1)
+    val unblockReport = CountDownLatch(1)
+    val reclaimed = CountDownLatch(1)
+
+    registerBlockingLeakReport(reportStarted, unblockReport)
+    UnreachableActions.register(Any(), reclaimed::countDown)
+
+    try {
+      assertTrue(awaitAction(reportStarted), "expected the leak-report worker to start")
+      assertTrue(awaitAction(reclaimed), "expected native reclamation to use another worker")
+    } finally {
+      unblockReport.countDown()
+    }
+  }
+
   /** Registers a handle that is unreachable once this call returns. */
   private fun registerUnreachableHandle(reports: MutableList<String>) {
     HandleLeakCleaner.register(
@@ -71,6 +90,25 @@ class HandleLeakCleanerTest {
     val leakReport = HandleStateCore.LeakReport("MapHandle", 0x5678L, reports::add)
     leakReport.markReleased()
     HandleLeakCleaner.register(Any(), leakReport)
+  }
+
+  /** Registers a diagnostic that blocks after its handle becomes unreachable. */
+  private fun registerBlockingLeakReport(started: CountDownLatch, unblock: CountDownLatch) {
+    HandleLeakCleaner.register(
+      Any(),
+      HandleStateCore.LeakReport("RuntimeHandle", 0x1234L) {
+        started.countDown()
+        unblock.await()
+      },
+    )
+  }
+
+  private fun awaitAction(action: CountDownLatch): Boolean {
+    repeat(ATTEMPTS) {
+      if (action.await(POLL_MILLIS, TimeUnit.MILLISECONDS)) return true
+      System.gc()
+    }
+    return action.count == 0L
   }
 
   private fun awaitReport(reports: List<String>): Boolean {
