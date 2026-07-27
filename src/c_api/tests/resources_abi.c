@@ -864,6 +864,125 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct provider_teardown_probe {
+  atomic_bool entered;
+  atomic_bool teardown_started;
+  atomic_bool callback_returned;
+} provider_teardown_probe;
+
+enum {
+  provider_teardown_wait_attempts = 10000,
+  provider_teardown_block_milliseconds = 200,
+};
+
+// Blocks after teardown starts so the test can distinguish teardown waiting
+// for this invocation from teardown returning while callback state is live.
+static uint32_t blocking_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) {
+  (void)request;
+  (void)handle;
+  provider_teardown_probe* probe = user_data;
+  atomic_store(&probe->entered, true);
+  for (size_t attempt = 0; attempt < provider_teardown_wait_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->teardown_started)) {
+      break;
+    }
+    mln_test_sleep_millisecond();
+  }
+  for (size_t elapsed = 0; elapsed < provider_teardown_block_milliseconds;
+       elapsed += 1) {
+    mln_test_sleep_millisecond();
+  }
+  atomic_store(&probe->callback_returned, true);
+  // An unknown decision is converted to a handled provider error. Keeping the
+  // request on the provider path avoids involving native network teardown in
+  // this provider-lifetime regression.
+  return UINT32_MAX;
+}
+
+// Starts an offline download because its network request runs on a MapLibre
+// file-source thread and does not require a live map during runtime teardown.
+static bool wait_for_provider_callback(
+  mln_runtime* runtime, provider_teardown_probe* probe
+) {
+  const mln_offline_region_definition definition = offline_tile_definition();
+  const uint8_t metadata[] = {1, 2, 3};
+  mln_offline_operation_id operation_id = 0;
+  if (
+    mln_runtime_offline_region_create_start(
+      runtime, &definition, metadata, sizeof(metadata), &operation_id
+    ) != MLN_STATUS_OK ||
+    !wait_for_offline_completion(runtime, operation_id)
+  ) {
+    return false;
+  }
+
+  mln_offline_region_snapshot* snapshot = NULL;
+  if (
+    mln_runtime_offline_region_create_take_result(
+      runtime, operation_id, &snapshot
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+  mln_offline_region_info info = {.size = sizeof(mln_offline_region_info)};
+  const mln_status info_status =
+    mln_offline_region_snapshot_get(snapshot, &info);
+  const mln_offline_region_id region_id = info.id;
+  mln_offline_region_snapshot_destroy(snapshot);
+  if (info_status != MLN_STATUS_OK) {
+    return false;
+  }
+
+  mln_offline_operation_id download_operation_id = 0;
+  if (
+    mln_runtime_offline_region_set_download_state_start(
+      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
+      &download_operation_id
+    ) != MLN_STATUS_OK
+  ) {
+    return false;
+  }
+
+  for (size_t attempt = 0; attempt < provider_teardown_wait_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->entered)) {
+      return true;
+    }
+    if (mln_runtime_run_once(runtime) != MLN_STATUS_OK) {
+      return false;
+    }
+    mln_test_sleep_millisecond();
+  }
+  return false;
+}
+
+// The provider callback and borrowed user_data remain valid until runtime
+// destruction returns, including callbacks already running on worker threads.
+static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
+  provider_teardown_probe probe = {0};
+  mln_runtime* runtime = mln_test_create_runtime();
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = blocking_resource_provider,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  TEST_ASSERT_TRUE(wait_for_provider_callback(runtime, &probe));
+
+  atomic_store(&probe.teardown_started, true);
+  mln_test_destroy_runtime(runtime);
+  TEST_ASSERT_TRUE_MESSAGE(
+    atomic_load(&probe.callback_returned),
+    "runtime teardown returned while a provider callback was still running"
+  );
+}
+
 void run_resources_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
@@ -880,4 +999,5 @@ void run_resources_abi_tests(void) {
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
   RUN_TEST(unsupported_style_url_names_declining_provider);
   RUN_TEST(resource_provider_defers_inline_release_until_callback_returns);
+  RUN_TEST(runtime_teardown_waits_for_in_flight_provider_callback);
 }

@@ -188,14 +188,22 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
 
   auto request(const mbgl::Resource& resource, Callback callback)
     -> std::unique_ptr<mbgl::AsyncRequest> override {
-    const auto provider =
-      runtime_resource_provider(resource_options_.platformContext());
-    if (can_request_network(resource) && provider.has_value()) {
-      auto request = request_custom_resource(
-        resource, provider->callback, provider->user_data, callback
+    bool has_provider = false;
+    if (can_request_network(resource)) {
+      // Keep the lease through the synchronous callback, then release it
+      // before falling through to native loading: the native source may invoke
+      // a transform that needs the runtime registry lock during teardown.
+      const auto provider = acquire_resource_provider_for_platform_context(
+        resource_options_.platformContext()
       );
-      if (request != nullptr) {
-        return request;
+      has_provider = provider.has_value();
+      if (provider.has_value()) {
+        auto request = request_custom_resource(
+          resource, provider->callback(), provider->user_data(), callback
+        );
+        if (request != nullptr) {
+          return request;
+        }
       }
     }
     if (!native_->canRequest(resource)) {
@@ -204,9 +212,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     const auto unsupported = unsupported_network_scheme(resource.url);
     if (unsupported.has_value()) {
       return respond_immediately(
-        unsupported_scheme_response(
-          *unsupported, resource.url, provider.has_value()
-        ),
+        unsupported_scheme_response(*unsupported, resource.url, has_provider),
         std::move(callback)
       );
     }
@@ -215,10 +221,10 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
 
   [[nodiscard]] auto canRequest(const mbgl::Resource& resource) const
     -> bool override {
-    const auto has_provider =
-      runtime_resource_provider(resource_options_.platformContext())
-        .has_value();
-    return (can_request_network(resource) && has_provider) ||
+    const auto provider = acquire_resource_provider_for_platform_context(
+      resource_options_.platformContext()
+    );
+    return (can_request_network(resource) && provider.has_value()) ||
            native_->canRequest(resource);
   }
 
@@ -261,15 +267,6 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
  private:
-  static auto runtime_resource_provider(void* platform_context)
-    -> std::optional<ResourceProvider> {
-    const auto* runtime = find_runtime_for_platform_context(platform_context);
-    if (runtime == nullptr || !runtime->has_resource_provider) {
-      return std::nullopt;
-    }
-    return runtime->resource_provider;
-  }
-
   // Reports the scheme of a URL the online source is unable to serve. The
   // resource loader routes file, asset, mbtiles, and pmtiles URLs to their own
   // sources ahead of the network, so anything left here reaches an HTTP
@@ -341,11 +338,13 @@ auto make_database_file_source(
     auto source = std::make_unique<mbgl::DatabaseFileSource>(
       resource_options, client_options
     );
-    const auto* runtime =
-      find_runtime_for_platform_context(resource_options.platformContext());
-    if (runtime != nullptr && runtime->has_maximum_cache_size) {
+    const auto maximum_cache_size =
+      find_maximum_cache_size_for_platform_context(
+        resource_options.platformContext()
+      );
+    if (maximum_cache_size.has_value()) {
       source->setMaximumAmbientCacheSize(
-        runtime->maximum_cache_size, [](std::exception_ptr exception) -> void {
+        *maximum_cache_size, [](std::exception_ptr exception) -> void {
           if (exception != nullptr) {
             mbgl::Log::Error(
               mbgl::Event::Database,
