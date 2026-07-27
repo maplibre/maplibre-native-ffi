@@ -723,6 +723,62 @@ auto to_native_geojson_source_options(const mln_geojson_source_options& options)
   return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
 }
 
+auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
+  -> std::string_view {
+  return geometry.match(
+    [](const mbgl::EmptyGeometry&) -> std::string_view { return "empty"; },
+    [](const mbgl::Point<double>&) -> std::string_view { return "point"; },
+    [](const mbgl::LineString<double>&) -> std::string_view {
+      return "line string";
+    },
+    [](const mbgl::Polygon<double>&) -> std::string_view { return "polygon"; },
+    [](const mbgl::MultiPoint<double>&) -> std::string_view {
+      return "multi-point";
+    },
+    [](const mbgl::MultiLineString<double>&) -> std::string_view {
+      return "multi-line string";
+    },
+    [](const mbgl::MultiPolygon<double>&) -> std::string_view {
+      return "multi-polygon";
+    },
+    [](const mapbox::geometry::geometry_collection<double>&)
+      -> std::string_view { return "geometry collection"; }
+  );
+}
+
+/**
+ * Reports whether clustered data satisfies supercluster's point-only input.
+ *
+ * MapLibre Native clusters a feature collection by reading each feature's
+ * geometry as a point, so any other geometry raises a variant access error
+ * inside supercluster while mln_map_add_geojson_source_data() or
+ * mln_map_set_geojson_source_data() builds the index. Checking here reports the
+ * source, the feature, and the constraint instead.
+ */
+auto validate_clustered_geojson(
+  const std::string& source_id, const mbgl::GeoJSON& geojson
+) -> bool {
+  if (!geojson.is<mbgl::FeatureCollection>()) {
+    return true;
+  }
+
+  const auto& features = geojson.get<mbgl::FeatureCollection>();
+  for (std::size_t index = 0; index < features.size(); ++index) {
+    const auto& geometry = features.at(index).geometry;
+    if (geometry.is<mbgl::Point<double>>()) {
+      continue;
+    }
+    const auto message =
+      "clustered GeoJSON source \"" + source_id +
+      "\" requires point geometry on every feature; feature " +
+      std::to_string(index) + " has " +
+      std::string{geojson_geometry_type_name(geometry)} + " geometry";
+    mln::core::set_thread_error(message.c_str());
+    return false;
+  }
+  return true;
+}
+
 auto has_custom_geometry_source_option(
   const mln_custom_geometry_source_options& options, uint32_t field
 ) -> bool {
@@ -3485,8 +3541,12 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto native_options =
-    to_native_geojson_source_options(effective_geojson_source_options(options));
+  const auto effective = effective_geojson_source_options(options);
+  if (effective.cluster && !validate_clustered_geojson(id, *geojson)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto native_options = to_native_geojson_source_options(effective);
   if (!native_options) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -3558,6 +3618,12 @@ auto map_set_geojson_source_data(
   auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    geojson_source->getOptions().cluster &&
+    !validate_clustered_geojson(string_from_view(source_id), *geojson)
+  ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
