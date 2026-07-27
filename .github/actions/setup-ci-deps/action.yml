@@ -70,7 +70,7 @@ runs:
         >> "$GITHUB_OUTPUT"
 
     - name: Cache MapLibre Native source
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           third_party/maplibre-native
@@ -111,7 +111,7 @@ runs:
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.cargo/registry/index/
@@ -148,7 +148,7 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Cache package downloads
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.ci-package-cache
         key: ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', 'dotnet-tools.json', 'bindings/dotnet/dotnet-tools.json') }}
@@ -176,7 +176,7 @@ runs:
     - name: Restore Zig packages
       if: ${{ inputs.zig == 'true' }}
       id: zig-packages
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.cache/zig/p
@@ -269,7 +269,7 @@ runs:
 
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
-      uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
+      uses: jakoch/install-vulkan-sdk-action@37effcfa045411f8bfbbda26df2fd1b3bf3436fa # v1.6.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
         # hit returns before the runtime is installed, so the entry saved
@@ -340,7 +340,7 @@ runs:
 
     - name: Restore toolchains
       id: toolchains
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         # mise keeps its data under LOCALAPPDATA on Windows and the XDG data
         # directory everywhere else. `core:rust` defers to rustup, which owns
@@ -357,7 +357,7 @@ runs:
           ${{ steps.toolchain-key.outputs.prefix }}-
 
     - name: Bootstrap repository
-      uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+      uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
       with:
         cache: false
         bootstrap: true
@@ -404,7 +404,7 @@ runs:
     # the losers pay the archive before the conflict is reported.
     - name: Save toolchains
       if: ${{ inputs.save-toolchains == 'true' && steps.toolchains.outputs.cache-hit != 'true' }}
-      uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.local/share/mise
