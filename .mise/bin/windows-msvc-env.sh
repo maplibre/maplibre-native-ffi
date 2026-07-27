@@ -47,42 +47,87 @@ if [[ ! -x "$vswhere" ]]; then
   return 1
 fi
 
-vs_install="$("$vswhere" -latest -version '[17.0,18.0)' -products '*' \
-  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
-  -property installationPath | tr -d '\r' | sed -n '1p')"
+vs_query() {
+  "$vswhere" -latest -version '[17.0,18.0)' -products '*' \
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+    -property "$1" | tr -d '\r' | sed -n '1p'
+}
+
+vs_install="$(vs_query installationPath)"
 if [[ -z "$vs_install" ]]; then
   echo "Visual Studio 2022 with the Desktop development with C++ workload was not found" >&2
   return 1
 fi
 
-vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
-loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
-cat > "$loader" <<EOF
+# Every mise task, and on CI every `shell: bash` step, starts a fresh Git Bash
+# that sources this file. Resolving the environment from scratch each time costs
+# a cmd.exe running VsDevCmd.bat plus a walk of the redist tree, which is slow
+# everywhere and is the dominant source of process creation on Windows ARM64,
+# where the MSYS2 runtime crashes under that churn. Resolving it once per
+# toolchain and replaying the result keeps later shells to one vswhere pair.
+#
+# The key covers everything the cached values derive from: the install path, the
+# installed version, and the target architecture. An in-place Visual Studio
+# update changes the version and so retires the entry.
+vs_version="$(vs_query installationVersion)"
+cache_key="${vs_install//[^A-Za-z0-9]/_}-${vs_version//[^A-Za-z0-9]/_}-${msvc_arch}"
+cache_file="${TMPDIR:-/tmp}/mln-msvc-env-${cache_key}.sh"
+
+msvc_path=
+crt_path=
+if [[ -r "$cache_file" ]]; then
+  # shellcheck source=/dev/null
+  source "$cache_file"
+fi
+
+# A cache written by a killed shell can be truncated, so treat a missing
+# msvc_path as a miss rather than trusting a partial replay.
+if [[ -z "$msvc_path" ]]; then
+  vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
+  loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
+  cat > "$loader" <<EOF
 @echo off
 call "$vs_dev_cmd" -arch=$msvc_arch -host_arch=$msvc_arch >nul
 set
 EOF
 
-loader_windows="$(cygpath -w "$loader")"
-if ! environment="$(cmd.exe //d //s //c "$loader_windows")"; then
+  loader_windows="$(cygpath -w "$loader")"
+  if ! environment="$(cmd.exe //d //s //c "$loader_windows")"; then
+    rm -f "$loader"
+    echo "VsDevCmd.bat failed to initialize the Visual Studio environment" >&2
+    return 1
+  fi
   rm -f "$loader"
-  echo "VsDevCmd.bat failed to initialize the Visual Studio environment" >&2
-  return 1
-fi
-rm -f "$loader"
 
-while IFS='=' read -r name value; do
-  [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-  case "$name" in
-    Path | PATH) msvc_path="$(cygpath -u -p "$value")" ;;
-    *) export "$name=$value" ;;
-  esac
-done < <(tr -d '\r' <<< "$environment")
+  cache_body=
+  while IFS='=' read -r name value; do
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    case "$name" in
+      Path | PATH) msvc_path="$(cygpath -u -p "$value")" ;;
+      *)
+        export "$name=$value"
+        cache_body+="export $name=$(printf '%q' "$value")"$'\n'
+        ;;
+    esac
+  done < <(tr -d '\r' <<< "$environment")
 
-redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
-crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
-if [[ -n "$crt_path" ]]; then
-  crt_path="$(dirname "$crt_path")"
+  redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
+  crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
+  if [[ -n "$crt_path" ]]; then
+    crt_path="$(dirname "$crt_path")"
+  fi
+
+  # Publish through a rename so a concurrent shell sees either no entry or a
+  # complete one. Writing the cache is best effort: a failure here costs the
+  # next shell a rebuild, which is what it would have paid anyway.
+  cache_body+="msvc_path=$(printf '%q' "$msvc_path")"$'\n'
+  cache_body+="crt_path=$(printf '%q' "$crt_path")"$'\n'
+  if cache_staging="$(mktemp "${cache_file}.XXXXXX" 2>/dev/null)"; then
+    if ! { printf '%s' "$cache_body" > "$cache_staging" &&
+      mv -f "$cache_staging" "$cache_file"; }; then
+      rm -f "$cache_staging"
+    fi
+  fi
 fi
 
 export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${msvc_path:+$msvc_path:}$original_path"
