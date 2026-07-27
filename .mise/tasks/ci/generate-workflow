@@ -32,7 +32,12 @@ def job_id(preset: str) -> str:
     return f"target-{preset}"
 
 
-def setup(target: str | None = None, zig: bool = False) -> list[str]:
+def setup(
+    target: str | None = None,
+    zig: bool = False,
+    gradle: bool = True,
+    save_toolchains: bool = False,
+) -> list[str]:
     lines = [
         f"      - uses: {CHECKOUT}",
         "        with:",
@@ -46,6 +51,10 @@ def setup(target: str | None = None, zig: bool = False) -> list[str]:
         lines.append(f"          target: {target}")
     if zig:
         lines.append("          zig: true")
+    if not gradle:
+        lines.append("          gradle: false")
+    if save_toolchains:
+        lines.append("          save-toolchains: true")
     lines.extend(
         [
             "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -81,7 +90,12 @@ def target_job(row: dict[str, object]) -> list[str]:
         "    timeout-minutes: 120",
         SCCACHE_ENVIRONMENT,
         "    steps:",
-        *setup(preset, zig=zig),
+        *setup(
+            preset,
+            zig=zig,
+            gradle=bool(row["gradle"]),
+            save_toolchains=bool(row["save_toolchains"]),
+        ),
     ]
     for command in native:
         lines.extend(run_step(command))
@@ -113,8 +127,8 @@ def target_job(row: dict[str, object]) -> list[str]:
                 f"        uses: {CACHE_SAVE}",
                 "        with:",
                 "          path: |",
-                "            ~/.cache/zig",
-                "            ~/AppData/Local/zig",
+                "            ~/.cache/zig/p",
+                "            ~/AppData/Local/zig/p",
                 "          key: ${{ steps.setup.outputs.zig-cache-key }}",
             ]
         )
@@ -168,7 +182,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    timeout-minutes: 30",
         SCCACHE_ENVIRONMENT,
         "    steps:",
-        *setup(),
+        *setup(gradle=False),
         "      - run: mise run ci:generate-workflow --check",
         "      - run: mise run ci:generate-devcontainer-tools --check",
         "      - run: dprint output-resolved-config > /dev/null",
@@ -187,7 +201,7 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    timeout-minutes: 60",
         SCCACHE_ENVIRONMENT,
         "    steps:",
-        *setup(),
+        *setup(gradle=False),
         "      - run: mise run //docs:build",
         "",
     ]

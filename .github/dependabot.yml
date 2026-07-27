@@ -2,7 +2,7 @@
 #
 # Not yet supported:
 # - mise tool versions: https://github.com/dependabot/dependabot-core/issues/12320
-# - the MapLibre Native pin in cmake/mln_version.cmake (manual bumps)
+# - the MapLibre Native submodule pin (manual bumps)
 version: 2
 updates:
   - package-ecosystem: github-actions
