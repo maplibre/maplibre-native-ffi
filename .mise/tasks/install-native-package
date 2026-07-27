@@ -36,7 +36,9 @@ if [[ ! -f "$descriptor" ]]; then
   exit 1
 fi
 license_dir="$package_root/share/maplibre-native-c/licenses"
-if [[ ! -d "$license_dir" ]] || [[ -z "$(find "$license_dir" -maxdepth 1 -type f -print -quit)" ]]; then
+# compgen is a bash builtin, so this stays clear of the differences between
+# GNU and BSD find on the macOS and iOS package runners.
+if [[ ! -d "$license_dir" ]] || ! compgen -G "$license_dir/*" >/dev/null; then
   echo "Native package is missing its third-party license bundle: $license_dir" >&2
   exit 1
 fi
