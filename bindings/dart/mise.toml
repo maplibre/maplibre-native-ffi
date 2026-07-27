@@ -2,7 +2,10 @@
 "core:dart" = "{{vars.dart_version}}"
 
 [tasks.pub-get]
-run = "dart pub get"
+# CI resolves strictly from the committed pubspec.lock and fails on any
+# content-hash drift. Locally, plain `pub get` keeps editing pubspec.yaml
+# ergonomic; use `dart pub upgrade` to move the lockfile deliberately.
+run = 'dart pub get ${CI:+--enforce-lockfile}'
 
 [tasks.ffigen]
 depends = [":pub-get"]
