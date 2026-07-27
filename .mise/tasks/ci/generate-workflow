@@ -136,12 +136,10 @@ def target_job(row: dict[str, object]) -> list[str]:
 def render(source: dict[str, object], presets: dict[str, object]) -> str:
     rows = target_rows(source, presets)
     target_ids = [job_id(str(row["preset"])) for row in rows]
-    android_vulkan_ids = [
+    android_package_ids = [
         job_id(str(row["preset"]))
         for row in rows
-        if str(row["preset"]).startswith("android-")
-        and str(row["preset"]).endswith("-vulkan")
-        and row["package"]
+        if str(row["preset"]).startswith("android-") and row["package"]
     ]
 
     lines = [
@@ -204,13 +202,13 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
             "    timeout-minutes: 30",
             SCCACHE_ENVIRONMENT,
             "    needs:",
-            *[f"      - {job}" for job in android_vulkan_ids],
+            *[f"      - {job}" for job in android_package_ids],
             "    steps:",
-            *setup("android-multi-vulkan"),
+            *setup("android-multi"),
             "      - name: Download Android native artifacts",
             f"        uses: {DOWNLOAD}",
             "        with:",
-            "          pattern: native-package-android-*-vulkan-${{ github.sha }}",
+            "          pattern: native-package-android-*-${{ github.sha }}",
             "          path: build/packages/native/android-multi-input",
             "      - run: >-",
             "          mise run //:kotlin:verify-android-multi-abi",

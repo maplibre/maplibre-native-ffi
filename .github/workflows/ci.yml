@@ -1083,7 +1083,9 @@ jobs:
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     needs:
+      - target-android-arm64-egl
       - target-android-arm64-vulkan
+      - target-android-x64-egl
       - target-android-x64-vulkan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1091,13 +1093,13 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
-          target: android-multi-vulkan
+          target: android-multi
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - name: Download Android native artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: native-package-android-*-vulkan-${{ github.sha }}
+          pattern: native-package-android-*-${{ github.sha }}
           path: build/packages/native/android-multi-input
       - run: >-
           mise run //:kotlin:verify-android-multi-abi
