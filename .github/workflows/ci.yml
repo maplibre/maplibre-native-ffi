@@ -28,6 +28,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run ci:generate-workflow --check
@@ -51,6 +52,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //docs:build
@@ -69,6 +71,7 @@ jobs:
         with:
           target: linux-x64-egl
           zig: true
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-x64-egl
@@ -121,8 +124,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -197,8 +200,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -221,6 +224,7 @@ jobs:
         with:
           target: linux-arm64-egl
           zig: true
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test linux-arm64-egl
@@ -273,8 +277,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -349,8 +353,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -373,6 +377,7 @@ jobs:
         with:
           target: macos-arm64-metal
           zig: true
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test macos-arm64-metal
@@ -430,8 +435,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -508,8 +513,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -583,8 +588,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -685,6 +690,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: android-arm64-egl
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run build android-arm64-egl
@@ -819,6 +825,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ohos-arm64-egl
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build:ohos ohos-arm64-egl
@@ -835,6 +842,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: ohos-arm64-vulkan
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //bindings/rust:build:ohos ohos-arm64-vulkan
@@ -853,6 +861,7 @@ jobs:
         with:
           target: windows-x64-wgl
           zig: true
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-x64-wgl
@@ -898,8 +907,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -967,8 +976,8 @@ jobs:
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -989,6 +998,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: windows-arm64-wgl
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run test windows-arm64-wgl
