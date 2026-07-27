@@ -117,10 +117,9 @@ runs:
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        # The workspace lock file alone. A `**` glob would also match
-        # `third_party/maplibre-native/rustutils/Cargo.lock`, which the step
-        # above restores from another cache, making this key depend on what
-        # that cache happened to hold.
+        # The workspace lock file alone: a `**` glob also matches the
+        # submodule's, which an earlier step restores from another cache, so the
+        # key would depend on that cache's contents.
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-
@@ -130,12 +129,9 @@ runs:
     # directory keeps a single cache entry accurate on every runner. Windows
     # tools need a native path, so prefer USERPROFILE with forward slashes.
     #
-    # Only download caches belong here. A lock file key is right for those: the
-    # entry is complete the first time it is written and never needs replacing.
-    # GOCACHE is a build cache, so it needs a key that moves with the sources;
-    # under a lock file key it froze at whatever the first save held, because an
-    # exact hit skips the save. bindings/go declares no module requirements, so
-    # there is no Go download cache to keep either.
+    # Only download caches belong here, because the key is a lock file hash: an
+    # exact hit skips the save, which is right for an entry that is complete
+    # when first written. A build cache needs a key that moves with the sources.
     - name: Pin package download caches
       shell: bash
       run: |
@@ -163,12 +159,9 @@ runs:
     # source dependencies off the network. Windows resolves it under
     # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
     #
-    # Restore only. `actions/cache` saves in a post step even when the job
-    # failed, so a fetch that died partway published an incomplete cache under
-    # the exact key — and because a key is never overwritten, every later run
-    # restored the same gaps and retried the same downloads, turning one
-    # transient network error into a permanent one. The job saves this cache
-    # itself, after the checks that populate it pass.
+    # Restore only; the job saves this cache itself, after the checks that
+    # populate it pass. A key is never overwritten, so a partial fetch that won
+    # the key would make one transient network error permanent.
     - name: Compute Zig package cache key
       if: ${{ inputs.zig == 'true' }}
       id: zig-cache-key
@@ -192,10 +185,9 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-
 
-    # Downloading and extracting the SDK takes about 40 seconds, which is not
-    # worth the ~1 GB it occupied in a 10 GB repository cache shared with every
-    # other target. The entry was evicted between runs anyway, so the two OHOS
-    # jobs paid the download and the upload.
+    # Not cached: the SDK is large enough to compete with every other target for
+    # the shared repository cache, and re-fetching it costs less than the
+    # eviction pressure an entry that size adds.
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
@@ -318,17 +310,13 @@ runs:
           throw "no vulkan-1.dll in $($candidates -join ', ') or on PATH"
         }
 
-    # `mise-action` saves its cache inline, at the end of its own step, so
-    # anything installed after it — the project toolchains below, and the rustup
-    # tree that `core:rust` installs outside the mise data directory — was never
-    # in the entry it wrote. Every job restored a hit and then re-downloaded the
-    # .NET SDK, Swift, the JDK, Go and Zig anyway. Own the cache instead: hash
-    # the same configs the action did, restore before it runs, and save once
-    # every install has succeeded.
+    # `mise-action` writes its cache inside its own step and declares no post
+    # step, so nothing installed after it reaches the entry — including the
+    # rustup tree, which lives outside the mise data directory either way.
+    # Restore before it runs and save once every install has succeeded.
     #
-    # The hashed set mirrors `[monorepo] config_roots` in mise.toml. Naming the
-    # roots keeps a `**` glob from reaching into the submodule this action
-    # restores from another cache a few steps up.
+    # The hashed set mirrors `[monorepo].config_roots`. Naming the roots keeps a
+    # `**` glob out of the submodule an earlier step restores from a cache.
     - name: Compute toolchain cache key
       id: toolchain-key
       shell: bash
@@ -361,15 +349,10 @@ runs:
         cache: false
         bootstrap: true
 
-    # `core:rust` installs a symlink to ~/.cargo/bin and leaves the toolchain,
-    # components and cross targets to rustup under ~/.rustup, which the cache
-    # above now carries alongside the mise data directory.
-    #
-    # An exact key match means mise.toml — and so the component and cross-target
-    # list — is the one that produced the entry, so a working `cargo` is enough
-    # to trust it. Anything else reinstalls: a partial match can carry a Rust
-    # install predating a target that was added since, which no version check
-    # would catch.
+    # An exact key match means the cached rustup tree was built from this
+    # mise.toml, components and cross targets included, so a working `cargo`
+    # is enough to trust it. Anything less reinstalls: a partial match can
+    # predate a target added since, which no version check would catch.
     #
     # `--force` uninstalls the toolchain before it reinstalls one, so a single
     # transient failure leaves the runner with no Rust at all and fails the job.
@@ -395,17 +378,17 @@ runs:
         done
         exit 1
 
-    # Project tools live in each project's config, so the root install covers
-    # only the repository-wide set. The devcontainer aggregate is the same set
-    # the published image bakes, and installing it here rather than lazily keeps
-    # the saved cache identical no matter which job writes it.
+    # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
+    # every `[monorepo].config_roots` entry, which is what the jobs run against.
+    # Installing them here rather than lazily keeps the cache saved below
+    # identical no matter which job writes it.
     - name: Install project toolchains
       shell: bash
-      run: MISE_NO_HOOKS=1 mise -C .devcontainer install
+      run: MISE_NO_HOOKS=1 mise install --monorepo
 
-    # Every job restores; one job per runner label saves. A miss otherwise has
-    # all ~22 jobs archive several GB of toolchains for one of them to win the
-    # key, and the losers pay the archive cost before the conflict is reported.
+    # Every job restores; one job per runner label saves. Otherwise a miss has
+    # every job archive the toolchain tree for one of them to win the key, and
+    # the losers pay the archive before the conflict is reported.
     - name: Save toolchains
       if: ${{ inputs.save-toolchains == 'true' && steps.toolchains.outputs.cache-hit != 'true' }}
       uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
