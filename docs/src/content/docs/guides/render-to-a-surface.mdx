@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 A surface render session renders a map into a host-provided native surface and
 presents through it. This is the integration for windows, views, and platform
@@ -58,278 +58,48 @@ Pace the loop with the display where you can: vsync callbacks
 (`CADisplayLink`, Android's `Choreographer`), or your toolkit's frame callback.
 The example apps poll with a short sleep, which is simplest but burns cycles.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    // Attach: layer is a CAMetalLayer*, VkSurfaceKHR, EGLSurface, or HDC
-    // obtained from the host window toolkit.
-    mln_opengl_surface_descriptor desc = mln_opengl_surface_descriptor_default();
-    desc.extent = (mln_render_target_extent){
-        .size = sizeof(mln_render_target_extent),
-        .width = logical_width, .height = logical_height,
-        .scale_factor = scale_factor,
-    };
-    desc.context.data.egl.display = egl_display;      // borrowed
-    desc.context.data.egl.config = egl_config;        // borrowed
-    desc.context.data.egl.share_context = egl_ctx;    // borrowed
-    desc.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
-    desc.surface = egl_surface;                       // borrowed
+```c
+// Attach: layer is a CAMetalLayer*, VkSurfaceKHR, EGLSurface, or HDC
+// obtained from the host window toolkit.
+mln_opengl_surface_descriptor desc = mln_opengl_surface_descriptor_default();
+desc.extent = (mln_render_target_extent){
+    .size = sizeof(mln_render_target_extent),
+    .width = logical_width, .height = logical_height,
+    .scale_factor = scale_factor,
+};
+desc.context.data.egl.display = egl_display;      // borrowed
+desc.context.data.egl.config = egl_config;        // borrowed
+desc.context.data.egl.share_context = egl_ctx;    // borrowed
+desc.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+desc.surface = egl_surface;                       // borrowed
 
-    mln_render_session* session = NULL;
-    mln_opengl_surface_attach(map, &desc, &session);
-    bool pending = false;
+mln_render_session* session = NULL;
+mln_opengl_surface_attach(map, &desc, &session);
+bool pending = false;
 
-    // Per frame, on the map owner thread:
-    mln_runtime_run_once(runtime);
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-           has_event) {
-      if (event.source != map) continue;
-      if (event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
-        pending = true;
-      } else if (
-          event.type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED &&
-          event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME &&
-          event.payload_size >= sizeof(mln_runtime_event_render_frame) &&
-          ((const mln_runtime_event_render_frame*)event.payload)->needs_repaint) {
-        pending = true;
-      }
-    }
-    if (pending) {
-      bool rendered = false;
-      mln_render_session_render_update(session, &rendered);
-      pending = !rendered;
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    // Attach: surface is a NativePointer to the EGLSurface / VkSurfaceKHR / layer.
-    val descriptor =
-      OpenGLSurfaceDescriptor(viewport.extent, graphics.contextDescriptor, graphics.surfacePointer)
-    val session = map.attachOpenGLSurface(descriptor)
-
-    // Per frame, on the map owner thread:
-    runtime.runOnce()
-    while (true) {
-      val event = runtime.pollEvent() ?: break
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        renderPending = true
-      } else if (
-        event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          event.mapSource == map &&
-          (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
-      ) {
-        renderPending = true
-      }
-    }
-    if (renderPending) {
-      renderPending = !session.renderUpdate()
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    // Attach: descriptor borrows the host's surface handle and context.
-    let descriptor = VulkanSurfaceDescriptor::new(extent, context_descriptor, surface);
-    let session = map.attach_vulkan_surface(&descriptor)?;
-
-    // Per frame, on the map owner thread:
-    runtime.run_once()?;
-    while let Some(event) = runtime.poll_event()? {
-        if event.source == RuntimeEventSource::Map(map.id()) {
-            match event.event_type {
-                RuntimeEventType::MapRenderUpdateAvailable => render_pending = true,
-                RuntimeEventType::MapRenderFrameFinished => {
-                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
-                        render_pending |= frame.needs_repaint;
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    if render_pending {
-        render_pending = !session.render_update()?;
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    // Attach: the view's CAMetalLayer; the session retains it.
-    let session = try map.attachMetalSurface(
-      MetalSurfaceDescriptor(
-        extent: viewport.extent,
-        context: graphics.contextDescriptor,
-        layer: graphics.layerPointer
-      )
-    )
-
-    // Per frame (e.g. from a CADisplayLink or timer), on the map owner thread:
-    try runtime.runOnce()
-    while let event = try runtime.pollEvent() {
-      guard map.isSource(of: event) else { continue }
-      switch event.type {
-      case .mapRenderUpdateAvailable:
-        renderPending = true
-      case .mapRenderFrameFinished:
-        if case let .renderFrame(frame) = event.payload, frame.needsRepaint {
-          renderPending = true
-        }
-      default:
-        break
-      }
-    }
-    if renderPending {
-      renderPending = try !session.renderUpdate()
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    // Attach: descriptor borrows the host's surface handle and context.
-    var session = try maplibre.attachOpenGLSurface(&map, .{
-        .extent = .{ .width = w, .height = h, .scale_factor = scale },
-        .context = context.descriptor(),
-        .surface = surface_pointer,
-    });
-    defer session.close() catch {};
-
-    // Carries a pending repaint across frames, so it lives outside the loop.
-    var render_pending = false;
-
-    // Per frame, on the map owner thread:
-    try runtime.runOnce();
-    while (try runtime.pollEvent(allocator)) |event| {
-        var owned = event;
-        defer owned.deinit();
-        if (owned.source_type != .map or owned.source_id == null or
-            !std.meta.eql(owned.source_id.?, try map.id())) continue;
-        switch (owned.event_type) {
-            .map_render_update_available => render_pending = true,
-            .map_render_frame_finished => switch (owned.payload) {
-                .render_frame => |frame| render_pending = render_pending or frame.needs_repaint,
-                else => {},
-            },
-            else => {},
-        }
-    }
-    if (render_pending) {
-        render_pending = !(try session.renderUpdate());
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    // Attach: descriptor borrows the host's surface handle and context.
-    var descriptor = new OpenGLSurfaceDescriptor
-    {
-        Extent = new RenderTargetExtent(width, height, scaleFactor),
-        Context = eglContextDescriptor,
-        Surface = surfacePointer,
-    };
-    var session = RenderSessionHandle.AttachOpenGLSurface(map, descriptor);
-
-    // Per frame, on the map owner thread:
-    runtime.RunOnce();
-    while (runtime.PollEvent() is { } runtimeEvent)
-    {
-        if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable
-            && ReferenceEquals(runtimeEvent.MapSource, map))
-        {
-            renderPending = true;
-        }
-        else if (
-            runtimeEvent.Type == RuntimeEventType.MapRenderFrameFinished
-            && ReferenceEquals(runtimeEvent.MapSource, map)
-            && runtimeEvent.Payload
-                is RuntimeEventPayload.RenderFrame { NeedsRepaint: true }
-        )
-        {
-            renderPending = true;
-        }
-    }
-    if (renderPending)
-    {
-        renderPending = !session.RenderUpdate();
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    # Attach: descriptor borrows the host's surface handle and context.
-    session = map_handle.attach_opengl_surface(
-        render.OpenGLSurfaceDescriptor(extent, context_descriptor, surface_pointer)
-    )
-
-    # Per frame, on the map owner thread:
-    runtime.run_once()
-    while event := runtime.poll_event():
-        if event.source.map_handle is not map_handle:
-            continue
-        if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
-            render_pending = True
-        elif (
-            event.event_type == mln.RuntimeEventType.MAP_RENDER_FRAME_FINISHED
-            and isinstance(event.payload, mln.RenderFramePayload)
-            and event.payload.needs_repaint
-        ):
-            render_pending = True
-    if render_pending:
-        render_pending = not session.render_update()
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    // Attach: descriptor borrows the host's surface handle and context.
-    session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{
-    	Extent:  extent,
-    	Context: contextDescriptor,
-    	Surface: surfacePointer,
-    })
-    if err != nil {
-    	return err
-    }
-    defer session.Close()
-
-    // Per frame, on the (locked) map owner thread:
-    if err := rt.RunOnce(); err != nil {
-    	return err
-    }
-    for {
-    	event, err := rt.PollEvent()
-    	if err != nil {
-    		return err
-    	}
-    	if event == nil {
-    		break
-    	}
-    	if event.Type == maplibre.RuntimeEventMapRenderUpdateAvailable {
-    		renderPending = true
-        } else if event.Type == maplibre.RuntimeEventMapRenderFrameFinished {
-            if frame, ok := event.Payload.(maplibre.RuntimeEventRenderFramePayload); ok {
-                renderPending = renderPending || frame.NeedsRepaint
-            }
-    	}
-    }
-    if renderPending {
-    	rendered, err := session.RenderUpdate()
-    	if err != nil {
-    		return err
-    	}
-    	renderPending = !rendered
-    }
-    ```
-  </TabItem>
-</Tabs>
+// Per frame, on the map owner thread:
+mln_runtime_run_once(runtime);
+mln_runtime_event event = {.size = sizeof(event)};
+bool has_event = false;
+while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
+       has_event) {
+  if (event.source != map) continue;
+  if (event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
+    pending = true;
+  } else if (
+      event.type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED &&
+      event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME &&
+      event.payload_size >= sizeof(mln_runtime_event_render_frame) &&
+      ((const mln_runtime_event_render_frame*)event.payload)->needs_repaint) {
+    pending = true;
+  }
+}
+if (pending) {
+  bool rendered = false;
+  mln_render_session_render_update(session, &rendered);
+  pending = !rendered;
+}
+```
 
 ## Resize with the host surface
 

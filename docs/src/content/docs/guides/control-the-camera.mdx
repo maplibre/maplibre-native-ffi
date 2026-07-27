@@ -5,7 +5,7 @@ sidebar:
   order: 5
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 The camera lives on the map and moves independently of rendering. All camera
 calls run on the map owner thread and take effect as the runtime pumps.
@@ -40,125 +40,21 @@ Three commands apply camera options:
 Animation options also accept a cubic `easing` curve. Cancel any in-flight
 transition with `cancel_transitions()`.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    mln_camera_options camera = mln_camera_options_default();
-    camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
-    camera.latitude = 37.7749;
-    camera.longitude = -122.4194;
-    camera.zoom = 13.0;
-    mln_map_jump_to(map, &camera);
+```c
+mln_camera_options camera = mln_camera_options_default();
+camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+camera.latitude = 37.7749;
+camera.longitude = -122.4194;
+camera.zoom = 13.0;
+mln_map_jump_to(map, &camera);
 
-    mln_animation_options animation = mln_animation_options_default();
-    animation.fields = MLN_ANIMATION_OPTION_DURATION;
-    animation.duration_ms = 800.0;
-    mln_map_ease_to(map, &camera, &animation); // animates
+mln_animation_options animation = mln_animation_options_default();
+animation.fields = MLN_ANIMATION_OPTION_DURATION;
+animation.duration_ms = 800.0;
+mln_map_ease_to(map, &camera, &animation); // animates
 
-    mln_map_fly_to(map, &camera, NULL); // animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    val camera =
-      CameraOptions().apply {
-        center = LatLng(37.7749, -122.4194)
-        zoom = 13.0
-      }
-    map.jumpTo(camera)
-
-    map.easeTo(camera, AnimationOptions().apply { durationMs = 800.0 }) // animates
-    map.flyTo(camera, null) // animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    let mut camera = CameraOptions::default();
-    camera.center = Some(LatLng::new(37.7749, -122.4194));
-    camera.zoom = Some(13.0);
-    map.jump_to(&camera)?;
-
-    let mut animation = AnimationOptions::default();
-    animation.duration_ms = Some(800.0);
-    map.ease_to(&camera, Some(&animation))?; // animates
-    map.fly_to(&camera, None)?; // derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    let camera = CameraOptions(
-      center: LatLng(latitude: 37.7749, longitude: -122.4194),
-      zoom: 13.0
-    )
-    try map.jump(to: camera)
-
-    try map.ease(to: camera, animation: AnimationOptions(durationMilliseconds: 800))
-    try map.fly(to: camera, animation: nil) // animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    const camera: maplibre.CameraOptions = .{
-        .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
-        .zoom = 13.0,
-    };
-    try map.jumpTo(camera);
-
-    try map.easeTo(camera, .{ .duration_ms = 800.0 }); // animates
-    try map.flyTo(camera, null); // animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    var camera = new CameraOptions
-    {
-        Center = new LatLng(37.7749, -122.4194),
-        Zoom = 13.0,
-    };
-    map.JumpTo(camera);
-
-    map.EaseTo(camera, new AnimationOptions { Duration = 800.0 }); // animates
-    map.FlyTo(camera, null); // animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    target = camera.CameraOptions(
-        center=geo.LatLng(37.7749, -122.4194),
-        zoom=13.0,
-    )
-    map_handle.jump_to(target)
-
-    map_handle.ease_to(target, camera.AnimationOptions(duration_ms=800.0))  # animates
-    map_handle.fly_to(target)  # animates with derived duration
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    cam := maplibre.CameraOptions{}.
-    	WithCenter(maplibre.LatLng{Latitude: 37.7749, Longitude: -122.4194}).
-    	WithZoom(13)
-    if err := m.JumpTo(cam); err != nil {
-    	return err
-    }
-
-    animation := maplibre.AnimationOptions{}.WithDurationMS(800)
-    if err := m.EaseTo(cam, &animation); err != nil { // animates
-    	return err
-    }
-    if err := m.FlyTo(cam, nil); err != nil { // animates with derived duration
-    	return err
-    }
-    ```
-  </TabItem>
-</Tabs>
+mln_map_fly_to(map, &camera, NULL); // animates with derived duration
+```
 
 ## Relative gestures
 
@@ -173,12 +69,12 @@ animated variant (same zero-duration default as `ease_to`):
 Absolute targets go through `jump_to` / `ease_to` / `fly_to` with the fields
 you want to change.
 
-```kotlin
-// Kotlin; the other bindings mirror these one-to-one.
-map.moveBy(deltaX, deltaY)
-map.scaleBy(1.5, ScreenPoint(x, y))
-map.rotateBy(firstTouch, secondTouch)
-map.pitchBy(10.0)
+```c
+// Screen-space gestures apply relative deltas to the current camera.
+mln_map_move_by(map, delta_x, delta_y);
+mln_map_scale_by(map, 1.5, &(mln_screen_point){.x = x, .y = y});
+mln_map_rotate_by(map, first_touch, second_touch);
+mln_map_pitch_by(map, 10.0);
 ```
 
 ## Fit the camera to content
@@ -196,103 +92,19 @@ Fit options add `padding` (edge insets in logical pixels), `bearing`, and
 `lat_lng_bounds_for_camera(camera)` — reports the geographic bounds a camera
 covers.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    mln_lat_lng_bounds bounds = {
-        .southwest = {.latitude = 37.7, .longitude = -122.5},
-        .northeast = {.latitude = 37.85, .longitude = -122.35},
-    };
-    mln_camera_fit_options fit = mln_camera_fit_options_default();
-    fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
-    fit.padding = (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};
+```c
+mln_lat_lng_bounds bounds = {
+    .southwest = {.latitude = 37.7, .longitude = -122.5},
+    .northeast = {.latitude = 37.85, .longitude = -122.35},
+};
+mln_camera_fit_options fit = mln_camera_fit_options_default();
+fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
+fit.padding = (mln_edge_insets){.top = 24, .left = 24, .bottom = 24, .right = 24};
 
-    mln_camera_options camera = mln_camera_options_default();
-    mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &camera);
-    mln_map_ease_to(map, &camera, &animation);
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    val bounds = LatLngBounds(LatLng(37.7, -122.5), LatLng(37.85, -122.35))
-    val fit = CameraFitOptions().apply { padding = EdgeInsets(24.0, 24.0, 24.0, 24.0) }
-    val fitted = map.cameraForLatLngBounds(bounds, fit)
-    map.easeTo(fitted, animation)
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    let bounds = LatLngBounds::new(LatLng::new(37.7, -122.5), LatLng::new(37.85, -122.35));
-    let mut fit = CameraFitOptions::default();
-    fit.padding = Some(EdgeInsets::new(24.0, 24.0, 24.0, 24.0));
-    let fitted = map.camera_for_lat_lng_bounds(bounds, Some(&fit))?;
-    map.ease_to(&fitted, Some(&animation))?;
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    let bounds = LatLngBounds(
-      southwest: LatLng(latitude: 37.7, longitude: -122.5),
-      northeast: LatLng(latitude: 37.85, longitude: -122.35)
-    )
-    let fitted = try map.cameraForLatLngBounds(
-      bounds,
-      fitOptions: CameraFitOptions(padding: EdgeInsets(top: 24, left: 24, bottom: 24, right: 24))
-    )
-    try map.ease(to: fitted, animation: animation)
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    const camera = try map.cameraForLatLngBounds(bounds, .{
-        .padding = .{ .top = 24, .left = 24, .bottom = 24, .right = 24 },
-    });
-    try map.easeTo(camera, animation);
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    var bounds = new LatLngBounds(new LatLng(37.7, -122.5), new LatLng(37.85, -122.35));
-    var fitted = map.CameraForLatLngBounds(
-        bounds,
-        new CameraFitOptions { Padding = new EdgeInsets(24, 24, 24, 24) }
-    );
-    map.EaseTo(fitted, animation);
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    fitted = map_handle.camera_for_lat_lng_bounds(
-        geo.LatLngBounds(
-            southwest=geo.LatLng(37.7, -122.5),
-            northeast=geo.LatLng(37.85, -122.35),
-        ),
-        camera.CameraFitOptions(padding=camera.EdgeInsets(24.0, 24.0, 24.0, 24.0)),
-    )
-    map_handle.ease_to(fitted, animation)
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    fitted, err := m.CameraForLatLngBounds(bounds, &maplibre.CameraFitOptions{
-    	Padding: &maplibre.EdgeInsets{Top: 24, Left: 24, Bottom: 24, Right: 24},
-    })
-    if err != nil {
-    	return err
-    }
-    if err := m.EaseTo(fitted, &animation); err != nil {
-    	return err
-    }
-    ```
-  </TabItem>
-</Tabs>
+mln_camera_options camera = mln_camera_options_default();
+mln_map_camera_for_lat_lng_bounds(map, bounds, &fit, &camera);
+mln_map_ease_to(map, &camera, &animation);
+```
 
 ## Constrain the camera
 

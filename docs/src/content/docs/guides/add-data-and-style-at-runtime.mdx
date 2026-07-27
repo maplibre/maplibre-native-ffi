@@ -5,7 +5,7 @@ sidebar:
   order: 7
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 Everything the style document can express, the runtime API can mutate after
 the style loads. The API leans on the
@@ -70,154 +70,30 @@ arrive as JSON arrays like `["interpolate", ["linear"], ["zoom"], ...]`.
 The matching getters return the current value, or an absent result for an
 undefined property.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    #include <string.h>
+```c
+#include <string.h>
 
-    static mln_string_view sv(const char* value) {
-      return (mln_string_view){.data = value, .size = strlen(value)};
-    }
+static mln_string_view sv(const char* value) {
+  return (mln_string_view){.data = value, .size = strlen(value)};
+}
 
-    // Add a GeoJSON source and a circle layer styling it.
-    mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url));
+// Add a GeoJSON source and a circle layer styling it.
+mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url));
 
-    const char* layer =
-        "{\"id\":\"cities\",\"type\":\"circle\",\"source\":\"cities\","
-        "\"paint\":{\"circle-radius\":6}}";
-    mln_json_value layer_json = parse_json(layer); // your JSON -> mln_json_value
-    mln_map_add_style_layer_json(map, &layer_json, sv("")); // empty = on top
+const char* layer =
+    "{\"id\":\"cities\",\"type\":\"circle\",\"source\":\"cities\","
+    "\"paint\":{\"circle-radius\":6}}";
+mln_json_value layer_json = parse_json(layer); // your JSON -> mln_json_value
+mln_map_add_style_layer_json(map, &layer_json, sv("")); // empty = on top
 
-    // Data-driven styling with an expression value.
-    mln_json_value color = parse_json(
-        "[\"match\",[\"get\",\"capital\"],[\"yes\"],\"#e55e5e\",\"#3887be\"]");
-    mln_map_set_layer_property(map, sv("cities"), sv("circle-color"), &color);
+// Data-driven styling with an expression value.
+mln_json_value color = parse_json(
+    "[\"match\",[\"get\",\"capital\"],[\"yes\"],\"#e55e5e\",\"#3887be\"]");
+mln_map_set_layer_property(map, sv("cities"), sv("circle-color"), &color);
 
-    // Update the data later.
-    mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    map.addGeoJsonSourceUrl("cities", geojsonUrl)
-
-    map.addStyleLayerJson(
-      JsonValue.ObjectValue(
-        listOf(
-          JsonValue.Member("id", JsonValue.StringValue("cities")),
-          JsonValue.Member("type", JsonValue.StringValue("circle")),
-          JsonValue.Member("source", JsonValue.StringValue("cities")),
-        )
-      ),
-      "", // beforeLayerId; empty = on top
-    )
-
-    // Data-driven styling with an expression value.
-    map.setLayerProperty(
-      "cities",
-      "circle-color",
-      JsonValue.Array(
-        listOf(
-          JsonValue.StringValue("match"),
-          JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("capital"))),
-          JsonValue.Array(listOf(JsonValue.StringValue("yes"))),
-          JsonValue.StringValue("#e55e5e"),
-          JsonValue.StringValue("#3887be"),
-        )
-      ),
-    )
-
-    map.setGeoJsonSourceUrl("cities", newUrl) // update the data later
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    map.add_geojson_source_data("cities", &geojson)?;
-
-    map.add_style_layer_json(&layer_json, None)?; // None = on top
-
-    // Data-driven styling with an expression value.
-    map.set_layer_property("cities", "circle-color", &expression_json)?;
-
-    map.set_geojson_source_data("cities", &updated_geojson)?; // update the data later
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    try map.addGeoJSONSourceURL(sourceId: "cities", url: geojsonUrl)
-
-    try map.addStyleLayerJSON(layerJSON) // beforeLayerId nil = on top
-
-    // Data-driven styling with an expression value.
-    try map.setLayerProperty(layerId: "cities", propertyName: "circle-color", value: expressionJSON)
-
-    try map.setGeoJSONSourceURL(sourceId: "cities", url: newUrl) // update the data later
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    try map.addGeoJsonSourceUrl(allocator, "cities", geojson_url);
-
-    try map.addStyleLayerJson(allocator, layer_json, ""); // empty = on top
-
-    // Data-driven styling with an expression value.
-    try map.setLayerProperty(allocator, "cities", "circle-color", expression_json);
-
-    try map.setGeoJsonSourceUrl(allocator, "cities", new_url); // update the data later
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    map.AddGeoJsonSourceUrl("cities", geojsonUrl);
-
-    map.AddStyleLayerJson(layerJson, ""); // beforeLayerId; empty = on top
-
-    // Data-driven styling with an expression value.
-    map.SetLayerProperty("cities", "circle-color", expressionJson);
-
-    map.SetGeoJsonSourceUrl("cities", newUrl); // update the data later
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    map_handle.add_geojson_source_url("cities", geojson_url)
-
-    map_handle.add_style_layer_json(layer_json)  # before_layer_id None = on top
-
-    # Data-driven styling with an expression value.
-    map_handle.set_layer_property("cities", "circle-color", expression_json)
-
-    map_handle.set_geojson_source_data("cities", updated_geojson)  # swap the data
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    if err := m.AddGeoJSONSourceURL("cities", geojsonURL); err != nil {
-    	return err
-    }
-
-    if err := m.AddStyleLayerJSON(layerJSON, ""); err != nil { // empty = on top
-    	return err
-    }
-
-    // Data-driven styling with an expression value.
-    if err := m.SetLayerProperty("cities", "circle-color", expressionJSON); err != nil {
-    	return err
-    }
-
-    if err := m.SetGeoJSONSourceData("cities", updatedGeoJSON); err != nil {
-    	return err
-    }
-    ```
-  </TabItem>
-</Tabs>
+// Update the data later.
+mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
+```
 
 ## Runtime images
 

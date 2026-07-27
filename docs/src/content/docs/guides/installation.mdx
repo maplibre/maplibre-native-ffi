@@ -217,84 +217,19 @@ Load the library and ask it what it supports. `mln_c_version()` reports the ABI
 contract version (`0` while unstable), and the backend mask reports which
 render backends the artifact was compiled with.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    #include <maplibre_native_c.h>
-    #include <stdio.h>
+```c
+#include <maplibre_native_c.h>
+#include <stdio.h>
 
-    int main(void) {
-      printf("ABI version: %u\n", mln_c_version());
-      uint32_t mask = mln_supported_render_backend_mask();
-      printf("OpenGL: %d, Vulkan: %d, Metal: %d\n",
-             !!(mask & MLN_RENDER_BACKEND_FLAG_OPENGL),
-             !!(mask & MLN_RENDER_BACKEND_FLAG_VULKAN),
-             !!(mask & MLN_RENDER_BACKEND_FLAG_METAL));
-      return 0;
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    import org.maplibre.nativeffi.Maplibre
-
-    println("ABI version: ${Maplibre.cVersion()}")
-    println("Backends: ${Maplibre.supportedRenderBackends()}")
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    println!("ABI version: {}", maplibre_native::c_version());
-    println!("Backends: {:?}", maplibre_native::supported_render_backends());
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    import MaplibreNative
-
-    print("ABI version: \(Maplibre.cVersion())")
-    print("Backends: \(Maplibre.supportedRenderBackends())")
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    const maplibre = @import("maplibre_native");
-
-    std.debug.print("ABI version: {}\n", .{maplibre.cVersion()});
-    std.debug.print("Backends: {}\n", .{maplibre.supportedRenderBackends()});
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    using Maplibre.Native;
-
-    Console.WriteLine($"ABI version: {Maplibre.CVersion()}");
-    Console.WriteLine($"Backends: {Maplibre.SupportedRenderBackends()}");
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    import maplibre_native as mln
-
-    print("ABI version:", mln.c_version())
-    print("Backends:", mln.supported_render_backends())
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    import maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
-
-    fmt.Println("ABI version:", maplibre.CVersion())
-    fmt.Println("Backends:", maplibre.SupportedRenderBackends())
-    ```
-  </TabItem>
-</Tabs>
+int main(void) {
+  printf("ABI version: %u\n", mln_c_version());
+  uint32_t mask = mln_supported_render_backend_mask();
+  printf("OpenGL: %d, Vulkan: %d, Metal: %d\n",
+         !!(mask & MLN_RENDER_BACKEND_FLAG_OPENGL),
+         !!(mask & MLN_RENDER_BACKEND_FLAG_VULKAN),
+         !!(mask & MLN_RENDER_BACKEND_FLAG_METAL));
+  return 0;
+}
+```
 
 Next: [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).

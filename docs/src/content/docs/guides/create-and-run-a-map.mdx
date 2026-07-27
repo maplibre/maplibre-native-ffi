@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 This guide walks through the lifecycle every integration shares: create a
 runtime, create a map, load a style, pump work, and tear everything down in
@@ -92,320 +92,62 @@ day one:
 This example creates a runtime and map, loads a style, pumps until the style
 loads (or fails), and tears down. It needs network access for the style URL.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    #include <maplibre_native_c.h>
-    #include <stdio.h>
-    #include <string.h>
-    #include <time.h>
+```c
+#include <maplibre_native_c.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
 
-    int main(void) {
-      mln_runtime_options options = mln_runtime_options_default();
-      options.cache_path = ":memory:";
+int main(void) {
+  mln_runtime_options options = mln_runtime_options_default();
+  options.cache_path = ":memory:";
 
-      mln_runtime* runtime = NULL;
-      if (mln_runtime_create(&options, &runtime) != MLN_STATUS_OK) return 1;
+  mln_runtime* runtime = NULL;
+  if (mln_runtime_create(&options, &runtime) != MLN_STATUS_OK) return 1;
 
-      mln_map_options map_options = mln_map_options_default();
-      map_options.width = 512;
-      map_options.height = 512;
-      map_options.scale_factor = 1.0;
+  mln_map_options map_options = mln_map_options_default();
+  map_options.width = 512;
+  map_options.height = 512;
+  map_options.scale_factor = 1.0;
 
-      mln_map* map = NULL;
-      if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
-        mln_runtime_destroy(runtime);
-        return 1;
-      }
+  mln_map* map = NULL;
+  if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
+    mln_runtime_destroy(runtime);
+    return 1;
+  }
 
-      bool loaded = false;
-      if (mln_map_set_style_url(
-              map, "https://tiles.openfreemap.org/styles/bright") != MLN_STATUS_OK)
+  bool loaded = false;
+  if (mln_map_set_style_url(
+          map, "https://tiles.openfreemap.org/styles/bright") != MLN_STATUS_OK)
+    goto done;
+
+  // A pump count is not elapsed time: on a slow network this can spin
+  // through every iteration before the response lands. Bound the wait on
+  // the clock and yield between pumps instead.
+  const time_t deadline = time(NULL) + 30;
+  while (!loaded && time(NULL) < deadline) {
+    mln_runtime_run_once(runtime);
+    mln_runtime_event event = {.size = sizeof(event)};
+    bool has_event = false;
+    while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
+           has_event) {
+      if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) loaded = true;
+      if (event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
+        fprintf(stderr, "style failed: %.*s\n", (int)event.message_size,
+                event.message);
         goto done;
-
-      // A pump count is not elapsed time: on a slow network this can spin
-      // through every iteration before the response lands. Bound the wait on
-      // the clock and yield between pumps instead.
-      const time_t deadline = time(NULL) + 30;
-      while (!loaded && time(NULL) < deadline) {
-        mln_runtime_run_once(runtime);
-        mln_runtime_event event = {.size = sizeof(event)};
-        bool has_event = false;
-        while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-               has_event) {
-          if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) loaded = true;
-          if (event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
-            fprintf(stderr, "style failed: %.*s\n", (int)event.message_size,
-                    event.message);
-            goto done;
-          }
-        }
-        // A real host sleeps briefly here, or drives this from its event loop,
-        // rather than spinning.
-      }
-
-    done:
-      mln_map_destroy(map);
-      mln_runtime_destroy(runtime);
-      return loaded ? 0 : 1;
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    import org.maplibre.nativeffi.map.MapHandle
-    import org.maplibre.nativeffi.map.MapOptions
-    import org.maplibre.nativeffi.runtime.RuntimeEventType
-    import org.maplibre.nativeffi.runtime.RuntimeHandle
-    import org.maplibre.nativeffi.runtime.RuntimeOptions
-
-    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 512
-          height = 512
-          scaleFactor = 1.0
-        },
-      ).use { map ->
-        map.setStyleUrl("https://tiles.openfreemap.org/styles/bright")
-
-        var loaded = false
-        while (!loaded) {
-          runtime.runOnce()
-          while (true) {
-            val event = runtime.pollEvent() ?: break
-            when (event.type) {
-              RuntimeEventType.MAP_STYLE_LOADED -> loaded = true
-              RuntimeEventType.MAP_LOADING_FAILED -> error("style failed: ${event.message}")
-              else -> Unit
-            }
-          }
-        }
       }
     }
-    ```
-  </TabItem>
+    // A real host sleeps briefly here, or drives this from its event loop,
+    // rather than spinning.
+  }
 
-  <TabItem label="Rust">
-    ```rust
-    use maplibre_native::{
-        MapHandle, MapOptions, RuntimeEventType, RuntimeHandle, RuntimeOptions,
-    };
-
-    fn main() -> Result<(), Box<dyn std::error::Error>> {
-        let mut runtime_options = RuntimeOptions::default();
-        runtime_options.cache_path = Some(":memory:".into());
-        let runtime = RuntimeHandle::with_options(&runtime_options)?;
-
-        let mut map_options = MapOptions::new(512, 512, 1.0);
-        let map = MapHandle::with_options(&runtime, &map_options)?;
-
-        map.set_style_url("https://tiles.openfreemap.org/styles/bright")?;
-
-        let mut loaded = false;
-        while !loaded {
-            runtime.run_once()?;
-            while let Some(event) = runtime.poll_event()? {
-                match event.event_type {
-                    RuntimeEventType::MapStyleLoaded => loaded = true,
-                    RuntimeEventType::MapLoadingFailed => {
-                        return Err(std::io::Error::other(format!(
-                            "style failed: {:?}",
-                            event.message
-                        ))
-                        .into());
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        map.close().map_err(|error| error.into_error())?;
-        runtime.close().map_err(|error| error.into_error())?;
-        Ok(())
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    import MaplibreNative
-
-    let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-    let map = try MapHandle(
-      runtime: runtime,
-      options: MapOptions(width: 512, height: 512, scaleFactor: 1.0, mode: .continuous)
-    )
-
-    try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-
-    var loaded = false
-    while !loaded {
-      try runtime.runOnce()
-      while let event = try runtime.pollEvent() {
-        switch event.type {
-        case .mapStyleLoaded:
-          loaded = true
-        case .mapLoadingFailed:
-          fatalError("style failed: \(event.message)")
-        default:
-          break
-        }
-      }
-    }
-
-    try map.close()
-    try runtime.close()
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    const maplibre = @import("maplibre_native");
-
-    var diagnostics = try maplibre.DiagnosticStore.init(allocator);
-    defer diagnostics.deinit();
-
-    var runtime = try maplibre.RuntimeHandle.create(
-        allocator,
-        .{ .cache_path = ":memory:" },
-        &diagnostics,
-    );
-    defer runtime.close() catch {};
-
-    var map = try maplibre.MapHandle.create(&runtime, .{
-        .width = 512,
-        .height = 512,
-        .scale_factor = 1.0,
-    });
-    defer map.close() catch {};
-
-    try map.setStyleUrl(allocator, "https://tiles.openfreemap.org/styles/bright");
-
-    var loaded = false;
-    while (!loaded) {
-        try runtime.runOnce();
-        while (try runtime.pollEvent(allocator)) |event| {
-            var owned = event;
-            defer owned.deinit();
-            switch (owned.event_type) {
-                .map_style_loaded => loaded = true,
-                .map_loading_failed => return error.StyleLoadingFailed,
-                else => {},
-            }
-        }
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    using Maplibre.Native.Map;
-    using Maplibre.Native.Runtime;
-
-    using var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
-    using var map = MapHandle.Create(
-        runtime,
-        new MapOptions { Width = 512, Height = 512, ScaleFactor = 1.0 }
-    );
-
-    map.SetStyleUrl("https://tiles.openfreemap.org/styles/bright");
-
-    var loaded = false;
-    while (!loaded)
-    {
-        runtime.RunOnce();
-        while (runtime.PollEvent() is { } runtimeEvent)
-        {
-            if (runtimeEvent.Type == RuntimeEventType.MapStyleLoaded)
-            {
-                loaded = true;
-            }
-            else if (runtimeEvent.Type == RuntimeEventType.MapLoadingFailed)
-            {
-                throw new InvalidOperationException($"style failed: {runtimeEvent.Message}");
-            }
-        }
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    import maplibre_native as mln
-
-    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=":memory:")) as runtime:
-        with runtime.create_map(mln.MapOptions(width=512, height=512)) as map_handle:
-            map_handle.set_style_url("https://tiles.openfreemap.org/styles/bright")
-
-            loaded = False
-            while not loaded:
-                runtime.run_once()
-                while event := runtime.poll_event():
-                    if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
-                        loaded = True
-                    elif event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
-                        raise RuntimeError(f"style failed: {event.message}")
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    package main
-
-    import (
-    	"fmt"
-    	"runtime"
-
-    	maplibre "github.com/maplibre/maplibre-native-ffi/bindings/go"
-    )
-
-    func main() {
-    	runtime.LockOSThread() // pin the runtime owner thread
-
-    	rt, err := maplibre.NewRuntimeWithOptions(maplibre.RuntimeOptions{CachePath: ":memory:"})
-    	if err != nil {
-    		panic(err)
-    	}
-    	defer rt.Close()
-
-    	m, err := rt.NewMapWithOptions(maplibre.MapOptions{Width: 512, Height: 512, ScaleFactor: 1})
-    	if err != nil {
-    		panic(err)
-    	}
-    	defer m.Close()
-
-    	if err := m.SetStyleURL("https://tiles.openfreemap.org/styles/bright"); err != nil {
-    		panic(err)
-    	}
-
-    	loaded := false
-    	for !loaded {
-    		if err := rt.RunOnce(); err != nil {
-    			panic(err)
-    		}
-    		for {
-    			event, err := rt.PollEvent()
-    			if err != nil {
-    				panic(err)
-    			}
-    			if event == nil {
-    				break
-    			}
-    			switch event.Type {
-    			case maplibre.RuntimeEventMapStyleLoaded:
-    				loaded = true
-    			case maplibre.RuntimeEventMapLoadingFailed:
-    				panic(fmt.Sprintf("style failed: %s", event.Message))
-    			}
-    		}
-    	}
-    }
-    ```
-  </TabItem>
-</Tabs>
+done:
+  mln_map_destroy(map);
+  mln_runtime_destroy(runtime);
+  return loaded ? 0 : 1;
+}
+```
 
 ## Tear down in order
 

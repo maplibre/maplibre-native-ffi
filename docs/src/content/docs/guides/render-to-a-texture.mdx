@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 A texture render session renders a map offscreen into a GPU texture instead of
 presenting to a surface. Use it to composite the map into your own rendering
@@ -51,162 +51,30 @@ as premultiplied RGBA8 in physical pixels into your buffer. Call it with a null
 buffer (or insufficient capacity) to learn the required size, then again with
 the buffer — the image info reports width, height, stride, and byte length.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    mln_opengl_owned_texture_descriptor desc =
-        mln_opengl_owned_texture_descriptor_default();
-    desc.extent = (mln_render_target_extent){
-        .size = sizeof(mln_render_target_extent),
-        .width = 512, .height = 512, .scale_factor = 1.0,
-    };
-    desc.context = context; // session creates a context in your share group
+```c
+mln_opengl_owned_texture_descriptor desc =
+    mln_opengl_owned_texture_descriptor_default();
+desc.extent = (mln_render_target_extent){
+    .size = sizeof(mln_render_target_extent),
+    .width = 512, .height = 512, .scale_factor = 1.0,
+};
+desc.context = context; // session creates a context in your share group
 
-    mln_render_session* session = NULL;
-    mln_opengl_owned_texture_attach(map, &desc, &session);
+mln_render_session* session = NULL;
+mln_opengl_owned_texture_attach(map, &desc, &session);
 
-    // After a render update produced a frame:
-    mln_texture_image_info info = mln_texture_image_info_default();
-    mln_texture_read_premultiplied_rgba8(session, NULL, 0, &info); // size query
-    uint8_t* pixels = malloc(info.byte_length);
-    mln_texture_read_premultiplied_rgba8(session, pixels, info.byte_length, &info);
+// After a render update produced a frame:
+mln_texture_image_info info = mln_texture_image_info_default();
+mln_texture_read_premultiplied_rgba8(session, NULL, 0, &info); // size query
+uint8_t* pixels = malloc(info.byte_length);
+mln_texture_read_premultiplied_rgba8(session, pixels, info.byte_length, &info);
 
-    // Or borrow the GPU frame for compositing:
-    mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
-    mln_opengl_owned_texture_acquire_frame(session, &frame);
-    // ... sample frame.texture from a context in the same share group ...
-    mln_opengl_owned_texture_release_frame(session, &frame);
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    val session =
-      map.attachMetalOwnedTexture(
-        MetalOwnedTextureDescriptor(
-          extent = RenderTargetExtent(512, 512, 1.0),
-          context = MetalContextDescriptor(devicePointer),
-        )
-      )
-
-    // After a render update produced a frame, composite the GPU frame:
-    session.acquireMetalOwnedTextureFrame().use { frameHandle ->
-      val frame = frameHandle.frame()
-      compositor.drawTexture(frame.texture().address)
-    }
-
-    // Or read pixels back to the CPU:
-    NativeBuffer.allocate(session.textureImageInfo().byteLength).use { buffer ->
-      val info = session.readPremultipliedRgba8(buffer)
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    let session = map.attach_vulkan_owned_texture(&VulkanOwnedTextureDescriptor::new(
-        extent,
-        context.descriptor(),
-    ))?;
-
-    // After a render update produced a frame, composite the GPU frame:
-    {
-        let frame = session.acquire_vulkan_owned_texture_frame()?;
-        compositor.draw(&frame)?;
-        frame.close()?; // release the borrow
-    }
-
-    // Or read pixels back to the CPU:
-    let mut pixels = vec![0u8; session.texture_image_info()?.byte_length];
-    let info = session.read_premultiplied_rgba8_into(&mut pixels)?;
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    let session = try map.attachMetalOwnedTexture(
-      MetalOwnedTextureDescriptor(extent: extent, context: contextDescriptor)
-    )
-
-    // After a render update produced a frame, composite the GPU frame:
-    let frame = try session.acquireMetalOwnedTextureFrame()
-    try frame.withBackendPointers { view in
-      let texture = try view.texture // valid only inside this scope
-      try compositor.draw(texture: texture)
-    }
-    try frame.close()
-
-    // Or read pixels back to the CPU:
-    var pixels = [UInt8](repeating: 0, count: byteCount)
-    let info = try session.readPremultipliedRGBA8(into: &pixels)
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    var session = try maplibre.attachMetalOwnedTexture(&map, .{
-        .extent = .{ .width = 512, .height = 512, .scale_factor = 1.0 },
-        .context = context.descriptor(),
-    });
-    defer session.close() catch {};
-
-    // After a render update produced a frame, read pixels back:
-    const pixels = try allocator.alloc(u8, 512 * 512 * 4);
-    defer allocator.free(pixels);
-    const info = try session.readPremultipliedRgba8Into(pixels);
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    using var session = RenderSessionHandle.AttachVulkanOwnedTexture(
-        map,
-        new VulkanOwnedTextureDescriptor(extent, contextDescriptor)
-    );
-
-    // After a render update produced a frame, read pixels back. ByteLength is a
-    // ulong, so convert it checked before the int-typed NativeBuffer allocation.
-    using var buffer = new NativeBuffer(checked((int)session.TextureImageInfo().ByteLength));
-    var info = session.ReadPremultipliedRgba8(buffer);
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    session = map_handle.attach_vulkan_owned_texture(
-        context.owned_texture_descriptor(width, height, scale_factor)
-    )
-
-    # After a render update produced a frame, composite the GPU frame:
-    frame = session.acquire_vulkan_owned_texture_frame()
-    compositor.draw(frame.image)
-    frame.close()
-
-    # Or read pixels back to the CPU:
-    pixels = bytearray(session.texture_image_info().byte_length)
-    info = session.read_premultiplied_rgba8_into(pixels)
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    session, err := m.AttachVulkanOwnedTexture(maplibre.VulkanOwnedTextureDescriptor{
-    	Extent:  extent,
-    	Context: contextDescriptor,
-    })
-    if err != nil {
-    	return err
-    }
-    defer session.Close()
-
-    // After a render update produced a frame, read pixels back:
-    pixels, info, err := session.ReadPremultipliedRGBA8()
-    if err != nil {
-    	return err
-    }
-    ```
-  </TabItem>
-</Tabs>
+// Or borrow the GPU frame for compositing:
+mln_opengl_owned_texture_frame frame = {.size = sizeof(frame)};
+mln_opengl_owned_texture_acquire_frame(session, &frame);
+// ... sample frame.texture from a context in the same share group ...
+mln_opengl_owned_texture_release_frame(session, &frame);
+```
 
 ## Borrowed mode: render into the host's texture
 
@@ -231,19 +99,20 @@ Backend synchronization notes:
   its share group, with level-0 dimensions matching the stated physical size.
   The session targets ES 3.0 contexts and cannot verify the size.
 
-```kotlin
-// Kotlin / Compose-style integration: render into a texture your toolkit owns.
-val session =
-  map.attachOpenGLBorrowedTexture(
-    OpenGLBorrowedTextureDescriptor(
-      extent.toRenderTargetExtent(),
-      extent.physicalWidth,
-      extent.physicalHeight,
-      target.context.toDescriptor(),
-      target.textureName,
-      target.textureTarget,
-    )
-  )
+```c
+// Render into a texture your toolkit owns. The physical size is stated
+// separately from the logical extent and must match the texture's level 0.
+mln_opengl_borrowed_texture_descriptor descriptor =
+    mln_opengl_borrowed_texture_descriptor_default();
+descriptor.extent = extent;
+descriptor.physical_width = physical_width;
+descriptor.physical_height = physical_height;
+descriptor.context = context;
+descriptor.texture = texture;
+descriptor.target = target;
+
+mln_render_session* session = NULL;
+mln_opengl_borrowed_texture_attach(map, &descriptor, &session);
 ```
 
 The `compose-map` example shows a complete borrowed-texture integration that

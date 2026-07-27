@@ -5,7 +5,7 @@ sidebar:
   order: 8
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 Resource configuration decides where MapLibre Native reads bytes from: which
 URLs it fetches, how it rewrites them, what it may intercept, and where it
@@ -48,129 +48,35 @@ Transforms apply to MapLibre's online file source (including nested PMTiles
 range requests), not to `file`, `asset`, `mbtiles`, or provider-intercepted
 requests.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    static const char trusted_prefix[] = "https://tiles.example.com/";
+```c
+static const char trusted_prefix[] = "https://tiles.example.com/";
 
-    mln_status add_api_key(void* user_data, uint32_t kind, const char* url,
-                           mln_resource_transform_response* out_response) {
-      (void)user_data; (void)kind;
-      // Runs for every origin the style references, so only the intended host
-      // sees the key. Leaving url null keeps the request URL unchanged.
-      if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
-        out_response->url = NULL;
-        return MLN_STATUS_OK;
-      }
-      char rewritten[1024];
-      const int written =
-          snprintf(rewritten, sizeof(rewritten), "%s?key=%s", url, API_KEY);
-      if (written < 0 || (size_t)written >= sizeof(rewritten)) {
-        // Truncation would fetch a corrupted address; keep the original URL.
-        out_response->url = NULL;
-        return MLN_STATUS_OK;
-      }
-      return mln_resource_transform_response_set_url(
-          out_response, rewritten, (size_t)written);
-    }
+mln_status add_api_key(void* user_data, uint32_t kind, const char* url,
+                       mln_resource_transform_response* out_response) {
+  (void)user_data; (void)kind;
+  // Runs for every origin the style references, so only the intended host
+  // sees the key. Leaving url null keeps the request URL unchanged.
+  if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
+    out_response->url = NULL;
+    return MLN_STATUS_OK;
+  }
+  char rewritten[1024];
+  const int written =
+      snprintf(rewritten, sizeof(rewritten), "%s?key=%s", url, API_KEY);
+  if (written < 0 || (size_t)written >= sizeof(rewritten)) {
+    // Truncation would fetch a corrupted address; keep the original URL.
+    out_response->url = NULL;
+    return MLN_STATUS_OK;
+  }
+  return mln_resource_transform_response_set_url(
+      out_response, rewritten, (size_t)written);
+}
 
-    mln_resource_transform transform = {
-        .size = sizeof(transform), .callback = add_api_key, .user_data = NULL};
-    mln_runtime_set_resource_transform(runtime, &transform);
-    // ... later: mln_runtime_clear_resource_transform(runtime);
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    runtime.setResourceTransform(
-      ResourceTransformCallback { request ->
-        // Only the intended host sees the key; other origins keep their URL.
-        if (request.url.startsWith(trustedPrefix)) "${request.url}?key=$apiKey"
-        else request.url
-      }
-    )
-    // ... later: runtime.clearResourceTransform()
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    runtime.set_resource_transform(move |request| {
-        // Only the intended host sees the key; None keeps the original URL.
-        request
-            .url
-            .starts_with(TRUSTED_PREFIX)
-            .then(|| format!("{}?key={}", request.url, api_key))
-    })?;
-    // ... later: runtime.clear_resource_transform()?;
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    try runtime.setResourceTransform { request in
-      // Only the intended host sees the key; other origins keep their URL.
-      request.url.hasPrefix(trustedPrefix) ? "\(request.url)?key=\(apiKey)" : request.url
-    }
-    // ... later: try runtime.clearResourceTransform()
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    fn addApiKey(context: ?*anyopaque, request: maplibre.ResourceTransformRequest) maplibre.ResourceTransformResponse {
-        _ = context;
-        // Only the intended host sees the key; null keeps the original URL.
-        if (!std.mem.startsWith(u8, request.url, trusted_prefix)) return .{};
-        return .{ .replacement_url = rewrite(request.url) };
-    }
-
-    try runtime.setResourceTransform(.{ .handler = addApiKey, .context = null });
-    // ... later: try runtime.setResourceTransform(null);
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    // Only the intended host sees the key; other origins keep their URL.
-    runtime.SetResourceTransform(request =>
-        request.Url.StartsWith(TrustedPrefix, StringComparison.Ordinal)
-            ? $"{request.Url}?key={apiKey}"
-            : request.Url);
-    // ... later: runtime.ClearResourceTransform();
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    # Only the intended host sees the key; other origins keep their URL.
-    runtime.set_resource_transform(
-        lambda request: f"{request.url}?key={api_key}"
-        if request.url.startswith(TRUSTED_PREFIX)
-        else request.url
-    )
-    # ... later: runtime.clear_resource_transform()
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    if err := rt.SetResourceTransform(
-    	func(request maplibre.ResourceTransformRequest) (string, bool) {
-    		// Only the intended host sees the key; false keeps the original URL.
-    		if !strings.HasPrefix(request.URL, trustedPrefix) {
-    			return "", false
-    		}
-    		return request.URL + "?key=" + apiKey, true
-    	},
-    ); err != nil {
-    	return err
-    }
-    // ... later: rt.ClearResourceTransform()
-    ```
-  </TabItem>
-</Tabs>
+mln_resource_transform transform = {
+    .size = sizeof(transform), .callback = add_api_key, .user_data = NULL};
+mln_runtime_set_resource_transform(runtime, &transform);
+// ... later: mln_runtime_clear_resource_transform(runtime);
+```
 
 ## Resource providers
 
@@ -195,152 +101,28 @@ extension point. Everything else — including custom schemes like
 `custom://style.json` — reaches the provider, and passes through to become an
 HTTP request (usually a failed one) when you decline it.
 
-<Tabs syncKey="lang">
-  <TabItem label="C">
-    ```c
-    uint32_t serve_custom_scheme(void* user_data,
-                                 const mln_resource_request* request,
-                                 mln_resource_request_handle* handle) {
-      (void)user_data;
-      if (strncmp(request->url, "custom://", 9) != 0)
-        return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+```c
+uint32_t serve_custom_scheme(void* user_data,
+                             const mln_resource_request* request,
+                             mln_resource_request_handle* handle) {
+  (void)user_data;
+  if (strncmp(request->url, "custom://", 9) != 0)
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
 
-      mln_resource_response response = {.size = sizeof(response)};
-      response.status = MLN_RESOURCE_RESPONSE_STATUS_OK;
-      response.bytes = style_json_bytes;
-      response.byte_count = style_json_size;
-      mln_resource_request_complete(handle, &response);
-      mln_resource_request_release(handle);
-      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-    }
+  mln_resource_response response = {.size = sizeof(response)};
+  response.status = MLN_RESOURCE_RESPONSE_STATUS_OK;
+  response.bytes = style_json_bytes;
+  response.byte_count = style_json_size;
+  mln_resource_request_complete(handle, &response);
+  mln_resource_request_release(handle);
+  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+}
 
-    // Before creating any map:
-    mln_resource_provider provider = {
-        .size = sizeof(provider), .callback = serve_custom_scheme, .user_data = NULL};
-    mln_runtime_set_resource_provider(runtime, &provider);
-    ```
-  </TabItem>
-
-  <TabItem label="Kotlin">
-    ```kotlin
-    // Before creating any map:
-    runtime.setResourceProvider(
-      ResourceProviderCallback { request, handle ->
-        if (!request.url.startsWith("custom://")) {
-          return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
-        }
-        handle.complete(
-          ResourceResponse(ResourceResponseStatus.OK).apply { bytes = styleJsonBytes }
-        )
-        handle.close()
-        ResourceProviderDecision.HANDLE
-      }
-    )
-    ```
-  </TabItem>
-
-  <TabItem label="Rust">
-    ```rust
-    // Before creating any map:
-    runtime.set_resource_provider(move |request, handle| {
-        if !request.url.starts_with("custom://") {
-            return ResourceProviderDecision::PassThrough;
-        }
-        let _ = handle.complete(ResourceResponse::ok(style_json_bytes.clone()));
-        ResourceProviderDecision::Handle // dropping the handle releases it
-    })?;
-    ```
-  </TabItem>
-
-  <TabItem label="Swift">
-    ```swift
-    // Before creating any map:
-    try runtime.setResourceProvider { request, handle in
-      guard request.url.hasPrefix("custom://") else { return .passThrough }
-      try? handle.complete(ResourceResponse(status: .ok, bytes: styleJsonBytes))
-      try? handle.close()
-      return .handle
-    }
-    ```
-  </TabItem>
-
-  <TabItem label="Zig">
-    ```zig
-    fn serveCustomScheme(
-        context: ?*anyopaque,
-        request: maplibre.ResourceRequest,
-        handle: ?maplibre.ResourceRequestHandle,
-    ) maplibre.ResourceProviderDecision {
-        _ = context;
-        if (!std.mem.startsWith(u8, request.url, "custom://")) return .pass_through;
-        const h = handle.?;
-        h.complete(.{ .bytes = style_json }) catch {
-            h.release();
-            return .handle;
-        };
-        h.release();
-        return .handle;
-    }
-
-    // Before creating any map:
-    try runtime.setResourceProvider(.{ .handler = serveCustomScheme, .context = null });
-    ```
-  </TabItem>
-
-  <TabItem label="C#">
-    ```csharp
-    // Before creating any map:
-    runtime.SetResourceProvider((request, handle) =>
-    {
-        if (!request.Url.StartsWith("custom://", StringComparison.Ordinal))
-        {
-            return ResourceProviderDecision.PassThrough;
-        }
-        handle.Complete(new ResourceResponse(ResourceResponseStatus.Ok) { Bytes = styleJsonBytes });
-        handle.Close();
-        return ResourceProviderDecision.Handle;
-    });
-    ```
-  </TabItem>
-
-  <TabItem label="Python">
-    ```python
-    # Before creating any map:
-    def provider(
-        request: resource.ResourceRequest,
-        handle: resource.ResourceRequestHandle,
-    ) -> resource.ResourceProviderDecision:
-        if not request.url.startswith("custom://"):
-            return resource.ResourceProviderDecision.PASS_THROUGH
-        handle.complete(resource.ResourceResponse(status=resource.ResourceResponseStatus.OK, bytes=style_json_bytes))
-        handle.close()
-        return resource.ResourceProviderDecision.HANDLE
-
-    runtime.set_resource_provider(provider)
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    ```go
-    // Before creating any map:
-    if err := rt.SetResourceProvider(
-    	func(request maplibre.ResourceRequest, handle *maplibre.ResourceRequestHandle) maplibre.ResourceProviderDecision {
-    		if !strings.HasPrefix(request.URL, "custom://") {
-    			return maplibre.ResourceProviderDecisionPassThrough
-    		}
-    		if err := handle.Complete(styleJSONResponse); err != nil {
-    			handle.Close()
-    			return maplibre.ResourceProviderDecisionHandle
-    		}
-    		handle.Close()
-    		return maplibre.ResourceProviderDecisionHandle
-    	},
-    ); err != nil {
-    	return err
-    }
-    ```
-  </TabItem>
-</Tabs>
+// Before creating any map:
+mln_resource_provider provider = {
+    .size = sizeof(provider), .callback = serve_custom_scheme, .user_data = NULL};
+mln_runtime_set_resource_provider(runtime, &provider);
+```
 
 ## Process-global switches
 
