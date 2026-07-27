@@ -746,20 +746,45 @@ auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
   );
 }
 
+auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
+  -> std::string_view {
+  return geojson.match(
+    [](const mbgl::Geometry<double>&) -> std::string_view {
+      return "a bare geometry";
+    },
+    [](const mbgl::GeoJSONFeature&) -> std::string_view {
+      return "a single feature";
+    },
+    [](const mbgl::FeatureCollection&) -> std::string_view {
+      return "a feature collection";
+    }
+  );
+}
+
 /**
- * Reports whether clustered data satisfies supercluster's point-only input.
+ * Reports whether clustered data satisfies supercluster's input requirements.
  *
- * MapLibre Native clusters a feature collection by reading each feature's
- * geometry as a point, so any other geometry raises a variant access error
- * inside supercluster while mln_map_add_geojson_source_data() or
- * mln_map_set_geojson_source_data() builds the index. Checking here reports the
- * source, the feature, and the constraint instead.
+ * MapLibre Native engages clustering for feature collections only, and it reads
+ * each feature's geometry as a point. A bare geometry or a single feature tiles
+ * without clustering, and a feature carrying other geometry raises a variant
+ * access error inside supercluster while mln_map_add_geojson_source_data() or
+ * mln_map_set_geojson_source_data() builds the index. Checking here names the
+ * source and the constraint instead of clustering silently or failing deep
+ * inside MapLibre Native.
+ *
+ * An empty feature collection stays accepted: it carries nothing to cluster,
+ * and a later mln_map_set_geojson_source_data() clusters the features it
+ * supplies.
  */
 auto validate_clustered_geojson(
   const std::string& source_id, const mbgl::GeoJSON& geojson
 ) -> bool {
   if (!geojson.is<mbgl::FeatureCollection>()) {
-    return true;
+    const auto message = "clustered GeoJSON source \"" + source_id +
+                         "\" requires a feature collection; the data is " +
+                         std::string{geojson_alternative_name(geojson)};
+    mln::core::set_thread_error(message.c_str());
+    return false;
   }
 
   const auto& features = geojson.get<mbgl::FeatureCollection>();
