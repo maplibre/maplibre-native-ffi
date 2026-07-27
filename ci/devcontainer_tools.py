@@ -4,6 +4,11 @@ The devcontainer image bakes one environment for every language ecosystem, so
 its config has to name every tool that any project declares. mise has no config
 include, so that list is generated from the project configs rather than kept in
 step with them by hand.
+
+`mise install --monorepo` reaches the same set in a working copy, and CI uses it
+for that. It is not a replacement here: `mise oci build` packages the config it
+runs on plus that config's parents, with no equivalent of `[monorepo]
+.config_roots`, so the image still needs every tool named in the aggregate.
 """
 
 from __future__ import annotations

@@ -408,13 +408,14 @@ runs:
         done
         exit 1
 
-    # Project tools live in each project's config, so the root install covers
-    # only the repository-wide set. The devcontainer aggregate is the same set
-    # the published image bakes, and installing it here rather than lazily keeps
-    # the saved cache identical no matter which job writes it.
+    # `mise bootstrap` above installs the root config's tools; `--monorepo`
+    # covers every `[monorepo].config_roots` entry too, which is what the jobs
+    # actually run against — 26 tools rather than the root config's 16.
+    # Installing them here rather than lazily keeps the cache saved below
+    # identical no matter which job writes it.
     - name: Install project toolchains
       shell: bash
-      run: MISE_NO_HOOKS=1 mise -C .devcontainer install
+      run: MISE_NO_HOOKS=1 mise install --monorepo
 
     # Every job restores; one job per runner label saves. A miss otherwise has
     # all ~22 jobs archive several GB of toolchains for one of them to win the
