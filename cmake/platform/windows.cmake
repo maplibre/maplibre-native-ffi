@@ -1,11 +1,10 @@
 function(mln_configure_platform_dependencies target)
   include(FetchContent)
-  # The Windows presets configure with CMAKE_TRY_COMPILE_TARGET_TYPE set to
-  # STATIC_LIBRARY, so the ~130 compiler-flag probes this tree runs skip the
-  # link step. zlib's `check_function_exists(fseeko HAVE_FSEEKO)` is the one
-  # probe here whose answer comes from linking, so the presets pin HAVE_FSEEKO
-  # to the value the linking probe reports on clang-cl. Any dependency bump
-  # that adds a link-based check needs the same treatment.
+  # The Windows presets set CMAKE_TRY_COMPILE_TARGET_TYPE to STATIC_LIBRARY so
+  # compiler-flag probes skip the link step. zlib's fseeko probe is the one here
+  # that answers from linking, so the preset pins HAVE_FSEEKO to what the
+  # linking probe reports on clang-cl. A dependency bump that adds a link-based
+  # check needs the same treatment.
   set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
   set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
