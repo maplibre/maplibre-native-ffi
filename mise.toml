@@ -60,6 +60,7 @@ swiftformat_version = "0.61.1"
 uv_version = "0.11.11"
 xtool_version = "1.17.0"
 zig_version = "0.16.0"
+sync_submodules_run = '{% if os() == "windows" %}"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-submodules{% else %}bash .mise/bin/sync-submodules{% endif %}'
 
 [tools]
 # Repository and native tooling
@@ -92,6 +93,7 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 [env]
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
+SYNC_SUBMODULES_RUN = "{{ vars.sync_submodules_run }}"
 
 # Public sccache reads via the R2 custom domain (no credentials). CI pushes
 # override these with write credentials in .github/actions/setup-ci-deps.
@@ -116,7 +118,7 @@ auto = true
 
 [deps.submodules]
 auto = true
-run = "bash .mise/bin/sync-submodules"
+run = "$SYNC_SUBMODULES_RUN"
 
 [hooks]
 postinstall = [
