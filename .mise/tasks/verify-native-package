@@ -36,8 +36,16 @@ MACHO_ALLOWED_PREFIXES = (
 MACHO_SEARCH_PATH_ROOTS = ("@loader_path", "@executable_path")
 ELF_SEARCH_PATH_ROOTS = ("$ORIGIN", "${ORIGIN}")
 
-MACHO_NAME = re.compile(r"^\s*name (?P<name>\S+) \(offset \d+\)$")
-MACHO_PATH = re.compile(r"^\s*path (?P<path>\S+) \(offset \d+\)$")
+# 64- and 32-bit thin Mach-O, then the 32- and 64-bit universal headers.
+MACHO_MAGICS = frozenset(
+    {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xca\xfe\xba\xbe", b"\xca\xfe\xba\xbf"}
+)
+
+# A path may contain spaces, so it runs to the trailing offset field, which
+# otool always prints. Anything narrower drops the build-host paths that live
+# under a home directory holding a full name.
+MACHO_NAME = re.compile(r"^\s*name (?P<name>.+) \(offset \d+\)$")
+MACHO_PATH = re.compile(r"^\s*path (?P<path>.+) \(offset \d+\)$")
 MACHO_COMMAND = re.compile(r"^\s*cmd (?P<command>LC_\w+)$")
 ELF_ENTRY = re.compile(r"^\s*0x[0-9a-f]+\s+\((?P<tag>\w+)\)\s+.*\[(?P<value>[^\]]*)\]")
 
@@ -104,9 +112,10 @@ def binary_problems(binary: pathlib.Path) -> list[str]:
         magic = file.read(4)
     if magic == b"\x7fELF":
         return elf_problems(binary)
-    # Mach-O, thin or universal. Windows PE imports name a DLL without a
-    # directory, so there is no build-host path for them to carry.
-    if magic in {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xbe\xba\xfe\xca"}:
+    # Mach-O, thin or universal. otool reads every slice of a universal binary,
+    # whose header is big-endian on disk. Windows PE imports name a DLL without
+    # a directory, so there is no build-host path for them to carry.
+    if magic in MACHO_MAGICS:
         return macho_problems(binary)
     return []
 
