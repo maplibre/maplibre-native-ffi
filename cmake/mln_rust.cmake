@@ -144,8 +144,16 @@ function(mln_link_rust_platform target)
     DIRECTORY
     APPEND
     PROPERTY
-      CMAKE_CONFIGURE_DEPENDS "${PROJECT_SOURCE_DIR}/Cargo.lock"
-      "${rust_license_config}" "${rust_license_template}")
+      # The manifests belong here alongside the lockfile: Cargo.lock does not
+      # record feature selection or target conditions, so a manifest edit can
+      # change the dependency graph without touching it, and the notices would
+      # otherwise stay as generated from the previous graph.
+      CMAKE_CONFIGURE_DEPENDS
+      "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      "${PROJECT_SOURCE_DIR}/Cargo.toml"
+      "${rust_manifest}"
+      "${rust_license_config}"
+      "${rust_license_template}")
   execute_process(
     COMMAND
       "${CARGO_ABOUT_EXECUTABLE}"

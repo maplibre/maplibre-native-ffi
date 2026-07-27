@@ -1,3 +1,4 @@
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import java.io.File
 import org.gradle.api.provider.Provider
@@ -241,16 +242,29 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
   }
 
   val licenseInstall = selectedInstalls.first()
+  // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK the
+  // redistributed libc++_shared.so is taken from. Reading ANDROID_HOME directly
+  // would pair the library with a notice from a different NDK whenever
+  // local.properties or ANDROID_SDK_ROOT selects another SDK.
+  val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
   val androidNdkNotice =
-    rootProject.file(
-      "${requiredEnvironmentVariable("ANDROID_HOME")}/ndk/" +
-        "${requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")}/NOTICE"
-    )
+    extensions
+      .getByType<KotlinMultiplatformAndroidComponentsExtension>()
+      .sdkComponents
+      .sdkDirectory
+      .map { it.file("ndk/$androidNdkVersion/NOTICE") }
+  val licenseDirectory = licenseInstall.resolve("share/maplibre-native-c/licenses")
   tasks.withType<Zip>().configureEach {
     if (name == "bundleAndroidMainAar") {
-      from(licenseInstall.resolve("share/maplibre-native-c/licenses")) {
-        into("META-INF/licenses/maplibre-native-c")
+      // A missing directory would otherwise be skipped silently and ship an AAR
+      // with no native notices at all.
+      doFirst {
+        check(licenseDirectory.isDirectory) {
+          "Native license notices are missing at $licenseDirectory; the install " +
+            "this AAR is assembled from predates the license bundle."
+        }
       }
+      from(licenseDirectory) { into("META-INF/licenses/maplibre-native-c") }
       from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
     }
   }
