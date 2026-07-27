@@ -67,3 +67,38 @@ prerelease; these are design tasks rather than compatibility commitments.
   - Suggested next step: add Dart platform-context test support equivalent to
     the repository's native backend harnesses and exercise each supported
     backend end to end.
+
+- [ ] **DART-QUERY-COVERAGE — Rendered feature query coverage**
+  - Severity: medium
+  - Complexity: low, once DART-BACKEND-HARNESS lands
+  - Area: BND-106 and the rendered-query geometry surface
+  - Rationale: `RenderSession.queryRenderedFeatures` is the only consumer of
+    `RenderedQueryGeometry`, so the whole rendered-query surface is reachable
+    only through a live render session. The suite constructs
+    `RenderedQueryLineString` once in a value-semantics test and never calls the
+    query itself, which leaves `RenderedQueryPoint`, `RenderedQueryBox`, the
+    `ScreenBox` it carries, and the layer-ID and filter options with no
+    coverage. `ScreenBox` currently has no construction site anywhere in the
+    package. The geometry and options conversions are private to the session, so
+    this gap resolves with the backend harness rather than ahead of it.
+  - Suggested next step: exercise each `RenderedQueryGeometry` variant and both
+    query options against a real render session as part of the backend harness
+    work, and assert the copied feature results required by BND-106.
+
+- [ ] **DART-FORMAT-HOOK — Dart formatting in the pre-commit hook**
+  - Severity: medium
+  - Complexity: low
+  - Area: repository hooks and Dart tool resolution
+  - Rationale: `hk.pkl` states that language-specific steps enter their
+    binding's mise context, and the other steps follow it: `gofumpt` delegates
+    to `//bindings/go:_gofumpt-*`, while `ruff`, `ty`, and `vp-check` use tools
+    installed at the root. The `dart-format` step instead invokes `dart format`
+    directly from the repository root, while `core:dart` is declared in
+    `bindings/dart/mise.toml` and resolves only inside that directory.
+    Committing a Dart file fails with `No version is set for shim: dart` for
+    anyone without a global Dart install, so the step's outcome depends on
+    contributor-local tool state rather than repository configuration.
+  - Suggested next step: add `_format-check` and `_format-fix` tasks to
+    `bindings/dart/mise.toml` and call them from the step the way the Go step
+    calls `//bindings/go:_gofumpt-*`, so Dart resolves from the package context
+    in both the hook and `mise run fix`.
