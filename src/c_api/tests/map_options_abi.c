@@ -4,6 +4,7 @@
 
 #include <stdint.h>
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 
@@ -341,12 +342,11 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
 // output pointer independently.
 static void map_size_tracks_attach_and_resize(void) {
   mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = NULL;
   mln_map_options options = mln_map_options_default();
   options.width = 512;
   options.height = 256;
   options.scale_factor = 1.1;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, &options, &map));
+  mln_map* map = mln_test_create_map_with_options(runtime, &options);
 
   uint32_t width = 0;
   uint32_t height = 0;
@@ -356,7 +356,7 @@ static void map_size_tracks_attach_and_resize(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(512, width);
   TEST_ASSERT_EQUAL_UINT32(256, height);
-  TEST_ASSERT_TRUE(scale_factor == 1.1);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, scale_factor);
 
   // The fixture attaches a 64x64 target at scale factor 1.0, so this also
   // covers the map keeping its own pixel ratio.
@@ -367,7 +367,7 @@ static void map_size_tracks_attach_and_resize(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(64, width);
   TEST_ASSERT_EQUAL_UINT32(64, height);
-  TEST_ASSERT_TRUE(scale_factor == 1.1);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, scale_factor);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_resize(render.session, 96, 48, 1.0)
@@ -377,7 +377,7 @@ static void map_size_tracks_attach_and_resize(void) {
   );
   TEST_ASSERT_EQUAL_UINT32(96, width);
   TEST_ASSERT_EQUAL_UINT32(48, height);
-  TEST_ASSERT_TRUE(scale_factor == 1.1);
+  TEST_ASSERT_EQUAL_DOUBLE(1.1, scale_factor);
   mln_test_render_fixture_destroy(&render);
 
   TEST_ASSERT_EQUAL_INT(
