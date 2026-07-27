@@ -1,0 +1,346 @@
+#!/usr/bin/env python3
+# MISE description="Verify compiled androidMain bytecode stays on the android-minSdk floor."
+
+"""Reject Android platform APIs introduced above the ``android-minSdk`` floor.
+
+AGP's ``com.android.kotlin.multiplatform.library`` plugin accepts a ``lint {}``
+block but registers no lint variant, so ``NewApi`` never runs for this module.
+This check reproduces the part of ``NewApi`` that matters here: it reads the
+platform API database the SDK ships (``platforms/android-<sdk>/data/
+api-versions.xml``), walks the constant pool of every compiled ``androidMain``
+class, and reports each platform class, method, or field whose ``since`` level
+is above the floor.
+
+References the database does not describe -- Kotlin stdlib, JavaCPP, project
+code -- are left alone, so only the Android platform surface is judged.
+"""
+
+import os
+import pathlib
+import re
+import struct
+import sys
+import xml.etree.ElementTree as element_tree
+
+# Constant pool tags that carry a type or member reference, mapped to the
+# number of bytes their payload occupies after the tag.
+TAG_UTF8 = 1
+TAG_INTEGER = 3
+TAG_FLOAT = 4
+TAG_LONG = 5
+TAG_DOUBLE = 6
+TAG_CLASS = 7
+TAG_STRING = 8
+TAG_FIELDREF = 9
+TAG_METHODREF = 10
+TAG_INTERFACE_METHODREF = 11
+TAG_NAME_AND_TYPE = 12
+TAG_METHOD_HANDLE = 15
+TAG_METHOD_TYPE = 16
+TAG_DYNAMIC = 17
+TAG_INVOKE_DYNAMIC = 18
+TAG_MODULE = 19
+TAG_PACKAGE = 20
+
+FIXED_WIDTH_TAGS = {
+    TAG_INTEGER: 4,
+    TAG_FLOAT: 4,
+    TAG_LONG: 8,
+    TAG_DOUBLE: 8,
+    TAG_CLASS: 2,
+    TAG_STRING: 2,
+    TAG_FIELDREF: 4,
+    TAG_METHODREF: 4,
+    TAG_INTERFACE_METHODREF: 4,
+    TAG_NAME_AND_TYPE: 4,
+    TAG_METHOD_HANDLE: 3,
+    TAG_METHOD_TYPE: 2,
+    TAG_DYNAMIC: 4,
+    TAG_INVOKE_DYNAMIC: 4,
+    TAG_MODULE: 2,
+    TAG_PACKAGE: 2,
+}
+
+WIDE_TAGS = {TAG_LONG, TAG_DOUBLE}
+
+
+class ApiClass:
+    """One ``<class>`` entry from the platform API database."""
+
+    __slots__ = ("name", "since", "supers", "methods", "fields")
+
+    def __init__(self, name, since):
+        self.name = name
+        self.since = since
+        self.supers = []
+        self.methods = {}
+        self.fields = {}
+
+
+def fail(message):
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def repository_root():
+    root = os.environ.get("MISE_MONOREPO_ROOT")
+    if root:
+        return pathlib.Path(root)
+    return pathlib.Path(__file__).resolve().parents[2]
+
+
+def catalog_version(root, key):
+    """Read a single ``[versions]`` entry from the Gradle version catalog."""
+    catalog = root / "gradle" / "libs.versions.toml"
+    pattern = re.compile(rf'^\s*{re.escape(key)}\s*=\s*"([^"]+)"', re.MULTILINE)
+    match = pattern.search(catalog.read_text(encoding="utf-8"))
+    if match is None:
+        fail(f"{key} not found in {catalog}")
+    return match.group(1)
+
+
+def android_sdk_directory(root):
+    """Resolve the SDK the same way settings.gradle.kts does."""
+    local_properties = root / "local.properties"
+    if local_properties.is_file():
+        match = re.search(
+            r"^\s*sdk\.dir\s*=\s*(.+)$",
+            local_properties.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            candidate = pathlib.Path(match.group(1).strip().replace("\\\\", "\\"))
+            if candidate.is_dir():
+                return candidate
+    for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        value = os.environ.get(variable)
+        if value and pathlib.Path(value).is_dir():
+            return pathlib.Path(value)
+    fail(
+        "Android SDK not found; set ANDROID_HOME or sdk.dir in local.properties "
+        "so the platform API database can be read"
+    )
+
+
+def api_database_path(sdk_directory, compile_sdk):
+    """Prefer the compileSdk platform, then the newest platform installed."""
+    preferred = sdk_directory / "platforms" / f"android-{compile_sdk}" / "data" / "api-versions.xml"
+    if preferred.is_file():
+        return preferred
+    candidates = sorted(
+        (sdk_directory / "platforms").glob("android-*/data/api-versions.xml"),
+        key=lambda path: path.parts,
+    )
+    if candidates:
+        return candidates[-1]
+    fail(
+        f"no api-versions.xml under {sdk_directory / 'platforms'}; "
+        f"install the android-{compile_sdk} platform"
+    )
+
+
+def load_api_database(path):
+    """Parse api-versions.xml into a name -> ApiClass mapping."""
+    root = element_tree.parse(path).getroot()
+    baseline = int(root.get("min", "1"))
+    classes = {}
+    for node in root.findall("class"):
+        name = node.get("name")
+        if name is None:
+            continue
+        entry = ApiClass(name, int(node.get("since", baseline)))
+        for relation in node:
+            if relation.tag in ("extends", "implements"):
+                target = relation.get("name")
+                if target:
+                    entry.supers.append(target)
+            elif relation.tag in ("method", "field"):
+                member = relation.get("name")
+                if member is None:
+                    continue
+                since = int(relation.get("since", entry.since))
+                table = entry.methods if relation.tag == "method" else entry.fields
+                # Keep the lowest level when a name repeats across overloads.
+                if member not in table or since < table[member]:
+                    table[member] = since
+        classes[name] = entry
+    return classes
+
+
+def resolve_member(classes, owner, member, kind):
+    """Walk the type hierarchy for a member, returning its ``since`` level.
+
+    Returns ``(since, declaring_class)`` or ``None`` when the database does not
+    describe the member -- which means it belongs to project or library code.
+    """
+    seen = set()
+    pending = [owner]
+    while pending:
+        name = pending.pop(0)
+        if name in seen:
+            continue
+        seen.add(name)
+        entry = classes.get(name)
+        if entry is None:
+            continue
+        table = entry.methods if kind == "method" else entry.fields
+        if member in table:
+            return table[member], name
+        pending.extend(entry.supers)
+    return None
+
+
+def read_constant_pool(data):
+    """Extract class and member references from a class file's constant pool."""
+    if len(data) < 10 or struct.unpack_from(">I", data, 0)[0] != 0xCAFEBABE:
+        return None
+    count = struct.unpack_from(">H", data, 8)[0]
+    offset = 10
+    entries = {}
+    index = 1
+    while index < count:
+        tag = data[offset]
+        offset += 1
+        if tag == TAG_UTF8:
+            length = struct.unpack_from(">H", data, offset)[0]
+            offset += 2
+            entries[index] = data[offset : offset + length].decode("utf-8", "replace")
+            offset += length
+        else:
+            width = FIXED_WIDTH_TAGS.get(tag)
+            if width is None:
+                # An unknown tag makes every later offset meaningless.
+                return None
+            entries[index] = struct.unpack_from(f">{width}B", data, offset)
+            offset += width
+        index += 2 if tag in WIDE_TAGS else 1
+    return entries, data
+
+
+def parse_references(data):
+    """Yield ``("class", name)`` and ``("method"|"field", owner, member)`` tuples."""
+    parsed = read_constant_pool(data)
+    if parsed is None:
+        return []
+    entries, raw = parsed
+
+    # Re-walk the pool to read the structured entries with correct field widths.
+    count = struct.unpack_from(">H", raw, 8)[0]
+    offset = 10
+    index = 1
+    classes = {}
+    name_and_types = {}
+    members = []
+    while index < count:
+        tag = raw[offset]
+        offset += 1
+        if tag == TAG_UTF8:
+            length = struct.unpack_from(">H", raw, offset)[0]
+            offset += 2 + length
+        elif tag == TAG_CLASS:
+            classes[index] = struct.unpack_from(">H", raw, offset)[0]
+            offset += 2
+        elif tag == TAG_NAME_AND_TYPE:
+            name_and_types[index] = struct.unpack_from(">HH", raw, offset)
+            offset += 4
+        elif tag in (TAG_FIELDREF, TAG_METHODREF, TAG_INTERFACE_METHODREF):
+            class_index, name_and_type_index = struct.unpack_from(">HH", raw, offset)
+            members.append((tag, class_index, name_and_type_index))
+            offset += 4
+        else:
+            offset += FIXED_WIDTH_TAGS[tag]
+        index += 2 if tag in WIDE_TAGS else 1
+
+    references = []
+    for class_index, name_index in classes.items():
+        name = entries.get(name_index)
+        if isinstance(name, str) and not name.startswith("["):
+            references.append(("class", name))
+    for tag, class_index, name_and_type_index in members:
+        owner = entries.get(classes.get(class_index, -1))
+        pair = name_and_types.get(name_and_type_index)
+        if not isinstance(owner, str) or pair is None or owner.startswith("["):
+            continue
+        member_name = entries.get(pair[0])
+        descriptor = entries.get(pair[1])
+        if not isinstance(member_name, str) or not isinstance(descriptor, str):
+            continue
+        if tag == TAG_FIELDREF:
+            references.append(("field", owner, member_name))
+        else:
+            # The database keys methods by name plus the argument list.
+            arguments = descriptor[: descriptor.rfind(")") + 1]
+            references.append(("method", owner, f"{member_name}{arguments}"))
+    return references
+
+
+def describe(reference):
+    if reference[0] == "class":
+        return reference[1].replace("/", ".")
+    return f"{reference[1].replace('/', '.')}#{reference[2]}"
+
+
+def main(argv):
+    root = repository_root()
+    floor = int(catalog_version(root, "android-minSdk"))
+    compile_sdk = catalog_version(root, "android-compileSdk")
+
+    roots = [pathlib.Path(path) for path in argv[1:]]
+    if not roots:
+        roots = [
+            root / "bindings/kotlin/build/classes/kotlin/android/main",
+            root / "bindings/kotlin/build/classes/java/androidMain",
+        ]
+    roots = [path for path in roots if path.is_dir()]
+    if not roots:
+        fail(
+            "no compiled androidMain classes found; run "
+            "./gradlew :bindings:kotlin:compileAndroidMain first"
+        )
+
+    database = load_api_database(api_database_path(android_sdk_directory(root), compile_sdk))
+
+    violations = {}
+    scanned = 0
+    for class_root in roots:
+        for class_file in sorted(class_root.rglob("*.class")):
+            scanned += 1
+            data = class_file.read_bytes()
+            for reference in parse_references(data):
+                if reference[0] == "class":
+                    entry = database.get(reference[1])
+                    if entry is None or entry.since <= floor:
+                        continue
+                    since = entry.since
+                else:
+                    resolved = resolve_member(database, reference[1], reference[2], reference[0])
+                    if resolved is None or resolved[0] <= floor:
+                        continue
+                    since = resolved[0]
+                violations.setdefault((since, describe(reference)), set()).add(
+                    str(class_file.relative_to(class_root))
+                )
+
+    if violations:
+        print(
+            f"error: androidMain calls {len(violations)} platform API(s) above "
+            f"the android-minSdk {floor} floor:",
+            file=sys.stderr,
+        )
+        for (since, name), sources in sorted(violations.items()):
+            origin = ", ".join(sorted(sources)[:3])
+            print(f"  API {since} (floor {floor}): {name}  [{origin}]", file=sys.stderr)
+        print(
+            "\nGuard each call with a Build.VERSION.SDK_INT check, use an API "
+            f"{floor}-compatible equivalent, or raise android-minSdk in "
+            "gradle/libs.versions.toml.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"androidMain stays on the API {floor} floor ({scanned} classes scanned)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))
