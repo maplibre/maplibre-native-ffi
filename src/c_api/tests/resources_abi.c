@@ -11,6 +11,10 @@
 #include "unity.h"
 
 static const char offline_style_url[] = "http://example.com/offline-style.json";
+static const char lookup_blocking_style_url[] =
+  "http://example.com/lookup-blocking-style.json";
+static const char lookup_probe_style_url[] =
+  "http://example.com/lookup-probe-style.json";
 static const char unsupported_scheme_style_url[] =
   "jar:file:/packaged/style.json";
 static const char credentialed_unsupported_scheme_style_url[] =
@@ -100,14 +104,16 @@ static bool wait_for_map_loading_failure(
   return false;
 }
 
-static mln_offline_region_definition offline_tile_definition(void) {
+static mln_offline_region_definition offline_tile_definition_for_style(
+  const char* style_url
+) {
   return (mln_offline_region_definition){
     .size = sizeof(mln_offline_region_definition),
     .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
     .data = {
       .tile_pyramid = {
         .size = sizeof(mln_offline_tile_pyramid_region_definition),
-        .style_url = offline_style_url,
+        .style_url = style_url,
         .bounds =
           {
             .southwest = {.latitude = 1.0, .longitude = 2.0},
@@ -120,6 +126,10 @@ static mln_offline_region_definition offline_tile_definition(void) {
       }
     },
   };
+}
+
+static mln_offline_region_definition offline_tile_definition(void) {
+  return offline_tile_definition_for_style(offline_style_url);
 }
 
 static mln_offline_region_definition offline_geometry_definition(
@@ -463,10 +473,14 @@ static void other_runtime_entry(void* argument) {
   mln_runtime_destroy(runtime);
 }
 
-static bool start_offline_region_download(
-  mln_runtime* runtime, teardown_probe* probe
+// Creates a region for `style_url` and activates its download. The download
+// requests the style from a MapLibre file source thread, which is where the
+// resource provider and resource transform callbacks run.
+static bool activate_style_download(
+  mln_runtime* runtime, const char* style_url
 ) {
-  const mln_offline_region_definition definition = offline_tile_definition();
+  const mln_offline_region_definition definition =
+    offline_tile_definition_for_style(style_url);
   const uint8_t metadata[] = {1, 2, 3};
   mln_offline_operation_id operation_id = 0;
   if (
@@ -504,12 +518,14 @@ static bool start_offline_region_download(
   ) {
     return false;
   }
+  return true;
+}
 
-  // The download requests the region style URL from a MapLibre file source
-  // thread, which is where the transform callback runs.
+// Pumps the owner thread's run loop until `flag` is set by a MapLibre thread.
+static bool pump_until_flag(mln_runtime* runtime, atomic_bool* flag) {
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
        attempt += 1) {
-    if (atomic_load(&probe->transform_entered)) {
+    if (atomic_load(flag)) {
       return true;
     }
     if (mln_runtime_run_once(runtime) != MLN_STATUS_OK) {
@@ -518,6 +534,13 @@ static bool start_offline_region_download(
     mln_test_sleep_millisecond();
   }
   return false;
+}
+
+static bool start_offline_region_download(
+  mln_runtime* runtime, teardown_probe* probe
+) {
+  return activate_style_download(runtime, offline_style_url) &&
+         pump_until_flag(runtime, &probe->transform_entered);
 }
 
 // This verifies that runtime teardown waits for an in-flight resource transform
@@ -555,6 +578,169 @@ static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, atomic_load(&probe.other_runtime_status)
   );
+}
+
+// Shared state for the file-source lookup lock-scope test below. The provider
+// callback, the transform callback, and the second runtime's owner thread are
+// three separate threads, so every field crosses a thread boundary.
+typedef struct lookup_probe {
+  atomic_bool transform_entered;
+  atomic_bool provider_entered;
+  atomic_bool writer_pending;
+  atomic_bool lookup_reached;
+  atomic_bool other_runtime_ready;
+  atomic_bool other_runtime_call_done;
+  atomic_bool other_runtime_call_observed;
+  atomic_int other_runtime_status;
+} lookup_probe;
+
+// Blocks the transform for the first region's style so its shared transform
+// lock stays held, which is what makes the pending writer below wait. It calls
+// no C API function while blocked.
+static mln_status lookup_blocking_transform(
+  void* user_data, uint32_t kind, const char* url,
+  mln_resource_transform_response* out_response
+) {
+  (void)kind;
+  lookup_probe* probe = user_data;
+  if (out_response != NULL) {
+    out_response->url = NULL;
+  }
+  if (url == NULL || strstr(url, "lookup-blocking") == NULL) {
+    return MLN_STATUS_OK;
+  }
+
+  atomic_store(&probe->transform_entered, true);
+  for (size_t attempt = 0; attempt < teardown_transform_block_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->other_runtime_call_done)) {
+      break;
+    }
+    mln_test_sleep_millisecond();
+  }
+  atomic_store(
+    &probe->other_runtime_call_observed,
+    atomic_load(&probe->other_runtime_call_done)
+  );
+  return MLN_STATUS_OK;
+}
+
+// Runs on the file source thread immediately before that thread looks up the
+// resource transform, so holding it here parks the thread until the owner
+// thread has a transform writer waiting. Passing the request through is what
+// sends the thread into the lookup under test.
+static uint32_t lookup_probe_resource_provider(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) {
+  (void)handle;
+  lookup_probe* probe = user_data;
+  if (
+    request == NULL || request->url == NULL ||
+    strstr(request->url, "lookup-probe") == NULL
+  ) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+
+  atomic_store(&probe->provider_entered, true);
+  for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
+       attempt += 1) {
+    if (atomic_load(&probe->writer_pending)) {
+      break;
+    }
+    mln_test_sleep_millisecond();
+  }
+  // Give the owner thread time to reach the exclusive transform lock, so the
+  // lookup this thread is about to make queues behind a waiting writer.
+  mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
+  atomic_store(&probe->lookup_reached, true);
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+// Owns a second runtime and calls into it while a file source thread is inside
+// the resource transform lookup for the first runtime.
+static void lookup_other_runtime_entry(void* argument) {
+  lookup_probe* probe = argument;
+  mln_runtime* runtime = NULL;
+  const mln_runtime_options options = mln_runtime_options_default();
+  const mln_status create_status = mln_runtime_create(&options, &runtime);
+  if (create_status != MLN_STATUS_OK) {
+    atomic_store(&probe->other_runtime_status, create_status);
+    atomic_store(&probe->other_runtime_call_done, true);
+    return;
+  }
+
+  atomic_store(&probe->other_runtime_ready, true);
+  wait_for_flag(&probe->lookup_reached);
+  // Give the file source thread time to reach the lookup itself.
+  mln_test_sleep_milliseconds(teardown_call_delay_milliseconds);
+  atomic_store(&probe->other_runtime_status, mln_runtime_run_once(runtime));
+  atomic_store(&probe->other_runtime_call_done, true);
+  mln_runtime_destroy(runtime);
+}
+
+// This verifies that a file source resource transform lookup releases the
+// process-global runtime registry lock before it waits on the per-runtime
+// transform lock. A transform callback holds the shared transform lock, the
+// owner thread waits for the exclusive lock, and a second file source thread
+// then makes the lookup, which a writer-preferring shared mutex queues behind
+// that waiting writer. Holding the registry lock across that wait stalls every
+// unrelated runtime, so an ordinary call on a second runtime must still finish
+// while the lookup waits.
+static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
+  lookup_probe probe = {0};
+  atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_test_thread* other_thread =
+    mln_test_thread_start(lookup_other_runtime_entry, &probe);
+  TEST_ASSERT_TRUE(wait_for_flag(&probe.other_runtime_ready));
+
+  const mln_resource_provider provider = {
+    .size = sizeof(mln_resource_provider),
+    .callback = lookup_probe_resource_provider,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
+  );
+  const mln_resource_transform transform = {
+    .size = sizeof(mln_resource_transform),
+    .callback = lookup_blocking_transform,
+    .user_data = &probe,
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_set_resource_transform(runtime, &transform)
+  );
+
+  // The first download parks a transform callback inside the shared lock.
+  TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_blocking_style_url));
+  TEST_ASSERT_TRUE(pump_until_flag(runtime, &probe.transform_entered));
+
+  // The second download parks a file source thread in the provider callback,
+  // one step ahead of the lookup under test.
+  TEST_ASSERT_TRUE(activate_style_download(runtime, lookup_probe_style_url));
+  TEST_ASSERT_TRUE(pump_until_flag(runtime, &probe.provider_entered));
+
+  atomic_store(&probe.writer_pending, true);
+  // Clearing waits for the in-flight transform callback to return, so it is
+  // the pending writer the lookup queues behind.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_clear_resource_transform(runtime)
+  );
+  mln_test_thread_join(other_thread);
+
+  TEST_ASSERT_TRUE_MESSAGE(
+    atomic_load(&probe.lookup_reached),
+    "the file source thread never reached the resource transform lookup"
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    atomic_load(&probe.other_runtime_call_observed),
+    "a call on an unrelated runtime was stalled by a resource transform lookup"
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, atomic_load(&probe.other_runtime_status)
+  );
+  mln_test_destroy_runtime(runtime);
 }
 
 // This verifies null, undersized, and missing-callback provider descriptors
@@ -687,6 +873,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(offline_take_rejects_mismatched_result_kind);
   RUN_TEST(resource_transform_rejects_raw_invalid_descriptors);
   RUN_TEST(runtime_teardown_leaves_other_runtimes_responsive);
+  RUN_TEST(resource_transform_lookup_leaves_other_runtimes_responsive);
   RUN_TEST(resource_provider_rejects_raw_invalid_descriptors);
   RUN_TEST(unsupported_style_url_scheme_names_scheme_and_url);
   RUN_TEST(unsupported_style_url_diagnostic_redacts_credentials);
