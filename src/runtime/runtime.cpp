@@ -98,6 +98,27 @@ auto runtime_registry() -> RuntimeRegistry& {
   return value;
 }
 
+// Leases the resource transform registration for a MapLibre-owned thread.
+//
+// The registry lock proves the platform context is a live runtime, and the
+// work done under it is a reference count increment that completes without
+// waiting on any per-runtime lock. Callers take the returned state's lock
+// afterwards, so a writer waiting on that lock delays this runtime alone
+// rather than every `mln_*` call in the process.
+auto lease_resource_transform_state(void* platform_context) noexcept
+  -> std::shared_ptr<mln::core::ResourceTransformState> {
+  if (platform_context == nullptr) {
+    return nullptr;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    return nullptr;
+  }
+  return runtime->resource_transform_state;
+}
+
 using OfflineRegionSnapshotRegistry = std::unordered_map<
   const mln_offline_region_snapshot*,
   std::unique_ptr<mln_offline_region_snapshot>>;
@@ -1010,6 +1031,8 @@ auto create_runtime(
     std::make_shared<OfflineOperationEventState>();
   owned_runtime->offline_operation_state->runtime = owned_runtime.get();
   owned_runtime->offline_operation_state->alive = true;
+  owned_runtime->resource_transform_state =
+    std::make_shared<ResourceTransformState>();
   auto* runtime = owned_runtime.get();
   {
     const std::scoped_lock lock(runtime_registry_mutex());
@@ -1040,9 +1063,10 @@ auto set_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::unique_lock lock(runtime->resource_transform_mutex);
-  runtime->resource_transform_callback = transform->callback;
-  runtime->resource_transform_user_data = transform->user_data;
+  auto& state = *runtime->resource_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = transform->callback;
+  state.user_data = transform->user_data;
   return MLN_STATUS_OK;
 }
 
@@ -1090,9 +1114,10 @@ auto clear_resource_transform(mln_runtime* runtime) -> mln_status {
     return status;
   }
 
-  const std::unique_lock lock(runtime->resource_transform_mutex);
-  runtime->resource_transform_callback = nullptr;
-  runtime->resource_transform_user_data = nullptr;
+  auto& state = *runtime->resource_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = nullptr;
+  state.user_data = nullptr;
   return MLN_STATUS_OK;
 }
 
@@ -2357,13 +2382,15 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
 
   // A resource transform callback that entered `invoke_resource_transform()`
   // before the erase above holds a shared transform lock, so this wait covers
-  // every callback that can still observe the runtime.
+  // every callback that can still observe the runtime. A lookup that leased
+  // the state before the erase and reaches the shared lock after this block
+  // reads the cleared registration and calls nothing. The lease keeps the
+  // state object alive on its own, so it stays readable past the runtime.
   {
-    const std::unique_lock transform_lock(
-      owned_runtime->resource_transform_mutex
-    );
-    owned_runtime->resource_transform_callback = nullptr;
-    owned_runtime->resource_transform_user_data = nullptr;
+    auto& transform_state = *owned_runtime->resource_transform_state;
+    const std::unique_lock transform_lock(transform_state.mutex);
+    transform_state.callback = nullptr;
+    transform_state.user_data = nullptr;
   }
 
   {
@@ -2526,46 +2553,31 @@ auto find_runtime_for_platform_context(void* platform_context) noexcept
 auto has_resource_transform_for_platform_context(
   void* platform_context
 ) noexcept -> bool {
-  if (platform_context == nullptr) {
+  const auto state = lease_resource_transform_state(platform_context);
+  if (state == nullptr) {
     return false;
   }
 
-  auto* runtime = static_cast<mln_runtime*>(platform_context);
-  // The registry lock stays held across the read: releasing it first would
-  // leave an unowned pointer, and this locks a mutex inside the runtime.
-  const std::scoped_lock registry_lock(runtime_registry_mutex());
-  if (!runtime_registry().contains(runtime)) {
-    return false;
-  }
-  const std::shared_lock transform_lock(runtime->resource_transform_mutex);
-  return runtime->resource_transform_callback != nullptr;
+  const std::shared_lock transform_lock(state->mutex);
+  return state->callback != nullptr;
 }
 
 auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,
   std::string& out_replacement_url
 ) noexcept -> mln_status {
-  if (platform_context == nullptr) {
+  const auto state = lease_resource_transform_state(platform_context);
+  if (state == nullptr) {
     return MLN_STATUS_OK;
   }
 
-  auto* runtime = static_cast<mln_runtime*>(platform_context);
-  std::shared_lock<std::shared_mutex> transform_lock;
-  {
-    // Taking the shared transform lock while the registry lock is held is the
-    // handoff that keeps the runtime alive for the callback:
-    // `destroy_runtime()` removes the registry entry under the same registry
-    // lock and then waits for the exclusive transform lock. A callback that
-    // reaches the shared lock first holds teardown until it returns, and one
-    // that arrives after the erase finds no entry and skips the transform.
-    const std::scoped_lock registry_lock(runtime_registry_mutex());
-    if (!runtime_registry().contains(runtime)) {
-      return MLN_STATUS_OK;
-    }
-    transform_lock = std::shared_lock{runtime->resource_transform_mutex};
-  }
-
-  const auto callback = runtime->resource_transform_callback;
+  // The lease keeps this state readable on its own, so the shared lock is
+  // taken with the registry lock released. `destroy_runtime()` erases the
+  // registry entry and then clears the registration under the exclusive lock,
+  // so a callback that reaches the shared lock first holds teardown until it
+  // returns, and one that arrives later finds an empty registration.
+  const std::shared_lock transform_lock(state->mutex);
+  const auto callback = state->callback;
   if (callback == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -2576,8 +2588,7 @@ auto invoke_resource_transform(
     .context = &out_replacement_url,
   };
   try {
-    const auto status =
-      callback(runtime->resource_transform_user_data, kind, url, &response);
+    const auto status = callback(state->user_data, kind, url, &response);
     if (
       status == MLN_STATUS_OK && response.url != nullptr &&
       *response.url != '\0'
