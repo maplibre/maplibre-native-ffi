@@ -63,8 +63,9 @@ public sealed record AnimationOptions
     /// <para>
     /// Each transition emits that event exactly once, whichever way it ends: running to
     /// completion, being superseded by a later camera command, being cancelled by
-    /// <c>MapHandle.CancelTransitions</c>, completing instantly as a zero-duration jump, or exiting
-    /// early because the requested camera contained a non-finite value. MapLibre Native reports the
+    /// <c>MapHandle.CancelTransitions</c>, or completing instantly as a zero-duration jump. A
+    /// command this API rejects, such as one carrying a non-finite enabled camera field, starts no
+    /// transition and emits no such event. MapLibre Native reports the
     /// moment a transition releases the camera and does not report which of those outcomes
     /// occurred, so the event establishes transition identity rather than a completion reason. A
     /// host that needs to tell completion from cancellation compares the resulting camera against

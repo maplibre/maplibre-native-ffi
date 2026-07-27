@@ -28,9 +28,8 @@ use crate::logging::test_support::LoggingTestGuard;
 use crate::{
     AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, FeatureIdentifier, GeoJson,
     GeoJsonSourceOptions, Geometry, JsonMember, LatLng, LogSeverity, LogSeverityMask, MapMode,
-    MapOptions,
-    OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload, RuntimeEventType,
-    RuntimeHandle, ScreenBox, ScreenPoint,
+    MapOptions, OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload,
+    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);

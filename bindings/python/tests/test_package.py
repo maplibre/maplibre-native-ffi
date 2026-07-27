@@ -3422,3 +3422,18 @@ def test_set_bounds_rejects_unsupported_constraint() -> None:
                     camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
                 )
             assert map_handle.get_bounds().bounds == camera.Unbounded()
+
+
+@pytest.mark.parametrize("transition_id", [-1, 2**64])
+def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> None:
+    # PyO3 extracts this as Option<u64>, so without a range check the caller
+    # would see a bare OverflowError instead of the binding's error shape.
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.ease_to(
+                    camera.CameraOptions(zoom=2.0),
+                    camera.AnimationOptions(
+                        duration_ms=0.0, transition_id=transition_id
+                    ),
+                )

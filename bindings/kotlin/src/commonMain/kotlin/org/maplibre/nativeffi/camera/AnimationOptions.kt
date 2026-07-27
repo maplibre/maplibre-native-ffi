@@ -28,12 +28,13 @@ public class AnimationOptions {
    *
    * Each transition emits that event exactly once, whichever way it ends: running to completion,
    * being superseded by a later camera command, being cancelled by
-   * [org.maplibre.nativeffi.map.MapHandle.cancelTransitions], completing instantly as a
-   * zero-duration jump, or exiting early because the requested camera contained a non-finite value.
-   * MapLibre Native reports the moment a transition releases the camera and leaves the outcome
-   * unreported, so the event establishes transition identity rather than a completion reason. A
-   * host that needs to tell completion from cancellation compares the resulting camera against the
-   * requested one, or tracks which transition id is current.
+   * [org.maplibre.nativeffi.map.MapHandle.cancelTransitions], or completing instantly as a
+   * zero-duration jump. A command this API rejects, such as one carrying a non-finite enabled
+   * camera field, starts no transition and emits no such event. MapLibre Native reports the moment
+   * a transition releases the camera and leaves the outcome unreported, so the event establishes
+   * transition identity rather than a completion reason. A host that needs to tell completion from
+   * cancellation compares the resulting camera against the requested one, or tracks which
+   * transition id is current.
    *
    * The event is queued on the runtime that owns the map and is drained by
    * [org.maplibre.nativeffi.runtime.RuntimeHandle.pollEvent]. For a transition that runs to

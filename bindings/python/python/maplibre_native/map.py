@@ -299,12 +299,21 @@ def _animation_parts(
         if animation.easing is not None
         else None
     )
+    transition_id = animation.transition_id
+    if transition_id is not None and not 0 <= transition_id < 2**64:
+        # PyO3 extracts this as `Option<u64>` and raises a bare OverflowError
+        # before the binding's error conversion runs, so range-check it here to
+        # keep invalid binding-owned input on the documented error shape.
+        raise InvalidArgumentError(
+            f"AnimationOptions.transition_id must fit in 64 unsigned bits, "
+            f"not {transition_id}"
+        )
     return (
         animation.duration_ms,
         animation.velocity,
         animation.min_zoom,
         easing,
-        animation.transition_id,
+        transition_id,
     )
 
 

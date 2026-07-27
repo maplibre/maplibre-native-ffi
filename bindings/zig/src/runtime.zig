@@ -817,9 +817,10 @@ pub const OfflineOperationCompletedPayload = struct {
 /// A camera command that carries `AnimationOptions.transition_id` reports this
 /// payload once for the transition it starts, whichever way that transition
 /// ends: running to completion, being superseded by a later camera command,
-/// being cancelled by `cancelTransitions`, completing instantly as a
-/// zero-duration jump, or exiting early because the requested camera contained
-/// a non-finite value. MapLibre Native reports the moment a transition releases
+/// being cancelled by `cancelTransitions`, or completing instantly as a
+/// zero-duration jump. A command this API rejects, such as one carrying a
+/// non-finite enabled camera field, starts no transition and emits no such
+/// event. MapLibre Native reports the moment a transition releases
 /// the camera and leaves the outcome unreported, so this payload establishes
 /// transition identity rather than a completion reason. A host that needs to
 /// tell completion from cancellation compares the resulting camera against the
