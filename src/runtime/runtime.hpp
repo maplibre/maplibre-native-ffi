@@ -28,6 +28,26 @@ struct ResourceProvider {
   void* user_data = nullptr;
 };
 
+// Holds the resource transform registration in its own reference-counted
+// object so a file-source lookup can keep the registration alive on its own.
+//
+// A lookup copies the runtime's handle to this state while it holds the
+// process-global runtime registry lock, which proves the runtime is live, and
+// takes `mutex` after releasing that lock. The copy is what keeps the state
+// readable, so the registry lock covers a non-blocking pointer copy instead of
+// a lock acquisition that a pending writer can delay.
+//
+// `callback` and `user_data` live here rather than on the runtime, so a lease
+// holder reads and invokes the registration without touching the runtime.
+// Runtime teardown clears both under the exclusive lock: a callback already
+// inside the shared lock keeps teardown waiting until it returns, and a lease
+// that takes the shared lock later observes an empty registration.
+struct ResourceTransformState {
+  std::shared_mutex mutex;
+  mln_resource_transform_callback callback = nullptr;
+  void* user_data = nullptr;
+};
+
 struct OfflineRegionEventState {
   std::mutex mutex;
   mln_runtime* runtime = nullptr;
@@ -66,9 +86,7 @@ struct mln_runtime {
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
   std::shared_ptr<mln::core::OfflineOperationEventState>
     offline_operation_state;
-  mutable std::shared_mutex resource_transform_mutex;
-  mln_resource_transform_callback resource_transform_callback = nullptr;
-  void* resource_transform_user_data = nullptr;
+  std::shared_ptr<mln::core::ResourceTransformState> resource_transform_state;
   std::size_t live_maps = 0;
   mutable std::mutex event_mutex;
   std::unordered_set<const mln_map*> event_maps;
@@ -203,8 +221,10 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions;
 auto find_runtime_for_platform_context(void* platform_context) noexcept
   -> mln_runtime*;
-// Reads resource transform presence under the registry lock, so MapLibre-owned
-// threads observe a value instead of a runtime pointer teardown may retire.
+// Reports whether a resource transform is registered. MapLibre-owned threads
+// observe a value instead of a runtime pointer teardown may retire, and the
+// process-global registry lock is released before the per-runtime transform
+// lock is taken. See `ResourceTransformState`.
 auto has_resource_transform_for_platform_context(
   void* platform_context
 ) noexcept -> bool;
