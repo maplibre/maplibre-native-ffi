@@ -222,9 +222,10 @@ class CameraTransitionFinishedPayload:
     A transition that carried a ``transition_id`` on its ``AnimationOptions``
     reports its end once for every terminal outcome: running to completion,
     being superseded by a later camera command, being cancelled by
-    ``MapHandle.cancel_transitions``, completing instantly as a zero-duration
-    jump, and exiting early on a non-finite camera value. MapLibre Native
-    reports the moment the transition releases the camera without naming which
+    ``MapHandle.cancel_transitions``, or completing instantly as a
+    zero-duration jump. A command this API rejects, such as one carrying a
+    non-finite enabled camera field, starts no transition and emits no such
+    event. MapLibre Native reports the moment the transition releases the camera without naming which
     outcome occurred, so this payload establishes transition identity rather
     than a completion reason.
     """

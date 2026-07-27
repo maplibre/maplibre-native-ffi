@@ -109,8 +109,10 @@ pub struct AnimationOptions {
     ///
     /// The event arrives for every terminal outcome: running to completion,
     /// being superseded by a later camera command, being cancelled by
-    /// `cancel_transitions`, completing instantly as a zero-duration jump, and
-    /// exiting early on a non-finite camera value. MapLibre Native reports the
+    /// `cancel_transitions`, or completing instantly as a zero-duration jump. A
+    /// command this API rejects, such as one carrying a non-finite enabled
+    /// camera field, starts no transition and emits no such event. MapLibre
+    /// Native reports the
     /// moment the transition releases the camera without naming which outcome
     /// occurred, so the event establishes transition identity rather than a
     /// completion reason. A host that needs to tell completion from
