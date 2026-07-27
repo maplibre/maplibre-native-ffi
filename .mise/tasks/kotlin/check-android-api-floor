@@ -63,6 +63,29 @@ FIXED_WIDTH_TAGS = {
 
 WIDE_TAGS = {TAG_LONG, TAG_DOUBLE}
 
+# D8 rewrites static helpers on these JDK types into inline code or synthetic
+# methods at every min-api level, so calling them stays safe below their
+# documented `since`. Verified by dexing at `--min-api 24`: the class file
+# references `Integer.toUnsignedLong` (API 26, what Kotlin's `UInt.toLong()`
+# emits) while the resulting dex has no such reference. The list stays narrow --
+# anything absent from it is reported, which keeps the default answer safe.
+BACKPORTED_OWNERS = frozenset(
+    {
+        "java/lang/Boolean",
+        "java/lang/Byte",
+        "java/lang/Character",
+        "java/lang/Double",
+        "java/lang/Float",
+        "java/lang/Integer",
+        "java/lang/Long",
+        "java/lang/Math",
+        "java/lang/Short",
+        "java/lang/StrictMath",
+        "java/lang/String",
+        "java/util/Objects",
+    }
+)
+
 
 class ApiClass:
     """One ``<class>`` entry from the platform API database."""
@@ -159,10 +182,19 @@ def load_api_database(path):
                 if member is None:
                     continue
                 since = int(relation.get("since", entry.since))
-                table = entry.methods if relation.tag == "method" else entry.fields
-                # Keep the lowest level when a name repeats across overloads.
-                if member not in table or since < table[member]:
-                    table[member] = since
+                if relation.tag == "field":
+                    keys, table = [member], entry.fields
+                else:
+                    # The database keys methods by their full descriptor. Index the
+                    # argument list too, so a covariant return still resolves.
+                    keys, table = [member], entry.methods
+                    cut = member.rfind(")")
+                    if cut != -1:
+                        keys.append(member[: cut + 1])
+                for key in keys:
+                    # Keep the lowest level when a key repeats across overloads.
+                    if key not in table or since < table[key]:
+                        table[key] = since
         classes[name] = entry
     return classes
 
@@ -173,6 +205,11 @@ def resolve_member(classes, owner, member, kind):
     Returns ``(since, declaring_class)`` or ``None`` when the database does not
     describe the member -- which means it belongs to project or library code.
     """
+    candidates = [member]
+    if kind == "method":
+        cut = member.rfind(")")
+        if cut != -1:
+            candidates.append(member[: cut + 1])
     seen = set()
     pending = [owner]
     while pending:
@@ -184,8 +221,9 @@ def resolve_member(classes, owner, member, kind):
         if entry is None:
             continue
         table = entry.methods if kind == "method" else entry.fields
-        if member in table:
-            return table[member], name
+        for candidate in candidates:
+            if candidate in table:
+                return table[candidate], name
         pending.extend(entry.supers)
     return None
 
@@ -268,9 +306,7 @@ def parse_references(data):
         if tag == TAG_FIELDREF:
             references.append(("field", owner, member_name))
         else:
-            # The database keys methods by name plus the argument list.
-            arguments = descriptor[: descriptor.rfind(")") + 1]
-            references.append(("method", owner, f"{member_name}{arguments}"))
+            references.append(("method", owner, f"{member_name}{descriptor}"))
     return references
 
 
@@ -313,6 +349,8 @@ def main(argv):
                         continue
                     since = entry.since
                 else:
+                    if reference[0] == "method" and reference[1] in BACKPORTED_OWNERS:
+                        continue
                     resolved = resolve_member(database, reference[1], reference[2], reference[0])
                     if resolved is None or resolved[0] <= floor:
                         continue
