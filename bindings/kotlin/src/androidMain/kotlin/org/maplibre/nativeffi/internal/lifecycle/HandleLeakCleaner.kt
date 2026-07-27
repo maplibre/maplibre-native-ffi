@@ -21,6 +21,7 @@ internal object HandleLeakCleaner {
 
   /** Keeps host callback state reachable for as long as native may invoke it. */
   private val nativeCallbackRoots = ConcurrentHashMap.newKeySet<Any>()
+
   /** Reports [leakReport] when [handle] becomes unreachable before explicit release. */
   fun register(handle: Any, leakReport: HandleStateCore.LeakReport) {
     leakReportActions.register(handle, LeakReportAction(leakReport))
