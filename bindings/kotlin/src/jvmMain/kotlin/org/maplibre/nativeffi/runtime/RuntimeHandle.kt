@@ -266,7 +266,9 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     Status.check(NativeAccess.clearResourceProvider(requireLiveHandle()))
     val previous = resourceProviderState
     resourceProviderState = null
-    closeQuietly(previous)
+    // The install path retained this as a strong leak-cleaner root, so closing
+    // alone would keep it and everything its callback captured reachable.
+    releaseCallbackRoot(previous)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
