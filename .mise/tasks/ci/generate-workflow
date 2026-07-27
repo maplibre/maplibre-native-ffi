@@ -21,30 +21,15 @@ CACHE_SAVE = PINS["actions/cache/save"]
 DOWNLOAD = PINS["actions/download-artifact"]
 UPLOAD = PINS["actions/upload-artifact"]
 
-
-def matrix(rows: list[dict[str, object]], indent: int = 8) -> list[str]:
-    lines = [" " * indent + "include:"]
-    for row in rows:
-        first, *rest = row.items()
-        key, value = first
-        lines.append(" " * (indent + 2) + f"- {key}: {value}")
-        for key, value in rest:
-            if isinstance(value, list):
-                lines.append(" " * (indent + 4) + f"{key}: >-")
-                for index, command in enumerate(value):
-                    suffix = " &&" if index < len(value) - 1 else ""
-                    lines.append(" " * (indent + 6) + f"{command}{suffix}")
-            else:
-                scalar = str(value).lower() if isinstance(value, bool) else value
-                lines.append(" " * (indent + 4) + f"{key}: {scalar}")
-    return lines
-
-
 # Environment secrets for R2 writes live in the GitHub Environment `sccache`
 # (main only). PRs omit the environment and fall back to public read-only.
 SCCACHE_ENVIRONMENT = (
     "    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}"
 )
+
+
+def job_id(preset: str) -> str:
+    return f"target-{preset}"
 
 
 def setup(target: str | None = None, zig: bool = False) -> list[str]:
@@ -60,7 +45,7 @@ def setup(target: str | None = None, zig: bool = False) -> list[str]:
     if target:
         lines.append(f"          target: {target}")
     if zig:
-        lines.append("          zig: ${{ matrix.zig }}")
+        lines.append("          zig: true")
     lines.extend(
         [
             "          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}",
@@ -70,8 +55,92 @@ def setup(target: str | None = None, zig: bool = False) -> list[str]:
     return lines
 
 
+def run_step(command: str, *, env: dict[str, str] | None = None) -> list[str]:
+    lines = [f"      - run: {command}"]
+    if env:
+        lines.append("        env:")
+        for key, value in env.items():
+            lines.append(f"          {key}: {value}")
+    return lines
+
+
+CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
+
+
+def target_job(row: dict[str, object]) -> list[str]:
+    preset = str(row["preset"])
+    package = bool(row["package"])
+    zig = bool(row["zig"])
+    native = list(row["native_commands"])
+    consumers = list(row.get("consumer_commands", []))
+
+    lines = [
+        f"  {job_id(preset)}:",
+        f"    name: target / {preset}",
+        f"    runs-on: {row['runner']}",
+        "    timeout-minutes: 120",
+        SCCACHE_ENVIRONMENT,
+        "    steps:",
+        *setup(preset, zig=zig),
+    ]
+    for command in native:
+        lines.extend(run_step(command))
+    if package:
+        lines.extend(
+            [
+                "      - name: Archive native artifact",
+                f"        run: mise run archive-native {preset}",
+                "      - name: Install packaged native artifact",
+                "        run: >-",
+                "          mise run install-native-package",
+                f"          {preset}",
+                f"          build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
+            ]
+        )
+        for command in consumers:
+            env = CONSUMER_ENV if command.startswith("mise run") else None
+            lines.extend(run_step(command, env=env))
+    # Only rows that fetch every Zig project the key covers may claim it;
+    # see `uses_zig`. No status function in the `if`, so `success()` is
+    # implied: a job that fetched only part of its Zig packages before
+    # failing saves nothing, leaving the key free for a later run that
+    # completes the fetch.
+    if zig:
+        lines.extend(
+            [
+                "      - name: Save Zig packages",
+                "        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}",
+                f"        uses: {CACHE_SAVE}",
+                "        with:",
+                "          path: |",
+                "            ~/.cache/zig",
+                "            ~/AppData/Local/zig",
+                "          key: ${{ steps.setup.outputs.zig-cache-key }}",
+            ]
+        )
+    if package:
+        lines.extend(
+            [
+                "      - name: Upload native artifact",
+                f"        uses: {UPLOAD}",
+                "        with:",
+                f"          name: native-package-{preset}-${{{{ github.sha }}}}",
+                f"          path: build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
+                "          if-no-files-found: error",
+            ]
+        )
+    lines.append("")
+    return lines
+
+
 def render(source: dict[str, object], presets: dict[str, object]) -> str:
     rows = target_rows(source, presets)
+    target_ids = [job_id(str(row["preset"])) for row in rows]
+    android_package_ids = [
+        job_id(str(row["preset"]))
+        for row in rows
+        if str(row["preset"]).startswith("android-") and row["package"]
+    ]
 
     lines = [
         "# Generated by `mise run ci:generate-workflow`. Do not edit directly.",
@@ -121,91 +190,50 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         *setup(),
         "      - run: mise run //docs:build",
         "",
-        "  target:",
-        "    name: target / ${{ matrix.preset }}",
-        "    runs-on: ${{ matrix.runner }}",
-        "    timeout-minutes: 120",
-        SCCACHE_ENVIRONMENT,
-        "    strategy:",
-        "      fail-fast: false",
-        "      matrix:",
-        *matrix(rows),
-        "    steps:",
-        *setup("${{ matrix.preset }}", zig=True),
-        "      - name: Run native checks",
-        "        run: ${{ matrix.native_commands }}",
-        "      - name: Archive native artifact",
-        "        if: ${{ matrix.package }}",
-        "        run: mise run archive-native ${{ matrix.preset }}",
-        "      - name: Install packaged native artifact",
-        "        if: ${{ matrix.package }}",
-        "        run: >-",
-        "          mise run install-native-package",
-        "          ${{ matrix.preset }}",
-        "          build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
-        "      - name: Run binding and example checks",
-        "        if: ${{ matrix.package }}",
-        "        env:",
-        '          MISE_TASK_SKIP: "//:build"',
-        "        run: ${{ matrix.consumer_commands }}",
-        # Only rows that fetch every Zig project the key covers may claim it;
-        # see `uses_zig`. No status function in the `if`, so `success()` is
-        # implied: a job that fetched only part of its Zig packages before
-        # failing saves nothing, leaving the key free for a later run that
-        # completes the fetch.
-        "      - name: Save Zig packages",
-        "        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}",
-        f"        uses: {CACHE_SAVE}",
-        "        with:",
-        "          path: |",
-        "            ~/.cache/zig",
-        "            ~/AppData/Local/zig",
-        "          key: ${{ steps.setup.outputs.zig-cache-key }}",
-        "      - name: Upload native artifact",
-        "        if: ${{ matrix.package }}",
-        f"        uses: {UPLOAD}",
-        "        with:",
-        "          name: native-package-${{ matrix.preset }}-${{ github.sha }}",
-        "          path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz",
-        "          if-no-files-found: error",
-        "",
-        "  android-multi:",
-        "    name: Android multi-ABI packaging",
-        "    runs-on: ubuntu-latest",
-        "    timeout-minutes: 30",
-        SCCACHE_ENVIRONMENT,
-        "    needs:",
-        "      - target",
-        "    steps:",
-        *setup("android-multi-vulkan"),
-        "      - name: Download Android native artifacts",
-        f"        uses: {DOWNLOAD}",
-        "        with:",
-        "          pattern: native-package-android-*-vulkan-${{ github.sha }}",
-        "          path: build/packages/native/android-multi-input",
-        "      - run: >-",
-        "          mise run //:kotlin:verify-android-multi-abi",
-        "          build/packages/native/android-multi-input",
-        "",
-        "  required:",
-        "    name: ci-required",
-        "    runs-on: ubuntu-latest",
-        "    timeout-minutes: 5",
-        "    if: ${{ always() }}",
-        "    needs:",
-        "      - hygiene",
-        "      - docs",
-        "      - target",
-        "      - android-multi",
-        "    steps:",
-        "      - name: Fail if required jobs failed",
-        "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
-        "        run: |",
-        "          echo '${{ toJSON(needs) }}'",
-        "          exit 1",
-        '      - run: "true"',
-        "",
     ]
+    for row in rows:
+        lines.extend(target_job(row))
+
+    lines.extend(
+        [
+            "  android-multi:",
+            "    name: Android multi-ABI packaging",
+            "    runs-on: ubuntu-latest",
+            "    timeout-minutes: 30",
+            SCCACHE_ENVIRONMENT,
+            "    needs:",
+            *[f"      - {job}" for job in android_package_ids],
+            "    steps:",
+            *setup("android-multi"),
+            "      - name: Download Android native artifacts",
+            f"        uses: {DOWNLOAD}",
+            "        with:",
+            "          pattern: native-package-android-*-${{ github.sha }}",
+            "          path: build/packages/native/android-multi-input",
+            "      - run: >-",
+            "          mise run //:kotlin:verify-android-multi-abi",
+            "          build/packages/native/android-multi-input",
+            "",
+            "  required:",
+            "    name: ci-required",
+            "    runs-on: ubuntu-latest",
+            "    timeout-minutes: 5",
+            "    if: ${{ always() }}",
+            "    needs:",
+            "      - hygiene",
+            "      - docs",
+            *[f"      - {job}" for job in target_ids],
+            "      - android-multi",
+            "    steps:",
+            "      - name: Fail if required jobs failed",
+            "        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
+            "        run: |",
+            "          echo '${{ toJSON(needs) }}'",
+            "          exit 1",
+            '      - run: "true"',
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 

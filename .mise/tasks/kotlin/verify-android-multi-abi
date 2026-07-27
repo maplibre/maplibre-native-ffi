@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Verify the multi-ABI Android runtime from packaged native artifacts."
+#MISE description="Verify multi-ABI Android runtime AARs from packaged native artifacts."
 #MISE tools={java="{{vars.java_version}}"}
 
 set -euo pipefail
@@ -11,7 +11,12 @@ fi
 
 input_root="$1"
 install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/android-multi-install"
-presets=(android-arm64-vulkan android-x64-vulkan)
+presets=(
+  android-arm64-egl
+  android-arm64-vulkan
+  android-x64-egl
+  android-x64-vulkan
+)
 
 rm -rf "$install_root"
 mkdir -p "$install_root"
@@ -36,8 +41,10 @@ for preset in "${presets[@]}"; do
   mv "${install_root}/${archive_root}" "${install_root}/${preset}"
 done
 
-./gradlew \
-  -Pmaplibre.android.prebuiltInstallRoot="$install_root" \
-  -Pmaplibre.android.backend=vulkan \
-  -Pmaplibre.android.abis=arm64-v8a,x86_64 \
-  :bindings:kotlin:androidBuild
+for backend in opengl vulkan; do
+  ./gradlew \
+    -Pmaplibre.android.prebuiltInstallRoot="$install_root" \
+    -Pmaplibre.android.backend="$backend" \
+    -Pmaplibre.android.abis=arm64-v8a,x86_64 \
+    :bindings:kotlin:androidBuild
+done
