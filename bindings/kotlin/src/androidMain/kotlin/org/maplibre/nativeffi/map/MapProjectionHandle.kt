@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -15,6 +16,10 @@ import org.maplibre.nativeffi.internal.status.Status
 public actual class MapProjectionHandle internal constructor(private val handleAddress: Long) :
   AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handleAddress)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
 
   public actual val camera: CameraOptions
     get() {

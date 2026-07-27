@@ -513,7 +513,8 @@ internal constructor(
 
   internal fun nativeAddress(): Long = state.address()
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    state.retainChild(childTypeName)
 
   internal fun resourceProviderStateForTesting(): ResourceProviderState? = resourceProviderState
 

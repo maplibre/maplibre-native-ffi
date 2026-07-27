@@ -25,6 +25,7 @@ import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -54,8 +55,13 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, private val handleAddress: Long) :
   AutoCloseable {
-  private val runtimeRetention = runtime.retainChild()
+  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val core = HandleStateCore("MapHandle", handleAddress)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual val isClosed: Boolean
@@ -267,7 +273,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
           )
         )
       }
-      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
     } catch (error: Throwable) {
       closeQuietly(sourceState)
       throw error
@@ -1462,14 +1469,15 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
 
   internal fun nativeAddress(): Long = handleAddress
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
     val iterator = customGeometrySources.iterator()
     while (iterator.hasNext()) {
       val entry = iterator.next()
       if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.value)
+        releaseCallbackRoot(entry.value)
         iterator.remove()
       }
     }
@@ -1580,11 +1588,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    closeQuietly(customGeometrySources.remove(sourceId))
+    releaseCallbackRoot(customGeometrySources.remove(sourceId))
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
 }
@@ -2854,6 +2862,11 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {

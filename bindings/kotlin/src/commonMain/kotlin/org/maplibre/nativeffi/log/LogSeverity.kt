@@ -3,7 +3,13 @@ package org.maplibre.nativeffi.log
 import kotlin.jvm.JvmInline
 import org.maplibre.nativeffi.internal.status.Status
 
-/** Severity for a Maplibre Native log record. */
+/**
+ * Severity for a Maplibre Native log record.
+ *
+ * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
+ * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
+ * [nativeValue] rather than collapsed to a known constant.
+ */
 @JvmInline
 public value class LogSeverity(public val nativeValue: Int) {
   public companion object {

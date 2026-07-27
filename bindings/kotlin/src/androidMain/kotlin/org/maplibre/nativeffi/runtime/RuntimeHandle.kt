@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.GeometryScope
@@ -36,6 +37,11 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handleAddress: Long) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handleAddress)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
@@ -344,11 +350,12 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       )
       previous = resourceProviderState
       resourceProviderState = replacement
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
     } catch (error: Throwable) {
       closeAndSuppress(error, replacement)
       throw error
     }
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
@@ -364,11 +371,12 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       )
       previous = resourceTransformState
       resourceTransformState = replacement
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
     } catch (error: Throwable) {
       closeAndSuppress(error, replacement)
       throw error
     }
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun clearResourceTransform() {
@@ -378,7 +386,7 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     )
     val previous = resourceTransformState
     resourceTransformState = null
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -399,9 +407,9 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) },
       afterSuccess = {
-        resourceProviderState?.close()
+        releaseCallbackRoot(resourceProviderState)
         resourceProviderState = null
-        resourceTransformState?.close()
+        releaseCallbackRoot(resourceTransformState)
         resourceTransformState = null
         liveMaps.clear()
       },
@@ -460,7 +468,8 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     operation.markConsumed()
   }
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun nativeAddress(): Long = requireLiveAddress()
 
@@ -593,6 +602,11 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
       Status.check(take(runtime(requireLiveAddress()), operationId, outList))
       offlineRegionList(outList)
     }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {

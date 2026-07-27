@@ -182,7 +182,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
-  private val runtimeRetention = runtime.retainChild()
+  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
@@ -1447,7 +1447,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   internal fun nativeAddress(): Long = state.address()
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    state.retainChild(childTypeName)
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

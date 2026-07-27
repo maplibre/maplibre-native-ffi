@@ -5,6 +5,7 @@ import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.loader.NativeAccess.NativeRuntimeEvent
@@ -21,6 +22,11 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public actual class RuntimeHandle private constructor(private val handle: MemorySegment) :
   AutoCloseable {
   private val core = HandleStateCore("RuntimeHandle", handle.address())
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private var resourceProviderState: ResourceProviderState? = null
   private var resourceTransformState: ResourceTransformState? = null
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
@@ -246,11 +252,12 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       Status.check(NativeAccess.setResourceProvider(requireLiveHandle(), replacement.descriptor()))
       previous = resourceProviderState
       resourceProviderState = replacement
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
     } catch (error: Throwable) {
       closeAndSuppress(error, replacement)
       throw error
     }
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
@@ -262,11 +269,12 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       Status.check(NativeAccess.setResourceTransform(requireLiveHandle(), replacement.descriptor()))
       previous = resourceTransformState
       resourceTransformState = replacement
+      HandleLeakCleaner.retainNativeCallbackRoot(replacement)
     } catch (error: Throwable) {
       closeAndSuppress(error, replacement)
       throw error
     }
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun clearResourceTransform() {
@@ -275,7 +283,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     Status.check(NativeAccess.clearResourceTransform(requireLiveHandle()))
     val previous = resourceTransformState
     resourceTransformState = null
-    closeQuietly(previous)
+    releaseCallbackRoot(previous)
   }
 
   public actual fun pollEvent(): RuntimeEvent? {
@@ -289,9 +297,9 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     core.closeOnce(
       destroy = { NativeAccess.destroyRuntime(handle) },
       afterSuccess = {
-        resourceProviderState?.close()
+        releaseCallbackRoot(resourceProviderState)
         resourceProviderState = null
-        resourceTransformState?.close()
+        releaseCallbackRoot(resourceTransformState)
         resourceTransformState = null
         liveMaps.clear()
       },
@@ -325,7 +333,8 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     operation.markConsumed()
   }
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun nativeHandle(): MemorySegment = requireLiveHandle()
 
@@ -372,6 +381,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     }
     return map
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {
