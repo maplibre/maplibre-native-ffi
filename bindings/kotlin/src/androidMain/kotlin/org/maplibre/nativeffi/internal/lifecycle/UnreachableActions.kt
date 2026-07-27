@@ -26,7 +26,17 @@ internal class UnreachableActions private constructor(threadName: String) {
   private val pendingLock = Any()
 
   init {
-    Thread(::drain, threadName).apply { isDaemon = true }.start()
+    // This worker lives for the process, so it is pinned to the binding's own
+    // class loader rather than retaining the context of whichever thread
+    // triggered the first registration. The `inheritThreadLocals` constructor
+    // that would also drop inherited values arrives at API 33, above the API 24
+    // floor, so registrations stay free of `InheritableThreadLocal` state.
+    Thread(::drain, threadName)
+      .apply {
+        isDaemon = true
+        contextClassLoader = UnreachableActions::class.java.classLoader
+      }
+      .start()
   }
 
   /** Runs [action] once [referent] becomes unreachable. */

@@ -13,8 +13,16 @@ import java.lang.ref.Cleaner
  * because `java.lang.ref.Cleaner` arrives at API 33 while the binding supports API 24.
  */
 internal class UnreachableActions private constructor(threadName: String) {
+  // These workers live for the process, so they are constructed without
+  // inheriting thread locals and are pinned to the binding's own class loader.
+  // Otherwise the thread that happens to trigger the first registration leaks
+  // its context — a host class loader or request-scoped `InheritableThreadLocal`
+  // — into a thread that never exits.
   private val cleaner: Cleaner = Cleaner.create { action ->
-    Thread(action, threadName).apply { isDaemon = true }
+    Thread(null, action, threadName, 0, false).apply {
+      isDaemon = true
+      contextClassLoader = UnreachableActions::class.java.classLoader
+    }
   }
 
   /** Runs [action] once [referent] becomes unreachable. */
