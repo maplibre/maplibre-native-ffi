@@ -2046,6 +2046,58 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     runtime.close().unwrap();
 }
 
+/// A host frame loop renders far more frames than a graphics queue keeps in
+/// flight at once. On Apple targets each frame takes objects that a pool owns
+/// until it drains, and Metal blocks a queue that reaches its in-flight command
+/// buffer limit, so a library that leaves draining to the host wedges partway
+/// through a loop like this one.
+#[test]
+fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    // A background-only style keeps each frame to the passes that take command
+    // buffers, without the tile work that would make the loop slow.
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    render_available_updates(&runtime, &session, 3);
+
+    // Metal allows 64 command buffers in flight per queue, and a frame takes
+    // several, so this many frames clears that limit many times over. Each
+    // camera change gives the next frame something to draw.
+    const TARGET_FRAMES: u32 = 256;
+    let mut rendered_frames = 0;
+    let mut step = 0;
+    while rendered_frames < TARGET_FRAMES && step < 200 {
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(37.0, -122.0));
+        camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
+        map.jump_to(&camera).unwrap();
+        let _ = runtime.run_once();
+        while let Ok(Some(event)) = runtime.poll_event() {
+            if event.event_type == RuntimeEventType::MapRenderUpdateAvailable
+                && session.render_update().unwrap()
+            {
+                rendered_frames += 1;
+            }
+        }
+        step += 1;
+    }
+
+    assert!(
+        rendered_frames >= TARGET_FRAMES,
+        "the loop rendered {rendered_frames} frames before running out of steps"
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 #[test]
 // Spec coverage: BND-163.
 fn owned_texture_session_retains_parent_and_enforces_single_session() {

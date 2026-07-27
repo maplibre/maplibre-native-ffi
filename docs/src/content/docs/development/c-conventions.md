@@ -83,6 +83,11 @@ Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build
 threaded models above the C API.
 
+On Apple targets each entry point drains its own Objective-C autorelease pool,
+so a host may pump frames from a thread that never returns to a run loop.
+Objects that cross the C boundary are retained rather than autoreleased, which
+keeps them valid after the entry point that produced them returns.
+
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
 one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop. One
 call drains the queued tasks, expired timers, and ready I/O it finds, including
