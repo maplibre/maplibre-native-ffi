@@ -93,7 +93,8 @@ vs_version="$(vs_query installationVersion)"
 cache_key="${vs_install//[^A-Za-z0-9]/_}-${vs_version//[^A-Za-z0-9]/_}-${msvc_arch}"
 cache_file="${TMPDIR:-/tmp}/mln-msvc-env-${cache_key}.sh"
 
-msvc_path=
+vs_path_prefix=
+vs_path_suffix=
 crt_path=
 cache_complete=
 if [[ -r "$cache_file" ]]; then
@@ -153,16 +154,30 @@ EOF
   # cmd.exe inherited this shell's PATH, so its Path is those entries plus
   # VsDevCmd's. Keep the additions for the same reason the variables above are
   # filtered: the inherited half belongs to the shell that generated the cache,
-  # and prepending its copy here would let stale entries win. The tail of PATH
-  # below supplies each sourcing shell's own entries.
+  # and prepending its copy here would let stale entries win.
+  #
+  # VsDevCmd both prepends and appends, and which side an entry landed on is the
+  # whole of its precedence. Visual Studio appends its own CMake, which has to
+  # keep losing to the one mise puts on PATH; hoisting every addition in front
+  # of the inherited entries hands the build a different CMake than the pinned
+  # one. Split the additions at the first inherited entry and restore each side
+  # around the sourcing shell's own PATH.
   inherited_path=":$PATH:"
-  vs_path=
+  vs_path_prefix=
+  vs_path_suffix=
+  seen_inherited=0
   while IFS= read -r entry; do
     [[ -n "$entry" ]] || continue
-    [[ "$inherited_path" == *":$entry:"* ]] && continue
-    vs_path="${vs_path:+$vs_path:}$entry"
+    if [[ "$inherited_path" == *":$entry:"* ]]; then
+      seen_inherited=1
+      continue
+    fi
+    if ((seen_inherited)); then
+      vs_path_suffix="${vs_path_suffix:+$vs_path_suffix:}$entry"
+    else
+      vs_path_prefix="${vs_path_prefix:+$vs_path_prefix:}$entry"
+    fi
   done < <(tr ':' '\n' <<< "$msvc_path")
-  msvc_path="$vs_path"
 
   redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
   crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
@@ -173,7 +188,8 @@ EOF
   # Publish through a rename so a concurrent shell sees either no entry or a
   # complete one. Writing the cache is best effort: a failure here costs the
   # next shell a rebuild, which is what it would have paid anyway.
-  cache_body+="msvc_path=$(printf '%q' "$msvc_path")"$'\n'
+  cache_body+="vs_path_prefix=$(printf '%q' "$vs_path_prefix")"$'\n'
+  cache_body+="vs_path_suffix=$(printf '%q' "$vs_path_suffix")"$'\n'
   cache_body+="crt_path=$(printf '%q' "$crt_path")"$'\n'
   cache_body+="cache_complete=1"$'\n'
   if cache_staging="$(mktemp "${cache_file}.XXXXXX" 2>/dev/null)"; then
@@ -184,4 +200,4 @@ EOF
   fi
 fi
 
-export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${msvc_path:+$msvc_path:}$original_path"
+export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${vs_path_prefix:+$vs_path_prefix:}$original_path${vs_path_suffix:+:$vs_path_suffix}"
