@@ -8,11 +8,18 @@ function(mln_add_c_api_test)
                       MLN_FFI_RUNTIME_DIRS)
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
                       MLN_FFI_INCLUDE_DIRS)
+  # Libraries the harness links for the graphics API it drives itself, which the
+  # C API resolves at runtime rather than linking.
+  get_target_property(dependency_test_libraries mln_ffi_render_dependencies
+                      MLN_FFI_TEST_LINK_LIBRARIES)
   if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
     set(dependency_runtime_dirs "")
   endif()
   if("${dependency_include_dirs}" MATCHES "-NOTFOUND$")
     set(dependency_include_dirs "")
+  endif()
+  if("${dependency_test_libraries}" MATCHES "-NOTFOUND$")
+    set(dependency_test_libraries "")
   endif()
 
   include(FetchContent)
@@ -79,7 +86,9 @@ function(mln_add_c_api_test)
     PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
   target_link_libraries(
     mln_c_api_tests
-    PRIVATE maplibre_native_c unity::framework MLN_FFI::RenderDependencies)
+    PRIVATE
+      maplibre_native_c unity::framework MLN_FFI::RenderDependencies
+      ${dependency_test_libraries})
   target_include_directories(
     mln_c_api_tests
     PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})

@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+# MISE description="Reject build-host paths in a packaged native artifact."
+# USAGE arg "<preset>" help="Native CMake preset"
+
+"""Check that a packaged shared library only names portable dependencies.
+
+A dependency recorded by absolute path resolves against the build host's
+layout, so an artifact carrying one loads on the machine that produced it and
+nowhere else. Package managers make this easy to get wrong: Homebrew's Vulkan
+loader, for one, has an absolute install name, and linking it is enough to
+stamp `/opt/homebrew/opt/...` into the result.
+"""
+
+from __future__ import annotations
+
+import os
+import pathlib
+import re
+import subprocess
+import sys
+import tarfile
+import tempfile
+
+
+# Load commands may name the system libraries every macOS host has at a fixed
+# location, or resolve relative to the loading binary.
+MACHO_ALLOWED_PREFIXES = (
+    "@rpath/",
+    "@loader_path/",
+    "@executable_path/",
+    "/usr/lib/",
+    "/System/Library/",
+)
+# Run paths carry no absolute component, so the bundle stays relocatable.
+MACHO_ALLOWED_RUN_PATHS = ("@loader_path", "@executable_path")
+# ELF search paths resolve against the loading object for the same reason.
+ELF_ALLOWED_SEARCH_PATH_PREFIXES = ("$ORIGIN", "${ORIGIN}")
+
+MACHO_NAME = re.compile(r"^\s*name (?P<name>\S+) \(offset \d+\)$")
+MACHO_PATH = re.compile(r"^\s*path (?P<path>\S+) \(offset \d+\)$")
+MACHO_COMMAND = re.compile(r"^\s*cmd (?P<command>LC_\w+)$")
+ELF_ENTRY = re.compile(r"^\s*0x[0-9a-f]+\s+\((?P<tag>\w+)\)\s+.*\[(?P<value>[^\]]*)\]")
+
+
+def run(command: list[str]) -> str:
+    result = subprocess.run(command, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise SystemExit(
+            f"{command[0]} failed for {command[-1]}:\n{result.stderr.strip()}"
+        )
+    return result.stdout
+
+
+def macho_problems(binary: pathlib.Path) -> list[str]:
+    """Dependencies and run paths from the Mach-O load commands."""
+    problems = []
+    command = ""
+    for line in run(["otool", "-l", str(binary)]).splitlines():
+        match = MACHO_COMMAND.match(line)
+        if match:
+            command = match.group("command")
+            continue
+        if command.endswith("_DYLIB"):
+            name = MACHO_NAME.match(line)
+            # LC_ID_DYLIB names the library itself, which install_name_dir
+            # already pins to @rpath, so it goes through the same check.
+            if name and not name.group("name").startswith(MACHO_ALLOWED_PREFIXES):
+                problems.append(f"{command} {name.group('name')}")
+        elif command == "LC_RPATH":
+            path = MACHO_PATH.match(line)
+            if path and path.group("path") not in MACHO_ALLOWED_RUN_PATHS:
+                problems.append(f"LC_RPATH {path.group('path')}")
+    return problems
+
+
+def elf_problems(binary: pathlib.Path) -> list[str]:
+    """Needed libraries and search paths from the ELF dynamic section."""
+    problems = []
+    for line in run(["readelf", "--dynamic", "--wide", str(binary)]).splitlines():
+        match = ELF_ENTRY.match(line)
+        if not match:
+            continue
+        tag, value = match.group("tag"), match.group("value")
+        # A needed library is a soname the dynamic loader resolves through the
+        # host's own search path; one carrying a directory bypasses it.
+        if tag == "NEEDED" and "/" in value:
+            problems.append(f"DT_NEEDED {value}")
+        elif tag in {"RPATH", "RUNPATH"}:
+            problems.extend(
+                f"DT_{tag} {entry}"
+                for entry in value.split(":")
+                if entry and not entry.startswith(ELF_ALLOWED_SEARCH_PATH_PREFIXES)
+            )
+    return problems
+
+
+def binary_problems(binary: pathlib.Path) -> list[str]:
+    with binary.open("rb") as file:
+        magic = file.read(4)
+    if magic == b"\x7fELF":
+        return elf_problems(binary)
+    # Mach-O, thin or universal. Windows PE imports name a DLL without a
+    # directory, so there is no build-host path for them to carry.
+    if magic in {b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xbe\xba\xfe\xca"}:
+        return macho_problems(binary)
+    return []
+
+
+def main() -> int:
+    preset = os.environ["usage_preset"]
+    root = pathlib.Path(os.environ["MISE_MONOREPO_ROOT"])
+    archive = root / "build/packages/native/dist" / f"maplibre-native-c-{preset}.tar.gz"
+    if not archive.is_file():
+        print(f"error: native package does not exist: {archive}", file=sys.stderr)
+        return 1
+
+    problems = {}
+    with tempfile.TemporaryDirectory() as directory:
+        with tarfile.open(archive) as tar:
+            tar.extractall(directory, filter="data")
+        for binary in sorted(pathlib.Path(directory).rglob("*")):
+            if not binary.is_file() or binary.suffix in {".a", ".lib"}:
+                continue
+            found = binary_problems(binary)
+            if found:
+                problems[binary.name] = found
+
+    if not problems:
+        return 0
+    for name, found in problems.items():
+        for problem in found:
+            print(
+                f"error: {name} depends on a build-host path: {problem}",
+                file=sys.stderr,
+            )
+    print(
+        f"\n{archive.name} only loads on hosts that reproduce the paths above. "
+        "Resolve the dependency at runtime, or give it a relocatable install "
+        "name and ship it in the package.",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
