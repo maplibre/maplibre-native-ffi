@@ -5,6 +5,8 @@ package maplibre
 */
 import "C"
 
+import "fmt"
+
 // CameraOptions configures map camera snapshots and commands.
 type CameraOptions struct {
 	Center         *LatLng
@@ -374,7 +376,7 @@ func (options BoundOptions) WithMaxPitch(maxPitch float64) BoundOptions {
 	return options
 }
 
-func cBoundOptions(options BoundOptions) C.mln_bound_options {
+func cBoundOptions(options BoundOptions) (C.mln_bound_options, error) {
 	raw := C.mln_bound_options_default()
 	if options.Bounds != nil {
 		switch options.Bounds.Kind {
@@ -383,6 +385,11 @@ func cBoundOptions(options BoundOptions) C.mln_bound_options {
 			raw.bounds = cLatLngBounds(options.Bounds.Bounds)
 		case BoundsConstraintUnbounded:
 			raw.fields |= C.MLN_BOUND_OPTION_UNBOUNDED
+		default:
+			// Neither constraint bit would be set, so the call would succeed
+			// while leaving the existing constraint untouched.
+			return raw, newBindingError(ErrInvalidArgument,
+				fmt.Sprintf("unknown BoundsConstraintKind %d", options.Bounds.Kind))
 		}
 	}
 	if options.MinZoom != nil {
@@ -401,7 +408,7 @@ func cBoundOptions(options BoundOptions) C.mln_bound_options {
 		raw.fields |= C.MLN_BOUND_OPTION_MAX_PITCH
 		raw.max_pitch = C.double(*options.MaxPitch)
 	}
-	return raw
+	return raw, nil
 }
 
 func goBoundOptions(raw C.mln_bound_options) BoundOptions {

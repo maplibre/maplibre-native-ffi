@@ -339,6 +339,12 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	if err := m.SetBounds(invalidBounds); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetBounds(invalid min/max) error = %v, want ErrInvalidArgument", err)
 	}
+	// An unknown kind sets neither constraint bit, so without validation the
+	// call would report success and leave the existing constraint in place.
+	unknownKind := BoundOptions{Bounds: &BoundsConstraint{Kind: BoundsConstraintKind(99)}}
+	if err := m.SetBounds(unknownKind); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetBounds(unknown kind) error = %v, want ErrInvalidArgument", err)
+	}
 	invalidFreeCamera := FreeCameraOptions{}.WithOrientation(Quaternion{})
 	if err := m.SetFreeCameraOptions(invalidFreeCamera); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetFreeCameraOptions(invalid orientation) error = %v, want ErrInvalidArgument", err)

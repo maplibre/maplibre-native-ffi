@@ -675,7 +675,10 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	rawOptions := cBoundOptions(options)
+	rawOptions, err := cBoundOptions(options)
+	if err != nil {
+		return err
+	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
 	})

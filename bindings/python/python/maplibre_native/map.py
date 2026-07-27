@@ -22,6 +22,7 @@ from .camera import (
     ScreenPoint,
     Unbounded,
 )
+from .errors import InvalidArgumentError
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
 from .render import (
@@ -255,6 +256,14 @@ def _bounds_parts(
         raw_bounds = (
             (box.southwest.latitude, box.southwest.longitude),
             (box.northeast.latitude, box.northeast.longitude),
+        )
+    elif constraint is not None and not isinstance(constraint, Unbounded):
+        # Annotations do not bind at runtime, so an unsupported value would
+        # otherwise read as "leave the geographic constraint alone" and the
+        # caller would see a silent no-op instead of a rejection.
+        raise InvalidArgumentError(
+            "BoundOptions.bounds must be Bounded, Unbounded, or None, "
+            f"not {type(constraint).__name__}"
         )
     return (
         raw_bounds,

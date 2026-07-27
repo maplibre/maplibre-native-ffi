@@ -3185,3 +3185,20 @@ def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
                     "custom",
                     style.CustomGeometrySourceOptions(max_queued_events=0),
                 )
+
+
+def test_set_bounds_rejects_unsupported_constraint() -> None:
+    # Annotations do not bind at runtime, so a stale LatLngBounds would
+    # otherwise be treated as absent and silently leave the constraint alone.
+    world = geo.LatLngBounds(
+        southwest=geo.LatLng(-90.0, -180.0),
+        northeast=geo.LatLng(90.0, 180.0),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.set_bounds(
+                    camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
+                )
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
