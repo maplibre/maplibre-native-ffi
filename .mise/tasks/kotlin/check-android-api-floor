@@ -436,7 +436,12 @@ def main(argv):
             scanned += 1
             data = class_file.read_bytes()
             for reference in parse_references(data):
-                if reference[1].startswith(DESUGARED_TYPE_PREFIXES):
+                # Only the bootstrap *types* an invokedynamic names are
+                # exempt. A direct call such as MethodHandle.invokeExact() is a
+                # method reference D8 does not rewrite, so it stays in scope.
+                if reference[0] == "class" and reference[1].startswith(
+                    DESUGARED_TYPE_PREFIXES
+                ):
                     continue
                 key = describe_key(reference)
                 if key in BACKPORTED_MEMBERS or key in ALLOWED_ABOVE_FLOOR:
