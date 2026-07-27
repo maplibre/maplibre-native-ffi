@@ -2333,11 +2333,21 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::scoped_lock registry_lock(runtime_registry_mutex());
-  if (runtime->live_maps != 0) {
-    set_thread_error("resource provider must be set before map creation");
-    return MLN_STATUS_INVALID_STATE;
+  // Validate under the registry lock, then release it before the provider wait
+  // below. `validate_runtime()` and `destroy_runtime()` both require the owner
+  // thread, so this thread's ownership keeps the runtime alive without holding
+  // the process-global lock while an in-flight callback drains.
+  {
+    const std::scoped_lock registry_lock(runtime_registry_mutex());
+    if (runtime->live_maps != 0) {
+      set_thread_error("resource provider must be set before map creation");
+      return MLN_STATUS_INVALID_STATE;
+    }
   }
+
+  // A file-source thread that entered the callback holds a shared provider
+  // lock, so the exclusive lock keeps the outgoing callback and user_data alive
+  // until that invocation returns.
   const std::unique_lock provider_lock(runtime->resource_provider_mutex);
   runtime->has_resource_provider = true;
   runtime->resource_provider = ResourceProvider{

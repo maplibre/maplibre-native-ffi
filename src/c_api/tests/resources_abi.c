@@ -861,6 +861,8 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, atomic_load(&state.completion_status));
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
+}
+
 typedef struct provider_teardown_probe {
   atomic_bool entered;
   atomic_bool teardown_started;

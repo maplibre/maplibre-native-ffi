@@ -1124,6 +1124,7 @@ impl RuntimeHandle {
 
     fn set_resource_provider(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
     ) -> PyResult<()> {
@@ -1137,15 +1138,37 @@ impl RuntimeHandle {
             max_pending_callbacks,
         ));
         let descriptor = replacement.descriptor();
-        let state = self.state_for_operation()?;
-        // SAFETY: state owns a runtime pointer that passed the binding
-        // lifecycle gate. The C API validates that it is live. descriptor
-        // points to replacement state, which is retained after a successful
-        // native registration.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_provider(state.as_ptr(), &descriptor)
-        })
-        .map_err(map_error)?;
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state_for_operation()?;
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
+        let callback = descriptor.callback;
+        let user_data_address = descriptor.user_data as usize;
+        let size = descriptor.size;
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live.
+        // descriptor points to replacement state, which is retained after a
+        // successful native registration. Replacement can wait for in-flight
+        // callbacks, so release the GIL while it runs without holding the Rust
+        // handle-state mutex.
+        let status = py.detach(move || {
+            let descriptor = sys::mln_resource_provider {
+                size,
+                callback,
+                user_data: user_data_address as *mut c_void,
+            };
+            unsafe {
+                sys::mln_runtime_set_resource_provider(
+                    runtime_address as *mut sys::mln_runtime,
+                    &descriptor,
+                )
+            }
+        });
+        maplibre_core::check(status).map_err(map_error)?;
         self.resource_provider
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
