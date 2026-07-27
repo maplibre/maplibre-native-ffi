@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.camera
 
-import org.maplibre.nativeffi.geo.LatLngBounds
-
 /**
  * Mutable map bounds descriptor.
  *
@@ -9,7 +7,8 @@ import org.maplibre.nativeffi.geo.LatLngBounds
  * unmodified while it is a key in a hash-based collection.
  */
 public class BoundOptions {
-  public var bounds: LatLngBounds? = null
+  /** Camera center constraint, or `null` to leave the map's current constraint unchanged. */
+  public var bounds: BoundsConstraint? = null
 
   public var minZoom: Double? = null
 

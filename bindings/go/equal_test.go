@@ -112,9 +112,12 @@ func TestBoundOptionsEqualComparesFieldValues(t *testing.T) {
 		"BoundOptions",
 		func() BoundOptions {
 			return BoundOptions{
-				Bounds: optionPtr(LatLngBounds{
-					Southwest: LatLng{Latitude: 0, Longitude: 0},
-					Northeast: LatLng{Latitude: 1, Longitude: 1},
+				Bounds: optionPtr(BoundsConstraint{
+					Kind: BoundsConstraintBounded,
+					Bounds: LatLngBounds{
+						Southwest: LatLng{Latitude: 0, Longitude: 0},
+						Northeast: LatLng{Latitude: 1, Longitude: 1},
+					},
 				}),
 				MinZoom:  optionPtr(2.0),
 				MaxZoom:  optionPtr(3.0),
@@ -125,10 +128,16 @@ func TestBoundOptionsEqualComparesFieldValues(t *testing.T) {
 		BoundOptions.Equal,
 		[]func(*BoundOptions){
 			func(o *BoundOptions) {
-				o.Bounds = optionPtr(LatLngBounds{
-					Southwest: LatLng{Latitude: -1, Longitude: -1},
-					Northeast: LatLng{Latitude: 2, Longitude: 2},
+				o.Bounds = optionPtr(BoundsConstraint{
+					Kind: BoundsConstraintBounded,
+					Bounds: LatLngBounds{
+						Southwest: LatLng{Latitude: -1, Longitude: -1},
+						Northeast: LatLng{Latitude: 2, Longitude: 2},
+					},
 				})
+			},
+			func(o *BoundOptions) {
+				o.Bounds = optionPtr(BoundsConstraint{Kind: BoundsConstraintUnbounded})
 			},
 			func(o *BoundOptions) { o.MinZoom = optionPtr(20.0) },
 			func(o *BoundOptions) { o.MaxZoom = optionPtr(30.0) },

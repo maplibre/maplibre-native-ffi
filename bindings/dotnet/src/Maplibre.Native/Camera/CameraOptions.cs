@@ -51,6 +51,26 @@ public sealed record CameraFitOptions
     public double? Pitch { get; set; }
 }
 
+/// <summary>Geographic constraint applied to the map camera center.</summary>
+public abstract record BoundsConstraint
+{
+    private BoundsConstraint() { }
+
+    /// <summary>Keeps the camera center inside the given bounds.</summary>
+    public sealed record Bounded(LatLngBounds Bounds) : BoundsConstraint;
+
+    /// <summary>
+    /// Leaves the camera center unconstrained, so the map pans freely across the antimeridian.
+    /// This differs from world bounds of -90/-180 to 90/180, which clamp longitude to that range.
+    /// </summary>
+    public sealed record Unbounded : BoundsConstraint
+    {
+        public static Unbounded Instance { get; } = new();
+
+        private Unbounded() { }
+    }
+}
+
 /// <summary>Camera bound constraint descriptor.</summary>
 /// <remarks>
 /// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
@@ -58,7 +78,7 @@ public sealed record CameraFitOptions
 /// </remarks>
 public sealed record BoundOptions
 {
-    public LatLngBounds? Bounds { get; set; }
+    public BoundsConstraint? Bounds { get; set; }
     public double? MinimumZoom { get; set; }
     public double? MaximumZoom { get; set; }
     public double? MinimumPitch { get; set; }

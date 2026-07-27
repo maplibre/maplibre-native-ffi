@@ -21,20 +21,26 @@ import Testing
   }
 
   try BoundOptions(
-    bounds: LatLngBounds(
+    bounds: .bounded(LatLngBounds(
       southwest: LatLng(latitude: 1, longitude: 2),
       northeast: LatLng(latitude: 3, longitude: 4)
-    ),
+    )),
     minZoom: 1,
     maxZoom: 10,
     minPitch: 0,
     maxPitch: 60
   ).nativeInput.withNativeOptions { native in
     #expect((native.pointee.fields & MLN_BOUND_OPTION_BOUNDS.rawValue) != 0)
+    #expect((native.pointee.fields & MLN_BOUND_OPTION_UNBOUNDED.rawValue) == 0)
     #expect((native.pointee.fields & MLN_BOUND_OPTION_MAX_PITCH.rawValue) != 0)
     #expect(native.pointee.bounds.northeast.longitude == 4)
     #expect(native.pointee.max_pitch == 60)
   }
+
+  try BoundOptions(bounds: .unbounded).nativeInput
+    .withNativeOptions { native in
+      #expect(native.pointee.fields == MLN_BOUND_OPTION_UNBOUNDED.rawValue)
+    }
 
   try FreeCameraOptions(
     position: Vec3(x: 1, y: 2, z: 3),

@@ -1776,10 +1776,20 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_BOUND_OPTION_BOUNDS) | MLN_BOUND_OPTION_MIN_ZOOM |
     MLN_BOUND_OPTION_MAX_ZOOM | MLN_BOUND_OPTION_MIN_PITCH |
-    MLN_BOUND_OPTION_MAX_PITCH;
+    MLN_BOUND_OPTION_MAX_PITCH | MLN_BOUND_OPTION_UNBOUNDED;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_bound_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    (options->fields & MLN_BOUND_OPTION_BOUNDS) != 0U &&
+    (options->fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U
+  ) {
+    mln::core::set_thread_error(
+      "MLN_BOUND_OPTION_BOUNDS and MLN_BOUND_OPTION_UNBOUNDED are mutually "
+      "exclusive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2516,6 +2526,14 @@ auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
   };
 }
 
+// mbgl keeps the unbounded flag private, so compare against a
+// default-constructed value. mbgl::LatLngBounds::operator== treats any two
+// unbounded values as equal and an unbounded value as distinct from every
+// bounded one, which makes this an exact test for the flag.
+auto is_unbounded_lat_lng_bounds(const mbgl::LatLngBounds& bounds) -> bool {
+  return bounds == mbgl::LatLngBounds{};
+}
+
 auto to_native_lat_lngs(const mln_lat_lng* coordinates, size_t coordinate_count)
   -> std::vector<mbgl::LatLng> {
   auto result = std::vector<mbgl::LatLng>{};
@@ -2561,6 +2579,11 @@ auto to_native_bound_options(const mln_bound_options& options)
   if ((options.fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
   }
+  if ((options.fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U) {
+    // A default-constructed LatLngBounds is the mbgl unbounded constraint:
+    // constrain() returns its input unchanged.
+    result.withLatLngBounds(mbgl::LatLngBounds{});
+  }
   if ((options.fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
     result.withMinZoom(options.min_zoom);
   }
@@ -2580,8 +2603,12 @@ auto from_native_bound_options(const mbgl::BoundOptions& options)
   -> mln_bound_options {
   auto result = mln::core::bound_options_default();
   if (options.bounds) {
-    result.fields |= MLN_BOUND_OPTION_BOUNDS;
-    result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    if (is_unbounded_lat_lng_bounds(*options.bounds)) {
+      result.fields |= MLN_BOUND_OPTION_UNBOUNDED;
+    } else {
+      result.fields |= MLN_BOUND_OPTION_BOUNDS;
+      result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    }
   }
   if (options.minZoom) {
     result.fields |= MLN_BOUND_OPTION_MIN_ZOOM;

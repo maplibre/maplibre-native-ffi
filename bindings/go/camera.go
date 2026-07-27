@@ -5,6 +5,8 @@ package maplibre
 */
 import "C"
 
+import "fmt"
+
 // CameraOptions configures map camera snapshots and commands.
 type CameraOptions struct {
 	Center         *LatLng
@@ -295,9 +297,28 @@ func cCameraFitOptionsPointer(options *CameraFitOptions) (C.mln_camera_fit_optio
 	return raw, &raw
 }
 
+// BoundsConstraintKind selects which case a BoundsConstraint carries.
+type BoundsConstraintKind int
+
+const (
+	// BoundsConstraintBounded keeps the camera center inside the constraint's bounds.
+	BoundsConstraintBounded BoundsConstraintKind = iota
+	// BoundsConstraintUnbounded leaves the camera center unconstrained.
+	BoundsConstraintUnbounded
+)
+
+// BoundsConstraint is the geographic constraint applied to the map camera center. An unbounded
+// constraint leaves the camera center free, so the map pans across the antimeridian. This differs
+// from world bounds of -90/-180 to 90/180, which clamp longitude to that range.
+type BoundsConstraint struct {
+	Kind BoundsConstraintKind
+	// Bounds is read when Kind is BoundsConstraintBounded.
+	Bounds LatLngBounds
+}
+
 // BoundOptions configures map camera constraints.
 type BoundOptions struct {
-	Bounds   *LatLngBounds
+	Bounds   *BoundsConstraint
 	MinZoom  *float64
 	MaxZoom  *float64
 	MinPitch *float64
@@ -307,17 +328,23 @@ type BoundOptions struct {
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
 // compares the optional fields by pointer identity.
 func (options BoundOptions) Equal(other BoundOptions) bool {
-	return equalPointer(options.Bounds, other.Bounds) &&
+	return equalBoundsConstraint(options.Bounds, other.Bounds) &&
 		equalPointer(options.MinZoom, other.MinZoom) &&
 		equalPointer(options.MaxZoom, other.MaxZoom) &&
 		equalPointer(options.MinPitch, other.MinPitch) &&
 		equalPointer(options.MaxPitch, other.MaxPitch)
 }
 
-// WithBounds returns a copy that sets geographic camera constraints.
+// WithBounds returns a copy that keeps the camera center inside the given bounds.
 func (options BoundOptions) WithBounds(bounds LatLngBounds) BoundOptions {
-	options.Bounds = new(LatLngBounds)
-	*options.Bounds = bounds
+	options.Bounds = &BoundsConstraint{Kind: BoundsConstraintBounded, Bounds: bounds}
+	return options
+}
+
+// WithUnbounded returns a copy that leaves the camera center unconstrained, so the map pans across
+// the antimeridian.
+func (options BoundOptions) WithUnbounded() BoundOptions {
+	options.Bounds = &BoundsConstraint{Kind: BoundsConstraintUnbounded}
 	return options
 }
 
@@ -349,11 +376,21 @@ func (options BoundOptions) WithMaxPitch(maxPitch float64) BoundOptions {
 	return options
 }
 
-func cBoundOptions(options BoundOptions) C.mln_bound_options {
+func cBoundOptions(options BoundOptions) (C.mln_bound_options, error) {
 	raw := C.mln_bound_options_default()
 	if options.Bounds != nil {
-		raw.fields |= C.MLN_BOUND_OPTION_BOUNDS
-		raw.bounds = cLatLngBounds(*options.Bounds)
+		switch options.Bounds.Kind {
+		case BoundsConstraintBounded:
+			raw.fields |= C.MLN_BOUND_OPTION_BOUNDS
+			raw.bounds = cLatLngBounds(options.Bounds.Bounds)
+		case BoundsConstraintUnbounded:
+			raw.fields |= C.MLN_BOUND_OPTION_UNBOUNDED
+		default:
+			// Neither constraint bit would be set, so the call would succeed
+			// while leaving the existing constraint untouched.
+			return raw, newBindingError(ErrInvalidArgument,
+				fmt.Sprintf("unknown BoundsConstraintKind %d", options.Bounds.Kind))
+		}
 	}
 	if options.MinZoom != nil {
 		raw.fields |= C.MLN_BOUND_OPTION_MIN_ZOOM
@@ -371,14 +408,16 @@ func cBoundOptions(options BoundOptions) C.mln_bound_options {
 		raw.fields |= C.MLN_BOUND_OPTION_MAX_PITCH
 		raw.max_pitch = C.double(*options.MaxPitch)
 	}
-	return raw
+	return raw, nil
 }
 
 func goBoundOptions(raw C.mln_bound_options) BoundOptions {
 	var options BoundOptions
-	if raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0 {
-		value := goLatLngBounds(raw.bounds)
-		options.Bounds = &value
+	switch {
+	case raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0:
+		options.Bounds = &BoundsConstraint{Kind: BoundsConstraintBounded, Bounds: goLatLngBounds(raw.bounds)}
+	case raw.fields&C.MLN_BOUND_OPTION_UNBOUNDED != 0:
+		options.Bounds = &BoundsConstraint{Kind: BoundsConstraintUnbounded}
 	}
 	if raw.fields&C.MLN_BOUND_OPTION_MIN_ZOOM != 0 {
 		value := float64(raw.min_zoom)

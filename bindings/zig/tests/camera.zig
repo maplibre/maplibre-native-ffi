@@ -89,10 +89,10 @@ test "camera constraints and free camera options round-trip public values" {
     defer map.close() catch @panic("map close failed");
 
     const constraints = maplibre.BoundOptions{
-        .bounds = .{
+        .bounds = .{ .bounded = .{
             .southwest = .{ .latitude = -45.0, .longitude = -120.0 },
             .northeast = .{ .latitude = 45.0, .longitude = 120.0 },
-        },
+        } },
         .min_zoom = 1.0,
         .max_zoom = 12.0,
         .min_pitch = 0.0,
@@ -108,6 +108,42 @@ test "camera constraints and free camera options round-trip public values" {
     try testing.expect(free_camera.position != null);
     try testing.expect(free_camera.orientation != null);
     try map.setFreeCameraOptions(.{ .orientation = free_camera.orientation });
+}
+
+fn jumpedLongitude(map: *maplibre.MapHandle, longitude: f64) !f64 {
+    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = longitude }, .zoom = 2.0 });
+    const snapshot = try map.getCamera();
+    return (snapshot.center orelse return error.MissingCameraCenter).longitude;
+}
+
+// The unbounded constraint is distinct from world bounds: an unbounded camera center pans across
+// the antimeridian, while world bounds clamp longitude to the -180..180 range.
+test "camera bounds separate the unbounded constraint from world bounds" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const pristine = try map.getBounds();
+    try testing.expectEqual(.unbounded, std.meta.activeTag(pristine.bounds.?));
+    try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
+
+    try map.setBounds(.{ .bounds = .{ .bounded = .{
+        .southwest = .{ .latitude = -90.0, .longitude = -180.0 },
+        .northeast = .{ .latitude = 90.0, .longitude = 180.0 },
+    } } });
+
+    const world = try map.getBounds();
+    switch (world.bounds.?) {
+        .bounded => |bounds| try testing.expectApproxEqAbs(@as(f64, 180.0), bounds.northeast.longitude, 1e-6),
+        .unbounded => return error.TestExpectedBoundedConstraint,
+    }
+    try testing.expectApproxEqAbs(@as(f64, 180.0), try jumpedLongitude(&map, 200.0), 1e-6);
+
+    try map.setBounds(.{ .bounds = .unbounded });
+    const released = try map.getBounds();
+    try testing.expectEqual(.unbounded, std.meta.activeTag(released.bounds.?));
+    try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
 }
 
 test "camera public descriptors report invalid native arguments" {

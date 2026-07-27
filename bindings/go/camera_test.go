@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	"testing"
 )
 
@@ -184,9 +185,88 @@ func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bounds(): %v", err)
 	}
-	if gotConstraints.Bounds == nil || *gotConstraints.Bounds != bounds {
-		t.Fatalf("Bounds().Bounds = %#v, want %#v", gotConstraints.Bounds, bounds)
+	if gotConstraints.Bounds == nil ||
+		gotConstraints.Bounds.Kind != BoundsConstraintBounded ||
+		gotConstraints.Bounds.Bounds != bounds {
+		t.Fatalf("Bounds().Bounds = %#v, want bounded %#v", gotConstraints.Bounds, bounds)
 	}
+}
+
+// The unbounded constraint is distinct from world bounds: an unbounded camera center pans across
+// the antimeridian, while world bounds clamp longitude to the -180..180 range.
+func TestMapBoundsSeparateUnboundedFromWorldBounds(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	constraintKind := func(want BoundsConstraintKind) {
+		t.Helper()
+		got, err := m.Bounds()
+		if err != nil {
+			t.Fatalf("Bounds(): %v", err)
+		}
+		if got.Bounds == nil || got.Bounds.Kind != want {
+			t.Fatalf("Bounds().Bounds = %#v, want kind %v", got.Bounds, want)
+		}
+	}
+	jumpedLongitude := func(longitude float64) float64 {
+		t.Helper()
+		camera := CameraOptions{}.
+			WithCenter(LatLng{Latitude: 0, Longitude: longitude}).
+			WithZoom(2)
+		if err := m.JumpTo(camera); err != nil {
+			t.Fatalf("JumpTo(%v): %v", longitude, err)
+		}
+		snapshot, err := m.Camera()
+		if err != nil {
+			t.Fatalf("Camera(): %v", err)
+		}
+		if snapshot.Center == nil {
+			t.Fatalf("Camera() missing center: %#v", snapshot)
+		}
+		return snapshot.Center.Longitude
+	}
+	assertLongitude := func(got, want float64) {
+		t.Helper()
+		if math.Abs(got-want) > 1e-6 {
+			t.Fatalf("camera longitude = %v, want %v", got, want)
+		}
+	}
+
+	constraintKind(BoundsConstraintUnbounded)
+	assertLongitude(jumpedLongitude(200), -160)
+
+	world := LatLngBounds{
+		Southwest: LatLng{Latitude: -90, Longitude: -180},
+		Northeast: LatLng{Latitude: 90, Longitude: 180},
+	}
+	if err := m.SetBounds(BoundOptions{}.WithBounds(world)); err != nil {
+		t.Fatalf("SetBounds(world): %v", err)
+	}
+	constraintKind(BoundsConstraintBounded)
+	assertLongitude(jumpedLongitude(200), 180)
+
+	if err := m.SetBounds(BoundOptions{}.WithUnbounded()); err != nil {
+		t.Fatalf("SetBounds(unbounded): %v", err)
+	}
+	constraintKind(BoundsConstraintUnbounded)
+	assertLongitude(jumpedLongitude(200), -160)
 }
 
 func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
@@ -258,6 +338,12 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	invalidBounds := BoundOptions{}.WithMinZoom(3).WithMaxZoom(2)
 	if err := m.SetBounds(invalidBounds); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetBounds(invalid min/max) error = %v, want ErrInvalidArgument", err)
+	}
+	// An unknown kind sets neither constraint bit, so without validation the
+	// call would report success and leave the existing constraint in place.
+	unknownKind := BoundOptions{Bounds: &BoundsConstraint{Kind: BoundsConstraintKind(99)}}
+	if err := m.SetBounds(unknownKind); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetBounds(unknown kind) error = %v, want ErrInvalidArgument", err)
 	}
 	invalidFreeCamera := FreeCameraOptions{}.WithOrientation(Quaternion{})
 	if err := m.SetFreeCameraOptions(invalidFreeCamera); !errors.Is(err, ErrInvalidArgument) {

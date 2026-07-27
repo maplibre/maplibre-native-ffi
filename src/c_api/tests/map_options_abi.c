@@ -138,6 +138,83 @@ static void camera_bounds_constraints_reject_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_bounds(fixture.map, &options)
   );
+  options = mln_bound_options_default();
+  options.fields = MLN_BOUND_OPTION_BOUNDS | MLN_BOUND_OPTION_UNBOUNDED;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_bounds(fixture.map, &options)
+  );
+  destroy_map_fixture(fixture);
+}
+
+static bool near_longitude(double actual, double expected) {
+  const double delta = actual - expected;
+  return delta > -1e-6 && delta < 1e-6;
+}
+
+static double jumped_longitude(mln_map* map, double longitude) {
+  mln_camera_options camera = mln_camera_options_default();
+  camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
+  camera.latitude = 0.0;
+  camera.longitude = longitude;
+  camera.zoom = 2.0;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_jump_to(map, &camera));
+  mln_camera_options snapshot = mln_camera_options_default();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_get_camera(map, &snapshot));
+  return snapshot.longitude;
+}
+
+// This verifies that the geographic constraint reports and applies the
+// unbounded state distinctly from world bounds, which the southwest/northeast
+// pair alone cannot express.
+static void camera_bounds_distinguish_unbounded_from_world(void) {
+  map_fixture fixture = create_map_fixture();
+
+  mln_bound_options snapshot = mln_bound_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_bounds(fixture.map, &snapshot)
+  );
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  // An unbounded map wraps across the antimeridian.
+  TEST_ASSERT_TRUE(
+    near_longitude(jumped_longitude(fixture.map, 200.0), -160.0)
+  );
+
+  mln_bound_options world = mln_bound_options_default();
+  world.fields = MLN_BOUND_OPTION_BOUNDS;
+  world.bounds.southwest.latitude = -90.0;
+  world.bounds.southwest.longitude = -180.0;
+  world.bounds.northeast.latitude = 90.0;
+  world.bounds.northeast.longitude = 180.0;
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_set_bounds(fixture.map, &world));
+
+  snapshot = mln_bound_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_bounds(fixture.map, &snapshot)
+  );
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_TRUE(near_longitude(snapshot.bounds.northeast.longitude, 180.0));
+  // World bounds clamp at the antimeridian instead of wrapping.
+  TEST_ASSERT_TRUE(near_longitude(jumped_longitude(fixture.map, 200.0), 180.0));
+
+  mln_bound_options unbounded = mln_bound_options_default();
+  unbounded.fields = MLN_BOUND_OPTION_UNBOUNDED;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_bounds(fixture.map, &unbounded)
+  );
+
+  snapshot = mln_bound_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_bounds(fixture.map, &snapshot)
+  );
+  TEST_ASSERT_TRUE(snapshot.fields & MLN_BOUND_OPTION_UNBOUNDED);
+  TEST_ASSERT_FALSE(snapshot.fields & MLN_BOUND_OPTION_BOUNDS);
+  // Releasing the constraint restores antimeridian wrapping.
+  TEST_ASSERT_TRUE(
+    near_longitude(jumped_longitude(fixture.map, 200.0), -160.0)
+  );
+
   destroy_map_fixture(fixture);
 }
 
@@ -486,6 +563,7 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(camera_rejects_invalid_arguments);
   RUN_TEST(camera_fitting_rejects_invalid_arguments);
   RUN_TEST(camera_bounds_constraints_reject_invalid_arguments);
+  RUN_TEST(camera_bounds_distinguish_unbounded_from_world);
   RUN_TEST(free_camera_options_reject_raw_invalid_arguments);
   RUN_TEST(map_projection_mode_rejects_invalid_arguments);
   RUN_TEST(map_coordinate_conversion_rejects_invalid_arguments);

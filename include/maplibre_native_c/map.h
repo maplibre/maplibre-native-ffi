@@ -51,11 +51,24 @@ typedef enum mln_camera_fit_option_field : uint32_t {
 
 /** Field mask values for mln_bound_options. */
 typedef enum mln_bound_option_field : uint32_t {
+  /**
+   * Selects mln_bound_options.bounds as a geographic constraint that the
+   * camera center stays inside. Mutually exclusive with
+   * MLN_BOUND_OPTION_UNBOUNDED.
+   */
   MLN_BOUND_OPTION_BOUNDS = 1U << 0U,
   MLN_BOUND_OPTION_MIN_ZOOM = 1U << 1U,
   MLN_BOUND_OPTION_MAX_ZOOM = 1U << 2U,
   MLN_BOUND_OPTION_MIN_PITCH = 1U << 3U,
   MLN_BOUND_OPTION_MAX_PITCH = 1U << 4U,
+  /**
+   * Selects the unbounded geographic constraint, which leaves every camera
+   * center unconstrained and lets the map pan freely across the antimeridian.
+   * This differs from world bounds of -90/-180 to 90/180, which clamp
+   * longitude to that range. Mutually exclusive with MLN_BOUND_OPTION_BOUNDS,
+   * and leaves mln_bound_options.bounds unread.
+   */
+  MLN_BOUND_OPTION_UNBOUNDED = 1U << 5U,
 } mln_bound_option_field;
 
 /** Field mask values for mln_free_camera_options. */
@@ -516,6 +529,7 @@ typedef struct mln_lat_lng_bounds {
 typedef struct mln_bound_options {
   uint32_t size;
   uint32_t fields;
+  /** Read when fields contains MLN_BOUND_OPTION_BOUNDS. */
   mln_lat_lng_bounds bounds;
   double min_zoom;
   double max_zoom;

@@ -1731,13 +1731,15 @@ impl MapHandle {
     fn set_bounds(
         &self,
         bounds: Option<((f64, f64), (f64, f64))>,
+        unbounded: bool,
         min_zoom: Option<f64>,
         max_zoom: Option<f64>,
         min_pitch: Option<f64>,
         max_pitch: Option<f64>,
     ) -> PyResult<()> {
         let state = self.state();
-        let bounds = bound_options_from_parts(bounds, min_zoom, max_zoom, min_pitch, max_pitch);
+        let bounds =
+            bound_options_from_parts(bounds, unbounded, min_zoom, max_zoom, min_pitch, max_pitch);
         // SAFETY: The C API validates the map pointer and bounds fields.
         maplibre_core::check(unsafe { sys::mln_map_set_bounds(state.as_ptr(), &bounds) })
             .map_err(map_error)
@@ -4791,13 +4793,20 @@ fn camera_fit_options_from_parts(
 
 fn bound_options_from_parts(
     bounds: Option<((f64, f64), (f64, f64))>,
+    unbounded: bool,
     min_zoom: Option<f64>,
     max_zoom: Option<f64>,
     min_pitch: Option<f64>,
     max_pitch: Option<f64>,
 ) -> sys::mln_bound_options {
     let mut options = maplibre_core::BoundOptions::default();
-    options.bounds = bounds.map(lat_lng_bounds_core_from_tuple);
+    options.bounds = match bounds {
+        Some(bounds) => Some(maplibre_core::BoundsConstraint::Bounded(
+            lat_lng_bounds_core_from_tuple(bounds),
+        )),
+        None if unbounded => Some(maplibre_core::BoundsConstraint::Unbounded),
+        None => None,
+    };
     options.min_zoom = min_zoom;
     options.max_zoom = max_zoom;
     options.min_pitch = min_pitch;
@@ -4907,10 +4916,19 @@ fn free_camera_options_to_py(
 fn bound_options_to_py(py: Python<'_>, options: &sys::mln_bound_options) -> PyResult<Py<PyAny>> {
     let options = maplibre_core::camera::bound_options_from_native(*options);
     let dict = PyDict::new(py);
-    if let Some(bounds) = options.bounds {
-        dict.set_item("bounds", lat_lng_bounds_core_to_py(py, &bounds)?)?;
-    } else {
-        dict.set_item("bounds", py.None())?;
+    match options.bounds {
+        Some(maplibre_core::BoundsConstraint::Bounded(bounds)) => {
+            dict.set_item("bounds", lat_lng_bounds_core_to_py(py, &bounds)?)?;
+            dict.set_item("unbounded", false)?;
+        }
+        Some(maplibre_core::BoundsConstraint::Unbounded) => {
+            dict.set_item("bounds", py.None())?;
+            dict.set_item("unbounded", true)?;
+        }
+        None => {
+            dict.set_item("bounds", py.None())?;
+            dict.set_item("unbounded", false)?;
+        }
     }
     dict.set_item("min_zoom", options.min_zoom)?;
     dict.set_item("max_zoom", options.max_zoom)?;

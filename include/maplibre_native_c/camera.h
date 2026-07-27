@@ -540,6 +540,9 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  * Copies map camera constraint options.
  *
  * On success, *out_options is overwritten and all known fields are marked.
+ * The geographic constraint is reported as exactly one of
+ * MLN_BOUND_OPTION_BOUNDS, which also fills out_options->bounds, or
+ * MLN_BOUND_OPTION_UNBOUNDED, which leaves out_options->bounds at its default.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -555,14 +558,17 @@ mln_map_get_bounds(mln_map* map, mln_bound_options* out_options) MLN_NOEXCEPT;
 /**
  * Applies selected map camera constraint options.
  *
- * Only fields indicated by options->fields affect the map.
+ * Only fields indicated by options->fields affect the map. Set
+ * MLN_BOUND_OPTION_BOUNDS to constrain the camera center to options->bounds,
+ * or MLN_BOUND_OPTION_UNBOUNDED to release the geographic constraint entirely.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits, bounds
- *   are invalid, a numeric field is non-finite, or paired min/max fields are
- *   inconsistent.
+ *   options->size is too small, options->fields contains unknown bits,
+ *   options->fields contains both MLN_BOUND_OPTION_BOUNDS and
+ *   MLN_BOUND_OPTION_UNBOUNDED, bounds are invalid, a numeric field is
+ *   non-finite, or paired min/max fields are inconsistent.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.

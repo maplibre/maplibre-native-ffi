@@ -28,8 +28,8 @@ use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 pub use camera::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
+    FreeCameraOptions, ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{

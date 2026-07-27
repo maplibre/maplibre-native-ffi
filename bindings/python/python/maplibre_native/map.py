@@ -13,13 +13,16 @@ from . import _native
 from .camera import (
     AnimationOptions,
     BoundOptions,
+    Bounded,
     CameraFitOptions,
     CameraOptions,
     EdgeInsets,
     FreeCameraOptions,
     ProjectionMode,
     ScreenPoint,
+    Unbounded,
 )
+from .errors import InvalidArgumentError
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
 from .render import (
@@ -240,21 +243,31 @@ def _bounds_parts(
     bounds: BoundOptions,
 ) -> tuple[
     tuple[tuple[float, float], tuple[float, float]] | None,
+    bool,
     float | None,
     float | None,
     float | None,
     float | None,
 ]:
-    raw_bounds = (
-        (
-            (bounds.bounds.southwest.latitude, bounds.bounds.southwest.longitude),
-            (bounds.bounds.northeast.latitude, bounds.bounds.northeast.longitude),
+    constraint = bounds.bounds
+    raw_bounds: tuple[tuple[float, float], tuple[float, float]] | None = None
+    if isinstance(constraint, Bounded):
+        box = constraint.bounds
+        raw_bounds = (
+            (box.southwest.latitude, box.southwest.longitude),
+            (box.northeast.latitude, box.northeast.longitude),
         )
-        if bounds.bounds is not None
-        else None
-    )
+    elif constraint is not None and not isinstance(constraint, Unbounded):
+        # Annotations do not bind at runtime, so an unsupported value would
+        # otherwise read as "leave the geographic constraint alone" and the
+        # caller would see a silent no-op instead of a rejection.
+        raise InvalidArgumentError(
+            "BoundOptions.bounds must be Bounded, Unbounded, or None, "
+            f"not {type(constraint).__name__}"
+        )
     return (
         raw_bounds,
+        isinstance(constraint, Unbounded),
         bounds.min_zoom,
         bounds.max_zoom,
         bounds.min_pitch,

@@ -6,6 +6,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -123,7 +124,7 @@ class OptionsValueSemanticsTest {
     assertValueSemantics(
       baseline = {
         BoundOptions().apply {
-          bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
+          bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))
           minZoom = 2.0
           maxZoom = 3.0
           minPitch = 4.0
@@ -133,7 +134,8 @@ class OptionsValueSemanticsTest {
       copyOf = { it.copy() },
       mutators =
         listOf(
-          { bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0)) },
+          { bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0))) },
+          { bounds = BoundsConstraint.Unbounded },
           { minZoom = 20.0 },
           { maxZoom = 30.0 },
           { minPitch = 40.0 },

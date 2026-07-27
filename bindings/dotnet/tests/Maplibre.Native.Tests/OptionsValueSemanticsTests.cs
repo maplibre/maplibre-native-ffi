@@ -109,13 +109,15 @@ public sealed class OptionsValueSemanticsTests
             () =>
                 new BoundOptions
                 {
-                    Bounds = new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
+                    Bounds = new BoundsConstraint.Bounded(
+                        new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1))
+                    ),
                     MinimumZoom = 2,
                     MaximumZoom = 3,
                     MinimumPitch = 4,
                     MaximumPitch = 5,
                 },
-            options => options.Bounds = new LatLngBounds(new LatLng(-1, -1), new LatLng(2, 2)),
+            options => options.Bounds = BoundsConstraint.Unbounded.Instance,
             options => options.MinimumZoom = 20,
             options => options.MaximumZoom = 30,
             options => options.MinimumPitch = 40,

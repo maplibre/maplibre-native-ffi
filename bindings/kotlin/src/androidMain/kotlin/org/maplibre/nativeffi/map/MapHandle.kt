@@ -8,6 +8,7 @@ import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -1847,7 +1848,9 @@ private fun boundOptions(value: MaplibreNativeC.mln_bound_options): BoundOptions
   val fields = value.fields()
   return BoundOptions().apply {
     if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS) != 0) {
-      bounds = latLngBounds(value.bounds())
+      bounds = BoundsConstraint.Bounded(latLngBounds(value.bounds()))
+    } else if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_UNBOUNDED) != 0) {
+      bounds = BoundsConstraint.Unbounded
     }
     if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM) != 0) {
       minZoom = value.min_zoom()
@@ -2108,9 +2111,15 @@ private class BoundOptionsScope(value: BoundOptions) : AutoCloseable {
 
   init {
     var fields = 0
-    value.bounds?.let {
-      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS
-      options.bounds(latLngBounds(it))
+    when (val constraint = value.bounds) {
+      is BoundsConstraint.Bounded -> {
+        fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS
+        options.bounds(latLngBounds(constraint.bounds))
+      }
+      BoundsConstraint.Unbounded -> {
+        fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_UNBOUNDED
+      }
+      null -> {}
     }
     value.minZoom?.let {
       fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM

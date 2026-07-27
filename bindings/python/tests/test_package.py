@@ -1356,7 +1356,11 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_bounds(
-                camera.BoundOptions(bounds=bounds, min_zoom=0.0, max_zoom=10.0)
+                camera.BoundOptions(
+                    bounds=camera.Bounded(bounds),
+                    min_zoom=0.0,
+                    max_zoom=10.0,
+                )
             )
             constraints = map_handle.get_bounds()
             fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
@@ -1374,7 +1378,7 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
                 unwrapped=True,
             )
 
-            assert constraints.bounds == bounds
+            assert constraints.bounds == camera.Bounded(bounds)
             assert constraints.min_zoom == pytest.approx(0.0)
             assert constraints.max_zoom == pytest.approx(10.0)
             assert isinstance(fit_bounds, camera.CameraOptions)
@@ -1382,6 +1386,48 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
             assert isinstance(fit_geometry, camera.CameraOptions)
             assert isinstance(visible_bounds, geo.LatLngBounds)
             assert isinstance(unwrapped_bounds, geo.LatLngBounds)
+
+
+def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
+    map_handle.jump_to(
+        camera.CameraOptions(center=geo.LatLng(0.0, longitude), zoom=2.0)
+    )
+    center = map_handle.get_camera().center
+    assert center is not None
+    return center.longitude
+
+
+def test_camera_bounds_distinguish_unbounded_from_world() -> None:
+    world = geo.LatLngBounds(
+        southwest=geo.LatLng(-90.0, -180.0),
+        northeast=geo.LatLng(90.0, 180.0),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
+            # An unbounded map wraps across the antimeridian.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                -160.0, abs=1e-6
+            )
+
+            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Bounded(world)))
+
+            constrained = map_handle.get_bounds().bounds
+            assert isinstance(constrained, camera.Bounded)
+            assert constrained.bounds.northeast.longitude == pytest.approx(180.0)
+            # World bounds clamp at the antimeridian instead of wrapping.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                180.0, abs=1e-6
+            )
+
+            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Unbounded()))
+
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
+            # Releasing the constraint restores antimeridian wrapping.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                -160.0, abs=1e-6
+            )
 
 
 def test_camera_transition_commands_accept_public_values() -> None:
@@ -3139,3 +3185,20 @@ def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
                     "custom",
                     style.CustomGeometrySourceOptions(max_queued_events=0),
                 )
+
+
+def test_set_bounds_rejects_unsupported_constraint() -> None:
+    # Annotations do not bind at runtime, so a stale LatLngBounds would
+    # otherwise be treated as absent and silently leave the constraint alone.
+    world = geo.LatLngBounds(
+        southwest=geo.LatLng(-90.0, -180.0),
+        northeast=geo.LatLng(90.0, 180.0),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.set_bounds(
+                    camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
+                )
+            assert map_handle.get_bounds().bounds == camera.Unbounded()

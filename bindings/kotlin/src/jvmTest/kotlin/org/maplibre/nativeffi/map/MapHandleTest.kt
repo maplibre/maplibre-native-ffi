@@ -8,6 +8,8 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -638,15 +640,15 @@ class MapHandleTest {
       }
 
       map.bounds =
-        org.maplibre.nativeffi.camera.BoundOptions().apply {
-          this.bounds = bounds
+        BoundOptions().apply {
+          this.bounds = BoundsConstraint.Bounded(bounds)
           minZoom = 1.0
           maxZoom = 10.0
           minPitch = 0.0
           maxPitch = 45.0
         }
       val boundOptions = map.bounds
-      assertEquals(bounds, boundOptions.bounds)
+      assertEquals(BoundsConstraint.Bounded(bounds), boundOptions.bounds)
       assertEquals(1.0, boundOptions.minZoom ?: 0.0, 1e-6)
       assertEquals(10.0, boundOptions.maxZoom ?: 0.0, 1e-6)
       assertEquals(0.0, boundOptions.minPitch ?: -1.0, 1e-6)
@@ -659,6 +661,50 @@ class MapHandleTest {
         }
       assertTrue(map.freeCameraOptions.position != null)
       assertTrue(map.freeCameraOptions.orientation != null)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun boundsConstraintDistinguishesUnboundedFromWorldBounds() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    fun jumpedLongitude(longitude: Double): Double {
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(0.0, longitude)
+          zoom = 2.0
+        }
+      )
+      return requireNotNull(map.camera.center).longitude
+    }
+
+    try {
+      // An unbounded map wraps across the antimeridian.
+      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
+      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
+
+      val world = LatLngBounds(LatLng(-90.0, -180.0), LatLng(90.0, 180.0))
+      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Bounded(world) }
+      assertEquals(BoundsConstraint.Bounded(world), map.bounds.bounds)
+      // World bounds clamp at the antimeridian instead of wrapping.
+      assertEquals(180.0, jumpedLongitude(200.0), 1e-6)
+
+      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Unbounded }
+      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
+      // Releasing the constraint restores antimeridian wrapping.
+      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
     } finally {
       map.close()
       runtime.close()

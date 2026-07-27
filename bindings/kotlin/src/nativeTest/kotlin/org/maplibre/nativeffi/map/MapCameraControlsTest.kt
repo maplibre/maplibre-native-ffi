@@ -7,6 +7,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -115,8 +116,10 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
-        map.bounds = BoundOptions().apply { this.bounds = bounds }
-        assertNotNull(map.bounds.bounds)
+        map.bounds = BoundOptions().apply { this.bounds = BoundsConstraint.Bounded(bounds) }
+        assertEquals(BoundsConstraint.Bounded(bounds), map.bounds.bounds)
+        map.bounds = BoundOptions().apply { this.bounds = BoundsConstraint.Unbounded }
+        assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
         map.freeCameraOptions =
           FreeCameraOptions().apply {
             position = Vec3(0.0, 0.0, 0.0)
