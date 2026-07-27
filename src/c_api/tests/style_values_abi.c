@@ -230,9 +230,89 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+static void clustered_geojson_data_requires_a_feature_collection(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+
+  const mln_geometry point = {
+    .size = sizeof(mln_geometry),
+    .type = MLN_GEOMETRY_TYPE_POINT,
+    .data = {.point = {.latitude = 37.7, .longitude = -122.5}}
+  };
+  const mln_feature feature = {.size = sizeof(mln_feature), .geometry = &point};
+  const mln_geojson bare_geometry = {
+    .size = sizeof(mln_geojson),
+    .type = MLN_GEOJSON_TYPE_GEOMETRY,
+    .data = {.geometry = &point}
+  };
+  const mln_geojson single_feature = {
+    .size = sizeof(mln_geojson),
+    .type = MLN_GEOJSON_TYPE_FEATURE,
+    .data = {.feature = &feature}
+  };
+
+  mln_geojson_source_options clustered = mln_geojson_source_options_default();
+  clustered.fields = MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  clustered.cluster = true;
+
+  // MapLibre Native clusters feature collections only, so both of these would
+  // tile unclustered rather than honouring the requested cluster option.
+  const mln_string_view geometry_id = {.data = "quakes", .size = 6};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, geometry_id, &bare_geometry, &clustered
+                                 )
+  );
+  const char* message = mln_thread_last_error_message();
+  TEST_ASSERT_NOT_NULL(message);
+  TEST_ASSERT_NOT_NULL(strstr(message, "\"quakes\""));
+  TEST_ASSERT_NOT_NULL(strstr(message, "requires a feature collection"));
+  TEST_ASSERT_NOT_NULL(strstr(message, "a bare geometry"));
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_add_geojson_source_data(
+                                   map, geometry_id, &single_feature, &clustered
+                                 )
+  );
+  TEST_ASSERT_NOT_NULL(
+    strstr(mln_thread_last_error_message(), "a single feature")
+  );
+
+  // The constraint belongs to clustering alone, so the same data tiles fine on
+  // an unclustered source, and the rejected ID stays free.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, geometry_id, &bare_geometry, NULL)
+  );
+
+  // An empty feature collection carries nothing to cluster, so it stays
+  // accepted and a later update supplies the features to cluster.
+  const mln_geojson empty = {
+    .size = sizeof(mln_geojson),
+    .type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION,
+    .data = {.feature_collection = {.features = NULL, .feature_count = 0}}
+  };
+  const mln_string_view empty_id = {.data = "pending", .size = 7};
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_add_geojson_source_data(map, empty_id, &empty, &clustered)
+  );
+
+  // A source added with clustering rejects a bare geometry on update too.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_geojson_source_data(map, empty_id, &bare_geometry)
+  );
+  TEST_ASSERT_NOT_NULL(strstr(mln_thread_last_error_message(), "\"pending\""));
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
   RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
+  RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
 }

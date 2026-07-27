@@ -277,6 +277,54 @@ fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
 
 #[test]
 // Spec coverage: BND-060 and BND-061.
+fn clustered_geojson_source_requires_a_feature_collection() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+
+    // MapLibre Native engages clustering for feature collections only, so these
+    // used to tile unclustered instead of honouring the requested option.
+    let bare = GeoJson::Geometry(Geometry::Point(LatLng::new(0.0, 0.0)));
+    let error = map
+        .add_geojson_source_data("quakes", &bare, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(message.contains("quakes"), "{message}");
+    assert!(
+        message.contains("requires a feature collection"),
+        "{message}"
+    );
+    assert!(message.contains("a bare geometry"), "{message}");
+
+    let single = GeoJson::Feature(Feature::new(
+        Geometry::Point(LatLng::new(0.0, 0.0)),
+        Vec::new(),
+    ));
+    let error = map
+        .add_geojson_source_data("quakes", &single, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.to_string().contains("a single feature"), "{error}");
+
+    // The constraint belongs to clustering alone, and the rejected ID stays free.
+    map.add_geojson_source_data("quakes", &bare, None).unwrap();
+
+    // An empty feature collection carries nothing to cluster, so it stays
+    // accepted and a later update supplies the features to cluster.
+    let empty = GeoJson::FeatureCollection(Vec::new());
+    map.add_geojson_source_data("pending", &empty, Some(&options))
+        .unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
 fn clustered_geojson_source_reports_non_point_geometry() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
