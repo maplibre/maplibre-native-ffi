@@ -164,8 +164,9 @@ the buffer — the image info reports width, height, stride, and byte length.
         new VulkanOwnedTextureDescriptor(extent, contextDescriptor)
     );
 
-    // After a render update produced a frame, read pixels back:
-    using var buffer = new NativeBuffer(session.TextureImageInfo().ByteLength);
+    // After a render update produced a frame, read pixels back. ByteLength is a
+    // ulong, so convert it checked before the int-typed NativeBuffer allocation.
+    using var buffer = new NativeBuffer(checked((int)session.TextureImageInfo().ByteLength));
     var info = session.ReadPremultipliedRgba8(buffer);
     ```
   </TabItem>

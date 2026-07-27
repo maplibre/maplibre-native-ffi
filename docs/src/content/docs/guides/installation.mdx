@@ -34,7 +34,6 @@ follow the pattern `<os>-<arch>-<backend>`:
 | Windows x64 / arm64    | `windows-x64-wgl`, `windows-x64-vulkan`, `windows-arm64-wgl`, `windows-arm64-vulkan` |
 | Android arm64 / x64    | `android-arm64-egl`, `android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan` |
 | iOS device / simulator | `ios-arm64-metal`, `ios-simulator-arm64-metal`                                       |
-| OpenHarmony arm64      | `ohos-arm64-egl`, `ohos-arm64-vulkan`                                                |
 
 `egl` and `wgl` are both the OpenGL backend; the suffix selects the context
 provider (EGL everywhere except Windows, WGL on Windows, ANGLE on macOS).
@@ -63,6 +62,9 @@ mise run package-native linux-x64-vulkan  # produce the .tar.gz archive
 
 The install tree lands in `build/<preset>/install` and matches the archive
 layout above.
+
+The OpenHarmony presets `ohos-arm64-egl` and `ohos-arm64-vulkan` build here but
+are not published as prebuilt archives, so build them from source.
 
 ## Consume from C or C++
 
@@ -142,10 +144,14 @@ same command works for both linkage modes.
     Depend on the SwiftPM package and make the native install discoverable through
     pkg-config.
 
+    The manifest lives under `bindings/swift/`, not at the repository root, so a
+    source-control dependency on the repository URL does not resolve. Clone the
+    repository and depend on that directory by path:
+
     ```swift
     // Package.swift
-    .package(url: "https://github.com/maplibre/maplibre-native-ffi", ...),
-    // target dependency: .product(name: "MaplibreNative", package: "maplibre-native-ffi")
+    .package(path: "../maplibre-native-ffi/bindings/swift"),
+    // target dependency: .product(name: "MaplibreNative", package: "swift")
     ```
 
     ```bash
@@ -198,6 +204,10 @@ same command works for both linkage modes.
     go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
     export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
     ```
+
+    pkg-config supplies the link flags only. On Windows, add the prefix's `bin/`
+    directory to `PATH` before running the executable, or copy
+    `maplibre-native-c.dll` beside it.
   </TabItem>
 </Tabs>
 

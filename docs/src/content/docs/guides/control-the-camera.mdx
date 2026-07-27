@@ -82,8 +82,8 @@ transition with `cancel_transitions()`.
 
     let mut animation = AnimationOptions::default();
     animation.duration_ms = Some(800.0);
-    map.ease_to(&camera, &animation)?; // animates
-    map.fly_to(&camera, &AnimationOptions::default())?; // derived duration
+    map.ease_to(&camera, Some(&animation))?; // animates
+    map.fly_to(&camera, None)?; // derived duration
     ```
   </TabItem>
 
@@ -228,7 +228,7 @@ covers.
     let mut fit = CameraFitOptions::default();
     fit.padding = Some(EdgeInsets::new(24.0, 24.0, 24.0, 24.0));
     let fitted = map.camera_for_lat_lng_bounds(bounds, Some(&fit))?;
-    map.ease_to(&fitted, &animation)?;
+    map.ease_to(&fitted, Some(&animation))?;
     ```
   </TabItem>
 
@@ -287,7 +287,7 @@ covers.
     if err != nil {
     	return err
     }
-    if err := m.EaseTo(fitted, animation); err != nil {
+    if err := m.EaseTo(fitted, &animation); err != nil {
     	return err
     }
     ```

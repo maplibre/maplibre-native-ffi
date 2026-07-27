@@ -39,6 +39,11 @@ thread:
 * It must not call back into the API (except the URL setter at the C level).
 * A failure or empty result keeps the original URL; it never fails the request.
 
+A style may reference sprites, glyphs, and tiles on origins you do not control,
+and the transform runs for those requests too. Gate any credential on an
+explicit allowlist of trusted hosts, as the examples below do, so the key
+reaches only the host it belongs to.
+
 Transforms apply to MapLibre's online file source (including nested PMTiles
 range requests), not to `file`, `asset`, `mbtiles`, or provider-intercepted
 requests.
@@ -46,13 +51,27 @@ requests.
 <Tabs syncKey="lang">
   <TabItem label="C">
     ```c
+    static const char trusted_prefix[] = "https://tiles.example.com/";
+
     mln_status add_api_key(void* user_data, uint32_t kind, const char* url,
                            mln_resource_transform_response* out_response) {
       (void)user_data; (void)kind;
+      // Runs for every origin the style references, so only the intended host
+      // sees the key. Leaving url null keeps the request URL unchanged.
+      if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
+        out_response->url = NULL;
+        return MLN_STATUS_OK;
+      }
       char rewritten[1024];
-      snprintf(rewritten, sizeof(rewritten), "%s?key=%s", url, API_KEY);
+      const int written =
+          snprintf(rewritten, sizeof(rewritten), "%s?key=%s", url, API_KEY);
+      if (written < 0 || (size_t)written >= sizeof(rewritten)) {
+        // Truncation would fetch a corrupted address; keep the original URL.
+        out_response->url = NULL;
+        return MLN_STATUS_OK;
+      }
       return mln_resource_transform_response_set_url(
-          out_response, rewritten, strlen(rewritten));
+          out_response, rewritten, (size_t)written);
     }
 
     mln_resource_transform transform = {
@@ -65,7 +84,11 @@ requests.
   <TabItem label="Kotlin">
     ```kotlin
     runtime.setResourceTransform(
-      ResourceTransformCallback { request -> "${request.url}?key=$apiKey" }
+      ResourceTransformCallback { request ->
+        // Only the intended host sees the key; other origins keep their URL.
+        if (request.url.startsWith(trustedPrefix)) "${request.url}?key=$apiKey"
+        else request.url
+      }
     )
     // ... later: runtime.clearResourceTransform()
     ```
@@ -74,7 +97,11 @@ requests.
   <TabItem label="Rust">
     ```rust
     runtime.set_resource_transform(move |request| {
-        Some(format!("{}?key={}", request.url, api_key))
+        // Only the intended host sees the key; None keeps the original URL.
+        request
+            .url
+            .starts_with(TRUSTED_PREFIX)
+            .then(|| format!("{}?key={}", request.url, api_key))
     })?;
     // ... later: runtime.clear_resource_transform()?;
     ```
@@ -83,7 +110,8 @@ requests.
   <TabItem label="Swift">
     ```swift
     try runtime.setResourceTransform { request in
-      "\(request.url)?key=\(apiKey)"
+      // Only the intended host sees the key; other origins keep their URL.
+      request.url.hasPrefix(trustedPrefix) ? "\(request.url)?key=\(apiKey)" : request.url
     }
     // ... later: try runtime.clearResourceTransform()
     ```
@@ -93,6 +121,8 @@ requests.
     ```zig
     fn addApiKey(context: ?*anyopaque, request: maplibre.ResourceTransformRequest) maplibre.ResourceTransformResponse {
         _ = context;
+        // Only the intended host sees the key; null keeps the original URL.
+        if (!std.mem.startsWith(u8, request.url, trusted_prefix)) return .{};
         return .{ .replacement_url = rewrite(request.url) };
     }
 
@@ -103,14 +133,23 @@ requests.
 
   <TabItem label="C#">
     ```csharp
-    runtime.SetResourceTransform(request => $"{request.Url}?key={apiKey}");
+    // Only the intended host sees the key; other origins keep their URL.
+    runtime.SetResourceTransform(request =>
+        request.Url.StartsWith(TrustedPrefix, StringComparison.Ordinal)
+            ? $"{request.Url}?key={apiKey}"
+            : request.Url);
     // ... later: runtime.ClearResourceTransform();
     ```
   </TabItem>
 
   <TabItem label="Python">
     ```python
-    runtime.set_resource_transform(lambda request: f"{request.url}?key={api_key}")
+    # Only the intended host sees the key; other origins keep their URL.
+    runtime.set_resource_transform(
+        lambda request: f"{request.url}?key={api_key}"
+        if request.url.startswith(TRUSTED_PREFIX)
+        else request.url
+    )
     # ... later: runtime.clear_resource_transform()
     ```
   </TabItem>
@@ -119,6 +158,10 @@ requests.
     ```go
     if err := rt.SetResourceTransform(
     	func(request maplibre.ResourceTransformRequest) (string, bool) {
+    		// Only the intended host sees the key; false keeps the original URL.
+    		if !strings.HasPrefix(request.URL, trustedPrefix) {
+    			return "", false
+    		}
     		return request.URL + "?key=" + apiKey, true
     	},
     ); err != nil {

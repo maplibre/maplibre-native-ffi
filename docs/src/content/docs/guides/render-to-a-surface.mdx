@@ -200,6 +200,9 @@ The example apps poll with a short sleep, which is simplest but burns cycles.
     });
     defer session.close() catch {};
 
+    // Carries a pending repaint across frames, so it lives outside the loop.
+    var render_pending = false;
+
     // Per frame, on the map owner thread:
     try runtime.runOnce();
     while (try runtime.pollEvent(allocator)) |event| {

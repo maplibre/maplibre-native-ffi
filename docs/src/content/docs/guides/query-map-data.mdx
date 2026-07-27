@@ -149,10 +149,16 @@ your binding's rules.
 
 ## Query source features
 
-`query_source_features` reads features straight out of a loaded source,
-independent of what is on screen. Vector sources require the source layer IDs
-in the options; GeoJSON sources ignore them. An optional filter applies the
-same way as rendered queries.
+`query_source_features` reads features straight out of a loaded source, bypassing
+layer visibility, styling, and the rendered viewport. Vector sources require the
+source layer IDs in the options; GeoJSON sources ignore them. An optional filter
+applies the same way as rendered queries.
+
+It still reads only the source data the renderer currently holds — typically the
+tiles loaded for the current camera — so it is not a search over the complete
+dataset. Features in tiles that have not loaded are absent, and results change
+as the camera moves. Query the underlying dataset directly when you need
+whole-source coverage.
 
 ```kotlin
 // Kotlin; the other bindings mirror this one-to-one.

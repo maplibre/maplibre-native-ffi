@@ -230,7 +230,12 @@ while (true) {
   when (val payload = event.payload) {
     is RuntimeEventPayload.OfflineRegionStatusChanged -> {
       val status = payload.status
-      progress = status.completedResourceCount.toDouble() / status.requiredResourceCount
+      // While discovery is still running the count is an estimate, and it is
+      // zero until the first resources are found, so guard the denominator
+      // rather than publishing NaN or infinity.
+      if (status.requiredResourceCountIsPrecise && status.requiredResourceCount > 0uL) {
+        progress = status.completedResourceCount.toDouble() / status.requiredResourceCount.toDouble()
+      }
       if (status.complete) onDownloaded(payload.regionId)
     }
     is RuntimeEventPayload.OfflineOperationCompleted -> {
@@ -407,6 +412,9 @@ A minimal create-and-confirm flow:
     // pump until OfflineOperationCompleted arrives for create.ID() ...
     region, err := create.Take()
     if err != nil {
+    	// A failed Take leaves the operation live, and it retains a runtime
+    	// child that would later block RuntimeHandle.Close.
+    	_ = create.Discard()
     	return err
     }
 
