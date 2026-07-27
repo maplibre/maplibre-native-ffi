@@ -13,9 +13,10 @@ can express the scenario.
 ## Registration contract
 
 Each `*_abi.c` holds `static void <name>(void)` tests plus one
-`run_<file>_tests(void)` entry point that starts with `UnitySetTestFile(__FILE__)`
-and then calls `RUN_TEST` once per test in the file. `abi_tests.h` declares the
-entry points; `main.c` calls them between `UNITY_BEGIN()` and `UNITY_END()`.
+`run_<file>_tests(void)` entry point that starts with
+`UnitySetTestFile(__FILE__)` and then calls `RUN_TEST` once per test in the
+file. `abi_tests.h` declares the entry points; `main.c` calls them between
+`UNITY_BEGIN()` and `UNITY_END()`.
 
 Adding a test means writing it `static` and adding its `RUN_TEST` call. Adding a
 file means creating `<name>_abi.c`, declaring `run_<name>_tests(void)` in
@@ -34,8 +35,8 @@ The build enforces this rather than trusting review:
 
 The compiler carries this instead of Unity's `generate_test_runner.rb` (Ruby is
 outside this repo's toolchain) or a regex checker (`render_backend_abi.c` guards
-both its tests and their `RUN_TEST` calls behind backend `#if` blocks, which only
-a preprocessor reads correctly).
+both its tests and their `RUN_TEST` calls behind backend `#if` blocks, which
+only a preprocessor reads correctly).
 
 ## Handle hygiene
 
@@ -52,4 +53,3 @@ thread fail to create one, turning one real failure into a suite-wide cascade.
 Reclaiming in `tearDown` keeps the failure count honest. When a test that
 otherwise passed leaves handles behind, `tearDown` fails it so the leak lands on
 the test that caused it.
-

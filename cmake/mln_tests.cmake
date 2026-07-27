@@ -46,8 +46,7 @@ function(mln_add_c_api_test)
   file(GLOB test_abi_sources CONFIGURE_DEPENDS
        ${PROJECT_SOURCE_DIR}/src/c_api/tests/*_abi.c)
   set(test_sources ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
-                   ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
-                   ${test_abi_sources})
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c ${test_abi_sources})
 
   # Each *_abi.c reaches the runner through one run_<file>_tests() call in
   # main.c. main.c carries no preprocessor guards, so a plain text match is
@@ -83,8 +82,8 @@ function(mln_add_c_api_test)
   # These stay off the vendored unity target.
   if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(
-      mln_c_api_tests PRIVATE -Werror=unused-function
-                              -Werror=missing-prototypes)
+      mln_c_api_tests
+      PRIVATE -Werror=unused-function -Werror=missing-prototypes)
   elseif(MSVC)
     # C4505: unreferenced function with internal linkage has been removed.
     target_compile_options(mln_c_api_tests PRIVATE /we4505)
