@@ -1,0 +1,104 @@
+---
+title: Add Data and Style at Runtime
+description: Add sources, layers, images, and properties after the style loads.
+sidebar:
+  order: 7
+---
+
+import { Aside, Code } from "@astrojs/starlight/components";
+import runtimeStyle from "../../../../snippets/c/runtime-style.c?raw";
+
+Anything a style document can express, you can also do at runtime. The API
+speaks [MapLibre Style Spec](https://maplibre.org/maplibre-style-spec/):
+sources and layers go in as style-spec objects, and property values and filters
+are style-spec values, expressions included. That keeps the surface in step with
+the spec across every layer type.
+
+Wait for `MAP_STYLE_LOADED` before you mutate anything. Additions target the
+loaded style, and loading another style replaces them.
+
+## Passing style-spec values
+
+Values arrive as a descriptor graph. A `mln_json_value` is a tagged union of
+string, number, bool, array, and object that you build in place, and the API
+copies it before returning.
+
+C makes this verbose, so write one helper that converts your host language's
+maps and lists into it. Number types carry meaning: use the unsigned variant
+where the spec or an extension expects an unsigned value.
+
+<Code code={runtimeStyle} lang="c" title="runtime-style.c" />
+
+## Sources
+
+`add_style_source_json` takes any style-spec source object. Typed entry points
+cover the sources that need more than construction.
+
+GeoJSON sources use `add_geojson_source_url` or `add_geojson_source_data`, each
+with a matching `set_*` that swaps in new data later. Adding an ID that already
+exists fails, so reach for the setter to replace data on a live source. Inline
+data arrives as geometry and feature descriptors.
+
+Both adders take `mln_geojson_source_options`, or null for the defaults. Those
+options cover tiling zoom range, simplification tolerance, tile size and buffer,
+and clustering, and they are fixed for the life of the source, so the setters
+keep whatever the source was added with.
+
+Vector, raster, and raster-DEM sources use `add_*_source_url` for TileJSON or
+`add_*_source_tiles` for explicit tile URL templates, with tile options for zoom
+range, attribution, scheme, bounds, tile size, and encoding.
+
+Image sources use `add_image_source_url` or `add_image_source_image` and take
+four corner coordinates in top-left, top-right, bottom-right, bottom-left order.
+
+`add_custom_geometry_source` registers `fetch_tile` and `cancel_tile` callbacks,
+which lets you generate tiles yourself.
+
+<Aside type="caution">
+  MapLibre runs custom geometry callbacks on its worker threads. Feeding tile
+  data back is a thread-affine map call, so queue it to the map owner thread.
+  Calling it from the callback thread returns `MLN_STATUS_WRONG_THREAD` and
+  leaves the tile empty.
+</Aside>
+
+Removing a source fails while a layer still references it, so remove the layers
+first. `style_source_exists`, `get_style_source_type`, and
+`list_style_source_ids` report what is loaded.
+
+## Layers
+
+`add_style_layer_json` takes any style-spec layer object carrying at least `id`
+and `type`, plus the ID to insert before. An empty before-ID puts the layer on
+top. `move_style_layer` reorders and `remove_style_layer` deletes.
+
+Three typed adders cover layers that need more than a JSON object.
+`add_hillshade_layer` and `add_color_relief_layer` validate that their source is
+raster-DEM. `add_location_indicator_layer` builds the user-location puck, driven
+afterward by its own setters for location, bearing, accuracy radius, and image
+name.
+
+## Properties and filters
+
+`set_layer_property` sets any paint or layout property by its style-spec name,
+taking a style-spec value. Expressions are arrays, such as
+`["interpolate", ["linear"], ["zoom"], ...]`. `set_layer_filter` applies a
+filter, and passing an absent value clears it. Getters return the current value,
+or report absent for a property nobody set.
+
+## Images
+
+`set_style_image` registers a bitmap that the style can reference from
+`icon-image` or `fill-pattern`. Calling it again with the same ID replaces the
+image. Pixels are premultiplied RGBA8 with an explicit stride. Options carry
+`pixel_ratio`, which you match to the map's scale factor for crisp icons, and
+`sdf` for signed-distance-field icons that `icon-color` tints.
+
+When a style references an image nobody supplied, the runtime emits
+`MAP_STYLE_IMAGE_MISSING` with the ID. Handle that event by adding the image,
+and the repaint follows.
+
+## Light
+
+`set_style_light_json` replaces the whole light object.
+`set_style_light_property` sets one of `anchor`, `color`, `intensity`, or
+`position`. Light steers fill-extrusion shading.

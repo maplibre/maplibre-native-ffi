@@ -1,0 +1,95 @@
+---
+title: Installation
+description: Get the native library and point a project at it.
+sidebar:
+  order: 1
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+<Aside type="caution">
+  Nothing here is released. CI rebuilds the native artifacts and force-moves the
+  snapshot tag on every push to `main`, and the C ABI stays unstable while
+  `mln_c_version()` returns `0`. Expect breakage between snapshots.
+</Aside>
+
+An integration needs the native library, which implements the C API. Unless you
+call C directly, it also needs a language binding that wraps it. CI compiles the
+native library per platform and per render backend, so pick the artifact
+matching your target.
+
+## Get the native library
+
+CI publishes CPack archives to the floating
+[`unstable-native-snapshot`](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+prerelease, named `maplibre-native-c-<preset>.tar.gz` alongside a `SHA256SUMS`
+manifest. Presets are `<os>-<arch>-<backend>`:
+
+| Platform | Presets                                                                              |
+| -------- | ------------------------------------------------------------------------------------ |
+| Linux    | `linux-x64-egl`, `linux-x64-vulkan`, `linux-arm64-egl`, `linux-arm64-vulkan`         |
+| macOS    | `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`                         |
+| Windows  | `windows-x64-wgl`, `windows-x64-vulkan`, `windows-arm64-wgl`, `windows-arm64-vulkan` |
+| Android  | `android-arm64-egl`, `android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan` |
+| iOS      | `ios-arm64-metal`, `ios-simulator-arm64-metal`                                       |
+
+`egl` and `wgl` both mean the OpenGL backend, and the suffix names the context
+provider. The OpenHarmony presets `ohos-arm64-egl` and `ohos-arm64-vulkan` build
+from source, and CI publishes no archive for them.
+
+An unpacked archive holds the umbrella header `maplibre_native_c.h` and its
+domain headers under `include/`, the library under `lib/` (`bin/` on Windows), a
+pkg-config descriptor under `share/pkgconfig/`, and
+`share/maplibre-native-c/artifact.json`, which records the backend and platform
+the artifact was built for.
+
+### Or build it yourself
+
+The repository builds with CMake presets driven by [mise](https://mise.jdx.dev):
+
+```bash
+mise bootstrap --yes            # system packages, tools, hooks
+mise run build                  # host library for this machine
+mise run build linux-x64-vulkan # a specific preset
+```
+
+The install tree lands in `build/<preset>/install` with the archive's layout.
+
+## Point a C project at it
+
+The public headers target C23, and the archive ships pkg-config in place of a
+CMake package config:
+
+```bash
+export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
+cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
+```
+
+Static archives define `-DMLN_STATIC` through the same descriptor, so one
+command covers both linkage modes. On Windows the runtime DLL lands in the
+prefix's `bin/`, which stays off the search path, so add that directory to
+`PATH` or copy the DLL next to your executable.
+
+To confirm the install, ask the library what it is:
+
+```c
+printf("ABI version: %u\n", mln_c_version());
+printf("backends: %#x\n", mln_supported_render_backend_mask());
+```
+
+## Language bindings
+
+Bindings live under `bindings/` for Kotlin, Rust, Swift, Zig, .NET, Python, and
+Go. Only the Kotlin artifacts are published anywhere today, as
+`org.maplibre.nativeffi` snapshots on
+[Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/).
+For the rest, depend on the binding by path or git from a checkout and point its
+build at a native install prefix.
+
+Each binding wraps the runtime, map, and render session model these guides
+describe. Read on in C, then consult the
+[Rust](/maplibre-native-ffi/reference/rust/maplibre_native/) or
+[Zig](/maplibre-native-ffi/reference/zig/) API reference for the spelling in
+those languages.
+
+Next: [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).
