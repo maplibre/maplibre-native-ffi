@@ -135,7 +135,8 @@ mln_render_session_destroy(mln_render_session* session) MLN_NOEXCEPT;
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
 mln_render_session_reduce_memory_use(mln_render_session* session) MLN_NOEXCEPT;
@@ -150,7 +151,8 @@ mln_render_session_reduce_memory_use(mln_render_session* session) MLN_NOEXCEPT;
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
 mln_render_session_clear_data(mln_render_session* session) MLN_NOEXCEPT;
@@ -165,7 +167,8 @@ mln_render_session_clear_data(mln_render_session* session) MLN_NOEXCEPT;
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
 mln_render_session_dump_debug_logs(mln_render_session* session) MLN_NOEXCEPT;
@@ -189,7 +192,8 @@ mln_render_session_dump_debug_logs(mln_render_session* session) MLN_NOEXCEPT;
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_set_feature_state(
   mln_render_session* session, const mln_feature_state_selector* selector,
@@ -215,7 +219,8 @@ MLN_API mln_status mln_render_session_set_feature_state(
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_get_feature_state(
   mln_render_session* session, const mln_feature_state_selector* selector,
@@ -240,7 +245,8 @@ MLN_API mln_status mln_render_session_get_feature_state(
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_remove_feature_state(
   mln_render_session* session, const mln_feature_state_selector* selector
