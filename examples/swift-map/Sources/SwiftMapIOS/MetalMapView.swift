@@ -120,7 +120,11 @@ final class MetalMapView: UIView {
     guard !isShutDown else { return }
     if let failureMessage = channels.failureMessage {
       log.error("\(failureMessage, privacy: .public)")
+      // The runtime loop waits for the session to close before destroying the
+      // map, so stopping the display link alone would leave it waiting out its
+      // deadline and then failing that destroy.
       stopHostLoop()
+      teardown()
       return
     }
     attachIfNeeded()

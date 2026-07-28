@@ -103,15 +103,6 @@ impl MapAddress {
         *guard = None;
         Ok(())
     }
-
-    /// Retires without closing, for a drop whose destroy already succeeded.
-    fn retire(&self) {
-        let mut guard = self
-            .0
-            .write()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        *guard = None;
-    }
 }
 
 #[derive(Debug)]

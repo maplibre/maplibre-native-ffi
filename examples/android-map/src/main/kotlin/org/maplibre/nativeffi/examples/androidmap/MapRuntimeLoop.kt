@@ -78,10 +78,11 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             }
           } catch (error: RuntimeException) {
             // Reposting after a failing pump spins the handler thread forever with nothing to
-            // show for it. Record it so the view stops scheduling frames, and stop the loop.
+            // show for it. Record it so the view stops scheduling frames and stops reposting.
+            // The handles stay live: the UI thread may still hold an attached session, and a map
+            // cannot be destroyed until that session closes. close() tears down in that order.
             Log.e(TAG, "runtime loop iteration failed", error)
             setupFailure = error
-            closeHandles()
             return
           }
         }
