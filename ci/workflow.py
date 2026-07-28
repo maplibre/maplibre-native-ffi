@@ -49,9 +49,7 @@ def runner(target: str) -> str:
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
     if target_platform == "windows":
-        # Zig 0.16 cannot run reliably on Windows ARM64, but its x64 build can
-        # cross-compile the complete ARM64 dependency graph on an x64 runner.
-        return "windows-2022"
+        return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
     if target_platform in {"android", "ohos"}:
         return "ubuntu-latest"
     raise SystemExit(f"error: cannot determine runner from target {target!r}")
@@ -182,7 +180,6 @@ def target_sets(
         target
         for target in configured
         if platform(target) in DESKTOP | {"ios-simulator"}
-        and not (platform(target) == "windows" and architecture(target) == "arm64")
     }
     packaged = {target for target in configured if platform(target) != "ohos"}
     return configured, tested, packaged

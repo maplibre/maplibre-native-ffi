@@ -78,7 +78,7 @@ zig_version = "0.16.0"
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
 "aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
-"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64", "windows/arm64"] }
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
 
@@ -186,7 +186,7 @@ zig build test -Dnative-target="$usage_target"
 '''
 
 [tasks.check]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64", "windows/arm64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools
@@ -195,7 +195,7 @@ hk check --all
 '''
 
 [tasks.fix]
-tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] } }
+tools = { "core:java" = "{{vars.java_version}}", "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}", "aqua:google/google-java-format" = "{{vars.google_java_format_version}}", "core:dotnet" = "{{vars.dotnet_version}}", "core:go" = "{{vars.go_version}}", "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64", "windows/arm64"] } }
 env = { MLN_DPRINT_SCOPED_TOOLS = "1" }
 run = '''
 mise -C bindings/dotnet deps install dotnet-tools

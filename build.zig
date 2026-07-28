@@ -215,9 +215,6 @@ pub fn build(b: *std.Build) void {
     define(configure, b, "CMAKE_INSTALL_LIBDIR", "lib");
     define(configure, b, "MLN_FFI_ARTIFACT_NAME", target.name);
     define(configure, b, "MLN_FFI_BUILD_JOBS", b.fmt("{d}", .{jobs}));
-    if (target.platform == .windows and target.architecture == .arm64) {
-        define(configure, b, "BUILD_TESTING", "OFF");
-    }
     addPlatformOptions(b, configure, target, build_dir);
     if (target.platform == .linux or target.platform == .windows) {
         addZigDependencies(b, configure, target, optimize);
