@@ -103,13 +103,13 @@ auto texture_read_premultiplied_rgba8(
   auto* renderer_backend = texture->texture.backend->renderer_backend();
   if (renderer_backend == nullptr) {
     set_thread_error("texture session renderer backend is not available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
   auto guard = mbgl::gfx::BackendScope{*renderer_backend};
   auto image = texture->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {
     set_thread_error("texture readback did not produce an image");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
   if (
     image.size.width != texture->physical_width ||
@@ -117,7 +117,7 @@ auto texture_read_premultiplied_rgba8(
     image.bytes() != byte_length
   ) {
     set_thread_error("texture readback image layout did not match the session");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   std::memcpy(out_data, image.data.get(), image.bytes());

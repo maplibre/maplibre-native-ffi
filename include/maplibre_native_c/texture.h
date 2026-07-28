@@ -472,12 +472,14 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *   null, out_info->size is too small, out_data is null, or out_data_capacity
  *   is too small.
  * - MLN_STATUS_INVALID_STATE when no rendered frame is available, the session
- *   is detached, a frame is currently acquired, or readback produces no image.
+ *   is detached, or a frame is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session is not a texture session or when the
  *   texture session uses a caller-owned target.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when readback produces no image or an image whose
+ *   layout does not match the session, when the render backend reports no
+ *   renderer backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
   mln_render_session* session, uint8_t* out_data, size_t out_data_capacity,
@@ -503,7 +505,8 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session cannot expose a Metal texture frame.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no rendered Metal
+ *   texture, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_acquire_frame(
   mln_render_session* session, mln_metal_owned_texture_frame* out_frame
