@@ -1,149 +1,95 @@
 ---
 title: Configure Resource Loading
-description: Resource providers, URL transforms, network status, cache paths, and logging.
+description: Decide where the map's bytes come from.
 sidebar:
   order: 8
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import resourceTransform from "../../../../snippets/c/resource-transform.c?raw";
 
-Resource configuration decides where MapLibre Native reads bytes from: which
-URLs it fetches, how it rewrites them, what it may intercept, and where it
-caches. Some of it is per-runtime and must happen **before the first map is
-created**; some is process-global.
+By default the map fetches what its style names, over the network, and caches
+the results. This guide covers changing that: rewriting URLs, serving requests
+yourself, and controlling the cache.
+
+Some of it is per-runtime and has to happen before the first map exists; some is
+process-global. Where a callback runs on a MapLibre thread rather than yours, it
+is called out below.
 
 ## Cache and asset paths
 
-Set at runtime creation through the runtime options (see
+These are runtime options, set at creation (see
 [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/)):
+`cache_path` for the ambient cache database, `asset_path` for the root that
+`asset://` URLs resolve against, and `maximum_cache_size` for a byte cap — which
+applies only when you also set its flag in `flags`.
 
-* `cache_path` — the ambient cache database. Persistent by default when you
-  pass a filesystem path; `":memory:"` keeps everything in memory. Offline
-  regions also live in this database, so pass a real path when you use
-  [offline regions](/maplibre-native-ffi/guides/download-offline-regions/).
-* `asset_path` — the filesystem root for `asset://` URLs.
-* `maximum_cache_size` — ambient cache cap in bytes.
-
-## URL transforms
+## Rewriting URLs
 
 A resource transform rewrites the URL of every network request the runtime
-makes — the standard way to attach API keys, swap hosts, or reroute through a
-proxy. Register it any time (even with live maps); replacing or clearing waits
-for in-flight callbacks to drain.
+makes. It is the normal way to attach an API key, swap a host, or route through
+a proxy. Register it whenever, even with maps already running.
 
-The callback contract is strict because it may run on a worker or network
-thread:
+Two things shape how you write one. It runs on a worker or network thread, so it
+must be thread-safe and quick, and it must not call back into the API apart from
+setting the replacement URL. And it can only change the URL — not headers, not
+the body, not the cache policy — so returning a failure means "no rewrite", not
+"fail this request".
 
-* It must be thread-safe and return quickly.
-* It replaces only the URL — headers, bodies, and cache policy stay untouched.
-* It must not call back into the API (except the URL setter at the C level).
-* A failure or empty result keeps the original URL; it never fails the request.
+The subtlety worth pausing on: a style can name sprites, glyphs, and tiles on
+origins you do not control, and your transform runs for those too. Match the
+host you own before adding a credential to it.
 
-A style may reference sprites, glyphs, and tiles on origins you do not control,
-and the transform runs for those requests too. Gate any credential on an
-explicit allowlist of trusted hosts, as the examples below do, so the key
-reaches only the host it belongs to.
+<Code code={resourceTransform} lang="c" title="resource-transform.c" />
 
-Transforms apply to MapLibre's online file source (including nested PMTiles
-range requests), not to `file`, `asset`, `mbtiles`, or provider-intercepted
-requests.
+Transforms apply to MapLibre's online file source, including nested PMTiles
+range requests. They do not apply to `file`, `asset`, or `mbtiles` URLs, or to
+requests a provider already intercepted.
 
-```c
-static const char trusted_prefix[] = "https://tiles.example.com/";
-
-mln_status add_api_key(void* user_data, uint32_t kind, const char* url,
-                       mln_resource_transform_response* out_response) {
-  (void)user_data; (void)kind;
-  // Runs for every origin the style references, so only the intended host
-  // sees the key. Leaving url null keeps the request URL unchanged.
-  if (strncmp(url, trusted_prefix, sizeof(trusted_prefix) - 1) != 0) {
-    out_response->url = NULL;
-    return MLN_STATUS_OK;
-  }
-  char rewritten[1024];
-  const int written =
-      snprintf(rewritten, sizeof(rewritten), "%s?key=%s", url, API_KEY);
-  if (written < 0 || (size_t)written >= sizeof(rewritten)) {
-    // Truncation would fetch a corrupted address; keep the original URL.
-    out_response->url = NULL;
-    return MLN_STATUS_OK;
-  }
-  return mln_resource_transform_response_set_url(
-      out_response, rewritten, (size_t)written);
-}
-
-mln_resource_transform transform = {
-    .size = sizeof(transform), .callback = add_api_key, .user_data = NULL};
-mln_runtime_set_resource_transform(runtime, &transform);
-// ... later: mln_runtime_clear_resource_transform(runtime);
-```
-
-## Resource providers
+## Serving requests yourself
 
 A resource provider intercepts network requests outright and answers them from
-host code — for serving custom URL schemes, reading from app storage, or
-plugging in your own HTTP stack. Register it **before creating any map** from
-the runtime.
+your code — for custom URL schemes, app storage, or your own HTTP stack. It has
+to be registered **before any map is created** from the runtime.
 
-The callback runs synchronously on a native network thread and returns a
-decision:
+The callback runs synchronously on a network thread and returns one of two
+decisions. *Pass through* means MapLibre handles the request normally, and you
+touch nothing. *Handle* means you own that request: complete it with a response
+— inline or later, from any thread — and then release it exactly once.
+Completion is one-shot, response bytes are copied before it returns, and a
+long-running fetch should check whether the request was cancelled before
+bothering to finish.
 
-* **Pass through** — MapLibre's online file source handles the request
-  normally. The request handle dies with the callback; release nothing.
-* **Handle** — you own the request handle. Complete it with
-  `complete(response)` — inline or later, from any thread — then `release()` it
-  exactly once. Completion is one-shot, and the response bytes are copied
-  before `complete` returns. Check `cancelled()` before completing long work;
-  MapLibre cancels requests it stops waiting for.
+Built-in schemes (`file`, `asset`, `mbtiles`, `pmtiles`) are resolved before
+your provider sees them. Everything else reaches it, including invented schemes
+like `custom://style.json` — which, if you pass them through, become HTTP
+requests and fail. Serving those is exactly what the provider is for.
 
-Built-in schemes (`file`, `asset`, `mbtiles`, `pmtiles`) resolve before this
-extension point. Everything else — including custom schemes like
-`custom://style.json` — reaches the provider, and passes through to become an
-HTTP request (usually a failed one) when you decline it.
-
-```c
-uint32_t serve_custom_scheme(void* user_data,
-                             const mln_resource_request* request,
-                             mln_resource_request_handle* handle) {
-  (void)user_data;
-  if (strncmp(request->url, "custom://", 9) != 0)
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
-
-  mln_resource_response response = {.size = sizeof(response)};
-  response.status = MLN_RESOURCE_RESPONSE_STATUS_OK;
-  response.bytes = style_json_bytes;
-  response.byte_count = style_json_size;
-  mln_resource_request_complete(handle, &response);
-  mln_resource_request_release(handle);
-  return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
-}
-
-// Before creating any map:
-mln_resource_provider provider = {
-    .size = sizeof(provider), .callback = serve_custom_scheme, .user_data = NULL};
-mln_runtime_set_resource_provider(runtime, &provider);
-```
+<Aside>
+  The provider callback and its `user_data` are held by reference for as long as
+  the runtime lives. Keep them alive that long — not just until registration
+  returns, and not just until your last map closes.
+</Aside>
 
 ## Process-global switches
 
-Two settings apply to the whole process rather than a runtime:
+Two settings are per-process rather than per-runtime.
 
-* **Network status** — `network_status_set(ONLINE/OFFLINE)` toggles whether
-  the online file source starts requests. Flipping offline stops new network
-  work until reachability returns; runtime-scoped configuration is unaffected.
-  Drive it from your platform's connectivity monitor.
-* **Logging** — `log_set_callback` installs the process-global log sink. The
-  callback may run on logging or worker threads while holding internal locks:
-  keep it thread-safe, fast, and free of calls back into the API. Return
-  "consumed" to suppress the platform logger. The async severity mask controls
-  which severities may be dispatched asynchronously (errors are synchronous by
-  default).
+**Network status.** `mln_network_status_set()` toggles whether the online file
+source starts requests at all. Going offline stops new network work until
+reachability returns. Drive it from your platform's connectivity monitor.
+
+**Logging.** `mln_log_set_callback()` installs the process-global log sink. It
+can be called on logging or worker threads while internal locks are held, so
+keep it thread-safe, fast, and free of calls back into the API. Return
+"consumed" to suppress the platform logger.
 
 <Aside>
-  Python's log API differs by necessity: `set_log_callback` installs a bounded
-  queue and you poll records from a `LogReceiver` instead of receiving a direct
-  callback, which keeps user code off native logging threads.
+  Python's binding does this differently out of necessity: `set_log_callback`
+  fills a bounded queue you poll from a `LogReceiver`, which keeps Python code
+  off native logging threads entirely.
 </Aside>
 
-On Android, call `mln_android_init` (Kotlin: `MaplibreAndroid.initialize(context)`)
-once at startup so HTTPS requests validate TLS with the platform trust store.
+On Android, call `mln_android_init` (`MaplibreAndroid.initialize(context)` from
+Kotlin) once at startup, or HTTPS requests cannot validate TLS against the
+platform trust store.

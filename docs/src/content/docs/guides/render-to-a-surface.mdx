@@ -1,136 +1,108 @@
 ---
 title: Render to a Surface
-description: Render and present through native surfaces.
+description: Draw into a window and present, driven by a host frame loop.
 sidebar:
   order: 3
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import attachSurface from "../../../../snippets/c/attach-opengl-surface.c?raw";
+import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
 
-A surface render session renders a map into a host-provided native surface and
-presents through it. This is the integration for windows, views, and platform
-surfaces: the host owns the window toolkit and the graphics context, and the
-session draws into them.
+A surface session draws the map into a native surface your window toolkit owns,
+and presents through it. This is the path for applications: you own the window,
+you own the graphics context, and MapLibre draws into them.
 
-## The surface contract
+## What you hand over
 
-A map has at most one live render session. You create a session by attaching a
-surface descriptor to the map with a backend-specific attach function; the
-backend is fixed by the native artifact you installed. All session calls run on
-the map owner thread.
+You do not give MapLibre a window. You give it the low-level surface handle your
+toolkit already produced, which depends on the render backend your artifact was
+built with:
 
-The surface handle the descriptor carries depends on the backend:
+| Backend      | You supply      | Presented with       |
+| ------------ | --------------- | -------------------- |
+| Metal        | `CAMetalLayer*` | The layer's drawable |
+| Vulkan       | `VkSurfaceKHR`  | A swapchain          |
+| OpenGL (EGL) | `EGLSurface`    | `eglSwapBuffers`     |
+| OpenGL (WGL) | `HDC`           | `SwapBuffers`        |
 
-| Backend      | Descriptor field | Actual type                | Presented by     |
-| ------------ | ---------------- | -------------------------- | ---------------- |
-| Metal        | `layer`          | `CAMetalLayer*` (retained) | Layer drawable   |
-| Vulkan       | `surface`        | `VkSurfaceKHR`             | Swapchain        |
-| OpenGL (EGL) | `surface`        | `EGLSurface`               | `eglSwapBuffers` |
-| OpenGL (WGL) | `surface`        | `HDC`                      | `SwapBuffers`    |
+Getting that handle is the platform's job, not MapLibre's: wrap an
+`ANativeWindow*` in an `EGLSurface` or `VkSurfaceKHR` on Android, create one
+from your X11 or Wayland window on Linux, take the window's `HDC` on Windows,
+hand over the view's `CAMetalLayer` on Apple platforms.
 
-The API works with these ready-made handles rather than toolkit objects, so the
-host creates them first: on Android, wrap an `ANativeWindow*` in an
-`EGLSurface` or a `VkSurfaceKHR`; on Linux, create an `EGLSurface` or
-`VkSurfaceKHR` from your X11/Wayland window; on Windows, use the window's
-`HDC`; on Apple platforms, hand over the view's `CAMetalLayer`.
+Along with the surface you supply a **context** — the backend objects the
+session shares with your application, so the map's textures and buffers live in
+the same world as yours. A Metal device; a Vulkan instance, device, and graphics
+queue; an EGL or WGL share context. The session joins that share group rather
+than taking it over.
 
-The descriptor also carries a **context** — the backend objects the session
-shares with your application (Metal device; Vulkan instance, device, and
-graphics queue; an EGL or WGL share context). The descriptor's extent is the
-logical viewport size in UI pixels plus the UI-to-device scale factor.
+Finally the descriptor carries an **extent**: the logical size in UI pixels plus
+the scale factor. Attaching replaces whatever size the map was created with.
+
+<Code code={attachSurface} lang="c" title="attach-opengl-surface.c" />
+
+<Aside>
+  Ownership differs a little by backend. Metal sessions retain the layer and
+  device you pass, so you can release your own references afterward. Vulkan and
+  OpenGL handles are borrowed — keep them alive until you detach or destroy the
+  session. The [C API reference](/maplibre-native-ffi/reference/c/) states this
+  per attach function.
+</Aside>
 
 ## Drive the frame loop
 
-Rendering is pull-based and host-paced. Each frame:
+Rendering is pull-based. MapLibre never draws on its own; it tells you it has
+something to draw and waits for you to ask for it. Each turn of your loop:
 
-1. Pump the runtime (`run_once`) and drain events.
-2. When `MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE` arrives for your map,
-   mark rendering as pending.
-3. When pending, call `mln_render_session_render_update()`. Surface sessions
-   render **and present** in this call. The call reports whether it produced a
-   frame; `false` at startup is normal (the map has not published an update
-   yet) — keep pumping and retry.
+1. Pump the runtime and drain its events.
+2. `MAP_RENDER_UPDATE_AVAILABLE` for your map means new content is ready — mark
+   a frame as pending.
+3. If a frame is pending, call `mln_render_session_render_update()`. For a
+   surface session this renders *and* presents.
 
-`MAP_RENDER_FRAME_FINISHED` events carry a `needs_repaint` flag; keep rendering
-while it is set to let animations and symbol placement settle.
+Two details make the difference between a map that settles and one that stalls.
+A render call reports whether it actually produced a frame; `false` early on is
+normal, because the map has not published its first update yet — stay pending
+and try again. And finished-frame events carry a `needs_repaint` flag, which is
+how camera animations and label placement ask for the next frame. Ignore it and
+animations freeze partway.
 
-Pace the loop with the display where you can: vsync callbacks
-(`CADisplayLink`, Android's `Choreographer`), or your toolkit's frame callback.
-The example apps poll with a short sleep, which is simplest but burns cycles.
+<Code code={frameLoop} lang="c" title="frame-loop.c" />
 
-```c
-// Attach: layer is a CAMetalLayer*, VkSurfaceKHR, EGLSurface, or HDC
-// obtained from the host window toolkit.
-mln_opengl_surface_descriptor desc = mln_opengl_surface_descriptor_default();
-desc.extent = (mln_render_target_extent){
-    .size = sizeof(mln_render_target_extent),
-    .width = logical_width, .height = logical_height,
-    .scale_factor = scale_factor,
-};
-desc.context.data.egl.display = egl_display;      // borrowed
-desc.context.data.egl.config = egl_config;        // borrowed
-desc.context.data.egl.share_context = egl_ctx;    // borrowed
-desc.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
-desc.surface = egl_surface;                       // borrowed
+What paces the loop is up to you. Prefer the display where you can —
+`CADisplayLink`, Android's `Choreographer`, your toolkit's frame callback. The
+example apps poll with a short sleep, which is simple and burns CPU.
 
-mln_render_session* session = NULL;
-mln_opengl_surface_attach(map, &desc, &session);
-bool pending = false;
-
-// Per frame, on the map owner thread:
-mln_runtime_run_once(runtime);
-mln_runtime_event event = {.size = sizeof(event)};
-bool has_event = false;
-while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-       has_event) {
-  if (event.source != map) continue;
-  if (event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
-    pending = true;
-  } else if (
-      event.type == MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED &&
-      event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME &&
-      event.payload_size >= sizeof(mln_runtime_event_render_frame) &&
-      ((const mln_runtime_event_render_frame*)event.payload)->needs_repaint) {
-    pending = true;
-  }
-}
-if (pending) {
-  bool rendered = false;
-  mln_render_session_render_update(session, &rendered);
-  pending = !rendered;
-}
-```
-
-## Resize with the host surface
+## Resize
 
 When the window changes size, call `mln_render_session_resize()` with the new
-logical size and scale factor, then request a repaint. Resize rebuilds the
-renderer on the next render update; map state (camera, style, sources)
-survives, but renderer-held state such as feature state does not.
+logical size and scale factor, then render again. The camera, style, and sources
+live on the map and survive; renderer-held state such as feature state does not,
+so reapply it afterward.
 
-A scale factor differing from the map's original `scale_factor` logs a warning —
-plan the map's scale factor around the displays you target.
+A scale factor that disagrees with the map's own logs a warning and renders
+imagery chosen for the map's density. Pick the map's `scale_factor` for the
+displays you actually target.
 
-## Follow the surface lifecycle
+## Follow the surface's life
 
-The session borrows the surface handle and context objects; they must stay
-valid until detach or destroy. When the platform destroys the surface (window
-closed, Android `surfaceDestroyed`, view detached):
+Surfaces come and go — the user closes the window, Android reports
+`surfaceDestroyed`, a view detaches. When the surface goes away:
 
-1. Call `mln_render_session_detach()` to release the map slot, then destroy the
-   old handle, or call `mln_render_session_destroy()` directly. A detached
-   handle remains live only for destruction; it cannot render or be reattached.
-2. Release the host surface and context.
-3. When a new surface arrives, attach a fresh session — the same map continues
-   with its camera and style intact.
+1. Destroy the session with `mln_render_session_destroy()`, or release the map's
+   slot with `mln_render_session_detach()` and destroy the handle after. A
+   detached handle is finished: it cannot render, and it cannot be reattached.
+2. Release your surface and context.
+3. When a new surface arrives, attach a fresh session. The map kept its camera
+   and style the whole time.
 
 <Aside type="tip">
-  On Android, call `MaplibreAndroid.initialize(context)` once before any
-  network activity, create the session from `surfaceCreated`/`surfaceChanged`,
-  destroy it from `surfaceDestroyed`, and pace the loop with `Choreographer`.
-  The `android-map` example shows the full pattern.
+  On Android, create the session from `surfaceCreated`/`surfaceChanged`, destroy
+  it from `surfaceDestroyed`, and pace with `Choreographer`. Call
+  `MaplibreAndroid.initialize(context)` once at startup first, or HTTPS requests
+  cannot validate against the platform trust store.
 </Aside>
 
-The full working versions of these loops, for every backend, live in the
-example apps: `zig-map`, `rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`,
-and `android-map`.
+Complete working loops for each backend live in the example apps: `zig-map`,
+`rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`, and `android-map`.

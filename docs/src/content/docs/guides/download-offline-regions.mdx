@@ -1,176 +1,94 @@
 ---
 title: Download Offline Regions
-description: Create, observe, update, and delete offline regions.
+description: Pre-download an area so the map works without a network.
 sidebar:
   order: 9
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
 
-Offline regions download the resources a style needs for an area ahead of time,
-so the map works without a network. Regions live in the runtime's cache
-database — pass a real `cache_path` in the runtime options for them to persist;
-`":memory:"` keeps them only as long as the database.
+An offline region downloads everything a style needs for an area ahead of time,
+so the map keeps working with no network. Regions live in the runtime's cache
+database, which means `cache_path` has to be a real filesystem path — with
+`":memory:"` they last exactly as long as the process.
 
-## The async operation pattern
+## Every offline call is asynchronous, the same way
 
-Every offline API is asynchronous and follows the same shape:
+This is the one pattern to learn; every operation follows it.
 
-1. A `..._start` call (bindings: `startCreateOfflineRegion`,
-   `start_offline_regions`, etc.) accepts the request and returns an operation
-   ID or handle.
-2. You keep pumping the runtime. Completion arrives as an
-   `OFFLINE_OPERATION_COMPLETED` event carrying the operation ID, the operation
-   kind, the result kind, and a result status.
-3. A matching `..._take_result` call consumes the stored result. On failure the
-   operation stays live so you can retry the take or `discard` it.
+1. Call a `..._start` function. It validates and returns an **operation ID**.
+2. Keep pumping the runtime. Completion arrives as an
+   `OFFLINE_OPERATION_COMPLETED` event carrying that ID, what kind of operation
+   it was, and its own result status — separate from the status that starting it
+   returned.
+3. Take the result with the matching `..._take_result` function, if the
+   operation produces one.
 
-Operations with no payload (delete, invalidate, set download state, set
-observed, ambient cache) complete through the event alone and have no take
-call. After matching the completion event, explicitly discard or close their
-operation ID or handle.
-
-<Aside>
-  The handle shapes differ per binding: Kotlin and Go type the handle by its
-  result (`OfflineOperationHandle<OfflineRegionInfo>`), Rust consumes it with a
-  typed `take()`, Swift passes bare operation IDs, and Python/.NET validate the
-  kind at take time. The event flow is identical everywhere.
-</Aside>
+Operations that produce no result — delete, invalidate, set download state, set
+observed, ambient cache maintenance — finish at step 2. Either way the operation
+holds runtime state until it is consumed or discarded, so discard the ones you
+do not take. A failed take deliberately leaves the operation alive so you can
+retry it; discard it when you give up.
 
 ## Create a region
 
-Two definition types exist:
+Two kinds of definition:
 
-* **Tile pyramid** — everything a style URL needs inside a bounding box between
-  `min_zoom` and `max_zoom`, at a given pixel ratio. An infinite `max_zoom`
-  asks for each source's own maximum.
-* **Geometry** — the tiles covering an arbitrary geometry (a route corridor,
-  say) across a zoom range.
+* **Tile pyramid** — everything inside a bounding box, between a min and max
+  zoom, at a given pixel ratio. An infinite max zoom means "each source's own
+  maximum".
+* **Geometry** — the tiles covering an arbitrary geometry, such as a route
+  corridor, across a zoom range.
 
-Creation takes optional **metadata** — opaque bytes stored with the region and
-returned on every later inspection. Hosts typically stash a name or a JSON blob
-there.
+Creation also takes **metadata**: opaque bytes stored with the region and handed
+back on every later inspection. A name, or a JSON blob, usually.
 
-```c
-mln_offline_region_definition definition = {
-    .size = sizeof(definition),
-    .type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-    .data.tile_pyramid = {
-        .size = sizeof(mln_offline_tile_pyramid_region_definition),
-        .style_url = "https://tiles.openfreemap.org/styles/bright",
-        .bounds = {.southwest = {37.6, -122.6}, .northeast = {37.9, -122.3}},
-        .min_zoom = 10.0,
-        .max_zoom = 14.0,
-        .pixel_ratio = 2.0f,
-        .include_ideographs = true,
-    },
-};
+A new region is inactive and silent. Mark it observed to get progress events,
+then set its download state to active to start the work.
 
-const char* metadata = "{\"name\":\"San Francisco\"}";
-mln_offline_operation_id operation = 0;
-mln_runtime_offline_region_create_start(
-    runtime, &definition, (const uint8_t*)metadata, strlen(metadata), &operation);
-```
+<Code code={offlineRegion} lang="c" title="offline-region.c" />
 
-## Drive and observe the download
+## Watch it download
 
-A new region starts inactive. Mark it observed, then activate the download:
+Three events report on a region being observed:
 
-1. `set_observed(region_id, true)` — the region reports status through events.
-2. `set_download_state(region_id, ACTIVE)` — downloading begins; `INACTIVE`
-   pauses it.
+| Event                                      | Tells you                                                       |
+| ------------------------------------------ | --------------------------------------------------------------- |
+| `OFFLINE_REGION_STATUS_CHANGED`            | A status snapshot: resource and tile counts, sizes, done or not |
+| `OFFLINE_REGION_RESPONSE_ERROR`            | One resource failed, and why                                    |
+| `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region wants more tiles than the ceiling allows             |
 
-While it runs, three events track progress:
+<Aside type="caution">
+  Deriving a percentage from the status snapshot needs care: while MapLibre is
+  still discovering what the region contains, the required-resource count is an
+  estimate, and it is zero before discovery finds anything. Check that the count
+  is marked precise and non-zero before dividing by it, or your progress bar will
+  show `NaN` on the first event.
+</Aside>
 
-| Event                                      | Payload                                                                                                        |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
-| `OFFLINE_REGION_STATUS_CHANGED`            | Region ID plus a status snapshot: completed/required resource and tile counts and sizes, and a `complete` flag |
-| `OFFLINE_REGION_RESPONSE_ERROR`            | A resource failed, with the error reason (not found, server, connection, rate limit)                           |
-| `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region exceeded the tile ceiling; shrink its bounds or zoom range                                          |
+Exceeding the tile ceiling is not something you can raise through this API — the
+event reports the limit, and the fix is a smaller region: tighter bounds or a
+narrower zoom range.
 
-You can also poll: `get_status(region_id)` is an async operation whose result
-is the same status snapshot.
+## Manage what you have downloaded
 
-```c
-// Event loop sketch; every binding mirrors this flow.
-mln_runtime_run_once(runtime);
-mln_runtime_event event = {.size = sizeof(event)};
-bool has_event = false;
-while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-       has_event) {
-  if (event.type == MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED &&
-      event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS) {
-    const mln_runtime_event_offline_region_status* payload = event.payload;
-    const mln_offline_region_status status = payload->status;
-    // While discovery is still running the count is an estimate, and it is
-    // zero until the first resources are found, so guard the denominator
-    // rather than publishing NaN or infinity.
-    if (status.required_resource_count_is_precise &&
-        status.required_resource_count > 0) {
-      progress = (double)status.completed_resource_count /
-                 (double)status.required_resource_count;
-    }
-    if (status.complete) on_downloaded(payload->region_id);
-  } else if (event.type == MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED &&
-             event.payload_type ==
-                 MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED) {
-    const mln_runtime_event_offline_operation_completed* payload =
-        event.payload;
-    if (payload->result_status != MLN_STATUS_OK) {
-      on_operation_failed(payload->operation_id);
-    }
-  }
-}
-```
+* `list` — every region in the database, with definitions and metadata.
+* `get` — one region; the completion event's `found` flag says whether it exists.
+* `update_metadata` — replace the stored bytes.
+* `merge_database` — import regions from a side database, such as one you
+  shipped with the app.
+* `invalidate` — mark a region's resources stale so their next use revalidates
+  against the server. This frees no space: the bytes stay and get reused when
+  revalidation succeeds.
+* `delete` — remove the region and its resources.
 
-## Inspect, update, and clean up
+Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE` and
+`CLEAR` act on ambient cached resources and leave offline regions alone, and
+`PACK_DATABASE` compacts the file.
 
-* `list()` — every region in the database, with definition and metadata.
-* `get(region_id)` — one region; the completion event's `found` flag reports
-  existence.
-* `update_metadata(region_id, metadata)` — replace the stored bytes.
-* `merge_database(path)` — import regions from a side database (for example,
-  one bundled with the app); the result lists the merged regions.
-* `invalidate(region_id)` — mark the region's cached resources stale so the
-  next use revalidates them against the server. This reclaims no storage:
-  the bytes stay and are reused when revalidation succeeds.
-* `delete(region_id)` — remove the region and its resources.
-
-Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE`
-and `CLEAR` operate on ambient resources without removing offline regions, and
-`PACK_DATABASE` compacts the shared database. `RESET_DATABASE` deletes and
-recreates that shared database, including all offline-region records and cached
-resources.
-
-A minimal create-and-confirm flow:
-
-```c
-mln_offline_operation_id create_id = 0;
-mln_runtime_offline_region_create_start(runtime, &definition, metadata,
-                                        metadata_size, &create_id);
-// pump until MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED arrives for
-// create_id ...
-mln_offline_region_snapshot* region = NULL;
-if (mln_runtime_offline_region_create_take_result(runtime, create_id,
-                                                  &region) != MLN_STATUS_OK) {
-  // A failed take leaves the operation live, so release it.
-  mln_runtime_offline_operation_discard(runtime, create_id);
-  return;
-}
-mln_offline_region_info info = {.size = sizeof(info)};
-mln_offline_region_snapshot_get(region, &info);
-
-mln_offline_operation_id observed_id = 0;
-mln_runtime_offline_region_set_observed_start(runtime, info.id, true,
-                                              &observed_id);
-// pump until completion arrives for observed_id ...
-mln_runtime_offline_operation_discard(runtime, observed_id);
-
-mln_offline_operation_id download_id = 0;
-mln_runtime_offline_region_set_download_state_start(
-    runtime, info.id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download_id);
-// pump until completion arrives for download_id ...
-mln_runtime_offline_operation_discard(runtime, download_id);
-// ... then watch status-changed events until status.complete ...
-mln_offline_region_snapshot_destroy(region);
-```
+<Aside type="danger">
+  `RESET_DATABASE` is different in kind: it deletes and recreates the whole
+  shared database, so downloaded regions go with it. It is not a bigger cache
+  clear.
+</Aside>

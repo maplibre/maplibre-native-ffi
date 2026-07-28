@@ -1,235 +1,96 @@
 ---
 title: Installation
-description: Install MapLibre Native FFI and its language bindings.
+description: Get the native library and point a project at it.
 sidebar:
   order: 1
 ---
 
-import { Aside, Tabs, TabItem } from "@astrojs/starlight/components";
+import { Aside } from "@astrojs/starlight/components";
 
 <Aside type="caution">
-  MapLibre Native FFI is pre-1.0. The C ABI is unstable while
-  `mln_c_version()` returns `0`, and artifacts ship as snapshots rather than
-  stable releases. Expect breaking changes between snapshots.
+  Nothing here is released yet. Native artifacts ship as snapshots that are
+  rebuilt and force-moved on every push to `main`, and the C ABI is unstable
+  while `mln_c_version()` returns `0`. Pin nothing; expect breakage.
 </Aside>
 
-Every integration needs two pieces: the **native library** (`maplibre-native-c`,
-the C API implementation) and, unless you call C directly, a **language
-binding** that wraps it. Each native artifact is compiled for one platform and
-one render backend, so pick the artifact that matches your target.
+An integration needs the **native library** — the C API implementation — and,
+unless you are calling C directly, a **language binding** that wraps it. The
+native library is compiled per platform and per render backend, so you pick the
+artifact matching your target rather than a single universal build.
 
 ## Get the native library
 
-### Download a prebuilt package
+CI publishes CPack archives to the floating
+[`unstable-native-snapshot`](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot)
+prerelease, named `maplibre-native-c-<preset>.tar.gz` alongside a `SHA256SUMS`
+manifest. Presets are `<os>-<arch>-<backend>`:
 
-CI publishes CPack archives to the floating `unstable-native-snapshot`
-[GitHub prerelease](https://github.com/maplibre/maplibre-native-ffi/releases/tag/unstable-native-snapshot),
-named `maplibre-native-c-<preset>.tar.gz` with a `SHA256SUMS` manifest. Presets
-follow the pattern `<os>-<arch>-<backend>`:
+| Platform | Presets                                                                              |
+| -------- | ------------------------------------------------------------------------------------ |
+| Linux    | `linux-x64-egl`, `linux-x64-vulkan`, `linux-arm64-egl`, `linux-arm64-vulkan`         |
+| macOS    | `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`                         |
+| Windows  | `windows-x64-wgl`, `windows-x64-vulkan`, `windows-arm64-wgl`, `windows-arm64-vulkan` |
+| Android  | `android-arm64-egl`, `android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan` |
+| iOS      | `ios-arm64-metal`, `ios-simulator-arm64-metal`                                       |
 
-| Preset family          | Presets                                                                              |
-| ---------------------- | ------------------------------------------------------------------------------------ |
-| Linux x64 / arm64      | `linux-x64-egl`, `linux-x64-vulkan`, `linux-arm64-egl`, `linux-arm64-vulkan`         |
-| macOS arm64            | `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`                         |
-| Windows x64 / arm64    | `windows-x64-wgl`, `windows-x64-vulkan`, `windows-arm64-wgl`, `windows-arm64-vulkan` |
-| Android arm64 / x64    | `android-arm64-egl`, `android-arm64-vulkan`, `android-x64-egl`, `android-x64-vulkan` |
-| iOS device / simulator | `ios-arm64-metal`, `ios-simulator-arm64-metal`                                       |
+`egl` and `wgl` both mean the OpenGL backend; the suffix names the context
+provider it uses. The OpenHarmony presets (`ohos-arm64-egl`,
+`ohos-arm64-vulkan`) build but are not published, so build those from source.
 
-`egl` and `wgl` are both the OpenGL backend; the suffix selects the context
-provider (EGL everywhere except Windows, WGL on Windows, ANGLE on macOS).
+An unpacked archive holds the umbrella header `maplibre_native_c.h` and its
+domain headers under `include/`, the library under `lib/` (`bin/` on Windows), a
+pkg-config descriptor under `share/pkgconfig/`, and
+`share/maplibre-native-c/artifact.json` recording which backend and platform the
+artifact was built for.
 
-An unpacked archive has this layout:
+### Or build it yourself
 
-```text
-include/maplibre_native_c.h          # umbrella header
-include/maplibre_native_c/*.h        # domain headers
-lib/                                 # shared or static library (bin/ on Windows)
-share/pkgconfig/maplibre-native-c.pc # pkg-config descriptor
-share/maplibre-native-c/artifact.json# renderBackend / targetPlatform metadata
-```
-
-### Build from source
-
-The repository builds with CMake presets driven by
-[mise](https://mise.jdx.dev):
+The repository builds with CMake presets driven by [mise](https://mise.jdx.dev):
 
 ```bash
-mise bootstrap --yes                 # system packages, tools, hooks
-mise run build                       # host library for this machine
-mise run build linux-x64-vulkan      # a specific preset
-mise run package-native linux-x64-vulkan  # produce the .tar.gz archive
+mise bootstrap --yes            # system packages, tools, hooks
+mise run build                  # host library for this machine
+mise run build linux-x64-vulkan # a specific preset
 ```
 
-The install tree lands in `build/<preset>/install` and matches the archive
-layout above.
+The install tree lands in `build/<preset>/install` with the same layout as the
+archive.
 
-The OpenHarmony presets `ohos-arm64-egl` and `ohos-arm64-vulkan` build here but
-are not published as prebuilt archives, so build them from source.
+## Point a C project at it
 
-## Consume from C or C++
-
-The public header requires C23. The archive installs a pkg-config descriptor;
-there is no CMake package config. Point `PKG_CONFIG_PATH` at the install prefix
-and compile against it:
+The public headers target **C23**, and the archive ships pkg-config rather than
+a CMake package config:
 
 ```bash
 export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
 cc -std=c23 main.c $(pkg-config --cflags --libs maplibre-native-c) -o main
 ```
 
-Static archives additionally define `-DMLN_STATIC` via the descriptor, so the
-same command works for both linkage modes.
+Static archives define `-DMLN_STATIC` through the same descriptor, so one
+command covers both linkage modes. On Windows the runtime DLL lives in the
+prefix's `bin/`, which is not on the search path by default — add it to `PATH`
+or copy the DLL next to your executable.
 
-## Consume from a language binding
-
-<Tabs syncKey="lang">
-  <TabItem label="Kotlin">
-    Add the snapshot repository and two dependencies: the binding plus one runtime
-    artifact per render backend.
-
-    ```kotlin
-    // settings.gradle.kts
-    dependencyResolutionManagement {
-      repositories {
-        maven {
-          url = uri("https://central.sonatype.com/repository/maven-snapshots/")
-          content { includeGroup("org.maplibre.nativeffi") }
-        }
-      }
-    }
-
-    // build.gradle.kts
-    dependencies {
-      implementation("org.maplibre.nativeffi:maplibre-native-ffi:0.1.0-SNAPSHOT")
-      implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:0.1.0-SNAPSHOT")
-      // or ...-runtime-vulkan, or ...-runtime-metal on Apple targets
-    }
-    ```
-
-    The runtime artifacts carry the native library: Android AARs bundle JNI libs
-    per ABI, Apple KLIBs embed the static archive, and JVM artifacts resolve a
-    `natives-<os>-<arch>` classifier JAR
-    (`natives-linux-x64`, `natives-linux-arm64`, `natives-macos-arm64`,
-    `natives-windows-x64`, `natives-windows-arm64`) that the binding extracts and
-    loads. Override loading with the system properties
-    `org.maplibre.nativeffi.library.path` or `org.maplibre.nativeffi.library.dirs`.
-
-    On the JVM, run with Java 25+ and pass `--enable-native-access=ALL-UNNAMED`. On
-    Android, call `MaplibreAndroid.initialize(context)` once at startup so network
-    requests can validate TLS with the platform trust store.
-  </TabItem>
-
-  <TabItem label="Rust">
-    The crates are not yet on crates.io; depend on them by path or git, and point
-    the build at a native install prefix.
-
-    ```toml
-    # Cargo.toml
-    [dependencies]
-    maplibre-native = { git = "https://github.com/maplibre/maplibre-native-ffi", ... }
-    ```
-
-    ```bash
-    export MAPLIBRE_NATIVE_C_INSTALL_DIR=/opt/maplibre-native-c
-    cargo build
-    ```
-
-    `maplibre-native-sys` links `-lmaplibre-native-c` from the prefix's `lib/`
-    directory and sets an rpath to the runtime library on Unix. On Windows, add
-    the prefix's `bin/` directory to `PATH` before running the executable, or
-    copy `maplibre-native-c.dll` beside it.
-  </TabItem>
-
-  <TabItem label="Swift">
-    Depend on the SwiftPM package and make the native install discoverable through
-    pkg-config.
-
-    The manifest lives under `bindings/swift/`, not at the repository root, so a
-    source-control dependency on the repository URL does not resolve. Clone the
-    repository and depend on that directory by path:
-
-    ```swift
-    // Package.swift
-    .package(path: "../maplibre-native-ffi/bindings/swift"),
-    // target dependency: .product(name: "MaplibreNative", package: "swift")
-    ```
-
-    ```bash
-    export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
-    swift build
-    ```
-
-    The package requires macOS 14.3+ or iOS 14.3+.
-  </TabItem>
-
-  <TabItem label="Zig">
-    Add the `maplibre_native` package to `build.zig.zon` and pass the native
-    install prefix as a build option.
-
-    ```bash
-    zig build -Dnative-install-dir=/opt/maplibre-native-c
-    ```
-
-    The package reads `share/maplibre-native-c/artifact.json` from the prefix to
-    select matching link settings for the artifact's backend and target.
-  </TabItem>
-
-  <TabItem label="C#">
-    The `Maplibre.Native` package (`net10.0`) is not yet on NuGet; reference the
-    project or build it from the repository. The native library resolves at
-    runtime, in order:
-
-    1. an explicit `Maplibre.LoadNativeLibrary(path)` call,
-    2. the path set with
-       `AppContext.SetData("Maplibre.Native.LibraryPath", path)`,
-    3. the `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` environment variable,
-    4. the OS library search path for `maplibre-native-c`.
-  </TabItem>
-
-  <TabItem label="Python">
-    The `maplibre-native` package (Python 3.14+) is built with maturin and is not
-    yet on PyPI.
-
-    ```bash
-    export MAPLIBRE_NATIVE_C_INSTALL_DIR=/opt/maplibre-native-c
-    maturin develop --manifest-path bindings/python/Cargo.toml
-    ```
-  </TabItem>
-
-  <TabItem label="Go">
-    The binding is a plain Go module consumed with `go get`; cgo finds the native
-    library through pkg-config.
-
-    ```bash
-    go get github.com/maplibre/maplibre-native-ffi/bindings/go@main
-    export PKG_CONFIG_PATH=/opt/maplibre-native-c/share/pkgconfig
-    ```
-
-    pkg-config supplies the link flags only. On Windows, add the prefix's `bin/`
-    directory to `PATH` before running the executable, or copy
-    `maplibre-native-c.dll` beside it.
-  </TabItem>
-</Tabs>
-
-## Verify the install
-
-Load the library and ask it what it supports. `mln_c_version()` reports the ABI
-contract version (`0` while unstable), and the backend mask reports which
-render backends the artifact was compiled with.
+To confirm a working install, ask the library what it is:
 
 ```c
-#include <maplibre_native_c.h>
-#include <stdio.h>
-
-int main(void) {
-  printf("ABI version: %u\n", mln_c_version());
-  uint32_t mask = mln_supported_render_backend_mask();
-  printf("OpenGL: %d, Vulkan: %d, Metal: %d\n",
-         !!(mask & MLN_RENDER_BACKEND_FLAG_OPENGL),
-         !!(mask & MLN_RENDER_BACKEND_FLAG_VULKAN),
-         !!(mask & MLN_RENDER_BACKEND_FLAG_METAL));
-  return 0;
-}
+printf("ABI version: %u\n", mln_c_version());
+printf("backends: %#x\n", mln_supported_render_backend_mask());
 ```
+
+## Language bindings
+
+Bindings live under `bindings/` — Kotlin, Rust, Swift, Zig, .NET, Python, and
+Go. Only the Kotlin artifacts are published anywhere today, as
+`org.maplibre.nativeffi` snapshots on
+[Maven Central's snapshot repository](https://central.sonatype.com/repository/maven-snapshots/org/maplibre/nativeffi/).
+For everything else, depend on the binding by path or git from a checkout and
+point its build at a native install prefix.
+
+Every binding wraps the same runtime, map, and render session model these guides
+describe, so read on in C and consult the
+[Rust](/maplibre-native-ffi/reference/rust/maplibre_native/) or
+[Zig](/maplibre-native-ffi/reference/zig/) API reference for the exact spelling
+in those languages.
 
 Next: [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).

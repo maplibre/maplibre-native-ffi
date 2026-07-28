@@ -39,20 +39,32 @@ run = [
 [tasks.install]
 run = "pnpm exec astro sync"
 
+# The guides embed these files verbatim, so a compiler decides whether a
+# documented snippet is valid rather than a reader or a review bot. Only the
+# public headers are needed, so this runs without building the library.
+[tasks."check-snippets"]
+description = "Syntax-check the C snippets the guides embed"
+dir = ".."
+run = '''
+for file in docs/snippets/c/*.c; do
+  "${CC:-cc}" -fsyntax-only -std=c23 -Wall -Wextra -Iinclude "$file" || exit 1
+done
+'''
+
 [tasks.dev]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run dev"
 
 [tasks.start]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run start"
 
 [tasks.build]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run build"
 
 [tasks.preview]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run preview"
 
 [tasks.astro]

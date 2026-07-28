@@ -1,136 +1,101 @@
 ---
 title: Add Data and Style at Runtime
-description: Add sources, layers, images, properties, filters, light, and feature state.
+description: Add sources, layers, images, and properties after the style loads.
 sidebar:
   order: 7
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import runtimeStyle from "../../../../snippets/c/runtime-style.c?raw";
 
-Everything the style document can express, the runtime API can mutate after
-the style loads. The API leans on the
+Anything a style document can express, you can also do at runtime. The API
+deliberately speaks
 [MapLibre Style Spec](https://maplibre.org/maplibre-style-spec/): sources and
-layers arrive as style-spec JSON, property and filter values are style-spec
-JSON (expressions included), so the surface stays in step with the
-specification across every source and layer type.
+layers go in as style-spec objects, property values and filters are style-spec
+values including expressions. Nothing here re-invents a typed styling API, which
+is why it stays in step with the spec across every layer type.
 
-Wait for `MAP_STYLE_LOADED` before mutating: the additions target the current
-style, and a style reload replaces them.
+Wait for `MAP_STYLE_LOADED` before mutating. Additions target the style that is
+loaded, and loading another one replaces them.
+
+## Passing style-spec values
+
+One thing differs from the web: values arrive as a **descriptor graph** rather
+than a JSON string. A `mln_json_value` is a tagged union — string, number, bool,
+array, object — that you build up in place, and the API copies it before
+returning.
+
+This is verbose in C by nature, and it is worth writing one helper that converts
+your host language's maps and lists into it. You will write your second `match`
+expression soon enough. Number types are meaningful: use the unsigned variant
+where the spec or an extension expects an unsigned value.
+
+<Code code={runtimeStyle} lang="c" title="runtime-style.c" />
 
 ## Sources
 
-The generic path is `add_style_source_json(source_id, source_json)` — any
-style-spec source object. Typed entry points exist where a source needs more
-than construction:
+`add_style_source_json` takes any style-spec source object and is the general
+path. Typed entry points exist where a source needs more than construction:
 
-* **GeoJSON** — `add_geojson_source_url` / `add_geojson_source_data`, with
-  matching `set_*` functions to swap the URL or data later. Data arrives as a
-  geometry/feature/feature-collection descriptor graph, not a JSON string.
-* **Vector, raster, raster-DEM** — `add_*_source_url` (TileJSON) or
-  `add_*_source_tiles` (explicit tile URL templates), with tile source options:
-  zoom range, attribution, scheme (XYZ/TMS), bounds, tile size, and tile
-  encoding (MVT/MLT for vector, Mapbox/Terrarium for raster-DEM).
-* **Image** — `add_image_source_url` / `add_image_source_image` with exactly
+* **GeoJSON** — `add_geojson_source_url` or `add_geojson_source_data`, each with
+  a matching `set_*` to swap in new data later. Note the add/set split: adding
+  an ID that already exists is an error, not an update. Inline data comes in as
+  geometry and feature descriptors rather than a JSON string.
+* **Vector, raster, raster-DEM** — `add_*_source_url` for TileJSON or
+  `add_*_source_tiles` for explicit tile URL templates, plus tile options: zoom
+  range, attribution, scheme, bounds, tile size, and encoding.
+* **Image** — `add_image_source_url` or `add_image_source_image`, with exactly
   four corner coordinates in top-left, top-right, bottom-right, bottom-left
-  order; setters update the URL, image, or coordinates in place.
-* **Custom geometry** — `add_custom_geometry_source` registers `fetch_tile`
-  and `cancel_tile` callbacks that run on native worker threads. Feed tiles
-  back with `set_custom_geometry_source_tile_data`, and poke the source with
-  the invalidate functions when your data changes. Those are thread-affine:
-  queue the call back to the map owner thread, because calling them from the
-  callback thread returns `MLN_STATUS_WRONG_THREAD` and leaves the tile
-  unpopulated. The callbacks must stay
-  valid until the source is removed, the style is replaced, or the map is
-  destroyed.
+  order.
+* **Custom geometry** — `add_custom_geometry_source` registers `fetch_tile` and
+  `cancel_tile` callbacks so you can generate tiles yourself.
 
-`remove_style_source` fails while a layer still uses the source — remove the
-layers first. `style_source_exists`, `get_style_source_type`,
-`list_style_source_ids`, and the attribution copy API inspect what is loaded.
+<Aside type="caution">
+  Custom geometry callbacks run on MapLibre's worker threads, not the map owner
+  thread. Feeding tile data back in is a thread-affine map call, so queue it to
+  the owner thread — calling it from the callback returns
+  `MLN_STATUS_WRONG_THREAD` and the tile stays empty.
+</Aside>
+
+Removing a source fails while a layer still references it; remove the layers
+first. `style_source_exists`, `get_style_source_type`, and
+`list_style_source_ids` inspect what is loaded.
 
 ## Layers
 
-The primary insertion path is `add_style_layer_json(layer_json,
-before_layer_id)` with any style-spec layer object (it must contain `id` and
-`type`). An empty `before_layer_id` appends on top; otherwise the layer inserts
-before that sibling. `move_style_layer` reorders later, `remove_style_layer`
-deletes, and `style_layer_exists` / `list_style_layer_ids` inspect.
+`add_style_layer_json` takes any style-spec layer object containing at least
+`id` and `type`, plus the ID to insert before — empty means "on top". Then
+`move_style_layer` reorders and `remove_style_layer` deletes.
 
-Three typed adders cover layers that need a surface beyond construction:
-
-* `add_hillshade_layer` and `add_color_relief_layer` validate that the source
-  is raster-DEM. Set the color-relief ramp afterwards with
-  `set_layer_property("color-relief-color", ...)`.
-* `add_location_indicator_layer` creates the user-location puck, driven by
-  per-frame setters: `set_location_indicator_location`,
-  `_bearing`, `_accuracy_radius`, and `_image_name`.
+Three typed adders exist for layers that need more than a JSON object.
+`add_hillshade_layer` and `add_color_relief_layer` check that their source is
+actually raster-DEM. `add_location_indicator_layer` builds the user-location
+puck, which is then driven per-frame by its own setters for location, bearing,
+accuracy radius, and image name — the one place a per-frame typed setter beats
+round-tripping JSON.
 
 ## Properties and filters
 
-`set_layer_property(layer_id, property_name, value)` sets any paint or layout
-property by its style-spec name, with style-spec JSON values — expressions
-arrive as JSON arrays like `["interpolate", ["linear"], ["zoom"], ...]`.
-`set_layer_filter` applies a style-spec filter; clearing passes null/absent.
-The matching getters return the current value, or an absent result for an
-undefined property.
+`set_layer_property` sets any paint or layout property by its style-spec name,
+taking a style-spec value. Expressions are just arrays:
+`["interpolate", ["linear"], ["zoom"], ...]`. `set_layer_filter` applies a
+filter, and clearing it means passing an absent value. Getters return the
+current value, or report absent for a property that was never set.
 
-```c
-#include <string.h>
+## Images
 
-static mln_string_view sv(const char* value) {
-  return (mln_string_view){.data = value, .size = strlen(value)};
-}
+`set_style_image` registers a bitmap the style can reference from `icon-image`,
+`fill-pattern`, and friends; calling it again with the same ID replaces the
+image. Pixels are premultiplied RGBA8 with an explicit stride. Options carry
+`pixel_ratio` — match it to the map's scale factor for crisp icons — and `sdf`
+for signed-distance-field icons that `icon-color` can tint.
 
-// Add a GeoJSON source and a circle layer styling it.
-mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url));
-
-const char* layer =
-    "{\"id\":\"cities\",\"type\":\"circle\",\"source\":\"cities\","
-    "\"paint\":{\"circle-radius\":6}}";
-mln_json_value layer_json = parse_json(layer); // your JSON -> mln_json_value
-mln_map_add_style_layer_json(map, &layer_json, sv("")); // empty = on top
-
-// Data-driven styling with an expression value.
-mln_json_value color = parse_json(
-    "[\"match\",[\"get\",\"capital\"],[\"yes\"],\"#e55e5e\",\"#3887be\"]");
-mln_map_set_layer_property(map, sv("cities"), sv("circle-color"), &color);
-
-// Update the data later.
-mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
-```
-
-## Runtime images
-
-`set_style_image(image_id, image, options)` registers a bitmap the style can
-reference from `icon-image`, `fill-pattern`, and friends; calling it again with
-the same ID replaces the image. Pixels are **premultiplied RGBA8** with an
-explicit stride, and options carry `pixel_ratio` (match it to the map's scale
-factor for crisp icons) and `sdf` for signed-distance-field icons tinted by
-`icon-color`.
-
-Two support pieces matter in practice:
-
-* When a style references an image ID nobody has provided, the runtime emits
-  `MAP_STYLE_IMAGE_MISSING` — handle it by adding the image and letting the
-  repaint machinery pick it up.
-* `copy_style_image_premultiplied_rgba8` reads an image back out (two-call
-  sizing: query the required byte length, then copy).
+When a style references an image nobody supplied, the runtime emits
+`MAP_STYLE_IMAGE_MISSING` with the ID. Handling that event by adding the image
+is the intended flow; the repaint follows on its own.
 
 ## Light
 
-The style light steers fill-extrusion shading. `set_style_light_json` replaces
-the whole light object; `set_style_light_property` sets one property
-(`anchor`, `color`, `intensity`, `position`) with the usual getter alongside.
-
-## Feature state
-
-Feature state — per-feature key-value data read by `feature-state` expressions —
-lives on the render session rather than the map. See
-[Query Map Data](/maplibre-native-ffi/guides/query-map-data/#feature-state).
-
-<Aside type="tip">
-  Keep one JSON construction helper per codebase. Expressions get verbose as
-  nested `JsonValue` trees in every binding; a small helper that converts your
-  language's maps/lists/strings into the binding's `JsonValue` pays for itself
-  the second time you build a `match` expression. Number types matter: use the
-  unsigned constructor where the spec or an extension expects unsigned values.
-</Aside>
+`set_style_light_json` replaces the whole light object and
+`set_style_light_property` sets one of `anchor`, `color`, `intensity`, or
+`position`. Light steers fill-extrusion shading.

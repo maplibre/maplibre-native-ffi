@@ -1,181 +1,155 @@
 ---
 title: Create and Run a Map
-description: The minimum host-owned map lifecycle, from runtime to teardown.
+description: The lifecycle every integration starts from, in C.
 sidebar:
   order: 2
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import minimalLifecycle from "../../../../snippets/c/minimal-lifecycle.c?raw";
 
-This guide walks through the lifecycle every integration shares: create a
-runtime, create a map, load a style, pump work, and tear everything down in
-order. It renders nothing yet — rendering attaches on top of this skeleton in
-[Render to a Surface](/maplibre-native-ffi/guides/render-to-a-surface/) or
-[Render to a Texture](/maplibre-native-ffi/guides/render-to-a-texture/).
+If you know MapLibre from the web or from the Android and iOS SDKs, you know
+what a map does. What is new here is that nothing runs on its own. There is no
+map view driving a render loop and no background thread advancing the state
+machine — you create the pieces, you call the function that lets MapLibre do
+work, and you decide when frames happen.
 
-## Create the runtime
+This guide builds the skeleton every integration shares. It renders nothing yet;
+rendering attaches on top of it.
 
-The runtime owns scheduler state and event storage for one **owner thread**.
-Create it on the thread that will pump it; every later runtime, map, and render
-session call must run on that same thread, and the API reports
-`MLN_STATUS_WRONG_THREAD` (or the binding equivalent) otherwise. Each thread
-may own one live runtime.
+## Two shapes of integration
 
-Runtime options select where the runtime reads and writes files:
+Almost everything built on this API is one of two things, and knowing which one
+you are building decides most of what follows.
 
-* `cache_path` — the ambient cache database. Tiles, glyphs, and sprites persist
-  here between runs. The special value `":memory:"` keeps the cache in memory.
+**An application, or an SDK under one.** A window or view exists, the map should
+follow the user's gestures, and frames keep coming as tiles arrive and labels
+settle. You will attach a
+[surface session](/maplibre-native-ffi/guides/render-to-a-surface/) and drive it
+from your toolkit's frame loop.
+
+**A snapshotter.** A raster tile server, a CLI that writes a PNG, a batch job
+rendering map images. There is no window and often no display at all. You want
+one finished image per request, then to move on. You will create the map in
+static or tile mode and attach a
+[texture session](/maplibre-native-ffi/guides/render-to-a-texture/).
+
+The lifecycle below is the same either way.
+
+## Everything happens on one thread
+
+The runtime, its maps, and their render sessions are **owner-thread affine**:
+whichever thread creates the runtime owns all of it, and calls from any other
+thread are rejected rather than silently racing. One thread can own one runtime.
+
+This is the constraint that surprises people, so decide early which thread that
+is. In a GUI app it is usually the UI thread. In a server it is usually a
+dedicated worker per rendering slot — spin up several threads, each with its own
+runtime and map, if you want concurrent renders.
+
+Callbacks are the exception: resource transforms and providers run on MapLibre's
+own network and worker threads, and they say so where they are documented.
+
+## Create a runtime
+
+The runtime owns the scheduler and the event queue. Its options decide where
+bytes live:
+
+* `cache_path` — the ambient cache database, where tiles, glyphs, and sprites
+  persist between runs. `":memory:"` keeps it in memory instead.
+  [Offline regions](/maplibre-native-ffi/guides/download-offline-regions/) live
+  in this database too, so give it a real path if you plan to use them.
 * `asset_path` — the filesystem root that `asset://` URLs resolve against.
-* `maximum_cache_size` — the ambient cache size cap in bytes, when set.
+* `maximum_cache_size` — a cap in bytes, applied only when you also set its flag
+  in `flags`.
 
-Options are copied at creation; later resource-loading configuration is covered
-in [Configure Resource Loading](/maplibre-native-ffi/guides/configure-resource-loading/).
+## Create a map
 
-## Create the map
+A map belongs to a runtime, and a runtime can own several. Map options set the
+starting viewport:
 
-A map belongs to a runtime. Map options set the initial viewport and behavior:
+* `width` and `height` — the logical viewport in UI pixels, the same units the
+  camera and hit-testing use. Attaching a render session replaces these with the
+  session's extent, so they matter mainly before you attach one.
+* `scale_factor` — the UI-to-device pixel ratio, and the one option you cannot
+  change later. It picks which sprite, glyph, and raster densities the map
+  requests for its whole life, so set it to the density you intend to render at.
+* `map_mode` — `CONTINUOUS` for a live map, `STATIC` for one-off stills of an
+  arbitrary viewport, `TILE` for one-off stills of a single tile. This is the
+  application/snapshotter fork from above.
 
-* `width` / `height` — the initial logical viewport in UI pixels. Attaching a
-  render session replaces these with the render target extent.
-* `scale_factor` — the UI-to-device pixel scale. It is fixed for the map's
-  lifetime and selects sprite, glyph, and raster density.
-* `map_mode` — `CONTINUOUS` for a live updating map, `STATIC` for a one-off
-  still of an arbitrary viewport, or `TILE` for a one-off still of a single
-  tile.
-
-The map is independent of any render target: you can load styles, move the
-camera, mutate sources and layers, and observe events without ever attaching
-one.
+A map is independent of any render target. You can load a style, move the
+camera, add sources and layers, and watch events on a map that has never
+rendered anything.
 
 ## Load a style
 
-`set_style_url` fetches a style document (and everything it references)
-asynchronously; `set_style_json` parses an inline style document. Both are
-"map commands": a success status means the request was accepted, not that the
-style loaded. Watch the runtime events for the outcome:
+`mln_map_set_style_url()` fetches a style document and everything it references;
+`mln_map_set_style_json()` takes one inline. Both are **commands**: an OK status
+means the request was accepted, not that the style loaded. The outcome comes
+back as an event — `MAP_STYLE_LOADED` or `MAP_LOADING_FAILED`, the latter
+carrying a message. A URL that 404s still returns OK synchronously and fails
+later, so report style errors from the event stream.
 
-* `MLN_RUNTIME_EVENT_MAP_STYLE_LOADED` — the style parsed and its sources are
-  ready for runtime additions.
-* `MLN_RUNTIME_EVENT_MAP_LOADING_FAILED` — loading failed; the event carries an
-  error message.
+## Let MapLibre do work
 
-Inline JSON with a syntax error may also fail the `set_style_json` call itself,
-so check both the return status and the events.
+MapLibre makes progress only while you pump the runtime, and pumping has two
+halves:
 
-## Pump the runtime
+`mln_runtime_run_once()` drains the owner thread's work — queued tasks, the
+tasks those tasks queue, expired timers, and ready network and database work. It
+does not block on an idle runtime, but it is a *drain*, not a time slice: one
+call can span a whole style parse. Do not treat it as a fixed per-frame cost.
 
-MapLibre Native makes progress only when the host pumps the runtime. The loop
-has two halves, always on the owner thread:
+`mln_runtime_poll_event()` pops one queued event per call until it reports none
+left. Events from every map under the runtime share this one queue, so check
+`event.source` against the map you care about. Payload and message pointers are
+borrowed until the next poll — copy anything you keep.
 
-1. `mln_runtime_run_once()` drains the owner-thread run loop: every queued task
-   plus the tasks those tasks enqueue, expired timers, and ready network and
-   database work. The promise is drain, not slice — one call can span a full
-   style parse, and an idle runtime returns promptly.
-2. `mln_runtime_poll_event()` pops queued events, one per call, until it
-   reports none. Event payloads and message strings are borrowed; copy anything
-   you keep.
+The events worth knowing on day one:
 
-How often you pump is a host decision: GUI examples pump once per frame,
-headless tools pump in a loop with a short sleep. The events worth knowing on
-day one:
+| Event                                     | Meaning                                                            |
+| ----------------------------------------- | ------------------------------------------------------------------ |
+| `MAP_STYLE_LOADED` / `MAP_LOADING_FAILED` | How the style request turned out                                   |
+| `MAP_RENDER_UPDATE_AVAILABLE`             | The map has new content to draw — this is what drives a frame loop |
+| `MAP_RENDER_FRAME_FINISHED`               | A frame completed, and says whether another is needed              |
+| `MAP_CAMERA_WILL` / `IS` / `DID_CHANGE`   | Camera transition progress                                         |
+| `MAP_STILL_IMAGE_FINISHED` / `FAILED`     | A requested still image resolved, in static and tile modes         |
+| `MAP_STYLE_IMAGE_MISSING`                 | The style wants an image ID nobody supplied                        |
 
-| Event                                     | Meaning                                                                         |
-| ----------------------------------------- | ------------------------------------------------------------------------------- |
-| `MAP_STYLE_LOADED` / `MAP_LOADING_FAILED` | Style outcome (above)                                                           |
-| `MAP_RENDER_UPDATE_AVAILABLE`             | The map has new content to render; drive your frame loop from this              |
-| `MAP_CAMERA_WILL/IS/DID_CHANGE`           | Camera transition progress                                                      |
-| `MAP_STILL_IMAGE_FINISHED` / `FAILED`     | A requested still image completed (static/tile modes)                           |
-| `MAP_STYLE_IMAGE_MISSING`                 | The style referenced an image ID nobody provided; add it with `set_style_image` |
+How often you pump is your call. A GUI app pumps once per frame; a headless tool
+pumps in a loop until it gets the event it is waiting for.
 
-## A complete minimal lifecycle
+## The whole thing
 
-This example creates a runtime and map, loads a style, pumps until the style
-loads (or fails), and tears down. It needs network access for the style URL.
+Runtime, map, style, pump, teardown — a complete program:
 
-```c
-#include <maplibre_native_c.h>
-#include <stdio.h>
-#include <string.h>
-#include <time.h>
-
-int main(void) {
-  mln_runtime_options options = mln_runtime_options_default();
-  options.cache_path = ":memory:";
-
-  mln_runtime* runtime = NULL;
-  if (mln_runtime_create(&options, &runtime) != MLN_STATUS_OK) return 1;
-
-  mln_map_options map_options = mln_map_options_default();
-  map_options.width = 512;
-  map_options.height = 512;
-  map_options.scale_factor = 1.0;
-
-  mln_map* map = NULL;
-  if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
-    mln_runtime_destroy(runtime);
-    return 1;
-  }
-
-  bool loaded = false;
-  if (mln_map_set_style_url(
-          map, "https://tiles.openfreemap.org/styles/bright") != MLN_STATUS_OK)
-    goto done;
-
-  // A pump count is not elapsed time: on a slow network this can spin
-  // through every iteration before the response lands. Bound the wait on
-  // the clock and yield between pumps instead.
-  const time_t deadline = time(NULL) + 30;
-  while (!loaded && time(NULL) < deadline) {
-    mln_runtime_run_once(runtime);
-    mln_runtime_event event = {.size = sizeof(event)};
-    bool has_event = false;
-    while (mln_runtime_poll_event(runtime, &event, &has_event) == MLN_STATUS_OK &&
-           has_event) {
-      if (event.type == MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) loaded = true;
-      if (event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED) {
-        fprintf(stderr, "style failed: %.*s\n", (int)event.message_size,
-                event.message);
-        goto done;
-      }
-    }
-    // A real host sleeps briefly here, or drives this from its event loop,
-    // rather than spinning.
-  }
-
-done:
-  mln_map_destroy(map);
-  mln_runtime_destroy(runtime);
-  return loaded ? 0 : 1;
-}
-```
+<Code code={minimalLifecycle} lang="c" title="minimal-lifecycle.c" />
 
 ## Tear down in order
 
-Handles form a parent-child chain — runtime → map → render session — and a
-parent refuses to close while children are live (`MLN_STATUS_INVALID_STATE`).
-Close in reverse order of creation:
+Handles form a chain — runtime owns maps, maps own render sessions — and a
+parent refuses to close while a child is live. Close them in the reverse of the
+order you created them: session, then map, then runtime.
 
-1. Detach and destroy any render session.
-2. Destroy the map.
-3. Destroy the runtime.
+Two things catch people out:
 
-Two teardown behaviors catch new integrators:
+**Destroying a map drops its queued events.** There is no flush and no final
+event. If you mirror map state from events, read what you need before you close
+the map that produces them.
 
-* **Closing a map discards its queued events.** There is no flush and no
-  terminal event, so snapshot any state you mirror from events before closing
-  the map that produced them.
-* **Non-deterministic cleanup does not save you.** Finalizers, GC, and `Drop`
-  report leaks but do not destroy thread-affine handles on the bindings' behalf
-  in the general case; explicit close on the owner thread is the contract.
+**Garbage collection will not do this for you.** Finalizers, `Drop`, and
+`using` blocks in the bindings report leaks; they do not stand in for closing a
+thread-affine handle on its owner thread. Close explicitly.
 
 <Aside>
-  Language-specific owner-thread helpers: Go callers must `runtime.LockOSThread()`
-  before creating a runtime and keep its lifecycle on the locked goroutine. .NET
-  ships an `OwnerThread` helper that runs closures on a dedicated owner thread.
-  Zig bindings take an explicit allocator and report native diagnostics through a
-  `DiagnosticStore` you pass at runtime creation. Kotlin/JVM needs
-  `--enable-native-access=ALL-UNNAMED`.
+  Bindings add what their language needs to make the owner-thread rule
+  enforceable — Go pins a goroutine with `runtime.LockOSThread()`, .NET offers an
+  `OwnerThread` helper that runs closures on a dedicated thread, Zig takes an
+  allocator and a diagnostic store. The model underneath is the one above.
 </Aside>
 
-Next: render the map [to a surface](/maplibre-native-ffi/guides/render-to-a-surface/)
-or [to a texture](/maplibre-native-ffi/guides/render-to-a-texture/).
+Next, give the map somewhere to draw: a
+[surface](/maplibre-native-ffi/guides/render-to-a-surface/) if you are building
+an application, a [texture](/maplibre-native-ffi/guides/render-to-a-texture/) if
+you are rendering images.

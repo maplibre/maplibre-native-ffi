@@ -1,163 +1,77 @@
 ---
 title: Query Map Data
-description: Query rendered features, source features, and feature extensions.
+description: Find out what is on the map, and attach state to it.
 sidebar:
   order: 6
 ---
 
-import { Aside } from "@astrojs/starlight/components";
+import { Aside, Code } from "@astrojs/starlight/components";
+import queryRendered from "../../../../snippets/c/query-rendered-features.c?raw";
 
-Queries read map data back out: what the user tapped, what a source contains,
-or what a feature extension (like a cluster) expands to. All query functions
-hang off the **render session**, not the map — they read the latest render
-session state, so the session must be attached and must have rendered at least
-once. Like everything else, they run on the map owner thread.
+Queries answer questions about what the map is showing: what the user tapped,
+what a source holds, what a cluster expands to.
 
-## Query rendered features
+They hang off the **render session**, not the map — because they read what was
+actually rendered. That means a session must be attached and must have rendered
+at least once before a query returns anything.
 
-`query_rendered_features` answers "what is on screen here?" — the classic
-tap handler. It takes:
+## What did the user tap?
 
-* A **geometry**: a screen point, a screen box (any corner order; clipped to
-  the viewport), or a screen line string, in logical pixels.
-* **Options**: an optional list of layer IDs to restrict the query (absent
-  means all rendered layers) and an optional style-spec filter expression as
-  JSON.
+`query_rendered_features` takes a screen geometry — a point, a box, or a line
+string, in logical pixels — and returns the features drawn under it. Options
+narrow it to a list of layer IDs and can apply a
+[style-spec filter](https://maplibre.org/maplibre-style-spec/expressions/)
+expression as JSON.
 
-The result is a list of queried features. Each carries the feature (geometry +
-properties), its source ID, its source layer ID when known, and its rendered
-feature state when set. Results are owned copies; destroy or `deinit` them per
-your binding's rules.
+For a tap handler, pass the layer IDs you care about. Without them the query
+matches everything rendered there, background fills included.
 
-```c
-mln_rendered_query_geometry geometry =
-    mln_rendered_query_geometry_point((mln_screen_point){.x = 256, .y = 256});
+Each result carries the feature, its source ID, its source layer where known,
+and its feature state where set. The results are copies you own; the pointers
+inside them belong to the result handle, so copy anything that has to outlive
+it, then destroy the handle.
 
-mln_string_view layers[] = {{.data = "poi", .size = 3}};
-mln_rendered_feature_query_options options =
-    mln_rendered_feature_query_options_default();
-options.fields = MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-options.layer_ids = layers;
-options.layer_id_count = 1;
+<Code code={queryRendered} lang="c" title="query-rendered-features.c" />
 
-mln_feature_query_result* result = NULL;
-mln_render_session_query_rendered_features(session, &geometry, &options, &result);
+## What is in this source?
 
-size_t count = 0;
-mln_feature_query_result_count(result, &count);
-for (size_t i = 0; i < count; i++) {
-  mln_queried_feature feature = {.size = sizeof(feature)};
-  mln_feature_query_result_get(result, i, &feature);
-  // inspect feature.feature properties ...
-}
-mln_feature_query_result_destroy(result);
-```
+`query_source_features` reads out of a loaded source, skipping layer visibility,
+styling, and the viewport. Vector sources need their source layer IDs in the
+options; GeoJSON sources ignore them.
 
-## Query source features
+The important limit: it reads only the source data the renderer currently
+holds — in practice, the tiles loaded for the current camera. Features in tiles
+that have not loaded are simply absent, and results change as the camera moves.
+It is not a search over your whole dataset. If you need that, query the dataset
+itself.
 
-`query_source_features` reads features straight out of a loaded source, bypassing
-layer visibility, styling, and the rendered viewport. Vector sources require the
-source layer IDs in the options; GeoJSON sources ignore them. An optional filter
-applies the same way as rendered queries.
+## Expanding clusters
 
-It still reads only the source data the renderer currently holds — typically the
-tiles loaded for the current camera — so it is not a search over the complete
-dataset. Features in tiles that have not loaded are absent, and results change
-as the camera moves. Query the underlying dataset directly when you need
-whole-source coverage.
+`query_feature_extensions` hands a feature you previously queried back to a
+source's extension. The built-in one is `supercluster`: give it a cluster
+feature from a clustered GeoJSON source and ask for its `"leaves"`,
+`"children"`, or `"expansion-zoom"`.
 
-```c
-const mln_string_view layers[] = {{.data = "pois", .size = 4}};
-mln_source_feature_query_options options =
-    mln_source_feature_query_options_default();
-options.fields = MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-options.source_layer_ids = layers;
-options.source_layer_id_count = 1;
-
-mln_feature_query_result* result = NULL;
-mln_render_session_query_source_features(
-    session, (mln_string_view){.data = "points", .size = 6}, &options, &result);
-// Read the features the same way as the rendered query above, then:
-mln_feature_query_result_destroy(result);
-```
-
-## Feature extensions (supercluster)
-
-`query_feature_extensions` passes a previously queried feature back to a
-source's feature extension. The built-in case is `supercluster`: given a
-cluster feature from a clustered GeoJSON source, ask for its `"leaves"`
-(individual points), `"children"`, or `"expansion-zoom"`.
-
-<Aside type="caution" title="Unsigned JSON is required">
-  Supercluster reads `cluster_id` from the feature's properties and the `limit`
-  and `offset` arguments strictly as **unsigned** JSON values. A JSON library
-  that emits all numbers as doubles silently produces an empty result with a
-  success status. Preserve the queried feature's property types (queried
-  features keep their original JSON types, so feeding the feature back
-  unmodified is safe) and construct `limit`/`offset` as unsigned values.
+<Aside type="caution" title="Unsigned numbers, specifically">
+  Supercluster reads `cluster_id` from the feature's properties, and the `limit`
+  and `offset` arguments, strictly as **unsigned** JSON values. A JSON layer that
+  turns every number into a double produces an empty result and a success
+  status — no error to chase. Feed the queried feature back unmodified (its
+  property types are preserved), and build `limit` and `offset` as unsigned.
 </Aside>
-
-The result is either a single JSON value or a feature collection. A wrong-typed
-or missing `cluster_id` yields a JSON null value; a valid cluster with no
-matches yields an empty collection; wrong-typed `limit`/`offset` fall back to
-10 leaves at offset 0.
-
-```c
-// Supercluster reads limit and offset strictly as unsigned JSON values.
-const mln_json_value limit = {.size = sizeof(limit),
-                              .type = MLN_JSON_VALUE_TYPE_UINT,
-                              .data = {.uint_value = 10}};
-const mln_json_value offset = {.size = sizeof(offset),
-                               .type = MLN_JSON_VALUE_TYPE_UINT,
-                               .data = {.uint_value = 0}};
-const mln_json_member members[] = {
-    {.key = {.data = "limit", .size = 5}, .value = &limit},
-    {.key = {.data = "offset", .size = 6}, .value = &offset},
-};
-const mln_json_value arguments = {
-    .size = sizeof(arguments),
-    .type = MLN_JSON_VALUE_TYPE_OBJECT,
-    .data = {.object_value = {.members = members, .member_count = 2}}};
-
-mln_feature_extension_result* result = NULL;
-mln_render_session_query_feature_extensions(
-    session, (mln_string_view){.data = "points", .size = 6}, cluster_feature,
-    (mln_string_view){.data = "supercluster", .size = 12},
-    (mln_string_view){.data = "leaves", .size = 6}, &arguments, &result);
-// Inspect the result, then release it.
-mln_feature_extension_result_destroy(result);
-```
 
 ## Feature state
 
-Feature state attaches per-feature key-value data (for example, `"hover":
-true`) that style expressions can read with `feature-state`. It lives on the
-render session's renderer:
+Feature state attaches per-feature key-value data — `"hover": true` and friends
+— that style expressions read through `feature-state`. It is how you highlight
+what the user is pointing at without touching the style.
 
-* The renderer must exist: render at least once after loading style data
-  before setting state.
-* State does **not** survive a session resize or reattach — reapply it
-  afterward.
-* A set or remove requests a repaint automatically.
+State lives on the session's renderer, which has two consequences worth
+planning around: the renderer has to exist first, so render once after the style
+loads before setting state; and state does not survive a resize or a reattach,
+so reapply it when either happens. Setting or removing state requests a repaint
+on its own.
 
-The selector identifies the target: `source_id` (required), `source_layer_id`
-(required to disambiguate vector sources), `feature_id`, and — for removing a
-single key — `state_key`.
-
-```c
-mln_feature_state_selector selector = {
-    .size = sizeof(selector),
-    .fields = MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
-              MLN_FEATURE_STATE_SELECTOR_FEATURE_ID,
-    .source_id = {.data = "points", .size = 6},
-    .source_layer_id = {.data = "pois", .size = 4},
-    .feature_id = {.data = "station-42", .size = 10},
-};
-
-mln_render_session_set_feature_state(session, &selector, &selected_json);
-mln_json_snapshot* state = NULL;
-mln_render_session_get_feature_state(session, &selector, &state);
-// The snapshot is owned; release it once read.
-mln_json_snapshot_destroy(state);
-mln_render_session_remove_feature_state(session, &selector);
-```
+The selector picks the target: source ID (always), source layer ID (to
+disambiguate vector sources), feature ID, and a state key when removing a single
+entry.
