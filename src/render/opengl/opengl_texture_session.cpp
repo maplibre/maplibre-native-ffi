@@ -278,7 +278,15 @@ class OpenGLTextureRenderableResource final
     }
   }
 
-  void swap() override { context.finish(); }
+  // A caller-owned texture is handed back to its owner as soon as the render
+  // update returns, so it completes every frame. A session-owned texture is
+  // handed over at acquire-frame, which completes the rendering itself, and
+  // CPU readback fences on glReadPixels in this context.
+  void swap() override {
+    if (borrowed_texture_ != 0) {
+      context.finish();
+    }
+  }
 
   auto readStillImage() -> mbgl::PremultipliedImage {
     bind();
@@ -443,6 +451,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
     return renderable.texture();
   }
+
+  void finish_rendering() { getContext<mbgl::gl::Context>().finish(); }
 
  private:
   [[nodiscard]] auto has_native_context() const -> bool {
@@ -612,6 +622,10 @@ class OpenGLTextureSessionBackend final
   auto acquire_opengl_owned_frame(
     const mln_render_session& texture, mln_opengl_owned_texture_frame& out_frame
   ) -> mln_status override {
+    // The host samples this texture from its own context, so the session
+    // completes its rendering before exposing the texture name.
+    auto guard = mbgl::gfx::BackendScope{backend_};
+    backend_.finish_rendering();
     out_frame = mln_opengl_owned_texture_frame{
       .size = sizeof(mln_opengl_owned_texture_frame),
       .generation = texture.generation,
