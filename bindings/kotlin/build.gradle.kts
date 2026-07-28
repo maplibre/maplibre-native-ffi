@@ -56,6 +56,7 @@ val extractRustlsPlatformVerifierAndroidJar =
 kotlin {
   iosArm64()
   iosSimulatorArm64()
+  linuxX64()
   macosArm64()
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
@@ -150,6 +151,7 @@ canonicalizeKmpRootMetadata(
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",
+      "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
     ),
 )

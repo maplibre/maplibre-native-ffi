@@ -14,6 +14,7 @@ MODULES = {
     "maplibre-native-ffi-iosarm64",
     "maplibre-native-ffi-iossimulatorarm64",
     "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-linuxx64",
     "maplibre-native-ffi-macosarm64",
     "maplibre-native-ffi-runtime-metal",
     "maplibre-native-ffi-runtime-metal-iosarm64",
@@ -23,9 +24,11 @@ MODULES = {
     "maplibre-native-ffi-runtime-opengl",
     "maplibre-native-ffi-runtime-opengl-android",
     "maplibre-native-ffi-runtime-opengl-jvm",
+    "maplibre-native-ffi-runtime-opengl-linuxx64",
     "maplibre-native-ffi-runtime-vulkan",
     "maplibre-native-ffi-runtime-vulkan-android",
     "maplibre-native-ffi-runtime-vulkan-jvm",
+    "maplibre-native-ffi-runtime-vulkan-linuxx64",
 }
 
 # Modules with public Kotlin API. Their javadoc jars must carry the Dokka site,
@@ -36,6 +39,7 @@ API_BEARING_MODULES = {
     "maplibre-native-ffi-iosarm64",
     "maplibre-native-ffi-iossimulatorarm64",
     "maplibre-native-ffi-jvm",
+    "maplibre-native-ffi-linuxx64",
     "maplibre-native-ffi-macosarm64",
 }
 
@@ -45,15 +49,18 @@ ROOT_TARGET_MODULES = {
         "iosArm64": "maplibre-native-ffi-iosarm64",
         "iosSimulatorArm64": "maplibre-native-ffi-iossimulatorarm64",
         "jvm": "maplibre-native-ffi-jvm",
+        "linuxX64": "maplibre-native-ffi-linuxx64",
         "macosArm64": "maplibre-native-ffi-macosarm64",
     },
     "maplibre-native-ffi-runtime-opengl": {
         "android": "maplibre-native-ffi-runtime-opengl-android",
         "jvm": "maplibre-native-ffi-runtime-opengl-jvm",
+        "linuxX64": "maplibre-native-ffi-runtime-opengl-linuxx64",
     },
     "maplibre-native-ffi-runtime-vulkan": {
         "android": "maplibre-native-ffi-runtime-vulkan-android",
         "jvm": "maplibre-native-ffi-runtime-vulkan-jvm",
+        "linuxX64": "maplibre-native-ffi-runtime-vulkan-linuxx64",
     },
     "maplibre-native-ffi-runtime-metal": {
         "iosArm64": "maplibre-native-ffi-runtime-metal-iosarm64",
@@ -284,6 +291,8 @@ def verify_jvm(root: pathlib.Path) -> None:
 
 def verify_native(root: pathlib.Path) -> None:
     modules = {
+        "maplibre-native-ffi-runtime-opengl-linuxx64",
+        "maplibre-native-ffi-runtime-vulkan-linuxx64",
         "maplibre-native-ffi-runtime-metal-macosarm64",
         "maplibre-native-ffi-runtime-metal-iosarm64",
         "maplibre-native-ffi-runtime-metal-iossimulatorarm64",

@@ -129,6 +129,15 @@ function(mln_add_c_api_test)
     target_link_libraries(mln_c_api_tests PRIVATE Threads::Threads)
   endif()
 
+  if(MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
+    # The graphics loaders this harness links come from the machine running the
+    # tests, so they are built against a newer glibc than the toolchain floor.
+    # The loader resolves their libc references at run time.
+    target_link_options(
+      mln_c_api_tests
+      PRIVATE "LINKER:--allow-shlib-undefined")
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_test(
       NAME c-api

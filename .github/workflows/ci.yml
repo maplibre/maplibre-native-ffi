@@ -101,6 +101,9 @@ jobs:
       - run: mise run //bindings/kotlin:jvmTest linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
@@ -178,6 +181,9 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/kotlin:jvmTest linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //examples/compose-map:build linux-x64-vulkan

@@ -22,6 +22,61 @@ function(mln_append_existing_targets out_var)
   set(${out_var} ${MLN_FFI_TARGETS} PARENT_SCOPE)
 endfunction()
 
+# Static archives holding the C++ runtime the toolchain links. Bundling them
+# into the distributed archive lets a consumer link the C API without supplying
+# a matching C++ runtime of its own. Empty unless the toolchain sets
+# MLN_FFI_CXX_RUNTIME_IS_BUNDLED.
+function(mln_bundled_cxx_runtime_archives out_var)
+  if(NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
+    set(${out_var} "" PARENT_SCOPE)
+    return()
+  endif()
+  if(DEFINED CACHE{MLN_FFI_CXX_RUNTIME_ARCHIVES})
+    set(${out_var} "${MLN_FFI_CXX_RUNTIME_ARCHIVES}" PARENT_SCOPE)
+    return()
+  endif()
+
+  # zig compiles libc++, libc++abi, libunwind, compiler-rt, and the glibc
+  # non-shared shims on demand into content-addressed cache directories, and the
+  # paths differ per optimization level. Ask the driver which ones a release
+  # link resolves to rather than guessing the layout.
+  set(probe_source "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe.cpp")
+  file(WRITE "${probe_source}"
+       "#include <stdexcept>\nint main() { try { throw std::runtime_error(\"\"); } catch (...) { return 1; } }\n"
+  )
+  separate_arguments(probe_flags NATIVE_COMMAND "${CMAKE_CXX_FLAGS_RELEASE}")
+  execute_process(
+    COMMAND
+      "${CMAKE_CXX_COMPILER}"
+      ${probe_flags}
+      "${probe_source}"
+      -o
+      "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe"
+      -v
+      OUTPUT_QUIET
+    ERROR_VARIABLE probe_log
+    RESULT_VARIABLE probe_result)
+  if(NOT probe_result EQUAL 0)
+    message(
+      FATAL_ERROR "Could not probe the toolchain C++ runtime:\n${probe_log}")
+  endif()
+
+  string(
+    REGEX MATCHALL
+    "[^ \t\r\n]+/lib(c\\+\\+abi|c\\+\\+|unwind|compiler_rt|c_nonshared)\\.a"
+    runtime_archives "${probe_log}")
+  list(REMOVE_DUPLICATES runtime_archives)
+  if(NOT runtime_archives)
+    message(
+      FATAL_ERROR
+        "The toolchain reported no C++ runtime archives to bundle:\n${probe_log}")
+  endif()
+
+  set(MLN_FFI_CXX_RUNTIME_ARCHIVES "${runtime_archives}"
+      CACHE INTERNAL "C++ runtime archives bundled into the static archive")
+  set(${out_var} "${runtime_archives}" PARENT_SCOPE)
+endfunction()
+
 function(mln_configure_complete_static_archive target)
   get_target_property(MLN_FFI_ARCHIVE_FORMAT mln_ffi_platform_dependencies
                       MLN_FFI_ARCHIVE_FORMAT)
@@ -77,25 +132,72 @@ function(mln_configure_complete_static_archive target)
       DEPENDS ${MLN_FFI_INPUT_TARGETS}
       VERBATIM)
   elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "elf")
-    add_custom_command(
-      OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_LINKER}"
-        -r
-        -o
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
-        --whole-archive
-        ${MLN_FFI_INPUT_ARCHIVES}
-        --no-whole-archive
-      COMMAND
-        "${CMAKE_AR}" qc "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
-      COMMAND "${CMAKE_RANLIB}" "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      DEPENDS ${MLN_FFI_INPUT_TARGETS}
-      VERBATIM)
+    mln_bundled_cxx_runtime_archives(MLN_FFI_CXX_RUNTIME)
+    if(MLN_FFI_CXX_RUNTIME)
+      # Three steps beyond the plain merge below make the archive
+      # self-contained:
+      #
+      # Our own archives come in whole, while the runtime archives resolve
+      # lazily, so only the members the C API actually reaches come along.
+      #
+      # The unwinder reaches the personality routine through the CIE rather than
+      # by name, so renaming ours keeps it clear of the routine a consumer's own
+      # C++ runtime defines. Kotlin/Native, for one, statically links GCC 8.3's
+      # libstdc++ into every consumer binary. The COMDAT group signature has to
+      # move with it, or the group dedupes away and its relocations dangle.
+      #
+      # Everything but the C API entry points then keeps internal linkage, so
+      # the bundled runtime can never collide with the consumer's.
+      add_custom_command(
+        OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
+        COMMAND
+          "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
+        COMMAND
+          "${CMAKE_LINKER}"
+          -r
+          -o
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+          --whole-archive
+          ${MLN_FFI_INPUT_ARCHIVES}
+          --no-whole-archive
+          ${MLN_FFI_CXX_RUNTIME}
+        COMMAND
+          "${CMAKE_OBJCOPY}" --redefine-sym
+          __gxx_personality_v0=__mln_personality_v0 --redefine-sym
+          DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        COMMAND
+          "${CMAKE_OBJCOPY}" --wildcard --keep-global-symbol=mln_*
+          --keep-global-symbol=__mln_personality_v0
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        COMMAND
+          "${CMAKE_AR}" qc "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        COMMAND "${CMAKE_RANLIB}" "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+        DEPENDS ${MLN_FFI_INPUT_TARGETS}
+        VERBATIM)
+    else()
+      add_custom_command(
+        OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+        COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
+        COMMAND
+          "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
+        COMMAND
+          "${CMAKE_LINKER}"
+          -r
+          -o
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+          --whole-archive
+          ${MLN_FFI_INPUT_ARCHIVES}
+          --no-whole-archive
+        COMMAND
+          "${CMAKE_AR}" qc "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+          "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
+        COMMAND "${CMAKE_RANLIB}" "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
+        DEPENDS ${MLN_FFI_INPUT_TARGETS}
+        VERBATIM)
+    endif()
   else()
     message(FATAL_ERROR "Unsupported archive format: ${MLN_FFI_ARCHIVE_FORMAT}")
   endif()
@@ -128,7 +230,12 @@ function(mln_configure_shared_exports target)
       ${target}
       PRIVATE "LINKER:--version-script,${export_file}")
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-      target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
+      # zig rejects --exclude-libs in every spelling, so its toolchain file
+      # clears this. The version script alone already limits the exports.
+      if(NOT DEFINED MLN_FFI_LINKER_SUPPORTS_EXCLUDE_LIBS
+         OR MLN_FFI_LINKER_SUPPORTS_EXCLUDE_LIBS)
+        target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
+      endif()
     endif()
   endif()
 endfunction()
@@ -136,9 +243,11 @@ endfunction()
 function(mln_configure_static_cxx_runtime target)
   # Bundle the C++ runtime so the shared library carries no libstdc++ ABI
   # requirement from the build host. The C ABI never passes C++ types or
-  # exceptions across the boundary, and the version script plus --exclude-libs
-  # keep the bundled runtime symbols private to the library.
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  # exceptions across the boundary, and the version script keeps the bundled
+  # runtime symbols private to the library. Toolchains that already link a
+  # static C++ runtime, such as zig with libc++, set
+  # MLN_FFI_CXX_RUNTIME_IS_BUNDLED and need no flags here.
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
     target_link_options(${target} PRIVATE -static-libstdc++ -static-libgcc)
   endif()
 endfunction()
