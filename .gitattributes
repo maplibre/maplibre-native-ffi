@@ -2,4 +2,5 @@
 *.bat       text eol=crlf
 *.jar       binary
 third_party/** linguist-vendored
+/bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart linguist-generated=true
 .github/workflows/ci.yml linguist-generated=true

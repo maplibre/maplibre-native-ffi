@@ -1,0 +1,5 @@
+# Keep publish contents independent from .gitignore. pubspec.lock is committed
+# so that development and CI resolve a reviewed dependency set, but a package
+# archive has no use for it: consumers always resolve from pubspec.yaml.
+.dart_tool/
+pubspec.lock

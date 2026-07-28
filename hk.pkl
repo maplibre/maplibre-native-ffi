@@ -70,6 +70,12 @@ local lintSteps = new Mapping<String, Step> {
     check = "unformatted=\"$(mise run --quiet //bindings/go:_gofumpt-check {{files}})\"; test -z \"$unformatted\" || { echo \"$unformatted\" >&2; exit 1; }"
     fix = "mise run --quiet //bindings/go:_gofumpt-fix {{files}}"
   }
+  ["dart-format"] {
+    glob = List("bindings/dart/**/*.dart")
+    exclude = List("bindings/dart/**/*.g.dart")
+    check = "mise run --quiet //bindings/dart:_format-check {{files}}"
+    fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
+  }
 }
 
 hooks {

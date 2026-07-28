@@ -533,7 +533,9 @@ session's lifetime, and it need not be the map's owner thread.
    attaching thread through a transferable attach reference whose only operation
    is attach. Bindings whose map handle is already safe to use from another
    thread expose attach on the map handle directly and MUST NOT add a redundant
-   reference type.
+   reference type. A binding whose owner identity is a host construct rather
+   than the native thread, such as a Dart isolate, states that the two must
+   coincide for its handles to stay usable.
 
 ### Transferability
 

@@ -43,3 +43,7 @@ commands = [{ task = "//bindings/go:test" }]
 [[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
+
+[[suites]]
+platforms = ["linux", "macos", "windows"]
+commands = [{ task = "//bindings/dart:test" }]

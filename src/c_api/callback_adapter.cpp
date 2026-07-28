@@ -1,0 +1,531 @@
+#define MLN_BUILDING_C
+
+// Adapts synchronous MapLibre callback contracts to hosts that can only receive
+// callbacks asynchronously through void listener functions. See
+// include/maplibre_native_c/callback_adapter.h for what this layer promises and
+// which hosts it serves.
+//
+// Everything here runs on MapLibre's own threads. It copies borrowed payloads
+// into native-owned records, decides from native-owned routing tables when a
+// result is needed immediately, and only ever hands records to a host through a
+// void listener.
+
+#include <algorithm>
+#include <condition_variable>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+#include "maplibre_native_c/callback_adapter.h"
+
+#include "maplibre_native_c.h"
+
+namespace {
+
+using AdapterResourceRewriteRule = mln_adapter_resource_rewrite_rule;
+using AdapterResourceRewriteRules = mln_adapter_resource_rewrite_rules;
+using AdapterResourceProviderRule = mln_adapter_resource_provider_rule;
+using AdapterResourceProviderRules = mln_adapter_resource_provider_rules;
+using AdapterQueuedResourceProviderRoute =
+  mln_adapter_queued_resource_provider_route;
+using AdapterQueuedResourceProvider = mln_adapter_queued_resource_provider;
+using AdapterQueuedResourceRequestView = mln_adapter_queued_resource_request;
+
+struct AdapterQueuedResourceRequest {
+  AdapterQueuedResourceRequestView view{};
+  std::string url;
+  std::string prior_etag;
+  std::vector<std::uint8_t> prior_data;
+};
+
+using AdapterLogCallbackState = mln_adapter_log_callback_state;
+using AdapterLogRecordView = mln_adapter_log_record;
+
+struct AdapterLogRecord {
+  AdapterLogRecordView view{};
+  std::string message;
+};
+
+struct AdapterLogCallbackEntry {
+  mln_adapter_log_record_listener listener = nullptr;
+  std::uint32_t consume = 0;
+  std::size_t in_flight = 0;
+  bool retired = false;
+};
+
+struct AdapterHandleLeakToken {
+  std::string type_name;
+};
+
+std::mutex resource_request_tokens_mutex;
+std::condition_variable resource_request_tokens_changed;
+std::unordered_map<std::uint64_t, mln_resource_request_handle*>
+  resource_request_tokens;
+std::uint64_t next_resource_request_token = 1;
+std::mutex log_setter_mutex;
+std::mutex log_state_mutex;
+std::unordered_map<void*, AdapterLogCallbackEntry> log_callbacks;
+void* active_log_callback = nullptr;
+
+auto matches_rule(std::uint32_t rule_kind, std::uint32_t request_kind) -> bool {
+  return rule_kind == MLN_ADAPTER_RESOURCE_KIND_ANY ||
+         rule_kind == request_kind;
+}
+
+auto string_equals(const char* left, const char* right) -> bool {
+  if (left == nullptr || right == nullptr) {
+    return false;
+  }
+  return std::strcmp(left, right) == 0;
+}
+
+auto request_matches_route(
+  std::span<const AdapterQueuedResourceProviderRoute> routes,
+  const mln_resource_request& request
+) -> bool {
+  return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
+    return matches_rule(route.kind, request.kind) &&
+           string_equals(route.url, request.url);
+  });
+}
+
+auto copy_prior_data(const mln_resource_request& request)
+  -> std::vector<std::uint8_t> {
+  if (request.prior_data == nullptr || request.prior_data_size == 0) {
+    return {};
+  }
+  auto data = std::vector<std::uint8_t>{};
+  data.resize(request.prior_data_size);
+  std::ranges::copy(
+    std::span{request.prior_data, request.prior_data_size}, data.begin()
+  );
+  return data;
+}
+
+auto copy_request(
+  const mln_resource_request& request, mln_resource_request_handle* handle
+) -> AdapterQueuedResourceRequestView* {
+  auto copy = std::make_unique<AdapterQueuedResourceRequest>();
+  copy->url = request.url == nullptr ? std::string{} : std::string{request.url};
+  copy->prior_etag = request.prior_etag == nullptr
+                       ? std::string{}
+                       : std::string{request.prior_etag};
+  copy->prior_data = copy_prior_data(request);
+  copy->view = AdapterQueuedResourceRequestView{
+    .owner = copy.get(),
+    .handle = handle,
+    .url = copy->url.c_str(),
+    .kind = request.kind,
+    .loading_method = request.loading_method,
+    .priority = request.priority,
+    .usage = request.usage,
+    .storage_policy = request.storage_policy,
+    .has_range = request.has_range,
+    .range_start = request.range_start,
+    .range_end = request.range_end,
+    .has_prior_modified = request.has_prior_modified,
+    .prior_modified_unix_ms = request.prior_modified_unix_ms,
+    .has_prior_expires = request.has_prior_expires,
+    .prior_expires_unix_ms = request.prior_expires_unix_ms,
+    .prior_etag = copy->prior_etag.empty() ? nullptr : copy->prior_etag.c_str(),
+    .prior_data = copy->prior_data.empty() ? nullptr : copy->prior_data.data(),
+    .prior_data_size = copy->prior_data.size(),
+  };
+  return &copy.release()->view;
+}
+
+void destroy_queued_request(
+  AdapterQueuedResourceRequestView* request
+) noexcept {
+  if (request == nullptr) {
+    return;
+  }
+  auto* owner = static_cast<AdapterQueuedResourceRequest*>(request->owner);
+  static_cast<void>(std::unique_ptr<AdapterQueuedResourceRequest>{owner});
+}
+
+auto copy_log_record(
+  std::uint32_t severity, std::uint32_t event, std::int64_t code,
+  const char* message, bool retire_callback = false
+) -> AdapterLogRecordView* {
+  auto copy = std::make_unique<AdapterLogRecord>();
+  copy->message = message == nullptr ? std::string{} : std::string{message};
+  copy->view = AdapterLogRecordView{
+    .owner = copy.get(),
+    .retire_callback = retire_callback,
+    .severity = severity,
+    .event = event,
+    .code = code,
+    .message = copy->message.c_str(),
+  };
+  return &copy.release()->view;
+}
+
+void destroy_log_record(AdapterLogRecordView* record) noexcept {
+  if (record == nullptr) {
+    return;
+  }
+  auto* owner = static_cast<AdapterLogRecord*>(record->owner);
+  static_cast<void>(std::unique_ptr<AdapterLogRecord>{owner});
+}
+
+void queue_log_retirement(mln_adapter_log_record_listener listener) noexcept {
+  if (listener == nullptr) {
+    return;
+  }
+  try {
+    listener(nullptr);
+  } catch (...) {
+    // The callback has already been removed from native dispatch. Listener
+    // delivery is notification-only at this boundary.
+  }
+}
+
+void destroy_handle_leak_token(void* token) noexcept {
+  static_cast<void>(std::unique_ptr<AdapterHandleLeakToken>{
+    static_cast<AdapterHandleLeakToken*>(token),
+  });
+}
+
+}  // namespace
+
+extern "C" MLN_API auto mln_adapter_handle_leak_token_create(
+  const char* type_name, void* handle
+) noexcept -> void* {
+  try {
+    auto token = std::make_unique<AdapterHandleLeakToken>();
+    static_cast<void>(handle);
+    token->type_name = type_name == nullptr ? std::string{} : type_name;
+    return token.release();
+  } catch (...) {
+    return nullptr;
+  }
+}
+
+extern "C" MLN_API void mln_adapter_handle_leak_token_destroy(
+  void* token
+) noexcept {
+  destroy_handle_leak_token(token);
+}
+
+extern "C" MLN_API void mln_adapter_handle_leak_report(void* token) noexcept {
+  auto* leak = static_cast<AdapterHandleLeakToken*>(token);
+  if (leak != nullptr) {
+    static_cast<void>(std::fputs("maplibre_native_ffi: leaked ", stderr));
+    static_cast<void>(std::fputs(leak->type_name.c_str(), stderr));
+    static_cast<void>(std::fputs(
+      " native handle; close it from its owning execution context before "
+      "releasing the host object\n",
+      stderr
+    ));
+  }
+  destroy_handle_leak_token(token);
+}
+
+extern "C" MLN_API auto mln_adapter_log_callback(
+  void* user_data, std::uint32_t severity, std::uint32_t event,
+  std::int64_t code, const char* message
+) noexcept -> std::uint32_t {
+  if (user_data == nullptr) {
+    return 0;
+  }
+  mln_adapter_log_record_listener listener = nullptr;
+  std::uint32_t consume = 0;
+  {
+    const auto lock = std::scoped_lock{log_state_mutex};
+    const auto iterator = log_callbacks.find(user_data);
+    if (iterator == log_callbacks.end() || iterator->second.retired) {
+      return 0;
+    }
+    listener = iterator->second.listener;
+    consume = iterator->second.consume;
+    ++iterator->second.in_flight;
+  }
+  if (listener != nullptr) {
+    try {
+      listener(copy_log_record(severity, event, code, message));
+    } catch (...) {
+      // Logging callbacks are notification-only at the host boundary.
+    }
+  }
+  mln_adapter_log_record_listener retirement_listener = nullptr;
+  {
+    const auto lock = std::scoped_lock{log_state_mutex};
+    const auto iterator = log_callbacks.find(user_data);
+    if (iterator != log_callbacks.end()) {
+      --iterator->second.in_flight;
+      if (iterator->second.retired && iterator->second.in_flight == 0) {
+        retirement_listener = iterator->second.listener;
+        log_callbacks.erase(iterator);
+      }
+    }
+  }
+  queue_log_retirement(retirement_listener);
+  return consume;
+}
+
+extern "C" MLN_API auto mln_adapter_log_set_callback(
+  mln_adapter_log_callback_state* state
+) noexcept -> mln_status {
+  const auto setter_lock = std::scoped_lock{log_setter_mutex};
+  if (state != nullptr) {
+    const auto state_lock = std::scoped_lock{log_state_mutex};
+    log_callbacks[state] = AdapterLogCallbackEntry{
+      .listener = state->listener,
+      .consume = state->consume,
+    };
+  }
+  const auto status = state == nullptr
+                        ? mln_log_clear_callback()
+                        : mln_log_set_callback(mln_adapter_log_callback, state);
+  if (status != MLN_STATUS_OK) {
+    if (state != nullptr) {
+      const auto state_lock = std::scoped_lock{log_state_mutex};
+      log_callbacks.erase(state);
+    }
+    return status;
+  }
+  mln_adapter_log_record_listener retirement_listener = nullptr;
+  {
+    const auto state_lock = std::scoped_lock{log_state_mutex};
+    auto* retired_state = active_log_callback;
+    active_log_callback = state;
+    if (retired_state != nullptr && retired_state != state) {
+      const auto iterator = log_callbacks.find(retired_state);
+      if (iterator != log_callbacks.end()) {
+        iterator->second.retired = true;
+        if (iterator->second.in_flight == 0) {
+          retirement_listener = iterator->second.listener;
+          log_callbacks.erase(iterator);
+        }
+      }
+    }
+  }
+  queue_log_retirement(retirement_listener);
+  return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API void mln_adapter_log_record_destroy(void* record) noexcept {
+  destroy_log_record(static_cast<AdapterLogRecordView*>(record));
+}
+
+extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
+  void* user_data, std::uint32_t kind, const char* url,
+  mln_resource_transform_response* out_response
+) noexcept -> mln_status {
+  if (user_data == nullptr || url == nullptr || out_response == nullptr) {
+    return MLN_STATUS_OK;
+  }
+
+  const auto& table =
+    *static_cast<const AdapterResourceRewriteRules*>(user_data);
+  for (const auto& rule : std::span{table.rules, table.count}) {
+    if (matches_rule(rule.kind, kind) && string_equals(rule.url, url)) {
+      if (rule.replacement_url == nullptr) {
+        return MLN_STATUS_OK;
+      }
+      return mln_resource_transform_response_set_url(
+        out_response, rule.replacement_url, std::strlen(rule.replacement_url)
+      );
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) noexcept -> std::uint32_t {
+  if (
+    user_data == nullptr || request == nullptr || request->url == nullptr ||
+    handle == nullptr
+  ) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+
+  const auto& table =
+    *static_cast<const AdapterResourceProviderRules*>(user_data);
+  for (const auto& rule : std::span{table.rules, table.count}) {
+    if (
+      matches_rule(rule.kind, request->kind) &&
+      string_equals(rule.url, request->url)
+    ) {
+      static_cast<void>(mln_resource_request_complete(handle, &rule.response));
+      mln_resource_request_release(handle);
+      return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+    }
+  }
+  return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+}
+
+extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
+  void* user_data, const mln_resource_request* request,
+  mln_resource_request_handle* handle
+) noexcept -> std::uint32_t {
+  if (
+    user_data == nullptr || request == nullptr || request->url == nullptr ||
+    handle == nullptr
+  ) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+
+  const auto& provider =
+    *static_cast<const AdapterQueuedResourceProvider*>(user_data);
+  if (provider.listener == nullptr) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+  if (!request_matches_route(
+        std::span{provider.routes, provider.route_count}, *request
+      )) {
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+  }
+
+  try {
+    auto* queued_request = copy_request(*request, handle);
+    provider.listener(queued_request);
+    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  } catch (...) {
+    auto response = mln_resource_response{
+      .size = sizeof(mln_resource_response),
+      .status = MLN_RESOURCE_RESPONSE_STATUS_ERROR,
+      .error_reason = MLN_RESOURCE_ERROR_REASON_OTHER,
+      .bytes = nullptr,
+      .byte_count = 0,
+      .error_message = "resource provider request queue failed",
+      .must_revalidate = false,
+      .has_modified = false,
+      .modified_unix_ms = 0,
+      .has_expires = false,
+      .expires_unix_ms = 0,
+      .etag = nullptr,
+      .has_retry_after = false,
+      .retry_after_unix_ms = 0,
+    };
+    static_cast<void>(mln_resource_request_complete(handle, &response));
+    mln_resource_request_release(handle);
+    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE;
+  }
+}
+
+extern "C" MLN_API void mln_adapter_resource_provider_request_destroy(
+  void* request
+) noexcept {
+  destroy_queued_request(
+    static_cast<AdapterQueuedResourceRequestView*>(request)
+  );
+}
+
+extern "C" MLN_API void mln_adapter_queued_resource_provider_retire(
+  mln_adapter_queued_resource_provider* provider
+) noexcept {
+  if (provider != nullptr && provider->listener != nullptr) {
+    provider->listener(nullptr);
+  }
+}
+
+extern "C" MLN_API void mln_adapter_custom_geometry_callbacks_retire(
+  mln_custom_geometry_source_tile_callback fetch_tile,
+  mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
+) noexcept {
+  constexpr auto RetirementTile = mln_canonical_tile_id{
+    .z = std::numeric_limits<std::uint8_t>::max(),
+    .x = 0,
+    .y = 0,
+  };
+  if (fetch_tile != nullptr) {
+    fetch_tile(user_data, RetirementTile);
+  }
+  if (cancel_tile != nullptr) {
+    cancel_tile(user_data, RetirementTile);
+  }
+}
+
+extern "C" MLN_API auto mln_adapter_resource_request_token_create(
+  mln_resource_request_handle* handle
+) noexcept -> std::uint64_t {
+  if (handle == nullptr) {
+    return 0;
+  }
+  try {
+    const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+    auto token = next_resource_request_token++;
+    while (token == 0 || resource_request_tokens.contains(token)) {
+      token = next_resource_request_token++;
+    }
+    resource_request_tokens.emplace(token, handle);
+    return token;
+  } catch (...) {
+    return 0;
+  }
+}
+
+extern "C" MLN_API auto mln_adapter_resource_request_token_cancelled(
+  std::uint64_t token, bool* out_cancelled
+) noexcept -> mln_status {
+  if (token == 0 || out_cancelled == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return mln_resource_request_cancelled(iterator->second, out_cancelled);
+}
+
+extern "C" MLN_API auto mln_adapter_resource_request_token_complete(
+  std::uint64_t token, const mln_resource_response* response
+) noexcept -> mln_status {
+  if (token == 0 || response == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = iterator->second;
+  const auto status = mln_resource_request_complete(handle, response);
+  mln_resource_request_release(handle);
+  resource_request_tokens.erase(iterator);
+  resource_request_tokens_changed.notify_all();
+  return status;
+}
+
+extern "C" MLN_API auto mln_adapter_resource_request_token_release(
+  std::uint64_t token
+) noexcept -> mln_status {
+  if (token == 0) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
+  const auto iterator = resource_request_tokens.find(token);
+  if (iterator == resource_request_tokens.end()) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  mln_resource_request_release(iterator->second);
+  resource_request_tokens.erase(iterator);
+  resource_request_tokens_changed.notify_all();
+  return MLN_STATUS_OK;
+}
+
+extern "C" MLN_API auto mln_adapter_resource_request_token_wait(
+  std::uint64_t token
+) noexcept -> mln_status {
+  if (token == 0) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto lock = std::unique_lock{resource_request_tokens_mutex};
+  resource_request_tokens_changed.wait(lock, [token] {
+    return !resource_request_tokens.contains(token);
+  });
+  return MLN_STATUS_OK;
+}
