@@ -325,8 +325,14 @@ extensions.configure<KotlinMultiplatformExtension> {
         )
       }
 
+    val runtimeArchive = runtimeInstallDir.resolve("lib/libmaplibre-native-c.a")
     val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
     tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
+      // cinterop takes the archive through -staticLibrary, which Gradle cannot
+      // see, so the task would otherwise stay up to date across a rebuild of the
+      // archive and embed a stale copy in the published KLIB. A file collection
+      // tolerates the archive being absent on a host that does not build it.
+      inputs.files(runtimeArchive).withPropertyName("maplibreNativeCArchive")
       embedMaplibreLicenseBundle(runtimeLicenseDirectory)
     }
 
