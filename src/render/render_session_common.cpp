@@ -19,6 +19,7 @@
 #include <mbgl/map/map.hpp>
 #include <mbgl/renderer/query.hpp>
 #include <mbgl/renderer/renderer.hpp>
+#include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/filter.hpp>
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
@@ -914,6 +915,58 @@ auto register_render_session(
   render_sessions().emplace(handle, std::move(session));
 }
 
+void RenderSessionScheduler::schedule(std::function<void()>&& task) {
+  const auto lock = std::scoped_lock{mutex_};
+  queue_.push_back(std::move(task));
+}
+
+void RenderSessionScheduler::schedule(
+  const mbgl::util::SimpleIdentity, std::function<void()>&& task
+) {
+  schedule(std::move(task));
+}
+
+auto RenderSessionScheduler::drain() -> void {
+  {
+    const auto lock = std::scoped_lock{mutex_};
+    if (draining_) {
+      // A task re-entered drain(). The loop below still owns the queue.
+      return;
+    }
+    draining_ = true;
+  }
+  // Clear the flag on every exit, including a throwing task. Leaving it set
+  // would silently stop this session from ever delivering results again.
+  const auto clear_draining = DrainGuard{*this};
+  while (true) {
+    auto batch = std::vector<std::function<void()>>{};
+    {
+      const auto lock = std::scoped_lock{mutex_};
+      if (queue_.empty()) {
+        return;
+      }
+      batch.swap(queue_);
+    }
+    // Run outside the lock: a task may schedule more work.
+    for (auto& task : batch) {
+      if (task) {
+        task();
+      }
+    }
+  }
+}
+
+RenderSessionScheduler::DrainGuard::~DrainGuard() {
+  const auto lock = std::scoped_lock{scheduler_.mutex_};
+  scheduler_.draining_ = false;
+}
+
+auto RenderSessionScheduler::discard() -> void {
+  auto batch = std::vector<std::function<void()>>{};
+  const auto lock = std::scoped_lock{mutex_};
+  batch.swap(queue_);
+}
+
 auto validate_render_session(mln_render_session* session) -> mln_status {
   if (session == nullptr) {
     set_thread_error("render session must not be null");
@@ -925,7 +978,9 @@ auto validate_render_session(mln_render_session* session) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (session->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("render session call must be made on its owner thread");
+    set_thread_error(
+      "render session call must be made on the thread that attached it"
+    );
     return MLN_STATUS_WRONG_THREAD;
   }
   return MLN_STATUS_OK;
@@ -971,6 +1026,12 @@ auto attach_render_session(
     return output_status;
   }
 
+  // The attaching thread owns the session for its whole lifetime. The session
+  // records its own thread rather than inheriting the map's, which is what lets
+  // a host attach where its graphics context is current while the map stays on
+  // the runtime loop thread.
+  session->owner_thread = std::this_thread::get_id();
+
   auto* map = session->map;
   auto* handle = session.get();
   const auto attach_status = map_attach_render_target_session(map, handle);
@@ -978,9 +1039,26 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    map_native(map)->setSize(mbgl::Size{session->width, session->height});
+    const auto size_status =
+      map_post_set_size(map, session->width, session->height);
+    if (size_status != MLN_STATUS_OK) {
+      static_cast<void>(map_detach_render_target_session(map, handle));
+      return size_status;
+    }
     warn_on_scale_factor_mismatch(map, session->scale_factor);
+    // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
+    // Create the backend's graphics context here, on the thread that will drive
+    // the session and where the host's context is current. WGL resolves
+    // wglCreateContextAttribsARB through wglGetProcAddress, which needs a
+    // current context, and shares against the host context by checking whether
+    // it is current on *this* thread. This is why attach must be called on the
+    // render loop thread rather than the map's: a graphics context cannot be
+    // current on two threads at once.
+    // Vulkan and Metal activate() are no-ops, so this costs them nothing.
+    if (auto* backend = renderer_backend(handle); backend != nullptr) {
+      const auto prime = mbgl::gfx::BackendScope{*backend};
+    }
     register_render_session(handle, std::move(session));
   } catch (...) {
     static_cast<void>(map_detach_render_target_session(map, handle));
@@ -1045,7 +1123,10 @@ auto render_session_resize(
     session->texture.acquired_native_texture = nullptr;
     session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
-  map_native(session->map)->setSize(mbgl::Size{width, height});
+  const auto size_status = map_post_set_size(session->map, width, height);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
   warn_on_scale_factor_mismatch(session->map, scale_factor);
   session->renderer.reset();
   session->rendered_generation = 0;
@@ -1082,6 +1163,20 @@ auto render_session_render_update(
     return MLN_STATUS_OK;
   }
 
+  // The map applies its logical size on its own thread, so a resize leaves this
+  // session holding an update built for the previous extent while the render
+  // target has already changed. Rendering it anyway would take the projection
+  // from the update's logical size but the viewport and scissor from the
+  // backend's physical size, producing a visibly stretched frame. Wait for the
+  // update that matches instead. This cannot stall: Transform::resize
+  // publishes a new update unless the size is already what we want.
+  if (
+    update->transformState.getSize() !=
+    mbgl::Size{session->width, session->height}
+  ) {
+    return MLN_STATUS_OK;
+  }
+
   if (session->kind == RenderSessionKind::Texture) {
     session->texture.backend->prepare_render_resources();
   }
@@ -1090,7 +1185,11 @@ auto render_session_render_update(
     set_thread_error("render session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
+  // Deliver tile and resource results first: destroying the tiles they retire
+  // is what enqueues the GPU-release work that map_run_render_jobs() drains.
+  session->scheduler.drain();
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
     try {
@@ -1110,6 +1209,9 @@ auto render_session_render_update(
     set_native_stage_error("rendering update", exception);
     return MLN_STATUS_NATIVE_ERROR;
   }
+  // Absorb results that landed from worker threads during the render, so they
+  // do not wait a whole frame.
+  session->scheduler.drain();
   if (session->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =
@@ -1143,9 +1245,18 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
   if (detach_status != MLN_STATUS_OK) {
     return detach_status;
   }
-  session->renderer.reset();
-  session->surface.backend.reset();
-  session->texture.backend.reset();
+  {
+    auto current = ScopedCurrentScheduler{session->scheduler};
+    // Let queued results land while the renderer they target still exists.
+    session->scheduler.drain();
+    session->renderer.reset();
+    session->surface.backend.reset();
+    session->texture.backend.reset();
+    // Anything enqueued during teardown is a mailbox receive or a bindOnce
+    // continuation whose target is already gone, so running it would be a
+    // no-op. Drop it rather than execute arbitrary work mid-teardown.
+    session->scheduler.discard();
+  }
   session->attached = false;
   session->rendered_generation = 0;
   session->texture.rendered_native_texture = nullptr;
@@ -1187,6 +1298,7 @@ auto render_session_reduce_memory_use(mln_render_session* session)
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
@@ -1201,6 +1313,7 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->clearData();
   return MLN_STATUS_OK;
@@ -1215,6 +1328,7 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
@@ -1247,13 +1361,14 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->setFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id), *state_object
   );
-  map_native(session->map)->triggerRepaint();
+  static_cast<void>(map_post_trigger_repaint(session->map));
   return MLN_STATUS_OK;
 }
 
@@ -1275,6 +1390,7 @@ auto render_session_get_feature_state(
   }
 
   auto state = mbgl::FeatureState{};
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
@@ -1300,6 +1416,7 @@ auto render_session_remove_feature_state(
     return MLN_STATUS_INVALID_STATE;
   }
 
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->removeFeatureState(
     string_from_view(selector->source_id),
@@ -1311,7 +1428,7 @@ auto render_session_remove_feature_state(
       *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
     )
   );
-  map_native(session->map)->triggerRepaint();
+  static_cast<void>(map_post_trigger_repaint(session->map));
   return MLN_STATUS_OK;
 }
 
@@ -1376,6 +1493,7 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_STATE;
   }
 
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
@@ -1435,6 +1553,7 @@ auto render_session_query_source_features(
   }
 
   auto native_source_id = string_from_view(source_id);
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   auto features =
     session->renderer->querySourceFeatures(native_source_id, *native_options);
@@ -1478,6 +1597,7 @@ auto render_session_query_feature_extensions(
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
+  auto current = ScopedCurrentScheduler{session->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   auto result = session->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),

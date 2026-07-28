@@ -1,6 +1,7 @@
 #ifndef MLN_C_API_TEST_SUPPORT_H
 #define MLN_C_API_TEST_SUPPORT_H
 
+#include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -33,6 +34,10 @@ bool mln_test_render_fixture_create(
   mln_map* map, mln_test_render_fixture* fixture
 );
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
+
+// Pumps the runtime until `flag` is set or the deadline passes. Returns whether
+// the flag was observed. Use for waiting on work another thread reports.
+bool mln_test_pump_until(mln_runtime* runtime, atomic_bool* flag);
 
 // Destroys everything this thread still has tracked, render session first, then
 // map, then runtime, and reports whether it reclaimed anything. Safe to call

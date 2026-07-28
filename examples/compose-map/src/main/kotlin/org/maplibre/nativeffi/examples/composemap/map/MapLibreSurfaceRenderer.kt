@@ -1,281 +1,173 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
-import kotlin.math.max
-import kotlin.math.min
-import org.maplibre.nativeffi.camera.AnimationOptions
-import org.maplibre.nativeffi.camera.CameraOptions
+import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceFrame
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderResult
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceRenderer
 import org.maplibre.nativeffi.examples.composemap.surface.NativeSurfaceSession
 import org.maplibre.nativeffi.examples.composemap.surface.ProducerBackend
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
-import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
-import org.maplibre.nativeffi.map.MapMode
-import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.runtime.RuntimeEventPayload
-import org.maplibre.nativeffi.runtime.RuntimeEventType
-import org.maplibre.nativeffi.runtime.RuntimeHandle
-import org.maplibre.nativeffi.runtime.RuntimeOptions
 
+/**
+ * The render loop.
+ *
+ * [render] runs on the bridge's producer thread, which owns the host graphics context and the
+ * borrowed texture, so that thread attaches the render session, renders through it, reattaches it
+ * on resize, and closes it. It touches the map only to attach, which native serves from any thread.
+ *
+ * Input decoding runs on the Compose thread and only enqueues camera commands; [MapRuntimeLoop]
+ * applies them on the thread that owns the map.
+ */
 internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   override val backend: ProducerBackend = MapLibreNativeSurfaceAdapter.backend
 
-  private var surfaceSession: NativeSurfaceSession? = null
-  private var ownerSession: NativeSurfaceSession? = null
-  private var runtime: RuntimeHandle? = null
-  private var map: MapHandle? = null
-  private var mapScaleFactor: Double? = null
-  private var renderSession: AttachedRenderSession? = null
-  private var currentExtent = SurfaceExtent.Empty
-  private var renderPending = true
-  private var closed = false
+  private val commands = CameraCommandQueue()
+  private val renderRequest = RenderRequest()
+  private val closed = AtomicBoolean(false)
+  private val failureReported = AtomicBoolean(false)
+
+  @Volatile private var surfaceSession: NativeSurfaceSession? = null
+  @Volatile private var ownerSession: NativeSurfaceSession? = null
+  @Volatile private var runtimeLoop: MapRuntimeLoop? = null
+  @Volatile private var renderSession: AttachedRenderSession? = null
+  @Volatile private var currentExtent = SurfaceExtent.Empty
 
   override fun onSurfaceAvailable(session: NativeSurfaceSession) {
-    session.withRendererAccess {
-      check(!closed) { "renderer is closed" }
-      surfaceSession = session
-      ownerSession = session
-      renderPending = true
-      session.requestFrame()
-    }
+    surfaceSession = session
+    ownerSession = session
+    requestRender()
   }
 
   override fun onSurfaceChanged(extent: SurfaceExtent) {
-    withRendererAccess {
-      if (closed || extent.isEmpty) {
-        return@withRendererAccess
-      }
-      currentExtent = extent
-      renderPending = true
-      surfaceSession?.requestFrame()
+    if (extent.isEmpty) {
+      return
     }
+    currentExtent = extent
+    requestRender()
   }
 
   override fun render(frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
-    check(!closed) { "renderer is closed" }
-    if (frame.extent.isEmpty) {
+    if (closed.get() || frame.extent.isEmpty) {
       return NativeSurfaceRenderResult.Skipped
     }
 
-    val currentMap = ensureMap(frame.extent)
-    val currentRuntime = checkNotNull(runtime) { "runtime was not created" }
-
-    currentRuntime.runOnce()
-    drainEvents(currentRuntime, currentMap)
-
-    val attached = ensureAttachedRenderSession(currentMap, frame)
-    if (!renderPending) {
+    val loop = ensureRuntimeLoop(frame.extent)
+    loop.failure?.let { error ->
+      if (failureReported.compareAndSet(false, true)) {
+        throw IllegalStateException("map runtime loop failed", error)
+      }
       return NativeSurfaceRenderResult.Skipped
     }
+    val map = loop.map ?: return NativeSurfaceRenderResult.Skipped
+    val attached = ensureAttachedRenderSession(map, frame)
 
-    return if (attached.session.renderUpdate()) {
-      renderPending = false
-      NativeSurfaceRenderResult.Rendered
-    } else {
-      renderPending = true
-      surfaceSession?.requestFrame()
-      NativeSurfaceRenderResult.Skipped
+    // Consume before rendering, so a request the runtime loop publishes during the render call is
+    // not discarded.
+    if (!renderRequest.consume()) {
+      return NativeSurfaceRenderResult.Skipped
     }
+    if (attached.session.renderUpdate()) {
+      return NativeSurfaceRenderResult.Rendered
+    }
+    // The map applies a new logical size on the runtime loop's next runOnce, so an attach or resize
+    // is followed by frames with nothing to render. Keep pacing and retry.
+    requestRender()
+    return NativeSurfaceRenderResult.Skipped
   }
 
   override fun onSurfaceLost() {
-    withRendererAccess {
-      surfaceSession = null
-      closeRenderSession()
+    withRendererAccess { closeRenderSession() }
+    surfaceSession = null
+  }
+
+  override fun close() {
+    if (!closed.compareAndSet(false, true)) {
+      return
+    }
+    surfaceSession = null
+    val owner = ownerSession
+    ownerSession = null
+    // The render loop closes the session before the runtime loop closes the map: a map with an
+    // attached session cannot be destroyed.
+    if (renderSession != null && owner != null) {
+      owner.withRendererAccess {
+        closeRenderSession()
+        stopRuntimeLoop()
+      }
+    } else {
+      stopRuntimeLoop()
     }
   }
 
   fun requestRender() {
-    withRendererAccess {
-      if (closed) {
-        return@withRendererAccess
-      }
-      renderPending = true
-      surfaceSession?.requestFrame()
-    }
+    renderRequest.set()
+    surfaceSession?.requestFrame()
   }
 
   fun moveBy(deltaX: Double, deltaY: Double) {
-    withRendererAccess {
-      map?.moveBy(deltaX, deltaY)
-      requestRender()
-    }
+    enqueue(CameraCommand.MoveBy(deltaX, deltaY))
   }
 
   fun scaleBy(scale: Double, anchorX: Double, anchorY: Double) {
-    withRendererAccess {
-      map?.scaleBy(scale, ScreenPoint(anchorX, anchorY))
-      requestRender()
-    }
+    enqueue(CameraCommand.ScaleBy(scale, ScreenPoint(anchorX, anchorY)))
   }
 
   fun moveByAnimated(deltaX: Double, deltaY: Double) {
-    withRendererAccess {
-      map?.moveByAnimated(deltaX, deltaY, KEYBOARD_ANIMATION)
-      requestRender()
-    }
+    enqueue(CameraCommand.MoveByAnimated(deltaX, deltaY))
   }
 
   fun scaleByAnimated(scale: Double) {
-    withRendererAccess {
-      map?.scaleByAnimated(scale, viewportCenter(), KEYBOARD_ANIMATION)
-      requestRender()
-    }
+    enqueue(CameraCommand.ScaleByAnimated(scale, viewportCenter()))
   }
 
   fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
-    withRendererAccess {
-      val currentMap = map ?: return@withRendererAccess
-      val camera = currentMap.camera
-      currentMap.jumpTo(
-        CameraOptions().apply {
-          bearing = (camera.bearing ?: 0.0) + deltaX * DRAG_ROTATE_FACTOR
-          pitch = ((camera.pitch ?: 0.0) - deltaY * DRAG_PITCH_FACTOR).clampPitch()
-        }
-      )
-      requestRender()
-    }
+    enqueue(
+      CameraCommand.AdjustBearingAndPitch(deltaX * DRAG_ROTATE_FACTOR, -deltaY * DRAG_PITCH_FACTOR)
+    )
   }
 
   fun rotateBy(deltaDegrees: Double) {
-    withRendererAccess {
-      val currentMap = map ?: return@withRendererAccess
-      currentMap.easeTo(
-        CameraOptions().apply { bearing = (currentMap.camera.bearing ?: 0.0) + deltaDegrees },
-        KEYBOARD_ANIMATION,
-      )
-      requestRender()
-    }
+    enqueue(CameraCommand.AdjustBearingAnimated(deltaDegrees))
   }
 
   fun pitchBy(deltaDegrees: Double) {
-    withRendererAccess {
-      val currentMap = map ?: return@withRendererAccess
-      currentMap.easeTo(
-        CameraOptions().apply {
-          pitch = ((currentMap.camera.pitch ?: 0.0) + deltaDegrees).clampPitch()
-        },
-        KEYBOARD_ANIMATION,
-      )
-      requestRender()
-    }
+    enqueue(CameraCommand.AdjustPitchAnimated(deltaDegrees))
   }
 
   fun resetPitchAndBearing() {
-    withRendererAccess {
-      map?.easeTo(
-        CameraOptions().apply {
-          bearing = 0.0
-          pitch = 0.0
-        },
-        RESET_ANIMATION,
-      )
-      requestRender()
-    }
+    enqueue(CameraCommand.ResetOrientation)
   }
 
   fun cancelTransitions() {
-    withRendererAccess { map?.cancelTransitions() }
+    enqueue(CameraCommand.CancelTransitions)
   }
 
-  override fun close() {
-    withRendererAccess { closeOwnedResources() }
-  }
-
-  private fun closeOwnedResources() {
-    if (closed) {
-      return
-    }
-    closed = true
-    surfaceSession = null
-    val closingMap = map
-    val closingRuntime = runtime
-    map = null
-    runtime = null
-    mapScaleFactor = null
-    ownerSession = null
-    try {
-      closeRenderSession()
-    } finally {
-      try {
-        closingMap?.close()
-      } finally {
-        closingRuntime?.close()
-      }
-    }
+  private fun enqueue(command: CameraCommand) {
+    commands.enqueue(command)
+    requestRender()
   }
 
   private fun <T> withRendererAccess(action: () -> T): T =
     ownerSession?.withRendererAccess(action) ?: action()
 
-  private fun ensureMap(extent: SurfaceExtent): MapHandle {
-    map?.let { existing ->
-      if (mapScaleFactor == extent.scaleFactor) {
+  private fun ensureRuntimeLoop(extent: SurfaceExtent): MapRuntimeLoop {
+    runtimeLoop?.let { existing ->
+      if (existing.scaleFactor == extent.scaleFactor) {
         return existing
       }
-      closeMapForScaleFactorChange()
+      closeRenderSession()
+      stopRuntimeLoop()
     }
-
-    val createdRuntime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
-    val createdMap =
-      try {
-        MapHandle.create(
-          createdRuntime,
-          MapOptions().apply {
-            width = extent.width
-            height = extent.height
-            scaleFactor = extent.scaleFactor
-            mapMode = MapMode.CONTINUOUS
-          },
-        )
-      } catch (error: RuntimeException) {
-        createdRuntime.close()
-        throw error
-      }
-    try {
-      createdMap.setStyleUrl(STYLE_URL)
-      createdMap.jumpTo(
-        CameraOptions().apply {
-          center = LatLng(37.7749, -122.4194)
-          zoom = 13.0
-          bearing = 12.0
-          pitch = 30.0
-        }
-      )
-      runtime = createdRuntime
-      map = createdMap
-      mapScaleFactor = extent.scaleFactor
-      return createdMap
-    } catch (error: RuntimeException) {
-      try {
-        createdMap.close()
-      } finally {
-        createdRuntime.close()
-      }
-      throw error
-    }
+    return MapRuntimeLoop(extent, commands, renderRequest).also { runtimeLoop = it }
   }
 
-  private fun closeMapForScaleFactorChange() {
-    val closingMap = map
-    val closingRuntime = runtime
-    map = null
-    runtime = null
-    mapScaleFactor = null
-    renderPending = true
-    try {
-      closeRenderSession()
-    } finally {
-      try {
-        closingMap?.close()
-      } finally {
-        closingRuntime?.close()
-      }
-    }
+  private fun stopRuntimeLoop() {
+    val stopping = runtimeLoop
+    runtimeLoop = null
+    stopping?.close()
   }
 
   private fun ensureAttachedRenderSession(
@@ -292,25 +184,8 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     closeRenderSession()
     val attached = AttachedRenderSession(descriptor.key, descriptor.attach(map))
     renderSession = attached
-    renderPending = true
+    renderRequest.set()
     return attached
-  }
-
-  private fun drainEvents(runtime: RuntimeHandle, map: MapHandle) {
-    while (true) {
-      val event = runtime.pollEvent() ?: return
-      if (event.mapSource != map) {
-        continue
-      }
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
-        renderPending = true
-      } else if (
-        event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
-      ) {
-        renderPending = true
-      }
-    }
   }
 
   private fun closeRenderSession() {
@@ -319,8 +194,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     closing?.session?.close()
   }
 
-  private fun viewportCenter(): ScreenPoint =
-    ScreenPoint(currentExtent.width / 2.0, currentExtent.height / 2.0)
+  private fun viewportCenter(): ScreenPoint {
+    val extent = currentExtent
+    return ScreenPoint(extent.width / 2.0, extent.height / 2.0)
+  }
 
   private data class AttachedRenderSession(
     val key: MapLibreNativeSurfaceAdapter.TargetKey,
@@ -328,12 +205,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
   )
 
   private companion object {
-    private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
     private const val DRAG_ROTATE_FACTOR = 0.5
     private const val DRAG_PITCH_FACTOR = 0.5
-    private val KEYBOARD_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
-    private val RESET_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
   }
 }
-
-private fun Double.clampPitch(): Double = max(0.0, min(60.0, this))

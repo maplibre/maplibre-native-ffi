@@ -103,6 +103,21 @@ public final class MapHandle {
     try handle.requireLive()
   }
 
+  /// Produces a `Sendable` reference to this map for attaching a render
+  /// session.
+  ///
+  /// A render session is owned by the thread that attaches it, which need not
+  /// be
+  /// the map's owner thread. ``MapHandle`` is not `Sendable`, so this is how
+  /// the
+  /// thread driving a render loop names the map it renders while the map itself
+  /// stays on the runtime owner thread.
+  public func attachRef() throws -> MapAttachRef {
+    // Resolve once so a closed map fails here rather than at the first attach.
+    _ = try requireLivePointer()
+    return MapAttachRef(handle: handle)
+  }
+
   private static func register(_ map: MapHandle) {
     registryLock.withLock {
       registry[map.nativeAddress] = WeakMapHandle(map)

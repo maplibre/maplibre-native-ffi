@@ -4,6 +4,7 @@ const build_options = @import("build_options");
 const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
 const c = @import("c.zig").c;
+const channel = @import("channel.zig");
 const diagnostics = @import("diagnostics.zig");
 const maplibre = @import("maplibre_native");
 const input = @import("input.zig");
@@ -14,6 +15,41 @@ const viewport = @import("viewport.zig");
 
 const RenderTarget = render.RenderTarget;
 const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+
+const RuntimeLoopArgs = struct {
+    allocator: std.mem.Allocator,
+    io: std.Io,
+    initial_viewport: types.Viewport,
+    commands: *channel.CommandQueue,
+    render_request: *channel.RenderRequest,
+    map_channel: *channel.MapChannel,
+};
+
+/// Owns the runtime and the map for their whole lifetime, on a thread that is
+/// not the one presenting. It never touches the render session: the render loop
+/// attaches its own against the map published here.
+fn runtimeLoop(args: RuntimeLoopArgs) void {
+    runtimeLoopFallible(args) catch |err| args.map_channel.fail(err);
+}
+
+fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
+    var state = try map_state.MapState.init(args.allocator, args.initial_viewport);
+    defer state.deinit();
+
+    args.map_channel.publishMap(state.map);
+
+    while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
+        try state.applyCommands(args.commands);
+        try state.runtime.runOnce();
+        if (try map_state.drainEvents(args.allocator, &state.runtime, &state.map)) {
+            args.render_request.set();
+        }
+
+        // run_once never blocks waiting for work, so pace the loop instead of
+        // spinning on it. One display refresh period is the spec's ceiling.
+        args.io.sleep(.fromMilliseconds(4), .awake) catch {};
+    }
+}
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
@@ -66,28 +102,80 @@ pub fn main(init_args: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var map = try map_state.MapState.init(allocator, window_handle, current_viewport, target_mode);
-    defer map.deinit();
-    defer map.finishFrame() catch |err| {
-        std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
+    // The graphics context, the render session, and every presentation resource
+    // belong to this thread, which owns the window and its display callbacks.
+    var target = try RenderTarget.init(allocator, window_handle, current_viewport, target_mode);
+
+    var commands = channel.CommandQueue{};
+    var render_request = channel.RenderRequest{};
+    var map_channel = channel.MapChannel{};
+
+    const runtime_thread = try std.Thread.spawn(.{}, runtimeLoop, .{RuntimeLoopArgs{
+        .allocator = allocator,
+        .io = init_args.io,
+        .initial_viewport = current_viewport,
+        .commands = &commands,
+        .render_request = &render_request,
+        .map_channel = &map_channel,
+    }});
+
+    const result = renderLoop(
+        init_args.io,
+        allocator,
+        window_handle,
+        target_mode,
+        &target,
+        &current_viewport,
+        &commands,
+        &render_request,
+        &map_channel,
+    );
+
+    // Destroy the session before the runtime loop destroys the map: a map with
+    // an attached session cannot be destroyed.
+    target.deinit();
+    map_channel.requestShutdown();
+    runtime_thread.join();
+
+    try result;
+    if (map_channel.failureValue()) |err| return err;
+}
+
+/// The display-paced render loop. Owns the window, input, and the render
+/// session once it adopts it.
+fn renderLoop(
+    io: std.Io,
+    allocator: std.mem.Allocator,
+    window_handle: *c.SDL_Window,
+    target_mode: types.RenderTargetMode,
+    target: *RenderTarget,
+    current_viewport: *types.Viewport,
+    commands: *channel.CommandQueue,
+    render_request: *channel.RenderRequest,
+    map_channel: *channel.MapChannel,
+) !void {
+    // The runtime loop creates the map; this loop attaches its own session
+    // against it and owns that session for the rest of the run.
+    var map = while (true) {
+        if (map_channel.failureValue()) |err| return err;
+        if (map_channel.mapHandle()) |handle| break handle;
+        try io.sleep(.fromMilliseconds(1), .awake);
     };
+    try target.attach(&map, current_viewport.*);
 
     printStartupStatus(target_mode);
     input.logControls();
 
     var running = true;
-    var has_presented_frame = false;
-    var render_pending = true;
     var input_controller = input.Controller{};
-    // TODO(map-example-spec): Replace poll-and-sleep with a display-paced host loop. See Frame loop.
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
 
-        var did_work = false;
+        if (map_channel.failureValue()) |err| return err;
+
         var event: c.SDL_Event = undefined;
         while (c.SDL_PollEvent(&event)) {
-            did_work = true;
             switch (event.type) {
                 c.SDL_EVENT_QUIT => running = false,
                 c.SDL_EVENT_WINDOW_CLOSE_REQUESTED => running = false,
@@ -95,43 +183,48 @@ pub fn main(init_args: std.process.Init) !void {
                 c.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED,
                 c.SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED,
                 => {
-                    current_viewport = viewport.get(window_handle);
-                    viewport.log("resized viewport", current_viewport);
-                    if (map.needsReattachOnResize()) {
-                        try map.resizeWithReattachedTarget(window_handle, current_viewport, target_mode);
+                    current_viewport.* = viewport.get(window_handle);
+                    viewport.log("resized viewport", current_viewport.*);
+                    if (target.needsReattachOnResize()) {
+                        // Reattach is entirely local now: close the session,
+                        // rebuild the target, attach again, all on this thread.
+                        target.deinit();
+                        target.* = try RenderTarget.init(
+                            allocator,
+                            window_handle,
+                            current_viewport.*,
+                            target_mode,
+                        );
+                        try target.attach(&map, current_viewport.*);
                     } else {
-                        try map.resize(current_viewport);
+                        try target.resize(current_viewport.*);
                     }
-                    render_pending = true;
+                    render_request.set();
                 },
                 else => {
-                    const input_result = try input_controller.handleEvent(
+                    const input_result = input_controller.handleEvent(
                         &event,
-                        &map.map,
-                        map.diagnostic_store,
-                        current_viewport,
+                        commands,
+                        current_viewport.*,
                     );
-                    render_pending = render_pending or input_result.camera_changed;
+                    if (input_result.camera_changed) render_request.set();
                 },
             }
         }
 
-        try map.runtime.runOnce();
-        const render_update_available = try map_state.drainEvents(allocator, &map.runtime, &map.map);
-        render_pending = render_pending or render_update_available;
-        did_work = did_work or render_update_available;
+        try target.finishFrame();
 
-        try map.finishFrame();
-
-        if (render_pending) {
-            if (try map.renderUpdate(current_viewport)) {
-                render_pending = false;
-                did_work = true;
-                has_presented_frame = true;
+        // Consume before rendering, so a request the runtime loop publishes
+        // during the render call is not discarded.
+        if (render_request.consume()) {
+            if (!try target.renderUpdate(null, current_viewport.*)) {
+                render_request.set();
             }
         }
 
-        if (!did_work) c.SDL_Delay(if (has_presented_frame) 8 else 1);
+        // Stand-in for a display-refresh subscription until the host loop is
+        // display-paced; see the frame loop section of the example spec.
+        try io.sleep(.fromMilliseconds(8), .awake);
     }
 }
 

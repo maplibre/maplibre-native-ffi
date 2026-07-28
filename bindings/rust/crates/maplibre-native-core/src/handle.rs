@@ -1,6 +1,7 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
+use std::sync::Mutex;
 
 use maplibre_native_sys as sys;
 
@@ -9,6 +10,50 @@ use crate::ptr::non_null_mut;
 
 pub type StatusDestroyFn<T> = unsafe extern "C" fn(*mut T) -> sys::mln_status;
 pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(*mut T);
+
+/// A native handle a best-effort release could not destroy.
+///
+/// Rust releases handles deterministically, so this reports the one case a
+/// destructor cannot: the native destroy was attempted and refused. The handle
+/// stays live, and the address is reported here rather than dropped silently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeHandleLeak {
+    /// The native type name, such as `mln_map`.
+    pub type_name: &'static str,
+    /// The native address that was not destroyed.
+    pub address: usize,
+}
+
+type LeakReporter = Box<dyn Fn(NativeHandleLeak) + Send + Sync>;
+
+static LEAK_REPORTER: Mutex<Option<LeakReporter>> = Mutex::new(None);
+
+/// Installs the process-wide reporter for handles a destructor could not
+/// destroy, replacing any previous one, and returns whether one was installed.
+///
+/// The most common cause is dropping a parent handle before its child: the C
+/// API refuses to destroy a map that still has a render session attached, and
+/// an infallible `Drop` has nowhere to return that error. Explicit `close`
+/// still reports it through the normal error path.
+pub fn set_leak_reporter(reporter: Option<LeakReporter>) -> bool {
+    let mut slot = LEAK_REPORTER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let replaced = slot.is_some();
+    *slot = reporter;
+    replaced
+}
+
+/// Reports a handle a destructor could not destroy. Never panics: it is called
+/// from `Drop`, where unwinding would abort.
+pub fn report_leak(leak: NativeHandleLeak) {
+    let slot = LEAK_REPORTER
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if let Some(reporter) = slot.as_ref() {
+        reporter(leak);
+    }
+}
 
 /// Bridge-neutral native pointer ownership state.
 ///

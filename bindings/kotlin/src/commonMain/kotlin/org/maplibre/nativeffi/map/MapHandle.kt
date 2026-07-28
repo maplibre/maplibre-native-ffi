@@ -371,6 +371,21 @@ public expect class MapHandle : AutoCloseable {
 
   public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng>
 
+  /**
+   * Attaches a render target to this map, returning the map's one live render session.
+   *
+   * The calling thread becomes the session's owner thread for the session's lifetime, and it need
+   * not be this map's owner thread. Call this on the thread that will drive the session, which for
+   * a graphics API with a thread-current context is the thread where that context is current. Every
+   * session call, including close, reports the wrong-thread error from any other thread.
+   *
+   * The session does not keep this handle alive on the Kotlin side. Native keeps the map alive by
+   * refusing to destroy a map that still has a session attached, so close the session before
+   * closing the map.
+   *
+   * The map applies its logical size on its own owner thread, so the map size and rendering lag
+   * until that thread pumps the runtime at least once after attaching.
+   */
   public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle
 
   public fun attachMetalBorrowedTexture(

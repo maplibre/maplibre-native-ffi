@@ -1,7 +1,11 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
@@ -46,9 +50,35 @@ pub use style::{
     VectorTileEncoding,
 };
 
+/// Cross-thread liveness for one map address.
+///
+/// The map handle publishes its address here and retires it when the native map
+/// is destroyed, so a [`MapAttachRef`] on another thread observes a closed map
+/// rather than an address a later map could reuse. Without this the reference
+/// would carry a bare pointer, and the C API's registry lookup keys on the
+/// pointer value, so an address reused by a new map would attach to the wrong
+/// one.
+#[derive(Debug)]
+pub(crate) struct MapAddress(AtomicUsize);
+
+impl MapAddress {
+    fn new(ptr: NonNull<sys::mln_map>) -> Self {
+        Self(AtomicUsize::new(ptr.as_ptr() as usize))
+    }
+
+    fn get(&self) -> Option<NonNull<sys::mln_map>> {
+        NonNull::new(self.0.load(Ordering::Acquire) as *mut sys::mln_map)
+    }
+
+    fn retire(&self) {
+        self.0.store(0, Ordering::Release);
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct MapState {
     handle: ThreadAffineNativeHandle<sys::mln_map>,
+    address: Arc<MapAddress>,
     runtime: RefCell<Option<Rc<RuntimeState>>>,
     id: MapId,
     custom_geometry_sources: RefCell<HashMap<String, Box<CustomGeometrySourceState>>>,
@@ -62,6 +92,7 @@ impl MapState {
             unsafe { ThreadAffineNativeHandle::from_raw(ptr, sys::mln_map_destroy, "mln_map") };
         Self {
             handle,
+            address: Arc::new(MapAddress::new(ptr)),
             runtime: RefCell::new(Some(runtime)),
             id,
             custom_geometry_sources: RefCell::new(HashMap::new()),
@@ -84,6 +115,9 @@ impl MapState {
     fn close(&self) -> Result<()> {
         let ptr = self.handle.as_ptr();
         self.handle.close()?;
+        // Retire only after a successful destroy. A failed close leaves the
+        // native map live, so an attach reference must still resolve to it.
+        self.address.retire();
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(ptr);
         }
@@ -140,6 +174,13 @@ impl Drop for MapState {
     fn drop(&mut self) {
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(self.handle.as_ptr());
+        }
+        // `ThreadAffineNativeHandle`'s own `Drop` runs after this and attempts
+        // the native destroy. It leaves the handle live when that fails, which
+        // it does while a render session is still attached, so the address is
+        // retired only once the handle really is closed.
+        if self.handle.is_closed() {
+            self.address.retire();
         }
     }
 }
@@ -765,7 +806,75 @@ impl MapHandle {
         MapProjectionHandle::new(self)
     }
 
-    /// Attaches a Metal native surface render target to this map.
+    /// Produces a [`Send`] reference to this map for attaching a render session.
+    ///
+    /// A render session is owned by the thread that attaches it, which need not
+    /// be the map's owner thread. [`MapHandle`] is `!Send`, so this is how the
+    /// thread that drives a render loop names the map it renders while the map
+    /// itself stays on the runtime owner thread.
+    pub fn attach_ref(&self) -> Result<MapAttachRef> {
+        self.inner.as_ptr()?;
+        Ok(MapAttachRef {
+            address: Arc::clone(&self.inner.address),
+            _not_sync: PhantomData,
+        })
+    }
+}
+
+/// A reference to a map for the sole purpose of attaching a render session.
+///
+/// Produced by [`MapHandle::attach_ref`]. Every attach function lives here
+/// rather than on [`MapHandle`], because attaching is the one map operation
+/// that runs on the render session's thread instead of the map's.
+///
+/// This carries no Rust retention of the map, because [`MapHandle`] is `!Send`.
+/// Native keeps the map alive instead: destroying a map fails while a render
+/// session is attached to it. Closing the map retires the shared address, so a
+/// reference that outlives its map reports a closed handle rather than binding
+/// a session to whatever the allocator put at that address next.
+///
+/// Dropping a [`MapHandle`] instead of closing it, while a session is still
+/// attached, leaks the native map: the destroy fails and an infallible `Drop`
+/// cannot return the error. It reports the address through
+/// [`set_leak_reporter`](crate::set_leak_reporter) instead, and the runtime
+/// stays undestroyable until that map is destroyed. Close the session first,
+/// then the map.
+///
+/// This is `Send` and deliberately not `Sync`: one thread holds it at a time.
+/// It needs no `unsafe impl`, because the address it shares lives in an
+/// `AtomicUsize` and the attach it performs reaches no thread-affine map state
+/// — the C API claims the map's render-session slot under its registry lock and
+/// posts the new size to the map's own owner thread.
+#[derive(Clone)]
+pub struct MapAttachRef {
+    address: Arc<MapAddress>,
+    _not_sync: PhantomData<Cell<()>>,
+}
+
+impl fmt::Debug for MapAttachRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MapAttachRef").finish()
+    }
+}
+
+impl MapAttachRef {
+    /// Whether the map this reference names has been closed.
+    ///
+    /// A reference can outlive its [`MapHandle`], so a host that keeps one
+    /// across a map's lifetime can check here instead of relying on the error
+    /// from a failed attach.
+    pub fn is_map_closed(&self) -> bool {
+        self.address.get().is_none()
+    }
+
+    pub(crate) fn as_ptr(&self) -> Result<*mut sys::mln_map> {
+        self.address
+            .get()
+            .map(NonNull::as_ptr)
+            .ok_or_else(|| closed_handle_error("MapHandle"))
+    }
+
+    /// Attaches a Metal native surface render target to the map.
     ///
     /// The layer and optional device pointers are backend-native handles. They
     /// must name valid Metal objects for this session and remain usable on the
@@ -782,7 +891,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan native surface render target to this map.
+    /// Attaches a Vulkan native surface render target to the map.
     ///
     /// Vulkan handles are borrowed. They must remain valid and externally
     /// synchronized until the session is detached or closed.
@@ -798,7 +907,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL native surface render target to this map.
+    /// Attaches an OpenGL native surface render target to the map.
     ///
     /// OpenGL context provider and surface handles are borrowed. They must
     /// remain valid and externally synchronized until the session is detached
@@ -815,7 +924,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Metal session-owned texture render target to this map.
+    /// Attaches a Metal session-owned texture render target to the map.
     ///
     /// The device pointer must name a valid Metal device that remains usable on
     /// the owner thread until the session is detached or closed.
@@ -831,7 +940,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Metal caller-owned texture render target to this map.
+    /// Attaches a Metal caller-owned texture render target to the map.
     ///
     /// The texture pointer is borrowed. The caller owns the texture, keeps it
     /// valid until detach or close, and synchronizes use outside this session.
@@ -847,7 +956,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan session-owned texture render target to this map.
+    /// Attaches a Vulkan session-owned texture render target to the map.
     ///
     /// Vulkan device and queue handles are borrowed. They must remain valid and
     /// externally synchronized until the session is detached or closed.
@@ -863,7 +972,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan caller-owned texture render target to this map.
+    /// Attaches a Vulkan caller-owned texture render target to the map.
     ///
     /// Vulkan handles, image, and image view are borrowed. The caller owns the
     /// image resources, keeps them valid until detach or close, and handles
@@ -880,7 +989,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL session-owned texture render target to this map.
+    /// Attaches an OpenGL session-owned texture render target to the map.
     ///
     /// The context provider handles are borrowed. They must remain valid until
     /// the session is detached or closed. Host sampling must use a context in
@@ -897,7 +1006,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL caller-owned texture render target to this map.
+    /// Attaches an OpenGL caller-owned texture render target to the map.
     ///
     /// The context provider handles and texture object are borrowed. The caller
     /// owns the texture, keeps it valid until detach or close, and synchronizes

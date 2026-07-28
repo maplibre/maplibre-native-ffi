@@ -1187,16 +1187,26 @@ test "map size follows attach and resize and keeps the creation scale factor" {
 
     // The target renders at a different scale factor, which leaves the map's
     // own pixel ratio untouched.
+    //
+    // A session enqueues the map size for the map's owner thread rather than
+    // setting it in place, because the session may be owned by another thread,
+    // so the map keeps its previous size until the runtime is pumped.
     var owned = try attachTestOwnedTexture(&map, .{
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
     });
     defer owned.close() catch {};
+    const before_pump = try map.getSize();
+    try testing.expectEqual(@as(u32, 64), before_pump.width);
+    try testing.expectEqual(@as(u32, 32), before_pump.height);
+
+    try runtime.runOnce();
     const attached = try map.getSize();
     try testing.expectEqual(@as(u32, 32), attached.width);
     try testing.expectEqual(@as(u32, 16), attached.height);
     try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
 
     try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
+    try runtime.runOnce();
     const resized = try map.getSize();
     try testing.expectEqual(@as(u32, 48), resized.width);
     try testing.expectEqual(@as(u32, 24), resized.height);
@@ -2092,7 +2102,11 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try frame_alias.release();
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
+    // Resizing hands the new logical size to the map's owner thread, so the
+    // map publishes an update matching the new target only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
+    try testing.expect(!try session.renderUpdate());
+    try runtime.runOnce();
     try testing.expect(try session.renderUpdate());
     var resized_frame = try session.acquireVulkanOwnedTextureFrame();
     const resized_info = try resized_frame.info();

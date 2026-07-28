@@ -1,5 +1,9 @@
 
-class NativeHandleBox {
+/// Its only stored property is the lock-guarded `NativeHandleState`, so the box
+/// itself is safe to share. This is what lets `MapAttachRef` be plainly
+/// `Sendable` rather than `@unchecked`. The public handles that hold a box stay
+/// non-`Sendable`, so this does not make any of them crossable.
+class NativeHandleBox: @unchecked Sendable {
   private let state: NativeHandleState
 
   init(typeName: String, pointer: OpaquePointer?) throws {

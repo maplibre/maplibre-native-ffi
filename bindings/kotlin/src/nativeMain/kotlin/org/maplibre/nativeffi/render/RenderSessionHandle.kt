@@ -68,7 +68,7 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
-/** Owned native render session handle. Close it on the map owner thread. */
+/** Owned native render session handle. Close it on the thread that attached it. */
 @OptIn(ExperimentalForeignApi::class)
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, handle: CPointer<mln_render_session>) :

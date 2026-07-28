@@ -2566,6 +2566,10 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void {
   }
 }
 
+auto runtime_run_loop(mln_runtime* runtime) -> mbgl::util::RunLoop& {
+  return *runtime->run_loop;
+}
+
 auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions {
   auto options = mbgl::ResourceOptions::Default();

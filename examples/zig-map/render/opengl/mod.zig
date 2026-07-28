@@ -228,14 +228,22 @@ const PlatformOpenGLRenderTarget = union(enum) {
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-        map: *maplibre.MapHandle,
     ) !PlatformOpenGLRenderTarget {
         _ = allocator;
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = try OpenGLOwnedTextureBackend.init(window, viewport, map) },
-            .borrowed_texture => .{ .borrowed_texture = try OpenGLBorrowedTextureBackend.init(window, viewport, map) },
-            .native_surface => .{ .native_surface = try OpenGLSurfaceBackend.init(window, viewport, map) },
+            .owned_texture => .{ .owned_texture = try OpenGLOwnedTextureBackend.init(window, viewport) },
+            .borrowed_texture => .{ .borrowed_texture = try OpenGLBorrowedTextureBackend.init(window, viewport) },
+            .native_surface => .{ .native_surface = try OpenGLSurfaceBackend.init(window, viewport) },
         };
+    }
+
+    /// Attaches the render session on the map owner thread.
+    pub fn attach(self: *PlatformOpenGLRenderTarget, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        switch (self.*) {
+            .owned_texture => |*backend| try backend.attach(map, viewport),
+            .borrowed_texture => |*backend| try backend.attach(map, viewport),
+            .native_surface => |*backend| try backend.attach(map, viewport),
+        }
     }
 
     pub fn deinit(self: *PlatformOpenGLRenderTarget) void {
@@ -490,15 +498,19 @@ const OpenGLOwnedTextureBackend = struct {
     fn init(
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !OpenGLOwnedTextureBackend {
         var self = OpenGLOwnedTextureBackend{
             .compositor = try OpenGLTextureCompositor.init(window, viewport),
             .session = .none,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *OpenGLOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *OpenGLOwnedTextureBackend) void {
@@ -597,7 +609,6 @@ const OpenGLBorrowedTextureBackend = struct {
     fn init(
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !OpenGLBorrowedTextureBackend {
         var compositor = try OpenGLTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
@@ -607,8 +618,13 @@ const OpenGLBorrowedTextureBackend = struct {
             .compositor = compositor,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *OpenGLBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *OpenGLBorrowedTextureBackend) void {
@@ -662,8 +678,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn init(
         window: *c.SDL_Window,
-        viewport: types.Viewport,
-        map: *maplibre.MapHandle,
+        _: types.Viewport,
     ) !OpenGLSurfaceBackend {
         var context = try OpenGLContext.init(window);
         errdefer context.deinit();
@@ -673,8 +688,13 @@ const OpenGLSurfaceBackend = struct {
             .session = .none,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *OpenGLSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *OpenGLSurfaceBackend) void {

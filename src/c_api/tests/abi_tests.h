@@ -22,6 +22,7 @@ void run_core_abi_tests(void);
 void run_map_options_abi_tests(void);
 void run_render_backend_abi_tests(void);
 void run_owned_texture_abi_tests(void);
+void run_render_thread_abi_tests(void);
 void run_query_abi_tests(void);
 void run_resources_abi_tests(void);
 void run_style_values_abi_tests(void);

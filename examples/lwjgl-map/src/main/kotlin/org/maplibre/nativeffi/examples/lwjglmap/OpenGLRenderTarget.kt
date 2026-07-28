@@ -12,20 +12,6 @@ import org.maplibre.nativeffi.render.WglContextDescriptor
 
 internal object OpenGLRenderTarget {
   fun attach(
-    context: GraphicsContext,
-    map: MapHandle,
-    viewport: Viewport,
-    mode: RenderTargetMode,
-  ): RenderTarget {
-    val openGLContext = context as OpenGLContext
-    return when (mode) {
-      RenderTargetMode.NATIVE_SURFACE -> attachSurface(openGLContext, map, viewport)
-      RenderTargetMode.OWNED_TEXTURE -> attachOwnedTexture(openGLContext, map, viewport)
-      RenderTargetMode.BORROWED_TEXTURE -> attachBorrowedTexture(openGLContext, map, viewport)
-    }
-  }
-
-  private fun attach(
     context: OpenGLContext,
     map: MapHandle,
     viewport: Viewport,
@@ -44,7 +30,7 @@ internal object OpenGLRenderTarget {
   ): RenderTarget {
     val descriptor =
       OpenGLSurfaceDescriptor(
-        MapState.extent(viewport),
+        RenderTarget.extent(viewport),
         descriptor(context),
         NativePointer.ofAddress(context.surfaceAddress()),
       )
@@ -56,7 +42,8 @@ internal object OpenGLRenderTarget {
     map: MapHandle,
     viewport: Viewport,
   ): RenderTarget {
-    val descriptor = OpenGLOwnedTextureDescriptor(MapState.extent(viewport), descriptor(context))
+    val descriptor =
+      OpenGLOwnedTextureDescriptor(RenderTarget.extent(viewport), descriptor(context))
     var session: RenderSessionHandle? = null
     var compositor: OpenGLTextureCompositor? = null
     try {
@@ -64,8 +51,8 @@ internal object OpenGLRenderTarget {
       compositor = OpenGLTextureCompositor(context, viewport)
       return OwnedTexture(session, compositor)
     } catch (error: RuntimeException) {
-      MapState.closeSuppressed(error, compositor)
-      MapState.closeSuppressed(error, session)
+      RenderTarget.closeSuppressed(error, compositor)
+      RenderTarget.closeSuppressed(error, session)
       throw error
     }
   }
@@ -82,7 +69,7 @@ internal object OpenGLRenderTarget {
       texture = OpenGLBorrowedTexture(context, viewport)
       val descriptor =
         OpenGLBorrowedTextureDescriptor(
-          MapState.extent(viewport),
+          RenderTarget.extent(viewport),
           viewport.framebufferWidth(),
           viewport.framebufferHeight(),
           descriptor(context),
@@ -93,9 +80,9 @@ internal object OpenGLRenderTarget {
       compositor = OpenGLTextureCompositor(context, viewport)
       return BorrowedTexture(context, map, session, compositor, texture)
     } catch (error: RuntimeException) {
-      MapState.closeSuppressed(error, compositor)
-      MapState.closeSuppressed(error, session)
-      MapState.closeSuppressed(error, texture)
+      RenderTarget.closeSuppressed(error, compositor)
+      RenderTarget.closeSuppressed(error, session)
+      RenderTarget.closeSuppressed(error, texture)
       throw error
     }
   }
@@ -172,19 +159,17 @@ internal object OpenGLRenderTarget {
   ) : RenderTarget {
     override fun needsReattachOnResize(): Boolean = true
 
+    /** Local to the render loop thread: close the session, rebuild the texture, attach again. */
     override fun reattach(viewport: Viewport) {
       close()
       val replacement = attachBorrowedTexture(context, map, viewport)
-      if (replacement is BorrowedTexture) {
-        session = replacement.session
-        compositor = replacement.compositor
-        texture = replacement.texture
-        replacement.session = null
-        replacement.compositor = null
-        replacement.texture = null
-      } else {
-        error("unexpected borrowed texture replacement")
-      }
+      check(replacement is BorrowedTexture) { "unexpected borrowed texture replacement" }
+      session = replacement.session
+      compositor = replacement.compositor
+      texture = replacement.texture
+      replacement.session = null
+      replacement.compositor = null
+      replacement.texture = null
     }
 
     override fun resize(viewport: Viewport) {

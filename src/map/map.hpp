@@ -365,10 +365,23 @@ auto map_get_free_camera_options(
 auto map_set_free_camera_options(
   mln_map* map, const mln_free_camera_options* options
 ) -> mln_status;
+// Validates a map handle is non-null and live, from any thread. Use this only
+// where the caller genuinely runs off the map owner thread, such as the render
+// session detaching from its own owner thread. Everything that touches
+// thread-affine map state uses validate_map().
+auto validate_map_live(mln_map* map) -> mln_status;
 auto validate_map(mln_map* map) -> mln_status;
-auto map_owner_thread(const mln_map* map) -> std::thread::id;
 auto map_scale_factor(const mln_map* map) -> double;
+// Map-thread only. Code reachable from a render session's owner thread uses the
+// posting helpers below instead.
 auto map_native(mln_map* map) -> mbgl::Map*;
+
+// Queue a map mutation for the map's owner thread. Callable from any thread;
+// the effect lands on the map's next mln_runtime_run_once(). Returns
+// MLN_STATUS_INVALID_ARGUMENT when the map handle is null or no longer live.
+auto map_post_set_size(mln_map* map, uint32_t width, uint32_t height)
+  -> mln_status;
+auto map_post_trigger_repaint(mln_map* map) -> mln_status;
 auto map_latest_update(mln_map* map) -> std::shared_ptr<mbgl::UpdateParameters>;
 auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver*;
 auto map_run_render_jobs(mln_map* map) -> void;

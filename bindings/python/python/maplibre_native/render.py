@@ -426,7 +426,7 @@ class DetachedRenderSessionHandle(NativeHandleMixin):
 
 
 class RenderSessionHandle(NativeHandleMixin):
-    """Owner-thread render session handle bound to a retained map wrapper."""
+    """Render session handle affine to the thread that attached it."""
 
     _handle_name = "RenderSessionHandle"
 
