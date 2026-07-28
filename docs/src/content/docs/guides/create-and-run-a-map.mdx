@@ -8,44 +8,19 @@ sidebar:
 import { Aside, Code } from "@astrojs/starlight/components";
 import minimalLifecycle from "../../../../snippets/c/minimal-lifecycle.c?raw";
 
-If you know MapLibre from the web or from the Android and iOS SDKs, you know
-what a map does. What is new here is that nothing runs on its own. There is no
-map view driving a render loop and no background thread advancing the state
-machine — you create the pieces, you call the function that lets MapLibre do
-work, and you decide when frames happen.
+Nothing here runs on its own. There is no map view driving a render loop and no
+background thread advancing the state machine — you create the pieces, you call
+the function that lets MapLibre do work, and you decide when frames happen.
 
 This guide builds the skeleton every integration shares. It renders nothing yet;
 rendering attaches on top of it.
-
-## Two shapes of integration
-
-Almost everything built on this API is one of two things, and knowing which one
-you are building decides most of what follows.
-
-**An application, or an SDK under one.** A window or view exists, the map should
-follow the user's gestures, and frames keep coming as tiles arrive and labels
-settle. You will attach a
-[surface session](/maplibre-native-ffi/guides/render-to-a-surface/) and drive it
-from your toolkit's frame loop.
-
-**A snapshotter.** A raster tile server, a CLI that writes a PNG, a batch job
-rendering map images. There is no window and often no display at all. You want
-one finished image per request, then to move on. You will create the map in
-static or tile mode and attach a
-[texture session](/maplibre-native-ffi/guides/render-to-a-texture/).
-
-The lifecycle below is the same either way.
 
 ## Everything happens on one thread
 
 The runtime, its maps, and their render sessions are **owner-thread affine**:
 whichever thread creates the runtime owns all of it, and calls from any other
-thread are rejected rather than silently racing. One thread can own one runtime.
-
-This is the constraint that surprises people, so decide early which thread that
-is. In a GUI app it is usually the UI thread. In a server it is usually a
-dedicated worker per rendering slot — spin up several threads, each with its own
-runtime and map, if you want concurrent renders.
+thread are rejected rather than silently racing. One thread can own one runtime,
+so pick that thread deliberately.
 
 Callbacks are the exception: resource transforms and providers run on MapLibre's
 own network and worker threads, and they say so where they are documented.
@@ -75,8 +50,7 @@ starting viewport:
   change later. It picks which sprite, glyph, and raster densities the map
   requests for its whole life, so set it to the density you intend to render at.
 * `map_mode` — `CONTINUOUS` for a live map, `STATIC` for one-off stills of an
-  arbitrary viewport, `TILE` for one-off stills of a single tile. This is the
-  application/snapshotter fork from above.
+  arbitrary viewport, `TILE` for one-off stills of a single tile.
 
 A map is independent of any render target. You can load a style, move the
 camera, add sources and layers, and watch events on a map that has never
@@ -117,8 +91,8 @@ The events worth knowing on day one:
 | `MAP_STILL_IMAGE_FINISHED` / `FAILED`     | A requested still image resolved, in static and tile modes         |
 | `MAP_STYLE_IMAGE_MISSING`                 | The style wants an image ID nobody supplied                        |
 
-How often you pump is your call. A GUI app pumps once per frame; a headless tool
-pumps in a loop until it gets the event it is waiting for.
+How often you pump is your call — once per frame, or in a loop until the event
+you are waiting for arrives.
 
 ## The whole thing
 
@@ -132,24 +106,16 @@ Handles form a chain — runtime owns maps, maps own render sessions — and a
 parent refuses to close while a child is live. Close them in the reverse of the
 order you created them: session, then map, then runtime.
 
-Two things catch people out:
+Two things are worth knowing:
 
 **Destroying a map drops its queued events.** There is no flush and no final
 event. If you mirror map state from events, read what you need before you close
 the map that produces them.
 
-**Garbage collection will not do this for you.** Finalizers, `Drop`, and
-`using` blocks in the bindings report leaks; they do not stand in for closing a
+**Garbage collection will not do this for you.** Finalizers, `Drop`, and `using`
+blocks in the bindings report leaks; they do not stand in for closing a
 thread-affine handle on its owner thread. Close explicitly.
 
-<Aside>
-  Bindings add what their language needs to make the owner-thread rule
-  enforceable — Go pins a goroutine with `runtime.LockOSThread()`, .NET offers an
-  `OwnerThread` helper that runs closures on a dedicated thread, Zig takes an
-  allocator and a diagnostic store. The model underneath is the one above.
-</Aside>
-
 Next, give the map somewhere to draw: a
-[surface](/maplibre-native-ffi/guides/render-to-a-surface/) if you are building
-an application, a [texture](/maplibre-native-ffi/guides/render-to-a-texture/) if
-you are rendering images.
+[surface](/maplibre-native-ffi/guides/render-to-a-surface/) or a
+[texture](/maplibre-native-ffi/guides/render-to-a-texture/).

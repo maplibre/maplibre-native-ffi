@@ -8,14 +8,14 @@ sidebar:
 import { Aside, Code } from "@astrojs/starlight/components";
 import queryRendered from "../../../../snippets/c/query-rendered-features.c?raw";
 
-Queries answer questions about what the map is showing: what the user tapped,
-what a source holds, what a cluster expands to.
+Queries read map data back out: what is drawn at a point on screen, what a
+source holds, what a cluster expands to.
 
 They hang off the **render session**, not the map — because they read what was
 actually rendered. That means a session must be attached and must have rendered
 at least once before a query returns anything.
 
-## What did the user tap?
+## Query rendered features
 
 `query_rendered_features` takes a screen geometry — a point, a box, or a line
 string, in logical pixels — and returns the features drawn under it. Options
@@ -23,8 +23,8 @@ narrow it to a list of layer IDs and can apply a
 [style-spec filter](https://maplibre.org/maplibre-style-spec/expressions/)
 expression as JSON.
 
-For a tap handler, pass the layer IDs you care about. Without them the query
-matches everything rendered there, background fills included.
+Passing layer IDs is usually what you want. Without them the query matches
+everything rendered there, background fills included.
 
 Each result carries the feature, its source ID, its source layer where known,
 and its feature state where set. The results are copies you own; the pointers
@@ -33,7 +33,7 @@ it, then destroy the handle.
 
 <Code code={queryRendered} lang="c" title="query-rendered-features.c" />
 
-## What is in this source?
+## Query source features
 
 `query_source_features` reads out of a loaded source, skipping layer visibility,
 styling, and the viewport. Vector sources need their source layer IDs in the
@@ -63,8 +63,8 @@ feature from a clustered GeoJSON source and ask for its `"leaves"`,
 ## Feature state
 
 Feature state attaches per-feature key-value data — `"hover": true` and friends
-— that style expressions read through `feature-state`. It is how you highlight
-what the user is pointing at without touching the style.
+— that style expressions read through `feature-state`, so per-feature appearance
+can change without touching the style.
 
 State lives on the session's renderer, which has two consequences worth
 planning around: the renderer has to exist first, so render once after the style

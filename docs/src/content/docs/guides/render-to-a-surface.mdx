@@ -10,8 +10,8 @@ import attachSurface from "../../../../snippets/c/attach-opengl-surface.c?raw";
 import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
 
 A surface session draws the map into a native surface your window toolkit owns,
-and presents through it. This is the path for applications: you own the window,
-you own the graphics context, and MapLibre draws into them.
+and presents through it. You own the window and the graphics context; MapLibre
+draws into them.
 
 ## What you hand over
 
@@ -70,9 +70,9 @@ animations freeze partway.
 
 <Code code={frameLoop} lang="c" title="frame-loop.c" />
 
-What paces the loop is up to you. Prefer the display where you can —
-`CADisplayLink`, Android's `Choreographer`, your toolkit's frame callback. The
-example apps poll with a short sleep, which is simple and burns CPU.
+What paces the loop is up to you. Prefer the display where you can — a vsync or
+frame callback from your toolkit. The example apps poll with a short sleep,
+which is simple and burns CPU.
 
 ## Resize
 
@@ -87,8 +87,8 @@ displays you actually target.
 
 ## Follow the surface's life
 
-Surfaces come and go — the user closes the window, Android reports
-`surfaceDestroyed`, a view detaches. When the surface goes away:
+Surfaces come and go as windows close and views detach. When the surface goes
+away:
 
 1. Destroy the session with `mln_render_session_destroy()`, or release the map's
    slot with `mln_render_session_detach()` and destroy the handle after. A
@@ -96,13 +96,6 @@ Surfaces come and go — the user closes the window, Android reports
 2. Release your surface and context.
 3. When a new surface arrives, attach a fresh session. The map kept its camera
    and style the whole time.
-
-<Aside type="tip">
-  On Android, create the session from `surfaceCreated`/`surfaceChanged`, destroy
-  it from `surfaceDestroyed`, and pace with `Choreographer`. Call
-  `MaplibreAndroid.initialize(context)` once at startup first, or HTTPS requests
-  cannot validate against the platform trust store.
-</Aside>
 
 Complete working loops for each backend live in the example apps: `zig-map`,
 `rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`, and `android-map`.

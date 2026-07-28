@@ -1,6 +1,6 @@
-// Renders one still image with no window and reads the pixels back to the CPU.
-// This is the snapshotter shape: a static-mode map, a session-owned texture,
-// and a loop that ends on a completion event instead of running forever.
+// Renders one still image with no window and reads the pixels back to the CPU:
+// a static-mode map, a session-owned texture, and a loop that ends on a
+// completion event instead of running forever.
 
 #include <maplibre_native_c.h>
 #include <stdlib.h>

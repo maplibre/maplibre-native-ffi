@@ -84,12 +84,6 @@ can be called on logging or worker threads while internal locks are held, so
 keep it thread-safe, fast, and free of calls back into the API. Return
 "consumed" to suppress the platform logger.
 
-<Aside>
-  Python's binding does this differently out of necessity: `set_log_callback`
-  fills a bounded queue you poll from a `LogReceiver`, which keeps Python code
-  off native logging threads entirely.
-</Aside>
-
 On Android, call `mln_android_init` (`MaplibreAndroid.initialize(context)` from
 Kotlin) once at startup, or HTTPS requests cannot validate TLS against the
 platform trust store.

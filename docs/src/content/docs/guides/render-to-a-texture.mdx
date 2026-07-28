@@ -1,6 +1,6 @@
 ---
 title: Render to a Texture
-description: Render offscreen for snapshots and for compositing into your own scene.
+description: Render offscreen, read the pixels back, or use the frame on the GPU.
 sidebar:
   order: 4
 ---
@@ -9,27 +9,19 @@ import { Aside, Code } from "@astrojs/starlight/components";
 import stillImage from "../../../../snippets/c/still-image.c?raw";
 
 A texture session renders the map into a GPU texture instead of presenting it to
-a window. Two very different jobs use it:
-
-* **Snapshotting.** A tile server, a CLI, a batch renderer. You want pixels on
-  the CPU, no display involved.
-* **Compositing.** A game engine, or a toolkit surface like Skiko, that draws
-  the map as one layer inside its own scene.
+a window. From there you can read the pixels back to the CPU, or use the texture
+directly in your own rendering.
 
 ## Who owns the texture
 
-That choice is the main decision here.
+That is the first decision, and it changes what the session can do for you.
 
-|                 | Session-owned ("owned")                  | Caller-owned ("borrowed")                |
-| --------------- | ---------------------------------------- | ---------------------------------------- |
-| Created by      | The session, on your device or context   | You                                      |
-| Resizing        | `mln_render_session_resize()` in place   | Recreate the texture and the session     |
-| Using the frame | Acquire it, use it, release it           | It is already yours                      |
-| CPU readback    | `mln_texture_read_premultiplied_rgba8()` | Read it back yourself                    |
-| Fits            | Snapshots, headless rendering            | Engines compositing into their own frame |
-
-Snapshotters almost always want owned textures. Engines that already manage a
-frame graph almost always want borrowed ones.
+|                 | Session-owned ("owned")                  | Caller-owned ("borrowed")            |
+| --------------- | ---------------------------------------- | ------------------------------------ |
+| Created by      | The session, on your device or context   | You                                  |
+| Resizing        | `mln_render_session_resize()` in place   | Recreate the texture and the session |
+| Using the frame | Acquire it, use it, release it           | It is already yours                  |
+| CPU readback    | `mln_texture_read_premultiplied_rgba8()` | Read it back yourself                |
 
 Both attach with a backend-specific function —
 `mln_<backend>_owned_texture_attach()` or
@@ -40,17 +32,17 @@ session cannot measure a texture you created (a `VkImage` exposes no queryable
 extent, and the OpenGL ES 3.0 contexts targeted here cannot query level-0
 dimensions either).
 
-## Snapshotting: one image, then done
+## Still images
 
 Create the map in `MLN_MAP_MODE_STATIC` (any viewport) or `MLN_MAP_MODE_TILE` (a
 single tile), attach an owned-texture session, and call
 `mln_map_request_still_image()`. Completion arrives as
 `MAP_STILL_IMAGE_FINISHED` or `MAP_STILL_IMAGE_FAILED`.
 
-The part worth saying plainly: a still image is not one render call. While the
-request is pending the map still publishes render updates, and you still have to
-render each one. Static mode removes the *continuous* repaint machinery and
-gives you a defined finish line; it does not remove the pump-and-render loop.
+A still image is not one render call. While the request is pending the map still
+publishes render updates, and you still have to render each one. Static mode
+removes the *continuous* repaint machinery and gives you a defined finish line;
+it does not remove the pump-and-render loop.
 
 Readback then copies the last rendered frame as premultiplied RGBA8 in physical
 pixels, sized in two calls: ask with no buffer to learn the layout, then ask
@@ -60,21 +52,21 @@ again with a buffer that fits.
 
 `zig-readback` is this program end to end, and runs headless in CI.
 
-## Compositing: borrowing the frame on the GPU
+## Using the frame on the GPU
 
 To use the rendered map on the GPU rather than the CPU,
 `mln_<backend>_owned_texture_acquire_frame()` hands you the most recent frame's
 backend handles — Metal texture, Vulkan image and view, OpenGL texture name —
 until you release it. Keep that borrow short: while a frame is acquired,
 rendering, resizing, detaching, destroying, and a second acquire all fail. The
-shape is acquire, sample, release, once per frame.
+shape is acquire, use, release, once per frame.
 
 With a borrowed texture you skip all of that, because the texture was yours to
 begin with. You allocate it, keep it valid until the session detaches, and
 handle synchronization around anything else that touches it. The session renders
 into it when you call `render_update()` and does nothing else — no acquire, no
-readback, no resize. Following a host resize means destroying the session,
-making a new texture, and attaching again.
+readback, no resize. Following a resize means destroying the session, making a
+new texture, and attaching again.
 
 Each backend has its own rules about the state the texture must be in — Vulkan
 image layouts and queue availability, Metal usage flags, OpenGL share groups and
@@ -82,6 +74,6 @@ level-0 dimensions. Those are stated per attach function in the
 [C API reference](/maplibre-native-ffi/reference/c/).
 
 <Aside type="tip">
-  `compose-map` is a complete borrowed-texture integration, bridging the map into
-  a Skiko/Compose surface including reattach-on-resize.
+  `compose-map` is a complete borrowed-texture integration, including
+  reattach-on-resize.
 </Aside>

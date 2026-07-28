@@ -25,10 +25,10 @@ than a JSON string. A `mln_json_value` is a tagged union — string, number, boo
 array, object — that you build up in place, and the API copies it before
 returning.
 
-This is verbose in C by nature, and it is worth writing one helper that converts
-your host language's maps and lists into it. You will write your second `match`
-expression soon enough. Number types are meaningful: use the unsigned variant
-where the spec or an extension expects an unsigned value.
+This is verbose in C by nature, and a single helper that converts your host
+language's maps and lists into it pays for itself quickly. Number types are
+meaningful: use the unsigned variant where the spec or an extension expects an
+unsigned value.
 
 <Code code={runtimeStyle} lang="c" title="runtime-style.c" />
 

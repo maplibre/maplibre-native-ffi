@@ -38,11 +38,10 @@ Two kinds of definition:
 * **Tile pyramid** — everything inside a bounding box, between a min and max
   zoom, at a given pixel ratio. An infinite max zoom means "each source's own
   maximum".
-* **Geometry** — the tiles covering an arbitrary geometry, such as a route
-  corridor, across a zoom range.
+* **Geometry** — the tiles covering an arbitrary geometry, across a zoom range.
 
 Creation also takes **metadata**: opaque bytes stored with the region and handed
-back on every later inspection. A name, or a JSON blob, usually.
+back on every later inspection.
 
 A new region is inactive and silent. Mark it observed to get progress events,
 then set its download state to active to start the work.
@@ -63,8 +62,8 @@ Three events report on a region being observed:
   Deriving a percentage from the status snapshot needs care: while MapLibre is
   still discovering what the region contains, the required-resource count is an
   estimate, and it is zero before discovery finds anything. Check that the count
-  is marked precise and non-zero before dividing by it, or your progress bar will
-  show `NaN` on the first event.
+  is marked precise and non-zero before dividing by it, or the first events
+  produce `NaN`.
 </Aside>
 
 Exceeding the tile ceiling is not something you can raise through this API — the
@@ -76,8 +75,7 @@ narrower zoom range.
 * `list` — every region in the database, with definitions and metadata.
 * `get` — one region; the completion event's `found` flag says whether it exists.
 * `update_metadata` — replace the stored bytes.
-* `merge_database` — import regions from a side database, such as one you
-  shipped with the app.
+* `merge_database` — import regions from a side database.
 * `invalidate` — mark a region's resources stale so their next use revalidates
   against the server. This frees no space: the bytes stay and get reused when
   revalidation succeeds.

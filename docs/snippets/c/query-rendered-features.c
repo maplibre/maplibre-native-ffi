@@ -1,5 +1,5 @@
-// A tap handler: ask what is drawn under a screen point. Queries hang off the
-// render session, not the map, because they read what was actually rendered.
+// Ask what is drawn under a screen point. Queries hang off the render session,
+// not the map, because they read what was actually rendered.
 
 #include <maplibre_native_c.h>
 #include <string.h>
@@ -8,12 +8,12 @@ static mln_string_view sv(const char* text) {
   return (mln_string_view){.data = text, .size = strlen(text)};
 }
 
-void on_tap(mln_render_session* session, double x, double y) {
+void query_at_point(mln_render_session* session, double x, double y) {
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_point((mln_screen_point){.x = x, .y = y});
 
-  // Restricting the query to the layers you care about keeps a tap from
-  // matching background fills.
+  // Restricting the query to the layers you care about keeps it from matching
+  // background fills.
   const mln_string_view layers[] = {sv("poi-labels")};
   mln_rendered_feature_query_options options =
     mln_rendered_feature_query_options_default();
