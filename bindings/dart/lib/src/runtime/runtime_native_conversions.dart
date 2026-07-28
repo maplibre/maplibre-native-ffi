@@ -96,7 +96,7 @@ final class _CustomGeometryCallbackState extends RetainedCallbackState {
     }
     _retirementQueued = true;
     _retirementSignals = cancelTile == null ? 1 : 2;
-    _c.raw.mln_dart_custom_geometry_callbacks_retire(
+    _c.raw.mln_adapter_custom_geometry_callbacks_retire(
       fetchTile.nativeFunction,
       cancelTile?.nativeFunction ??
           nullptr

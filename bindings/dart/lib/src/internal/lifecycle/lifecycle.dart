@@ -9,18 +9,18 @@ import '../status/status.dart';
 final DynamicLibrary _library = openMaplibreNativeCLibrary();
 
 final NativeFinalizer _leakReporter = NativeFinalizer(
-  _library.lookup<NativeFinalizerFunction>('mln_dart_handle_leak_report'),
+  _library.lookup<NativeFinalizerFunction>('mln_adapter_handle_leak_report'),
 );
 
 final Pointer<Void> Function(Pointer<Char>, Pointer<Void>) _createLeakToken =
     _library.lookupFunction<
       Pointer<Void> Function(Pointer<Char>, Pointer<Void>),
       Pointer<Void> Function(Pointer<Char>, Pointer<Void>)
-    >('mln_dart_handle_leak_token_create');
+    >('mln_adapter_handle_leak_token_create');
 
 final void Function(Pointer<Void>) _destroyLeakToken = _library
     .lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>(
-      'mln_dart_handle_leak_token_destroy',
+      'mln_adapter_handle_leak_token_destroy',
     );
 
 /// Attaches the binding's non-owning native-handle leak diagnostic to [owner].

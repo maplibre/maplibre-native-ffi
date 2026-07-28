@@ -17,7 +17,9 @@ void main(List<String> args) {
   final headerRoot = repoRoot.resolve('include/');
   final publicHeader = headerRoot.resolve('maplibre_native_c.h');
   final publicHeaderDir = headerRoot.resolve('maplibre_native_c/');
-  final dartShimHeader = repoRoot.resolve('src/c_api/dart_shim.h');
+  // The callback adapter is a public header outside the umbrella, so it needs
+  // its own entry point.
+  final adapterHeader = publicHeaderDir.resolve('callback_adapter.h');
 
   FfiGenerator(
     output: Output(
@@ -37,12 +39,11 @@ void main(List<String> args) {
 ''',
     ),
     headers: Headers(
-      entryPoints: [publicHeader, dartShimHeader],
+      entryPoints: [publicHeader, adapterHeader],
       // Keep generation to the repository's own headers so that transitively
       // included system and Vulkan declarations stay out of the bindings.
       include: (header) =>
           header == publicHeader ||
-          header == dartShimHeader ||
           header.toString().startsWith(publicHeaderDir.toString()),
       compilerOptions: [
         '-I${headerRoot.toFilePath()}',

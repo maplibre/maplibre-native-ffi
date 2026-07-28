@@ -9,7 +9,8 @@ import 'maplibre_native_c.g.dart' as generated;
 /// C ABI contract version supported by this generated binding.
 const int expectedCAbiVersion = 0;
 
-/// Native library handle plus binding-private Dart shim entry points.
+/// Native library handle plus the callback adapter entry points this
+/// binding registers with native code.
 final class MaplibreNativeCApi {
   MaplibreNativeCApi._(this.library)
     : raw = generated.MaplibreNativeC(library) {
@@ -35,97 +36,39 @@ final class MaplibreNativeCApi {
     return pointer.cast<Utf8>().toDartString();
   }
 
-  /// Native Dart-shim callback for queued log records.
+  /// Native adapter callback for queued log records.
   Pointer<NativeFunction<generated.mln_log_callbackFunction>>
-  dartLogCallback() => library.lookup('mln_dart_log_callback');
+  adapterLogCallback() => library.lookup('mln_adapter_log_callback');
 
-  /// Destroys a copied Dart-shim log record.
-  void dartLogRecordDestroy(Pointer<Void> record) {
+  /// Destroys a copied adapter log record.
+  void adapterLogRecordDestroy(Pointer<Void> record) {
     library.lookupFunction<
       Void Function(Pointer<Void>),
       void Function(Pointer<Void>)
-    >('mln_dart_log_record_destroy')(record);
+    >('mln_adapter_log_record_destroy')(record);
   }
 
-  /// Native Dart-shim callback for exact URL resource providers.
+  /// Native adapter callback for exact URL resource providers.
   Pointer<NativeFunction<generated.mln_resource_provider_callbackFunction>>
-  dartResourceProviderRulesCallback() =>
-      library.lookup('mln_dart_resource_provider_rules_callback');
+  adapterResourceProviderRulesCallback() =>
+      library.lookup('mln_adapter_resource_provider_rules_callback');
 
-  /// Native Dart-shim callback for queued resource providers.
+  /// Native adapter callback for queued resource providers.
   Pointer<NativeFunction<generated.mln_resource_provider_callbackFunction>>
-  dartQueuedResourceProviderCallback() =>
-      library.lookup('mln_dart_queued_resource_provider_callback');
+  adapterQueuedResourceProviderCallback() =>
+      library.lookup('mln_adapter_queued_resource_provider_callback');
 
-  /// Native Dart-shim callback for exact URL resource transforms.
+  /// Native adapter callback for exact URL resource transforms.
   Pointer<NativeFunction<generated.mln_resource_transform_callbackFunction>>
-  dartResourceTransformRewriteCallback() =>
-      library.lookup('mln_dart_resource_transform_rewrite_callback');
+  adapterResourceTransformRewriteCallback() =>
+      library.lookup('mln_adapter_resource_transform_rewrite_callback');
 
-  /// Destroys a copied Dart-shim resource request record.
-  void dartResourceProviderRequestDestroy(Pointer<Void> request) {
+  /// Destroys a copied adapter resource request record.
+  void adapterResourceProviderRequestDestroy(Pointer<Void> request) {
     library.lookupFunction<
       Void Function(Pointer<Void>),
       void Function(Pointer<Void>)
-    >('mln_dart_resource_provider_request_destroy')(request);
-  }
-
-  /// Invokes a custom-geometry tile callback through the native Dart shim.
-  void dartTestInvokeCustomGeometryTileCallback(
-    Pointer<
-      NativeFunction<generated.mln_custom_geometry_source_tile_callbackFunction>
-    >
-    callback,
-    Pointer<Void> userData,
-    generated.mln_canonical_tile_id tileId,
-  ) {
-    library.lookupFunction<
-      Void Function(
-        Pointer<
-          NativeFunction<
-            generated.mln_custom_geometry_source_tile_callbackFunction
-          >
-        >,
-        Pointer<Void>,
-        generated.mln_canonical_tile_id,
-      ),
-      void Function(
-        Pointer<
-          NativeFunction<
-            generated.mln_custom_geometry_source_tile_callbackFunction
-          >
-        >,
-        Pointer<Void>,
-        generated.mln_canonical_tile_id,
-      )
-    >('mln_dart_test_invoke_custom_geometry_tile_callback')(
-      callback,
-      userData,
-      tileId,
-    );
-  }
-
-  /// Emits one deterministic log record through the active native callback.
-  int dartTestEmitLog({
-    required int severity,
-    required int event,
-    required int code,
-    required String message,
-  }) {
-    final nativeMessage = message.toNativeUtf8();
-    try {
-      return library.lookupFunction<
-        Uint32 Function(Uint32, Uint32, Int64, Pointer<Char>),
-        int Function(int, int, int, Pointer<Char>)
-      >('mln_dart_test_emit_log')(
-        severity,
-        event,
-        code,
-        nativeMessage.cast<Char>(),
-      );
-    } finally {
-      malloc.free(nativeMessage);
-    }
+    >('mln_adapter_resource_provider_request_destroy')(request);
   }
 }
 

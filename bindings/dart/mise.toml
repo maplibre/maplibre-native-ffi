@@ -1,6 +1,15 @@
 [tools]
 "core:dart" = "{{vars.dart_version}}"
 
+# The built-in provider runs `dart pub get` and tracks pubspec.yaml/pubspec.lock
+# against .dart_tool/package_config.json. Use `dart pub upgrade` to move the
+# lockfile deliberately.
+[deps.dart]
+auto = true
+
+# `dart format` takes only files and directories, so it cannot join dprint's
+# stdin/stdout exec plugin like the other language formatters. hk calls these
+# path-taking tasks directly instead.
 [tasks._format-check]
 description = "Check Dart formatting."
 hide = true
@@ -15,14 +24,7 @@ raw_args = true
 dir = "../.."
 run = "dart format"
 
-[tasks.pub-get]
-# CI resolves strictly from the committed pubspec.lock and fails on any
-# content-hash drift. Locally, plain `pub get` keeps editing pubspec.yaml
-# ergonomic; use `dart pub upgrade` to move the lockfile deliberately.
-run = 'dart pub get ${CI:+--enforce-lockfile}'
-
 [tasks.ffigen]
-depends = [":pub-get"]
 run = "dart run tool/ffigen.dart"
 sources = [
   "tool/ffigen.dart",
@@ -30,12 +32,10 @@ sources = [
   "pubspec.lock",
   "../../include/maplibre_native_c.h",
   "../../include/maplibre_native_c/**/*.h",
-  "../../src/c_api/dart_shim.h",
 ]
 outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
 
 [tasks.ffigen-check]
-depends = [":pub-get"]
 run = """
 mkdir -p .dart_tool
 trap 'rm -f .dart_tool/maplibre_native_c.check.g.dart' EXIT

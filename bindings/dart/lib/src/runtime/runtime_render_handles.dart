@@ -524,7 +524,7 @@ final class ResourceRequestHandle implements Finalizable {
   /// terminal immediately and must not be used again.
   ResourceRequestToken transfer() {
     final pointer = _livePointer;
-    final token = _c.raw.mln_dart_resource_request_token_create(pointer);
+    final token = _c.raw.mln_adapter_resource_request_token_create(pointer);
     if (token == 0) {
       throwInvalidState('failed to create a transferable resource request');
     }
@@ -612,7 +612,10 @@ final class ResourceRequestToken {
     return withNativeArena((arena) {
       final outCancelled = arena<Bool>();
       _checkResourceRequestToken(
-        _c.raw.mln_dart_resource_request_token_cancelled(token, outCancelled),
+        _c.raw.mln_adapter_resource_request_token_cancelled(
+          token,
+          outCancelled,
+        ),
       );
       return outCancelled.value;
     });
@@ -626,7 +629,10 @@ final class ResourceRequestToken {
       nativeResponse.ref = _resourceResponseToNative(response, arena);
       final token = _takeToken();
       _checkResourceRequestToken(
-        _c.raw.mln_dart_resource_request_token_complete(token, nativeResponse),
+        _c.raw.mln_adapter_resource_request_token_complete(
+          token,
+          nativeResponse,
+        ),
       );
     });
   }
@@ -638,7 +644,7 @@ final class ResourceRequestToken {
     }
     final token = _takeToken();
     _checkResourceRequestToken(
-      _c.raw.mln_dart_resource_request_token_release(token),
+      _c.raw.mln_adapter_resource_request_token_release(token),
     );
   }
 
@@ -649,7 +655,7 @@ final class ResourceRequestToken {
   void waitUntilReleased() {
     final token = _liveToken;
     _checkResourceRequestToken(
-      _c.raw.mln_dart_resource_request_token_wait(token),
+      _c.raw.mln_adapter_resource_request_token_wait(token),
     );
     _token = 0;
   }

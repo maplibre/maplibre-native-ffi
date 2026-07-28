@@ -159,7 +159,7 @@ final class RuntimeHandle {
       withNativeArena((arena) {
         final transform = arena<raw.mln_resource_transform>();
         transform.ref.size = sizeOf<raw.mln_resource_transform>();
-        transform.ref.callback = _c.dartResourceTransformRewriteCallback();
+        transform.ref.callback = _c.adapterResourceTransformRewriteCallback();
         transform.ref.user_data = state.pointer.cast<Void>();
         _check(_c.raw.mln_runtime_set_resource_transform(_pointer, transform));
       });
@@ -185,7 +185,7 @@ final class RuntimeHandle {
       withNativeArena((arena) {
         final provider = arena<raw.mln_resource_provider>();
         provider.ref.size = sizeOf<raw.mln_resource_provider>();
-        provider.ref.callback = _c.dartResourceProviderRulesCallback();
+        provider.ref.callback = _c.adapterResourceProviderRulesCallback();
         provider.ref.user_data = state.pointer.cast<Void>();
         _check(_c.raw.mln_runtime_set_resource_provider(_pointer, provider));
       });
@@ -206,7 +206,8 @@ final class RuntimeHandle {
       withNativeArena((arena) {
         final nativeProvider = arena<raw.mln_resource_provider>();
         nativeProvider.ref.size = sizeOf<raw.mln_resource_provider>();
-        nativeProvider.ref.callback = _c.dartQueuedResourceProviderCallback();
+        nativeProvider.ref.callback = _c
+            .adapterQueuedResourceProviderCallback();
         nativeProvider.ref.user_data = state.pointer.cast<Void>();
         _check(
           _c.raw.mln_runtime_set_resource_provider(_pointer, nativeProvider),

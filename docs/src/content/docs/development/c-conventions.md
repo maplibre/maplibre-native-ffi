@@ -165,3 +165,33 @@ documented return behavior.
 Render session APIs document owner thread, render target backend handle
 ownership, synchronization, borrowed pointer lifetimes, generation or
 stale-frame behavior, and teardown rules.
+
+## Callback Adapter
+
+`include/maplibre_native_c/callback_adapter.h` adapts these synchronous callback
+contracts for host runtimes that cannot meet them. It serves hosts with both of
+these constraints:
+
+- Host callbacks are delivered asynchronously and return void, so the host
+  cannot answer a decision the C API needs immediately, and cannot read a
+  borrowed payload that expires when the C callback returns.
+- The host has no native compilation unit of its own, because it consumes the
+  shared library through a pure foreign-function interface.
+
+A host that compiles native code writes this adaptation there instead, in
+whatever form its runtime prefers, and does not use this header.
+
+The layer answers on the host's behalf: it copies borrowed payloads into
+native-owned records the host releases explicitly, decides from native-owned
+routing tables when a result is needed immediately, and hands records to the
+host through void listener functions. Its entry points carry the `mln_adapter_`
+prefix and follow every rule in this document, including the callback
+documentation requirements above.
+
+This header is public but stays out of the `maplibre_native_c.h` umbrella, so
+binding generators that target the umbrella do not emit declarations for a layer
+their host does not need. Bindings that need it name the header directly.
+
+Keep test-only entry points out of this layer, as out of every other public
+header. A binding that needs to drive native dispatch from its own tests calls
+these public entry points directly with the state it registered.

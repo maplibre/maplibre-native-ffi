@@ -6,11 +6,11 @@ final class _ResourceTransformState {
       _checkNativeCString(rule.url);
       _checkNativeCString(rule.replacementUrl);
     }
-    pointer = calloc<raw.mln_dart_resource_rewrite_rules>();
+    pointer = calloc<raw.mln_adapter_resource_rewrite_rules>();
     pointer.ref.count = rules.length;
     pointer.ref.rules = rules.isEmpty
-        ? nullptr.cast<raw.mln_dart_resource_rewrite_rule>()
-        : calloc<raw.mln_dart_resource_rewrite_rule>(rules.length);
+        ? nullptr.cast<raw.mln_adapter_resource_rewrite_rule>()
+        : calloc<raw.mln_adapter_resource_rewrite_rule>(rules.length);
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
       pointer.ref.rules[index].kind =
@@ -22,7 +22,7 @@ final class _ResourceTransformState {
     }
   }
 
-  late final Pointer<raw.mln_dart_resource_rewrite_rules> pointer;
+  late final Pointer<raw.mln_adapter_resource_rewrite_rules> pointer;
 
   void close() {
     final rules = pointer.ref.rules;
@@ -43,11 +43,11 @@ final class _ResourceProviderRulesState {
       _checkNativeCString(rule.url);
       _checkResourceResponseNativeStrings(rule.response);
     }
-    pointer = calloc<raw.mln_dart_resource_provider_rules>();
+    pointer = calloc<raw.mln_adapter_resource_provider_rules>();
     pointer.ref.count = rules.length;
     pointer.ref.rules = rules.isEmpty
-        ? nullptr.cast<raw.mln_dart_resource_provider_rule>()
-        : calloc<raw.mln_dart_resource_provider_rule>(rules.length);
+        ? nullptr.cast<raw.mln_adapter_resource_provider_rule>()
+        : calloc<raw.mln_adapter_resource_provider_rule>(rules.length);
     for (var index = 0; index < rules.length; index += 1) {
       final rule = rules[index];
       pointer.ref.rules[index].kind =
@@ -60,7 +60,7 @@ final class _ResourceProviderRulesState {
     }
   }
 
-  late final Pointer<raw.mln_dart_resource_provider_rules> pointer;
+  late final Pointer<raw.mln_adapter_resource_provider_rules> pointer;
 
   void close() {
     final rules = pointer.ref.rules;
@@ -82,7 +82,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     }
     callback =
         NativeCallable<
-          raw.mln_dart_queued_resource_request_listenerFunction
+          raw.mln_adapter_queued_resource_request_listenerFunction
         >.listener((Pointer<Void> request) {
           if (request == nullptr) {
             close();
@@ -95,11 +95,11 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
             _dropQueuedResourceProviderRequest(request);
           }
         });
-    pointer = calloc<raw.mln_dart_queued_resource_provider>();
+    pointer = calloc<raw.mln_adapter_queued_resource_provider>();
     pointer.ref.route_count = provider.routes.length;
     pointer.ref.routes = provider.routes.isEmpty
-        ? nullptr.cast<raw.mln_dart_queued_resource_provider_route>()
-        : calloc<raw.mln_dart_queued_resource_provider_route>(
+        ? nullptr.cast<raw.mln_adapter_queued_resource_provider_route>()
+        : calloc<raw.mln_adapter_queued_resource_provider_route>(
             provider.routes.length,
           );
     for (var index = 0; index < provider.routes.length; index += 1) {
@@ -111,9 +111,9 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
     pointer.ref.listener = callback.nativeFunction;
   }
 
-  late final Pointer<raw.mln_dart_queued_resource_provider> pointer;
+  late final Pointer<raw.mln_adapter_queued_resource_provider> pointer;
   late final NativeCallable<
-    raw.mln_dart_queued_resource_request_listenerFunction
+    raw.mln_adapter_queued_resource_request_listenerFunction
   >
   callback;
   var _retirementQueued = false;
@@ -123,7 +123,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       return;
     }
     _retirementQueued = true;
-    _c.raw.mln_dart_queued_resource_provider_retire(pointer);
+    _c.raw.mln_adapter_queued_resource_provider_retire(pointer);
   }
 
   @override
@@ -142,7 +142,9 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
 
 void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
   try {
-    final request = rawRequest.cast<raw.mln_dart_queued_resource_request>().ref;
+    final request = rawRequest
+        .cast<raw.mln_adapter_queued_resource_request>()
+        .ref;
     final handle = ResourceRequestHandle._(request.handle);
     if (!handle.isReleased) {
       try {
@@ -158,7 +160,7 @@ void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
       }
     }
   } finally {
-    _c.dartResourceProviderRequestDestroy(rawRequest);
+    _c.adapterResourceProviderRequestDestroy(rawRequest);
   }
 }
 
@@ -167,7 +169,9 @@ void _invokeQueuedResourceProvider(
   Pointer<Void> rawRequest,
 ) {
   try {
-    final request = rawRequest.cast<raw.mln_dart_queued_resource_request>().ref;
+    final request = rawRequest
+        .cast<raw.mln_adapter_queued_resource_request>()
+        .ref;
     final handle = ResourceRequestHandle._(request.handle);
     try {
       callback(_copyResourceRequest(request), handle);
@@ -187,12 +191,12 @@ void _invokeQueuedResourceProvider(
       }
     }
   } finally {
-    _c.dartResourceProviderRequestDestroy(rawRequest);
+    _c.adapterResourceProviderRequestDestroy(rawRequest);
   }
 }
 
 ResourceRequest _copyResourceRequest(
-  raw.mln_dart_queued_resource_request request,
+  raw.mln_adapter_queued_resource_request request,
 ) {
   final priorData =
       request.prior_data == nullptr || request.prior_data_size == 0

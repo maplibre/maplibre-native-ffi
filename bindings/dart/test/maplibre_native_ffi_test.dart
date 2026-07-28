@@ -2,15 +2,42 @@ import 'dart:ffi';
 import 'dart:isolate';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.g.dart'
     as raw;
+import 'package:maplibre_native_ffi/src/maplibre.dart'
+    show logCallbackStateForTesting;
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
     show customGeometryCallbackProbeForTesting;
 import 'package:test/test.dart';
 
 const _emptyStyleJson = '{"version":8,"sources":{},"layers":[]}';
+
+/// Dispatches one record through the registered adapter log callback, the way
+/// MapLibre's logging threads do, and reports the consume value native code
+/// sees.
+int _dispatchLogRecord(
+  MaplibreNativeCApi c, {
+  required int severity,
+  required int event,
+  required int code,
+  required String message,
+}) {
+  final nativeMessage = message.toNativeUtf8();
+  try {
+    return c.raw.mln_adapter_log_callback(
+      logCallbackStateForTesting().cast<Void>(),
+      severity,
+      event,
+      code,
+      nativeMessage.cast<Char>(),
+    );
+  } finally {
+    malloc.free(nativeMessage);
+  }
+}
 
 void main() {
   test('process-global APIs cross the native C ABI', () {
@@ -81,7 +108,8 @@ void main() {
 
     Maplibre.setLogCallback(first.add, consume: true);
     expect(
-      c.dartTestEmitLog(
+      _dispatchLogRecord(
+        c,
         severity: LogSeverity.info.rawValue,
         event: LogEvent.general.rawValue,
         code: 101,
@@ -95,7 +123,8 @@ void main() {
 
     Maplibre.setLogCallback(replacement.add);
     expect(
-      c.dartTestEmitLog(
+      _dispatchLogRecord(
+        c,
         severity: LogSeverity.warning.rawValue,
         event: LogEvent.setup.rawValue,
         code: 202,
@@ -110,7 +139,8 @@ void main() {
 
     Maplibre.clearLogCallback();
     expect(
-      c.dartTestEmitLog(
+      _dispatchLogRecord(
+        c,
         severity: LogSeverity.error.rawValue,
         event: LogEvent.render.rawValue,
         code: 303,
@@ -439,8 +469,7 @@ void main() {
     runtime.close();
   });
 
-  test('custom geometry tile callbacks cross the native shim', () async {
-    final c = MaplibreNativeCApi.open();
+  test('custom geometry tile callbacks reach their isolate', () async {
     final deliveredTiles = <CanonicalTileId>[];
     final callback =
         NativeCallable<
@@ -455,8 +484,8 @@ void main() {
     tileId.x = 4;
     tileId.y = 5;
 
-    c.dartTestInvokeCustomGeometryTileCallback(
-      callback.nativeFunction,
+    callback.nativeFunction
+        .asFunction<void Function(Pointer<Void>, raw.mln_canonical_tile_id)>()(
       nullptr,
       tileId,
     );

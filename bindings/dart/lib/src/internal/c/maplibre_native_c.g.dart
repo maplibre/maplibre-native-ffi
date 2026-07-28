@@ -5592,14 +5592,14 @@ class MaplibreNativeC {
             )
           >();
 
-  ffi.Pointer<ffi.Void> mln_dart_handle_leak_token_create(
+  ffi.Pointer<ffi.Void> mln_adapter_handle_leak_token_create(
     ffi.Pointer<ffi.Char> type_name,
     ffi.Pointer<ffi.Void> handle,
   ) {
-    return _mln_dart_handle_leak_token_create(type_name, handle);
+    return _mln_adapter_handle_leak_token_create(type_name, handle);
   }
 
-  late final _mln_dart_handle_leak_token_createPtr =
+  late final _mln_adapter_handle_leak_token_createPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Pointer<ffi.Void> Function(
@@ -5607,9 +5607,9 @@ class MaplibreNativeC {
             ffi.Pointer<ffi.Void>,
           )
         >
-      >('mln_dart_handle_leak_token_create');
-  late final _mln_dart_handle_leak_token_create =
-      _mln_dart_handle_leak_token_createPtr
+      >('mln_adapter_handle_leak_token_create');
+  late final _mln_adapter_handle_leak_token_create =
+      _mln_adapter_handle_leak_token_createPtr
           .asFunction<
             ffi.Pointer<ffi.Void> Function(
               ffi.Pointer<ffi.Char>,
@@ -5617,40 +5617,41 @@ class MaplibreNativeC {
             )
           >();
 
-  void mln_dart_handle_leak_token_destroy(ffi.Pointer<ffi.Void> token) {
-    return _mln_dart_handle_leak_token_destroy(token);
+  void mln_adapter_handle_leak_token_destroy(ffi.Pointer<ffi.Void> token) {
+    return _mln_adapter_handle_leak_token_destroy(token);
   }
 
-  late final _mln_dart_handle_leak_token_destroyPtr =
+  late final _mln_adapter_handle_leak_token_destroyPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'mln_dart_handle_leak_token_destroy',
+        'mln_adapter_handle_leak_token_destroy',
       );
-  late final _mln_dart_handle_leak_token_destroy =
-      _mln_dart_handle_leak_token_destroyPtr
+  late final _mln_adapter_handle_leak_token_destroy =
+      _mln_adapter_handle_leak_token_destroyPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-  void mln_dart_handle_leak_report(ffi.Pointer<ffi.Void> token) {
-    return _mln_dart_handle_leak_report(token);
+  void mln_adapter_handle_leak_report(ffi.Pointer<ffi.Void> token) {
+    return _mln_adapter_handle_leak_report(token);
   }
 
-  late final _mln_dart_handle_leak_reportPtr =
+  late final _mln_adapter_handle_leak_reportPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'mln_dart_handle_leak_report',
+        'mln_adapter_handle_leak_report',
       );
-  late final _mln_dart_handle_leak_report = _mln_dart_handle_leak_reportPtr
-      .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+  late final _mln_adapter_handle_leak_report =
+      _mln_adapter_handle_leak_reportPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-  int mln_dart_log_callback(
+  int mln_adapter_log_callback(
     ffi.Pointer<ffi.Void> user_data,
     int severity,
     int event,
     int code,
     ffi.Pointer<ffi.Char> message,
   ) {
-    return _mln_dart_log_callback(user_data, severity, event, code, message);
+    return _mln_adapter_log_callback(user_data, severity, event, code, message);
   }
 
-  late final _mln_dart_log_callbackPtr =
+  late final _mln_adapter_log_callbackPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Uint32 Function(
@@ -5661,8 +5662,8 @@ class MaplibreNativeC {
             ffi.Pointer<ffi.Char>,
           )
         >
-      >('mln_dart_log_callback');
-  late final _mln_dart_log_callback = _mln_dart_log_callbackPtr
+      >('mln_adapter_log_callback');
+  late final _mln_adapter_log_callback = _mln_adapter_log_callbackPtr
       .asFunction<
         int Function(
           ffi.Pointer<ffi.Void>,
@@ -5673,40 +5674,41 @@ class MaplibreNativeC {
         )
       >();
 
-  mln_status mln_dart_log_set_callback(
-    ffi.Pointer<mln_dart_log_callback_state> state,
+  mln_status mln_adapter_log_set_callback(
+    ffi.Pointer<mln_adapter_log_callback_state> state,
   ) {
-    return mln_status.fromValue(_mln_dart_log_set_callback(state));
+    return mln_status.fromValue(_mln_adapter_log_set_callback(state));
   }
 
-  late final _mln_dart_log_set_callbackPtr =
+  late final _mln_adapter_log_set_callbackPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_dart_log_callback_state>)
+          ffi.Int32 Function(ffi.Pointer<mln_adapter_log_callback_state>)
         >
-      >('mln_dart_log_set_callback');
-  late final _mln_dart_log_set_callback = _mln_dart_log_set_callbackPtr
-      .asFunction<int Function(ffi.Pointer<mln_dart_log_callback_state>)>();
+      >('mln_adapter_log_set_callback');
+  late final _mln_adapter_log_set_callback = _mln_adapter_log_set_callbackPtr
+      .asFunction<int Function(ffi.Pointer<mln_adapter_log_callback_state>)>();
 
-  void mln_dart_log_record_destroy(ffi.Pointer<ffi.Void> record) {
-    return _mln_dart_log_record_destroy(record);
+  void mln_adapter_log_record_destroy(ffi.Pointer<ffi.Void> record) {
+    return _mln_adapter_log_record_destroy(record);
   }
 
-  late final _mln_dart_log_record_destroyPtr =
+  late final _mln_adapter_log_record_destroyPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'mln_dart_log_record_destroy',
+        'mln_adapter_log_record_destroy',
       );
-  late final _mln_dart_log_record_destroy = _mln_dart_log_record_destroyPtr
-      .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
+  late final _mln_adapter_log_record_destroy =
+      _mln_adapter_log_record_destroyPtr
+          .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-  mln_status mln_dart_resource_transform_rewrite_callback(
+  mln_status mln_adapter_resource_transform_rewrite_callback(
     ffi.Pointer<ffi.Void> user_data,
     int kind,
     ffi.Pointer<ffi.Char> url,
     ffi.Pointer<mln_resource_transform_response> out_response,
   ) {
     return mln_status.fromValue(
-      _mln_dart_resource_transform_rewrite_callback(
+      _mln_adapter_resource_transform_rewrite_callback(
         user_data,
         kind,
         url,
@@ -5715,7 +5717,7 @@ class MaplibreNativeC {
     );
   }
 
-  late final _mln_dart_resource_transform_rewrite_callbackPtr =
+  late final _mln_adapter_resource_transform_rewrite_callbackPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
@@ -5725,9 +5727,9 @@ class MaplibreNativeC {
             ffi.Pointer<mln_resource_transform_response>,
           )
         >
-      >('mln_dart_resource_transform_rewrite_callback');
-  late final _mln_dart_resource_transform_rewrite_callback =
-      _mln_dart_resource_transform_rewrite_callbackPtr
+      >('mln_adapter_resource_transform_rewrite_callback');
+  late final _mln_adapter_resource_transform_rewrite_callback =
+      _mln_adapter_resource_transform_rewrite_callbackPtr
           .asFunction<
             int Function(
               ffi.Pointer<ffi.Void>,
@@ -5737,19 +5739,19 @@ class MaplibreNativeC {
             )
           >();
 
-  int mln_dart_resource_provider_rules_callback(
+  int mln_adapter_resource_provider_rules_callback(
     ffi.Pointer<ffi.Void> user_data,
     ffi.Pointer<mln_resource_request> request,
     ffi.Pointer<mln_resource_request_handle> handle,
   ) {
-    return _mln_dart_resource_provider_rules_callback(
+    return _mln_adapter_resource_provider_rules_callback(
       user_data,
       request,
       handle,
     );
   }
 
-  late final _mln_dart_resource_provider_rules_callbackPtr =
+  late final _mln_adapter_resource_provider_rules_callbackPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Uint32 Function(
@@ -5758,9 +5760,9 @@ class MaplibreNativeC {
             ffi.Pointer<mln_resource_request_handle>,
           )
         >
-      >('mln_dart_resource_provider_rules_callback');
-  late final _mln_dart_resource_provider_rules_callback =
-      _mln_dart_resource_provider_rules_callbackPtr
+      >('mln_adapter_resource_provider_rules_callback');
+  late final _mln_adapter_resource_provider_rules_callback =
+      _mln_adapter_resource_provider_rules_callbackPtr
           .asFunction<
             int Function(
               ffi.Pointer<ffi.Void>,
@@ -5769,19 +5771,19 @@ class MaplibreNativeC {
             )
           >();
 
-  int mln_dart_queued_resource_provider_callback(
+  int mln_adapter_queued_resource_provider_callback(
     ffi.Pointer<ffi.Void> user_data,
     ffi.Pointer<mln_resource_request> request,
     ffi.Pointer<mln_resource_request_handle> handle,
   ) {
-    return _mln_dart_queued_resource_provider_callback(
+    return _mln_adapter_queued_resource_provider_callback(
       user_data,
       request,
       handle,
     );
   }
 
-  late final _mln_dart_queued_resource_provider_callbackPtr =
+  late final _mln_adapter_queued_resource_provider_callbackPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Uint32 Function(
@@ -5790,9 +5792,9 @@ class MaplibreNativeC {
             ffi.Pointer<mln_resource_request_handle>,
           )
         >
-      >('mln_dart_queued_resource_provider_callback');
-  late final _mln_dart_queued_resource_provider_callback =
-      _mln_dart_queued_resource_provider_callbackPtr
+      >('mln_adapter_queued_resource_provider_callback');
+  late final _mln_adapter_queued_resource_provider_callback =
+      _mln_adapter_queued_resource_provider_callbackPtr
           .asFunction<
             int Function(
               ffi.Pointer<ffi.Void>,
@@ -5801,51 +5803,51 @@ class MaplibreNativeC {
             )
           >();
 
-  void mln_dart_resource_provider_request_destroy(
+  void mln_adapter_resource_provider_request_destroy(
     ffi.Pointer<ffi.Void> request,
   ) {
-    return _mln_dart_resource_provider_request_destroy(request);
+    return _mln_adapter_resource_provider_request_destroy(request);
   }
 
-  late final _mln_dart_resource_provider_request_destroyPtr =
+  late final _mln_adapter_resource_provider_request_destroyPtr =
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Pointer<ffi.Void>)>>(
-        'mln_dart_resource_provider_request_destroy',
+        'mln_adapter_resource_provider_request_destroy',
       );
-  late final _mln_dart_resource_provider_request_destroy =
-      _mln_dart_resource_provider_request_destroyPtr
+  late final _mln_adapter_resource_provider_request_destroy =
+      _mln_adapter_resource_provider_request_destroyPtr
           .asFunction<void Function(ffi.Pointer<ffi.Void>)>();
 
-  void mln_dart_queued_resource_provider_retire(
-    ffi.Pointer<mln_dart_queued_resource_provider> provider,
+  void mln_adapter_queued_resource_provider_retire(
+    ffi.Pointer<mln_adapter_queued_resource_provider> provider,
   ) {
-    return _mln_dart_queued_resource_provider_retire(provider);
+    return _mln_adapter_queued_resource_provider_retire(provider);
   }
 
-  late final _mln_dart_queued_resource_provider_retirePtr =
+  late final _mln_adapter_queued_resource_provider_retirePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_dart_queued_resource_provider>)
+          ffi.Void Function(ffi.Pointer<mln_adapter_queued_resource_provider>)
         >
-      >('mln_dart_queued_resource_provider_retire');
-  late final _mln_dart_queued_resource_provider_retire =
-      _mln_dart_queued_resource_provider_retirePtr
+      >('mln_adapter_queued_resource_provider_retire');
+  late final _mln_adapter_queued_resource_provider_retire =
+      _mln_adapter_queued_resource_provider_retirePtr
           .asFunction<
-            void Function(ffi.Pointer<mln_dart_queued_resource_provider>)
+            void Function(ffi.Pointer<mln_adapter_queued_resource_provider>)
           >();
 
-  void mln_dart_custom_geometry_callbacks_retire(
+  void mln_adapter_custom_geometry_callbacks_retire(
     mln_custom_geometry_source_tile_callback fetch_tile,
     mln_custom_geometry_source_tile_callback cancel_tile,
     ffi.Pointer<ffi.Void> user_data,
   ) {
-    return _mln_dart_custom_geometry_callbacks_retire(
+    return _mln_adapter_custom_geometry_callbacks_retire(
       fetch_tile,
       cancel_tile,
       user_data,
     );
   }
 
-  late final _mln_dart_custom_geometry_callbacks_retirePtr =
+  late final _mln_adapter_custom_geometry_callbacks_retirePtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Void Function(
@@ -5854,9 +5856,9 @@ class MaplibreNativeC {
             ffi.Pointer<ffi.Void>,
           )
         >
-      >('mln_dart_custom_geometry_callbacks_retire');
-  late final _mln_dart_custom_geometry_callbacks_retire =
-      _mln_dart_custom_geometry_callbacks_retirePtr
+      >('mln_adapter_custom_geometry_callbacks_retire');
+  late final _mln_adapter_custom_geometry_callbacks_retire =
+      _mln_adapter_custom_geometry_callbacks_retirePtr
           .asFunction<
             void Function(
               mln_custom_geometry_source_tile_callback,
@@ -5865,139 +5867,87 @@ class MaplibreNativeC {
             )
           >();
 
-  int mln_dart_resource_request_token_create(
+  int mln_adapter_resource_request_token_create(
     ffi.Pointer<mln_resource_request_handle> handle,
   ) {
-    return _mln_dart_resource_request_token_create(handle);
+    return _mln_adapter_resource_request_token_create(handle);
   }
 
-  late final _mln_dart_resource_request_token_createPtr =
+  late final _mln_adapter_resource_request_token_createPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Uint64 Function(ffi.Pointer<mln_resource_request_handle>)
         >
-      >('mln_dart_resource_request_token_create');
-  late final _mln_dart_resource_request_token_create =
-      _mln_dart_resource_request_token_createPtr
+      >('mln_adapter_resource_request_token_create');
+  late final _mln_adapter_resource_request_token_create =
+      _mln_adapter_resource_request_token_createPtr
           .asFunction<int Function(ffi.Pointer<mln_resource_request_handle>)>();
 
-  mln_status mln_dart_resource_request_token_cancelled(
+  mln_status mln_adapter_resource_request_token_cancelled(
     int token,
     ffi.Pointer<ffi.Bool> out_cancelled,
   ) {
     return mln_status.fromValue(
-      _mln_dart_resource_request_token_cancelled(token, out_cancelled),
+      _mln_adapter_resource_request_token_cancelled(token, out_cancelled),
     );
   }
 
-  late final _mln_dart_resource_request_token_cancelledPtr =
+  late final _mln_adapter_resource_request_token_cancelledPtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(ffi.Uint64, ffi.Pointer<ffi.Bool>)
         >
-      >('mln_dart_resource_request_token_cancelled');
-  late final _mln_dart_resource_request_token_cancelled =
-      _mln_dart_resource_request_token_cancelledPtr
+      >('mln_adapter_resource_request_token_cancelled');
+  late final _mln_adapter_resource_request_token_cancelled =
+      _mln_adapter_resource_request_token_cancelledPtr
           .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
 
-  mln_status mln_dart_resource_request_token_complete(
+  mln_status mln_adapter_resource_request_token_complete(
     int token,
     ffi.Pointer<mln_resource_response> response,
   ) {
     return mln_status.fromValue(
-      _mln_dart_resource_request_token_complete(token, response),
+      _mln_adapter_resource_request_token_complete(token, response),
     );
   }
 
-  late final _mln_dart_resource_request_token_completePtr =
+  late final _mln_adapter_resource_request_token_completePtr =
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(ffi.Uint64, ffi.Pointer<mln_resource_response>)
         >
-      >('mln_dart_resource_request_token_complete');
-  late final _mln_dart_resource_request_token_complete =
-      _mln_dart_resource_request_token_completePtr
+      >('mln_adapter_resource_request_token_complete');
+  late final _mln_adapter_resource_request_token_complete =
+      _mln_adapter_resource_request_token_completePtr
           .asFunction<int Function(int, ffi.Pointer<mln_resource_response>)>();
 
-  mln_status mln_dart_resource_request_token_release(int token) {
+  mln_status mln_adapter_resource_request_token_release(int token) {
     return mln_status.fromValue(
-      _mln_dart_resource_request_token_release(token),
+      _mln_adapter_resource_request_token_release(token),
     );
   }
 
-  late final _mln_dart_resource_request_token_releasePtr =
+  late final _mln_adapter_resource_request_token_releasePtr =
       _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Uint64)>>(
-        'mln_dart_resource_request_token_release',
+        'mln_adapter_resource_request_token_release',
       );
-  late final _mln_dart_resource_request_token_release =
-      _mln_dart_resource_request_token_releasePtr
+  late final _mln_adapter_resource_request_token_release =
+      _mln_adapter_resource_request_token_releasePtr
           .asFunction<int Function(int)>();
 
-  mln_status mln_dart_resource_request_token_wait(int token) {
-    return mln_status.fromValue(_mln_dart_resource_request_token_wait(token));
-  }
-
-  late final _mln_dart_resource_request_token_waitPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Uint64)>>(
-        'mln_dart_resource_request_token_wait',
-      );
-  late final _mln_dart_resource_request_token_wait =
-      _mln_dart_resource_request_token_waitPtr.asFunction<int Function(int)>();
-
-  void mln_dart_test_invoke_custom_geometry_tile_callback(
-    mln_custom_geometry_source_tile_callback callback,
-    ffi.Pointer<ffi.Void> user_data,
-    mln_canonical_tile_id tile_id,
-  ) {
-    return _mln_dart_test_invoke_custom_geometry_tile_callback(
-      callback,
-      user_data,
-      tile_id,
+  mln_status mln_adapter_resource_request_token_wait(int token) {
+    return mln_status.fromValue(
+      _mln_adapter_resource_request_token_wait(token),
     );
   }
 
-  late final _mln_dart_test_invoke_custom_geometry_tile_callbackPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(
-            mln_custom_geometry_source_tile_callback,
-            ffi.Pointer<ffi.Void>,
-            mln_canonical_tile_id,
-          )
-        >
-      >('mln_dart_test_invoke_custom_geometry_tile_callback');
-  late final _mln_dart_test_invoke_custom_geometry_tile_callback =
-      _mln_dart_test_invoke_custom_geometry_tile_callbackPtr
-          .asFunction<
-            void Function(
-              mln_custom_geometry_source_tile_callback,
-              ffi.Pointer<ffi.Void>,
-              mln_canonical_tile_id,
-            )
-          >();
-
-  int mln_dart_test_emit_log(
-    int severity,
-    int event,
-    int code,
-    ffi.Pointer<ffi.Char> message,
-  ) {
-    return _mln_dart_test_emit_log(severity, event, code, message);
-  }
-
-  late final _mln_dart_test_emit_logPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Uint32 Function(
-            ffi.Uint32,
-            ffi.Uint32,
-            ffi.Int64,
-            ffi.Pointer<ffi.Char>,
-          )
-        >
-      >('mln_dart_test_emit_log');
-  late final _mln_dart_test_emit_log = _mln_dart_test_emit_logPtr
-      .asFunction<int Function(int, int, int, ffi.Pointer<ffi.Char>)>();
+  late final _mln_adapter_resource_request_token_waitPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Uint64)>>(
+        'mln_adapter_resource_request_token_wait',
+      );
+  late final _mln_adapter_resource_request_token_wait =
+      _mln_adapter_resource_request_token_waitPtr
+          .asFunction<int Function(int)>();
 }
 
 enum mln_status {
@@ -8846,7 +8796,7 @@ final class mln_texture_image_info extends ffi.Struct {
   external int byte_length;
 }
 
-final class mln_dart_resource_rewrite_rule extends ffi.Struct {
+final class mln_adapter_resource_rewrite_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
@@ -8855,14 +8805,14 @@ final class mln_dart_resource_rewrite_rule extends ffi.Struct {
   external ffi.Pointer<ffi.Char> replacement_url;
 }
 
-final class mln_dart_resource_rewrite_rules extends ffi.Struct {
-  external ffi.Pointer<mln_dart_resource_rewrite_rule> rules;
+final class mln_adapter_resource_rewrite_rules extends ffi.Struct {
+  external ffi.Pointer<mln_adapter_resource_rewrite_rule> rules;
 
   @ffi.Size()
   external int count;
 }
 
-final class mln_dart_resource_provider_rule extends ffi.Struct {
+final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
@@ -8871,39 +8821,39 @@ final class mln_dart_resource_provider_rule extends ffi.Struct {
   external mln_resource_response response;
 }
 
-final class mln_dart_resource_provider_rules extends ffi.Struct {
-  external ffi.Pointer<mln_dart_resource_provider_rule> rules;
+final class mln_adapter_resource_provider_rules extends ffi.Struct {
+  external ffi.Pointer<mln_adapter_resource_provider_rule> rules;
 
   @ffi.Size()
   external int count;
 }
 
-final class mln_dart_queued_resource_provider_route extends ffi.Struct {
+final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
   external ffi.Pointer<ffi.Char> url;
 }
 
-typedef mln_dart_queued_resource_request_listenerFunction =
+typedef mln_adapter_queued_resource_request_listenerFunction =
     ffi.Void Function(ffi.Pointer<ffi.Void> request);
-typedef Dartmln_dart_queued_resource_request_listenerFunction =
+typedef Dartmln_adapter_queued_resource_request_listenerFunction =
     void Function(ffi.Pointer<ffi.Void> request);
-typedef mln_dart_queued_resource_request_listener =
+typedef mln_adapter_queued_resource_request_listener =
     ffi.Pointer<
-      ffi.NativeFunction<mln_dart_queued_resource_request_listenerFunction>
+      ffi.NativeFunction<mln_adapter_queued_resource_request_listenerFunction>
     >;
 
-final class mln_dart_queued_resource_provider extends ffi.Struct {
-  external ffi.Pointer<mln_dart_queued_resource_provider_route> routes;
+final class mln_adapter_queued_resource_provider extends ffi.Struct {
+  external ffi.Pointer<mln_adapter_queued_resource_provider_route> routes;
 
   @ffi.Size()
   external int route_count;
 
-  external mln_dart_queued_resource_request_listener listener;
+  external mln_adapter_queued_resource_request_listener listener;
 }
 
-final class mln_dart_queued_resource_request extends ffi.Struct {
+final class mln_adapter_queued_resource_request extends ffi.Struct {
   external ffi.Pointer<ffi.Void> owner;
 
   external ffi.Pointer<mln_resource_request_handle> handle;
@@ -8954,21 +8904,21 @@ final class mln_dart_queued_resource_request extends ffi.Struct {
   external int prior_data_size;
 }
 
-typedef mln_dart_log_record_listenerFunction =
+typedef mln_adapter_log_record_listenerFunction =
     ffi.Void Function(ffi.Pointer<ffi.Void> record);
-typedef Dartmln_dart_log_record_listenerFunction =
+typedef Dartmln_adapter_log_record_listenerFunction =
     void Function(ffi.Pointer<ffi.Void> record);
-typedef mln_dart_log_record_listener =
-    ffi.Pointer<ffi.NativeFunction<mln_dart_log_record_listenerFunction>>;
+typedef mln_adapter_log_record_listener =
+    ffi.Pointer<ffi.NativeFunction<mln_adapter_log_record_listenerFunction>>;
 
-final class mln_dart_log_callback_state extends ffi.Struct {
-  external mln_dart_log_record_listener listener;
+final class mln_adapter_log_callback_state extends ffi.Struct {
+  external mln_adapter_log_record_listener listener;
 
   @ffi.Uint32()
   external int consume;
 }
 
-final class mln_dart_log_record extends ffi.Struct {
+final class mln_adapter_log_record extends ffi.Struct {
   external ffi.Pointer<ffi.Void> owner;
 
   @ffi.Bool()
@@ -8985,3 +8935,5 @@ final class mln_dart_log_record extends ffi.Struct {
 
   external ffi.Pointer<ffi.Char> message;
 }
+
+const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;

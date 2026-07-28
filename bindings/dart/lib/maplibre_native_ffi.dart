@@ -7,7 +7,7 @@ export 'src/geo/geo.dart';
 export 'src/json/json.dart';
 export 'src/log/log.dart';
 export 'src/map/map.dart';
-export 'src/maplibre.dart';
+export 'src/maplibre.dart' hide logCallbackStateForTesting;
 export 'src/offline/offline.dart';
 export 'src/projection/projection.dart';
 export 'src/query/query.dart';
