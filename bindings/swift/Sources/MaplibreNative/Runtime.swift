@@ -446,20 +446,21 @@ public final class RuntimeHandle {
   ///
   /// This blocks the calling thread. Do not call it while holding a lock that a
   /// thread signalling a `WakeSource` also takes.
-  public func wait(timeout: Duration?) throws -> Bool {
+  ///
+  /// `timeout` is in seconds. `Duration` would read better but is unavailable
+  /// at this package's iOS deployment floor.
+  public func wait(timeout: TimeInterval?) throws -> Bool {
     try mapNativeFailure {
-      // A negative duration is a caller mistake rather than a request for an
-      // unbounded park, which `nil` spells, so it collapses to no wait.
-      let timeoutMilliseconds: Int64 =
-        if let timeout {
-          max(
-            0,
-            timeout.components.seconds * 1000 + timeout.components
-              .attoseconds / 1_000_000_000_000_000
-          )
-        } else {
-          -1
-        }
+      let timeoutMilliseconds: Int64
+      if let timeout {
+        // A negative or non-finite timeout is a caller mistake rather than a
+        // request for an unbounded park, which `nil` spells, so it collapses to
+        // no wait. The upper clamp keeps the conversion inside Int64.
+        let milliseconds = timeout.isFinite ? (timeout * 1000).rounded() : 0
+        timeoutMilliseconds = Int64(min(max(milliseconds, 0), 9.0e18))
+      } else {
+        timeoutMilliseconds = -1
+      }
       var signaled = false
       try checkStatus(
         mln_runtime_wait(handle.requireLive(), timeoutMilliseconds, &signaled)
