@@ -619,7 +619,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   // event copy, polling, stale-source, and unknown-domain behavior.
 
   @Test
-  fun runOnceProcessesStyleLoadedEventAndPollingDrainsQueue() {
+  fun pumpProcessesStyleLoadedEventAndPollingDrainsQueue() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
