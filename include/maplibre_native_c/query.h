@@ -175,7 +175,8 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_rendered_features(
   mln_render_session* session, const mln_rendered_query_geometry* geometry,
@@ -200,7 +201,8 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_source_features(
   mln_render_session* session, mln_string_view source_id,
@@ -249,7 +251,8 @@ MLN_API mln_status mln_render_session_query_source_features(
  *   been created for the session yet.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no renderer
+ *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_feature_extensions(
   mln_render_session* session, mln_string_view source_id,
