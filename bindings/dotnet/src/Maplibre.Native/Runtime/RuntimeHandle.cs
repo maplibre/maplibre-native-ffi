@@ -188,6 +188,18 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
     }
 
+    /// <summary>Clears the runtime-scoped resource provider callback.</summary>
+    public void ClearResourceProvider()
+    {
+        lock (callbackGate)
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_provider(Pointer));
+            var previous = resourceProviderState;
+            resourceProviderState = null;
+            previous?.Dispose();
+        }
+    }
+
     /// <summary>Clears the runtime-scoped resource transform callback.</summary>
     public void ClearResourceTransform()
     {

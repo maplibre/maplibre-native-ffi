@@ -1,10 +1,13 @@
 use super::*;
 use std::time::Duration;
 
-use crate::events::{RuntimeEventSource, RuntimeEventType, empty_runtime_event};
+use crate::events::{
+    RuntimeEventPayload, RuntimeEventSource, RuntimeEventType, empty_runtime_event,
+};
 use crate::{
-    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, JsonMember, MapMode, ResourceKind,
-    ResourceProviderDecision, ResourceResponse, TextureImageInfo,
+    BoundsConstraint, CameraChangeMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind,
+    Feature, JsonMember, MapMode, ResourceKind, ResourceProviderDecision, ResourceResponse,
+    TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -218,6 +221,148 @@ fn tile_source_helpers_call_real_c_api() {
         map.style_source_type("dem-tiles").unwrap(),
         Some(SourceType::RasterDem)
     );
+}
+
+#[test]
+// Spec coverage: BND-060, BND-061, and BND-105.
+fn geojson_source_helpers_accept_options_and_keep_them_across_updates() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+    options.cluster_radius = Some(40);
+    // A present zero must reach native as an explicit buffer of zero.
+    options.buffer = Some(0);
+    options.cluster_properties = Some(JsonValue::Object(vec![JsonMember::new(
+        "weight_sum",
+        JsonValue::Array(vec![
+            JsonValue::String("+".to_owned()),
+            JsonValue::Array(vec![
+                JsonValue::String("get".to_owned()),
+                JsonValue::String("weight".to_owned()),
+            ]),
+        ]),
+    )]));
+
+    map.add_geojson_source_url(
+        "geojson-url",
+        "https://example.com/points.geojson",
+        Some(&options),
+    )
+    .unwrap();
+    assert_eq!(
+        map.style_source_type("geojson-url").unwrap(),
+        Some(SourceType::GeoJson)
+    );
+
+    let data = GeoJson::FeatureCollection(vec![Feature::new(
+        Geometry::Point(LatLng::new(0.0, 0.0)),
+        vec![JsonMember::new("weight", JsonValue::UInt(1))],
+    )]);
+    map.add_geojson_source_data("geojson-data", &data, None)
+        .unwrap();
+    assert_eq!(
+        map.style_source_type("geojson-data").unwrap(),
+        Some(SourceType::GeoJson)
+    );
+
+    // Updates carry no options of their own; the source keeps what it was added
+    // with.
+    map.set_geojson_source_data("geojson-url", &data).unwrap();
+    map.set_geojson_source_url("geojson-data", "https://example.com/points.geojson")
+        .unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
+fn clustered_geojson_source_requires_a_feature_collection() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+
+    // MapLibre Native engages clustering for feature collections only, so these
+    // used to tile unclustered instead of honouring the requested option.
+    let bare = GeoJson::Geometry(Geometry::Point(LatLng::new(0.0, 0.0)));
+    let error = map
+        .add_geojson_source_data("quakes", &bare, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(message.contains("quakes"), "{message}");
+    assert!(
+        message.contains("requires a feature collection"),
+        "{message}"
+    );
+    assert!(message.contains("a bare geometry"), "{message}");
+
+    let single = GeoJson::Feature(Feature::new(
+        Geometry::Point(LatLng::new(0.0, 0.0)),
+        Vec::new(),
+    ));
+    let error = map
+        .add_geojson_source_data("quakes", &single, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.to_string().contains("a single feature"), "{error}");
+
+    // The constraint belongs to clustering alone, and the rejected ID stays free.
+    map.add_geojson_source_data("quakes", &bare, None).unwrap();
+
+    // An empty feature collection carries nothing to cluster, so it stays
+    // accepted and a later update supplies the features to cluster.
+    let empty = GeoJson::FeatureCollection(Vec::new());
+    map.add_geojson_source_data("pending", &empty, Some(&options))
+        .unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-060 and BND-061.
+fn clustered_geojson_source_reports_non_point_geometry() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+
+    let mixed = GeoJson::FeatureCollection(vec![
+        Feature::new(Geometry::Point(LatLng::new(0.0, 0.0)), Vec::new()),
+        Feature::new(
+            Geometry::GeometryCollection(vec![Geometry::Point(LatLng::new(1.0, 1.0))]),
+            Vec::new(),
+        ),
+    ]);
+
+    // Supercluster reads every feature geometry as a point, so this used to
+    // surface a bare variant access message from inside MapLibre Native.
+    let error = map
+        .add_geojson_source_data("quakes", &mixed, Some(&options))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    let message = error.to_string();
+    assert!(message.contains("quakes"), "{message}");
+    assert!(
+        message.contains("point geometry on every feature"),
+        "{message}"
+    );
+    assert!(message.contains("geometry collection"), "{message}");
+
+    // The constraint belongs to clustering alone, and the rejected ID stays free.
+    map.add_geojson_source_data("quakes", &mixed, None).unwrap();
+
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]
@@ -590,6 +735,102 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
     runtime.close().unwrap();
 }
 
+/// Camera events drained from one runtime queue, in arrival order.
+#[derive(Default)]
+struct CameraEventTally {
+    finished_transition_ids: Vec<u64>,
+    did_change_modes: Vec<CameraChangeMode>,
+    did_change_followed_finish: bool,
+}
+
+/// Drains the queued runtime events and tallies the camera events among them.
+///
+/// The transition-finished event is queued while the camera command that ends
+/// the transition runs, so polling alone observes it.
+fn drain_camera_events(runtime: &RuntimeHandle) -> CameraEventTally {
+    let mut tally = CameraEventTally::default();
+    while let Some(event) = runtime.poll_event().unwrap() {
+        match event.event_type {
+            RuntimeEventType::MapCameraTransitionFinished => {
+                let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload else {
+                    panic!("transition-finished event should carry its typed payload");
+                };
+                tally.finished_transition_ids.push(payload.transition_id);
+            }
+            RuntimeEventType::MapCameraDidChange => {
+                tally
+                    .did_change_modes
+                    .push(CameraChangeMode::from_raw(event.code as u32));
+                tally.did_change_followed_finish |= !tally.finished_transition_ids.is_empty();
+            }
+            _ => {}
+        }
+    }
+    tally
+}
+
+fn identified_ease(transition_id: u64, duration_ms: f64) -> AnimationOptions {
+    let mut animation = AnimationOptions::default();
+    animation.transition_id = Some(transition_id);
+    animation.duration_ms = Some(duration_ms);
+    animation
+}
+
+#[test]
+// Spec coverage: BND-061, BND-102, and BND-087.
+fn identified_camera_transitions_report_each_terminal_outcome_once() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::new(512, 512, 1.0);
+    options.mode = MapMode::Continuous;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(45.0, -122.0));
+    camera.zoom = Some(4.0);
+    // Map construction queues its own camera events, so start from an empty
+    // queue.
+    let _ = drain_camera_events(&runtime);
+
+    // A zero-duration ease resolves inside the call, so its end is reported
+    // ahead of the did-change event for the same instant jump.
+    map.ease_to(&camera, Some(&identified_ease(0, 0.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![0]);
+    assert!(tally.did_change_followed_finish);
+    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Immediate]);
+
+    // A running transition stays silent until something ends it.
+    camera.zoom = Some(12.0);
+    map.ease_to(&camera, Some(&identified_ease(11, 5_000.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert!(tally.finished_transition_ids.is_empty());
+
+    // A later camera command supersedes the running transition.
+    camera.zoom = Some(13.0);
+    map.ease_to(&camera, Some(&identified_ease(12, 5_000.0)))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![11]);
+    assert_eq!(tally.did_change_modes, vec![CameraChangeMode::Animated]);
+
+    // Cancelling ends the superseding transition.
+    map.cancel_transitions().unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert_eq!(tally.finished_transition_ids, vec![12]);
+
+    // Leaving the identity absent keeps the transition silent, so the present
+    // zero ID above stayed distinguishable from an omitted one.
+    camera.zoom = Some(14.0);
+    map.ease_to(&camera, Some(&AnimationOptions::default()))
+        .unwrap();
+    let tally = drain_camera_events(&runtime);
+    assert!(tally.finished_transition_ids.is_empty());
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 #[test]
 // Spec coverage: BND-104.
 fn empty_coordinate_slice_is_rejected_before_calling_c() {
@@ -603,6 +844,52 @@ fn empty_coordinate_slice_is_rejected_before_calling_c() {
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), None);
     assert!(error.diagnostic().contains("at least one coordinate"));
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102, BND-103.
+fn unbounded_and_world_bounds_constrain_the_camera_differently() {
+    fn jumped_longitude(map: &MapHandle, longitude: f64) -> f64 {
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(0.0, longitude));
+        camera.zoom = Some(2.0);
+        map.jump_to(&camera).unwrap();
+        map.camera().unwrap().center.unwrap().longitude
+    }
+
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // A pristine map reports the unbounded constraint, not world bounds.
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Unbounded)
+    );
+    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
+
+    let world = LatLngBounds::new(LatLng::new(-90.0, -180.0), LatLng::new(90.0, 180.0));
+    let mut options = BoundOptions::default();
+    options.bounds = Some(BoundsConstraint::Bounded(world));
+    map.set_bounds(&options).unwrap();
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Bounded(world))
+    );
+    // World bounds clamp at the antimeridian instead of wrapping.
+    assert!((jumped_longitude(&map, 200.0) - 180.0).abs() < 1e-6);
+
+    let mut options = BoundOptions::default();
+    options.bounds = Some(BoundsConstraint::Unbounded);
+    map.set_bounds(&options).unwrap();
+    assert_eq!(
+        map.bounds().unwrap().bounds,
+        Some(BoundsConstraint::Unbounded)
+    );
+    // Releasing the constraint restores antimeridian wrapping.
+    assert!((jumped_longitude(&map, 200.0) - -160.0).abs() < 1e-6);
 
     map.close().unwrap();
     runtime.close().unwrap();

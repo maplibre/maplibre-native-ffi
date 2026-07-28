@@ -17,6 +17,18 @@ use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
 
+/// Wire shape for `maplibre_native.camera.AnimationOptions`.
+///
+/// Ordered as duration in milliseconds, velocity, minimum zoom, easing control
+/// points, and the caller-chosen transition ID.
+type AnimationParts = (
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<(f64, f64, f64, f64)>,
+    Option<u64>,
+);
+
 mod py_errors {
     pyo3::import_exception!(maplibre_native.errors, InvalidArgumentError);
     pyo3::import_exception!(maplibre_native.errors, InvalidStateError);
@@ -1124,6 +1136,7 @@ impl RuntimeHandle {
 
     fn set_resource_provider(
         &self,
+        py: Python<'_>,
         callback: Py<PyAny>,
         max_pending_callbacks: usize,
     ) -> PyResult<()> {
@@ -1137,19 +1150,68 @@ impl RuntimeHandle {
             max_pending_callbacks,
         ));
         let descriptor = replacement.descriptor();
-        let state = self.state_for_operation()?;
-        // SAFETY: state owns a runtime pointer that passed the binding
-        // lifecycle gate. The C API validates that it is live. descriptor
-        // points to replacement state, which is retained after a successful
-        // native registration.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_provider(state.as_ptr(), &descriptor)
-        })
-        .map_err(map_error)?;
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state_for_operation()?;
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
+        let callback = descriptor.callback;
+        let user_data_address = descriptor.user_data as usize;
+        let size = descriptor.size;
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live.
+        // descriptor points to replacement state, which is retained after a
+        // successful native registration. Replacement can wait for in-flight
+        // callbacks that need the GIL, so release the GIL while it runs without
+        // holding the Rust handle-state mutex.
+        let status = py.detach(move || {
+            let descriptor = sys::mln_resource_provider {
+                size,
+                callback,
+                user_data: user_data_address as *mut c_void,
+            };
+            unsafe {
+                sys::mln_runtime_set_resource_provider(
+                    runtime_address as *mut sys::mln_runtime,
+                    &descriptor,
+                )
+            }
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        // Native retired the previous provider before returning, so dropping
+        // the state it replaces here can no longer be reached from native.
         self.resource_provider
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .replace(replacement);
+        Ok(())
+    }
+
+    fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<()> {
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state_for_operation()?;
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate. The C API validates that it is live and waits
+        // for in-flight callbacks that need the GIL before returning, so release
+        // the GIL while it runs without holding the Rust handle-state mutex.
+        let status = py.detach(move || unsafe {
+            sys::mln_runtime_clear_resource_provider(runtime_address as *mut sys::mln_runtime)
+        });
+        maplibre_core::check(status).map_err(map_error)?;
+        // Native can no longer reach the cleared provider state, so drop it.
+        self.resource_provider
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take();
         Ok(())
     }
 
@@ -1348,6 +1410,19 @@ impl MapHandle {
         Ok(loaded)
     }
 
+    fn get_size(&self) -> PyResult<(u32, u32, f64)> {
+        let state = self.state();
+        let mut width = 0u32;
+        let mut height = 0u32;
+        let mut scale_factor = 0f64;
+        // SAFETY: The C API validates the map pointer and out pointers.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_size(state.as_ptr(), &mut width, &mut height, &mut scale_factor)
+        })
+        .map_err(map_error)?;
+        Ok((width, height, scale_factor))
+    }
+
     fn get_viewport_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         // SAFETY: Default constructor takes no arguments and initializes size.
@@ -1512,12 +1587,7 @@ impl MapHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let camera = camera_options_from_parts(
@@ -1556,12 +1626,7 @@ impl MapHandle {
         anchor: Option<(f64, f64)>,
         roll: Option<f64>,
         field_of_view: Option<f64>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let camera = camera_options_from_parts(
@@ -1718,13 +1783,15 @@ impl MapHandle {
     fn set_bounds(
         &self,
         bounds: Option<((f64, f64), (f64, f64))>,
+        unbounded: bool,
         min_zoom: Option<f64>,
         max_zoom: Option<f64>,
         min_pitch: Option<f64>,
         max_pitch: Option<f64>,
     ) -> PyResult<()> {
         let state = self.state();
-        let bounds = bound_options_from_parts(bounds, min_zoom, max_zoom, min_pitch, max_pitch);
+        let bounds =
+            bound_options_from_parts(bounds, unbounded, min_zoom, max_zoom, min_pitch, max_pitch);
         // SAFETY: The C API validates the map pointer and bounds fields.
         maplibre_core::check(unsafe { sys::mln_map_set_bounds(state.as_ptr(), &bounds) })
             .map_err(map_error)
@@ -1741,12 +1808,7 @@ impl MapHandle {
         &self,
         delta_x: f64,
         delta_y: f64,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
@@ -1777,12 +1839,7 @@ impl MapHandle {
         &self,
         scale: f64,
         anchor: Option<(f64, f64)>,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let anchor = anchor.map(screen_point_from_tuple);
@@ -1817,12 +1874,7 @@ impl MapHandle {
         &self,
         first: (f64, f64),
         second: (f64, f64),
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
+        animation: Option<AnimationParts>,
     ) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
@@ -1846,16 +1898,7 @@ impl MapHandle {
             .map_err(map_error)
     }
 
-    fn pitch_by_animated(
-        &self,
-        pitch: f64,
-        animation: Option<(
-            Option<f64>,
-            Option<f64>,
-            Option<f64>,
-            Option<(f64, f64, f64, f64)>,
-        )>,
-    ) -> PyResult<()> {
+    fn pitch_by_animated(&self, pitch: f64, animation: Option<AnimationParts>) -> PyResult<()> {
         let state = self.state();
         let animation = animation.map(animation_options_from_parts);
         // SAFETY: The C API validates the map pointer, pitch value, and optional
@@ -2035,25 +2078,97 @@ impl MapHandle {
         .map_err(map_error)
     }
 
-    fn add_geojson_source_url(&self, source_id: String, url: String) -> PyResult<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn add_geojson_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        cluster_max_zoom: Option<f64>,
+        cluster_properties: Option<Bound<'_, PyAny>>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        cluster_radius: Option<u32>,
+        cluster_min_points: Option<u32>,
+        line_metrics: Option<bool>,
+        cluster: Option<bool>,
+    ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
         let url = maplibre_core::string::string_view(&url);
-        // SAFETY: The C API validates the map pointer and borrowed string views.
+        let options = geojson_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            tolerance,
+            cluster_max_zoom,
+            cluster_properties,
+            tile_size,
+            buffer,
+            cluster_radius,
+            cluster_min_points,
+            line_metrics,
+            cluster,
+        )?;
+        let options =
+            maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, borrowed string views, and options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_url(state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_add_geojson_source_url(
+                state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options.as_ptr(),
+            )
         })
         .map_err(map_error)
     }
 
-    fn add_geojson_source_data(&self, source_id: String, data: &Bound<'_, PyAny>) -> PyResult<()> {
+    #[allow(clippy::too_many_arguments)]
+    fn add_geojson_source_data(
+        &self,
+        source_id: String,
+        data: &Bound<'_, PyAny>,
+        min_zoom: Option<f64>,
+        max_zoom: Option<f64>,
+        tolerance: Option<f64>,
+        cluster_max_zoom: Option<f64>,
+        cluster_properties: Option<Bound<'_, PyAny>>,
+        tile_size: Option<u32>,
+        buffer: Option<u32>,
+        cluster_radius: Option<u32>,
+        cluster_min_points: Option<u32>,
+        line_metrics: Option<bool>,
+        cluster: Option<bool>,
+    ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
         let data = geojson_from_wire(data)?;
         let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
-        // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
+        let options = geojson_source_options_from_parts(
+            min_zoom,
+            max_zoom,
+            tolerance,
+            cluster_max_zoom,
+            cluster_properties,
+            tile_size,
+            buffer,
+            cluster_radius,
+            cluster_min_points,
+            line_metrics,
+            cluster,
+        )?;
+        let options =
+            maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
+        // SAFETY: The C API validates the map pointer, source ID, GeoJSON descriptor, and options.
         maplibre_core::check(unsafe {
-            sys::mln_map_add_geojson_source_data(state.as_ptr(), source_id.raw(), data.as_ptr())
+            sys::mln_map_add_geojson_source_data(
+                state.as_ptr(),
+                source_id.raw(),
+                data.as_ptr(),
+                options.as_ptr(),
+            )
         })
         .map_err(map_error)
     }
@@ -3961,7 +4076,7 @@ unsafe extern "C" fn resource_provider_trampoline(
             return maplibre_core::resource::UNKNOWN_PROVIDER_DECISION;
         };
         // SAFETY: user_data points to PyResourceProviderState retained by RuntimeHandle
-        // until replacement or runtime teardown; native waits for in-flight callbacks.
+        // until replacement, clear, or runtime teardown; native waits for in-flight callbacks.
         unsafe { state.as_ref() }.invoke(request, handle)
     }))
     .unwrap_or(maplibre_core::resource::UNKNOWN_PROVIDER_DECISION)
@@ -4116,6 +4231,10 @@ fn payload_to_py(py: Python<'_>, payload: RuntimeEventPayload) -> PyResult<Py<Py
             dict.set_item("result_status", payload.result_status)?;
             dict.set_item("found", payload.found)?;
         }
+        RuntimeEventPayload::CameraTransitionFinished(payload) => {
+            dict.set_item("kind", "camera_transition_finished")?;
+            dict.set_item("transition_id", payload.transition_id)?;
+        }
         RuntimeEventPayload::Unknown(payload) => {
             dict.set_item("kind", "unknown")?;
             dict.set_item("raw_type", payload.raw_type)?;
@@ -4217,6 +4336,9 @@ fn event_type_raw(event_type: RuntimeEventType) -> u32 {
         RuntimeEventType::MapCameraWillChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE,
         RuntimeEventType::MapCameraIsChanging => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING,
         RuntimeEventType::MapCameraDidChange => sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE,
+        RuntimeEventType::MapCameraTransitionFinished => {
+            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED
+        }
         RuntimeEventType::MapStyleLoaded => sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED,
         RuntimeEventType::MapLoadingStarted => sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED,
         RuntimeEventType::MapLoadingFinished => sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED,
@@ -4525,6 +4647,57 @@ fn tile_source_options_from_parts(
     Ok(options)
 }
 
+#[allow(clippy::too_many_arguments)]
+fn geojson_source_options_from_parts(
+    min_zoom: Option<f64>,
+    max_zoom: Option<f64>,
+    tolerance: Option<f64>,
+    cluster_max_zoom: Option<f64>,
+    cluster_properties: Option<Bound<'_, PyAny>>,
+    tile_size: Option<u32>,
+    buffer: Option<u32>,
+    cluster_radius: Option<u32>,
+    cluster_min_points: Option<u32>,
+    line_metrics: Option<bool>,
+    cluster: Option<bool>,
+) -> PyResult<maplibre_core::GeoJsonSourceOptions> {
+    let mut options = maplibre_core::GeoJsonSourceOptions::default();
+    if let Some(min_zoom) = min_zoom {
+        options.min_zoom = Some(min_zoom);
+    }
+    if let Some(max_zoom) = max_zoom {
+        options.max_zoom = Some(max_zoom);
+    }
+    if let Some(tolerance) = tolerance {
+        options.tolerance = Some(tolerance);
+    }
+    if let Some(cluster_max_zoom) = cluster_max_zoom {
+        options.cluster_max_zoom = Some(cluster_max_zoom);
+    }
+    if let Some(cluster_properties) = cluster_properties {
+        options.cluster_properties = Some(json_value_from_py(&cluster_properties)?);
+    }
+    if let Some(tile_size) = tile_size {
+        options.tile_size = Some(tile_size);
+    }
+    if let Some(buffer) = buffer {
+        options.buffer = Some(buffer);
+    }
+    if let Some(cluster_radius) = cluster_radius {
+        options.cluster_radius = Some(cluster_radius);
+    }
+    if let Some(cluster_min_points) = cluster_min_points {
+        options.cluster_min_points = Some(cluster_min_points);
+    }
+    if let Some(line_metrics) = line_metrics {
+        options.line_metrics = Some(line_metrics);
+    }
+    if let Some(cluster) = cluster {
+        options.cluster = Some(cluster);
+    }
+    Ok(options)
+}
+
 fn viewport_options_from_parts(
     north_orientation: Option<u32>,
     constrain_mode: Option<u32>,
@@ -4601,18 +4774,14 @@ fn projection_mode_from_parts(
 }
 
 fn animation_options_from_parts(
-    (duration_ms, velocity, min_zoom, easing): (
-        Option<f64>,
-        Option<f64>,
-        Option<f64>,
-        Option<(f64, f64, f64, f64)>,
-    ),
+    (duration_ms, velocity, min_zoom, easing, transition_id): AnimationParts,
 ) -> sys::mln_animation_options {
     let mut options = maplibre_core::AnimationOptions::default();
     options.duration_ms = duration_ms;
     options.velocity = velocity;
     options.min_zoom = min_zoom;
     options.easing = easing.map(|(x1, y1, x2, y2)| maplibre_core::UnitBezier::new(x1, y1, x2, y2));
+    options.transition_id = transition_id;
     maplibre_core::camera::animation_options_to_native(&options)
 }
 
@@ -4655,13 +4824,20 @@ fn camera_fit_options_from_parts(
 
 fn bound_options_from_parts(
     bounds: Option<((f64, f64), (f64, f64))>,
+    unbounded: bool,
     min_zoom: Option<f64>,
     max_zoom: Option<f64>,
     min_pitch: Option<f64>,
     max_pitch: Option<f64>,
 ) -> sys::mln_bound_options {
     let mut options = maplibre_core::BoundOptions::default();
-    options.bounds = bounds.map(lat_lng_bounds_core_from_tuple);
+    options.bounds = match bounds {
+        Some(bounds) => Some(maplibre_core::BoundsConstraint::Bounded(
+            lat_lng_bounds_core_from_tuple(bounds),
+        )),
+        None if unbounded => Some(maplibre_core::BoundsConstraint::Unbounded),
+        None => None,
+    };
     options.min_zoom = min_zoom;
     options.max_zoom = max_zoom;
     options.min_pitch = min_pitch;
@@ -4771,10 +4947,19 @@ fn free_camera_options_to_py(
 fn bound_options_to_py(py: Python<'_>, options: &sys::mln_bound_options) -> PyResult<Py<PyAny>> {
     let options = maplibre_core::camera::bound_options_from_native(*options);
     let dict = PyDict::new(py);
-    if let Some(bounds) = options.bounds {
-        dict.set_item("bounds", lat_lng_bounds_core_to_py(py, &bounds)?)?;
-    } else {
-        dict.set_item("bounds", py.None())?;
+    match options.bounds {
+        Some(maplibre_core::BoundsConstraint::Bounded(bounds)) => {
+            dict.set_item("bounds", lat_lng_bounds_core_to_py(py, &bounds)?)?;
+            dict.set_item("unbounded", false)?;
+        }
+        Some(maplibre_core::BoundsConstraint::Unbounded) => {
+            dict.set_item("bounds", py.None())?;
+            dict.set_item("unbounded", true)?;
+        }
+        None => {
+            dict.set_item("bounds", py.None())?;
+            dict.set_item("unbounded", false)?;
+        }
     }
     dict.set_item("min_zoom", options.min_zoom)?;
     dict.set_item("max_zoom", options.max_zoom)?;
@@ -6761,6 +6946,41 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
     Ok(out.into_any().unbind())
 }
 
+/// Copies a camera transition-finished event whose native payload reports
+/// `missing_payload_bytes` fewer bytes than the payload struct holds.
+///
+/// Live transitions always report the full payload size, so this seam is the
+/// only way to reach the payload-size validation that guards reading typed
+/// payload fields.
+#[pyfunction]
+fn camera_transition_finished_event_for_test(
+    py: Python<'_>,
+    transition_id: u64,
+    missing_payload_bytes: usize,
+) -> PyResult<Py<PyAny>> {
+    let payload = sys::mln_runtime_event_camera_transition_finished {
+        size: std::mem::size_of::<sys::mln_runtime_event_camera_transition_finished>() as u32,
+        transition_id,
+    };
+    let event = sys::mln_runtime_event {
+        size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
+        type_: sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+        source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
+        source: ptr::null_mut(),
+        code: 0,
+        payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+        payload: ptr::addr_of!(payload).cast(),
+        payload_size: std::mem::size_of_val(&payload).saturating_sub(missing_payload_bytes),
+        message: ptr::null(),
+        message_size: 0,
+    };
+    // SAFETY: The raw event and its payload are built in this function and
+    // remain live for the duration of the copy.
+    let copied =
+        unsafe { maplibre_core::events::runtime_event_from_native(&event) }.map_err(map_error)?;
+    event_to_py(py, copied)
+}
+
 /// Creates a runtime handle on the current thread.
 #[pyfunction]
 fn create_runtime(
@@ -7284,6 +7504,10 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     )?)?;
     module.add_function(wrap_pyfunction!(
         runtime_event_payload_wire_shapes_for_test,
+        module
+    )?)?;
+    module.add_function(wrap_pyfunction!(
+        camera_transition_finished_event_for_test,
         module
     )?)?;
     module.add_function(wrap_pyfunction!(create_runtime, module)?)?;

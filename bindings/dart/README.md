@@ -43,6 +43,7 @@ releases the provider reference even when completion reports a native error.
 Callback exceptions are contained at the native boundary and reported through
 the native diagnostic path.
 
-Unsigned C `uint64_t` JSON values and feature identifiers use Dart `BigInt` so
-the complete native range is preserved. Native buffers return copied bytes;
-direct pointer access is explicitly unsafe and ends at `NativeBuffer.close()`.
+Unsigned C `uint64_t` JSON values, feature identifiers, and camera transition
+IDs use Dart `BigInt` so the complete native range is preserved. Native buffers
+return copied bytes; direct pointer access is explicitly unsafe and ends at
+`NativeBuffer.close()`.

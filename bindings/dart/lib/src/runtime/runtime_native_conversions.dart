@@ -483,6 +483,111 @@ Pointer<raw.mln_style_tile_source_options> _nativeTileSourceOptions(
   return nativeOptions;
 }
 
+Pointer<raw.mln_geojson_source_options> _nativeGeoJsonSourceOptions(
+  GeoJsonSourceOptions options,
+  Allocator allocator,
+) {
+  final nativeOptions = allocator<raw.mln_geojson_source_options>();
+  nativeOptions.ref = _c.raw.mln_geojson_source_options_default();
+  final minZoom = options.minZoom;
+  if (minZoom != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+        .value;
+    nativeOptions.ref.min_zoom = minZoom;
+  }
+  final maxZoom = options.maxZoom;
+  if (maxZoom != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+        .value;
+    nativeOptions.ref.max_zoom = maxZoom;
+  }
+  final tolerance = options.tolerance;
+  if (tolerance != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+        .value;
+    nativeOptions.ref.tolerance = tolerance;
+  }
+  final clusterMaxZoom = options.clusterMaxZoom;
+  if (clusterMaxZoom != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+        .value;
+    nativeOptions.ref.cluster_max_zoom = clusterMaxZoom;
+  }
+  final clusterProperties = options.clusterProperties;
+  if (clusterProperties != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+        .value;
+    nativeOptions.ref.cluster_properties = native_json
+        .nativeJsonValue(clusterProperties, allocator)
+        .pointer;
+  }
+  final tileSize = options.tileSize;
+  if (tileSize != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+        .value;
+    nativeOptions.ref.tile_size = _uint32(tileSize, 'GeoJSON tile size');
+  }
+  final buffer = options.buffer;
+  if (buffer != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_BUFFER
+        .value;
+    nativeOptions.ref.buffer = _uint32(buffer, 'GeoJSON buffer');
+  }
+  final clusterRadius = options.clusterRadius;
+  if (clusterRadius != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+        .value;
+    nativeOptions.ref.cluster_radius = _uint32(
+      clusterRadius,
+      'GeoJSON cluster radius',
+    );
+  }
+  final clusterMinPoints = options.clusterMinPoints;
+  if (clusterMinPoints != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+        .value;
+    nativeOptions.ref.cluster_min_points = _uint32(
+      clusterMinPoints,
+      'GeoJSON cluster minimum points',
+    );
+  }
+  final lineMetrics = options.lineMetrics;
+  if (lineMetrics != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+        .value;
+    nativeOptions.ref.line_metrics = lineMetrics;
+  }
+  final cluster = options.cluster;
+  if (cluster != null) {
+    nativeOptions.ref.fields |= raw
+        .mln_geojson_source_option_field
+        .MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+        .value;
+    nativeOptions.ref.cluster = cluster;
+  }
+  return nativeOptions;
+}
+
 Pointer<raw.mln_lat_lng> _latLngArray(
   List<LatLng> coordinates,
   Allocator allocator,

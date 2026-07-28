@@ -52,6 +52,7 @@ endfunction()
 function(mln_install_c_api_library target)
   set(MLN_FFI_NATIVE_COMPONENT native)
   mln_install_zig_libc()
+  mln_install_licenses(${target} "${MLN_FFI_NATIVE_COMPONENT}")
 
   get_target_property(MLN_FFI_C_API_LIBRARY_TYPE ${target} TYPE)
   set(MLN_FFI_PKG_CONFIG_CFLAGS "")

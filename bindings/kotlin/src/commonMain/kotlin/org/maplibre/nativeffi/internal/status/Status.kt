@@ -31,9 +31,22 @@ internal object Status {
   fun invalidState(diagnostic: String): InvalidStateException =
     InvalidStateException(MaplibreStatus.INVALID_STATE.nativeCode, diagnostic)
 
-  /** Creates the binding-owned error for closing a parent with live child handles. */
-  fun liveChildren(typeName: String, childCount: Int): InvalidStateException =
-    invalidState("$typeName has $childCount live child handle(s)")
+  /**
+   * Creates the binding-owned error for closing a parent with live child handles.
+   *
+   * The diagnostic names the live child wrapper types so callers can identify which handles still
+   * hold the parent open.
+   */
+  fun liveChildren(typeName: String, childTypeNames: List<String>): InvalidStateException {
+    val summary =
+      childTypeNames
+        .groupingBy { it }
+        .eachCount()
+        .entries
+        .sortedBy { it.key }
+        .joinToString(", ") { (name, count) -> if (count == 1) name else "$name x$count" }
+    return invalidState("$typeName has ${childTypeNames.size} live child handle(s): $summary")
+  }
 
   /** Creates a binding-owned invalid-argument error without reading stale C diagnostics. */
   fun invalidArgument(diagnostic: String): InvalidArgumentException =

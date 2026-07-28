@@ -13,6 +13,7 @@
 #if defined(_WIN32)
 #include <windows.h>
 #else
+#include <pthread.h>
 #include <time.h>
 #endif
 
@@ -25,39 +26,206 @@
 #include <vulkan/vulkan.h>
 #endif
 
+// Per-thread record of the handles these helpers created. A failing assertion
+// longjmps out of the test body, so the test's own teardown never runs and the
+// handles it holds would otherwise stay live: the next test on this thread
+// would then fail to create a runtime and the single real failure would look
+// like a suite-wide outage. Tracking is thread local so the owner thread's
+// teardown leaves a worker thread's runtime alone.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define MLN_TEST_THREAD_LOCAL __declspec(thread)
+#else
+#define MLN_TEST_THREAD_LOCAL _Thread_local
+#endif
+
+#define MLN_TEST_TRACKED_CAPACITY 8
+
+// Sessions are tracked by value. The caller's fixture usually lives on the test
+// stack frame, which an aborting assertion unwinds before teardown runs, so a
+// pointer to it would dangle.
+typedef struct tracked_session {
+  mln_render_session* session;
+  void* backend_state;
+} tracked_session;
+
+static MLN_TEST_THREAD_LOCAL mln_runtime* tracked_runtime;
+static MLN_TEST_THREAD_LOCAL mln_map* tracked_maps[MLN_TEST_TRACKED_CAPACITY];
+static MLN_TEST_THREAD_LOCAL size_t tracked_map_count;
+static MLN_TEST_THREAD_LOCAL tracked_session
+  tracked_sessions[MLN_TEST_TRACKED_CAPACITY];
+static MLN_TEST_THREAD_LOCAL size_t tracked_session_count;
+
+// Fails before the caller creates the handle. Dropping an overflow silently
+// would leave a live map outside teardown, and failing after creation would
+// strand the very handle that overflowed, so both cascade the same way.
+static void reserve_map_slot(void) {
+  if (tracked_map_count >= MLN_TEST_TRACKED_CAPACITY) {
+    TEST_FAIL_MESSAGE(
+      "This test holds more live maps than the suite can track. Destroy maps "
+      "as the test finishes with them, or raise MLN_TEST_TRACKED_CAPACITY."
+    );
+  }
+}
+
+static void track_map(mln_map* map) {
+  tracked_maps[tracked_map_count] = map;
+  tracked_map_count += 1;
+}
+
+static void untrack_map(const mln_map* map) {
+  for (size_t index = 0; index < tracked_map_count; index += 1) {
+    if (tracked_maps[index] == map) {
+      tracked_maps[index] = tracked_maps[tracked_map_count - 1];
+      tracked_map_count -= 1;
+      return;
+    }
+  }
+}
+
+// Fails before the caller attaches, for the same reason as reserve_map_slot().
+static void reserve_session_slot(void) {
+  if (tracked_session_count >= MLN_TEST_TRACKED_CAPACITY) {
+    TEST_FAIL_MESSAGE(
+      "This test holds more live render sessions than the suite can track. "
+      "Destroy sessions as the test finishes with them, or raise "
+      "MLN_TEST_TRACKED_CAPACITY."
+    );
+  }
+}
+
+static void track_session(const mln_test_render_fixture* fixture) {
+  tracked_sessions[tracked_session_count] = (tracked_session){
+    .session = fixture->session, .backend_state = fixture->backend_state
+  };
+  tracked_session_count += 1;
+}
+
+static void untrack_session(const mln_render_session* session) {
+  for (size_t index = 0; index < tracked_session_count; index += 1) {
+    if (tracked_sessions[index].session == session) {
+      tracked_sessions[index] = tracked_sessions[tracked_session_count - 1];
+      tracked_session_count -= 1;
+      return;
+    }
+  }
+}
+
 mln_runtime* mln_test_create_runtime(void) {
   mln_runtime* runtime = NULL;
   const mln_runtime_options options = mln_runtime_options_default();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_create(&options, &runtime));
+  const mln_status status = mln_runtime_create(&options, &runtime);
+  if (status == MLN_STATUS_INVALID_STATE) {
+    TEST_FAIL_MESSAGE(
+      "This thread already owns a live runtime, so an earlier test leaked one. "
+      "Look for the first failing test above and destroy the runtime it "
+      "created."
+    );
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
   TEST_ASSERT_NOT_NULL(runtime);
+  tracked_runtime = runtime;
   return runtime;
 }
 
-mln_map* mln_test_create_map(mln_runtime* runtime) {
+mln_map* mln_test_create_map_with_options(
+  mln_runtime* runtime, const mln_map_options* options
+) {
   mln_map* map = NULL;
-  mln_map_options options = mln_map_options_default();
-  options.width = 512;
-  options.height = 512;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, &options, &map));
+  reserve_map_slot();
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, options, &map));
   TEST_ASSERT_NOT_NULL(map);
+  track_map(map);
   return map;
 }
 
+mln_map* mln_test_create_map(mln_runtime* runtime) {
+  mln_map_options options = mln_map_options_default();
+  options.width = 512;
+  options.height = 512;
+  return mln_test_create_map_with_options(runtime, &options);
+}
+
+// Untracking happens only after the destroy succeeds. A destroy that is
+// temporarily invalid -- destroying a map that still has a render session
+// attached -- longjmps out of the assertion below, and the handle has to stay
+// tracked so teardown can still reclaim it.
 void mln_test_destroy_runtime(mln_runtime* runtime) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
+  if (tracked_runtime == runtime) {
+    tracked_runtime = NULL;
+  }
 }
 
 void mln_test_destroy_map(mln_map* map) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  untrack_map(map);
 }
 
-void mln_test_sleep_millisecond(void) {
+void mln_test_sleep_millisecond(void) { mln_test_sleep_milliseconds(1); }
+
+void mln_test_sleep_milliseconds(unsigned int milliseconds) {
 #if defined(_WIN32)
-  Sleep(1);
+  Sleep(milliseconds);
 #else
-  const struct timespec duration = {.tv_sec = 0, .tv_nsec = 1000000};
+  const struct timespec duration = {
+    .tv_sec = (time_t)(milliseconds / 1000u),
+    .tv_nsec = (long)(milliseconds % 1000u) * 1000000L,
+  };
   nanosleep(&duration, NULL);
 #endif
+}
+
+struct mln_test_thread {
+  void (*entry)(void*);
+  void* argument;
+#if defined(_WIN32)
+  HANDLE handle;
+#else
+  pthread_t handle;
+#endif
+};
+
+#if defined(_WIN32)
+static DWORD WINAPI thread_trampoline(LPVOID argument) {
+  mln_test_thread* thread = argument;
+  thread->entry(thread->argument);
+  return 0;
+}
+#else
+static void* thread_trampoline(void* argument) {
+  mln_test_thread* thread = argument;
+  thread->entry(thread->argument);
+  return NULL;
+}
+#endif
+
+mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument) {
+  mln_test_thread* thread = calloc(1, sizeof(*thread));
+  TEST_ASSERT_NOT_NULL(thread);
+  thread->entry = entry;
+  thread->argument = argument;
+#if defined(_WIN32)
+  thread->handle = CreateThread(NULL, 0, thread_trampoline, thread, 0, NULL);
+  TEST_ASSERT_NOT_NULL(thread->handle);
+#else
+  TEST_ASSERT_EQUAL_INT(
+    0, pthread_create(&thread->handle, NULL, thread_trampoline, thread)
+  );
+#endif
+  return thread;
+}
+
+void mln_test_thread_join(mln_test_thread* thread) {
+  if (thread == NULL) {
+    return;
+  }
+#if defined(_WIN32)
+  WaitForSingleObject(thread->handle, INFINITE);
+  CloseHandle(thread->handle);
+#else
+  pthread_join(thread->handle, NULL);
+#endif
+  free(thread);
 }
 
 #if defined(MLN_TEST_BACKEND_METAL)
@@ -506,6 +674,7 @@ bool mln_test_render_fixture_create(
   if (map == NULL || fixture == NULL) {
     return false;
   }
+  reserve_session_slot();
   *fixture = (mln_test_render_fixture){0};
 #if defined(MLN_TEST_BACKEND_METAL)
   mln_metal_context_descriptor context = {0};
@@ -547,6 +716,7 @@ bool mln_test_render_fixture_create(
     *fixture = (mln_test_render_fixture){0};
     return false;
   }
+  track_session(fixture);
   return true;
 }
 
@@ -559,6 +729,33 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
   }
+  untrack_session(fixture->session);
   destroy_backend_state(fixture->backend_state);
   *fixture = (mln_test_render_fixture){0};
+}
+
+bool mln_test_reclaim_thread_resources(void) {
+  bool reclaimed = false;
+  // Render session before map before runtime: the C API keeps a map with a live
+  // session and a runtime with live maps alive on purpose.
+  while (tracked_session_count > 0) {
+    tracked_session_count -= 1;
+    const tracked_session entry = tracked_sessions[tracked_session_count];
+    if (entry.session != NULL) {
+      mln_render_session_destroy(entry.session);
+    }
+    destroy_backend_state(entry.backend_state);
+    reclaimed = true;
+  }
+  while (tracked_map_count > 0) {
+    tracked_map_count -= 1;
+    mln_map_destroy(tracked_maps[tracked_map_count]);
+    reclaimed = true;
+  }
+  if (tracked_runtime != NULL) {
+    mln_runtime_destroy(tracked_runtime);
+    tracked_runtime = NULL;
+    reclaimed = true;
+  }
+  return reclaimed;
 }

@@ -4,6 +4,7 @@ library;
 import 'dart:typed_data';
 
 import '../geo/geo.dart';
+import '../json/json.dart';
 
 /// Style source type.
 final class SourceType {
@@ -188,6 +189,87 @@ final class TileSourceOptions {
 
   /// Optional raster DEM encoding.
   final RasterDemEncoding? rasterDemEncoding;
+}
+
+/// Options fixed when a GeoJSON source is created.
+final class GeoJsonSourceOptions {
+  /// Creates GeoJSON source options.
+  const GeoJsonSourceOptions({
+    this.minZoom,
+    this.maxZoom,
+    this.tolerance,
+    this.clusterMaxZoom,
+    this.clusterProperties,
+    this.tileSize,
+    this.buffer,
+    this.clusterRadius,
+    this.clusterMinPoints,
+    this.lineMetrics,
+    this.cluster,
+  });
+
+  /// Optional minimum tiling zoom.
+  final double? minZoom;
+
+  /// Optional maximum tiling zoom.
+  final double? maxZoom;
+
+  /// Optional Douglas-Peucker simplification tolerance.
+  final double? tolerance;
+
+  /// Optional highest zoom at which points cluster.
+  final double? clusterMaxZoom;
+
+  /// Optional cluster aggregation expressions keyed by property name.
+  final JsonValue? clusterProperties;
+
+  /// Optional tile extent in pixels.
+  final int? tileSize;
+
+  /// Optional tile buffer in pixels.
+  final int? buffer;
+
+  /// Optional cluster radius in pixels.
+  final int? clusterRadius;
+
+  /// Optional number of points required to form a cluster.
+  final int? clusterMinPoints;
+
+  /// Optional line-distance-metrics switch.
+  final bool? lineMetrics;
+
+  /// Optional point-clustering switch.
+  final bool? cluster;
+
+  @override
+  bool operator ==(Object other) =>
+      other is GeoJsonSourceOptions &&
+      other.minZoom == minZoom &&
+      other.maxZoom == maxZoom &&
+      other.tolerance == tolerance &&
+      other.clusterMaxZoom == clusterMaxZoom &&
+      other.clusterProperties == clusterProperties &&
+      other.tileSize == tileSize &&
+      other.buffer == buffer &&
+      other.clusterRadius == clusterRadius &&
+      other.clusterMinPoints == clusterMinPoints &&
+      other.lineMetrics == lineMetrics &&
+      other.cluster == cluster;
+
+  @override
+  int get hashCode => Object.hash(
+    minZoom,
+    maxZoom,
+    tolerance,
+    clusterMaxZoom,
+    clusterProperties,
+    tileSize,
+    buffer,
+    clusterRadius,
+    clusterMinPoints,
+    lineMetrics,
+    cluster,
+  );
 }
 
 /// Style image options.

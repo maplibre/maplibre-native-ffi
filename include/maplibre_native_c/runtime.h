@@ -89,7 +89,47 @@ typedef struct mln_offline_region_status {
   bool complete;
 } mln_offline_region_status;
 
-/** Runtime event types returned by mln_runtime_poll_event(). */
+/**
+ * Runtime event types returned by mln_runtime_poll_event().
+ *
+ * The event type selects the meaning of mln_runtime_event.code and the struct
+ * behind mln_runtime_event.payload. Event type names below omit their
+ * MLN_RUNTIME_EVENT_ prefix and payload type names omit their
+ * MLN_RUNTIME_EVENT_PAYLOAD_ prefix.
+ *
+ * - MAP_CAMERA_WILL_CHANGE: code is an mln_camera_change_mode; payload NONE.
+ * - MAP_CAMERA_IS_CHANGING: code is 0; payload NONE.
+ * - MAP_CAMERA_DID_CHANGE: code is an mln_camera_change_mode; payload NONE.
+ * - MAP_CAMERA_TRANSITION_FINISHED: code is 0; payload
+ *   CAMERA_TRANSITION_FINISHED.
+ * - MAP_STYLE_LOADED: code is 0; payload NONE.
+ * - MAP_LOADING_STARTED: code is 0; payload NONE.
+ * - MAP_LOADING_FINISHED: code is 0; payload NONE.
+ * - MAP_LOADING_FAILED: code is the ordinal of MapLibre Native's internal map
+ *   load error kind, which this API does not name as an enum, and is 0 when the
+ *   failure came from a style-loading exception raised inside a C API call.
+ *   Read message for the failure text in both cases; payload NONE.
+ * - MAP_IDLE: code is 0; payload NONE.
+ * - MAP_RENDER_UPDATE_AVAILABLE: code is 0; payload NONE.
+ * - MAP_RENDER_ERROR: code is 0; message carries the error text; payload NONE.
+ * - MAP_STILL_IMAGE_FINISHED: code is 0; payload NONE.
+ * - MAP_STILL_IMAGE_FAILED: code is 0; message carries the error text; payload
+ *   NONE.
+ * - MAP_RENDER_FRAME_STARTED: code is 0; payload NONE.
+ * - MAP_RENDER_FRAME_FINISHED: code is 0; payload RENDER_FRAME.
+ * - MAP_RENDER_MAP_STARTED: code is 0; payload NONE.
+ * - MAP_RENDER_MAP_FINISHED: code is 0; payload RENDER_MAP.
+ * - MAP_STYLE_IMAGE_MISSING: code is 0; payload STYLE_IMAGE_MISSING.
+ * - MAP_TILE_ACTION: code is 0; payload TILE_ACTION.
+ * - OFFLINE_REGION_STATUS_CHANGED: code is 0; payload OFFLINE_REGION_STATUS.
+ * - OFFLINE_REGION_RESPONSE_ERROR: code is 0; payload
+ *   OFFLINE_REGION_RESPONSE_ERROR.
+ * - OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED: code is 0; payload
+ *   OFFLINE_REGION_TILE_COUNT_LIMIT.
+ * - OFFLINE_OPERATION_COMPLETED: code is the operation result as an mln_status
+ *   value, the same value the payload reports in result_status; payload
+ *   OFFLINE_OPERATION_COMPLETED.
+ */
 typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE = 1,
   MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING = 2,
@@ -113,6 +153,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
   MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
 } mln_runtime_event_type;
 
 /** Source kinds used by mln_runtime_event.source_type. */
@@ -132,7 +173,16 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
 } mln_runtime_event_payload_type;
+
+/** Camera change kinds reported by camera will-change and did-change events. */
+typedef enum mln_camera_change_mode : uint32_t {
+  /** The camera reached its new value without an animated transition. */
+  MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
+  /** The camera moved as part of an animated transition. */
+  MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
+} mln_camera_change_mode;
 
 /** Render modes reported by render observer events. */
 typedef enum mln_render_mode : uint32_t {
@@ -314,6 +364,21 @@ typedef struct mln_runtime_event_tile_action {
   size_t source_id_size;
 } mln_runtime_event_tile_action;
 
+/**
+ * Payload for MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED.
+ *
+ * See mln_animation_options.transition_id for how a caller stamps an identity
+ * onto a camera transition and what terminal outcomes this event covers.
+ */
+typedef struct mln_runtime_event_camera_transition_finished {
+  uint32_t size;
+  /**
+   * The transition_id the caller set on the mln_animation_options that started
+   * this transition.
+   */
+  uint64_t transition_id;
+} mln_runtime_event_camera_transition_finished;
+
 /** Payload for MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED. */
 typedef struct mln_runtime_event_offline_region_status {
   uint32_t size;
@@ -362,6 +427,11 @@ typedef struct mln_runtime_event {
    * valid while the source handle remains live.
    */
   void* source;
+  /**
+   * Secondary event detail whose meaning type selects. Depending on type it
+   * carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
+   * ordinal, or 0. See mln_runtime_event_type for the per-type meaning.
+   */
   int32_t code;
   /** One of mln_runtime_event_payload_type. */
   uint32_t payload_type;
@@ -489,6 +559,8 @@ typedef struct mln_resource_response {
  *   release the handle.
  * - MLN_RESOURCE_PROVIDER_DECISION_HANDLE lets the provider complete the
  *   request through the handle inline or later.
+ * - A callback that returns HANDLE may release the handle during the callback.
+ *   The C API defers that release until the callback returns.
  * - Unknown decision values produce a provider error response. The C API
  *   releases the provided handle and does not pass the request through.
  * - The C API copies completion data, and mln_resource_request_complete() may
@@ -535,24 +607,28 @@ MLN_API mln_status mln_runtime_create(
 ) MLN_NOEXCEPT;
 
 /**
- * Sets a runtime-scoped network resource provider.
+ * Registers or replaces a runtime-scoped network resource provider.
  *
- * The provider must be set before any map is created from the runtime. It is
- * invoked for requests that reach the C API network file source. Built-in
+ * It is invoked for requests that reach the C API network file source. Built-in
  * non-network schemes such as file, asset, mbtiles, and pmtiles are handled by
- * native MainResourceLoader before this extension point. Native
- * OnlineFileSource claims every remaining scheme, so a URL with a scheme
- * MapLibre does not recognize, such as jar:file:, is treated as a network
- * request, reaches this callback, and completes as an HTTP error when the
- * provider passes it through. Serving those schemes from host storage is what
- * this extension point is for. The callback and user_data are stored by
- * reference and must remain valid until the runtime is destroyed.
+ * native MainResourceLoader before this extension point.
+ *
+ * This call may replace an existing provider while maps exist. The callback and
+ * user_data are stored by reference and must remain valid until this call
+ * returns having replaced them, mln_runtime_clear_resource_provider() returns,
+ * or the runtime is destroyed. When this call returns, no in-flight request can
+ * still invoke the previous provider. Requests the previous provider already
+ * took a handle for keep that handle: complete and release each one as usual.
+ * Native OnlineFileSource claims every remaining scheme, so a URL with a
+ * scheme MapLibre does not recognize, such as jar:file:, is treated as a
+ * network request, reaches this callback, and completes as an HTTP error when
+ * the provider passes it through. Hosts use this extension point to serve
+ * those schemes from host storage.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, provider is
  *   null, provider->size is too small, or callback is null.
- * - MLN_STATUS_INVALID_STATE when runtime already owns live maps.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -560,6 +636,26 @@ MLN_API mln_status mln_runtime_create(
 MLN_API mln_status mln_runtime_set_resource_provider(
   mln_runtime* runtime, const mln_resource_provider* provider
 ) MLN_NOEXCEPT;
+
+/**
+ * Clears the runtime-scoped network resource provider.
+ *
+ * After this call succeeds, requests that reach the C API network file source
+ * go to MapLibre's online file source. When it returns, no in-flight request
+ * can still invoke the previous provider, and the C API holds no further
+ * reference to its callback or user_data. Requests the previous provider
+ * already took a handle for keep that handle: complete and release each one as
+ * usual.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_runtime_clear_resource_provider(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
  * Completes a C API resource provider request.
@@ -601,10 +697,11 @@ MLN_API mln_status mln_resource_request_cancelled(
 /**
  * Releases the provider's reference to a resource request handle.
  *
- * Providers own a releasable handle only after returning
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE from the callback. Release the handle
- * exactly once after completing the request or deciding not to complete it.
- * Passing null is a no-op. A released handle must not be used again.
+ * Release the handle exactly once after completing the request or deciding not
+ * to complete it. A provider callback that returns
+ * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline; the C
+ * API defers reclamation until the callback returns. Passing null is a no-op. A
+ * released handle must not be used again.
  */
 MLN_API void mln_resource_request_release(
   mln_resource_request_handle* handle
@@ -702,6 +799,18 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  * returns quickly and calls no C API function other than
  * mln_resource_transform_response_set_url().
  *
+ * A registered resource provider is waited on the same way: this call blocks
+ * until every in-flight mln_resource_provider_callback invocation returns,
+ * matching mln_runtime_set_resource_provider() and
+ * mln_runtime_clear_resource_provider(). The callback and its user_data stay
+ * valid until that point and are unreferenced once this call returns, so a
+ * host frees provider-owned state only after it does.
+ *
+ * Both waits run with no runtime-internal lock that other runtimes need, so a
+ * slow callback delays only this runtime. Do not call this while holding a
+ * host lock that a provider or transform callback also acquires; the callback
+ * cannot finish, and this call cannot return.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
@@ -755,6 +864,9 @@ MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
  * destroyed. Copy those bytes before then when they must outlive that window.
  * For style-image-missing and tile-action events, out_event->message contains
  * the same ID string exposed by the typed payload.
+ *
+ * out_event->code carries a secondary detail whose meaning out_event->type
+ * selects. mln_runtime_event_type lists the meaning for every event type.
  *
  * Destroying a map discards that map's queued events, so this function returns
  * events only for maps that are still live. Read the state a host mirrors from

@@ -178,9 +178,7 @@ final class RuntimeHandle {
     _resourceTransformState = null;
   }
 
-  /// Registers exact native-owned response rules for network resources.
-  ///
-  /// The provider must be set before this runtime creates maps.
+  /// Registers or replaces exact native-owned response rules.
   void setResourceProviderRules(List<ResourceProviderRule> rules) {
     final state = _ResourceProviderRulesState(rules);
     try {
@@ -201,9 +199,7 @@ final class RuntimeHandle {
     }
   }
 
-  /// Registers a queued Dart resource provider callback.
-  ///
-  /// The provider must be set before this runtime creates maps.
+  /// Registers or replaces a queued Dart resource provider callback.
   void setResourceProvider(ResourceProvider provider) {
     final state = _ResourceProviderCallbackState(provider);
     try {
@@ -224,6 +220,15 @@ final class RuntimeHandle {
       state.close();
       rethrow;
     }
+  }
+
+  /// Clears the runtime-scoped network resource provider.
+  void clearResourceProvider() {
+    _check(_c.raw.mln_runtime_clear_resource_provider(_pointer));
+    _resourceProviderRulesState?.close();
+    _resourceProviderRulesState = null;
+    _resourceProviderCallbackState?.retire();
+    _resourceProviderCallbackState = null;
   }
 
   /// Starts an ambient cache maintenance operation.
@@ -663,6 +668,10 @@ final class RuntimeEventType {
     22,
     'offlineOperationCompleted',
   );
+  static const mapCameraTransitionFinished = RuntimeEventType._(
+    23,
+    'mapCameraTransitionFinished',
+  );
 
   factory RuntimeEventType.fromRawValue(int rawValue) => switch (rawValue) {
     1 => mapCameraWillChange,
@@ -687,6 +696,7 @@ final class RuntimeEventType {
     20 => offlineRegionResponseError,
     21 => offlineRegionTileCountLimitExceeded,
     22 => offlineOperationCompleted,
+    23 => mapCameraTransitionFinished,
     _ => RuntimeEventType._(rawValue, 'unknown($rawValue)'),
   };
 
@@ -696,6 +706,37 @@ final class RuntimeEventType {
   @override
   bool operator ==(Object other) =>
       other is RuntimeEventType && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
+/// Camera change kind carried by camera will-change and did-change events.
+final class CameraChangeMode {
+  const CameraChangeMode._(this.rawValue, this.name);
+
+  /// The camera reached its new value without an animated transition.
+  static const immediate = CameraChangeMode._(0, 'immediate');
+
+  /// The camera moved as part of an animated transition.
+  static const animated = CameraChangeMode._(1, 'animated');
+
+  /// Creates a camera change mode while preserving unknown native values.
+  factory CameraChangeMode.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => immediate,
+    1 => animated,
+    _ => CameraChangeMode._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is CameraChangeMode && other.rawValue == rawValue;
 
   @override
   int get hashCode => rawValue.hashCode;
@@ -1083,6 +1124,20 @@ sealed class RuntimeEventPayload {
           );
         },
       ),
+      9 => _runtimePayloadOrUnknown(
+        event,
+        sizeOf<raw.mln_runtime_event_camera_transition_finished>(),
+        () {
+          final value = payload
+              .cast<raw.mln_runtime_event_camera_transition_finished>()
+              .ref;
+          return RuntimeEventCameraTransitionFinished(
+            rawPayloadType: rawPayloadType,
+            payloadSize: payloadSize,
+            transitionId: uint64FromNative(value.transition_id),
+          );
+        },
+      ),
       _ => RuntimeEventPayloadUnknown(
         rawPayloadType,
         payloadSize,
@@ -1228,6 +1283,18 @@ final class RuntimeEventOfflineOperationCompleted extends RuntimeEventPayload {
   final bool found;
 }
 
+/// Camera-transition-finished event payload.
+final class RuntimeEventCameraTransitionFinished extends RuntimeEventPayload {
+  const RuntimeEventCameraTransitionFinished({
+    required int rawPayloadType,
+    required int payloadSize,
+    required this.transitionId,
+  }) : super(rawPayloadType, payloadSize);
+
+  /// Caller-chosen transition identity across the full `uint64_t` domain.
+  final BigInt transitionId;
+}
+
 /// Unknown runtime event payload copied as raw bytes.
 final class RuntimeEventPayloadUnknown extends RuntimeEventPayload {
   RuntimeEventPayloadUnknown(
@@ -1344,6 +1411,35 @@ final class MapOptions {
 
   /// Map rendering mode.
   final MapMode mapMode;
+}
+
+/// A map's logical viewport size and pixel ratio.
+final class MapSize {
+  /// Creates a map size snapshot.
+  const MapSize({
+    required this.width,
+    required this.height,
+    required this.scaleFactor,
+  });
+
+  /// Logical viewport width.
+  final int width;
+
+  /// Logical viewport height.
+  final int height;
+
+  /// Map pixel ratio, fixed for the map lifetime.
+  final double scaleFactor;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapSize &&
+      other.width == width &&
+      other.height == height &&
+      other.scaleFactor == scaleFactor;
+
+  @override
+  int get hashCode => Object.hash(width, height, scaleFactor);
 }
 
 /// Owner-thread map handle bound to a retained runtime.
@@ -1760,6 +1856,23 @@ final class MapHandle {
       final outLoaded = arena<Bool>();
       _check(_c.raw.mln_map_is_fully_loaded(_pointer, outLoaded));
       return outLoaded.value;
+    });
+  }
+
+  /// Copies the current logical viewport size and map pixel ratio.
+  MapSize size() {
+    return withNativeArena((arena) {
+      final outWidth = arena<Uint32>();
+      final outHeight = arena<Uint32>();
+      final outScaleFactor = arena<Double>();
+      _check(
+        _c.raw.mln_map_get_size(_pointer, outWidth, outHeight, outScaleFactor),
+      );
+      return MapSize(
+        width: outWidth.value,
+        height: outHeight.value,
+        scaleFactor: outScaleFactor.value,
+      );
     });
   }
 
@@ -2185,30 +2298,42 @@ final class MapHandle {
   }
 
   /// Adds a GeoJSON source that loads from [url].
-  void addGeoJsonSourceUrl(String sourceId, String url) {
+  void addGeoJsonSourceUrl(
+    String sourceId,
+    String url, {
+    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+  }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeUrl = nativeStringView(url, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
       _check(
         _c.raw.mln_map_add_geojson_source_url(
           _pointer,
           nativeId.value,
           nativeUrl.value,
+          nativeOptions,
         ),
       );
     });
   }
 
   /// Adds a GeoJSON source with inline data.
-  void addGeoJsonSourceData(String sourceId, GeoJson data) {
+  void addGeoJsonSourceData(
+    String sourceId,
+    GeoJson data, {
+    GeoJsonSourceOptions options = const GeoJsonSourceOptions(),
+  }) {
     withNativeArena((arena) {
       final nativeId = nativeStringView(sourceId, arena);
       final nativeData = native_geometry.nativeGeoJson(data, arena);
+      final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
       _check(
         _c.raw.mln_map_add_geojson_source_data(
           _pointer,
           nativeId.value,
           nativeData.pointer,
+          nativeOptions,
         ),
       );
     });

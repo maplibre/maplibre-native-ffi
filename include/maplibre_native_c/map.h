@@ -40,6 +40,7 @@ typedef enum mln_animation_option_field : uint32_t {
   MLN_ANIMATION_OPTION_VELOCITY = 1U << 1U,
   MLN_ANIMATION_OPTION_MIN_ZOOM = 1U << 2U,
   MLN_ANIMATION_OPTION_EASING = 1U << 3U,
+  MLN_ANIMATION_OPTION_TRANSITION_ID = 1U << 4U,
 } mln_animation_option_field;
 
 /** Field mask values for mln_camera_fit_options. */
@@ -51,11 +52,24 @@ typedef enum mln_camera_fit_option_field : uint32_t {
 
 /** Field mask values for mln_bound_options. */
 typedef enum mln_bound_option_field : uint32_t {
+  /**
+   * Selects mln_bound_options.bounds as a geographic constraint that the
+   * camera center stays inside. Mutually exclusive with
+   * MLN_BOUND_OPTION_UNBOUNDED.
+   */
   MLN_BOUND_OPTION_BOUNDS = 1U << 0U,
   MLN_BOUND_OPTION_MIN_ZOOM = 1U << 1U,
   MLN_BOUND_OPTION_MAX_ZOOM = 1U << 2U,
   MLN_BOUND_OPTION_MIN_PITCH = 1U << 3U,
   MLN_BOUND_OPTION_MAX_PITCH = 1U << 4U,
+  /**
+   * Selects the unbounded geographic constraint, which leaves every camera
+   * center unconstrained and lets the map pan freely across the antimeridian.
+   * This differs from world bounds of -90/-180 to 90/180, which clamp
+   * longitude to that range. Mutually exclusive with MLN_BOUND_OPTION_BOUNDS,
+   * and leaves mln_bound_options.bounds unread.
+   */
+  MLN_BOUND_OPTION_UNBOUNDED = 1U << 5U,
 } mln_bound_option_field;
 
 /** Field mask values for mln_free_camera_options. */
@@ -235,6 +249,35 @@ typedef struct mln_animation_options {
   /** Peak zoom for flyTo transitions. */
   double min_zoom;
   mln_unit_bezier easing;
+  /**
+   * Caller-chosen identity for the transition this options struct starts.
+   *
+   * When MLN_ANIMATION_OPTION_TRANSITION_ID is set, the transition emits one
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED event carrying this value
+   * in its mln_runtime_event_camera_transition_finished payload. The C API
+   * passes the value through without interpreting it, so callers pick their own
+   * scheme, such as a monotonically increasing counter.
+   *
+   * Each transition emits that event exactly once, whichever way it ends:
+   * running to completion, being superseded by a later camera command, being
+   * cancelled by mln_map_cancel_transitions(), or completing instantly as a
+   * zero-duration jump. A command this API rejects -- one carrying a non-finite
+   * enabled camera field, for example -- starts no transition and emits no such
+   * event. MapLibre Native reports the moment a transition
+   * releases the camera and does not report which of those outcomes occurred,
+   * so this event establishes transition identity rather than a completion
+   * reason. A host that needs to tell completion from cancellation compares the
+   * resulting camera against the requested one, or tracks which transition ID
+   * is current.
+   *
+   * The event is queued on the runtime that owns the map and is drained by
+   * mln_runtime_poll_event(). For a transition that runs to completion, it is
+   * queued immediately before that transition's
+   * MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE event.
+   *
+   * When this field is omitted, the transition emits no such event.
+   */
+  uint64_t transition_id;
 } mln_animation_options;
 
 /** Optional fitting controls for camera-for-viewport queries. */
@@ -516,6 +559,7 @@ typedef struct mln_lat_lng_bounds {
 typedef struct mln_bound_options {
   uint32_t size;
   uint32_t fields;
+  /** Read when fields contains MLN_BOUND_OPTION_BOUNDS. */
   mln_lat_lng_bounds bounds;
   double min_zoom;
   double max_zoom;
@@ -1050,6 +1094,30 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_status mln_map_create(
   mln_runtime* runtime, const mln_map_options* options, mln_map** out_map
+) MLN_NOEXCEPT;
+
+/**
+ * Copies the map's current logical viewport size and its pixel ratio.
+ *
+ * The size starts at mln_map_options.width and height, and follows the
+ * attach and resize rules documented there. The scale factor is
+ * mln_map_options.scale_factor, fixed for the lifetime of the map and
+ * independent of any render target's scale factor; compare the two before
+ * attaching or resizing a render session to keep them in agreement.
+ *
+ * This is a state snapshot. All three out-parameters are required.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_width,
+ *   out_height, or out_scale_factor is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
 ) MLN_NOEXCEPT;
 
 /**

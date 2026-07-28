@@ -1,7 +1,7 @@
 # Dart binding review notes
 
 This log contains only findings that need architectural or infrastructure work
-after updating the `dart` branch to `main` at `3de8ea9763`. The binding is
+after updating the `dart` branch to `main` at `07faf8bb1`. The binding is
 prerelease; these are design tasks rather than compatibility commitments.
 
 ## Logged for triage
@@ -84,21 +84,3 @@ prerelease; these are design tasks rather than compatibility commitments.
   - Suggested next step: exercise each `RenderedQueryGeometry` variant and both
     query options against a real render session as part of the backend harness
     work, and assert the copied feature results required by BND-106.
-
-- [ ] **DART-FORMAT-HOOK — Dart formatting in the pre-commit hook**
-  - Severity: medium
-  - Complexity: low
-  - Area: repository hooks and Dart tool resolution
-  - Rationale: `hk.pkl` states that language-specific steps enter their
-    binding's mise context, and the other steps follow it: `gofumpt` delegates
-    to `//bindings/go:_gofumpt-*`, while `ruff`, `ty`, and `vp-check` use tools
-    installed at the root. The `dart-format` step instead invokes `dart format`
-    directly from the repository root, while `core:dart` is declared in
-    `bindings/dart/mise.toml` and resolves only inside that directory.
-    Committing a Dart file fails with `No version is set for shim: dart` for
-    anyone without a global Dart install, so the step's outcome depends on
-    contributor-local tool state rather than repository configuration.
-  - Suggested next step: add `_format-check` and `_format-fix` tasks to
-    `bindings/dart/mise.toml` and call them from the step the way the Go step
-    calls `//bindings/go:_gofumpt-*`, so Dart resolves from the package context
-    in both the hook and `mise run fix`.

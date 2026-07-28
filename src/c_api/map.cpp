@@ -50,6 +50,11 @@ auto mln_style_tile_source_options_default(void) noexcept
   return mln::core::style_tile_source_options_default();
 }
 
+auto mln_geojson_source_options_default(void) noexcept
+  -> mln_geojson_source_options {
+  return mln::core::geojson_source_options_default();
+}
+
 auto mln_custom_geometry_source_options_default(void) noexcept
   -> mln_custom_geometry_source_options {
   return mln::core::custom_geometry_source_options_default();
@@ -195,18 +200,22 @@ auto mln_map_list_style_source_ids(
 }
 
 auto mln_map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_add_geojson_source_url(map, source_id, url);
+    return mln::core::map_add_geojson_source_url(map, source_id, url, options);
   });
 }
 
 auto mln_map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::map_add_geojson_source_data(map, source_id, data);
+    return mln::core::map_add_geojson_source_data(
+      map, source_id, data, options
+    );
   });
 }
 
@@ -729,6 +738,17 @@ auto mln_map_is_fully_loaded(mln_map* map, bool* out_loaded) noexcept
 auto mln_map_dump_debug_logs(mln_map* map) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_dump_debug_logs(map);
+  });
+}
+
+auto mln_map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_size(
+      map, out_width, out_height, out_scale_factor
+    );
   });
 }
 

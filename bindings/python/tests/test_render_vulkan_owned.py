@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
+    assert_typed_geojson_cluster_source,
     skip_or_fail_fixture_setup,
 )
 
@@ -180,6 +181,20 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
+def test_detached_session_leaves_the_map_free_to_close(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    session = vulkan_owned_session.session
+
+    assert_invalid_state(vulkan_owned_session.map.close)
+
+    detached = session.detach()
+    vulkan_owned_session.map.close()
+    detached.close()
+
+    assert session.closed
+
+
 def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
@@ -209,6 +224,18 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
         assert info.generation >= 2
     finally:
         frame.close()
+
+
+def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    # The fixture creates a 64x64 map at scale factor 1.0 and attaches a 32x16
+    # target, so the map size already tracks the attach.
+    assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+
+    # Resizing at a different scale factor leaves the map's own pixel ratio.
+    vulkan_owned_session.session.resize(48, 24, 2.0)
+    assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(1.0))
 
 
 def test_cpu_readback_metadata_capacity_and_reusable_buffer(
@@ -437,6 +464,16 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
     assert_cluster_feature_extensions(
+        vulkan_owned_session.runtime,
+        vulkan_owned_session.map,
+        vulkan_owned_session.session,
+    )
+
+
+def test_typed_geojson_source_options_cluster_nearby_points(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    assert_typed_geojson_cluster_source(
         vulkan_owned_session.runtime,
         vulkan_owned_session.map,
         vulkan_owned_session.session,

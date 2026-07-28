@@ -48,6 +48,61 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 	}
 }
 
+func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	first, err := runtime.NewMap()
+	if err != nil {
+		t.Fatalf("NewMap(): %v", err)
+	}
+	second, err := runtime.NewMap()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("second NewMap(): %v", err)
+	}
+	defer func() {
+		if err := second.Close(); err != nil {
+			t.Errorf("second Map Close(): %v", err)
+		}
+	}()
+
+	firstID, err := first.ID()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("ID(): %v", err)
+	}
+	secondID, err := second.ID()
+	if err != nil {
+		_ = first.Close()
+		t.Fatalf("second ID(): %v", err)
+	}
+	if firstID == 0 || firstID == secondID {
+		_ = first.Close()
+		t.Fatalf("map IDs = %d and %d, want distinct nonzero IDs", firstID, secondID)
+	}
+	if repeated, err := first.ID(); err != nil || repeated != firstID {
+		_ = first.Close()
+		t.Fatalf("repeated ID() = %d, %v, want %d, nil", repeated, err, firstID)
+	}
+
+	if err := first.Close(); err != nil {
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if _, err := first.ID(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ID() after Close error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
 	state, err := handle.New(&nativeMap{}, "MapHandle")
 	if err != nil {
@@ -224,6 +279,36 @@ func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
 	}
 	if err := m.DumpDebugLogs(); err != nil {
 		t.Fatalf("DumpDebugLogs(): %v", err)
+	}
+}
+
+func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 256, 2))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	width, height, scaleFactor, err := m.Size()
+	if err != nil {
+		t.Fatalf("Size(): %v", err)
+	}
+	if width != 512 || height != 256 || scaleFactor != 2 {
+		t.Fatalf("Size() = %d, %d, %v; want 512, 256, 2", width, height, scaleFactor)
 	}
 }
 

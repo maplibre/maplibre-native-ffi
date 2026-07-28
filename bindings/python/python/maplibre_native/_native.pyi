@@ -14,7 +14,9 @@ _Vec3: TypeAlias = tuple[float, float, float]
 _Quat: TypeAlias = tuple[float, float, float, float]
 _Insets: TypeAlias = tuple[float, float, float, float]
 _Bounds: TypeAlias = tuple[_Point, _Point]
-_Animation: TypeAlias = tuple[float | None, float | None, float | None, _Insets | None]
+_Animation: TypeAlias = tuple[
+    float | None, float | None, float | None, _Insets | None, int | None
+]
 _WireDict: TypeAlias = dict[str, Any]
 
 class _RuntimeHandle:
@@ -59,6 +61,7 @@ class _RuntimeHandle:
         callback: Callable[[_WireDict, "_ResourceRequestHandle"], int],
         max_pending_callbacks: int,
     ) -> None: ...
+    def clear_resource_provider(self) -> None: ...
     def set_resource_transform(
         self, callback: Callable[[_WireDict], str | None], max_pending_callbacks: int
     ) -> None: ...
@@ -78,6 +81,7 @@ class _MapHandle:
     def set_rendering_stats_view_enabled(self, enabled: bool) -> None: ...
     def get_rendering_stats_view_enabled(self) -> bool: ...
     def is_fully_loaded(self) -> bool: ...
+    def get_size(self) -> tuple[int, int, float]: ...
     def get_viewport_options(self) -> _WireDict: ...
     def set_viewport_options(
         self,
@@ -177,6 +181,7 @@ class _MapHandle:
     def set_bounds(
         self,
         bounds: _Bounds | None,
+        unbounded: bool,
         min_zoom: float | None,
         max_zoom: float | None,
         min_pitch: float | None,
@@ -210,8 +215,38 @@ class _MapHandle:
     def pixels_for_lat_lngs(self, coordinates: Sequence[_Point]) -> list[_WireDict]: ...
     def lat_lngs_for_pixels(self, points: Sequence[_Point]) -> list[_WireDict]: ...
     def add_style_source_json(self, source_id: str, source_json: object) -> None: ...
-    def add_geojson_source_url(self, source_id: str, url: str) -> None: ...
-    def add_geojson_source_data(self, source_id: str, data: object) -> None: ...
+    def add_geojson_source_url(
+        self,
+        source_id: str,
+        url: str,
+        min_zoom: float | None,
+        max_zoom: float | None,
+        tolerance: float | None,
+        cluster_max_zoom: float | None,
+        cluster_properties: object | None,
+        tile_size: int | None,
+        buffer: int | None,
+        cluster_radius: int | None,
+        cluster_min_points: int | None,
+        line_metrics: bool | None,
+        cluster: bool | None,
+    ) -> None: ...
+    def add_geojson_source_data(
+        self,
+        source_id: str,
+        data: object,
+        min_zoom: float | None,
+        max_zoom: float | None,
+        tolerance: float | None,
+        cluster_max_zoom: float | None,
+        cluster_properties: object | None,
+        tile_size: int | None,
+        buffer: int | None,
+        cluster_radius: int | None,
+        cluster_min_points: int | None,
+        line_metrics: bool | None,
+        cluster: bool | None,
+    ) -> None: ...
     def set_geojson_source_url(self, source_id: str, url: str) -> None: ...
     def set_geojson_source_data(self, source_id: str, data: object) -> None: ...
     def add_vector_source_url(
@@ -551,6 +586,9 @@ def create_runtime_with_abi_version_for_test(
     maximum_cache_size: int | None,
 ) -> _RuntimeHandle: ...
 def runtime_event_payload_wire_shapes_for_test() -> dict[str, _WireDict]: ...
+def camera_transition_finished_event_for_test(
+    transition_id: int, missing_payload_bytes: int
+) -> _WireDict: ...
 def projected_meters_for_lat_lng(latitude: float, longitude: float) -> _WireDict: ...
 def lat_lng_for_projected_meters(northing: float, easting: float) -> _WireDict: ...
 def set_log_callback(max_queued_records: int, consume: bool) -> _LogReceiver: ...

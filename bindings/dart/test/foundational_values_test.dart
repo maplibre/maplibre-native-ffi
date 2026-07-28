@@ -105,8 +105,16 @@ void main() {
         const CameraOptions(center: LatLng(1, 2), zoom: 3),
       ),
       (
-        const AnimationOptions(durationMs: 4, easing: UnitBezier(0, 0, 1, 1)),
-        const AnimationOptions(durationMs: 4, easing: UnitBezier(0, 0, 1, 1)),
+        AnimationOptions(
+          durationMs: 4,
+          easing: const UnitBezier(0, 0, 1, 1),
+          transitionId: BigInt.from(5),
+        ),
+        AnimationOptions(
+          durationMs: 4,
+          easing: const UnitBezier(0, 0, 1, 1),
+          transitionId: BigInt.from(5),
+        ),
       ),
       (
         const CameraFitOptions(bearing: 5, pitch: 6),
@@ -128,8 +136,16 @@ void main() {
         const MapTileOptions(lodScale: 2, lodMode: TileLodMode.distance),
       ),
       (
-        const BoundOptions(minZoom: 1, maxZoom: 10),
-        const BoundOptions(minZoom: 1, maxZoom: 10),
+        const BoundOptions(
+          bounds: BoundsConstraint.unbounded(),
+          minZoom: 1,
+          maxZoom: 10,
+        ),
+        const BoundOptions(
+          bounds: BoundsConstraint.unbounded(),
+          minZoom: 1,
+          maxZoom: 10,
+        ),
       ),
       (
         const FreeCameraOptions(position: Vec3(1, 2, 3)),
@@ -146,6 +162,10 @@ void main() {
       expect(left.hashCode, right.hashCode);
     }
     expect(const CameraOptions(zoom: 3), isNot(const CameraOptions(zoom: 4)));
+    expect(
+      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+      const GeoJsonSourceOptions(cluster: true, clusterRadius: 50),
+    );
   });
 
   test('north orientation preserves unknown native values', () {
@@ -162,10 +182,12 @@ void main() {
   });
 
   test('animation options materialize field masks', () {
+    final maximum = (BigInt.one << 64) - BigInt.one;
     final native = animationOptionsToNative(
-      const AnimationOptions(
+      AnimationOptions(
         durationMs: 100,
-        easing: UnitBezier(0, 0.25, 0.75, 1),
+        easing: const UnitBezier(0, 0.25, 0.75, 1),
+        transitionId: maximum,
       ),
       MaplibreNativeCApi.open().raw.mln_animation_options_default(),
     );
@@ -180,8 +202,47 @@ void main() {
           raw.mln_animation_option_field.MLN_ANIMATION_OPTION_EASING.value,
       isNonZero,
     );
+    expect(
+      native.fields &
+          raw
+              .mln_animation_option_field
+              .MLN_ANIMATION_OPTION_TRANSITION_ID
+              .value,
+      isNonZero,
+    );
     expect(native.duration_ms, 100);
     expect(native.easing.y2, 1);
+    expect(native.transition_id, -1);
+  });
+
+  test('bounds constraints distinguish bounded and unbounded states', () {
+    final c = MaplibreNativeCApi.open();
+    final bounded = boundOptionsToNative(
+      const BoundOptions(
+        bounds: BoundsConstraint.bounded(
+          LatLngBounds(southwest: LatLng(-1, -2), northeast: LatLng(3, 4)),
+        ),
+      ),
+      c.raw.mln_bound_options_default(),
+    );
+    final unbounded = boundOptionsToNative(
+      const BoundOptions(bounds: BoundsConstraint.unbounded()),
+      c.raw.mln_bound_options_default(),
+    );
+
+    expect(
+      bounded.fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value,
+      isNonZero,
+    );
+    expect(
+      unbounded.fields &
+          raw.mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED.value,
+      isNonZero,
+    );
+    expect(
+      boundOptionsFromNative(unbounded).bounds,
+      const BoundsConstraint.unbounded(),
+    );
   });
 
   test('geometry values materialize and copy native descriptor trees', () {

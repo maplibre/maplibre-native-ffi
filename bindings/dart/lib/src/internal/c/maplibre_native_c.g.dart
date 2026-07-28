@@ -185,6 +185,20 @@ class MaplibreNativeC {
             )
           >();
 
+  mln_status mln_runtime_clear_resource_provider(
+    ffi.Pointer<mln_runtime> runtime,
+  ) {
+    return mln_status.fromValue(_mln_runtime_clear_resource_provider(runtime));
+  }
+
+  late final _mln_runtime_clear_resource_providerPtr =
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_runtime>)>>(
+        'mln_runtime_clear_resource_provider',
+      );
+  late final _mln_runtime_clear_resource_provider =
+      _mln_runtime_clear_resource_providerPtr
+          .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
+
   mln_status mln_resource_request_complete(
     ffi.Pointer<mln_resource_request_handle> handle,
     ffi.Pointer<mln_resource_response> response,
@@ -1114,6 +1128,38 @@ class MaplibreNativeC {
           ffi.Pointer<mln_runtime>,
           ffi.Pointer<mln_map_options>,
           ffi.Pointer<ffi.Pointer<mln_map>>,
+        )
+      >();
+
+  mln_status mln_map_get_size(
+    ffi.Pointer<mln_map> map,
+    ffi.Pointer<ffi.Uint32> out_width,
+    ffi.Pointer<ffi.Uint32> out_height,
+    ffi.Pointer<ffi.Double> out_scale_factor,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_get_size(map, out_width, out_height, out_scale_factor),
+    );
+  }
+
+  late final _mln_map_get_sizePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            ffi.Pointer<mln_map>,
+            ffi.Pointer<ffi.Uint32>,
+            ffi.Pointer<ffi.Uint32>,
+            ffi.Pointer<ffi.Double>,
+          )
+        >
+      >('mln_map_get_size');
+  late final _mln_map_get_size = _mln_map_get_sizePtr
+      .asFunction<
+        int Function(
+          ffi.Pointer<mln_map>,
+          ffi.Pointer<ffi.Uint32>,
+          ffi.Pointer<ffi.Uint32>,
+          ffi.Pointer<ffi.Double>,
         )
       >();
 
@@ -3125,6 +3171,18 @@ class MaplibreNativeC {
       _mln_style_tile_source_options_defaultPtr
           .asFunction<mln_style_tile_source_options Function()>();
 
+  mln_geojson_source_options mln_geojson_source_options_default() {
+    return _mln_geojson_source_options_default();
+  }
+
+  late final _mln_geojson_source_options_defaultPtr =
+      _lookup<ffi.NativeFunction<mln_geojson_source_options Function()>>(
+        'mln_geojson_source_options_default',
+      );
+  late final _mln_geojson_source_options_default =
+      _mln_geojson_source_options_defaultPtr
+          .asFunction<mln_geojson_source_options Function()>();
+
   mln_custom_geometry_source_options
   mln_custom_geometry_source_options_default() {
     return _mln_custom_geometry_source_options_default();
@@ -3464,9 +3522,10 @@ class MaplibreNativeC {
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
     mln_string_view url,
+    ffi.Pointer<mln_geojson_source_options> options,
   ) {
     return mln_status.fromValue(
-      _mln_map_add_geojson_source_url(map, source_id, url),
+      _mln_map_add_geojson_source_url(map, source_id, url, options),
     );
   }
 
@@ -3477,22 +3536,29 @@ class MaplibreNativeC {
             ffi.Pointer<mln_map>,
             mln_string_view,
             mln_string_view,
+            ffi.Pointer<mln_geojson_source_options>,
           )
         >
       >('mln_map_add_geojson_source_url');
   late final _mln_map_add_geojson_source_url =
       _mln_map_add_geojson_source_urlPtr
           .asFunction<
-            int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
+            int Function(
+              ffi.Pointer<mln_map>,
+              mln_string_view,
+              mln_string_view,
+              ffi.Pointer<mln_geojson_source_options>,
+            )
           >();
 
   mln_status mln_map_add_geojson_source_data(
     ffi.Pointer<mln_map> map,
     mln_string_view source_id,
     ffi.Pointer<mln_geojson> data,
+    ffi.Pointer<mln_geojson_source_options> options,
   ) {
     return mln_status.fromValue(
-      _mln_map_add_geojson_source_data(map, source_id, data),
+      _mln_map_add_geojson_source_data(map, source_id, data, options),
     );
   }
 
@@ -3503,6 +3569,7 @@ class MaplibreNativeC {
             ffi.Pointer<mln_map>,
             mln_string_view,
             ffi.Pointer<mln_geojson>,
+            ffi.Pointer<mln_geojson_source_options>,
           )
         >
       >('mln_map_add_geojson_source_data');
@@ -3513,6 +3580,7 @@ class MaplibreNativeC {
               ffi.Pointer<mln_map>,
               mln_string_view,
               ffi.Pointer<mln_geojson>,
+              ffi.Pointer<mln_geojson_source_options>,
             )
           >();
 
@@ -6187,7 +6255,8 @@ enum mln_runtime_event_type {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED(19),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR(20),
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(21),
-  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED(22);
+  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED(22),
+  MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED(23);
 
   final int value;
   const mln_runtime_event_type(this.value);
@@ -6215,6 +6284,7 @@ enum mln_runtime_event_type {
     20 => MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
     21 => MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
     22 => MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
+    23 => MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_type: $value',
     ),
@@ -6246,7 +6316,8 @@ enum mln_runtime_event_payload_type {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS(5),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR(6),
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT(7),
-  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED(8);
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED(8),
+  MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED(9);
 
   final int value;
   const mln_runtime_event_payload_type(this.value);
@@ -6261,8 +6332,25 @@ enum mln_runtime_event_payload_type {
     6 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
     7 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT,
     8 => MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
+    9 => MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
     _ => throw ArgumentError(
       'Unknown value for mln_runtime_event_payload_type: $value',
+    ),
+  };
+}
+
+enum mln_camera_change_mode {
+  MLN_CAMERA_CHANGE_MODE_IMMEDIATE(0),
+  MLN_CAMERA_CHANGE_MODE_ANIMATED(1);
+
+  final int value;
+  const mln_camera_change_mode(this.value);
+
+  static mln_camera_change_mode fromValue(int value) => switch (value) {
+    0 => MLN_CAMERA_CHANGE_MODE_IMMEDIATE,
+    1 => MLN_CAMERA_CHANGE_MODE_ANIMATED,
+    _ => throw ArgumentError(
+      'Unknown value for mln_camera_change_mode: $value',
     ),
   };
 }
@@ -6558,6 +6646,14 @@ final class mln_runtime_event_tile_action extends ffi.Struct {
   external int source_id_size;
 }
 
+final class mln_runtime_event_camera_transition_finished extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint64()
+  external int transition_id;
+}
+
 final class mln_runtime_event_offline_region_status extends ffi.Struct {
   @ffi.Uint32()
   external int size;
@@ -6824,7 +6920,8 @@ enum mln_animation_option_field {
   MLN_ANIMATION_OPTION_DURATION(1),
   MLN_ANIMATION_OPTION_VELOCITY(2),
   MLN_ANIMATION_OPTION_MIN_ZOOM(4),
-  MLN_ANIMATION_OPTION_EASING(8);
+  MLN_ANIMATION_OPTION_EASING(8),
+  MLN_ANIMATION_OPTION_TRANSITION_ID(16);
 
   final int value;
   const mln_animation_option_field(this.value);
@@ -6834,6 +6931,7 @@ enum mln_animation_option_field {
     2 => MLN_ANIMATION_OPTION_VELOCITY,
     4 => MLN_ANIMATION_OPTION_MIN_ZOOM,
     8 => MLN_ANIMATION_OPTION_EASING,
+    16 => MLN_ANIMATION_OPTION_TRANSITION_ID,
     _ => throw ArgumentError(
       'Unknown value for mln_animation_option_field: $value',
     ),
@@ -6863,7 +6961,8 @@ enum mln_bound_option_field {
   MLN_BOUND_OPTION_MIN_ZOOM(2),
   MLN_BOUND_OPTION_MAX_ZOOM(4),
   MLN_BOUND_OPTION_MIN_PITCH(8),
-  MLN_BOUND_OPTION_MAX_PITCH(16);
+  MLN_BOUND_OPTION_MAX_PITCH(16),
+  MLN_BOUND_OPTION_UNBOUNDED(32);
 
   final int value;
   const mln_bound_option_field(this.value);
@@ -6874,6 +6973,7 @@ enum mln_bound_option_field {
     4 => MLN_BOUND_OPTION_MAX_ZOOM,
     8 => MLN_BOUND_OPTION_MIN_PITCH,
     16 => MLN_BOUND_OPTION_MAX_PITCH,
+    32 => MLN_BOUND_OPTION_UNBOUNDED,
     _ => throw ArgumentError(
       'Unknown value for mln_bound_option_field: $value',
     ),
@@ -7168,6 +7268,9 @@ final class mln_animation_options extends ffi.Struct {
   external double min_zoom;
 
   external mln_unit_bezier easing;
+
+  @ffi.Uint64()
+  external int transition_id;
 }
 
 final class mln_camera_fit_options extends ffi.Struct {
@@ -8204,6 +8307,41 @@ enum mln_style_raster_dem_encoding {
   };
 }
 
+enum mln_geojson_source_option_field {
+  MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM(1),
+  MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM(2),
+  MLN_GEOJSON_SOURCE_OPTION_TOLERANCE(4),
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM(8),
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES(16),
+  MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE(32),
+  MLN_GEOJSON_SOURCE_OPTION_BUFFER(64),
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS(128),
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS(256),
+  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS(512),
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024);
+
+  final int value;
+  const mln_geojson_source_option_field(this.value);
+
+  static mln_geojson_source_option_field fromValue(int value) =>
+      switch (value) {
+        1 => MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM,
+        2 => MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM,
+        4 => MLN_GEOJSON_SOURCE_OPTION_TOLERANCE,
+        8 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM,
+        16 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
+        32 => MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE,
+        64 => MLN_GEOJSON_SOURCE_OPTION_BUFFER,
+        128 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS,
+        256 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
+        512 => MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
+        1024 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
+        _ => throw ArgumentError(
+          'Unknown value for mln_geojson_source_option_field: $value',
+        ),
+      };
+}
+
 enum mln_custom_geometry_source_option_field {
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM(2),
@@ -8314,6 +8452,46 @@ final class mln_style_tile_source_options extends ffi.Struct {
 
   @ffi.Uint32()
   external int raster_encoding;
+}
+
+final class mln_geojson_source_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int fields;
+
+  @ffi.Double()
+  external double min_zoom;
+
+  @ffi.Double()
+  external double max_zoom;
+
+  @ffi.Double()
+  external double tolerance;
+
+  @ffi.Double()
+  external double cluster_max_zoom;
+
+  external ffi.Pointer<mln_json_value> cluster_properties;
+
+  @ffi.Uint32()
+  external int tile_size;
+
+  @ffi.Uint32()
+  external int buffer;
+
+  @ffi.Uint32()
+  external int cluster_radius;
+
+  @ffi.Uint32()
+  external int cluster_min_points;
+
+  @ffi.Bool()
+  external bool line_metrics;
+
+  @ffi.Bool()
+  external bool cluster;
 }
 
 final class mln_canonical_tile_id extends ffi.Struct {

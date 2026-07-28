@@ -39,6 +39,19 @@ private final class ResourceCancellationResult: @unchecked Sendable {
   }
 }
 
+private final class ResourceProviderCallCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
+
+  func recordCall() {
+    lock.withLock { count += 1 }
+  }
+
+  var callCount: Int {
+    lock.withLock { count }
+  }
+}
+
 private final class ResourceHandleStateCapture: @unchecked Sendable {
   private let lock = NSLock()
   private var state: NativeResourceRequestHandleState?
@@ -76,14 +89,86 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   try runtime.clearResourceTransform()
 }
 
-@Test func runtimeResourceProviderCanInstallPassThroughCallback() throws {
+/// Requests a style URL whose scheme no file source serves, then pumps the
+/// runtime until the matching map loading failure arrives. The failure proves
+/// the request reached the C API network file source, where the runtime-scoped
+/// resource provider applies. Returns the copied failure message.
+private func loadProbeStyle(
+  runtime: RuntimeHandle,
+  map: MapHandle,
+  styleURL: String
+) throws -> String? {
+  try map.setStyleURL(styleURL)
+  for _ in 0 ..< 5000 {
+    try runtime.runOnce()
+    while let event = try runtime.pollEvent() {
+      guard event.type == .mapLoadingFailed,
+            event.message.contains(styleURL)
+      else { continue }
+      return event.message
+    }
+    Thread.sleep(forTimeInterval: 0.001)
+  }
+  Issue.record("timed out waiting for a loading failure for \(styleURL)")
+  return nil
+}
+
+@Test func runtimeResourceProviderIsConsultedUntilReplacedAndCleared() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.close() }
 
+  let firstCalls = ResourceProviderCallCounter()
   try runtime.setResourceProvider { _, _ in
-    .passThrough
+    firstCalls.recordCall()
+    return .passThrough
   }
+
+  let firstFailure = try loadProbeStyle(
+    runtime: runtime,
+    map: map,
+    styleURL: "jar:file:/packaged/first.json"
+  )
+  #expect(firstFailure?.contains("\"jar\"") == true)
+  #expect(firstCalls.callCount > 0)
+
+  // Replacing the provider while a map is live is part of the contract, and
+  // the previous provider stops being consulted once the call returns.
+  let secondCalls = ResourceProviderCallCounter()
+  try runtime.setResourceProvider { _, _ in
+    secondCalls.recordCall()
+    return .passThrough
+  }
+  let firstCallsAfterReplace = firstCalls.callCount
+
+  let secondFailure = try loadProbeStyle(
+    runtime: runtime,
+    map: map,
+    styleURL: "jar:file:/packaged/second.json"
+  )
+  #expect(secondFailure?.contains("\"jar\"") == true)
+  #expect(secondCalls.callCount > 0)
+  #expect(firstCalls.callCount == firstCallsAfterReplace)
+
+  try runtime.clearResourceProvider()
+  let secondCallsAfterClear = secondCalls.callCount
+
+  let clearedFailure = try loadProbeStyle(
+    runtime: runtime,
+    map: map,
+    styleURL: "jar:file:/packaged/third.json"
+  )
+  #expect(clearedFailure?.contains("\"jar\"") == true)
+  #expect(firstCalls.callCount == firstCallsAfterReplace)
+  #expect(secondCalls.callCount == secondCallsAfterClear)
+
+  // Clearing an already cleared provider stays a successful no-op.
+  try runtime.clearResourceProvider()
 }
 
 @Test func resourceTransformCallbackCopiesRequestWithoutReplacement() {

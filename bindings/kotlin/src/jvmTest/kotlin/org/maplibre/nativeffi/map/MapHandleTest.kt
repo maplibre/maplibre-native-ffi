@@ -4,10 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -33,10 +36,14 @@ import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.runtime.CameraChangeMode
+import org.maplibre.nativeffi.runtime.RuntimeEventPayload
+import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -79,6 +86,30 @@ class MapHandleTest {
     }
     runtime.close()
     assertTrue(runtime.isClosed)
+  }
+
+  @Test
+  fun mapSizeReportsCreationExtentAndPixelRatio() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 512
+          height = 256
+          scaleFactor = 2.0
+        },
+      )
+
+    val size = map.size
+    assertEquals(512, size.width)
+    assertEquals(256, size.height)
+    assertEquals(2.0, size.scaleFactor)
+    assertEquals(MapSize(512, 256, 2.0), size)
+    assertEquals(MapSize(512, 256, 2.0).hashCode(), size.hashCode())
+
+    map.close()
+    runtime.close()
   }
 
   @Test
@@ -126,16 +157,52 @@ class MapHandleTest {
 
     try {
       map.setStyleJson("""{"version":8,"sources":{},"layers":[]}""")
-      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson")
+      map.addGeoJsonSourceUrl("remote-places", "https://example.com/places.geojson", null)
       assertEquals(SourceType.GEOJSON, map.styleSourceType("remote-places"))
       map.setGeoJsonSourceUrl("remote-places", "https://example.com/updated.geojson")
 
-      map.addGeoJsonSourceData("inline-places", geoJsonData())
+      map.addGeoJsonSourceData(
+        "inline-places",
+        geoJsonData(),
+        GeoJsonSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 14.0
+          tolerance = 0.5
+          tileSize = 256
+          buffer = 64
+          lineMetrics = true
+        },
+      )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("inline-places"))
       map.setGeoJsonSourceData(
         "inline-places",
         GeoJson.GeometryValue(Geometry.LineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))),
       )
+
+      map.addGeoJsonSourceData("clustered-places", nearbyPoints(), clusterOptions())
+      assertEquals(SourceType.GEOJSON, map.styleSourceType("clustered-places"))
+
+      // Option values reach native validation rather than being dropped by the binding.
+      assertFailsWith<InvalidArgumentException> {
+        map.addGeoJsonSourceUrl(
+          "invalid-zooms",
+          "https://example.com/places.geojson",
+          GeoJsonSourceOptions().apply {
+            minZoom = 12.0
+            maxZoom = 4.0
+          },
+        )
+      }
+      assertFalse(map.styleSourceExists("invalid-zooms"))
+      assertFailsWith<InvalidArgumentException> {
+        map.addGeoJsonSourceUrl(
+          "invalid-cluster-properties",
+          "https://example.com/places.geojson",
+          GeoJsonSourceOptions().apply {
+            clusterProperties = JsonValue.StringValue("not an object")
+          },
+        )
+      }
     } finally {
       map.close()
       runtime.close()
@@ -577,15 +644,15 @@ class MapHandleTest {
       }
 
       map.bounds =
-        org.maplibre.nativeffi.camera.BoundOptions().apply {
-          this.bounds = bounds
+        BoundOptions().apply {
+          this.bounds = BoundsConstraint.Bounded(bounds)
           minZoom = 1.0
           maxZoom = 10.0
           minPitch = 0.0
           maxPitch = 45.0
         }
       val boundOptions = map.bounds
-      assertEquals(bounds, boundOptions.bounds)
+      assertEquals(BoundsConstraint.Bounded(bounds), boundOptions.bounds)
       assertEquals(1.0, boundOptions.minZoom ?: 0.0, 1e-6)
       assertEquals(10.0, boundOptions.maxZoom ?: 0.0, 1e-6)
       assertEquals(0.0, boundOptions.minPitch ?: -1.0, 1e-6)
@@ -598,6 +665,166 @@ class MapHandleTest {
         }
       assertTrue(map.freeCameraOptions.position != null)
       assertTrue(map.freeCameraOptions.orientation != null)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  // BND-087, BND-102: camera transitions report their identity through runtime events, and
+  // camera change events type their code.
+
+  @Test
+  fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+        },
+      )
+
+    try {
+      // A zero-duration ease resolves inside the call and reports its end right away. An id above
+      // Long.MAX_VALUE round-trips as the unsigned bit pattern the caller passed in.
+      val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
+      map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
+      val instant = drainCameraEvents(runtime)
+      assertEquals(listOf(instantId), instant.finishedTransitionIds)
+      assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
+
+      // A running transition stays silent until it releases the camera.
+      map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
+      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+
+      // A later camera command supersedes it, ending the transition it replaced.
+      map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
+      val superseded = drainCameraEvents(runtime)
+      assertEquals(listOf(11L), superseded.finishedTransitionIds)
+      assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
+
+      // Cancellation ends the superseding transition.
+      map.cancelTransitions()
+      assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
+
+      // Omitting the id leaves the transition silent.
+      map.easeTo(
+        CameraOptions().apply { zoom = 14.0 },
+        AnimationOptions().apply { durationMs = 0.0 },
+      )
+      assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun completedCameraTransitionReportsItsIdOnceAndReachesTheRequestedCamera() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    try {
+      map.easeTo(CameraOptions().apply { zoom = 5.0 }, transitionAnimation(21L, 5_000.0))
+      // A still-image request runs a static map's pending transitions to their end.
+      map.requestStillImage()
+
+      val finished = mutableListOf<Long>()
+      var rounds = 0
+      while (finished.isEmpty() && rounds < 10_000) {
+        runtime.runOnce()
+        finished += drainCameraEvents(runtime).finishedTransitionIds
+        rounds++
+        Thread.sleep(1)
+      }
+      assertEquals(listOf(21L), finished)
+      assertEquals(5.0, map.camera.zoom ?: 0.0, 1e-6)
+
+      // The completed transition reports its end once; later pumping adds nothing.
+      repeat(100) {
+        runtime.runOnce()
+        finished += drainCameraEvents(runtime).finishedTransitionIds
+      }
+      assertEquals(listOf(21L), finished)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  private fun transitionAnimation(transitionId: Long, durationMs: Double): AnimationOptions =
+    AnimationOptions().apply {
+      this.transitionId = transitionId
+      this.durationMs = durationMs
+    }
+
+  private class CameraEvents(
+    val finishedTransitionIds: List<Long>,
+    val lastChangeMode: CameraChangeMode?,
+  )
+
+  private fun drainCameraEvents(runtime: RuntimeHandle): CameraEvents {
+    val finished = mutableListOf<Long>()
+    var lastChangeMode: CameraChangeMode? = null
+    while (true) {
+      val event = runtime.pollEvent() ?: return CameraEvents(finished, lastChangeMode)
+      when (event.type) {
+        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED ->
+          finished +=
+            assertIs<RuntimeEventPayload.CameraTransitionFinished>(event.payload).transitionId
+        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> lastChangeMode = CameraChangeMode(event.code)
+      }
+    }
+  }
+
+  @Test
+  fun boundsConstraintDistinguishesUnboundedFromWorldBounds() {
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+          mapMode = MapMode.STATIC
+        },
+      )
+
+    fun jumpedLongitude(longitude: Double): Double {
+      map.jumpTo(
+        CameraOptions().apply {
+          center = LatLng(0.0, longitude)
+          zoom = 2.0
+        }
+      )
+      return requireNotNull(map.camera.center).longitude
+    }
+
+    try {
+      // An unbounded map wraps across the antimeridian.
+      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
+      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
+
+      val world = LatLngBounds(LatLng(-90.0, -180.0), LatLng(90.0, 180.0))
+      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Bounded(world) }
+      assertEquals(BoundsConstraint.Bounded(world), map.bounds.bounds)
+      // World bounds clamp at the antimeridian instead of wrapping.
+      assertEquals(180.0, jumpedLongitude(200.0), 1e-6)
+
+      map.bounds = BoundOptions().apply { bounds = BoundsConstraint.Unbounded }
+      assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
+      // Releasing the constraint restores antimeridian wrapping.
+      assertEquals(-160.0, jumpedLongitude(200.0), 1e-6)
     } finally {
       map.close()
       runtime.close()
@@ -690,6 +917,42 @@ class MapHandleTest {
         ),
       )
     )
+
+  /** Point features close enough together to collapse into one cluster at low zoom. */
+  private fun nearbyPoints(): GeoJson =
+    GeoJson.FeatureCollection(
+      List(4) { index ->
+        Feature(
+          Geometry.Point(LatLng(index * 0.001, index * 0.001)),
+          listOf(JsonValue.Member("weight", JsonValue.UInt(1))),
+          FeatureIdentifier.UInt(index.toLong()),
+        )
+      }
+    )
+
+  private fun clusterOptions(): GeoJsonSourceOptions =
+    GeoJsonSourceOptions().apply {
+      cluster = true
+      clusterRadius = 50
+      clusterMaxZoom = 14.0
+      clusterMinPoints = 2
+      clusterProperties =
+        JsonValue.ObjectValue(
+          listOf(
+            JsonValue.Member(
+              "total",
+              JsonValue.Array(
+                listOf(
+                  JsonValue.StringValue("+"),
+                  JsonValue.Array(
+                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
+                  ),
+                )
+              ),
+            )
+          )
+        )
+    }
 
   private fun geoJsonData(): GeoJson =
     GeoJson.FeatureCollection(

@@ -183,13 +183,18 @@ var (
 	}
 )
 
+func newResourceProviderState(callback ResourceProviderCallback) *ResourceProviderState {
+	state := &ResourceProviderState{callback: callback}
+	state.handle = cgo.NewHandle(state)
+	return state
+}
+
 // SetResourceProvider installs or replaces a runtime-scoped resource provider.
 func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
 	if callback == nil {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	state := &ResourceProviderState{callback: callback}
-	state.handle = cgo.NewHandle(state)
+	state := newResourceProviderState(callback)
 	descriptor := C.mln_resource_provider{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_provider{})),
 		callback:  C.mln_resource_provider_callback(C.goMaplibreResourceProvider),
@@ -204,6 +209,11 @@ func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallba
 		return nil, status
 	}
 	return state, int32(C.MLN_STATUS_OK)
+}
+
+// ClearResourceProvider clears the runtime-scoped resource provider.
+func ClearResourceProvider(runtime unsafe.Pointer) int32 {
+	return int32(C.mln_runtime_clear_resource_provider((*C.mln_runtime)(runtime)))
 }
 
 // Release frees provider callback state after native no longer references it.

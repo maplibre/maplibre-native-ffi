@@ -13,13 +13,16 @@ from . import _native
 from .camera import (
     AnimationOptions,
     BoundOptions,
+    Bounded,
     CameraFitOptions,
     CameraOptions,
     EdgeInsets,
     FreeCameraOptions,
     ProjectionMode,
     ScreenPoint,
+    Unbounded,
 )
+from .errors import InvalidArgumentError
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
 from .render import (
@@ -41,6 +44,7 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    GeoJsonSourceOptions,
     LocationIndicatorImageKind,
     StyleImage,
     StyleImageInfo,
@@ -239,21 +243,31 @@ def _bounds_parts(
     bounds: BoundOptions,
 ) -> tuple[
     tuple[tuple[float, float], tuple[float, float]] | None,
+    bool,
     float | None,
     float | None,
     float | None,
     float | None,
 ]:
-    raw_bounds = (
-        (
-            (bounds.bounds.southwest.latitude, bounds.bounds.southwest.longitude),
-            (bounds.bounds.northeast.latitude, bounds.bounds.northeast.longitude),
+    constraint = bounds.bounds
+    raw_bounds: tuple[tuple[float, float], tuple[float, float]] | None = None
+    if isinstance(constraint, Bounded):
+        box = constraint.bounds
+        raw_bounds = (
+            (box.southwest.latitude, box.southwest.longitude),
+            (box.northeast.latitude, box.northeast.longitude),
         )
-        if bounds.bounds is not None
-        else None
-    )
+    elif constraint is not None and not isinstance(constraint, Unbounded):
+        # Annotations do not bind at runtime, so an unsupported value would
+        # otherwise read as "leave the geographic constraint alone" and the
+        # caller would see a silent no-op instead of a rejection.
+        raise InvalidArgumentError(
+            "BoundOptions.bounds must be Bounded, Unbounded, or None, "
+            f"not {type(constraint).__name__}"
+        )
     return (
         raw_bounds,
+        isinstance(constraint, Unbounded),
         bounds.min_zoom,
         bounds.max_zoom,
         bounds.min_pitch,
@@ -269,6 +283,7 @@ def _animation_parts(
         float | None,
         float | None,
         tuple[float, float, float, float] | None,
+        int | None,
     ]
     | None
 ):
@@ -284,7 +299,22 @@ def _animation_parts(
         if animation.easing is not None
         else None
     )
-    return animation.duration_ms, animation.velocity, animation.min_zoom, easing
+    transition_id = animation.transition_id
+    if transition_id is not None and not 0 <= transition_id < 2**64:
+        # PyO3 extracts this as `Option<u64>` and raises a bare OverflowError
+        # before the binding's error conversion runs, so range-check it here to
+        # keep invalid binding-owned input on the documented error shape.
+        raise InvalidArgumentError(
+            f"AnimationOptions.transition_id must fit in 64 unsigned bits, "
+            f"not {transition_id}"
+        )
+    return (
+        animation.duration_ms,
+        animation.velocity,
+        animation.min_zoom,
+        easing,
+        transition_id,
+    )
 
 
 def _coordinate_parts(
@@ -330,6 +360,50 @@ def _tile_source_parts(
         int(options.raster_dem_encoding)
         if options.raster_dem_encoding is not None
         else None,
+    )
+
+
+def _geojson_source_parts(
+    options: GeoJsonSourceOptions | None,
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    JsonValue | None,
+    int | None,
+    int | None,
+    int | None,
+    int | None,
+    bool | None,
+    bool | None,
+]:
+    if options is None:
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    return (
+        options.min_zoom,
+        options.max_zoom,
+        options.tolerance,
+        options.cluster_max_zoom,
+        options.cluster_properties,
+        options.tile_size,
+        options.buffer,
+        options.cluster_radius,
+        options.cluster_min_points,
+        options.line_metrics,
+        options.cluster,
     )
 
 
@@ -451,7 +525,14 @@ class MapHandle(NativeHandleMixin):
         return self._native_address_value
 
     def close(self) -> None:
-        """Release this map handle exactly once."""
+        """Release this map handle exactly once.
+
+        Closing discards this map's queued runtime events and its recorded
+        loading failure. There is no flush and no terminal event, so read any
+        state you mirror from events before closing, and treat close as the end
+        of this map's event stream rather than awaiting an event during
+        teardown.
+        """
         self._native.close()
         self._runtime._unregister_map(self)  # noqa: SLF001
 
@@ -486,6 +567,16 @@ class MapHandle(NativeHandleMixin):
     def dump_debug_logs(self) -> None:
         """Dump map debug logs through MapLibre Native logging."""
         self._native.dump_debug_logs()
+
+    def get_size(self) -> tuple[int, int, float]:
+        """Return the map's logical width, height, and pixel ratio.
+
+        The size starts at the creation width and height, and follows the
+        attach and resize rules documented on MapOptions. The scale factor is
+        fixed for the lifetime of the map and is independent of any render
+        target's scale factor.
+        """
+        return self._native.get_size()
 
     def get_viewport_options(self) -> MapViewportOptions:
         """Return live map viewport and render-transform controls."""
@@ -528,24 +619,59 @@ class MapHandle(NativeHandleMixin):
         )
 
     def set_style_url(self, url: str) -> None:
-        """Load a style URL through MapLibre Native style APIs."""
+        """Load a style URL through MapLibre Native style APIs.
+
+        Loading is asynchronous, so a style that fails to fetch or parse still
+        returns normally here and reports through a later loading-failed
+        runtime event. Watch the event stream for load outcomes.
+
+        A well-formed style whose contents are semantically invalid, such as an
+        unknown "version" or a layer naming a missing source, loads without an
+        error and without an event: MapLibre Native logs it and renders what it
+        can.
+        """
         self._native.set_style_url(url)
 
     def set_style_json(self, json: str) -> None:
-        """Load inline style JSON through MapLibre Native style APIs."""
+        """Load inline style JSON through MapLibre Native style APIs.
+
+        Malformed JSON is reported twice: this call raises the parse error
+        synchronously, and the same message also arrives as a loading-failed
+        runtime event. Handle both, so an event-driven loop stays consistent
+        with the call site.
+
+        A well-formed style whose contents are semantically invalid, such as an
+        unknown "version" or a layer naming a missing source, loads without an
+        error and without an event: MapLibre Native logs it and renders what it
+        can.
+        """
         self._native.set_style_json(json)
 
     def add_style_source_json(self, source_id: str, source_json: JsonObject) -> None:
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)
 
-    def add_geojson_source_url(self, source_id: str, url: str) -> None:
+    def add_geojson_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source that loads data from a URL."""
-        self._native.add_geojson_source_url(source_id, url)
+        self._native.add_geojson_source_url(
+            source_id, url, *_geojson_source_parts(options)
+        )
 
-    def add_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+    def add_geojson_source_data(
+        self,
+        source_id: str,
+        data: GeoJson,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source with inline data."""
-        self._native.add_geojson_source_data(source_id, data)
+        self._native.add_geojson_source_data(
+            source_id, data, *_geojson_source_parts(options)
+        )
 
     def set_geojson_source_url(self, source_id: str, url: str) -> None:
         """Update one GeoJSON source to load data from a URL."""
@@ -919,7 +1045,12 @@ class MapHandle(NativeHandleMixin):
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply a camera ease transition command."""
+        """Apply a camera ease transition command.
+
+        An absent `animation`, or an animation with no duration, eases over
+        zero duration: the camera reaches the target before this call returns,
+        with no runtime pump in between. Set a duration to animate over time.
+        """
         self._native.ease_to(*_camera_parts(camera), _animation_parts(animation))
 
     def fly_to(
@@ -927,7 +1058,13 @@ class MapHandle(NativeHandleMixin):
         camera: CameraOptions,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply a camera fly transition command."""
+        """Apply a camera fly transition command.
+
+        Fly is the one camera command that animates by default: an absent
+        `animation`, or an animation with no duration, derives a duration from
+        a default velocity of 1.2 screenfuls per second, so the camera is still
+        en route when this call returns and advances as the runtime is pumped.
+        """
         self._native.fly_to(*_camera_parts(camera), _animation_parts(animation))
 
     def camera_for_lat_lng_bounds(
@@ -1008,7 +1145,12 @@ class MapHandle(NativeHandleMixin):
         delta_y: float,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space pan command."""
+        """Apply an animated screen-space pan command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the pan
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.move_by_animated(delta_x, delta_y, _animation_parts(animation))
 
     def scale_by(self, scale: float, anchor: ScreenPoint | None = None) -> None:
@@ -1022,7 +1164,12 @@ class MapHandle(NativeHandleMixin):
         anchor: ScreenPoint | None = None,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space zoom command."""
+        """Apply an animated screen-space zoom command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the zoom
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         raw_anchor = (anchor.x, anchor.y) if anchor is not None else None
         self._native.scale_by_animated(scale, raw_anchor, _animation_parts(animation))
 
@@ -1036,7 +1183,12 @@ class MapHandle(NativeHandleMixin):
         second: ScreenPoint,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated screen-space rotate command."""
+        """Apply an animated screen-space rotate command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the rotation
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.rotate_by_animated(
             (first.x, first.y),
             (second.x, second.y),
@@ -1052,11 +1204,22 @@ class MapHandle(NativeHandleMixin):
         pitch: float,
         animation: AnimationOptions | None = None,
     ) -> None:
-        """Apply an animated pitch delta command."""
+        """Apply an animated pitch delta command.
+
+        Native routes this delta through the ease transition, so an absent
+        `animation`, or an animation with no duration, applies the pitch
+        instantly like `ease_to`. Set a duration to animate over time.
+        """
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
-        """Cancel active camera transitions."""
+        """Cancel active camera transitions.
+
+        A cancelled transition that carried an ``AnimationOptions``
+        ``transition_id`` reports its end through a
+        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, the same event a
+        transition that runs to completion reports.
+        """
         self._native.cancel_transitions()
 
     def get_free_camera_options(self) -> FreeCameraOptions:

@@ -21,6 +21,7 @@ import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
@@ -443,6 +444,14 @@ internal constructor(
     previous?.close()
   }
 
+  public actual fun clearResourceProvider() {
+    resourceProviderState?.checkCanClose()
+    Status.check(mln_runtime_clear_resource_provider(state.requireLive()))
+    val previous = resourceProviderState
+    resourceProviderState = null
+    previous?.close()
+  }
+
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     setResourceTransform(callback) { replacement ->
       mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
@@ -513,7 +522,8 @@ internal constructor(
 
   internal fun nativeAddress(): Long = state.address()
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    state.retainChild(childTypeName)
 
   internal fun resourceProviderStateForTesting(): ResourceProviderState? = resourceProviderState
 

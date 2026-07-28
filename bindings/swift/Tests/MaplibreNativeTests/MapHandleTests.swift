@@ -1,6 +1,33 @@
 @testable import MaplibreNative
 import Testing
 
+private struct CameraEventTally {
+  var finishedTransitionIds: [UInt64] = []
+  var lastDidChangeMode: CameraChangeMode?
+}
+
+private func drainCameraEvents(_ runtime: RuntimeHandle) throws
+  -> CameraEventTally
+{
+  var tally = CameraEventTally()
+  while let event = try runtime.pollEvent() {
+    switch event.type {
+    case .mapCameraTransitionFinished:
+      guard case let .cameraTransitionFinished(payload) = event.payload else {
+        Issue.record("unexpected transition payload: \(event.payload)")
+        continue
+      }
+      tally.finishedTransitionIds.append(payload.transitionId)
+    case .mapCameraDidChange:
+      tally.lastDidChangeMode = CameraChangeMode
+        .fromNative(UInt32(bitPattern: event.code))
+    default:
+      break
+    }
+  }
+  return tally
+}
+
 @Test func mapCreateCameraStyleAndClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -51,6 +78,92 @@ import Testing
   #expect(map.isClosed)
 }
 
+@Test func mapSizeReportsCreationExtentAndPixelRatio() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 512, height: 256, scaleFactor: 2.0)
+  )
+  defer { try? map.close() }
+
+  let size = try map.size()
+  #expect(size.width == 512)
+  #expect(size.height == 256)
+  #expect(size.scaleFactor == 2.0)
+}
+
+/// Terminal outcomes a headless map reaches without rendering frames: a
+/// zero-duration ease, a transition superseded by a later camera command, and a
+/// cancelled transition. Running a transition to completion needs a live render
+/// session, which this suite has no fixture for.
+@Test func cameraTransitionIdReportsTerminalOutcomesOnce() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(
+      width: 256,
+      height: 256,
+      scaleFactor: 1.0,
+      mode: .continuous
+    )
+  )
+  defer { try? map.close() }
+
+  var camera = CameraOptions(
+    center: LatLng(latitude: 37.7749, longitude: -122.4194),
+    zoom: 11,
+    bearing: 12,
+    pitch: 30
+  )
+
+  // A zero-duration ease resolves inside the call, so its event lands ahead of
+  // the immediate did-change event.
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 0, transitionId: 7)
+  )
+  var tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [7])
+  #expect(tally.lastDidChangeMode == .immediate)
+
+  // A running transition stays silent until it releases the camera.
+  camera.zoom = 12
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000, transitionId: 11)
+  )
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds.isEmpty)
+
+  // A later camera command supersedes it and reports the superseded identity.
+  camera.zoom = 13
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000, transitionId: 12)
+  )
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [11])
+  #expect(tally.lastDidChangeMode == .animated)
+
+  try map.cancelTransitions()
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds == [12])
+
+  // A transition started without an identity reports nothing when cancelled.
+  camera.zoom = 14
+  try map.ease(
+    to: camera,
+    animation: AnimationOptions(durationMilliseconds: 5000)
+  )
+  try map.cancelTransitions()
+  tally = try drainCameraEvents(runtime)
+  #expect(tally.finishedTransitionIds.isEmpty)
+}
+
 @Test func styleURLRejectsEmbeddedNULAsPublicInvalidArgument() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -71,6 +184,50 @@ import Testing
   } catch {
     Issue.record("unexpected error: \(error)")
   }
+}
+
+/// This verifies that the geographic constraint reports and applies the
+/// unbounded state distinctly from world bounds, which the southwest/northeast
+/// pair alone cannot express.
+@Test func cameraBoundsDistinguishUnboundedFromWorldBounds() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 256, height: 256)
+  )
+  defer { try? map.close() }
+
+  func longitudeAfterJump(to longitude: Double) throws -> Double {
+    try map.jump(to: CameraOptions(
+      center: LatLng(latitude: 0, longitude: longitude),
+      zoom: 2
+    ))
+    return try map.camera().center?.longitude ?? .nan
+  }
+
+  #expect(try map.bounds().bounds == .unbounded)
+  // An unbounded map wraps across the antimeridian.
+  #expect(try abs(longitudeAfterJump(to: 200) - -160) < 0.000001)
+
+  try map.setBounds(BoundOptions(bounds: .bounded(LatLngBounds(
+    southwest: LatLng(latitude: -90, longitude: -180),
+    northeast: LatLng(latitude: 90, longitude: 180)
+  ))))
+
+  if case let .bounded(reported) = try map.bounds().bounds {
+    #expect(abs(reported.northeast.longitude - 180) < 0.000001)
+  } else {
+    Issue.record("world bounds should report a bounded constraint")
+  }
+  // World bounds clamp at the antimeridian instead of wrapping.
+  #expect(try abs(longitudeAfterJump(to: 200) - 180) < 0.000001)
+
+  try map.setBounds(BoundOptions(bounds: .unbounded))
+  #expect(try map.bounds().bounds == .unbounded)
+  // Releasing the constraint restores antimeridian wrapping.
+  #expect(try abs(longitudeAfterJump(to: 200) - -160) < 0.000001)
 }
 
 @Test func closedMapReportsSwiftOwnedStateError() throws {

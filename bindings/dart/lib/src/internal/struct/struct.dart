@@ -3,6 +3,7 @@ import 'dart:ffi';
 import '../../camera/camera.dart';
 import '../../geo/geo.dart';
 import '../c/maplibre_native_c.g.dart' as raw;
+import '../value/uint64.dart';
 
 /// Converts a Dart coordinate to the native C value shape.
 raw.mln_lat_lng latLngToNative(LatLng value) {
@@ -247,8 +248,13 @@ raw.mln_bound_options boundOptionsToNative(
 ) {
   final bounds = value.bounds;
   if (bounds != null) {
-    result.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value;
-    result.bounds = latLngBoundsToNative(bounds);
+    if (bounds.isUnbounded) {
+      result.fields |=
+          raw.mln_bound_option_field.MLN_BOUND_OPTION_UNBOUNDED.value;
+    } else {
+      result.fields |= raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value;
+      result.bounds = latLngBoundsToNative(bounds.bounds!);
+    }
   }
   final minZoom = value.minZoom;
   if (minZoom != null) {
@@ -280,9 +286,16 @@ BoundOptions boundOptionsFromNative(raw.mln_bound_options value) {
   final fields = value.fields;
   return BoundOptions(
     bounds:
-        (fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value) == 0
-        ? null
-        : latLngBoundsFromNative(value.bounds),
+        (fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS.value) != 0
+        ? BoundsConstraint.bounded(latLngBoundsFromNative(value.bounds))
+        : (fields &
+                  raw
+                      .mln_bound_option_field
+                      .MLN_BOUND_OPTION_UNBOUNDED
+                      .value) !=
+              0
+        ? const BoundsConstraint.unbounded()
+        : null,
     minZoom:
         (fields & raw.mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM.value) ==
             0
@@ -646,6 +659,12 @@ raw.mln_animation_options animationOptionsToNative(
     result.fields |=
         raw.mln_animation_option_field.MLN_ANIMATION_OPTION_EASING.value;
     result.easing = unitBezierToNative(easing);
+  }
+  final transitionId = value.transitionId;
+  if (transitionId != null) {
+    result.fields |=
+        raw.mln_animation_option_field.MLN_ANIMATION_OPTION_TRANSITION_ID.value;
+    result.transition_id = uint64ToNative(transitionId, 'transitionId');
   }
   return result;
 }

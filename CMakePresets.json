@@ -95,7 +95,9 @@
       "cacheVariables": {
         "CMAKE_C_COMPILER": "$env{ProgramFiles}/LLVM/bin/clang-cl.exe",
         "CMAKE_CXX_COMPILER": "$env{ProgramFiles}/LLVM/bin/clang-cl.exe",
-        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>"
+        "CMAKE_MSVC_RUNTIME_LIBRARY": "MultiThreaded$<$<CONFIG:Debug>:Debug>",
+        "CMAKE_TRY_COMPILE_TARGET_TYPE": "STATIC_LIBRARY",
+        "HAVE_FSEEKO": { "type": "BOOL", "value": "OFF" }
       }
     },
     {

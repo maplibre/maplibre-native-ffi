@@ -67,8 +67,8 @@ local lintSteps = new Mapping<String, Step> {
   ["dart-format"] {
     glob = List("bindings/dart/**/*.dart")
     exclude = List("bindings/dart/**/*.g.dart")
-    check = "dart format --output=none --set-exit-if-changed {{files}}"
-    fix = "dart format {{files}}"
+    check = "mise run --quiet //bindings/dart:_format-check {{files}}"
+    fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
   }
 }
 

@@ -87,7 +87,8 @@ frameworks supplied by the Apple SDK.
 
 Each Android runtime AAR contains its backend-specific JNI libraries under
 `jni/<abi>`. OpenGL and Vulkan use separate runtime publications because the
-native library is compiled for one render backend.
+native library is compiled for one render backend. Runtime AARs include the
+native dependency notices and the Android NDK notice under `META-INF/licenses`.
 
 The Android target of `maplibre-native-ffi` directly includes the JVM helper
 from the exact `rustls-platform-verifier-android` package selected by
@@ -110,10 +111,11 @@ runtimeOnly(
 Classifier names use `natives-<os>-<arch>`, for example `natives-linux-arm64`,
 `natives-macos-arm64`, and `natives-windows-x64`. The runtime JAR contains the
 MapLibre Native FFI shared library and the runtime dependencies that the project
-redistributes. The JVM binding extracts that packaged set to a versioned
-directory and loads packaged dependencies before the C API library. Linux hosts
-still need the selected graphics loader and driver. Explicit native-library path
-configuration remains available as an override.
+redistributes. It carries their notices under
+`META-INF/licenses/maplibre-native-c`. The JVM binding extracts that packaged
+set to a versioned directory and loads packaged dependencies before the C API
+library. Linux hosts still need the selected graphics loader and driver.
+Explicit native-library path configuration remains available as an override.
 
 ## Snapshot publication
 

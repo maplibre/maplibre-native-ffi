@@ -316,6 +316,29 @@ void main() {
       } finally {
         calloc.free(renderMap);
       }
+
+      final transition =
+          calloc<raw.mln_runtime_event_camera_transition_finished>();
+      try {
+        transition.ref.size =
+            sizeOf<raw.mln_runtime_event_camera_transition_finished>();
+        transition.ref.transition_id = -1;
+        event.ref.payload_type = raw
+            .mln_runtime_event_payload_type
+            .MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+            .value;
+        event.ref.payload = transition.cast<Void>();
+        event.ref.payload_size =
+            sizeOf<raw.mln_runtime_event_camera_transition_finished>();
+        final typed = copyRuntimeEventForTesting(event.ref, runtime).payload;
+        expect(typed, isA<RuntimeEventCameraTransitionFinished>());
+        expect(
+          (typed as RuntimeEventCameraTransitionFinished).transitionId,
+          (BigInt.one << 64) - BigInt.one,
+        );
+      } finally {
+        calloc.free(transition);
+      }
     } finally {
       malloc.free(message);
       calloc.free(unknownPayload);

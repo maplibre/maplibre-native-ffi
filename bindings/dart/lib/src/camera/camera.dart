@@ -112,6 +112,7 @@ final class AnimationOptions {
     this.velocity,
     this.minZoom,
     this.easing,
+    this.transitionId,
   });
 
   /// Optional duration in milliseconds.
@@ -126,16 +127,25 @@ final class AnimationOptions {
   /// Optional easing curve.
   final UnitBezier? easing;
 
+  /// Optional caller-chosen identity reported when this transition ends.
+  ///
+  /// The value spans the full native `uint64_t` domain. A transition carrying
+  /// an ID emits one camera-transition-finished runtime event whether it
+  /// completes, is superseded, is cancelled, or applies immediately.
+  final BigInt? transitionId;
+
   @override
   bool operator ==(Object other) =>
       other is AnimationOptions &&
       other.durationMs == durationMs &&
       other.velocity == velocity &&
       other.minZoom == minZoom &&
-      other.easing == easing;
+      other.easing == easing &&
+      other.transitionId == transitionId;
 
   @override
-  int get hashCode => Object.hash(durationMs, velocity, minZoom, easing);
+  int get hashCode =>
+      Object.hash(durationMs, velocity, minZoom, easing, transitionId);
 }
 
 /// Optional fitting controls for camera-for-viewport queries.
@@ -392,6 +402,28 @@ final class MapTileOptions {
   );
 }
 
+/// Geographic constraint applied to the map camera center.
+final class BoundsConstraint {
+  /// Keeps the camera center inside [bounds].
+  const BoundsConstraint.bounded(LatLngBounds value) : bounds = value;
+
+  /// Leaves the camera center unconstrained across the antimeridian.
+  const BoundsConstraint.unbounded() : bounds = null;
+
+  /// Coordinate bounds for a bounded constraint, or null when unbounded.
+  final LatLngBounds? bounds;
+
+  /// Whether this constraint leaves the camera center unbounded.
+  bool get isUnbounded => bounds == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BoundsConstraint && other.bounds == bounds;
+
+  @override
+  int get hashCode => bounds.hashCode;
+}
+
 /// Optional map camera constraint fields.
 final class BoundOptions {
   /// Creates bound options.
@@ -403,8 +435,8 @@ final class BoundOptions {
     this.maxPitch,
   });
 
-  /// Optional coordinate bounds.
-  final LatLngBounds? bounds;
+  /// Optional camera-center constraint; null leaves it unchanged.
+  final BoundsConstraint? bounds;
 
   /// Optional minimum zoom.
   final double? minZoom;

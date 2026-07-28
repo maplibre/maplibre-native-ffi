@@ -76,9 +76,40 @@ Uri _outputFile(List<String> args, Uri packageRoot) {
 }
 
 String _clangResourceDir() {
-  final result = Process.runSync('clang', ['-print-resource-dir']);
+  final result = Process.runSync(_clangExecutable(), ['-print-resource-dir']);
   if (result.exitCode != 0) {
     throw StateError('clang -print-resource-dir failed: ${result.stderr}');
   }
   return (result.stdout as String).trim();
+}
+
+String _clangExecutable() {
+  final executableName = Platform.isWindows ? 'clang.exe' : 'clang';
+  final separator = Platform.isWindows ? ';' : ':';
+  for (final directory in (Platform.environment['PATH'] ?? '').split(
+    separator,
+  )) {
+    if (directory.isEmpty) {
+      continue;
+    }
+    final candidate = File(
+      '$directory${Platform.pathSeparator}$executableName',
+    );
+    if (!candidate.existsSync()) {
+      continue;
+    }
+    final normalized = candidate.absolute.path.replaceAll('\\', '/');
+    if (normalized.contains('/mise/shims/')) {
+      continue;
+    }
+    // Resource-directory discovery needs the compiler itself: an inactive
+    // mise shim or ccache wrapper resolves another command through PATH.
+    final resolved = candidate.resolveSymbolicLinksSync().replaceAll('\\', '/');
+    final resolvedName = resolved.substring(resolved.lastIndexOf('/') + 1);
+    if (!resolvedName.toLowerCase().startsWith('clang')) {
+      continue;
+    }
+    return candidate.path;
+  }
+  throw StateError('a direct clang executable is required on PATH');
 }

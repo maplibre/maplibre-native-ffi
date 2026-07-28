@@ -178,6 +178,25 @@ pub struct OfflineOperationCompletedEvent {
     pub found: bool,
 }
 
+/// Camera transition-finished event payload.
+///
+/// A transition reports its end once for every terminal outcome: running to
+/// completion, being superseded by a later camera command, being cancelled by
+/// `cancel_transitions`, or completing instantly as a zero-duration jump. A
+/// command this API rejects, such as one carrying a non-finite enabled camera
+/// field, starts no transition and emits no such event. MapLibre Native reports
+/// the
+/// moment the transition releases the camera without naming which outcome
+/// occurred, so this payload establishes transition identity rather than a
+/// completion reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct CameraTransitionFinishedEvent {
+    /// The `transition_id` the caller set on the `AnimationOptions` that
+    /// started this transition.
+    pub transition_id: u64,
+}
+
 /// Style-image-missing event payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -206,6 +225,7 @@ pub enum RuntimeEventPayload {
     OfflineRegionResponseError(OfflineRegionResponseErrorEvent),
     OfflineRegionTileCountLimit(OfflineRegionTileCountLimitEvent),
     OfflineOperationCompleted(OfflineOperationCompletedEvent),
+    CameraTransitionFinished(CameraTransitionFinishedEvent),
     Unknown(UnknownRuntimeEventPayload),
 }
 
@@ -215,6 +235,15 @@ pub enum RuntimeEventPayload {
 pub struct CopiedRuntimeEvent {
     pub event_type: RuntimeEventType,
     pub source: RawRuntimeEventSource,
+    /// Secondary event detail whose meaning `event_type` selects.
+    ///
+    /// Camera will-change and did-change events carry a
+    /// [`CameraChangeMode`](crate::CameraChangeMode), which decodes as
+    /// `CameraChangeMode::from_raw(code as u32)`. Offline
+    /// operation-completion events carry the operation's native status value.
+    /// Map loading-failure events carry the ordinal of MapLibre Native's
+    /// internal load error kind, whose text is in `message`. Every other event
+    /// type carries 0.
     pub code: i32,
     pub message: Option<String>,
     pub payload: RuntimeEventPayload,
@@ -334,6 +363,15 @@ fn copy_payload(raw: &sys::mln_runtime_event) -> Result<RuntimeEventPayload> {
                     raw_result_kind: payload.result_kind,
                     result_status: payload.result_status,
                     found: payload.found,
+                },
+            ))
+        }
+        sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => {
+            let payload =
+                copy_payload_struct::<sys::mln_runtime_event_camera_transition_finished>(raw)?;
+            Ok(RuntimeEventPayload::CameraTransitionFinished(
+                CameraTransitionFinishedEvent {
+                    transition_id: payload.transition_id,
                 },
             ))
         }

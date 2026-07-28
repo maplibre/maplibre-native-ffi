@@ -768,18 +768,15 @@ test "custom URL style loads through resource provider" {
     defer runtime.close() catch @panic("runtime close failed");
 
     var state = ProviderState{};
-    var replacement_state = ProviderState{};
     try runtime.setResourceProvider(.{ .handler = customStyleProvider, .context = &state });
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
-    try testing.expectError(error.InvalidState, runtime.setResourceProvider(.{ .handler = customStyleProvider, .context = &replacement_state }));
 
     try map.setStyleUrl(testing.allocator, "custom://style.json");
     try waitForStyleLoaded(&runtime);
     try testing.expect(state.calls.load(.seq_cst) > 0);
     try testing.expectEqual(@as(usize, 1), state.completions.load(.seq_cst));
-    try testing.expectEqual(@as(usize, 0), replacement_state.calls.load(.seq_cst));
     try testing.expect(state.saw_cancelled_query.load(.seq_cst));
     try testing.expect(state.saw_second_complete_error.load(.seq_cst));
     try testing.expect(state.saw_after_release_error.load(.seq_cst));
@@ -789,6 +786,65 @@ test "custom URL style loads through resource provider" {
     try testing.expect(state.saw_online_usage.load(.seq_cst));
     try testing.expect(state.saw_permanent_storage.load(.seq_cst));
     try testing.expect(state.saw_no_range.load(.seq_cst));
+}
+
+const CountingProviderState = struct {
+    calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+};
+
+// Counts invocations from a MapLibre file source thread and leaves loading to
+// the native path.
+fn countingProvider(
+    context: ?*anyopaque,
+    request: maplibre.ResourceRequest,
+    maybe_handle: ?maplibre.ResourceRequestHandle,
+) maplibre.ResourceProviderDecision {
+    const state: *CountingProviderState = @ptrCast(@alignCast(context.?));
+    _ = state.calls.fetchAdd(1, .seq_cst);
+    _ = request;
+    _ = maybe_handle;
+    return .pass_through;
+}
+
+// Requests a style whose scheme no file source serves, so the failure event
+// that follows proves the request reached the network file source.
+fn loadProbeStyle(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle, style_url: []const u8) !void {
+    try map.setStyleUrl(testing.allocator, style_url);
+    var event = try waitForOwnedEvent(runtime, .map_loading_failed);
+    defer event.deinit();
+    try testing.expect(std.mem.indexOf(u8, event.message, "\"jar\"") != null);
+}
+
+test "resource provider can be replaced and cleared after map creation" {
+    try maplibre.setNetworkStatus(.online, null);
+    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var installed = CountingProviderState{};
+    try runtime.setResourceProvider(.{ .handler = countingProvider, .context = &installed });
+    try loadProbeStyle(&runtime, &map, "jar:file:/packaged/first.json");
+    try testing.expect(installed.calls.load(.seq_cst) > 0);
+
+    var replacement = CountingProviderState{};
+    try runtime.setResourceProvider(.{ .handler = countingProvider, .context = &replacement });
+    const installed_calls = installed.calls.load(.seq_cst);
+    try loadProbeStyle(&runtime, &map, "jar:file:/packaged/second.json");
+    try testing.expect(replacement.calls.load(.seq_cst) > 0);
+    try testing.expectEqual(installed_calls, installed.calls.load(.seq_cst));
+
+    try runtime.setResourceProvider(null);
+    const replacement_calls = replacement.calls.load(.seq_cst);
+    try loadProbeStyle(&runtime, &map, "jar:file:/packaged/third.json");
+    try testing.expectEqual(installed_calls, installed.calls.load(.seq_cst));
+    try testing.expectEqual(replacement_calls, replacement.calls.load(.seq_cst));
+
+    // Clearing an already cleared provider stays a successful no-op.
+    try runtime.setResourceProvider(null);
 }
 
 const offline_style_url = "http://example.com/offline-style.json";

@@ -419,8 +419,13 @@ Resource provider invocation follows this operation:
    or release.
 4. Treat inline completion during the provider callback as handled ownership,
    even if the callback return path would otherwise pass through.
-5. Allow deferred or cross-thread completion when the C API allows it, without
+5. Defer inline request release until the callback returns handled ownership.
+6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
+
+Provider registration is replaceable for a runtime's whole life. A binding keeps
+the registered callback state reachable until the C call that replaces or clears
+the provider returns, and releases it after that call returns.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -702,6 +707,7 @@ that a real native failure would expose.
 | BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                    |
 | BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
 | BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
 
 ### Rendering
 

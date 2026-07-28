@@ -11,6 +11,16 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public expect class RuntimeHandle : AutoCloseable {
   public val isClosed: Boolean
 
+  /**
+   * Runs one iteration of the owner-thread run loop.
+   *
+   * An iteration drains every queued task, including tasks those tasks enqueue, plus expired timers
+   * and ready I/O. It is one loop iteration rather than one task.
+   *
+   * This call does not block waiting for work, but its duration is unbounded: a single iteration
+   * can span a full style parse. Callers driving a frame loop should measure it rather than budget
+   * it as a fixed per-frame slice.
+   */
   public fun runOnce()
 
   public fun startAmbientCacheOperation(
@@ -77,10 +87,22 @@ public expect class RuntimeHandle : AutoCloseable {
 
   public fun setResourceProvider(callback: ResourceProviderCallback)
 
+  public fun clearResourceProvider()
+
   public fun setResourceTransform(callback: ResourceTransformCallback)
 
   public fun clearResourceTransform()
 
+  /**
+   * Removes and returns one queued runtime event, or null when the queue is empty.
+   *
+   * Polling also advances binding-owned state, so it is more than a read. On a
+   * [RuntimeEventType.MAP_STYLE_LOADED] event it releases the custom geometry sources that the
+   * newly loaded style dropped, closing their upcall stubs. That release happens only when the
+   * event is polled, so a host that stops polling keeps those stubs alive.
+   *
+   * Returned values are copies and stay valid across later polls.
+   */
   public fun pollEvent(): RuntimeEvent?
 
   override fun close()

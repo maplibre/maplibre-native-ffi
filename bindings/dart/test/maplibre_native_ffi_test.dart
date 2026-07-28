@@ -683,6 +683,15 @@ void main() {
 
     final map = runtime.createMap();
     expect(map.isClosed, isFalse);
+    expect(map.size(), const MapSize(width: 256, height: 256, scaleFactor: 1));
+    runtime.setResourceProviderRules(const []);
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [],
+        callback: (_, handle) => handle.close(),
+      ),
+    );
+    runtime.clearResourceProvider();
     map.setStyleJson(_emptyStyleJson);
     map.requestRepaint();
     expect(() => map.requestStillImage(), throwsA(isA<MaplibreException>()));
@@ -735,6 +744,34 @@ void main() {
     final camera = map.camera();
     expect(camera.center, const LatLng(0, 0));
     expect(camera.zoom, closeTo(1, 0.0001));
+    runtime.drainEvents();
+    final transitionId = (BigInt.one << 64) - BigInt.one;
+    map.easeTo(
+      const CameraOptions(zoom: 2),
+      animation: AnimationOptions(durationMs: 0, transitionId: transitionId),
+    );
+    final cameraEvents = <RuntimeEvent>[];
+    RuntimeEvent? cameraEvent;
+    while ((cameraEvent = runtime.pollEvent()) != null) {
+      cameraEvents.add(cameraEvent!);
+    }
+    final transitionEvent = cameraEvents.firstWhere(
+      (event) =>
+          event.eventType == RuntimeEventType.mapCameraTransitionFinished,
+    );
+    expect(
+      (transitionEvent.payload as RuntimeEventCameraTransitionFinished)
+          .transitionId,
+      transitionId,
+    );
+    expect(
+      cameraEvents
+          .where(
+            (event) => event.eventType == RuntimeEventType.mapCameraDidChange,
+          )
+          .map((event) => CameraChangeMode.fromRawValue(event.code)),
+      contains(CameraChangeMode.immediate),
+    );
     map.setRenderingStatsViewEnabled(true);
     expect(map.renderingStatsViewEnabled(), isTrue);
     map.setRenderingStatsViewEnabled(false);
@@ -745,8 +782,20 @@ void main() {
     expect(map.viewportOptions().viewportMode, isNotNull);
     map.setTileOptions(const MapTileOptions(prefetchZoomDelta: 0));
     expect(map.tileOptions().prefetchZoomDelta, isNotNull);
-    map.setBounds(const BoundOptions(minZoom: 0, maxZoom: 24));
-    expect(map.bounds().minZoom, isNotNull);
+    const cameraBounds = LatLngBounds(
+      southwest: LatLng(-10, -20),
+      northeast: LatLng(10, 20),
+    );
+    map.setBounds(
+      const BoundOptions(
+        bounds: BoundsConstraint.bounded(cameraBounds),
+        minZoom: 0,
+        maxZoom: 24,
+      ),
+    );
+    expect(map.bounds().bounds, const BoundsConstraint.bounded(cameraBounds));
+    map.setBounds(const BoundOptions(bounds: BoundsConstraint.unbounded()));
+    expect(map.bounds().bounds, const BoundsConstraint.unbounded());
     final projectionMode = map.projectionMode();
     expect(projectionMode.axonometric, isNotNull);
     map.setProjectionMode(const ProjectionModeOptions(axonometric: false));
@@ -908,6 +957,29 @@ void main() {
       'https://example.com/b.geojson',
     );
     expect(map.removeStyleSource('dart-geojson-url-source'), isTrue);
+    expect(
+      () => map.addGeoJsonSourceData(
+        'dart-invalid-geojson-options',
+        FeatureCollectionGeoJson([]),
+        options: const GeoJsonSourceOptions(tileSize: 4294967296),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    map.addGeoJsonSourceData(
+      'dart-clustered-geojson-source',
+      FeatureCollectionGeoJson([
+        FeatureGeoJson(geometry: const PointGeometry(LatLng(0, 0))),
+      ]),
+      options: const GeoJsonSourceOptions(cluster: true, clusterRadius: 60),
+    );
+    expect(
+      () => map.setGeoJsonSourceData(
+        'dart-clustered-geojson-source',
+        const GeometryGeoJson(PointGeometry(LatLng(0, 0))),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
+    expect(map.removeStyleSource('dart-clustered-geojson-source'), isTrue);
     map.addVectorSourceUrl(
       'dart-vector-source',
       'https://example.com/vector.json',

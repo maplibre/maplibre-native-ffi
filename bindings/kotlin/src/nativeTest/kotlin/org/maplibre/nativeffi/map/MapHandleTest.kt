@@ -46,6 +46,32 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
+  fun mapSizeReportsCreationExtentAndPixelRatio() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 512
+            height = 256
+            scaleFactor = 2.0
+          },
+        )
+      try {
+        val size = map.size
+        assertEquals(512, size.width)
+        assertEquals(256, size.height)
+        assertEquals(2.0, size.scaleFactor)
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  @Test
   fun closeReleasesMapOnceKeepsRuntimeLiveAndInvalidatesWrapper() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
@@ -87,7 +113,7 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       val error = assertFailsWith<InvalidStateException> { runtime.close() }
       assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-      assertEquals("RuntimeHandle has 1 live child handle(s)", error.diagnostic)
+      assertEquals("RuntimeHandle has 1 live child handle(s): MapHandle", error.diagnostic)
       assertFalse(runtime.isClosed)
 
       runtime.runOnce()

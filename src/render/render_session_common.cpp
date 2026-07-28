@@ -318,20 +318,22 @@ auto renderer_backend(mln_render_session* session)
   return session->texture.backend->renderer_backend();
 }
 
-auto validate_renderer_backend(mln_render_session* session)
-  -> mbgl::gfx::RendererBackend* {
+auto validate_renderer_backend(
+  mln_render_session* session, mbgl::gfx::RendererBackend*& out_backend
+) -> mln_status {
   if (session->renderer == nullptr) {
     mln::core::set_thread_error("render session renderer is not available");
-    return nullptr;
+    return MLN_STATUS_INVALID_STATE;
   }
   auto* backend = renderer_backend(session);
   if (backend == nullptr) {
     mln::core::set_thread_error(
       "render session renderer backend is not available"
     );
-    return nullptr;
+    return MLN_STATUS_NATIVE_ERROR;
   }
-  return backend;
+  out_backend = backend;
+  return MLN_STATUS_OK;
 }
 
 constexpr uint32_t feature_state_selector_known_fields =
@@ -888,17 +890,15 @@ auto find_feature_extension_result_locked(
 // chosen for a different density, so warn instead of failing the call.
 auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
   constexpr auto tolerance = 1e-6;
-  const auto map_scale_factor = static_cast<double>(
-    mln::core::map_native(map)->getMapOptions().pixelRatio()
-  );
-  if (std::abs(map_scale_factor - scale_factor) <= tolerance) {
+  const auto creation_scale_factor = mln::core::map_scale_factor(map);
+  if (std::abs(creation_scale_factor - scale_factor) <= tolerance) {
     return;
   }
   mbgl::Log::Warning(
     mbgl::Event::Render,
     "render target scale_factor " + mbgl::util::toString(scale_factor) +
       " differs from the map scale_factor " +
-      mbgl::util::toString(map_scale_factor) +
+      mbgl::util::toString(creation_scale_factor) +
       "; the map value is fixed at creation and still selects sprites, glyphs, "
       "and raster tiles, so styled imagery will not match the rendered "
       "geometry. Create the map with the scale factor you intend to render at."
@@ -1090,7 +1090,7 @@ auto render_session_render_update(
   auto* backend = renderer_backend(session);
   if (backend == nullptr) {
     set_thread_error("render session renderer backend is not available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
   auto guard = mbgl::gfx::BackendScope{*backend};
   map_run_render_jobs(session->map);
@@ -1185,9 +1185,12 @@ auto render_session_reduce_memory_use(mln_render_session* session)
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->reduceMemoryUse();
@@ -1199,9 +1202,12 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->clearData();
@@ -1213,9 +1219,12 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
   auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->dumpDebugLogs();
@@ -1234,9 +1243,12 @@ auto render_session_set_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto native_state = to_native_json_value(state);
@@ -1271,9 +1283,12 @@ auto render_session_get_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto state = mbgl::FeatureState{};
@@ -1297,9 +1312,12 @@ auto render_session_remove_feature_state(
   if (selector_status != MLN_STATUS_OK) {
     return selector_status;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto guard = mbgl::gfx::BackendScope{*backend};
@@ -1373,9 +1391,12 @@ auto render_session_query_rendered_features(
       return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto guard = mbgl::gfx::BackendScope{*backend};
@@ -1431,9 +1452,12 @@ auto render_session_query_source_features(
   if (!native_options) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto native_source_id = string_from_view(source_id);
@@ -1474,9 +1498,12 @@ auto render_session_query_feature_extensions(
   if (!native_arguments) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  auto* backend = validate_renderer_backend(session);
-  if (backend == nullptr) {
-    return MLN_STATUS_INVALID_STATE;
+  mbgl::gfx::RendererBackend* backend = nullptr;
+  if (
+    const auto backend_status = validate_renderer_backend(session, backend);
+    backend_status != MLN_STATUS_OK
+  ) {
+    return backend_status;
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};

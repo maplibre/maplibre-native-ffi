@@ -233,6 +233,14 @@ function(mln_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
+  # Every Apple target needs the pool, not just the Metal backend: MoltenVK and
+  # the platform frameworks hand back autoreleased objects under Vulkan and
+  # OpenGL too.
+  if(APPLE)
+    list(APPEND MLN_FFI_C_API_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/c_api/autorelease_pool.mm)
+  endif()
+
   mln_target_project_sources(${target} ${MLN_FFI_C_API_SOURCES})
 
   target_include_directories(

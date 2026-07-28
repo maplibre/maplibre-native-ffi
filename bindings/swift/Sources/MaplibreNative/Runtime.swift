@@ -48,6 +48,7 @@ public enum RuntimeEventType: Sendable, Hashable {
   case offlineRegionResponseError
   case offlineRegionTileCountLimitExceeded
   case offlineOperationCompleted
+  case mapCameraTransitionFinished
   case unknown(UInt32)
 
   public static func fromNative(_ rawValue: UInt32) -> Self {
@@ -74,6 +75,7 @@ public enum RuntimeEventType: Sendable, Hashable {
     case 20: .offlineRegionResponseError
     case 21: .offlineRegionTileCountLimitExceeded
     case 22: .offlineOperationCompleted
+    case 23: .mapCameraTransitionFinished
     default: .unknown(rawValue)
     }
   }
@@ -90,6 +92,27 @@ public enum RuntimeEventSource: Equatable, Sendable {
     case 0: return .runtime
     case 1: return .map(source)
     default: return .unknown(sourceType: sourceType, source: source)
+    }
+  }
+}
+
+/// Camera change kinds reported by camera will-change and did-change events.
+///
+/// `RuntimeEvent.code` carries this value for `.mapCameraWillChange` and
+/// `.mapCameraDidChange`. Convert it with
+/// `CameraChangeMode.fromNative(UInt32(bitPattern: event.code))`.
+public enum CameraChangeMode: Sendable, Hashable {
+  /// The camera reached its new value without an animated transition.
+  case immediate
+  /// The camera moved as part of an animated transition.
+  case animated
+  case unknown(UInt32)
+
+  public static func fromNative(_ rawValue: UInt32) -> Self {
+    switch rawValue {
+    case 0: .immediate
+    case 1: .animated
+    default: .unknown(rawValue)
     }
   }
 }
@@ -272,6 +295,16 @@ public struct OfflineOperationCompletedEvent: Equatable, Sendable {
   }
 }
 
+/// Payload of a `.mapCameraTransitionFinished` event.
+public struct CameraTransitionFinishedEvent: Equatable, Sendable {
+  /// The `AnimationOptions.transitionId` that started the finished transition.
+  public let transitionId: UInt64
+
+  init(native: NativeCameraTransitionFinishedEvent) {
+    transitionId = native.transitionId
+  }
+}
+
 public enum RuntimeEventPayload: Equatable, Sendable {
   case none
   case renderFrame(RenderFrameEvent)
@@ -282,6 +315,7 @@ public enum RuntimeEventPayload: Equatable, Sendable {
   case offlineRegionResponseError(OfflineRegionResponseErrorEvent)
   case offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent)
   case offlineOperationCompleted(OfflineOperationCompletedEvent)
+  case cameraTransitionFinished(CameraTransitionFinishedEvent)
   case unknown(type: UInt32, byteCount: Int)
 
   init(native: NativeRuntimeEventPayload) {
@@ -313,6 +347,11 @@ public enum RuntimeEventPayload: Equatable, Sendable {
         .offlineOperationCompleted(
           OfflineOperationCompletedEvent(native: event)
         )
+    case let .cameraTransitionFinished(event):
+      self =
+        .cameraTransitionFinished(
+          CameraTransitionFinishedEvent(native: event)
+        )
     case let .unknown(type, byteCount):
       self = .unknown(type: type, byteCount: byteCount)
     }
@@ -322,6 +361,17 @@ public enum RuntimeEventPayload: Equatable, Sendable {
 public struct RuntimeEvent: Equatable, Sendable {
   public let type: RuntimeEventType
   public let source: RuntimeEventSource
+  /// Secondary event detail whose meaning `type` selects.
+  ///
+  /// - `.mapCameraWillChange` and `.mapCameraDidChange` carry a
+  ///   `CameraChangeMode` raw value, read with
+  ///   `CameraChangeMode.fromNative(UInt32(bitPattern: code))`.
+  /// - `.mapLoadingFailed` carries the ordinal of MapLibre Native's internal
+  ///   map load error kind, which this API leaves unnamed; `message` holds the
+  ///   failure text.
+  /// - `.offlineOperationCompleted` carries the operation result as a native
+  ///   status value, the same value the payload reports in `resultStatus`.
+  /// - Every other event type leaves it 0.
   public let code: Int32
   public let message: String
   public let payload: RuntimeEventPayload
@@ -452,5 +502,13 @@ public final class RuntimeHandle {
       }
     }
     resourceProvider = replacement
+  }
+
+  public func clearResourceProvider() throws {
+    try mapNativeFailure {
+      try checkStatus(mln_runtime_clear_resource_provider(handle
+          .requireLive()))
+    }
+    resourceProvider = nil
   }
 }

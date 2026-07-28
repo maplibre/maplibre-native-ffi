@@ -169,6 +169,48 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
     return false;
 }
 
+const TransitionFramePump = struct {
+    finished_count: usize = 0,
+    last_transition_id: ?u64 = null,
+};
+
+fn pumpTransitionFrame(
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    session: *maplibre.RenderSessionHandle,
+) !TransitionFramePump {
+    // Metal hosts drain autoreleased backend objects once per frame-loop
+    // iteration. The other backends need no platform scope here.
+    const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+    defer if (build_options.supports_metal) pool.deinit();
+
+    // Match the public host loop: camera invalidation, one native pump, event
+    // coalescing, and at most one render of the latest update.
+    try map.requestRepaint();
+    try runtime.runOnce();
+
+    var result = TransitionFramePump{};
+    var render_update_available = false;
+    while (try runtime.pollEvent(testing.allocator)) |polled| {
+        var event = polled;
+        defer event.deinit();
+        if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_render_update_available)) {
+            render_update_available = true;
+            continue;
+        }
+        switch (event.payload) {
+            .camera_transition_finished => |payload| {
+                try testing.expect(std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_camera_transition_finished));
+                result.finished_count += 1;
+                result.last_transition_id = payload.transition_id;
+            },
+            else => {},
+        }
+    }
+    if (render_update_available) try testing.expect(try session.renderUpdate());
+    return result;
+}
+
 fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
     for (actual, expected) |actual_channel, expected_channel| {
         const delta = if (actual_channel > expected_channel)
@@ -1131,6 +1173,90 @@ test "owned texture render session lifecycle and readback" {
     try owned.close();
 }
 
+test "map size follows attach and resize and keeps the creation scale factor" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = 64, .height = 32, .scale_factor = 2.0 });
+    defer map.close() catch @panic("map close failed");
+    const created = try map.getSize();
+    try testing.expectEqual(@as(u32, 64), created.width);
+    try testing.expectEqual(@as(u32, 32), created.height);
+    try testing.expectEqual(@as(f64, 2.0), created.scale_factor);
+
+    // The target renders at a different scale factor, which leaves the map's
+    // own pixel ratio untouched.
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+    const attached = try map.getSize();
+    try testing.expectEqual(@as(u32, 32), attached.width);
+    try testing.expectEqual(@as(u32, 16), attached.height);
+    try testing.expectEqual(@as(f64, 2.0), attached.scale_factor);
+
+    try owned.session.resize(.{ .width = 48, .height = 24, .scale_factor = 1.0 });
+    const resized = try map.getSize();
+    try testing.expectEqual(@as(u32, 48), resized.width);
+    try testing.expectEqual(@as(u32, 24), resized.height);
+    try testing.expectEqual(@as(f64, 2.0), resized.scale_factor);
+}
+
+test "an ease pumped through rendered frames reports its transition finish once" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
+    });
+    defer owned.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    // Consume the style frame before starting the transition. Leaving it
+    // pending suppresses the next update event that drives the eased frame.
+    {
+        const pool = if (build_options.supports_metal) try metal_support.AutoreleasePool.init() else {};
+        defer if (build_options.supports_metal) pool.deinit();
+        try testing.expect(try owned.session.renderUpdate());
+    }
+
+    // A camera transition advances when the host requests and renders frames.
+    try map.easeTo(
+        .{ .center = .{ .latitude = 37.7749, .longitude = -122.4194 }, .zoom = 4.0 },
+        .{ .duration_ms = 50, .transition_id = 31 },
+    );
+
+    var finished_count: usize = 0;
+    var last_transition_id: ?u64 = null;
+    for (0..200) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        finished_count += frame.finished_count;
+        if (frame.last_transition_id) |transition_id| last_transition_id = transition_id;
+        if (finished_count > 0) break;
+        try testing.io.sleep(.fromMilliseconds(1), .awake);
+    }
+
+    try testing.expectEqual(@as(usize, 1), finished_count);
+    try testing.expectEqual(@as(?u64, 31), last_transition_id);
+
+    // A completed transform cannot report the same transition again.
+    var trailing_finished_count: usize = 0;
+    for (0..8) |_| {
+        const frame = try pumpTransitionFrame(&runtime, &map, &owned.session);
+        trailing_finished_count += frame.finished_count;
+    }
+    try testing.expectEqual(@as(usize, 0), trailing_finished_count);
+
+    const settled_camera = try map.getCamera();
+    try testing.expectApproxEqAbs(@as(f64, 4.0), settled_camera.zoom.?, 0.000001);
+}
+
 test "map close rejects live render session through public bindings" {
     if (!supports_test_owned_texture) return error.SkipZigTest;
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
@@ -1474,6 +1600,101 @@ test "render session queries cluster feature extensions" {
     var second = try session.queryFeatureExtension(testing.allocator, "cluster-source", borrowed.feature, "supercluster", "leaves", .{ .object = second_args[0..] });
     defer second.deinit(testing.allocator);
     try testing.expect(!std.mem.eql(u8, try singleLeafName(first), try singleLeafName(second)));
+}
+
+fn featurePropertyNumber(feature: *const maplibre.QueriedFeature, key: []const u8) !f64 {
+    for (feature.feature.properties) |property| {
+        if (!std.mem.eql(u8, property.key, key)) continue;
+        return switch (property.value) {
+            .uint => |value| @floatFromInt(value),
+            .int => |value| @floatFromInt(value),
+            .double => |value| value,
+            else => error.ExpectedNumberProperty,
+        };
+    }
+    return error.MissingFeatureProperty;
+}
+
+fn featurePropertyBool(feature: *const maplibre.QueriedFeature, key: []const u8) !bool {
+    for (feature.feature.properties) |property| {
+        if (!std.mem.eql(u8, property.key, key)) continue;
+        return switch (property.value) {
+            .bool => |value| value,
+            else => error.ExpectedBoolProperty,
+        };
+    }
+    return error.MissingFeatureProperty;
+}
+
+test "GeoJSON source options cluster nearby points and aggregate cluster properties" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var owned = try attachTestOwnedTexture(&map, .{});
+    defer owned.close() catch {};
+    const session = &owned.session;
+
+    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 0 });
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_style_loaded));
+
+    const first_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 1 } }};
+    const second_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 2 } }};
+    const third_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 3 } }};
+    const features = [_]maplibre.Feature{
+        .{ .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } }, .properties = first_properties[0..] },
+        .{ .geometry = .{ .point = .{ .latitude = 0.001, .longitude = 0.001 } }, .properties = second_properties[0..] },
+        .{ .geometry = .{ .point = .{ .latitude = 0.002, .longitude = 0.002 } }, .properties = third_properties[0..] },
+    };
+    const rank_expression = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "rank" } };
+    const total_expression = [_]maplibre.JsonValue{ .{ .string = "+" }, .{ .array = rank_expression[0..] } };
+    const cluster_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = total_expression[0..] } }};
+    try map.addGeoJsonSourceData(
+        testing.allocator,
+        "cluster-options-source",
+        .{ .feature_collection = features[0..] },
+        .{
+            .cluster = true,
+            .cluster_radius = 50,
+            .cluster_min_points = 2,
+            .cluster_max_zoom = 14,
+            .cluster_properties = .{ .object = cluster_properties[0..] },
+        },
+    );
+
+    const filter = [_]maplibre.JsonValue{ .{ .string = "has" }, .{ .string = "point_count" } };
+    const paint = [_]maplibre.JsonMember{.{ .key = "circle-radius", .value = .{ .uint = 20 } }};
+    const layer_members = [_]maplibre.JsonMember{
+        .{ .key = "id", .value = .{ .string = "cluster-options-circle" } },
+        .{ .key = "type", .value = .{ .string = "circle" } },
+        .{ .key = "source", .value = .{ .string = "cluster-options-source" } },
+        .{ .key = "filter", .value = .{ .array = filter[0..] } },
+        .{ .key = "paint", .value = .{ .object = paint[0..] } },
+    };
+    try map.addStyleLayerJson(testing.allocator, .{ .object = layer_members[0..] }, "");
+
+    for (0..5) |_| {
+        if (!try waitForEvent(&runtime, .map_render_update_available)) break;
+        _ = try session.renderUpdate();
+    }
+
+    // The layer only draws features carrying point_count, so a queried feature proves the source
+    // options clustered the points rather than rendering them individually.
+    const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
+    var clusters = try waitForRenderedFeatureQuery(&runtime, session, .{ .box = .{
+        .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
+        .max = .{ .x = query_point.x + 30, .y = query_point.y + 30 },
+    } }, .{ .layer_ids = &.{"cluster-options-circle"} });
+    defer clusters.deinit();
+
+    const cluster = &clusters.features[0];
+    try testing.expect(try featurePropertyBool(cluster, "cluster"));
+    try testing.expectEqual(@as(f64, 3), try featurePropertyNumber(cluster, "point_count"));
+    try testing.expectEqual(@as(f64, 6), try featurePropertyNumber(cluster, "total"));
 }
 
 fn singleLeafName(result: maplibre.FeatureExtensionResult) ![]const u8 {

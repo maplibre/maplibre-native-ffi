@@ -932,16 +932,26 @@ pub const MapHandle = enum(u128) {
         );
     }
 
+    /// Adds a GeoJSON source with inline data. MapLibre Native fixes options when the source is
+    /// created, so later setGeoJsonSourceData and setGeoJsonSourceUrl calls keep the options
+    /// passed here.
     pub fn addGeoJsonSourceData(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         data: values.GeoJson,
+        options: ?values.StyleGeoJsonSourceOptions,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
+        var raw_options = if (options) |value| try styleGeoJsonSourceOptionsToNative(&temp, value) else undefined;
         try status.checkStatus(
-            c.mln_map_add_geojson_source_data(try native(self), try temp.stringView(source_id), try temp.geoJson(data)),
+            c.mln_map_add_geojson_source_data(
+                try native(self),
+                try temp.stringView(source_id),
+                try temp.geoJson(data),
+                if (options != null) &raw_options else null,
+            ),
             diagnosticStore(self),
         );
     }
@@ -960,16 +970,26 @@ pub const MapHandle = enum(u128) {
         );
     }
 
+    /// Adds a GeoJSON source that loads from a URL. MapLibre Native fixes options when the source
+    /// is created, so later setGeoJsonSourceUrl and setGeoJsonSourceData calls keep the options
+    /// passed here.
     pub fn addGeoJsonSourceUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         url: []const u8,
+        options: ?values.StyleGeoJsonSourceOptions,
     ) status.Error!void {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
+        var raw_options = if (options) |value| try styleGeoJsonSourceOptionsToNative(&temp, value) else undefined;
         try status.checkStatus(
-            c.mln_map_add_geojson_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url)),
+            c.mln_map_add_geojson_source_url(
+                try native(self),
+                try temp.stringView(source_id),
+                try temp.stringView(url),
+                if (options != null) &raw_options else null,
+            ),
             diagnosticStore(self),
         );
     }
@@ -1100,6 +1120,20 @@ pub const MapHandle = enum(u128) {
         var loaded = false;
         try status.checkStatus(c.mln_map_is_fully_loaded(try native(self), &loaded), diagnosticStore(self));
         return loaded;
+    }
+
+    /// Returns the map's logical viewport size in UI pixels and its pixel ratio.
+    ///
+    /// The size starts at the creation width and height, and follows the attach
+    /// and resize rules documented on MapOptions. The scale factor is fixed for
+    /// the lifetime of the map and is independent of any render target's scale
+    /// factor.
+    pub fn getSize(self: *MapHandle) status.Error!struct { width: u32, height: u32, scale_factor: f64 } {
+        var width: u32 = 0;
+        var height: u32 = 0;
+        var scale_factor: f64 = 0;
+        try status.checkStatus(c.mln_map_get_size(try native(self), &width, &height, &scale_factor), diagnosticStore(self));
+        return .{ .width = width, .height = height, .scale_factor = scale_factor };
     }
 
     pub fn dumpDebugLogs(self: *MapHandle) status.Error!void {
@@ -1430,6 +1464,58 @@ fn styleTileSourceOptionsToNative(
     if (options.raster_encoding) |encoding| {
         raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
         raw.raster_encoding = values.styleRasterDemEncodingToNative(encoding);
+    }
+    return raw;
+}
+
+fn styleGeoJsonSourceOptionsToNative(
+    temp: *native_temp.TempStorage,
+    options: values.StyleGeoJsonSourceOptions,
+) status.Error!c.mln_geojson_source_options {
+    var raw = c.mln_geojson_source_options_default();
+    if (options.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (options.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if (options.tolerance) |tolerance| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+        raw.tolerance = tolerance;
+    }
+    if (options.cluster_max_zoom) |cluster_max_zoom| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+        raw.cluster_max_zoom = cluster_max_zoom;
+    }
+    if (options.cluster_properties) |cluster_properties| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+        raw.cluster_properties = try temp.jsonValue(cluster_properties);
+    }
+    if (options.tile_size) |tile_size| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
+        raw.tile_size = tile_size;
+    }
+    if (options.buffer) |buffer| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+        raw.buffer = buffer;
+    }
+    if (options.cluster_radius) |cluster_radius| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+        raw.cluster_radius = cluster_radius;
+    }
+    if (options.cluster_min_points) |cluster_min_points| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+        raw.cluster_min_points = cluster_min_points;
+    }
+    if (options.line_metrics) |line_metrics| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+        raw.line_metrics = line_metrics;
+    }
+    if (options.cluster) |cluster| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+        raw.cluster = cluster;
     }
     return raw;
 }
