@@ -58,9 +58,8 @@ struct mln_offline_region_list {
   std::vector<OfflineRegionData> regions;
 };
 
-// Retains the wake state on its own, so a host destroys a wake source and its
-// runtime in either order and a signal that races runtime teardown finds a
-// live object to read `alive` from.
+// Holds its own reference to the wake state, so the state stays readable for a
+// signal that races runtime teardown and hosts destroy the two in either order.
 struct mln_wake_source {
   std::shared_ptr<mln::core::WakeState> state;
 };
@@ -528,8 +527,8 @@ auto push_offline_region_event(
     }
     runtime->events.push_back(std::move(event));
   }
-  // The offline region observer runs off the owner-thread run loop, so this is
-  // the only thing that tells a parked owner thread the event exists.
+  // The offline region observer runs off the owner-thread run loop, so this
+  // signal is what tells a parked owner thread the event arrived.
   mln::core::signal_wake(runtime->wake_state);
 }
 
@@ -1044,10 +1043,9 @@ auto create_runtime(
   owned_runtime->wake_state = std::make_shared<WakeState>();
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
-  // `setPlatformCallback` is an unlocked assignment, so it is set here, while
-  // the run loop is still reachable only from this thread. MapLibre then calls
-  // it from every thread that queues owner-thread work, which is what lets a
-  // parked owner thread learn about style, tile, and database responses.
+  // `setPlatformCallback` is an unlocked assignment, so it is set here while
+  // the run loop is reachable only from this thread. MapLibre calls it from
+  // every thread that queues owner-thread work.
   owned_runtime->run_loop->setPlatformCallback(
     [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
   );
@@ -2486,9 +2484,9 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
     });
   }
 
-  // Retiring the wake state before the run loop is released makes both a late
-  // `mln_wake_source_signal()` and the run loop teardown's own final iteration
-  // no-ops. Wake sources the host still holds keep the state readable.
+  // Retiring the wake state before the run loop is released covers a late
+  // `mln_wake_source_signal()` and the run loop teardown's final iteration.
+  // Wake sources the host still holds keep the state readable.
   {
     const std::scoped_lock wake_lock(owned_runtime->wake_state->mutex);
     owned_runtime->wake_state->alive = false;
@@ -2512,9 +2510,9 @@ auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
     }
     state->signaled = true;
   }
-  // Notifying outside the lock keeps this path short. MapLibre calls it while
-  // it holds the `RunLoop` mutex, which every thread that queues owner-thread
-  // work needs.
+  // MapLibre calls this while it holds the `RunLoop` mutex, which every thread
+  // that queues owner-thread work needs, so the notify happens outside the wake
+  // lock to keep the path short.
   state->condition.notify_all();
 }
 
@@ -2524,9 +2522,8 @@ auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
     return status;
   }
 
-  // A host that stops polling before the queue empties would otherwise park
-  // behind events it has already been handed, because queueing them latched a
-  // wake an earlier pump consumed.
+  // Queued unread events return the call without parking, so a host that
+  // stopped polling before the queue emptied keeps making progress.
   auto queued_events = false;
   {
     const std::scoped_lock event_lock(runtime->event_mutex);
@@ -2546,8 +2543,8 @@ auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
         );
       }
     }
-    // Consuming the latch here rather than after the drain keeps work that
-    // arrives while the drain runs latched for the next pump.
+    // The latch is consumed before the drain, so work arriving during the
+    // drain stays latched for the next pump.
     wake.signaled = false;
   }
 
@@ -2819,19 +2816,18 @@ auto push_runtime_map_event_payload(
     if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
       runtime->map_loading_failures[map] = event.message;
     }
-    // Render updates coalesce against an unread one at the tail, matching the
-    // `uv_async_send` semantics MapLibre's own headless frontend gets for free:
-    // a render always draws the latest update, so a host that renders once per
-    // event would otherwise redraw successively newer state N times for one
-    // frame's worth of progress. Coalescing only against the tail keeps every
-    // other event in the order it was queued.
+    // A render draws the latest update, so one unread render-update event
+    // covers every invalidation queued behind it. This matches the
+    // `uv_async_send` coalescing MapLibre's own headless frontend relies on.
+    // Comparing against the tail alone preserves the order of every other
+    // event.
     if (
       type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE && map != nullptr &&
       !runtime->events.empty() && runtime->events.back().type == type &&
       runtime->events.back().map == map
     ) {
-      // The unread event already tells the host to render, and it also keeps
-      // the next pump from parking, so this needs no wake of its own.
+      // The unread event already asks the host to render and already returns
+      // the next pump without parking.
       return;
     }
     runtime->events.push_back(std::move(event));

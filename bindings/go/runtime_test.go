@@ -157,8 +157,8 @@ func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
 	}
 }
 
-// quiesce leaves the runtime idle with no unread events, so a following park
-// can only be released by the signal the test raises.
+// quiesce pumps until the runtime is idle, so a park that follows is released by
+// the signal the test raises.
 func quiesce(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
 	for i := 0; i < 100; i++ {
@@ -196,9 +196,8 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	}
 	quiesce(t, runtime)
 
-	// The style is malformed, so native reports the failure from its own
-	// threads. What matters here is that the failure reaches a parked owner
-	// thread at all.
+	// The style is malformed, so native reports the failure from its own threads
+	// and the failure reaches the parked owner thread.
 	if err := mapHandle.SetStyleURL("unsupported://style.json"); err != nil {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
@@ -231,8 +230,8 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		t.Fatal("the parked owner thread never saw the loading failure")
 	}
 
-	// A source used from another goroutine is what a host's submission path
-	// holds, and the park it releases has no other work to end it.
+	// A source signalled from another goroutine matches a host's submission path,
+	// and the park it releases has no other work to end it.
 	source, err := runtime.WakeSource()
 	if err != nil {
 		t.Fatalf("WakeSource(): %v", err)
@@ -254,8 +253,8 @@ func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		t.Fatalf("Signal(): %v", err)
 	}
 
-	// A wake source stays usable once its runtime is gone, so host teardown
-	// ordering is free.
+	// A wake source stays usable after its runtime closes, so hosts tear the two
+	// down in either order.
 	if err := mapHandle.Close(); err != nil {
 		t.Fatalf("map Close(): %v", err)
 	}
@@ -301,7 +300,7 @@ func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 		t.Fatal("a pump blocked despite a latched signal")
 	}
 
-	// The latch is spent, so an idle runtime now sits out its whole timeout.
+	// With the latch spent, an idle runtime sits out its timeout.
 	idleStarted := time.Now()
 	if err := runtime.Pump(200 * time.Millisecond); err != nil {
 		t.Fatalf("Pump(): %v", err)

@@ -101,11 +101,9 @@ struct OfflineRegionEventState {
 // Holds the latch a parked owner thread waits on, in its own reference-counted
 // object so a wake source keeps it readable after the runtime is destroyed.
 //
-// `mutex` is a leaf: signalling takes it while MapLibre already holds the
-// `RunLoop` mutex or the runtime already holds `event_mutex`, and nothing takes
-// it before either of those. `signaled` is a latch rather than a work
-// predicate, because no signal source can prove work remains by the time the
-// owner thread looks.
+// `mutex` is a leaf lock. Signalling takes it while MapLibre holds the
+// `RunLoop` mutex or the runtime holds `event_mutex`, so those two order ahead
+// of it everywhere.
 struct WakeState {
   std::mutex mutex;
   std::condition_variable condition;

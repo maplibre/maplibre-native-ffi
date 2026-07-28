@@ -513,9 +513,9 @@ fn renderTexture(
     var rendered_frame = false;
     const started = std.Io.Clock.awake.now(io);
     while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
-        // Headless readback has no display to pace it, so the pump takes its
-        // cadence from the runtime's own work. The bound keeps the deadline
-        // above responsive.
+        // Headless readback has no display, so the pump takes its cadence from
+        // the runtime's own work. The bound keeps the deadline above
+        // responsive.
         try runtime.pump(park_timeout_milliseconds);
         while (try runtime.pollEvent(allocator)) |event| {
             var owned_event = event;

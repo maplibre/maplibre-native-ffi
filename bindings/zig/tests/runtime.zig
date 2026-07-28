@@ -153,8 +153,8 @@ test "closing a map discards queued runtime events" {
     try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 }
 
-// Leaves the runtime idle with no unread events, so a following park can only
-// be released by the signal the test raises.
+// Pumps until the runtime is idle, so a park that follows is released by the
+// signal the test raises.
 fn quiesce(runtime: *maplibre.RuntimeHandle) !void {
     for (0..100) |_| {
         try runtime.pump(0);
@@ -196,9 +196,8 @@ test "a parked owner thread wakes for native work and for a wake source" {
     defer if (map_open) map.close() catch @panic("map close failed");
     try quiesce(&runtime);
 
-    // The style is malformed, so native reports the failure from its own
-    // threads. What matters here is that the failure reaches a parked owner
-    // thread at all.
+    // The style is malformed, so native reports the failure from its own threads
+    // and the failure reaches the parked owner thread.
     try map.setStyleUrl(testing.allocator, "unsupported://style.json");
     var loading_failed = false;
     const load_started = std.Io.Clock.awake.now(testing.io);
@@ -216,7 +215,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     }
     try testing.expect(loading_failed);
 
-    // A source used from another thread is what a host's submission path holds,
+    // A source signalled from another thread matches a host's submission path,
     // and the park it releases has no other work to end it.
     const source = try runtime.wakeSource();
     try quiesce(&runtime);
@@ -228,8 +227,8 @@ test "a parked owner thread wakes for native work and for a wake source" {
     thread.join();
     try testing.expect(thread_error == null);
 
-    // A wake source stays usable once its runtime is gone, so host teardown
-    // ordering is free.
+    // A wake source stays usable after its runtime closes, so hosts tear the two
+    // down in either order.
     try map.close();
     map_open = false;
     try runtime.close();
@@ -252,7 +251,7 @@ test "a pump consumes one latched signal at a time" {
     try runtime.pump(10_000);
     try testing.expect(elapsedMilliseconds(signalled_started) < 5_000);
 
-    // The latch is spent, so an idle runtime now sits out its whole timeout.
+    // With the latch spent, an idle runtime sits out its timeout.
     const idle_started = std.Io.Clock.awake.now(testing.io);
     try runtime.pump(200);
     try testing.expect(elapsedMilliseconds(idle_started) >= 100);

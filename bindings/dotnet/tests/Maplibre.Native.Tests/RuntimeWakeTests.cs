@@ -9,12 +9,12 @@ public sealed class RuntimeWakeTests
 {
     private static readonly TimeSpan ParkTimeout = TimeSpan.FromSeconds(10);
 
-    // Well below ParkTimeout, and far above the scheduling noise a loaded CI
-    // machine adds to a condition-variable wake.
+    // Well below ParkTimeout, and far above the scheduling noise a loaded CI machine
+    // adds to a condition-variable wake.
     private static readonly TimeSpan PromptReturn = TimeSpan.FromSeconds(5);
 
-    // Leaves the runtime idle with no unread events, so a following park can only
-    // be released by the signal the test raises.
+    // Pumps until the runtime is idle, so a park that follows is released by the
+    // signal the test raises.
     private static void Quiesce(RuntimeHandle runtime)
     {
         for (var attempt = 0; attempt < 100; attempt++)
@@ -44,8 +44,7 @@ public sealed class RuntimeWakeTests
         Quiesce(runtime);
 
         // The style is malformed, so native reports the failure from its own
-        // threads. What matters here is that the failure reaches a parked owner
-        // thread at all.
+        // threads and the failure reaches the parked owner thread.
         map.SetStyleUrl("unsupported://style.json");
         var loadingFailed = false;
         var loadStarted = Stopwatch.StartNew();
@@ -67,8 +66,8 @@ public sealed class RuntimeWakeTests
 
         Assert.True(loadingFailed);
 
-        // A source signalled from another thread is what a host's submission path
-        // holds, and the park it releases has no other work to end it.
+        // A source signalled from another thread matches a host's submission
+        // path, and the park it releases has no other work to end it.
         var source = runtime.AcquireWakeSource();
         Quiesce(runtime);
         var signaller = new Thread(() =>
@@ -86,8 +85,8 @@ public sealed class RuntimeWakeTests
         );
         signaller.Join();
 
-        // A wake source stays usable once its runtime is gone, so host teardown
-        // ordering is free.
+        // A wake source stays usable after its runtime closes, so hosts tear
+        // the two down in either order.
         map.Close();
         runtime.Close();
         source.Signal();
@@ -111,7 +110,7 @@ public sealed class RuntimeWakeTests
             "A pump blocked despite a latched signal."
         );
 
-        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        // With the latch spent, an idle runtime sits out its timeout.
         var idleStarted = Stopwatch.StartNew();
         runtime.Pump(TimeSpan.FromMilliseconds(200));
         Assert.True(

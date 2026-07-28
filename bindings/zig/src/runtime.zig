@@ -554,16 +554,19 @@ pub const ResourceRequestHandle = enum(u128) {
     }
 };
 
-/// Releases a runtime owner thread parked in `RuntimeHandle.wait`.
+/// Releases a runtime owner thread parked in `RuntimeHandle.pump`.
 ///
-/// Unlike the other handles here, a wake source is usable from any thread: it
-/// is what a host's task submission or shutdown path calls. It stays usable
-/// after its runtime closes, and signalling it then does nothing. The
-/// diagnostic store the runtime was created with must outlive the source.
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. It stays usable after its runtime closes, and
+/// signalling it then does nothing. The diagnostic store the runtime was
+/// created with must outlive the source.
 pub const WakeSourceHandle = enum(u128) {
     _,
 
     /// Latches a wake and releases the parked owner thread.
+    ///
+    /// A signal raised while the owner thread runs stays latched, so the next
+    /// `RuntimeHandle.pump` consumes it and returns without parking.
     pub fn signal(self: WakeSourceHandle) status.Error!void {
         lockWakeSourceRegistry();
         defer unlockWakeSourceRegistry();
@@ -1106,30 +1109,30 @@ pub const RuntimeHandle = enum(u128) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Advances this runtime, optionally parking the owner thread first.
+    /// Advances this runtime.
     ///
-    /// One call is the whole pump step: park if asked, then drain the
-    /// owner-thread task queues. Follow it with `pollEvent` until that returns
-    /// null, then render whatever the drained events asked for.
+    /// The call parks the owner thread when `timeout_ms` allows it, then drains
+    /// the owner-thread task queues. Drain the queued runtime events with
+    /// `pollEvent` afterwards.
     ///
-    /// `timeout_ms` selects where the loop's cadence comes from. Zero never
-    /// blocks, which is what a host driven by a frame callback it does not own
-    /// passes. A positive value parks for up to that long, which is how a host
-    /// that owns its pump thread takes its cadence from the runtime's own work.
-    /// Null parks until a wake arrives.
+    /// `timeout_ms` sets the park bound. Zero drains and returns; hosts pumping
+    /// from a frame callback pass it. A positive value parks for up to that many
+    /// milliseconds; hosts that own their pump thread pass one and take their
+    /// cadence from the runtime's own work. Null parks until a wake arrives.
     ///
-    /// Draining is drain, not slice: a single call can span a whole style
-    /// parse, so measure it rather than budgeting it as a per-frame slice.
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
     ///
-    /// A wake is a latch, not a work predicate. A return does not promise work
-    /// arrived, and a pump that finds nothing is expected. Style, tile,
-    /// offline, and resource responses latch a wake, as does
-    /// `WakeSourceHandle.signal`; an unread runtime event also prevents
-    /// parking. Timers and ready file descriptors that queue no owner-thread
-    /// work do not, so pass a timeout to bound latency regardless.
+    /// A wake is a latch. One pump consumes one latch, and work arriving during
+    /// the drain latches the next wake, so a pump that finds no new work is
+    /// ordinary. Style, tile, offline, and resource responses latch a wake, as
+    /// does `WakeSourceHandle.signal`. A queued unread runtime event also
+    /// returns the call without parking. Timers and ready file descriptors
+    /// latch a wake when they queue owner-thread work, so pass a bounded
+    /// timeout to cap park latency.
     ///
-    /// A non-zero timeout blocks the calling thread. Do not use one while
-    /// holding a lock that a thread signalling a wake source also takes.
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock
+    /// that a thread signalling a wake source takes.
     pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1143,8 +1146,9 @@ pub const RuntimeHandle = enum(u128) {
         );
     }
 
-    /// Acquires a wake source that releases this runtime's parked owner thread
-    /// from any thread. The caller releases the returned handle.
+    /// Acquires a wake source that releases this runtime's parked owner thread.
+    /// The returned handle is usable from any thread, and the caller releases
+    /// it.
     pub fn wakeSource(self: *RuntimeHandle) status.Error!WakeSourceHandle {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();

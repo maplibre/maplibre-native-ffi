@@ -823,32 +823,32 @@ impl RuntimeHandle {
         )
     }
 
-    /// Advances this runtime, optionally parking the owner thread first.
+    /// Advances this runtime.
     ///
-    /// One call is the whole pump step: park if asked, then drain the
-    /// owner-thread task queues. Follow it with [`Self::poll_event`] until that
-    /// yields `None`, then render whatever the drained events asked for.
+    /// The call parks the owner thread when `timeout` allows it, then drains
+    /// the owner-thread task queues. Drain the queued runtime events with
+    /// [`Self::poll_event`] afterwards.
     ///
-    /// `timeout` selects where the loop's cadence comes from.
-    /// `Some(Duration::ZERO)` never blocks, which is what a host driven by a
-    /// frame callback it does not own passes. A longer `Some` parks for up to
-    /// that long, which is how a host that owns its pump thread takes its
-    /// cadence from the runtime's own work. `None` parks until a wake arrives.
+    /// `timeout` sets the park bound. `Some(Duration::ZERO)` drains and
+    /// returns; hosts pumping from a frame callback pass it. A longer `Some`
+    /// parks for up to that long; hosts that own their pump thread pass one and
+    /// take their cadence from the runtime's own work. `None` parks until a
+    /// wake arrives.
     ///
-    /// Draining is drain, not slice: it runs every task queued when the drain
-    /// begins plus every task those enqueue, so a single call can span a whole
-    /// style parse.
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
     ///
-    /// A wake is a latch, not a work predicate. A return does not promise work
-    /// arrived, and a pump that finds nothing is expected. Style, tile,
-    /// offline, and resource responses latch a wake, as does
-    /// [`WakeSource::signal`]; an unread runtime event also prevents parking.
-    /// Timers and ready file descriptors that queue no owner-thread work do
-    /// not, so bound the park when a host wants a latency ceiling regardless.
+    /// A wake is a latch. One pump consumes one latch, and work arriving during
+    /// the drain latches the next wake, so a pump that finds no new work is
+    /// ordinary. Style, tile, offline, and resource responses latch a wake, as
+    /// does [`WakeSource::signal`]. A queued unread runtime event also returns
+    /// the call without parking. Timers and ready file descriptors latch a wake
+    /// when they queue owner-thread work, so pass a bounded timeout to cap park
+    /// latency.
     ///
-    /// A non-zero timeout blocks the calling thread. Do not use one while
-    /// holding a lock that a thread signalling a [`WakeSource`] also takes, and
-    /// do not call it from a native callback.
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock
+    /// that a thread signalling a [`WakeSource`] takes, and outside native
+    /// callbacks.
     pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         let timeout_ms = timeout.map_or(-1, |timeout| {
@@ -859,7 +859,7 @@ impl RuntimeHandle {
     }
 
     /// Acquires a [`WakeSource`] that releases this runtime's parked owner
-    /// thread from any thread.
+    /// thread. The returned source is usable from any thread.
     pub fn wake_source(&self) -> Result<WakeSource> {
         let runtime = self.inner.as_ptr()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
@@ -926,13 +926,12 @@ impl RuntimeHandle {
     }
 }
 
-/// Releases a runtime owner thread parked in [`RuntimeHandle::wait`].
+/// Releases a runtime owner thread parked in [`RuntimeHandle::pump`].
 ///
-/// Unlike the other handles in this crate, a wake source is usable from any
-/// thread: it is what a host's task submission or shutdown path calls to hand
-/// the parked owner thread back to itself. Each source carries its own
-/// reference to the runtime's wake state, so it stays usable after the runtime
-/// it came from is closed, and signalling it then does nothing.
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. Each source holds its own reference to the runtime's
+/// wake state, so it stays usable after the runtime closes and signalling it
+/// then does nothing.
 #[derive(Debug)]
 pub struct WakeSource {
     ptr: NonNull<sys::mln_wake_source>,
@@ -940,19 +939,19 @@ pub struct WakeSource {
 
 // SAFETY: The C API documents mln_wake_source_signal() and
 // mln_wake_source_destroy() as callable from any thread. The native handle owns
-// a reference-counted wake state whose only mutable field is guarded by a
-// native mutex, and it holds no pointer to the thread-affine runtime.
+// a reference-counted wake state whose mutable field is guarded by a native
+// mutex, and it holds only that state.
 unsafe impl Send for WakeSource {}
-// SAFETY: See the Send justification; signalling takes `&self` and native
+// SAFETY: See the Send justification. Signalling takes `&self`, and native
 // synchronizes concurrent signals internally.
 unsafe impl Sync for WakeSource {}
 
 impl WakeSource {
     /// Latches a wake and releases the parked owner thread.
     ///
-    /// A signal raised while the owner thread runs is latched, so the next
-    /// [`RuntimeHandle::wait`] consumes it without blocking. Signalling after
-    /// the runtime is closed succeeds and does nothing.
+    /// A signal raised while the owner thread runs stays latched, so the next
+    /// [`RuntimeHandle::pump`] consumes it and returns without parking.
+    /// Signalling after the runtime closes succeeds and does nothing.
     pub fn signal(&self) -> Result<()> {
         // SAFETY: ptr is a live wake source owned by this wrapper, and native
         // accepts signals from any thread.
@@ -1414,8 +1413,8 @@ mod tests {
         runtime.close().unwrap();
     }
 
-    // Leaves the runtime idle with no latched signal, so a following park can
-    // only be released by the signal the test raises.
+    // Pumps until the runtime is idle, so a park that follows is released by
+    // the signal the test raises.
     fn quiesce(runtime: &RuntimeHandle) {
         for _ in 0..100 {
             runtime.pump(Some(Duration::ZERO)).unwrap();
@@ -1431,7 +1430,7 @@ mod tests {
     }
 
     // Drives the runtime the way a parked host does, so a missing wake shows up
-    // as a timed-out park rather than as a slow poll loop.
+    // as an expired timeout.
     fn park_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         let started = Instant::now();
         for _ in 0..20 {
@@ -1474,8 +1473,8 @@ mod tests {
             RuntimeEventType::MapStyleLoaded
         ));
 
-        // A source moved to another thread is what a host's submission path
-        // holds, and the park it releases has no other work to end it.
+        // A source moved to another thread matches a host's submission path,
+        // and the park it releases has no other work to end it.
         let source = runtime.wake_source().unwrap();
         quiesce(&runtime);
         let signaller = std::thread::spawn(move || {
@@ -1491,8 +1490,8 @@ mod tests {
         );
         let source = signaller.join().unwrap();
 
-        // A wake source stays usable once its runtime is gone, so host teardown
-        // ordering is free.
+        // A wake source stays usable after its runtime closes, so hosts tear
+        // the two down in either order.
         map.close().unwrap();
         runtime.close().unwrap();
         source.signal().unwrap();
@@ -1513,7 +1512,7 @@ mod tests {
             "a pump blocked despite a latched signal"
         );
 
-        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        // With the latch spent, an idle runtime sits out its timeout.
         let started = Instant::now();
         runtime.pump(Some(Duration::from_millis(200))).unwrap();
         assert!(

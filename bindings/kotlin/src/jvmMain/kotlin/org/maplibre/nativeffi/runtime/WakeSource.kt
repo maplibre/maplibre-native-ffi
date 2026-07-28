@@ -9,8 +9,8 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 /** Wake source backed by the JVM FFM bridge. */
 public actual class WakeSource private constructor(private val source: MemorySegment) :
   AutoCloseable {
-  // HandleStateCore serializes close against a concurrent signal, which is what
-  // makes this handle usable from any thread.
+  // HandleStateCore serializes close against a concurrent signal, so this
+  // handle is usable from any thread.
   private val core = HandleStateCore("WakeSource", source.address())
 
   init {

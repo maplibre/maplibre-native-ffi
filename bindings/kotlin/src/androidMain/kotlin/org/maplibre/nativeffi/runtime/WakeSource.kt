@@ -11,8 +11,8 @@ import org.maplibre.nativeffi.internal.status.Status
 /** Owned wake source backed by the Android JNI bridge. */
 public actual class WakeSource internal constructor(private val sourceAddress: Long) :
   AutoCloseable {
-  // HandleStateCore serializes close against a concurrent signal, which is what
-  // makes this handle usable from any thread.
+  // HandleStateCore serializes close against a concurrent signal, so this
+  // handle is usable from any thread.
   private val core = HandleStateCore("WakeSource", sourceAddress)
 
   init {

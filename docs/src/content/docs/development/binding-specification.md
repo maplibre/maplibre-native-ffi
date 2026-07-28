@@ -464,13 +464,13 @@ The helper follows this design:
    shape.
 
 A helper that parks its owner thread between iterations acquires a wake source
-and signals it from submission and close, so a submitted operation runs when it
-is submitted rather than when the park's timeout expires.
+and signals it from submission and close, so a submitted operation runs at
+submission time.
 
 ### Parking and wake
 
-The pump is one method taking a timeout, not a non-blocking pump plus a separate
-wait. Bindings expose it alongside a wake source handle.
+The pump is one method taking a timeout. Bindings expose it alongside a wake
+source handle.
 
 The pump wrapper follows this design:
 
@@ -480,8 +480,8 @@ The pump wrapper follows this design:
 2. It releases the host runtime's blocking-call machinery for the duration of
    the call, including any interpreter lock, so other host threads run while the
    owner thread parks.
-3. Its documentation states that a wake is a latch rather than a work predicate,
-   and that callers drain events after every return.
+3. Its documentation states that a wake is a latch, and that callers drain
+   events after every return.
 
 The wake source follows this design:
 
@@ -522,8 +522,8 @@ owner-thread handles MUST be non-transferable. A transferable owner-thread
 helper handle is allowed only when every operation is submitted back to the
 bound native owner thread. Copied immutable values can be transferable when
 their contents are independent of native owner-thread state. A wake source
-handle is transferable, because it reaches native wake state that carries its
-own synchronization and holds no owner-thread pointer. Unchecked or unsafe
+handle is transferable: it reaches native wake state that carries its own
+synchronization and holds no owner-thread pointer. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
 

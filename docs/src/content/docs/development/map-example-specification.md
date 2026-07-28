@@ -261,10 +261,9 @@ While the map is visible and the example is active:
   swapchain frame callbacks, `CADisplayLink`, or `Choreographer`) to pace the
   loop.
 
-Display refresh paces the loop; it does not replace the pump. Each iteration
-MUST call `pump` exactly once, with the timeout its profile selects. A
-display-paced profile passes zero, so the pump drains without blocking and the
-refresh mechanism remains the only cadence.
+Display refresh paces the loop. Each iteration MUST call `pump` exactly once,
+with the timeout its profile selects. A display-paced profile passes zero, so
+the refresh mechanism remains the loop's only cadence.
 
 When the profile stops the loop (for example mobile background), runtime
 progress stalls until the loop resumes.

@@ -80,7 +80,7 @@ internal class AndroidMapView(context: Context) :
     frameCallbackPosted = false
     val state = mapState ?: return
     try {
-      state.pump(0)
+      state.pump()
       renderPending = state.drainEvents() || renderPending
       if (renderPending) {
         if (state.renderUpdate()) {

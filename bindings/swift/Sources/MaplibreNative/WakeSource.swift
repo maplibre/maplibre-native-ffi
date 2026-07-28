@@ -1,11 +1,10 @@
 internal import CMaplibreNativeC
 
-/// Releases a runtime owner thread parked in `RuntimeHandle.wait(timeout:)`.
+/// Releases a runtime owner thread parked in `RuntimeHandle.pump(timeout:)`.
 ///
-/// Unlike the other handles here, a wake source is usable from any thread: it
-/// is
-/// what a host's task submission or shutdown path calls. It stays usable after
-/// its runtime closes, and signalling it then does nothing.
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. It stays usable after its runtime closes, and
+/// signalling it then does nothing.
 ///
 /// The unchecked conformance rests on two invariants: `NativeHandleState`
 /// serializes pointer reads against close under its own lock, and the C API
@@ -24,9 +23,9 @@ public final class WakeSource: @unchecked Sendable {
 
   /// Latches a wake and releases the parked owner thread.
   ///
-  /// A signal raised while the owner thread runs is latched, so the next
-  /// `RuntimeHandle.wait(timeout:)` consumes it without blocking. Signalling
-  /// after the runtime closes succeeds and does nothing.
+  /// A signal raised while the owner thread runs stays latched, so the next
+  /// `RuntimeHandle.pump(timeout:)` consumes it and returns without parking.
+  /// Signalling after the runtime closes succeeds and does nothing.
   public func signal() throws {
     try mapNativeFailure {
       try checkStatus(mln_wake_source_signal(state.requireLive()))

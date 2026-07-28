@@ -9,8 +9,8 @@ import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 
 class WakeSourceTest {
-  // Leaves the runtime idle with no latched signal, so a following park can only be released by
-  // the signal the test raises.
+  // Pumps until the runtime is idle, so a park that follows is released by the signal the test
+  // raises.
   private fun quiesce(runtime: RuntimeHandle) {
     repeat(100) {
       runtime.pump(0)
@@ -39,8 +39,8 @@ class WakeSourceTest {
 
     quiesce(runtime)
 
-    // The style is malformed, so native reports the failure from its own threads. What matters
-    // here is that the failure reaches a parked owner thread at all.
+    // The style is malformed, so native reports the failure from its own threads and the failure
+    // reaches the parked owner thread.
     map.setStyleUrl("unsupported://style.json")
     var loadingFailed = false
     val loadStarted = TimeSource.Monotonic.markNow()
@@ -61,8 +61,8 @@ class WakeSourceTest {
     }
     assertTrue(loadingFailed)
 
-    // A source signalled from another thread is what a host's submission path holds, and the park
-    // it releases has no other work to end it.
+    // A source signalled from another thread matches a host's submission path, and the park it
+    // releases has no other work to end it.
     val source = runtime.acquireWakeSource()
     quiesce(runtime)
     val signaller = Thread {
@@ -78,7 +78,8 @@ class WakeSourceTest {
     )
     signaller.join()
 
-    // A wake source stays usable once its runtime is gone, so host teardown ordering is free.
+    // A wake source stays usable after its runtime closes, so hosts tear the two down in either
+    // order.
     map.close()
     runtime.close()
     source.signal()
@@ -101,7 +102,7 @@ class WakeSourceTest {
           "a pump blocked despite a latched signal",
         )
 
-        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        // With the latch spent, an idle runtime sits out its timeout.
         val idleStarted = TimeSource.Monotonic.markNow()
         runtime.pump(200)
         assertTrue(

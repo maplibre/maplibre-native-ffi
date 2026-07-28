@@ -12,33 +12,33 @@ public expect class RuntimeHandle : AutoCloseable {
   public val isClosed: Boolean
 
   /**
-   * Advances this runtime, optionally parking the owner thread first.
+   * Advances this runtime.
    *
-   * One call is the whole pump step: park if asked, then drain the owner-thread task queues. Follow
-   * it with [pollEvent] until the queue is empty, then render whatever the drained events asked
-   * for.
+   * The call parks the owner thread when [timeoutMillis] allows it, then drains the owner-thread
+   * task queues. Drain the queued runtime events with [pollEvent] afterwards.
    *
-   * [timeoutMillis] selects where the loop's cadence comes from. Zero never blocks, which is what a
-   * host driven by a frame callback it does not own passes. A positive value parks for up to that
-   * long, which is how a host that owns its pump thread takes its cadence from the runtime's own
-   * work. A negative value parks until a wake arrives.
+   * [timeoutMillis] sets the park bound. Zero drains and returns; hosts pumping from a frame
+   * callback pass it. A positive value parks for up to that many milliseconds; hosts that own their
+   * pump thread pass one and take their cadence from the runtime's own work. A negative value parks
+   * until a wake arrives.
    *
-   * Draining is drain, not slice: a single call can span a whole style parse, so measure it rather
-   * than budgeting it as a per-frame slice.
+   * The drain runs every task queued when it begins plus every task those enqueue, so a single call
+   * can span a full style parse.
    *
-   * A wake is a latch, not a work predicate. A return does not promise work arrived, and a pump
-   * that finds nothing is expected. Style, tile, offline, and resource responses latch a wake, as
-   * does [WakeSource.signal]; an unread runtime event also prevents parking. Timers and ready I/O
-   * that queue no owner-thread work do not, so pass a timeout to bound latency regardless.
+   * A wake is a latch. One pump consumes one latch, and work arriving during the drain latches the
+   * next wake, so a pump that finds no new work is ordinary. Style, tile, offline, and resource
+   * responses latch a wake, as does [WakeSource.signal]. A queued unread runtime event also returns
+   * the call without parking. Timers and ready I/O latch a wake when they queue owner-thread work,
+   * so pass a bounded timeout to cap park latency.
    *
-   * A non-zero timeout blocks the calling thread without releasing it to an interruption. Do not
-   * use one while holding a lock that a thread signalling a [WakeSource] also takes.
+   * A non-zero timeout blocks the calling thread and ignores interruption. Call it outside any lock
+   * that a thread signalling a [WakeSource] takes.
    */
   public fun pump(timeoutMillis: Long)
 
   /**
-   * Acquires a [WakeSource] that releases this runtime's parked owner thread from any thread. The
-   * caller closes the returned source.
+   * Acquires a [WakeSource] that releases this runtime's parked owner thread. The returned source
+   * is usable from any thread, and the caller closes it.
    */
   public fun acquireWakeSource(): WakeSource
 

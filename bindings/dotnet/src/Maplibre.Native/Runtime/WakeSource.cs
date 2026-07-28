@@ -5,12 +5,12 @@ using Maplibre.Native.Internal.Status;
 namespace Maplibre.Native.Runtime;
 
 /// <summary>
-/// Releases a runtime owner thread parked in <see cref="RuntimeHandle.Wait" />.
+/// Releases a runtime owner thread parked in <see cref="RuntimeHandle.Pump" />.
 /// </summary>
 /// <remarks>
-/// Unlike the other handles here, a wake source is usable from any thread: it is
-/// what a host's task submission or shutdown path calls. It stays usable after its
-/// runtime closes, and signalling it then does nothing.
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. It stays usable after its runtime closes, and signalling
+/// it then does nothing.
 /// </remarks>
 public sealed unsafe class WakeSource : IDisposable
 {
@@ -34,9 +34,9 @@ public sealed unsafe class WakeSource : IDisposable
 
     /// <summary>Latches a wake and releases the parked owner thread.</summary>
     /// <remarks>
-    /// A signal raised while the owner thread runs is latched, so the next
-    /// <see cref="RuntimeHandle.Wait" /> consumes it without blocking. Signalling
-    /// after the runtime closes succeeds and does nothing.
+    /// A signal raised while the owner thread runs stays latched, so the next
+    /// <see cref="RuntimeHandle.Pump" /> consumes it and returns without parking.
+    /// Signalling after the runtime closes succeeds and does nothing.
     /// </remarks>
     public void Signal()
     {

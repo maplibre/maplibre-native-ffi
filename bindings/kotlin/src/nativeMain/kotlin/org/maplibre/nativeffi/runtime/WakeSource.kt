@@ -13,8 +13,8 @@ import org.maplibre.nativeffi.internal.status.Status
 @OptIn(ExperimentalForeignApi::class)
 public actual class WakeSource internal constructor(handle: CPointer<mln_wake_source>?) :
   AutoCloseable {
-  // HandleState serializes close against a concurrent signal, which is what
-  // makes this handle usable from any thread.
+  // HandleState serializes close against a concurrent signal, so this handle is
+  // usable from any thread.
   private val state = HandleState("WakeSource", handle)
 
   public actual val isClosed: Boolean

@@ -427,7 +427,7 @@ def test_runtime_handle_context_manager_closes_once() -> None:
 
 
 def quiesce(runtime: mln.RuntimeHandle) -> None:
-    """Leave the runtime idle so a following park needs a fresh signal."""
+    """Pump until the runtime is idle, so a park that follows needs a fresh signal."""
     for _ in range(100):
         runtime.pump()
         drained = False
@@ -444,8 +444,7 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
         quiesce(runtime)
 
         # The style is malformed, so native reports the failure from its own
-        # threads. What matters here is that the failure reaches a parked owner
-        # thread at all.
+        # threads and the failure reaches the parked owner thread.
         map_handle.set_style_url("unsupported://style.json")
         loading_failed = False
         load_started = time.monotonic()
@@ -461,9 +460,9 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
                 break
         assert loading_failed
 
-        # A source signalled from another thread is what a host's submission
-        # path holds, and the park it releases has no other work to end it. This
-        # also proves the park releases the GIL.
+        # A source signalled from another thread matches a host's submission path,
+        # and the park it releases has no other work to end it. The park also
+        # releases the GIL.
         source = runtime.wake_source()
         quiesce(runtime)
         thread = threading.Thread(target=lambda: (time.sleep(0.02), source.signal()))
@@ -477,8 +476,8 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
 
         map_handle.close()
 
-    # A wake source stays usable once its runtime is gone, so host teardown
-    # ordering is free.
+    # A wake source stays usable after its runtime closes, so hosts tear the two
+    # down in either order.
     source.signal()
     source.close()
     assert source.closed
@@ -496,7 +495,7 @@ def test_pump_consumes_one_latched_signal_at_a_time() -> None:
                 "a pump blocked despite a latched signal"
             )
 
-            # The latch is spent, so an idle runtime sits out its whole timeout.
+            # With the latch spent, an idle runtime sits out its timeout.
             idle_started = time.monotonic()
             runtime.pump(0.2)
             assert time.monotonic() - idle_started >= 0.1, (

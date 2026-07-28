@@ -94,27 +94,23 @@ thread when asked, then drains the queued tasks, expired timers, and ready I/O
 it finds, including work enqueued while it runs. Document pump entry points as
 draining rather than as a bounded per-call budget.
 
-One pump entry point carries both cadence sources rather than two functions
-splitting them, because a park that does not drain is never what a host wants
-and a host that forgets to drain after it sees no error is left with a silent
-stall. The timeout selects the cadence: zero for hosts driven by a callback they
-do not own, positive for hosts that own their pump thread and take their cadence
-from the runtime's own work. Park-and-wake follows these rules:
+One entry point carries both cadence sources: the timeout selects the cadence,
+with zero for hosts driven by a callback they do not own and a positive value
+for hosts that own their pump thread and take their cadence from the runtime's
+own work. Park-and-wake follows these rules:
 
 - The C API owns the parking primitive. Wake signals reach the owner thread
   through runtime state rather than through a host callback, because MapLibre
   raises them from arbitrary threads while it holds locks that every thread
   queueing owner-thread work needs.
-- A wake is a latch, not a work predicate. Document a pump as advancing the
-  runtime rather than as reporting that work arrived, and require the event
-  drain after every return.
+- A wake is a latch. Document a pump as advancing the runtime, and require the
+  event drain after every return.
 - Any-thread wake entry points take a handle that carries its own reference to
   the wake state, never the thread-affine runtime pointer.
 - Document each blocking entry point's deadlock risk, naming the host locks a
   caller must not hold across it.
-- Queue events for one host-visible outcome once. An event whose handling always
-  acts on the latest state, such as a render update, coalesces against an unread
-  one rather than queueing per invalidation.
+- Queue one event per host-visible outcome. An event whose handling acts on the
+  latest state, such as a render update, coalesces against an unread one.
 
 ## Status And Diagnostics
 
