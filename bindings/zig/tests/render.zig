@@ -441,6 +441,12 @@ const WglAttachContext = if (supports_wgl) struct {
     pub fn readSurfaceRGBA8(self: *const WglAttachContext, width: u32, height: u32, pixels: []u8) !void {
         try self.context.readSurfaceRgba(width, height, pixels);
     }
+
+    pub fn readRgbaTexture(self: *const WglAttachContext, texture: gl.uint, width: u32, height: u32, pixels: []u8) !void {
+        _ = width;
+        _ = height;
+        try self.context.readRgbaTexture(texture, pixels);
+    }
 } else struct {};
 
 const WglBorrowedTexture = if (supports_wgl) struct {
@@ -1830,6 +1836,14 @@ test "OpenGL owned texture frame scopes public binding access" {
     try testing.expectEqual(@as(u32, gl.RGBA), info.format);
     try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), info.type);
     try testing.expect(info.texture != 0);
+
+    // The acquired texture belongs to the session context, so reading it back
+    // through the host context covers the cross-context handoff.
+    var host_pixels: [32 * 32 * 4]u8 = undefined;
+    @memset(&host_pixels, 0);
+    try context.readRgbaTexture(info.texture, 32, 32, &host_pixels);
+    try expectPixelApprox(host_pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
+
     try expectOpenGLFrameReleaseWrongThread(&frame);
 
     try testing.expectError(error.ActiveBorrow, session.renderUpdate());
@@ -1868,7 +1882,7 @@ test "OpenGL borrowed texture renders through public bindings" {
     defer testing.allocator.free(pixels);
     @memset(pixels, 0);
     try borrowed.readRGBA8(pixels);
-    try testing.expect(hasNonZeroByte(pixels));
+    try expectPixelApprox(pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 
     try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
     var readback_buffer: [128 * 128 * 4]u8 = undefined;
