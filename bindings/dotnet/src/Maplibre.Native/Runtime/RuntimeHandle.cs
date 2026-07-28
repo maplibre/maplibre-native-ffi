@@ -616,44 +616,40 @@ public sealed unsafe class RuntimeHandle : IDisposable
     }
 
     /// <summary>
-    /// Runs one iteration of this runtime's owner-thread run loop. The iteration
-    /// drains the high-priority task queue and then the default queue until both
-    /// are empty, including tasks enqueued during the drain, and also dispatches
-    /// expired timers and ready I/O.
+    /// Advances this runtime, optionally parking the owner thread first.
     /// </summary>
     /// <remarks>
-    /// <see cref="RunOnce" /> returns without blocking on new work, but its
-    /// duration is unbounded: a single iteration can span a style parse. Treat it
-    /// as "make progress now" rather than as a fixed per-frame time slice.
-    /// </remarks>
-    public void RunOnce()
-    {
-        NativeStatus.Check(NativeMethods.mln_runtime_run_once(Pointer));
-    }
-
-    /// <summary>
-    /// Parks the owner thread until this runtime may have work, and reports whether
-    /// the call consumed a signal rather than reaching its timeout. A negative
-    /// <paramref name="timeout" /> parks until a signal arrives.
-    /// </summary>
-    /// <remarks>
-    /// A wake is a latch, not a work predicate: follow every return with
-    /// <see cref="RunOnce" /> and then <see cref="PollEvent" /> until the queue is
-    /// empty, the same way a polling loop does. Style, tile, offline, and resource
-    /// responses signal a wake, as does <see cref="WakeSource.Signal" />. Timers and
-    /// ready file descriptors that queue no owner-thread work do not, so pass a
-    /// timeout to bound wait latency regardless.
+    /// One call is the whole pump step: park if asked, then drain the owner-thread
+    /// task queues. Follow it with <see cref="PollEvent" /> until the queue is
+    /// empty, then render whatever the drained events asked for.
     /// <para>
-    /// This blocks the calling thread. Do not call it while holding a lock that a
-    /// thread signalling a <see cref="WakeSource" /> also takes.
+    /// <paramref name="timeout" /> selects where the loop's cadence comes from.
+    /// <see cref="TimeSpan.Zero" /> never blocks, which is what a host driven by a
+    /// frame callback it does not own passes. A positive value parks for up to that
+    /// long, which is how a host that owns its pump thread takes its cadence from
+    /// the runtime's own work. A negative value parks until a wake arrives.
+    /// </para>
+    /// <para>
+    /// Draining is drain, not slice: a single call can span a whole style parse, so
+    /// measure it rather than budgeting it as a per-frame slice.
+    /// </para>
+    /// <para>
+    /// A wake is a latch, not a work predicate. A return does not promise work
+    /// arrived, and a pump that finds nothing is expected. Style, tile, offline, and
+    /// resource responses latch a wake, as does <see cref="WakeSource.Signal" />; an
+    /// unread runtime event also prevents parking. Timers and ready file descriptors
+    /// that queue no owner-thread work do not, so pass a timeout to bound latency
+    /// regardless.
+    /// </para>
+    /// <para>
+    /// A non-zero timeout blocks the calling thread. Do not use one while holding a
+    /// lock that a thread signalling a <see cref="WakeSource" /> also takes.
     /// </para>
     /// </remarks>
-    public bool Wait(TimeSpan timeout)
+    public void Pump(TimeSpan timeout)
     {
         var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
-        bool signaled;
-        NativeStatus.Check(NativeMethods.mln_runtime_wait(Pointer, timeoutMilliseconds, &signaled));
-        return signaled;
+        NativeStatus.Check(NativeMethods.mln_runtime_pump(Pointer, timeoutMilliseconds));
     }
 
     /// <summary>

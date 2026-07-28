@@ -132,8 +132,8 @@ final class MapState {
     }
   }
 
-  func runOnce() throws {
-    try runtime.runOnce()
+  func pump() throws {
+    try runtime.pump()
   }
 
   func drainEvents() throws -> Bool {

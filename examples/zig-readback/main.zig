@@ -513,11 +513,10 @@ fn renderTexture(
     var rendered_frame = false;
     const started = std.Io.Clock.awake.now(io);
     while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
-        // Headless readback has no display to pace it, so this parks until the
-        // runtime has work instead of polling. The bound keeps the deadline
+        // Headless readback has no display to pace it, so the pump takes its
+        // cadence from the runtime's own work. The bound keeps the deadline
         // above responsive.
-        _ = try runtime.wait(park_timeout_milliseconds);
-        try runtime.runOnce();
+        try runtime.pump(park_timeout_milliseconds);
         while (try runtime.pollEvent(allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();

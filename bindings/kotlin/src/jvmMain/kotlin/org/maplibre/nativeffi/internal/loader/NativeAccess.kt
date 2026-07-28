@@ -343,19 +343,9 @@ internal object NativeAccess {
       }
     }
 
-  internal fun runRuntimeOnce(runtime: MemorySegment) {
-    Status.check(runtimeStatusFunction("mln_runtime_run_once").invokeWithArguments(runtime) as Int)
+  internal fun pumpRuntime(runtime: MemorySegment, timeoutMillis: Long) {
+    Status.check(runtimePumpFunction().invokeWithArguments(runtime, timeoutMillis) as Int)
   }
-
-  internal fun waitRuntime(runtime: MemorySegment, timeoutMillis: Long): Boolean =
-    Arena.ofConfined().use { arena ->
-      val outSignaled = arena.allocate(ValueLayout.JAVA_BOOLEAN)
-      outSignaled.set(ValueLayout.JAVA_BOOLEAN, 0, false)
-      Status.check(
-        runtimeWaitFunction().invokeWithArguments(runtime, timeoutMillis, outSignaled) as Int
-      )
-      outSignaled.get(ValueLayout.JAVA_BOOLEAN, 0)
-    }
 
   internal fun acquireWakeSource(runtime: MemorySegment): MemorySegment =
     Arena.ofConfined().use { arena ->
@@ -2764,7 +2754,7 @@ internal object NativeAccess {
 
   private fun runtimeStatusFunction(name: String): MethodHandle = downcall(name)
 
-  private fun runtimeWaitFunction(): MethodHandle = downcall("mln_runtime_wait")
+  private fun runtimePumpFunction(): MethodHandle = downcall("mln_runtime_pump")
 
   private fun runtimeWakeSourceAcquireFunction(): MethodHandle =
     downcall("mln_runtime_wake_source_acquire")

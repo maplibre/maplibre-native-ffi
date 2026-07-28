@@ -575,7 +575,7 @@ class RenderSessionHandleTest {
     eventType: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return true
@@ -605,7 +605,7 @@ class RenderSessionHandleTest {
     map: MapHandle,
     session: RenderSessionHandle,
   ) {
-    runtime.runOnce()
+    runtime.pump(0)
     repeat(100) {
       val event = runtime.pollEvent() ?: return
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {

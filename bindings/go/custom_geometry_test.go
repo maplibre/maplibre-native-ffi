@@ -80,8 +80,8 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 func drainRuntimeEvents(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
 	for range make([]struct{}, 100) {
-		if err := runtime.RunOnce(); err != nil {
-			t.Fatalf("RunOnce(): %v", err)
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
 		}
 		event, err := runtime.PollEvent()
 		if err != nil {

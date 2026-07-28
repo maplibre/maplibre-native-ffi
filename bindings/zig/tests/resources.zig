@@ -16,7 +16,7 @@ fn sleepOneMillisecond() !void {
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -32,7 +32,7 @@ fn waitForOwnedEvent(
     event_type: maplibre.RuntimeEventType,
 ) !maplibre.OwnedRuntimeEvent {
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             if (std.meta.eql(owned_event.event_type, event_type)) return owned_event;
@@ -61,7 +61,7 @@ fn waitForOfflineOperation(
 ) !maplibre.OfflineOperationCompletedPayload {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -564,7 +564,7 @@ test "resource transform rewrites network style URL" {
 
     try map.setStyleUrl(testing.allocator, original_url);
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             owned_event.deinit();
@@ -607,7 +607,7 @@ test "failed resource transform replacement keeps previous callback" {
 
     try map.setStyleUrl(testing.allocator, "http://example.invalid/original-style.json");
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             owned_event.deinit();
@@ -741,7 +741,7 @@ fn pmtilesRangeProvider(
 
 fn waitForPmtilesRangeRequest(runtime: *maplibre.RuntimeHandle, state: *PmtilesRangeProviderState) !void {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         if (state.recorded_pmtiles_request.load(.seq_cst)) return;
         try sleepOneMillisecond();
     }
@@ -1150,7 +1150,7 @@ fn delayedStyleProvider(
 
 fn waitForProviderHandle(runtime: *maplibre.RuntimeHandle, state: *AsyncProviderState) !maplibre.ResourceRequestHandle {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         if (state.takeHandle()) |handle| return handle;
         try sleepOneMillisecond();
     }
@@ -1378,7 +1378,7 @@ test "offline region download errors are runtime events" {
 fn waitForRequestCancellation(runtime: *maplibre.RuntimeHandle, handle: maplibre.ResourceRequestHandle) !void {
     for (0..5000) |_| {
         if (try handle.cancelled()) return;
-        try runtime.runOnce();
+        try runtime.pump(0);
         try sleepOneMillisecond();
     }
     return error.RequestNotCancelled;
@@ -1432,7 +1432,7 @@ test "offline region download control emits copied status events" {
 
     var observed = false;
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();

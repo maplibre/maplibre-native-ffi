@@ -35,8 +35,8 @@ private constructor(
     renderTarget = null
   }
 
-  fun runOnce() {
-    runtime.runOnce()
+  fun pump() {
+    runtime.pump(0)
   }
 
   fun drainEvents(): Boolean {

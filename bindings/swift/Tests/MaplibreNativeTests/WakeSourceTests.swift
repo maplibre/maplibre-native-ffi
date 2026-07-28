@@ -5,17 +5,25 @@ import Testing
 
 private let parkTimeout: TimeInterval = 10
 
-/// Leaves the runtime idle with no latched signal, so a following park can only
+/// Well below parkTimeout, and far above the scheduling noise a loaded CI
+/// machine
+/// adds to a condition-variable wake.
+private let promptReturn: TimeInterval = 5
+
+/// Leaves the runtime idle with no unread events, so a following park can only
 /// be released by the signal the test raises.
-private func drainLatchedWakes(_ runtime: RuntimeHandle) throws {
+private func quiesce(_ runtime: RuntimeHandle) throws {
   for _ in 0 ..< 100 {
-    if try !runtime.wait(timeout: 0) {
+    try runtime.pump()
+    var drained = false
+    while try runtime.pollEvent() != nil {
+      drained = true
+    }
+    if !drained {
       return
     }
-    try runtime.runOnce()
-    while try runtime.pollEvent() != nil {}
   }
-  Issue.record("the runtime kept latching wakes while idle")
+  Issue.record("the runtime kept producing events while idle")
 }
 
 @Test func parkedOwnerThreadWakesForNativeWorkAndForAWakeSource() throws {
@@ -25,15 +33,19 @@ private func drainLatchedWakes(_ runtime: RuntimeHandle) throws {
     runtime: runtime,
     options: MapOptions(width: 512, height: 512)
   )
-  try drainLatchedWakes(runtime)
+  try quiesce(runtime)
 
   // The style is malformed, so native reports the failure from its own threads.
   // What matters here is that the failure reaches a parked owner thread at all.
   try map.setStyleURL("unsupported://style.json")
   var loadingFailed = false
+  let loadStarted = Date()
   for _ in 0 ..< 20 where !loadingFailed {
-    #expect(try runtime.wait(timeout: parkTimeout))
-    try runtime.runOnce()
+    try runtime.pump(timeout: parkTimeout)
+    #expect(
+      Date().timeIntervalSince(loadStarted) < promptReturn,
+      "parks sat out their timeouts while loading was pending"
+    )
     while let event = try runtime.pollEvent() {
       if event.type == .mapLoadingFailed {
         loadingFailed = true
@@ -45,14 +57,19 @@ private func drainLatchedWakes(_ runtime: RuntimeHandle) throws {
   // A source signalled from another thread is what a host's submission path
   // holds, and the park it releases has no other work to end it.
   let source = try runtime.wakeSource()
-  try drainLatchedWakes(runtime)
+  try quiesce(runtime)
   let signalled = DispatchSemaphore(value: 0)
   DispatchQueue.global().async {
     Thread.sleep(forTimeInterval: 0.02)
     try? source.signal()
     signalled.signal()
   }
-  #expect(try runtime.wait(timeout: parkTimeout))
+  let parkStarted = Date()
+  try runtime.pump(timeout: parkTimeout)
+  #expect(
+    Date().timeIntervalSince(parkStarted) < promptReturn,
+    "the parked owner thread timed out instead of taking the signal"
+  )
   signalled.wait()
 
   // A wake source stays usable once its runtime is gone, so host teardown
@@ -64,16 +81,27 @@ private func drainLatchedWakes(_ runtime: RuntimeHandle) throws {
   #expect(source.isClosed)
 }
 
-@Test func waitConsumesOneLatchedSignalAtATime() throws {
+@Test func pumpConsumesOneLatchedSignalAtATime() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let source = try runtime.wakeSource()
-  try drainLatchedWakes(runtime)
+  try quiesce(runtime)
 
   try source.signal()
-  #expect(try runtime.wait(timeout: 0))
-  // The latch is consumed, so an idle runtime reports the timeout instead.
-  #expect(try !runtime.wait(timeout: 0))
+  let signalledStarted = Date()
+  try runtime.pump(timeout: parkTimeout)
+  #expect(
+    Date().timeIntervalSince(signalledStarted) < promptReturn,
+    "a pump blocked despite a latched signal"
+  )
+
+  // The latch is spent, so an idle runtime now sits out its whole timeout.
+  let idleStarted = Date()
+  try runtime.pump(timeout: 0.2)
+  #expect(
+    Date().timeIntervalSince(idleStarted) >= 0.1,
+    "a second pump consumed a latch the first should have spent"
+  )
 
   try source.close()
   try runtime.close()

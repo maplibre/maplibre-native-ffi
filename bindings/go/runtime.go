@@ -550,42 +550,33 @@ func (runtime *RuntimeHandle) ptr() (*nativeRuntime, func(), error) {
 	return borrow.Ptr(), borrow.Release, nil
 }
 
-// RunOnce runs one iteration of this runtime's owner-thread run loop. The
-// iteration drains the high-priority task queue and then the default queue
-// until both are empty, including tasks enqueued during the drain, and also
-// dispatches expired timers and ready I/O.
+// Pump advances this runtime, optionally parking the owner thread first.
 //
-// RunOnce returns without blocking on new work, but its duration is unbounded:
-// a single iteration can span a style parse. Treat it as "make progress now"
-// rather than as a fixed per-frame time slice.
-func (runtime *RuntimeHandle) RunOnce() error {
+// One call is the whole pump step: park if asked, then drain the owner-thread
+// task queues. Follow it with PollEvent until that reports no event, then
+// render whatever the drained events asked for.
+//
+// timeout selects where the loop's cadence comes from. Zero never blocks, which
+// is what a host driven by a frame callback it does not own passes. A positive
+// value parks for up to that long, which is how a host that owns its pump
+// goroutine takes its cadence from the runtime's own work. A negative value
+// parks until a wake arrives.
+//
+// Draining is drain, not slice: a single call can span a whole style parse, so
+// measure it rather than budgeting it as a per-frame slice.
+//
+// A wake is a latch, not a work predicate. A return does not promise work
+// arrived, and a pump that finds nothing is expected. Style, tile, offline, and
+// resource responses latch a wake, as does WakeSource.Signal; an unread runtime
+// event also prevents parking. Timers and ready file descriptors that queue no
+// owner-thread work do not, so pass a timeout to bound latency regardless.
+//
+// A non-zero timeout blocks the calling goroutine and its OS thread. Do not use
+// one while holding a lock that a goroutine signalling a WakeSource also takes.
+func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return err
-	}
-	defer release()
-	defer runtime.state.KeepAlive()
-	return checkNative(func() int32 {
-		return int32(C.mln_runtime_run_once((*C.mln_runtime)(unsafe.Pointer(ptr))))
-	})
-}
-
-// Wait parks the owner thread until this runtime may have work, reporting
-// whether the call took a signal rather than reaching its timeout. A negative
-// timeout parks until a signal arrives.
-//
-// A wake is a latch, not a work predicate: follow every return with RunOnce and
-// then PollEvent until it reports no event, the same way a polling loop does.
-// Style, tile, offline, and resource responses signal a wake, as does
-// WakeSource.Signal. Timers and ready file descriptors that queue no
-// owner-thread work do not, so pass a timeout to bound wait latency regardless.
-//
-// Wait blocks the calling goroutine and its OS thread. Do not call it while
-// holding a lock that a goroutine signalling a WakeSource also takes.
-func (runtime *RuntimeHandle) Wait(timeout time.Duration) (bool, error) {
-	ptr, release, err := runtime.ptr()
-	if err != nil {
-		return false, err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
@@ -594,13 +585,9 @@ func (runtime *RuntimeHandle) Wait(timeout time.Duration) (bool, error) {
 	if timeout >= 0 {
 		timeoutMS = int64(timeout / time.Millisecond)
 	}
-	var signaled C.bool
-	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_wait((*C.mln_runtime)(unsafe.Pointer(ptr)), C.int64_t(timeoutMS), &signaled))
-	}); err != nil {
-		return false, err
-	}
-	return bool(signaled), nil
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_pump((*C.mln_runtime)(unsafe.Pointer(ptr)), C.int64_t(timeoutMS)))
+	})
 }
 
 // WakeSource acquires a wake source that releases this runtime's parked owner

@@ -162,9 +162,7 @@ auto create_runtime(
   const mln_runtime_options* options, mln_runtime** out_runtime
 ) -> mln_status;
 auto destroy_runtime(mln_runtime* runtime) -> mln_status;
-auto run_runtime_once(mln_runtime* runtime) -> mln_status;
-auto wait_runtime(mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled)
-  -> mln_status;
+auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status;
 auto acquire_wake_source(mln_runtime* runtime, mln_wake_source** out_source)
   -> mln_status;
 auto signal_wake_source(mln_wake_source* source) -> mln_status;

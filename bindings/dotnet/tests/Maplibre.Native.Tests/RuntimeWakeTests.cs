@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Maplibre.Native.Map;
 using Maplibre.Native.Runtime;
 using Xunit;
@@ -8,22 +9,30 @@ public sealed class RuntimeWakeTests
 {
     private static readonly TimeSpan ParkTimeout = TimeSpan.FromSeconds(10);
 
-    // Leaves the runtime idle with no latched signal, so a following park can only
+    // Well below ParkTimeout, and far above the scheduling noise a loaded CI
+    // machine adds to a condition-variable wake.
+    private static readonly TimeSpan PromptReturn = TimeSpan.FromSeconds(5);
+
+    // Leaves the runtime idle with no unread events, so a following park can only
     // be released by the signal the test raises.
-    private static void DrainLatchedWakes(RuntimeHandle runtime)
+    private static void Quiesce(RuntimeHandle runtime)
     {
         for (var attempt = 0; attempt < 100; attempt++)
         {
-            if (!runtime.Wait(TimeSpan.Zero))
+            runtime.Pump(TimeSpan.Zero);
+            var drained = false;
+            while (runtime.PollEvent() is not null)
+            {
+                drained = true;
+            }
+
+            if (!drained)
             {
                 return;
             }
-
-            runtime.RunOnce();
-            while (runtime.PollEvent() is not null) { }
         }
 
-        Assert.Fail("The runtime kept latching wakes while idle.");
+        Assert.Fail("The runtime kept producing events while idle.");
     }
 
     [BindingSpecTest("BND-088")]
@@ -32,17 +41,21 @@ public sealed class RuntimeWakeTests
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
-        DrainLatchedWakes(runtime);
+        Quiesce(runtime);
 
         // The style is malformed, so native reports the failure from its own
         // threads. What matters here is that the failure reaches a parked owner
         // thread at all.
         map.SetStyleUrl("unsupported://style.json");
         var loadingFailed = false;
+        var loadStarted = Stopwatch.StartNew();
         for (var attempt = 0; attempt < 20 && !loadingFailed; attempt++)
         {
-            Assert.True(runtime.Wait(ParkTimeout), "A park timed out while loading was pending.");
-            runtime.RunOnce();
+            runtime.Pump(ParkTimeout);
+            Assert.True(
+                loadStarted.Elapsed < PromptReturn,
+                "Parks sat out their timeouts while loading was pending."
+            );
             while (runtime.PollEvent() is { } polled)
             {
                 if (polled.Type == RuntimeEventType.MapLoadingFailed)
@@ -57,7 +70,7 @@ public sealed class RuntimeWakeTests
         // A source signalled from another thread is what a host's submission path
         // holds, and the park it releases has no other work to end it.
         var source = runtime.AcquireWakeSource();
-        DrainLatchedWakes(runtime);
+        Quiesce(runtime);
         var signaller = new Thread(() =>
         {
             Thread.Sleep(TimeSpan.FromMilliseconds(20));
@@ -65,8 +78,10 @@ public sealed class RuntimeWakeTests
         });
         signaller.Start();
 
+        var parkStarted = Stopwatch.StartNew();
+        runtime.Pump(ParkTimeout);
         Assert.True(
-            runtime.Wait(ParkTimeout),
+            parkStarted.Elapsed < PromptReturn,
             "The parked owner thread timed out instead of taking the signal."
         );
         signaller.Join();
@@ -82,15 +97,26 @@ public sealed class RuntimeWakeTests
 
     [BindingSpecTest("BND-089")]
     [Fact]
-    public void WaitConsumesOneLatchedSignalAtATime()
+    public void PumpConsumesOneLatchedSignalAtATime()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var source = runtime.AcquireWakeSource();
-        DrainLatchedWakes(runtime);
+        Quiesce(runtime);
 
         source.Signal();
-        Assert.True(runtime.Wait(TimeSpan.Zero));
-        // The latch is consumed, so an idle runtime reports the timeout instead.
-        Assert.False(runtime.Wait(TimeSpan.Zero));
+        var signalledStarted = Stopwatch.StartNew();
+        runtime.Pump(ParkTimeout);
+        Assert.True(
+            signalledStarted.Elapsed < PromptReturn,
+            "A pump blocked despite a latched signal."
+        );
+
+        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        var idleStarted = Stopwatch.StartNew();
+        runtime.Pump(TimeSpan.FromMilliseconds(200));
+        Assert.True(
+            idleStarted.Elapsed >= TimeSpan.FromMilliseconds(100),
+            "A second pump consumed a latch the first should have spent."
+        );
     }
 }

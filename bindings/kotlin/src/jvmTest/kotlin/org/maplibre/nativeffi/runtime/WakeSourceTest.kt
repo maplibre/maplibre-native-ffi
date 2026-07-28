@@ -2,8 +2,8 @@ package org.maplibre.nativeffi.runtime
 
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlin.time.TimeSource
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
@@ -11,17 +11,18 @@ import org.maplibre.nativeffi.map.MapOptions
 class WakeSourceTest {
   // Leaves the runtime idle with no latched signal, so a following park can only be released by
   // the signal the test raises.
-  private fun drainLatchedWakes(runtime: RuntimeHandle) {
+  private fun quiesce(runtime: RuntimeHandle) {
     repeat(100) {
-      if (!runtime.waitForWork(0)) {
+      runtime.pump(0)
+      var drained = false
+      while (runtime.pollEvent() != null) {
+        drained = true
+      }
+      if (!drained) {
         return
       }
-      runtime.runOnce()
-      while (runtime.pollEvent() != null) {
-        // Drain.
-      }
     }
-    error("the runtime kept latching wakes while idle")
+    error("the runtime kept producing events while idle")
   }
 
   @Test
@@ -36,16 +37,20 @@ class WakeSourceTest {
         },
       )
 
-    drainLatchedWakes(runtime)
+    quiesce(runtime)
 
     // The style is malformed, so native reports the failure from its own threads. What matters
     // here is that the failure reaches a parked owner thread at all.
     map.setStyleUrl("unsupported://style.json")
     var loadingFailed = false
+    val loadStarted = TimeSource.Monotonic.markNow()
     repeat(20) {
       if (!loadingFailed) {
-        assertTrue(runtime.waitForWork(10_000), "a park timed out while the style load was pending")
-        runtime.runOnce()
+        runtime.pump(10_000)
+        assertTrue(
+          loadStarted.elapsedNow().inWholeMilliseconds < 5_000,
+          "parks sat out their timeouts while the style load was pending",
+        )
         while (true) {
           val event = runtime.pollEvent() ?: break
           if (event.type == RuntimeEventType.MAP_LOADING_FAILED) {
@@ -59,14 +64,16 @@ class WakeSourceTest {
     // A source signalled from another thread is what a host's submission path holds, and the park
     // it releases has no other work to end it.
     val source = runtime.acquireWakeSource()
-    drainLatchedWakes(runtime)
+    quiesce(runtime)
     val signaller = Thread {
       Thread.sleep(20)
       source.signal()
     }
     signaller.start()
+    val parkStarted = TimeSource.Monotonic.markNow()
+    runtime.pump(10_000)
     assertTrue(
-      runtime.waitForWork(10_000),
+      parkStarted.elapsedNow().inWholeMilliseconds < 5_000,
       "the parked owner thread timed out instead of taking the signal",
     )
     signaller.join()
@@ -81,15 +88,26 @@ class WakeSourceTest {
   }
 
   @Test
-  fun waitConsumesOneLatchedSignalAtATime() {
+  fun pumpConsumesOneLatchedSignalAtATime() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       runtime.acquireWakeSource().use { source ->
-        drainLatchedWakes(runtime)
+        quiesce(runtime)
 
         source.signal()
-        assertTrue(runtime.waitForWork(0))
-        // The latch is consumed, so an idle runtime reports the timeout instead.
-        assertFalse(runtime.waitForWork(0))
+        val signalledStarted = TimeSource.Monotonic.markNow()
+        runtime.pump(10_000)
+        assertTrue(
+          signalledStarted.elapsedNow().inWholeMilliseconds < 5_000,
+          "a pump blocked despite a latched signal",
+        )
+
+        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        val idleStarted = TimeSource.Monotonic.markNow()
+        runtime.pump(200)
+        assertTrue(
+          idleStarted.elapsedNow().inWholeMilliseconds >= 100,
+          "a second pump consumed a latch the first should have spent",
+        )
       }
     }
   }

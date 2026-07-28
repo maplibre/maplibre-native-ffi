@@ -469,20 +469,19 @@ is submitted rather than when the park's timeout expires.
 
 ### Parking and wake
 
-Expose the C API's park-and-wake pair when the binding exposes the pump: a
-blocking wait on the runtime, and a wake source handle.
+The pump is one method taking a timeout, not a non-blocking pump plus a separate
+wait. Bindings expose it alongside a wake source handle.
 
-The wait wrapper follows this design:
+The pump wrapper follows this design:
 
-1. It takes the host language's duration or timeout type and maps the language's
-   "no timeout" spelling to an unbounded wait.
-2. It returns whether the call consumed a signal, so callers can distinguish a
-   wake from a timeout.
-3. It releases the host runtime's blocking-call machinery for the duration of
+1. It takes the host language's duration or timeout type, maps zero to a
+   non-blocking drain, and maps the language's "no timeout" spelling to an
+   unbounded park.
+2. It releases the host runtime's blocking-call machinery for the duration of
    the call, including any interpreter lock, so other host threads run while the
    owner thread parks.
-4. Its documentation states that a wake is a latch rather than a work predicate,
-   and that callers pump and drain events after every return.
+3. Its documentation states that a wake is a latch rather than a work predicate,
+   and that callers drain events after every return.
 
 The wake source follows this design:
 
@@ -689,7 +688,7 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                        |
+| BND-080 | `pump` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                            |
 | BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.                                             |
 | BND-082 | Event message and payload data remain valid after the next event poll.                                                                                              |
 | BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |

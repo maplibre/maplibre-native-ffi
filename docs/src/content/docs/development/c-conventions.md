@@ -89,25 +89,32 @@ Objects that cross the C boundary are retained rather than autoreleased, which
 keeps them valid after the entry point that produced them returns.
 
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop. One
-call drains the queued tasks, expired timers, and ready I/O it finds, including
-work enqueued while it runs, and returns without blocking for more. Document
-pump entry points as draining rather than as a bounded per-call budget.
+one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
+thread when asked, then drains the queued tasks, expired timers, and ready I/O
+it finds, including work enqueued while it runs. Document pump entry points as
+draining rather than as a bounded per-call budget.
 
-A host that owns its pump thread may park it instead of pumping on a cadence.
-`mln_runtime_wait()` is a blocking query: it parks the owner thread and returns
-when a signal arrives or its timeout elapses. Park-and-wake follows these rules:
+One pump entry point carries both cadence sources rather than two functions
+splitting them, because a park that does not drain is never what a host wants
+and a host that forgets to drain after it sees no error is left with a silent
+stall. The timeout selects the cadence: zero for hosts driven by a callback they
+do not own, positive for hosts that own their pump thread and take their cadence
+from the runtime's own work. Park-and-wake follows these rules:
 
 - The C API owns the parking primitive. Wake signals reach the owner thread
   through runtime state rather than through a host callback, because MapLibre
   raises them from arbitrary threads while it holds locks that every thread
   queueing owner-thread work needs.
-- A wake is a latch, not a work predicate. Document a wait as reporting that a
-  signal arrived, and require the pump-and-drain sequence after every return.
+- A wake is a latch, not a work predicate. Document a pump as advancing the
+  runtime rather than as reporting that work arrived, and require the event
+  drain after every return.
 - Any-thread wake entry points take a handle that carries its own reference to
   the wake state, never the thread-affine runtime pointer.
 - Document each blocking entry point's deadlock risk, naming the host locks a
   caller must not hold across it.
+- Queue events for one host-visible outcome once. An event whose handling always
+  acts on the latest state, such as a render update, coalesces against an unread
+  one rather than queueing per invalidation.
 
 ## Status And Diagnostics
 

@@ -2501,16 +2501,6 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto run_runtime_once(mln_runtime* runtime) -> mln_status {
-  const auto status = validate_runtime(runtime);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  runtime->run_loop->runOnce();
-  return MLN_STATUS_OK;
-}
-
 auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
   if (!state) {
     return;
@@ -2528,44 +2518,40 @@ auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
   state->condition.notify_all();
 }
 
-auto wait_runtime(mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled)
-  -> mln_status {
+auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
   const auto status = validate_runtime(runtime);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_signaled == nullptr) {
-    set_thread_error("out_signaled must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
 
-  *out_signaled = false;
   // A host that stops polling before the queue empties would otherwise park
   // behind events it has already been handed, because queueing them latched a
-  // wake that an earlier wait consumed.
+  // wake an earlier pump consumed.
+  auto queued_events = false;
   {
     const std::scoped_lock event_lock(runtime->event_mutex);
-    if (!runtime->events.empty()) {
-      *out_signaled = true;
-    }
+    queued_events = !runtime->events.empty();
   }
 
-  auto& wake = *runtime->wake_state;
-  std::unique_lock lock(wake.mutex);
-  if (*out_signaled) {
+  {
+    auto& wake = *runtime->wake_state;
+    std::unique_lock lock(wake.mutex);
+    if (!queued_events && timeout_ms != 0 && !wake.signaled) {
+      if (timeout_ms < 0) {
+        wake.condition.wait(lock, [&wake]() -> bool { return wake.signaled; });
+      } else {
+        wake.condition.wait_for(
+          lock, std::chrono::milliseconds{timeout_ms},
+          [&wake]() -> bool { return wake.signaled; }
+        );
+      }
+    }
+    // Consuming the latch here rather than after the drain keeps work that
+    // arrives while the drain runs latched for the next pump.
     wake.signaled = false;
-    return MLN_STATUS_OK;
   }
-  if (timeout_ms < 0) {
-    wake.condition.wait(lock, [&wake]() -> bool { return wake.signaled; });
-  } else if (timeout_ms > 0) {
-    wake.condition.wait_for(
-      lock, std::chrono::milliseconds{timeout_ms},
-      [&wake]() -> bool { return wake.signaled; }
-    );
-  }
-  *out_signaled = wake.signaled;
-  wake.signaled = false;
+
+  runtime->run_loop->runOnce();
   return MLN_STATUS_OK;
 }
 
@@ -2832,6 +2818,21 @@ auto push_runtime_map_event_payload(
     }
     if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
       runtime->map_loading_failures[map] = event.message;
+    }
+    // Render updates coalesce against an unread one at the tail, matching the
+    // `uv_async_send` semantics MapLibre's own headless frontend gets for free:
+    // a render always draws the latest update, so a host that renders once per
+    // event would otherwise redraw successively newer state N times for one
+    // frame's worth of progress. Coalescing only against the tail keeps every
+    // other event in the order it was queued.
+    if (
+      type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE && map != nullptr &&
+      !runtime->events.empty() && runtime->events.back().type == type &&
+      runtime->events.back().map == map
+    ) {
+      // The unread event already tells the host to render, and it also keeps
+      // the next pump from parking, so this needs no wake of its own.
+      return;
     }
     runtime->events.push_back(std::move(event));
   }

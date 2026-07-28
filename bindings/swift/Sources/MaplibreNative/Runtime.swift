@@ -418,38 +418,32 @@ public final class RuntimeHandle {
     try handle.requireLive()
   }
 
-  /// Runs one iteration of this runtime's owner-thread run loop.
+  /// Advances this runtime, optionally parking the owner thread first.
   ///
-  /// The iteration drains the high-priority task queue and then the default
-  /// queue until both are empty, including tasks enqueued during the drain, and
-  /// also dispatches expired timers and ready I/O.
+  /// One call is the whole pump step: park if asked, then drain the
+  /// owner-thread task queues. Follow it with `pollEvent` until that returns
+  /// `nil`, then render whatever the drained events asked for.
   ///
-  /// `runOnce` returns without blocking on new work, but its duration is
-  /// unbounded: a single iteration can span a style parse. Treat it as "make
-  /// progress now" rather than as a fixed per-frame time slice.
-  public func runOnce() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_runtime_run_once(handle.requireLive()))
-    }
-  }
-
-  /// Parks the owner thread until this runtime may have work, reporting whether
-  /// the call took a signal rather than reaching its timeout. A `nil` timeout
-  /// parks until a signal arrives.
+  /// `timeout` is in seconds and selects where the loop's cadence comes from.
+  /// Zero never blocks, which is what a host driven by a frame callback it does
+  /// not own passes. A positive value parks for up to that long, which is how a
+  /// host that owns its pump thread takes its cadence from the runtime's own
+  /// work. `nil` parks until a wake arrives. `Duration` would read better than
+  /// `TimeInterval` but is unavailable at this package's iOS deployment floor.
   ///
-  /// A wake is a latch, not a work predicate: follow every return with
-  /// `runOnce` and then `pollEvent` until it returns `nil`, the same way a
-  /// polling loop does. Style, tile, offline, and resource responses signal a
-  /// wake, as does `WakeSource.signal()`. Timers and ready file descriptors
-  /// that queue no owner-thread work do not, so pass a timeout to bound wait
-  /// latency regardless.
+  /// Draining is drain, not slice: a single call can span a whole style parse,
+  /// so measure it rather than budgeting it as a per-frame slice.
   ///
-  /// This blocks the calling thread. Do not call it while holding a lock that a
-  /// thread signalling a `WakeSource` also takes.
+  /// A wake is a latch, not a work predicate. A return does not promise work
+  /// arrived, and a pump that finds nothing is expected. Style, tile, offline,
+  /// and resource responses latch a wake, as does `WakeSource.signal()`; an
+  /// unread runtime event also prevents parking. Timers and ready file
+  /// descriptors that queue no owner-thread work do not, so pass a timeout to
+  /// bound latency regardless.
   ///
-  /// `timeout` is in seconds. `Duration` would read better but is unavailable
-  /// at this package's iOS deployment floor.
-  public func wait(timeout: TimeInterval?) throws -> Bool {
+  /// A non-zero timeout blocks the calling thread. Do not use one while holding
+  /// a lock that a thread signalling a `WakeSource` also takes.
+  public func pump(timeout: TimeInterval? = 0) throws {
     try mapNativeFailure {
       let timeoutMilliseconds: Int64
       if let timeout {
@@ -461,11 +455,9 @@ public final class RuntimeHandle {
       } else {
         timeoutMilliseconds = -1
       }
-      var signaled = false
       try checkStatus(
-        mln_runtime_wait(handle.requireLive(), timeoutMilliseconds, &signaled)
+        mln_runtime_pump(handle.requireLive(), timeoutMilliseconds)
       )
-      return signaled
     }
   }
 

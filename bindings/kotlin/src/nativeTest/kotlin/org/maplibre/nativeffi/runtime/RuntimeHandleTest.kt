@@ -64,13 +64,13 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
 
     assertFalse(runtime.isClosed)
-    runtime.runOnce()
+    runtime.pump(0)
     runtime.pollEvent()
     runtime.close()
 
     assertTrue(runtime.isClosed)
     runtime.close()
-    assertFailsWith<InvalidStateException> { runtime.runOnce() }
+    assertFailsWith<InvalidStateException> { runtime.pump(0) }
   }
 
   @Test
@@ -89,7 +89,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
 
       assertEquals(1, destroys)
       assertTrue(runtime.isClosed)
-      assertFailsWith<InvalidStateException> { runtime.runOnce() }
+      assertFailsWith<InvalidStateException> { runtime.pump(0) }
     }
   }
 
@@ -498,7 +498,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.WRONG_THREAD.nativeCode, error.nativeStatusCode)
       assertTrue(diagnostic.isNotBlank())
 
-      runtime.runOnce()
+      runtime.pump(0)
 
       assertEquals(diagnostic, error.diagnostic)
     } finally {
@@ -518,7 +518,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.WRONG_THREAD, error.status)
       assertFalse(runtime.isClosed)
 
-      runtime.runOnce()
+      runtime.pump(0)
     } finally {
       runtime.close()
     }
@@ -635,7 +635,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       var styleLoaded: RuntimeEvent? = null
       var reachedEmptyQueue = false
       repeat(20) {
-        runtime.runOnce()
+        runtime.pump(0)
         while (true) {
           val event = runtime.pollEvent()
           if (event == null) {
@@ -864,7 +864,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     eventType: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return true
@@ -887,7 +887,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     eventType: RuntimeEventType,
   ): RuntimeEvent {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return event
@@ -913,7 +913,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     styleUrl: String,
   ): String {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (
@@ -931,7 +931,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
 
   private fun waitForTransformCall(runtime: RuntimeHandle, calls: AtomicInt): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (runtime.pollEvent() != null) {
         // Drain events so native loading can keep advancing.
       }
@@ -947,7 +947,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     expected: Int,
   ) {
     repeat(100) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (runtime.pollEvent() != null) {
         // Drain events so native loading can keep advancing.
       }
@@ -964,7 +964,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       handledRequest.load()?.let {
         return it
       }
-      runtime.runOnce()
+      runtime.pump(0)
       usleep(1_000U)
     }
     error("resource provider did not receive handled request")
@@ -976,7 +976,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   ): Boolean {
     repeat(10_000) {
       if (handle.isCancelled()) return true
-      runtime.runOnce()
+      runtime.pump(0)
       usleep(1_000U)
     }
     return false
@@ -1092,7 +1092,7 @@ private class BackgroundRuntimeCall(
 ) {
   fun run() {
     try {
-      runtime.runOnce()
+      runtime.pump(0)
     } catch (throwable: Throwable) {
       error.store(throwable)
     }

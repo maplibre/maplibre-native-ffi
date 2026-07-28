@@ -823,18 +823,53 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
 MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
- * Runs one iteration of this runtime's owner-thread run loop.
+ * Advances this runtime, optionally parking the owner thread first.
  *
- * A single call drains the owner-thread task queues. It runs every task queued
- * when the call begins plus every task those tasks enqueue, and it services
- * expired timers and file descriptors that are ready for the runtime's own
- * network and database work. The call returns as soon as that iteration
- * finishes and never blocks waiting for new work, so an idle runtime returns
- * promptly.
+ * One call is the whole pump step, and every host loop is the same shape: pump,
+ * then drain mln_runtime_poll_event() until it reports no event, then render
+ * whatever the drained events asked for.
  *
- * The promise is drain, not slice. The duration of one call is bounded only by
- * the work it finds and can span a full style parse, so treat it as work that
- * runs to completion rather than as a fixed-cost per-frame slice.
+ * timeout_ms selects where the loop's cadence comes from:
+ *
+ * - Zero never blocks. The call drains the owner-thread task queues and
+ *   returns. Hosts driven by a callback they do not own, such as a display-link
+ *   or frame callback, pass zero and take their cadence from that callback.
+ * - A positive value parks the owner thread for up to that many milliseconds,
+ *   or until a wake arrives, and then drains. Hosts that own their pump thread
+ *   take their cadence from the runtime's own work this way.
+ * - A negative value parks until a wake arrives, with no bound.
+ *
+ * Draining is drain, not slice. It runs every task queued when the drain begins
+ * plus every task those tasks enqueue, and services expired timers and ready
+ * file descriptors for the runtime's own network and database work. Its
+ * duration is bounded only by the work it finds and can span a full style
+ * parse, so treat it as work that runs to completion rather than as a
+ * fixed-cost per-frame slice.
+ *
+ * A wake is a latch, not a work predicate. A return does not promise that work
+ * arrived, and a pump that finds nothing is expected: work that arrives while
+ * the drain runs latches another wake, so the next call returns promptly and
+ * may find its work already done.
+ *
+ * These latch a wake:
+ *
+ * - the owner-thread run loop receiving queued work from any thread, which
+ *   covers style, tile, offline database, and resource responses;
+ * - the runtime queueing a runtime event;
+ * - mln_wake_source_signal() from any thread.
+ *
+ * A pending unread runtime event also prevents parking, so a host that stopped
+ * polling before the queue emptied cannot park behind its own unread events.
+ *
+ * Timers and file descriptors that become ready without queueing owner-thread
+ * work do not latch a wake. The runtime registers none on the owner-thread run
+ * loop today. Pass a positive timeout_ms to bound latency regardless.
+ *
+ * A non-zero timeout_ms makes this a blocking query. Do not call it with one
+ * while holding a host lock that a thread signalling a wake source also
+ * acquires, and do not call it from a C API callback. Acquire a wake source
+ * with mln_runtime_wake_source_acquire() to release the owner thread for
+ * host-driven work such as submitted tasks or shutdown.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -844,57 +879,8 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
-
-/**
- * Parks the owner thread until this runtime may have work.
- *
- * This is a blocking query. It lets a host that owns its pump thread wait for
- * work instead of calling mln_runtime_run_once() on a fixed cadence.
- *
- * A wake is a latch, not a work predicate: a return reports that a signal
- * arrived, not that work remains. Follow every return with
- * mln_runtime_run_once() and then mln_runtime_poll_event() until the queue is
- * empty, the same way a polling host does. Returns without a signal are
- * allowed, and work that arrives while mln_runtime_run_once() runs latches
- * another wake, so an extra iteration that finds nothing is expected.
- *
- * These signal a wake:
- *
- * - the owner-thread run loop receiving queued work from any thread, which
- *   covers style, tile, offline database, and resource responses;
- * - the runtime queueing a runtime event;
- * - mln_wake_source_signal() from any thread.
- *
- * The call returns immediately when a runtime event is already queued, so a
- * host that stopped polling before the queue emptied cannot park behind its own
- * unread events.
- *
- * Timers and file descriptors that become ready without queueing owner-thread
- * work do not signal a wake. The runtime registers none on the owner-thread run
- * loop today. Pass a positive timeout_ms to bound wait latency regardless.
- *
- * timeout_ms selects the wait bound. A negative value waits until a signal
- * arrives, zero consumes an already-latched signal without blocking, and a
- * positive value waits that many milliseconds.
- *
- * Do not call this while holding a host lock that a thread signalling a wake
- * source also acquires, and do not call it from a C API callback. Acquire a
- * wake source with mln_runtime_wake_source_acquire() to release the owner
- * thread for host-driven work such as submitted tasks or shutdown.
- *
- * Returns:
- * - MLN_STATUS_OK on success. *out_signaled reports whether the call consumed a
- *   signal rather than reaching its timeout.
- * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
- *   handle, or out_signaled is null.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
- *   owner thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_runtime_wait(
-  mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled
-) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) MLN_NOEXCEPT;
 
 /**
  * Acquires a wake source that releases this runtime's parked owner thread.
@@ -923,7 +909,7 @@ MLN_API mln_status mln_runtime_wake_source_acquire(
  * returns, so it is safe to call from a host's task submission path.
  *
  * A signal that arrives while the owner thread runs is latched, so the next
- * mln_runtime_wait() call consumes it and returns without blocking. Signalling
+ * mln_runtime_pump() call consumes it and returns without blocking. Signalling
  * a wake source whose runtime is destroyed succeeds and does nothing, which
  * keeps host shutdown ordering free.
  *

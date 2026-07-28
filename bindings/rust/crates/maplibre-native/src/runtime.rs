@@ -823,47 +823,39 @@ impl RuntimeHandle {
         )
     }
 
-    /// Runs one iteration of this runtime's owner-thread run loop.
+    /// Advances this runtime, optionally parking the owner thread first.
     ///
-    /// One iteration drains the high-priority task queue and then the default
-    /// task queue until both are empty, including tasks enqueued while the
-    /// drain runs, and also services expired timers and ready I/O. The call
-    /// returns without blocking on new work, yet its duration is unbounded: a
-    /// single iteration can span a whole style parse. Drive it from a pump loop
-    /// rather than budgeting it as a fixed per-frame slice.
-    pub fn run_once(&self) -> Result<()> {
-        let runtime = self.inner.as_ptr()?;
-        // SAFETY: runtime is a live runtime handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_runtime_run_once(runtime) })
-    }
-
-    /// Parks the owner thread until this runtime may have work.
+    /// One call is the whole pump step: park if asked, then drain the
+    /// owner-thread task queues. Follow it with [`Self::poll_event`] until that
+    /// yields `None`, then render whatever the drained events asked for.
     ///
-    /// `timeout` of `None` parks until a signal arrives, and `Some` bounds the
-    /// park. The returned flag reports whether the call consumed a signal
-    /// rather than reaching its timeout.
+    /// `timeout` selects where the loop's cadence comes from.
+    /// `Some(Duration::ZERO)` never blocks, which is what a host driven by a
+    /// frame callback it does not own passes. A longer `Some` parks for up to
+    /// that long, which is how a host that owns its pump thread takes its
+    /// cadence from the runtime's own work. `None` parks until a wake arrives.
     ///
-    /// A wake is a latch, not a work predicate. Follow every return with
-    /// [`Self::run_once`] and then [`Self::poll_event`] until it yields `None`,
-    /// exactly as a polling loop does; returns that find nothing are expected.
-    /// Style, tile, offline, and resource responses signal a wake, as does
-    /// [`WakeSource::signal`]; timers and ready file descriptors that queue no
-    /// owner-thread work do not, so bound the park when a host wants a latency
-    /// ceiling regardless.
+    /// Draining is drain, not slice: it runs every task queued when the drain
+    /// begins plus every task those enqueue, so a single call can span a whole
+    /// style parse.
     ///
-    /// This blocks the calling thread. Do not call it while holding a lock that
-    /// a thread signalling a [`WakeSource`] also takes, and do not call it from
-    /// a native callback.
-    pub fn wait(&self, timeout: Option<Duration>) -> Result<bool> {
+    /// A wake is a latch, not a work predicate. A return does not promise work
+    /// arrived, and a pump that finds nothing is expected. Style, tile,
+    /// offline, and resource responses latch a wake, as does
+    /// [`WakeSource::signal`]; an unread runtime event also prevents parking.
+    /// Timers and ready file descriptors that queue no owner-thread work do
+    /// not, so bound the park when a host wants a latency ceiling regardless.
+    ///
+    /// A non-zero timeout blocks the calling thread. Do not use one while
+    /// holding a lock that a thread signalling a [`WakeSource`] also takes, and
+    /// do not call it from a native callback.
+    pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
         let timeout_ms = timeout.map_or(-1, |timeout| {
             i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
         });
-        let mut signaled = false;
-        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
-        // signaled points to writable bool storage owned by this call.
-        maplibre_core::check(unsafe { sys::mln_runtime_wait(runtime, timeout_ms, &mut signaled) })?;
-        Ok(signaled)
+        // SAFETY: runtime is a live runtime handle owned by this wrapper.
+        maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime, timeout_ms) })
     }
 
     /// Acquires a [`WakeSource`] that releases this runtime's parked owner
@@ -1052,7 +1044,7 @@ mod tests {
                     ),
                 ));
             }
-            runtime.run_once()?;
+            runtime.pump(Some(Duration::ZERO))?;
             while let Some(event) = runtime.poll_event()? {
                 let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload
                 else {
@@ -1362,7 +1354,7 @@ mod tests {
         options.maximum_cache_size = Some(0);
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         runtime.close().unwrap();
     }
 
@@ -1386,7 +1378,7 @@ mod tests {
 
     fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
-            let _ = runtime.run_once();
+            let _ = runtime.pump(Some(Duration::ZERO));
             while let Ok(Some(event)) = runtime.poll_event() {
                 if event.event_type == event_type {
                     return true;
@@ -1399,7 +1391,7 @@ mod tests {
 
     fn wait_for_map_loading_failure(runtime: &RuntimeHandle) -> RuntimeEvent {
         for _ in 0..100 {
-            runtime.run_once().unwrap();
+            runtime.pump(Some(Duration::ZERO)).unwrap();
             while let Some(event) = runtime.poll_event().unwrap() {
                 if event.event_type == RuntimeEventType::MapLoadingFailed {
                     return event;
@@ -1415,7 +1407,7 @@ mod tests {
     fn runtime_create_run_poll_drain_and_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         let _ = runtime.poll_event().unwrap();
         let _ = runtime.poll_event().unwrap();
         while runtime.poll_event().unwrap().is_some() {}
@@ -1424,25 +1416,30 @@ mod tests {
 
     // Leaves the runtime idle with no latched signal, so a following park can
     // only be released by the signal the test raises.
-    fn drain_latched_wakes(runtime: &RuntimeHandle) {
+    fn quiesce(runtime: &RuntimeHandle) {
         for _ in 0..100 {
-            if !runtime.wait(Some(Duration::ZERO)).unwrap() {
+            runtime.pump(Some(Duration::ZERO)).unwrap();
+            let mut drained = false;
+            while runtime.poll_event().unwrap().is_some() {
+                drained = true;
+            }
+            if !drained {
                 return;
             }
-            runtime.run_once().unwrap();
-            while runtime.poll_event().unwrap().is_some() {}
         }
-        panic!("the runtime kept latching wakes while idle");
+        panic!("the runtime kept producing events while idle");
     }
 
     // Drives the runtime the way a parked host does, so a missing wake shows up
     // as a timed-out park rather than as a slow poll loop.
     fn park_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        let started = Instant::now();
         for _ in 0..20 {
-            if !runtime.wait(Some(Duration::from_secs(10))).unwrap() {
-                return false;
-            }
-            runtime.run_once().unwrap();
+            runtime.pump(Some(Duration::from_secs(10))).unwrap();
+            assert!(
+                started.elapsed() < Duration::from_secs(5),
+                "parks sat out their timeouts instead of taking wakes"
+            );
             while let Some(event) = runtime.poll_event().unwrap() {
                 if event.event_type == event_type {
                     return true;
@@ -1480,13 +1477,18 @@ mod tests {
         // A source moved to another thread is what a host's submission path
         // holds, and the park it releases has no other work to end it.
         let source = runtime.wake_source().unwrap();
-        drain_latched_wakes(&runtime);
+        quiesce(&runtime);
         let signaller = std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(20));
             source.signal().unwrap();
             source
         });
-        assert!(runtime.wait(Some(Duration::from_secs(10))).unwrap());
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the parked owner thread timed out instead of taking the signal"
+        );
         let source = signaller.join().unwrap();
 
         // A wake source stays usable once its runtime is gone, so host teardown
@@ -1498,15 +1500,26 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-089.
-    fn wait_consumes_one_latched_signal_at_a_time() {
+    fn a_pump_consumes_one_latched_signal_at_a_time() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let source = runtime.wake_source().unwrap();
-        drain_latched_wakes(&runtime);
+        quiesce(&runtime);
 
         source.signal().unwrap();
-        assert!(runtime.wait(Some(Duration::ZERO)).unwrap());
-        // The latch is consumed, so an idle runtime reports the timeout instead.
-        assert!(!runtime.wait(Some(Duration::ZERO)).unwrap());
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "a pump blocked despite a latched signal"
+        );
+
+        // The latch is spent, so an idle runtime now sits out its whole timeout.
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_millis(200))).unwrap();
+        assert!(
+            started.elapsed() >= Duration::from_millis(100),
+            "a second pump consumed a latch the first should have spent"
+        );
 
         runtime.close().unwrap();
     }
@@ -1538,7 +1551,7 @@ mod tests {
             // SAFETY: This intentionally exercises the C API's owner-thread
             // validation path with a live runtime handle from another thread.
             maplibre_core::check(unsafe {
-                sys::mln_runtime_run_once(runtime_ptr as *mut sys::mln_runtime)
+                sys::mln_runtime_pump(runtime_ptr as *mut sys::mln_runtime, 0)
             })
             .unwrap_err()
         })
@@ -2029,7 +2042,7 @@ mod tests {
         assert_eq!(error.raw_status(), None);
         let runtime = error.into_handle();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         map.close().unwrap();
         runtime.close().unwrap();
     }

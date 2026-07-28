@@ -870,15 +870,7 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn run_once(&self) -> PyResult<()> {
-        let state = self.state_for_operation()?;
-        // SAFETY: The C API validates that the pointer is a live runtime handle
-        // and that the call occurs on the runtime owner thread.
-        maplibre_core::check(unsafe { sys::mln_runtime_run_once(state.as_ptr()) })
-            .map_err(map_error)
-    }
-
-    fn wait(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<bool> {
+    fn pump(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
         let runtime_address = {
             let state = self.state_for_operation()?;
@@ -887,22 +879,17 @@ impl RuntimeHandle {
             };
             runtime_address
         };
-        let mut signaled = false;
         // SAFETY: runtime_address came from a runtime pointer that passed the
         // binding lifecycle gate, and the C API validates that it is live and
-        // called on the owner thread. The park blocks until native work, a wake
-        // source, or the timeout releases it, so the GIL is released for its
-        // duration and the Rust handle-state mutex is not held across it:
-        // another Python thread signalling a wake source is what ends the park.
+        // called on the owner thread. A non-zero timeout parks until native
+        // work, a wake source, or the timeout releases it, so the GIL is
+        // released for the call and the Rust handle-state mutex is not held
+        // across it: another Python thread signalling a wake source is what
+        // ends the park.
         let status = py.detach(|| unsafe {
-            sys::mln_runtime_wait(
-                runtime_address as *mut sys::mln_runtime,
-                timeout_ms,
-                &mut signaled,
-            )
+            sys::mln_runtime_pump(runtime_address as *mut sys::mln_runtime, timeout_ms)
         });
-        maplibre_core::check(status).map_err(map_error)?;
-        Ok(signaled)
+        maplibre_core::check(status).map_err(map_error)
     }
 
     fn wake_source(&self) -> PyResult<WakeSource> {

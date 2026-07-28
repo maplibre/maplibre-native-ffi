@@ -396,40 +396,37 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def run_once(self) -> None:
-        """Run one iteration of this runtime's owner-thread run loop.
+    def pump(self, timeout: float | None = 0.0) -> None:
+        """Advance this runtime, optionally parking the owner thread first.
 
-        One iteration drains the high-priority task queue and then the default
-        task queue until both are empty, including tasks enqueued while the
-        drain runs, and also services expired timers and ready I/O. The call
-        returns without blocking on new work, yet its duration is unbounded: a
-        single iteration can span a whole style parse. Drive it from a pump
-        loop rather than budgeting it as a fixed per-frame slice.
-        """
-        self._native.run_once()
+        One call is the whole pump step: park if asked, then drain the
+        owner-thread task queues. Follow it with :meth:`poll_event` until that
+        returns ``None``, then render whatever the drained events asked for.
 
-    def wait(self, timeout: float | None) -> bool:
-        """Park the owner thread until this runtime may have work.
+        ``timeout`` is in seconds and selects where the loop's cadence comes
+        from. Zero never blocks, which is what a host driven by a frame callback
+        it does not own passes. A positive value parks for up to that long,
+        which is how a host that owns its pump thread takes its cadence from the
+        runtime's own work. ``None`` parks until a wake arrives.
 
-        ``timeout`` is in seconds; ``None`` parks until a signal arrives. The
-        return value reports whether the call consumed a signal rather than
-        reaching its timeout.
+        Draining is drain, not slice: a single call can span a whole style
+        parse, so measure it rather than budgeting it as a per-frame slice.
 
-        A wake is a latch, not a work predicate: follow every return with
-        :meth:`run_once` and then :meth:`poll_event` until it returns ``None``,
-        the same way a polling loop does. Style, tile, offline, and resource
-        responses signal a wake, as does :meth:`WakeSource.signal`. Timers and
-        ready file descriptors that queue no owner-thread work do not, so pass a
-        timeout to bound wait latency regardless.
+        A wake is a latch, not a work predicate. A return does not promise work
+        arrived, and a pump that finds nothing is expected. Style, tile,
+        offline, and resource responses latch a wake, as does
+        :meth:`WakeSource.signal`; an unread runtime event also prevents
+        parking. Timers and ready file descriptors that queue no owner-thread
+        work do not, so pass a timeout to bound latency regardless.
 
-        The call releases the GIL while it parks, so other Python threads run
-        and can signal a wake source. Do not call it while holding a lock that a
-        signalling thread also takes.
+        A non-zero timeout releases the GIL while it parks, so other Python
+        threads run and can signal a wake source. Do not use one while holding a
+        lock that a signalling thread also takes.
         """
         # A negative timeout is a caller mistake rather than a request for an
         # unbounded park, which ``None`` spells, so it collapses to no wait.
         timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
-        return bool(self._native.wait(timeout_ms))
+        self._native.pump(timeout_ms)
 
     def wake_source(self) -> WakeSource:
         """Acquire a wake source that releases this runtime's parked owner thread."""

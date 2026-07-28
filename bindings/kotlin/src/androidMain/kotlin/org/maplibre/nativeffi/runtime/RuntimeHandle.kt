@@ -49,19 +49,9 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun runOnce() {
+  public actual fun pump(timeoutMillis: Long) {
     NativeAccess.ensureLoaded()
-    Status.check(MaplibreNativeC.mln_runtime_run_once(runtime(requireLiveAddress())))
-  }
-
-  public actual fun waitForWork(timeoutMillis: Long): Boolean {
-    NativeAccess.ensureLoaded()
-    val address = requireLiveAddress()
-    BoolPointer(1).use { outSignaled ->
-      outSignaled.put(0, false)
-      Status.check(MaplibreNativeC.mln_runtime_wait(runtime(address), timeoutMillis, outSignaled))
-      return outSignaled.get(0)
-    }
+    Status.check(MaplibreNativeC.mln_runtime_pump(runtime(requireLiveAddress()), timeoutMillis))
   }
 
   public actual fun acquireWakeSource(): WakeSource {

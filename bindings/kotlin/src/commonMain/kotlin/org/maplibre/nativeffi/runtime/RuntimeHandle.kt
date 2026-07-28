@@ -12,31 +12,29 @@ public expect class RuntimeHandle : AutoCloseable {
   public val isClosed: Boolean
 
   /**
-   * Runs one iteration of the owner-thread run loop.
+   * Advances this runtime, optionally parking the owner thread first.
    *
-   * An iteration drains every queued task, including tasks those tasks enqueue, plus expired timers
-   * and ready I/O. It is one loop iteration rather than one task.
+   * One call is the whole pump step: park if asked, then drain the owner-thread task queues. Follow
+   * it with [pollEvent] until the queue is empty, then render whatever the drained events asked
+   * for.
    *
-   * This call does not block waiting for work, but its duration is unbounded: a single iteration
-   * can span a full style parse. Callers driving a frame loop should measure it rather than budget
-   * it as a fixed per-frame slice.
+   * [timeoutMillis] selects where the loop's cadence comes from. Zero never blocks, which is what a
+   * host driven by a frame callback it does not own passes. A positive value parks for up to that
+   * long, which is how a host that owns its pump thread takes its cadence from the runtime's own
+   * work. A negative value parks until a wake arrives.
+   *
+   * Draining is drain, not slice: a single call can span a whole style parse, so measure it rather
+   * than budgeting it as a per-frame slice.
+   *
+   * A wake is a latch, not a work predicate. A return does not promise work arrived, and a pump
+   * that finds nothing is expected. Style, tile, offline, and resource responses latch a wake, as
+   * does [WakeSource.signal]; an unread runtime event also prevents parking. Timers and ready I/O
+   * that queue no owner-thread work do not, so pass a timeout to bound latency regardless.
+   *
+   * A non-zero timeout blocks the calling thread without releasing it to an interruption. Do not
+   * use one while holding a lock that a thread signalling a [WakeSource] also takes.
    */
-  public fun runOnce()
-
-  /**
-   * Parks the owner thread until this runtime may have work, and reports whether the call consumed
-   * a signal rather than reaching its timeout. A negative [timeoutMillis] parks until a signal
-   * arrives.
-   *
-   * A wake is a latch, not a work predicate. Follow every return with [runOnce] and then
-   * [pollEvent] until the queue is empty, the same way a polling loop does. Style, tile, offline,
-   * and resource responses signal a wake, as does [WakeSource.signal]. Timers and ready I/O that
-   * queue no owner-thread work do not, so pass a timeout to bound wait latency regardless.
-   *
-   * This blocks the calling thread without releasing it to an interruption. Do not call it while
-   * holding a lock that a thread signalling a [WakeSource] also takes.
-   */
-  public fun waitForWork(timeoutMillis: Long): Boolean
+  public fun pump(timeoutMillis: Long)
 
   /**
    * Acquires a [WakeSource] that releases this runtime's parked owner thread from any thread. The

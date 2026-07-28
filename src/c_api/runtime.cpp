@@ -328,17 +328,10 @@ auto mln_runtime_destroy(mln_runtime* runtime) noexcept -> mln_status {
   });
 }
 
-auto mln_runtime_run_once(mln_runtime* runtime) noexcept -> mln_status {
+auto mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::run_runtime_once(runtime);
-  });
-}
-
-auto mln_runtime_wait(
-  mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::wait_runtime(runtime, timeout_ms, out_signaled);
+    return mln::core::pump_runtime(runtime, timeout_ms);
   });
 }
 

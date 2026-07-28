@@ -1106,47 +1106,41 @@ pub const RuntimeHandle = enum(u128) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Runs one iteration of this runtime's owner-thread run loop.
+    /// Advances this runtime, optionally parking the owner thread first.
     ///
-    /// The iteration drains the high-priority task queue and then the default
-    /// queue until both are empty, including tasks enqueued during the drain,
-    /// and also dispatches expired timers and ready I/O.
+    /// One call is the whole pump step: park if asked, then drain the
+    /// owner-thread task queues. Follow it with `pollEvent` until that returns
+    /// null, then render whatever the drained events asked for.
     ///
-    /// `runOnce` returns without blocking on new work, but its duration is
-    /// unbounded: a single iteration can span a style parse. Treat it as "make
-    /// progress now" rather than as a fixed per-frame time slice.
-    pub fn runOnce(self: *RuntimeHandle) status.Error!void {
-        const runtime_lease = try lease(self);
-        defer runtime_lease.release();
-        try status.checkStatus(c.mln_runtime_run_once(runtime_lease.native), runtime_lease.diagnostic_store);
-    }
-
-    /// Parks the owner thread until this runtime may have work, returning
-    /// whether the call took a signal rather than reaching its timeout. A null
-    /// `timeout_ms` parks until a signal arrives.
+    /// `timeout_ms` selects where the loop's cadence comes from. Zero never
+    /// blocks, which is what a host driven by a frame callback it does not own
+    /// passes. A positive value parks for up to that long, which is how a host
+    /// that owns its pump thread takes its cadence from the runtime's own work.
+    /// Null parks until a wake arrives.
     ///
-    /// A wake is a latch, not a work predicate: follow every return with
-    /// `runOnce` and then `pollEvent` until it returns null, the same way a
-    /// polling loop does. Style, tile, offline, and resource responses signal a
-    /// wake, as does `WakeSourceHandle.signal`. Timers and ready file
-    /// descriptors that queue no owner-thread work do not, so pass a timeout to
-    /// bound wait latency regardless.
+    /// Draining is drain, not slice: a single call can span a whole style
+    /// parse, so measure it rather than budgeting it as a per-frame slice.
     ///
-    /// This blocks the calling thread. Do not call it while holding a lock that
-    /// a thread signalling a wake source also takes.
-    pub fn wait(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!bool {
+    /// A wake is a latch, not a work predicate. A return does not promise work
+    /// arrived, and a pump that finds nothing is expected. Style, tile,
+    /// offline, and resource responses latch a wake, as does
+    /// `WakeSourceHandle.signal`; an unread runtime event also prevents
+    /// parking. Timers and ready file descriptors that queue no owner-thread
+    /// work do not, so pass a timeout to bound latency regardless.
+    ///
+    /// A non-zero timeout blocks the calling thread. Do not use one while
+    /// holding a lock that a thread signalling a wake source also takes.
+    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const native_timeout: i64 = if (timeout_ms) |value|
             std.math.cast(i64, value) orelse std.math.maxInt(i64)
         else
             -1;
-        var signaled = false;
         try status.checkStatus(
-            c.mln_runtime_wait(runtime_lease.native, native_timeout, &signaled),
+            c.mln_runtime_pump(runtime_lease.native, native_timeout),
             runtime_lease.diagnostic_store,
         );
-        return signaled;
     }
 
     /// Acquires a wake source that releases this runtime's parked owner thread
@@ -2471,7 +2465,7 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
 fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OfflineOperationHandle) !void {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(std.testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();

@@ -742,7 +742,7 @@ class MapHandleTest {
       val finished = mutableListOf<Long>()
       var rounds = 0
       while (finished.isEmpty() && rounds < 10_000) {
-        runtime.runOnce()
+        runtime.pump(0)
         finished += drainCameraEvents(runtime).finishedTransitionIds
         rounds++
         Thread.sleep(1)
@@ -752,7 +752,7 @@ class MapHandleTest {
 
       // The completed transition reports its end once; later pumping adds nothing.
       repeat(100) {
-        runtime.runOnce()
+        runtime.pump(0)
         finished += drainCameraEvents(runtime).finishedTransitionIds
       }
       assertEquals(listOf(21L), finished)

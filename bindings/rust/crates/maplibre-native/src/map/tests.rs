@@ -588,14 +588,14 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
 
 fn drain_runtime_events(runtime: &RuntimeHandle) {
     for _ in 0..20 {
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         while runtime.poll_event().unwrap().is_some() {}
     }
 }
 
 fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: RuntimeEventType) {
     for _ in 0..1000 {
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         while let Some(event) = runtime.poll_event().unwrap() {
             if event.event_type == event_type && event.source == RuntimeEventSource::Map(map.id()) {
                 return;

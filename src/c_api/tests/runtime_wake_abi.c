@@ -1,8 +1,8 @@
-// Park-and-wake coverage: the latch semantics of mln_runtime_wait(), the
-// signal sources that release a parked owner thread, and wake source lifetime
-// across runtime teardown. A parked owner thread cannot be observed from a
-// binding test without a second thread and a real network response, so the
-// wake sources live here.
+// Pump-and-wake coverage: the latch semantics of mln_runtime_pump(), the signal
+// sources that release a parked owner thread, wake source lifetime across
+// runtime teardown, and render-update coalescing. A parked owner thread cannot
+// be observed from a binding test without a second thread and a real network
+// response, so the wake sources live here.
 
 #include <stdatomic.h>
 #include <stdint.h>
@@ -15,11 +15,16 @@ static const char wake_style_url[] = "http://example.com/wake-style.json";
 static const uint8_t wake_style_json[] =
   "{\"version\":8,\"sources\":{},\"layers\":[]}";
 
-// A broken wake would otherwise park the suite forever, so every wait in this
-// file is bounded and reports the timeout through `signaled` instead.
-static const int64_t wake_timeout_milliseconds = 10000;
+// A broken wake would otherwise park the suite forever, so every blocking pump
+// here is bounded and the test asserts on how long it actually took.
+static const int64_t park_timeout_milliseconds = 10000;
+// Well below park_timeout_milliseconds, and far above the scheduling noise a
+// loaded CI machine adds to a condition-variable wake.
+static const uint64_t prompt_return_milliseconds = 5000;
+static const int64_t idle_park_milliseconds = 200;
 static const size_t style_load_attempts = 20;
 static const unsigned int signal_delay_milliseconds = 20;
+static const size_t coalesced_repaint_count = 5;
 
 static mln_runtime_event empty_event(void) {
   return (mln_runtime_event){
@@ -29,30 +34,37 @@ static mln_runtime_event empty_event(void) {
   };
 }
 
-// Consumes whatever the runtime latched while the test set itself up, so a
-// later wait measures only the signal the test triggers.
-static void drain_latched_wakes(mln_runtime* runtime) {
-  for (size_t attempt = 0; attempt < 100; attempt += 1) {
-    bool signaled = true;
+static size_t drain_events(mln_runtime* runtime, uint32_t counted_type) {
+  size_t counted = 0;
+  while (true) {
+    mln_runtime_event event = empty_event();
+    bool has_event = false;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK, mln_runtime_wait(runtime, 0, &signaled)
+      MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
     );
-    if (!signaled) {
-      return;
+    if (!has_event) {
+      return counted;
     }
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
-    while (true) {
-      mln_runtime_event event = empty_event();
-      bool has_event = false;
-      TEST_ASSERT_EQUAL_INT(
-        MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
-      );
-      if (!has_event) {
-        break;
+    if (event.type == counted_type) {
+      counted += 1;
+    }
+  }
+}
+
+// Leaves the runtime idle with no latched wake and no unread events, so a
+// following park can only be released by the signal the test raises.
+static void quiesce(mln_runtime* runtime) {
+  for (size_t attempt = 0; attempt < 100; attempt += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+    if (drain_events(runtime, 0) == 0) {
+      // One more zero pump consumes a latch that the drained events raised.
+      TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
+      if (drain_events(runtime, 0) == 0) {
+        return;
       }
     }
   }
-  TEST_FAIL_MESSAGE("The runtime kept latching wakes while idle.");
+  TEST_FAIL_MESSAGE("The runtime kept producing events while idle.");
 }
 
 typedef struct signal_probe {
@@ -72,16 +84,13 @@ static void signal_wake_source_entry(void* argument) {
 
 typedef struct wrong_thread_probe {
   mln_runtime* runtime;
-  atomic_int wait_status;
+  atomic_int pump_status;
   atomic_int acquire_status;
 } wrong_thread_probe;
 
 static void foreign_thread_entry(void* argument) {
   wrong_thread_probe* probe = argument;
-  bool signaled = true;
-  atomic_store(
-    &probe->wait_status, mln_runtime_wait(probe->runtime, 0, &signaled)
-  );
+  atomic_store(&probe->pump_status, mln_runtime_pump(probe->runtime, 0));
   mln_wake_source* source = NULL;
   atomic_store(
     &probe->acquire_status,
@@ -117,21 +126,22 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
     MLN_STATUS_OK, mln_runtime_wake_source_acquire(runtime, &source)
   );
   TEST_ASSERT_NOT_NULL(source);
-  drain_latched_wakes(runtime);
+  quiesce(runtime);
 
   signal_probe probe = {.source = source};
   mln_test_thread* thread =
     mln_test_thread_start(signal_wake_source_entry, &probe);
 
-  bool signaled = false;
+  const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_OK,
-    mln_runtime_wait(runtime, wake_timeout_milliseconds, &signaled)
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
   );
-  // A timeout reports `false`, so this is the assertion that the wait blocked
-  // and the foreign signal is what ended it.
+  const uint64_t elapsed = mln_test_monotonic_milliseconds() - started;
+  // Sitting out the timeout is the failure this guards: the park has to end
+  // because the foreign signal arrived, not because ten seconds passed.
   TEST_ASSERT_TRUE_MESSAGE(
-    signaled, "The parked owner thread timed out instead of taking the signal."
+    elapsed < prompt_return_milliseconds,
+    "The parked owner thread timed out instead of taking the signal."
   );
 
   mln_test_thread_join(thread);
@@ -143,25 +153,37 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
 }
 
 // The signal is a latch rather than an edge a parked thread has to be present
-// for, so a host that signals before it parks does not lose the wake.
-static void a_signal_that_precedes_the_wait_is_latched(void) {
+// for, so a host that signals before it parks does not lose the wake, and one
+// pump consumes exactly one latch.
+static void a_signal_that_precedes_the_pump_is_latched(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   mln_wake_source* source = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_wake_source_acquire(runtime, &source)
   );
-  drain_latched_wakes(runtime);
+  quiesce(runtime);
 
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_wake_source_signal(source));
 
-  bool signaled = false;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_wait(runtime, 0, &signaled));
-  TEST_ASSERT_TRUE(signaled);
+  uint64_t started = mln_test_monotonic_milliseconds();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
+    "A pump blocked despite a latched signal."
+  );
 
-  // One wait consumes one latch, so an idle runtime parks again afterwards.
-  signaled = true;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_wait(runtime, 0, &signaled));
-  TEST_ASSERT_FALSE(signaled);
+  // The latch is spent, so an idle runtime now sits out its whole timeout.
+  started = mln_test_monotonic_milliseconds();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_pump(runtime, idle_park_milliseconds)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_monotonic_milliseconds() - started >=
+      (uint64_t)idle_park_milliseconds / 2,
+    "A second pump consumed a latch that the first one should have spent."
+  );
 
   mln_wake_source_destroy(source);
   mln_test_destroy_runtime(runtime);
@@ -181,26 +203,19 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
     MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
   );
   mln_map* map = mln_test_create_map(runtime);
-  drain_latched_wakes(runtime);
+  quiesce(runtime);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_url(map, wake_style_url)
   );
 
+  const uint64_t started = mln_test_monotonic_milliseconds();
   bool style_loaded = false;
   for (size_t attempt = 0; attempt < style_load_attempts && !style_loaded;
        attempt += 1) {
-    bool signaled = false;
     TEST_ASSERT_EQUAL_INT(
-      MLN_STATUS_OK,
-      mln_runtime_wait(runtime, wake_timeout_milliseconds, &signaled)
+      MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
     );
-    // Every park before the style resolves is ended by native work, so a
-    // timeout here means a signal source is missing rather than slow.
-    TEST_ASSERT_TRUE_MESSAGE(
-      signaled, "A park timed out while the style load was still pending."
-    );
-    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
     while (true) {
       mln_runtime_event event = empty_event();
       bool has_event = false;
@@ -219,6 +234,12 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
     }
   }
   TEST_ASSERT_TRUE(style_loaded);
+  // Every park before the style resolves is ended by native work, so the whole
+  // load costs well under one timeout rather than one per iteration.
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
+    "Parks sat out their timeouts while the style load was pending."
+  );
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -226,25 +247,27 @@ static void a_style_response_wakes_a_parked_owner_thread(void) {
 
 // A host that stops polling before the queue empties would park behind events
 // it has already been handed, because queueing them latched a wake an earlier
-// wait consumed.
-static void queued_events_return_from_the_wait_immediately(void) {
+// pump consumed.
+static void queued_events_return_from_the_pump_immediately(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   mln_map* map = mln_test_create_map(runtime);
-  drain_latched_wakes(runtime);
+  quiesce(runtime);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_json(map, (const char*)wake_style_json)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
 
-  // The first wait consumes the latch the queued event raised. The second one
-  // can only report a signal from the queue the host has not drained.
-  bool signaled = false;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_wait(runtime, 0, &signaled));
-  TEST_ASSERT_TRUE(signaled);
-  signaled = false;
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_wait(runtime, 0, &signaled));
-  TEST_ASSERT_TRUE(signaled);
+  // The queue now holds events this test has not read. A blocking pump must
+  // not park behind them even though the latch they raised is spent.
+  const uint64_t started = mln_test_monotonic_milliseconds();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
+  );
+  TEST_ASSERT_TRUE_MESSAGE(
+    mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
+    "A pump parked behind unread runtime events."
+  );
 
   mln_runtime_event event = empty_event();
   bool has_event = false;
@@ -252,6 +275,28 @@ static void queued_events_return_from_the_wait_immediately(void) {
     MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
   );
   TEST_ASSERT_TRUE(has_event);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// A render always draws the latest update, so back-to-back invalidations must
+// collapse to one queued event. Otherwise a host that renders per event redraws
+// successively newer state once per invalidation for one frame of progress.
+static void render_updates_coalesce_at_the_queue_tail(void) {
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map* map = mln_test_create_map(runtime);
+  quiesce(runtime);
+
+  // Each repaint request invalidates the map synchronously on this thread, so
+  // nothing can interleave between the pushes.
+  for (size_t repaint = 0; repaint < coalesced_repaint_count; repaint += 1) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_request_repaint(map));
+  }
+
+  const size_t render_updates =
+    drain_events(runtime, MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE);
+  TEST_ASSERT_EQUAL_size_t(1, render_updates);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -274,11 +319,8 @@ static void a_wake_source_outlives_its_runtime(void) {
 
 // This verifies raw null handles, output initialization, and owner-thread
 // validation that binding wrappers hide.
-static void wait_and_wake_sources_reject_raw_invalid_arguments(void) {
-  bool signaled = true;
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_wait(NULL, 0, &signaled)
-  );
+static void pump_and_wake_sources_reject_raw_invalid_arguments(void) {
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(NULL, 0));
   mln_wake_source* source = NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_wake_source_acquire(NULL, &source)
@@ -288,9 +330,6 @@ static void wait_and_wake_sources_reject_raw_invalid_arguments(void) {
   );
 
   mln_runtime* runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_wait(runtime, 0, NULL)
-  );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_wake_source_acquire(runtime, NULL)
   );
@@ -307,7 +346,7 @@ static void wait_and_wake_sources_reject_raw_invalid_arguments(void) {
   mln_test_thread* thread = mln_test_thread_start(foreign_thread_entry, &probe);
   mln_test_thread_join(thread);
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_WRONG_THREAD, atomic_load(&probe.wait_status)
+    MLN_STATUS_WRONG_THREAD, atomic_load(&probe.pump_status)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_WRONG_THREAD, atomic_load(&probe.acquire_status)
@@ -320,9 +359,10 @@ static void wait_and_wake_sources_reject_raw_invalid_arguments(void) {
 void run_runtime_wake_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_wake_source_releases_a_parked_owner_thread);
-  RUN_TEST(a_signal_that_precedes_the_wait_is_latched);
+  RUN_TEST(a_signal_that_precedes_the_pump_is_latched);
   RUN_TEST(a_style_response_wakes_a_parked_owner_thread);
-  RUN_TEST(queued_events_return_from_the_wait_immediately);
+  RUN_TEST(queued_events_return_from_the_pump_immediately);
+  RUN_TEST(render_updates_coalesce_at_the_queue_tail);
   RUN_TEST(a_wake_source_outlives_its_runtime);
-  RUN_TEST(wait_and_wake_sources_reject_raw_invalid_arguments);
+  RUN_TEST(pump_and_wake_sources_reject_raw_invalid_arguments);
 }

@@ -441,10 +441,9 @@
 --include-function mln_runtime_options_default
 --include-function mln_runtime_poll_event
 --include-function mln_runtime_run_ambient_cache_operation_start
---include-function mln_runtime_run_once
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
---include-function mln_runtime_wait
+--include-function mln_runtime_pump
 --include-function mln_runtime_wake_source_acquire
 --include-function mln_wake_source_destroy
 --include-function mln_wake_source_signal

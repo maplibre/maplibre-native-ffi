@@ -105,15 +105,15 @@ func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
 	}
 }
 
-func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
+func TestRuntimeCreatePumpAndClose(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
 	}
-	if err := runtime.RunOnce(); err != nil {
-		t.Fatalf("RunOnce(): %v", err)
+	if err := runtime.Pump(0); err != nil {
+		t.Fatalf("Pump(): %v", err)
 	}
 	if event, err := runtime.PollEvent(); err != nil {
 		t.Fatalf("PollEvent(): %v", err)
@@ -148,30 +148,24 @@ func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
 		_ = runtime.Close()
 		t.Fatalf("Close() from another thread error = %v, want ErrWrongThread", err)
 	}
-	if err := runtime.RunOnce(); err != nil {
+	if err := runtime.Pump(0); err != nil {
 		_ = runtime.Close()
-		t.Fatalf("RunOnce() after failed close: %v", err)
+		t.Fatalf("Pump() after failed close: %v", err)
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("Close() on owner thread after failed close: %v", err)
 	}
 }
 
-// drainLatchedWakes leaves the runtime idle with no latched signal, so a
-// following park can only be released by the signal the test raises.
-func drainLatchedWakes(t *testing.T, runtime *RuntimeHandle) {
+// quiesce leaves the runtime idle with no unread events, so a following park
+// can only be released by the signal the test raises.
+func quiesce(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
 	for i := 0; i < 100; i++ {
-		signaled, err := runtime.Wait(0)
-		if err != nil {
-			t.Fatalf("Wait(): %v", err)
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
 		}
-		if !signaled {
-			return
-		}
-		if err := runtime.RunOnce(); err != nil {
-			t.Fatalf("RunOnce(): %v", err)
-		}
+		drained := false
 		for {
 			event, err := runtime.PollEvent()
 			if err != nil {
@@ -180,12 +174,16 @@ func drainLatchedWakes(t *testing.T, runtime *RuntimeHandle) {
 			if event == nil {
 				break
 			}
+			drained = true
+		}
+		if !drained {
+			return
 		}
 	}
-	t.Fatal("the runtime kept latching wakes while idle")
+	t.Fatal("the runtime kept producing events while idle")
 }
 
-func TestRuntimeWaitWakesForNativeWorkAndForAWakeSource(t *testing.T) {
+func TestRuntimePumpWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
@@ -196,7 +194,7 @@ func TestRuntimeWaitWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	drainLatchedWakes(t, runtime)
+	quiesce(t, runtime)
 
 	// The style is malformed, so native reports the failure from its own
 	// threads. What matters here is that the failure reaches a parked owner
@@ -205,16 +203,13 @@ func TestRuntimeWaitWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 		t.Fatalf("SetStyleURL(): %v", err)
 	}
 	loadingFailed := false
+	loadStarted := time.Now()
 	for i := 0; i < 20; i++ {
-		signaled, err := runtime.Wait(10 * time.Second)
-		if err != nil {
-			t.Fatalf("Wait(): %v", err)
+		if err := runtime.Pump(10 * time.Second); err != nil {
+			t.Fatalf("Pump(): %v", err)
 		}
-		if !signaled {
-			t.Fatal("a park timed out while the style load was still pending")
-		}
-		if err := runtime.RunOnce(); err != nil {
-			t.Fatalf("RunOnce(): %v", err)
+		if time.Since(loadStarted) > 5*time.Second {
+			t.Fatal("parks sat out their timeouts while the style load was pending")
 		}
 		for {
 			event, err := runtime.PollEvent()
@@ -242,17 +237,17 @@ func TestRuntimeWaitWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	if err != nil {
 		t.Fatalf("WakeSource(): %v", err)
 	}
-	drainLatchedWakes(t, runtime)
+	quiesce(t, runtime)
 	signalErr := make(chan error, 1)
 	go func() {
 		time.Sleep(20 * time.Millisecond)
 		signalErr <- source.Signal()
 	}()
-	signaled, err := runtime.Wait(10 * time.Second)
-	if err != nil {
-		t.Fatalf("Wait(): %v", err)
+	parkStarted := time.Now()
+	if err := runtime.Pump(10 * time.Second); err != nil {
+		t.Fatalf("Pump(): %v", err)
 	}
-	if !signaled {
+	if time.Since(parkStarted) > 5*time.Second {
 		t.Fatal("the parked owner thread timed out instead of taking the signal")
 	}
 	if err := <-signalErr; err != nil {
@@ -276,7 +271,7 @@ func TestRuntimeWaitWakesForNativeWorkAndForAWakeSource(t *testing.T) {
 	}
 }
 
-func TestRuntimeWaitConsumesOneLatchedSignal(t *testing.T) {
+func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 	lockOSThreadForTest(t)
 
 	runtime, err := NewRuntime()
@@ -293,20 +288,25 @@ func TestRuntimeWaitConsumesOneLatchedSignal(t *testing.T) {
 		t.Fatalf("WakeSource(): %v", err)
 	}
 	defer source.Close()
-	drainLatchedWakes(t, runtime)
+	quiesce(t, runtime)
 
 	if err := source.Signal(); err != nil {
 		t.Fatalf("Signal(): %v", err)
 	}
-	if signaled, err := runtime.Wait(0); err != nil {
-		t.Fatalf("Wait(): %v", err)
-	} else if !signaled {
-		t.Fatal("Wait() did not consume the latched signal")
+	signalledStarted := time.Now()
+	if err := runtime.Pump(10 * time.Second); err != nil {
+		t.Fatalf("Pump(): %v", err)
 	}
-	// The latch is consumed, so an idle runtime reports the timeout instead.
-	if signaled, err := runtime.Wait(0); err != nil {
-		t.Fatalf("Wait(): %v", err)
-	} else if signaled {
-		t.Fatal("Wait() reported a second signal from one latch")
+	if time.Since(signalledStarted) > 5*time.Second {
+		t.Fatal("a pump blocked despite a latched signal")
+	}
+
+	// The latch is spent, so an idle runtime now sits out its whole timeout.
+	idleStarted := time.Now()
+	if err := runtime.Pump(200 * time.Millisecond); err != nil {
+		t.Fatalf("Pump(): %v", err)
+	}
+	if time.Since(idleStarted) < 100*time.Millisecond {
+		t.Fatal("a second pump consumed a latch the first should have spent")
 	}
 }
