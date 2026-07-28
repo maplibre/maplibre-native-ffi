@@ -40,7 +40,14 @@ run = """
 mkdir -p .dart_tool
 trap 'rm -f .dart_tool/maplibre_native_c.check.g.dart' EXIT
 dart run tool/ffigen.dart --output .dart_tool/maplibre_native_c.check.g.dart
-cmp --silent .dart_tool/maplibre_native_c.check.g.dart lib/src/internal/c/maplibre_native_c.g.dart
+# Report the drift rather than just the exit code. ffigen parses with whatever
+# libclang the host provides, and that is unpinned, so a mismatch here needs to
+# name what actually differs before anyone can act on it.
+if ! diff -u lib/src/internal/c/maplibre_native_c.g.dart .dart_tool/maplibre_native_c.check.g.dart; then
+  echo "error: the committed ffigen bindings differ from a fresh generation" >&2
+  echo "Regenerate with 'mise run //bindings/dart:ffigen' and commit the result." >&2
+  exit 1
+fi
 """
 
 [tasks.format]
