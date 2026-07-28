@@ -111,6 +111,11 @@ function(mln_configure_renderer target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      # Supplies the EGL entry points, so nothing links an EGL loader.
+      list(APPEND MLN_FFI_OPENGL_SOURCES
+           ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)
+    endif()
   endif()
   set_source_files_properties(
     ${MLN_FFI_OPENGL_SOURCES}
