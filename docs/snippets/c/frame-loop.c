@@ -41,8 +41,9 @@ void run_one_frame(
 
   if (!*pending) return;
 
-  // A false result means no frame was produced, which is normal before the map
-  // publishes its first update. Stay pending and try again next turn.
+  // A false result means no frame was produced, which is normal until the map
+  // publishes an update for the session's extent: at startup, and on the turns
+  // just after an attach or resize. Stay pending and try again next turn.
   bool rendered = false;
   const mln_status status =
     mln_render_session_render_update(session, &rendered);
