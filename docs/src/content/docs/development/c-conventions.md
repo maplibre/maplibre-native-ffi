@@ -94,6 +94,21 @@ call drains the queued tasks, expired timers, and ready I/O it finds, including
 work enqueued while it runs, and returns without blocking for more. Document
 pump entry points as draining rather than as a bounded per-call budget.
 
+A host that owns its pump thread may park it instead of pumping on a cadence.
+`mln_runtime_wait()` is a blocking query: it parks the owner thread and returns
+when a signal arrives or its timeout elapses. Park-and-wake follows these rules:
+
+- The C API owns the parking primitive. Wake signals reach the owner thread
+  through runtime state rather than through a host callback, because MapLibre
+  raises them from arbitrary threads while it holds locks that every thread
+  queueing owner-thread work needs.
+- A wake is a latch, not a work predicate. Document a wait as reporting that a
+  signal arrived, and require the pump-and-drain sequence after every return.
+- Any-thread wake entry points take a handle that carries its own reference to
+  the wake state, never the thread-affine runtime pointer.
+- Document each blocking entry point's deadlock risk, naming the host locks a
+  caller must not hold across it.
+
 ## Status And Diagnostics
 
 Status-returning C API functions return `mln_status`. Each function's public

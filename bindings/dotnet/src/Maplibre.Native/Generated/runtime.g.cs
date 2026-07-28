@@ -634,6 +634,18 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_runtime_run_once(mln_runtime* runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_wait(mln_runtime* runtime, [NativeTypeName("int64_t")] long timeout_ms, bool* out_signaled);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_wake_source_acquire(mln_runtime* runtime, mln_wake_source** out_source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_wake_source_signal(mln_wake_source* source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_wake_source_destroy(mln_wake_source* source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_poll_event(mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event);
     }
 }

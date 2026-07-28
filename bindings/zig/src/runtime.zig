@@ -69,6 +69,16 @@ const ResourceRequestRegistrySlot = struct {
     generation: u64,
 };
 
+const WakeSourceState = struct {
+    native: ?*c.mln_wake_source,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+};
+
+const WakeSourceRegistrySlot = struct {
+    state: ?*WakeSourceState,
+    generation: u64,
+};
+
 const OfflineOperationState = struct {
     runtime: RuntimeHandle,
     operation_id: OfflineOperationId,
@@ -93,6 +103,10 @@ var runtime_handle_free_list: std.ArrayList(usize) = .empty;
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
 var resource_request_registry: std.ArrayList(ResourceRequestRegistrySlot) = .empty;
 var resource_request_free_list: std.ArrayList(usize) = .empty;
+
+var wake_source_registry_lock = std.atomic.Value(bool).init(false);
+var wake_source_registry: std.ArrayList(WakeSourceRegistrySlot) = .empty;
+var wake_source_free_list: std.ArrayList(usize) = .empty;
 
 var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
 var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
@@ -537,6 +551,38 @@ pub const ResourceRequestHandle = enum(u128) {
         const native_handle = request_state.native orelse return;
         c.mln_resource_request_release(native_handle);
         request_state.native = null;
+    }
+};
+
+/// Releases a runtime owner thread parked in `RuntimeHandle.wait`.
+///
+/// Unlike the other handles here, a wake source is usable from any thread: it
+/// is what a host's task submission or shutdown path calls. It stays usable
+/// after its runtime closes, and signalling it then does nothing. The
+/// diagnostic store the runtime was created with must outlive the source.
+pub const WakeSourceHandle = enum(u128) {
+    _,
+
+    /// Latches a wake and releases the parked owner thread.
+    pub fn signal(self: WakeSourceHandle) status.Error!void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = wakeSourceState(self) orelse return error.ClosedHandle;
+        const native_source = source_state.native orelse return error.ClosedHandle;
+        try status.checkStatus(c.mln_wake_source_signal(native_source), source_state.diagnostic_store);
+    }
+
+    /// Releases the wake source. Later signals report a closed handle.
+    pub fn release(self: WakeSourceHandle) void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = unregisterWakeSourceState(self) orelse return;
+        defer std.heap.smp_allocator.destroy(source_state);
+        const native_source = source_state.native orelse return;
+        c.mln_wake_source_destroy(native_source);
+        source_state.native = null;
     }
 };
 
@@ -1073,6 +1119,59 @@ pub const RuntimeHandle = enum(u128) {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         try status.checkStatus(c.mln_runtime_run_once(runtime_lease.native), runtime_lease.diagnostic_store);
+    }
+
+    /// Parks the owner thread until this runtime may have work, returning
+    /// whether the call took a signal rather than reaching its timeout. A null
+    /// `timeout_ms` parks until a signal arrives.
+    ///
+    /// A wake is a latch, not a work predicate: follow every return with
+    /// `runOnce` and then `pollEvent` until it returns null, the same way a
+    /// polling loop does. Style, tile, offline, and resource responses signal a
+    /// wake, as does `WakeSourceHandle.signal`. Timers and ready file
+    /// descriptors that queue no owner-thread work do not, so pass a timeout to
+    /// bound wait latency regardless.
+    ///
+    /// This blocks the calling thread. Do not call it while holding a lock that
+    /// a thread signalling a wake source also takes.
+    pub fn wait(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!bool {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+        const native_timeout: i64 = if (timeout_ms) |value|
+            std.math.cast(i64, value) orelse std.math.maxInt(i64)
+        else
+            -1;
+        var signaled = false;
+        try status.checkStatus(
+            c.mln_runtime_wait(runtime_lease.native, native_timeout, &signaled),
+            runtime_lease.diagnostic_store,
+        );
+        return signaled;
+    }
+
+    /// Acquires a wake source that releases this runtime's parked owner thread
+    /// from any thread. The caller releases the returned handle.
+    pub fn wakeSource(self: *RuntimeHandle) status.Error!WakeSourceHandle {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+
+        var native_source: ?*c.mln_wake_source = null;
+        try status.checkStatus(
+            c.mln_runtime_wake_source_acquire(runtime_lease.native, &native_source),
+            runtime_lease.diagnostic_store,
+        );
+        const source = native_source orelse return error.NativeError;
+
+        const source_state = std.heap.smp_allocator.create(WakeSourceState) catch {
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
+        source_state.* = .{ .native = source, .diagnostic_store = runtime_lease.diagnostic_store };
+        return registerWakeSourceState(source_state) catch {
+            std.heap.smp_allocator.destroy(source_state);
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
     }
 
     /// Polls and copies the next queued runtime event, returning null when the
@@ -1850,6 +1949,68 @@ fn lockResourceRequestRegistry() void {
 
 fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
+}
+
+fn registerWakeSourceState(source_state: *WakeSourceState) std.mem.Allocator.Error!WakeSourceHandle {
+    lockWakeSourceRegistry();
+    defer unlockWakeSourceRegistry();
+
+    if (wake_source_free_list.items.len > 0) {
+        const slot_index = wake_source_free_list.pop().?;
+        wake_source_registry.items[slot_index].state = source_state;
+        wake_source_registry.items[slot_index].generation = nextHandleGeneration();
+        return wakeSourceHandle(slot_index + 1, wake_source_registry.items[slot_index].generation);
+    }
+
+    const generation = nextHandleGeneration();
+    try wake_source_free_list.ensureTotalCapacity(std.heap.smp_allocator, wake_source_registry.items.len + 1);
+    try wake_source_registry.append(std.heap.smp_allocator, .{ .state = source_state, .generation = generation });
+    return wakeSourceHandle(wake_source_registry.items.len, generation);
+}
+
+fn wakeSourceHandle(index: usize, generation: u64) WakeSourceHandle {
+    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
+}
+
+fn wakeSourceIndex(handle: WakeSourceHandle) ?usize {
+    const index = @intFromEnum(handle) & std.math.maxInt(u64);
+    if (index == 0 or index > std.math.maxInt(usize)) return null;
+    return @intCast(index);
+}
+
+fn wakeSourceGeneration(handle: WakeSourceHandle) u64 {
+    return @intCast(@intFromEnum(handle) >> 64);
+}
+
+fn wakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot = wake_source_registry.items[index - 1];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    return slot.state;
+}
+
+fn unregisterWakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot_index = index - 1;
+    const slot = &wake_source_registry.items[slot_index];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    const source_state = slot.state orelse return null;
+    slot.state = null;
+    slot.generation = nextHandleGeneration();
+    wake_source_free_list.appendAssumeCapacity(slot_index);
+    return source_state;
+}
+
+fn lockWakeSourceRegistry() void {
+    while (wake_source_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn unlockWakeSourceRegistry() void {
+    wake_source_registry_lock.store(false, .seq_cst);
 }
 
 fn registerOfflineOperationState(operation_state: *OfflineOperationState) std.mem.Allocator.Error!OfflineOperationHandle {

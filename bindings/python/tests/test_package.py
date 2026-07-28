@@ -426,6 +426,67 @@ def test_runtime_handle_context_manager_closes_once() -> None:
     assert runtime.closed
 
 
+def drain_latched_wakes(runtime: mln.RuntimeHandle) -> None:
+    """Leave the runtime idle so a following park needs a fresh signal."""
+    for _ in range(100):
+        if not runtime.wait(0):
+            return
+        runtime.run_once()
+        while runtime.poll_event() is not None:
+            pass
+    pytest.fail("the runtime kept latching wakes while idle")
+
+
+def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        drain_latched_wakes(runtime)
+
+        # The style is malformed, so native reports the failure from its own
+        # threads. What matters here is that the failure reaches a parked owner
+        # thread at all.
+        map_handle.set_style_url("unsupported://style.json")
+        loading_failed = False
+        for _ in range(20):
+            assert runtime.wait(10.0), "a park timed out while loading was pending"
+            runtime.run_once()
+            while (event := runtime.poll_event()) is not None:
+                if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                    loading_failed = True
+            if loading_failed:
+                break
+        assert loading_failed
+
+        # A source signalled from another thread is what a host's submission
+        # path holds, and the park it releases has no other work to end it. This
+        # also proves the park releases the GIL.
+        source = runtime.wake_source()
+        drain_latched_wakes(runtime)
+        thread = threading.Thread(target=lambda: (time.sleep(0.02), source.signal()))
+        thread.start()
+        assert runtime.wait(10.0)
+        thread.join()
+
+        map_handle.close()
+
+    # A wake source stays usable once its runtime is gone, so host teardown
+    # ordering is free.
+    source.signal()
+    source.close()
+    assert source.closed
+
+
+def test_wait_consumes_one_latched_signal_at_a_time() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.wake_source() as source:
+            drain_latched_wakes(runtime)
+
+            source.signal()
+            assert runtime.wait(0)
+            # The latch is consumed, so an idle runtime reports the timeout.
+            assert not runtime.wait(0)
+
+
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
     script = textwrap.dedent(
         """

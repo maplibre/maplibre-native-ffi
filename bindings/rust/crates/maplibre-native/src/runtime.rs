@@ -2,7 +2,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::rc::{Rc, Weak};
+use std::time::Duration;
 
 use maplibre_core::AmbientCacheOperation;
 use maplibre_native_core as maplibre_core;
@@ -835,6 +837,50 @@ impl RuntimeHandle {
         maplibre_core::check(unsafe { sys::mln_runtime_run_once(runtime) })
     }
 
+    /// Parks the owner thread until this runtime may have work.
+    ///
+    /// `timeout` of `None` parks until a signal arrives, and `Some` bounds the
+    /// park. The returned flag reports whether the call consumed a signal
+    /// rather than reaching its timeout.
+    ///
+    /// A wake is a latch, not a work predicate. Follow every return with
+    /// [`Self::run_once`] and then [`Self::poll_event`] until it yields `None`,
+    /// exactly as a polling loop does; returns that find nothing are expected.
+    /// Style, tile, offline, and resource responses signal a wake, as does
+    /// [`WakeSource::signal`]; timers and ready file descriptors that queue no
+    /// owner-thread work do not, so bound the park when a host wants a latency
+    /// ceiling regardless.
+    ///
+    /// This blocks the calling thread. Do not call it while holding a lock that
+    /// a thread signalling a [`WakeSource`] also takes, and do not call it from
+    /// a native callback.
+    pub fn wait(&self, timeout: Option<Duration>) -> Result<bool> {
+        let runtime = self.inner.as_ptr()?;
+        let timeout_ms = timeout.map_or(-1, |timeout| {
+            i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
+        });
+        let mut signaled = false;
+        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
+        // signaled points to writable bool storage owned by this call.
+        maplibre_core::check(unsafe { sys::mln_runtime_wait(runtime, timeout_ms, &mut signaled) })?;
+        Ok(signaled)
+    }
+
+    /// Acquires a [`WakeSource`] that releases this runtime's parked owner
+    /// thread from any thread.
+    pub fn wake_source(&self) -> Result<WakeSource> {
+        let runtime = self.inner.as_ptr()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
+        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
+        // out is a valid null-initialized out-pointer owned by this call.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_wake_source_acquire(runtime, out.as_mut_ptr())
+        })?;
+        Ok(WakeSource {
+            ptr: out_handle(out, "mln_wake_source")?,
+        })
+    }
+
     /// Polls one queued runtime event and copies it into an owned Rust value.
     ///
     /// Polling also advances binding-owned state that the event reports. A
@@ -885,6 +931,48 @@ impl RuntimeHandle {
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
+    }
+}
+
+/// Releases a runtime owner thread parked in [`RuntimeHandle::wait`].
+///
+/// Unlike the other handles in this crate, a wake source is usable from any
+/// thread: it is what a host's task submission or shutdown path calls to hand
+/// the parked owner thread back to itself. Each source carries its own
+/// reference to the runtime's wake state, so it stays usable after the runtime
+/// it came from is closed, and signalling it then does nothing.
+#[derive(Debug)]
+pub struct WakeSource {
+    ptr: NonNull<sys::mln_wake_source>,
+}
+
+// SAFETY: The C API documents mln_wake_source_signal() and
+// mln_wake_source_destroy() as callable from any thread. The native handle owns
+// a reference-counted wake state whose only mutable field is guarded by a
+// native mutex, and it holds no pointer to the thread-affine runtime.
+unsafe impl Send for WakeSource {}
+// SAFETY: See the Send justification; signalling takes `&self` and native
+// synchronizes concurrent signals internally.
+unsafe impl Sync for WakeSource {}
+
+impl WakeSource {
+    /// Latches a wake and releases the parked owner thread.
+    ///
+    /// A signal raised while the owner thread runs is latched, so the next
+    /// [`RuntimeHandle::wait`] consumes it without blocking. Signalling after
+    /// the runtime is closed succeeds and does nothing.
+    pub fn signal(&self) -> Result<()> {
+        // SAFETY: ptr is a live wake source owned by this wrapper, and native
+        // accepts signals from any thread.
+        maplibre_core::check(unsafe { sys::mln_wake_source_signal(self.ptr.as_ptr()) })
+    }
+}
+
+impl Drop for WakeSource {
+    fn drop(&mut self) {
+        // SAFETY: ptr is a live wake source this wrapper owns and destroys
+        // exactly once, and native accepts destruction from any thread.
+        unsafe { sys::mln_wake_source_destroy(self.ptr.as_ptr()) };
     }
 }
 
@@ -1331,6 +1419,95 @@ mod tests {
         let _ = runtime.poll_event().unwrap();
         let _ = runtime.poll_event().unwrap();
         while runtime.poll_event().unwrap().is_some() {}
+        runtime.close().unwrap();
+    }
+
+    // Leaves the runtime idle with no latched signal, so a following park can
+    // only be released by the signal the test raises.
+    fn drain_latched_wakes(runtime: &RuntimeHandle) {
+        for _ in 0..100 {
+            if !runtime.wait(Some(Duration::ZERO)).unwrap() {
+                return;
+            }
+            runtime.run_once().unwrap();
+            while runtime.poll_event().unwrap().is_some() {}
+        }
+        panic!("the runtime kept latching wakes while idle");
+    }
+
+    // Drives the runtime the way a parked host does, so a missing wake shows up
+    // as a timed-out park rather than as a slow poll loop.
+    fn park_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        for _ in 0..20 {
+            if !runtime.wait(Some(Duration::from_secs(10))).unwrap() {
+                return false;
+            }
+            runtime.run_once().unwrap();
+            while let Some(event) = runtime.poll_event().unwrap() {
+                if event.event_type == event_type {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    #[test]
+    // Spec coverage: BND-088.
+    fn parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.url != "custom://style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                handle
+                    .complete(ResourceResponse::ok(
+                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                    ))
+                    .unwrap();
+                ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("custom://style.json").unwrap();
+        assert!(park_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+
+        // A source moved to another thread is what a host's submission path
+        // holds, and the park it releases has no other work to end it.
+        let source = runtime.wake_source().unwrap();
+        drain_latched_wakes(&runtime);
+        let signaller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            source.signal().unwrap();
+            source
+        });
+        assert!(runtime.wait(Some(Duration::from_secs(10))).unwrap());
+        let source = signaller.join().unwrap();
+
+        // A wake source stays usable once its runtime is gone, so host teardown
+        // ordering is free.
+        map.close().unwrap();
+        runtime.close().unwrap();
+        source.signal().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-089.
+    fn wait_consumes_one_latched_signal_at_a_time() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let source = runtime.wake_source().unwrap();
+        drain_latched_wakes(&runtime);
+
+        source.signal().unwrap();
+        assert!(runtime.wait(Some(Duration::ZERO)).unwrap());
+        // The latch is consumed, so an idle runtime reports the timeout instead.
+        assert!(!runtime.wait(Some(Duration::ZERO)).unwrap());
+
         runtime.close().unwrap();
     }
 

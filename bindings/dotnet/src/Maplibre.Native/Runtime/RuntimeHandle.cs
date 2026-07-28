@@ -632,6 +632,42 @@ public sealed unsafe class RuntimeHandle : IDisposable
     }
 
     /// <summary>
+    /// Parks the owner thread until this runtime may have work, and reports whether
+    /// the call consumed a signal rather than reaching its timeout. A negative
+    /// <paramref name="timeout" /> parks until a signal arrives.
+    /// </summary>
+    /// <remarks>
+    /// A wake is a latch, not a work predicate: follow every return with
+    /// <see cref="RunOnce" /> and then <see cref="PollEvent" /> until the queue is
+    /// empty, the same way a polling loop does. Style, tile, offline, and resource
+    /// responses signal a wake, as does <see cref="WakeSource.Signal" />. Timers and
+    /// ready file descriptors that queue no owner-thread work do not, so pass a
+    /// timeout to bound wait latency regardless.
+    /// <para>
+    /// This blocks the calling thread. Do not call it while holding a lock that a
+    /// thread signalling a <see cref="WakeSource" /> also takes.
+    /// </para>
+    /// </remarks>
+    public bool Wait(TimeSpan timeout)
+    {
+        var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
+        bool signaled;
+        NativeStatus.Check(NativeMethods.mln_runtime_wait(Pointer, timeoutMilliseconds, &signaled));
+        return signaled;
+    }
+
+    /// <summary>
+    /// Acquires a wake source that releases this runtime's parked owner thread from
+    /// any thread. The caller disposes the returned source.
+    /// </summary>
+    public WakeSource AcquireWakeSource()
+    {
+        mln_wake_source* source = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_wake_source_acquire(Pointer, &source));
+        return new WakeSource(source);
+    }
+
+    /// <summary>
     /// Polls and copies the next runtime event, when one is queued, and returns
     /// <see langword="null" /> when the queue is empty.
     /// </summary>

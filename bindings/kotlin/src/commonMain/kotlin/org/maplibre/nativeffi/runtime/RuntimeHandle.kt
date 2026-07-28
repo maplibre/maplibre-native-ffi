@@ -23,6 +23,27 @@ public expect class RuntimeHandle : AutoCloseable {
    */
   public fun runOnce()
 
+  /**
+   * Parks the owner thread until this runtime may have work, and reports whether the call consumed
+   * a signal rather than reaching its timeout. A negative [timeoutMillis] parks until a signal
+   * arrives.
+   *
+   * A wake is a latch, not a work predicate. Follow every return with [runOnce] and then
+   * [pollEvent] until the queue is empty, the same way a polling loop does. Style, tile, offline,
+   * and resource responses signal a wake, as does [WakeSource.signal]. Timers and ready I/O that
+   * queue no owner-thread work do not, so pass a timeout to bound wait latency regardless.
+   *
+   * This blocks the calling thread without releasing it to an interruption. Do not call it while
+   * holding a lock that a thread signalling a [WakeSource] also takes.
+   */
+  public fun waitForWork(timeoutMillis: Long): Boolean
+
+  /**
+   * Acquires a [WakeSource] that releases this runtime's parked owner thread from any thread. The
+   * caller closes the returned source.
+   */
+  public fun acquireWakeSource(): WakeSource
+
   public fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
   ): OfflineOperationHandle<Unit>

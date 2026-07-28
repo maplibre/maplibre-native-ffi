@@ -444,6 +444,10 @@
 --include-function mln_runtime_run_once
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
+--include-function mln_runtime_wait
+--include-function mln_runtime_wake_source_acquire
+--include-function mln_wake_source_destroy
+--include-function mln_wake_source_signal
 --include-struct mln_offline_region_status
 --include-struct mln_rendering_stats
 --include-struct mln_resource_provider

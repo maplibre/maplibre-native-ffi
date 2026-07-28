@@ -847,6 +847,102 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
 MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
+ * Parks the owner thread until this runtime may have work.
+ *
+ * This is a blocking query. It lets a host that owns its pump thread wait for
+ * work instead of calling mln_runtime_run_once() on a fixed cadence.
+ *
+ * A wake is a latch, not a work predicate: a return reports that a signal
+ * arrived, not that work remains. Follow every return with
+ * mln_runtime_run_once() and then mln_runtime_poll_event() until the queue is
+ * empty, the same way a polling host does. Returns without a signal are
+ * allowed, and work that arrives while mln_runtime_run_once() runs latches
+ * another wake, so an extra iteration that finds nothing is expected.
+ *
+ * These signal a wake:
+ *
+ * - the owner-thread run loop receiving queued work from any thread, which
+ *   covers style, tile, offline database, and resource responses;
+ * - the runtime queueing a runtime event;
+ * - mln_wake_source_signal() from any thread.
+ *
+ * The call returns immediately when a runtime event is already queued, so a
+ * host that stopped polling before the queue emptied cannot park behind its own
+ * unread events.
+ *
+ * Timers and file descriptors that become ready without queueing owner-thread
+ * work do not signal a wake. The runtime registers none on the owner-thread run
+ * loop today. Pass a positive timeout_ms to bound wait latency regardless.
+ *
+ * timeout_ms selects the wait bound. A negative value waits until a signal
+ * arrives, zero consumes an already-latched signal without blocking, and a
+ * positive value waits that many milliseconds.
+ *
+ * Do not call this while holding a host lock that a thread signalling a wake
+ * source also acquires, and do not call it from a C API callback. Acquire a
+ * wake source with mln_runtime_wake_source_acquire() to release the owner
+ * thread for host-driven work such as submitted tasks or shutdown.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success. *out_signaled reports whether the call consumed a
+ *   signal rather than reaching its timeout.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
+ *   handle, or out_signaled is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_wait(
+  mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled
+) MLN_NOEXCEPT;
+
+/**
+ * Acquires a wake source that releases this runtime's parked owner thread.
+ *
+ * Each call returns a distinct handle the host destroys with
+ * mln_wake_source_destroy(). A wake source carries its own reference to the
+ * runtime's wake state, so it stays valid after the runtime is destroyed and
+ * hosts tear the two down in either order.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
+ *   handle, out_source is null, or *out_source is not null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_wake_source_acquire(
+  mln_runtime* runtime, mln_wake_source** out_source
+) MLN_NOEXCEPT;
+
+/**
+ * Latches a wake and releases the parked owner thread.
+ *
+ * This function may be called from any thread. It takes one small lock and
+ * returns, so it is safe to call from a host's task submission path.
+ *
+ * A signal that arrives while the owner thread runs is latched, so the next
+ * mln_runtime_wait() call consumes it and returns without blocking. Signalling
+ * a wake source whose runtime is destroyed succeeds and does nothing, which
+ * keeps host shutdown ordering free.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including after the runtime is destroyed.
+ * - MLN_STATUS_INVALID_ARGUMENT when source is null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_wake_source_signal(mln_wake_source* source) MLN_NOEXCEPT;
+
+/**
+ * Destroys a wake source.
+ *
+ * This function may be called from any thread. Null is a no-op. Destroy each
+ * handle exactly once, after no thread can still signal it.
+ */
+MLN_API void mln_wake_source_destroy(mln_wake_source* source) MLN_NOEXCEPT;
+
+/**
  * Pops the next queued runtime event.
  *
  * On success, *out_event is reset and *out_has_event indicates whether an event

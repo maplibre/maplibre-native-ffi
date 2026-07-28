@@ -1,5 +1,6 @@
 #pragma once
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -97,6 +98,21 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
+// Holds the latch a parked owner thread waits on, in its own reference-counted
+// object so a wake source keeps it readable after the runtime is destroyed.
+//
+// `mutex` is a leaf: signalling takes it while MapLibre already holds the
+// `RunLoop` mutex or the runtime already holds `event_mutex`, and nothing takes
+// it before either of those. `signaled` is a latch rather than a work
+// predicate, because no signal source can prove work remains by the time the
+// owner thread looks.
+struct WakeState {
+  std::mutex mutex;
+  std::condition_variable condition;
+  bool signaled = false;
+  bool alive = true;
+};
+
 struct OfflineOperationEventState;
 
 struct QueuedRuntimeEvent {
@@ -129,6 +145,7 @@ struct mln_runtime {
   std::shared_ptr<mln::core::OfflineOperationEventState>
     offline_operation_state;
   std::shared_ptr<mln::core::ResourceTransformState> resource_transform_state;
+  std::shared_ptr<mln::core::WakeState> wake_state;
   std::size_t live_maps = 0;
   mutable std::mutex event_mutex;
   std::unordered_set<const mln_map*> event_maps;
@@ -146,6 +163,15 @@ auto create_runtime(
 ) -> mln_status;
 auto destroy_runtime(mln_runtime* runtime) -> mln_status;
 auto run_runtime_once(mln_runtime* runtime) -> mln_status;
+auto wait_runtime(mln_runtime* runtime, int64_t timeout_ms, bool* out_signaled)
+  -> mln_status;
+auto acquire_wake_source(mln_runtime* runtime, mln_wake_source** out_source)
+  -> mln_status;
+auto signal_wake_source(mln_wake_source* source) -> mln_status;
+auto destroy_wake_source(mln_wake_source* source) noexcept -> void;
+// Latches a wake for the runtime owning `state` and releases any parked owner
+// thread. Callers hold the `RunLoop` mutex or `event_mutex`; see `WakeState`.
+auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void;
 auto poll_runtime_event(
   mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event
 ) -> mln_status;

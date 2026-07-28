@@ -433,6 +433,54 @@ public final class RuntimeHandle {
     }
   }
 
+  /// Parks the owner thread until this runtime may have work, reporting whether
+  /// the call took a signal rather than reaching its timeout. A `nil` timeout
+  /// parks until a signal arrives.
+  ///
+  /// A wake is a latch, not a work predicate: follow every return with
+  /// `runOnce` and then `pollEvent` until it returns `nil`, the same way a
+  /// polling loop does. Style, tile, offline, and resource responses signal a
+  /// wake, as does `WakeSource.signal()`. Timers and ready file descriptors
+  /// that queue no owner-thread work do not, so pass a timeout to bound wait
+  /// latency regardless.
+  ///
+  /// This blocks the calling thread. Do not call it while holding a lock that a
+  /// thread signalling a `WakeSource` also takes.
+  public func wait(timeout: Duration?) throws -> Bool {
+    try mapNativeFailure {
+      // A negative duration is a caller mistake rather than a request for an
+      // unbounded park, which `nil` spells, so it collapses to no wait.
+      let timeoutMilliseconds: Int64 =
+        if let timeout {
+          max(
+            0,
+            timeout.components.seconds * 1000 + timeout.components
+              .attoseconds / 1_000_000_000_000_000
+          )
+        } else {
+          -1
+        }
+      var signaled = false
+      try checkStatus(
+        mln_runtime_wait(handle.requireLive(), timeoutMilliseconds, &signaled)
+      )
+      return signaled
+    }
+  }
+
+  /// Acquires a wake source that releases this runtime's parked owner thread
+  /// from any thread. The caller closes the returned source.
+  public func wakeSource() throws -> WakeSource {
+    try mapNativeFailure {
+      var source: OpaquePointer?
+      try checkStatus(mln_runtime_wake_source_acquire(
+        handle.requireLive(),
+        &source
+      ))
+      return try WakeSource(pointer: source)
+    }
+  }
+
   /// Polls and copies the next queued runtime event, returning `nil` when the
   /// queue is empty.
   ///

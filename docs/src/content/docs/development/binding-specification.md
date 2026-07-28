@@ -463,6 +463,35 @@ The helper follows this design:
    thread, and leaves later submissions in the binding's closed-state error
    shape.
 
+A helper that parks its owner thread between iterations acquires a wake source
+and signals it from submission and close, so a submitted operation runs when it
+is submitted rather than when the park's timeout expires.
+
+### Parking and wake
+
+Expose the C API's park-and-wake pair when the binding exposes the pump: a
+blocking wait on the runtime, and a wake source handle.
+
+The wait wrapper follows this design:
+
+1. It takes the host language's duration or timeout type and maps the language's
+   "no timeout" spelling to an unbounded wait.
+2. It returns whether the call consumed a signal, so callers can distinguish a
+   wake from a timeout.
+3. It releases the host runtime's blocking-call machinery for the duration of
+   the call, including any interpreter lock, so other host threads run while the
+   owner thread parks.
+4. Its documentation states that a wake is a latch rather than a work predicate,
+   and that callers pump and drain events after every return.
+
+The wake source follows this design:
+
+1. It is a distinct owned handle that the host releases explicitly, and
+   releasing it is independent of the runtime's lifetime in both orders.
+2. It is transferable and callable from any thread, and the binding declares
+   that where the host language can express it.
+3. Signalling after the runtime is closed succeeds and does nothing.
+
 ### Event polling
 
 The public event API is explicit: host code pumps native runtime work, then
@@ -493,7 +522,9 @@ When the language can declare or enforce cross-thread transferability, ordinary
 owner-thread handles MUST be non-transferable. A transferable owner-thread
 helper handle is allowed only when every operation is submitted back to the
 bound native owner thread. Copied immutable values can be transferable when
-their contents are independent of native owner-thread state. Unchecked or unsafe
+their contents are independent of native owner-thread state. A wake source
+handle is transferable, because it reaches native wake state that carries its
+own synchronization and holds no owner-thread pointer. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
 
@@ -666,6 +697,8 @@ that a real native failure would expose.
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
 | BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
+| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
+| BND-089 | One wait consumes one latched signal, and a wake source stays signalable and releasable after its runtime closes.                                                   |
 
 ### Map, camera, projection, style, and query
 

@@ -8,7 +8,9 @@ import "C"
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
@@ -566,6 +568,103 @@ func (runtime *RuntimeHandle) RunOnce() error {
 	return checkNative(func() int32 {
 		return int32(C.mln_runtime_run_once((*C.mln_runtime)(unsafe.Pointer(ptr))))
 	})
+}
+
+// Wait parks the owner thread until this runtime may have work, reporting
+// whether the call took a signal rather than reaching its timeout. A negative
+// timeout parks until a signal arrives.
+//
+// A wake is a latch, not a work predicate: follow every return with RunOnce and
+// then PollEvent until it reports no event, the same way a polling loop does.
+// Style, tile, offline, and resource responses signal a wake, as does
+// WakeSource.Signal. Timers and ready file descriptors that queue no
+// owner-thread work do not, so pass a timeout to bound wait latency regardless.
+//
+// Wait blocks the calling goroutine and its OS thread. Do not call it while
+// holding a lock that a goroutine signalling a WakeSource also takes.
+func (runtime *RuntimeHandle) Wait(timeout time.Duration) (bool, error) {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	timeoutMS := int64(-1)
+	if timeout >= 0 {
+		timeoutMS = int64(timeout / time.Millisecond)
+	}
+	var signaled C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_wait((*C.mln_runtime)(unsafe.Pointer(ptr)), C.int64_t(timeoutMS), &signaled))
+	}); err != nil {
+		return false, err
+	}
+	return bool(signaled), nil
+}
+
+// WakeSource acquires a wake source that releases this runtime's parked owner
+// thread from any goroutine. The caller closes the returned source.
+func (runtime *RuntimeHandle) WakeSource() (*WakeSource, error) {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	var raw *C.mln_wake_source
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_wake_source_acquire((*C.mln_runtime)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
+		return nil, err
+	}
+	state, err := handle.New((*nativeWakeSource)(unsafe.Pointer(raw)), "WakeSource")
+	if err != nil {
+		C.mln_wake_source_destroy(raw)
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	source := &WakeSource{state: state}
+	stdruntime.SetFinalizer(source, func(source *WakeSource) { source.Close() })
+	return source, nil
+}
+
+// WakeSource releases a runtime owner thread parked in RuntimeHandle.Wait.
+//
+// Unlike the other handles here, a wake source is usable from any goroutine: it
+// is what a host's task submission or shutdown path calls. It stays usable
+// after its runtime closes, and signalling it then does nothing.
+type WakeSource struct {
+	state *handle.State[nativeWakeSource]
+}
+
+var destroyWakeSource = func(ptr *nativeWakeSource) int32 {
+	C.mln_wake_source_destroy((*C.mln_wake_source)(unsafe.Pointer(ptr)))
+	return int32(C.MLN_STATUS_OK)
+}
+
+// Signal latches a wake and releases the parked owner thread.
+func (source *WakeSource) Signal() error {
+	if source == nil || source.state == nil {
+		return newBindingError(ErrInvalidArgument, "WakeSource is nil")
+	}
+	borrow, live := source.state.Borrow()
+	if !live {
+		return newBindingError(ErrInvalidArgument, "WakeSource is closed")
+	}
+	defer borrow.Release()
+	defer source.state.KeepAlive()
+	return checkNative(func() int32 {
+		return int32(C.mln_wake_source_signal((*C.mln_wake_source)(unsafe.Pointer(borrow.Ptr()))))
+	})
+}
+
+// Close releases the wake source. Later signals report a closed handle.
+func (source *WakeSource) Close() {
+	if source == nil || source.state == nil {
+		return
+	}
+	source.state.Close(destroyWakeSource)
 }
 
 // PollEvent polls one queued runtime event and copies it into a Go value. It

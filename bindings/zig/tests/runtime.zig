@@ -153,6 +153,96 @@ test "closing a map discards queued runtime events" {
     try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 }
 
+// Leaves the runtime idle with no latched signal, so a following park can only
+// be released by the signal the test raises.
+fn drainLatchedWakes(runtime: *maplibre.RuntimeHandle) !void {
+    for (0..100) |_| {
+        if (!try runtime.wait(0)) return;
+        try runtime.runOnce();
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            owned_event.deinit();
+        }
+    }
+    return error.RuntimeKeptLatchingWakes;
+}
+
+fn signalWakeSourceOnThread(source: maplibre.WakeSourceHandle, out_error: *?anyerror) void {
+    testing.io.sleep(.fromMilliseconds(20), .awake) catch |err| {
+        out_error.* = err;
+        return;
+    };
+    source.signal() catch |err| {
+        out_error.* = err;
+        return;
+    };
+    out_error.* = null;
+}
+
+test "a parked owner thread wakes for native work and for a wake source" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    var runtime_open = true;
+    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_open = true;
+    defer if (map_open) map.close() catch @panic("map close failed");
+    try drainLatchedWakes(&runtime);
+
+    // The style is malformed, so native reports the failure from its own
+    // threads. What matters here is that the failure reaches a parked owner
+    // thread at all.
+    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
+    var loading_failed = false;
+    for (0..20) |_| {
+        if (!try runtime.wait(10_000)) return error.ParkTimedOut;
+        try runtime.runOnce();
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
+                loading_failed = true;
+            }
+        }
+        if (loading_failed) break;
+    }
+    try testing.expect(loading_failed);
+
+    // A source used from another thread is what a host's submission path holds,
+    // and the park it releases has no other work to end it.
+    const source = try runtime.wakeSource();
+    try drainLatchedWakes(&runtime);
+    var thread_error: ?anyerror = error.Unexpected;
+    const thread = try std.Thread.spawn(.{}, signalWakeSourceOnThread, .{ source, &thread_error });
+    try testing.expect(try runtime.wait(10_000));
+    thread.join();
+    try testing.expect(thread_error == null);
+
+    // A wake source stays usable once its runtime is gone, so host teardown
+    // ordering is free.
+    try map.close();
+    map_open = false;
+    try runtime.close();
+    runtime_open = false;
+    try source.signal();
+    source.release();
+    try testing.expectError(error.ClosedHandle, source.signal());
+}
+
+test "a wait consumes one latched signal at a time" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const source = try runtime.wakeSource();
+    defer source.release();
+    try drainLatchedWakes(&runtime);
+
+    try source.signal();
+    try testing.expect(try runtime.wait(0));
+    // The latch is consumed, so an idle runtime reports the timeout instead.
+    try testing.expect(!try runtime.wait(0));
+}
+
 test "runtime event polling reports empty queues" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

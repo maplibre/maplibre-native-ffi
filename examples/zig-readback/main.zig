@@ -16,6 +16,7 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
+const park_timeout_milliseconds = 100;
 
 pub fn main(init_args: std.process.Init) !void {
     const allocator = init_args.gpa;
@@ -512,6 +513,10 @@ fn renderTexture(
     var rendered_frame = false;
     const started = std.Io.Clock.awake.now(io);
     while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
+        // Headless readback has no display to pace it, so this parks until the
+        // runtime has work instead of polling. The bound keeps the deadline
+        // above responsive.
+        _ = try runtime.wait(park_timeout_milliseconds);
         try runtime.runOnce();
         while (try runtime.pollEvent(allocator)) |event| {
             var owned_event = event;
@@ -533,8 +538,6 @@ fn renderTexture(
                 else => {},
             }
         }
-
-        try io.sleep(.fromMilliseconds(10), .awake);
     }
     return error.RenderTimedOut;
 }

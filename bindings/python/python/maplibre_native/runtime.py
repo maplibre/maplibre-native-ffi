@@ -321,6 +321,34 @@ class RuntimeOptions:
     maximum_cache_size: int | None = None
 
 
+class WakeSource(NativeHandleMixin):
+    """Releases a runtime owner thread parked in :meth:`RuntimeHandle.wait`.
+
+    Unlike the other handles here, a wake source is usable from any thread: it
+    is what a host's task submission or shutdown path calls. It stays usable
+    after its runtime closes, and signalling it then does nothing.
+    """
+
+    _handle_name = "WakeSource"
+
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _WAKE_SOURCE_CREATE_KEY:
+            msg = "WakeSource instances are created by RuntimeHandle.wake_source()"
+            raise TypeError(msg)
+        self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> WakeSource:
+        return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
+
+    def signal(self) -> None:
+        """Latch a wake and release the parked owner thread."""
+        self._native.signal()
+
+
+_WAKE_SOURCE_CREATE_KEY = object()
+
+
 class RuntimeHandle(NativeHandleMixin):
     """Owner-thread runtime handle."""
 
@@ -379,6 +407,33 @@ class RuntimeHandle(NativeHandleMixin):
         loop rather than budgeting it as a fixed per-frame slice.
         """
         self._native.run_once()
+
+    def wait(self, timeout: float | None) -> bool:
+        """Park the owner thread until this runtime may have work.
+
+        ``timeout`` is in seconds; ``None`` parks until a signal arrives. The
+        return value reports whether the call consumed a signal rather than
+        reaching its timeout.
+
+        A wake is a latch, not a work predicate: follow every return with
+        :meth:`run_once` and then :meth:`poll_event` until it returns ``None``,
+        the same way a polling loop does. Style, tile, offline, and resource
+        responses signal a wake, as does :meth:`WakeSource.signal`. Timers and
+        ready file descriptors that queue no owner-thread work do not, so pass a
+        timeout to bound wait latency regardless.
+
+        The call releases the GIL while it parks, so other Python threads run
+        and can signal a wake source. Do not call it while holding a lock that a
+        signalling thread also takes.
+        """
+        # A negative timeout is a caller mistake rather than a request for an
+        # unbounded park, which ``None`` spells, so it collapses to no wait.
+        timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
+        return bool(self._native.wait(timeout_ms))
+
+    def wake_source(self) -> WakeSource:
+        """Acquire a wake source that releases this runtime's parked owner thread."""
+        return WakeSource._from_native(self._native.wake_source())  # noqa: SLF001
 
     def _offline_operation(
         self, start: Callable[..., int], *args: object

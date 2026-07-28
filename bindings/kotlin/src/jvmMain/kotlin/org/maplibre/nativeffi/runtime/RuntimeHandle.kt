@@ -40,6 +40,18 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     NativeAccess.runRuntimeOnce(handle)
   }
 
+  public actual fun waitForWork(timeoutMillis: Long): Boolean {
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    return NativeAccess.waitRuntime(handle, timeoutMillis)
+  }
+
+  public actual fun acquireWakeSource(): WakeSource {
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    return WakeSource.fromNative(NativeAccess.acquireWakeSource(handle))
+  }
+
   public actual fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
   ): OfflineOperationHandle<Unit> {
