@@ -98,8 +98,9 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
-// Holds the latch a parked owner thread waits on, in its own reference-counted
-// object so a wake source keeps it readable after the runtime is destroyed.
+// Holds the wake flag and the condition variable a parked owner thread blocks
+// on, in its own reference-counted object so a wake source keeps it readable
+// after the runtime is destroyed.
 //
 // `mutex` is a leaf lock. Signalling takes it while MapLibre holds the
 // `RunLoop` mutex or the runtime holds `event_mutex`, so those two order ahead
@@ -165,8 +166,9 @@ auto acquire_wake_source(mln_runtime* runtime, mln_wake_source** out_source)
   -> mln_status;
 auto signal_wake_source(mln_wake_source* source) -> mln_status;
 auto destroy_wake_source(mln_wake_source* source) noexcept -> void;
-// Latches a wake for the runtime owning `state` and releases any parked owner
-// thread. Callers hold the `RunLoop` mutex or `event_mutex`; see `WakeState`.
+// Sets the wake flag for the runtime owning `state` and releases any parked
+// owner thread. Callers hold the `RunLoop` mutex or `event_mutex`; see
+// `WakeState`.
 auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void;
 auto poll_runtime_event(
   mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event

@@ -342,10 +342,10 @@ class WakeSource(NativeHandleMixin):
         return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
 
     def signal(self) -> None:
-        """Latch a wake and release the parked owner thread.
+        """Set the runtime's wake flag and release the parked owner thread.
 
-        A signal raised while the owner thread runs stays latched, so the next
-        :meth:`RuntimeHandle.pump` consumes it and returns without parking.
+        A signal raised while the owner thread is running sets the wake flag,
+        so the next :meth:`RuntimeHandle.pump` returns without parking.
         """
         self._native.signal()
 
@@ -416,13 +416,14 @@ class RuntimeHandle(NativeHandleMixin):
         The drain runs every task queued when it begins plus every task those
         enqueue, so a single call can span a full style parse.
 
-        A wake is a latch. One pump consumes one latch, and work arriving during
-        the drain latches the next wake, so a pump that finds no new work is
-        ordinary. Style, tile, offline, and resource responses latch a wake, as
-        does :meth:`WakeSource.signal`. A queued unread runtime event also
-        returns the call without parking. Timers and ready file descriptors
-        latch a wake when they queue owner-thread work, so pass a bounded
-        timeout to cap park latency.
+        The runtime holds a wake flag. Style, tile, offline, and resource
+        responses set it, as do queued runtime events and
+        :meth:`WakeSource.signal`. A parking call returns as soon as the flag is
+        set and clears it before returning, and work arriving during the drain
+        sets it again. A call also returns without parking while unread runtime
+        events are queued. Timers and ready file descriptors set the flag only
+        when they queue owner-thread work, so pass a bounded timeout to cap how
+        long a call waits.
 
         A non-zero timeout releases the GIL while it parks, so other Python
         threads run and can signal a wake source. Call it outside any lock that

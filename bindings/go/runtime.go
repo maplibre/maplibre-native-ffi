@@ -564,12 +564,13 @@ func (runtime *RuntimeHandle) ptr() (*nativeRuntime, func(), error) {
 // The drain runs every task queued when it begins plus every task those
 // enqueue, so a single call can span a full style parse.
 //
-// A wake is a latch. One pump consumes one latch, and work arriving during the
-// drain latches the next wake, so a pump that finds no new work is ordinary.
-// Style, tile, offline, and resource responses latch a wake, as does
-// WakeSource.Signal. A queued unread runtime event also returns the call
-// without parking. Timers and ready file descriptors latch a wake when they
-// queue owner-thread work, so pass a bounded timeout to cap park latency.
+// The runtime holds a wake flag. Style, tile, offline, and resource responses
+// set it, as do queued runtime events and WakeSource.Signal. A parking call
+// returns as soon as the flag is set and clears it before returning, and work
+// arriving during the drain sets it again. A call also returns without parking
+// while unread runtime events are queued. Timers and ready file descriptors set
+// the flag only when they queue owner-thread work, so pass a bounded timeout to
+// cap how long a call waits.
 //
 // A non-zero timeout blocks the calling goroutine and its OS thread. Call it
 // outside any lock that a goroutine signalling a WakeSource takes.
@@ -631,9 +632,9 @@ var destroyWakeSource = func(ptr *nativeWakeSource) int32 {
 	return int32(C.MLN_STATUS_OK)
 }
 
-// Signal latches a wake and releases the parked owner thread. A signal raised
-// while the owner thread runs stays latched, so the next Pump consumes it and
-// returns without parking.
+// Signal sets the runtime's wake flag and releases the parked owner thread. A
+// signal raised while the owner thread is running leaves the flag set, so the
+// next Pump returns without parking.
 func (source *WakeSource) Signal() error {
 	if source == nil || source.state == nil {
 		return newBindingError(ErrInvalidArgument, "WakeSource is nil")

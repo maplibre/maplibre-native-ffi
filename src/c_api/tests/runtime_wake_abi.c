@@ -1,4 +1,4 @@
-// Raw C ABI coverage for mln_runtime_pump() latch semantics, the signal sources
+// Raw C ABI coverage for the mln_runtime_pump() wake flag, the signal sources
 // that release a parked owner thread, wake source lifetime across runtime
 // teardown, and render-update coalescing. These need a second thread and a real
 // network response, which bindings hide.
@@ -50,13 +50,13 @@ static size_t drain_events(mln_runtime* runtime, uint32_t counted_type) {
   }
 }
 
-// Pumps until the runtime is idle: no latched wake and no unread events. A park
-// that follows is released by the signal the test raises.
+// Pumps until the runtime is idle: the wake flag is clear and no events are
+// queued. A park that follows is released by the signal the test raises.
 static void quiesce(mln_runtime* runtime) {
   for (size_t attempt = 0; attempt < 100; attempt += 1) {
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
     if (drain_events(runtime, 0) == 0) {
-      // One more zero pump consumes the latch the drained events raised.
+      // One more zero pump clears the flag the drained events set.
       TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
       if (drain_events(runtime, 0) == 0) {
         return;
@@ -149,9 +149,8 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A signal raised before the park stays latched, and one pump spends one
-// latch.
-static void a_signal_that_precedes_the_pump_is_latched(void) {
+// A signal raised before the pump sets the wake flag, and one pump clears it.
+static void a_signal_before_the_pump_sets_the_wake_flag(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   mln_wake_source* source = NULL;
   TEST_ASSERT_EQUAL_INT(
@@ -167,10 +166,10 @@ static void a_signal_that_precedes_the_pump_is_latched(void) {
   );
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_monotonic_milliseconds() - started < prompt_return_milliseconds,
-    "A pump blocked despite a latched signal."
+    "A pump waited even though the wake flag was set."
   );
 
-  // With the latch spent, an idle runtime sits out its timeout.
+  // The pump above cleared the wake flag, so this one waits its full timeout.
   started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_pump(runtime, idle_park_milliseconds)
@@ -178,7 +177,7 @@ static void a_signal_that_precedes_the_pump_is_latched(void) {
   TEST_ASSERT_TRUE_MESSAGE(
     mln_test_monotonic_milliseconds() - started >=
       (uint64_t)idle_park_milliseconds / 2,
-    "A second pump consumed a latch that the first one should have spent."
+    "The first pump left the wake flag set."
   );
 
   mln_wake_source_destroy(source);
@@ -250,8 +249,8 @@ static void queued_events_return_from_the_pump_immediately(void) {
   );
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
 
-  // The queue holds unread events and their latch is spent, so the queue
-  // itself is what returns the pump.
+  // The queue holds unread events and the wake flag is clear, so the queued
+  // events are what return the pump.
   const uint64_t started = mln_test_monotonic_milliseconds();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_pump(runtime, park_timeout_milliseconds)
@@ -350,7 +349,7 @@ static void pump_and_wake_sources_reject_raw_invalid_arguments(void) {
 void run_runtime_wake_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_wake_source_releases_a_parked_owner_thread);
-  RUN_TEST(a_signal_that_precedes_the_pump_is_latched);
+  RUN_TEST(a_signal_before_the_pump_sets_the_wake_flag);
   RUN_TEST(a_style_response_wakes_a_parked_owner_thread);
   RUN_TEST(queued_events_return_from_the_pump_immediately);
   RUN_TEST(render_updates_coalesce_at_the_queue_tail);

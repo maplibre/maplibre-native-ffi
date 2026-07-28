@@ -21,10 +21,10 @@ public final class WakeSource: @unchecked Sendable {
     state.isClosed
   }
 
-  /// Latches a wake and releases the parked owner thread.
+  /// Sets the runtime's wake flag and releases the parked owner thread.
   ///
-  /// A signal raised while the owner thread runs stays latched, so the next
-  /// `RuntimeHandle.pump(timeout:)` consumes it and returns without parking.
+  /// A signal raised while the owner thread is running sets the wake flag, so
+  /// the next `RuntimeHandle.pump(timeout:)` returns without parking.
   /// Signalling after the runtime closes succeeds and does nothing.
   public func signal() throws {
     try mapNativeFailure {

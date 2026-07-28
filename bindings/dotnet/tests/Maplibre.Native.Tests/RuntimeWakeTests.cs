@@ -96,7 +96,7 @@ public sealed class RuntimeWakeTests
 
     [BindingSpecTest("BND-089")]
     [Fact]
-    public void PumpConsumesOneLatchedSignalAtATime()
+    public void PumpClearsTheWakeFlagItReturnsOn()
     {
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var source = runtime.AcquireWakeSource();
@@ -107,15 +107,15 @@ public sealed class RuntimeWakeTests
         runtime.Pump(ParkTimeout);
         Assert.True(
             signalledStarted.Elapsed < PromptReturn,
-            "A pump blocked despite a latched signal."
+            "A pump waited even though the wake flag was set."
         );
 
-        // With the latch spent, an idle runtime sits out its timeout.
+        // The pump above cleared the wake flag, so this one waits its full timeout.
         var idleStarted = Stopwatch.StartNew();
         runtime.Pump(TimeSpan.FromMilliseconds(200));
         Assert.True(
             idleStarted.Elapsed >= TimeSpan.FromMilliseconds(100),
-            "A second pump consumed a latch the first should have spent."
+            "The first pump left the wake flag set."
         );
     }
 }

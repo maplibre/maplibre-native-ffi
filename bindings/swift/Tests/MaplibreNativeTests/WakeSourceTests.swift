@@ -83,7 +83,7 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   #expect(source.isClosed)
 }
 
-@Test func pumpConsumesOneLatchedSignalAtATime() throws {
+@Test func pumpClearsTheWakeFlagItReturnsOn() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   let source = try runtime.wakeSource()
@@ -94,15 +94,15 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   try runtime.pump(timeout: parkTimeout)
   #expect(
     Date().timeIntervalSince(signalledStarted) < promptReturn,
-    "a pump blocked despite a latched signal"
+    "a pump waited even though the wake flag was set"
   )
 
-  // With the latch spent, an idle runtime sits out its timeout.
+  // The pump above cleared the wake flag, so this one waits its full timeout.
   let idleStarted = Date()
   try runtime.pump(timeout: 0.2)
   #expect(
     Date().timeIntervalSince(idleStarted) >= 0.1,
-    "a second pump consumed a latch the first should have spent"
+    "the first pump left the wake flag set"
   )
 
   try source.close()

@@ -238,7 +238,7 @@ test "a parked owner thread wakes for native work and for a wake source" {
     try testing.expectError(error.ClosedHandle, source.signal());
 }
 
-test "a pump consumes one latched signal at a time" {
+test "a pump clears the wake flag it returns on" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -251,7 +251,7 @@ test "a pump consumes one latched signal at a time" {
     try runtime.pump(10_000);
     try testing.expect(elapsedMilliseconds(signalled_started) < 5_000);
 
-    // With the latch spent, an idle runtime sits out its timeout.
+    // The pump above cleared the wake flag, so this one waits its full timeout.
     const idle_started = std.Io.Clock.awake.now(testing.io);
     try runtime.pump(200);
     try testing.expect(elapsedMilliseconds(idle_started) >= 100);

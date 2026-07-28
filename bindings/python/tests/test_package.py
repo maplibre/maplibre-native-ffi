@@ -483,7 +483,7 @@ def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> No
     assert source.closed
 
 
-def test_pump_consumes_one_latched_signal_at_a_time() -> None:
+def test_pump_clears_the_wake_flag_it_returns_on() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.wake_source() as source:
             quiesce(runtime)
@@ -492,14 +492,15 @@ def test_pump_consumes_one_latched_signal_at_a_time() -> None:
             signalled_started = time.monotonic()
             runtime.pump(10.0)
             assert time.monotonic() - signalled_started < 5.0, (
-                "a pump blocked despite a latched signal"
+                "a pump waited even though the wake flag was set"
             )
 
-            # With the latch spent, an idle runtime sits out its timeout.
+            # The pump above cleared the wake flag, so this one waits its
+            # full timeout.
             idle_started = time.monotonic()
             runtime.pump(0.2)
             assert time.monotonic() - idle_started >= 0.1, (
-                "a second pump consumed a latch the first should have spent"
+                "the first pump left the wake flag set"
             )
 
 

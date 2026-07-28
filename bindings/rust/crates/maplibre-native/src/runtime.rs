@@ -838,13 +838,14 @@ impl RuntimeHandle {
     /// The drain runs every task queued when it begins plus every task those
     /// enqueue, so a single call can span a full style parse.
     ///
-    /// A wake is a latch. One pump consumes one latch, and work arriving during
-    /// the drain latches the next wake, so a pump that finds no new work is
-    /// ordinary. Style, tile, offline, and resource responses latch a wake, as
-    /// does [`WakeSource::signal`]. A queued unread runtime event also returns
-    /// the call without parking. Timers and ready file descriptors latch a wake
-    /// when they queue owner-thread work, so pass a bounded timeout to cap park
-    /// latency.
+    /// The runtime holds a wake flag. Style, tile, offline, and resource
+    /// responses set it, as do queued runtime events and
+    /// [`WakeSource::signal`]. A parking call returns as soon as the flag is
+    /// set and clears it before returning, and work arriving during the drain
+    /// sets it again. A call also returns without parking while unread runtime
+    /// events are queued. Timers and ready file descriptors set the flag only
+    /// when they queue owner-thread work, so pass a bounded timeout to cap how
+    /// long a call waits.
     ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a [`WakeSource`] takes, and outside native
@@ -947,11 +948,11 @@ unsafe impl Send for WakeSource {}
 unsafe impl Sync for WakeSource {}
 
 impl WakeSource {
-    /// Latches a wake and releases the parked owner thread.
+    /// Sets the runtime's wake flag and releases the parked owner thread.
     ///
-    /// A signal raised while the owner thread runs stays latched, so the next
-    /// [`RuntimeHandle::pump`] consumes it and returns without parking.
-    /// Signalling after the runtime closes succeeds and does nothing.
+    /// A signal raised while the owner thread is running sets the wake flag,
+    /// so the next [`RuntimeHandle::pump`] returns without parking. Signalling
+    /// after the runtime closes succeeds and does nothing.
     pub fn signal(&self) -> Result<()> {
         // SAFETY: ptr is a live wake source owned by this wrapper, and native
         // accepts signals from any thread.
@@ -1499,7 +1500,7 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-089.
-    fn a_pump_consumes_one_latched_signal_at_a_time() {
+    fn a_pump_clears_the_wake_flag_it_returns_on() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let source = runtime.wake_source().unwrap();
         quiesce(&runtime);
@@ -1509,15 +1510,15 @@ mod tests {
         runtime.pump(Some(Duration::from_secs(10))).unwrap();
         assert!(
             started.elapsed() < Duration::from_secs(5),
-            "a pump blocked despite a latched signal"
+            "a pump waited even though the wake flag was set"
         );
 
-        // With the latch spent, an idle runtime sits out its timeout.
+        // The pump above cleared the wake flag, so this one waits its full timeout.
         let started = Instant::now();
         runtime.pump(Some(Duration::from_millis(200))).unwrap();
         assert!(
             started.elapsed() >= Duration::from_millis(100),
-            "a second pump consumed a latch the first should have spent"
+            "the first pump left the wake flag set"
         );
 
         runtime.close().unwrap();

@@ -119,7 +119,7 @@ class WakeSourceTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
-  fun pumpConsumesOneLatchedSignalAtATime() {
+  fun pumpClearsTheWakeFlagItReturnsOn() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       runtime.acquireWakeSource().use { source ->
         quiesce(runtime)
@@ -129,15 +129,15 @@ class WakeSourceTest : org.maplibre.nativeffi.NativeTestBase() {
         runtime.pump(10_000)
         assertTrue(
           signalledStarted.elapsedNow().inWholeMilliseconds < 5_000,
-          "a pump blocked despite a latched signal",
+          "a pump waited even though the wake flag was set",
         )
 
-        // With the latch spent, an idle runtime sits out its timeout.
+        // The pump above cleared the wake flag, so this one waits its full timeout.
         val idleStarted = TimeSource.Monotonic.markNow()
         runtime.pump(200)
         assertTrue(
           idleStarted.elapsedNow().inWholeMilliseconds >= 100,
-          "a second pump consumed a latch the first should have spent",
+          "the first pump left the wake flag set",
         )
       }
     }

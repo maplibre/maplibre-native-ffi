@@ -563,10 +563,10 @@ pub const ResourceRequestHandle = enum(u128) {
 pub const WakeSourceHandle = enum(u128) {
     _,
 
-    /// Latches a wake and releases the parked owner thread.
+    /// Sets the runtime's wake flag and releases the parked owner thread.
     ///
-    /// A signal raised while the owner thread runs stays latched, so the next
-    /// `RuntimeHandle.pump` consumes it and returns without parking.
+    /// A signal raised while the owner thread is running sets the wake flag,
+    /// so the next `RuntimeHandle.pump` returns without parking.
     pub fn signal(self: WakeSourceHandle) status.Error!void {
         lockWakeSourceRegistry();
         defer unlockWakeSourceRegistry();
@@ -1123,13 +1123,14 @@ pub const RuntimeHandle = enum(u128) {
     /// The drain runs every task queued when it begins plus every task those
     /// enqueue, so a single call can span a full style parse.
     ///
-    /// A wake is a latch. One pump consumes one latch, and work arriving during
-    /// the drain latches the next wake, so a pump that finds no new work is
-    /// ordinary. Style, tile, offline, and resource responses latch a wake, as
-    /// does `WakeSourceHandle.signal`. A queued unread runtime event also
-    /// returns the call without parking. Timers and ready file descriptors
-    /// latch a wake when they queue owner-thread work, so pass a bounded
-    /// timeout to cap park latency.
+    /// The runtime holds a wake flag. Style, tile, offline, and resource
+    /// responses set it, as do queued runtime events and
+    /// `WakeSourceHandle.signal`. A parking call returns as soon as the flag is
+    /// set and clears it before returning, and work arriving during the drain
+    /// sets it again. A call also returns without parking while unread runtime
+    /// events are queued. Timers and ready file descriptors set the flag only
+    /// when they queue owner-thread work, so pass a bounded timeout to cap how
+    /// long a call waits.
     ///
     /// A non-zero timeout blocks the calling thread. Call it outside any lock
     /// that a thread signalling a wake source takes.

@@ -844,21 +844,22 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
  * finds and can span a full style parse, so treat it as work that runs to
  * completion rather than as a fixed-cost per-frame slice.
  *
- * A wake is a latch. One pump consumes one latch, and work arriving during the
- * drain latches the next wake, so a pump that finds no new work is ordinary.
- *
- * These latch a wake:
+ * The runtime holds a wake flag. These set it:
  *
  * - the owner-thread run loop receiving queued work from any thread, which
  *   covers style, tile, offline database, and resource responses;
  * - the runtime queueing a runtime event;
  * - mln_wake_source_signal() from any thread.
  *
- * A queued unread runtime event also returns the call without parking.
+ * A parking call returns as soon as the flag is set, and clears the flag before
+ * it returns. Work that arrives during the drain sets the flag again, so the
+ * next call returns right away and may find that work already done.
  *
- * Timers and file descriptors latch a wake when they queue owner-thread work.
- * The runtime registers none of its own on the owner-thread run loop. Pass a
- * positive timeout_ms to bound park latency.
+ * A call also returns without parking while unread runtime events are queued.
+ *
+ * Timers and file descriptors set the flag only when they queue owner-thread
+ * work, and the runtime registers none of its own on the owner-thread run loop.
+ * Pass a positive timeout_ms so a call returns even when nothing sets the flag.
  *
  * A non-zero timeout_ms makes this a blocking query. Call it outside any host
  * lock that a thread signalling a wake source acquires, and outside C API
@@ -898,15 +899,15 @@ MLN_API mln_status mln_runtime_wake_source_acquire(
 ) MLN_NOEXCEPT;
 
 /**
- * Latches a wake and releases the parked owner thread.
+ * Sets the runtime's wake flag and releases the parked owner thread.
  *
  * This function may be called from any thread. It takes one small lock and
  * returns, so a host calls it from its task submission path.
  *
- * A signal raised while the owner thread runs stays latched, so the next
- * mln_runtime_pump() call consumes it and returns without parking. Signalling a
- * wake source whose runtime is destroyed succeeds and does nothing, so hosts
- * shut the two down in either order.
+ * A signal raised while the owner thread is running sets the wake flag, so the
+ * next mln_runtime_pump() call returns without parking. Signalling a wake
+ * source whose runtime is destroyed succeeds and does nothing, so hosts shut
+ * the two down in either order.
  *
  * Returns:
  * - MLN_STATUS_OK on success, including after the runtime is destroyed.

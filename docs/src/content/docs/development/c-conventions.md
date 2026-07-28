@@ -103,8 +103,8 @@ own work. Park-and-wake follows these rules:
   through runtime state rather than through a host callback, because MapLibre
   raises them from arbitrary threads while it holds locks that every thread
   queueing owner-thread work needs.
-- A wake is a latch. Document a pump as advancing the runtime, and require the
-  event drain after every return.
+- Wake signals set a flag that the pump clears before it returns. Document a
+  pump as advancing the runtime, and require the event drain after every return.
 - Any-thread wake entry points take a handle that carries its own reference to
   the wake state, never the thread-affine runtime pointer.
 - Document each blocking entry point's deadlock risk, naming the host locks a

@@ -2543,8 +2543,8 @@ auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
         );
       }
     }
-    // The latch is consumed before the drain, so work arriving during the
-    // drain stays latched for the next pump.
+    // The flag is cleared before the drain, so work arriving during the drain
+    // leaves it set for the next pump.
     wake.signaled = false;
   }
 

@@ -632,12 +632,13 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// enqueue, so a single call can span a full style parse.
     /// </para>
     /// <para>
-    /// A wake is a latch. One pump consumes one latch, and work arriving during the
-    /// drain latches the next wake, so a pump that finds no new work is ordinary.
-    /// Style, tile, offline, and resource responses latch a wake, as does
-    /// <see cref="WakeSource.Signal" />. A queued unread runtime event also returns
-    /// the call without parking. Timers and ready file descriptors latch a wake when
-    /// they queue owner-thread work, so pass a bounded timeout to cap park latency.
+    /// The runtime holds a wake flag. Style, tile, offline, and resource responses
+    /// set it, as do queued runtime events and <see cref="WakeSource.Signal" />. A
+    /// parking call returns as soon as the flag is set and clears it before
+    /// returning, and work arriving during the drain sets it again. A call also
+    /// returns without parking while unread runtime events are queued. Timers and
+    /// ready file descriptors set the flag only when they queue owner-thread work,
+    /// so pass a bounded timeout to cap how long a call waits.
     /// </para>
     /// <para>
     /// A non-zero timeout blocks the calling thread. Call it outside any lock that a

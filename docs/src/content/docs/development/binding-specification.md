@@ -480,8 +480,8 @@ The pump wrapper follows this design:
 2. It releases the host runtime's blocking-call machinery for the duration of
    the call, including any interpreter lock, so other host threads run while the
    owner thread parks.
-3. Its documentation states that a wake is a latch, and that callers drain
-   events after every return.
+3. Its documentation states that a wake signal sets a flag the pump clears, and
+   that callers drain events after every return.
 
 The wake source follows this design:
 
@@ -697,7 +697,7 @@ that a real native failure would expose.
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
 | BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
 | BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
-| BND-089 | One wait consumes one latched signal, and a wake source stays signalable and releasable after its runtime closes.                                                   |
+| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |
 
 ### Map, camera, projection, style, and query
 

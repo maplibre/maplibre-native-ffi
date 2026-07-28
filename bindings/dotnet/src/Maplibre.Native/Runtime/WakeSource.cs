@@ -32,11 +32,11 @@ public sealed unsafe class WakeSource : IDisposable
     /// <summary>Whether this wrapper has released its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
-    /// <summary>Latches a wake and releases the parked owner thread.</summary>
+    /// <summary>Sets the runtime's wake flag and releases the parked owner thread.</summary>
     /// <remarks>
-    /// A signal raised while the owner thread runs stays latched, so the next
-    /// <see cref="RuntimeHandle.Pump" /> consumes it and returns without parking.
-    /// Signalling after the runtime closes succeeds and does nothing.
+    /// A signal raised while the owner thread is running sets the wake flag, so the
+    /// next <see cref="RuntimeHandle.Pump" /> returns without parking. Signalling
+    /// after the runtime closes succeeds and does nothing.
     /// </remarks>
     public void Signal()
     {

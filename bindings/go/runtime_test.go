@@ -297,15 +297,15 @@ func TestRuntimePumpConsumesOneLatchedSignal(t *testing.T) {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if time.Since(signalledStarted) > 5*time.Second {
-		t.Fatal("a pump blocked despite a latched signal")
+		t.Fatal("a pump waited even though the wake flag was set")
 	}
 
-	// With the latch spent, an idle runtime sits out its timeout.
+	// The pump above cleared the wake flag, so this one waits its full timeout.
 	idleStarted := time.Now()
 	if err := runtime.Pump(200 * time.Millisecond); err != nil {
 		t.Fatalf("Pump(): %v", err)
 	}
 	if time.Since(idleStarted) < 100*time.Millisecond {
-		t.Fatal("a second pump consumed a latch the first should have spent")
+		t.Fatal("the first pump left the wake flag set")
 	}
 }
