@@ -58,6 +58,7 @@ java_version = "zulu-25.34.17.0"
 jvl_version = "2026.05.03"
 ktfmt_version = "0.62"
 node_version = "24.11.0"
+ninja_version = "1.13.2"
 pkl_version = "0.31.0"
 pnpm_version = "10.33.2"
 python_version = "3.14.4"
@@ -79,6 +80,7 @@ zig_version = "0.16.0"
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
 "aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+ninja = "{{vars.ninja_version}}"
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
 
