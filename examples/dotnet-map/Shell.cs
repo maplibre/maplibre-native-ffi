@@ -1,4 +1,5 @@
 using Maplibre.Native.Render;
+using Maplibre.Native.Runtime;
 
 namespace Maplibre.Native.Examples.DotnetMap;
 
@@ -71,10 +72,11 @@ internal static class Shell
     )
     {
         MapState? state = null;
+        WakeSource? wake = null;
         try
         {
             state = MapState.Create(initialViewport);
-            using var wake = state.AcquireWakeSource();
+            wake = state.AcquireWakeSource();
             channel.PublishMap(state.Map, wake);
             commands.OnEnqueue = channel.WakeRuntimeLoop;
 
@@ -96,6 +98,11 @@ internal static class Shell
             // Wait for the shutdown signal even after a failure: the render loop closes its
             // session before it sends that signal, and the map cannot be destroyed until then.
             channel.WaitForShutdown();
+            // Stop handing the render loop this source before disposing it. Disposing first would
+            // leave the channel signalling a closed handle, which throws over the original failure.
+            commands.OnEnqueue = null;
+            channel.ClearWake();
+            wake?.Dispose();
             state?.Dispose();
         }
     }

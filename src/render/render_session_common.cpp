@@ -1165,6 +1165,23 @@ auto render_session_render_update(
     return MLN_STATUS_INVALID_STATE;
   }
 
+  auto* backend = renderer_backend(session);
+  if (backend == nullptr) {
+    set_thread_error("render session renderer backend is not available");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto guard = mbgl::gfx::BackendScope{*backend};
+  // Deliver tile and resource results first: destroying the tiles they retire
+  // is what enqueues the GPU-release work that map_run_render_jobs() drains.
+  //
+  // Before the early returns below, not after. When this session owns the
+  // thread's scheduler, this queue is the only place those results land, and it
+  // drains nowhere else. Returning without draining would strand them whenever
+  // there is no update to render, which is exactly the window a resize opens.
+  session->scheduler.drain();
+  map_run_render_jobs(session->map);
+
   auto update = map_latest_update(session->map);
   if (!update) {
     return MLN_STATUS_OK;
@@ -1187,17 +1204,6 @@ auto render_session_render_update(
   if (session->kind == RenderSessionKind::Texture) {
     session->texture.backend->prepare_render_resources();
   }
-  auto* backend = renderer_backend(session);
-  if (backend == nullptr) {
-    set_thread_error("render session renderer backend is not available");
-    return MLN_STATUS_NATIVE_ERROR;
-  }
-  auto current = ScopedCurrentScheduler{session->scheduler};
-  auto guard = mbgl::gfx::BackendScope{*backend};
-  // Deliver tile and resource results first: destroying the tiles they retire
-  // is what enqueues the GPU-release work that map_run_render_jobs() drains.
-  session->scheduler.drain();
-  map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
     try {
       session->renderer = std::make_unique<mbgl::Renderer>(

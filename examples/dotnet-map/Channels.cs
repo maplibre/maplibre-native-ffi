@@ -114,7 +114,19 @@ internal sealed class MapChannel : IDisposable
     /// <summary>Render loop: releases the runtime loop's parked pump.</summary>
     public void WakeRuntimeLoop()
     {
-        wake?.Signal();
+        // The runtime loop clears this before disposing, but the two run on different threads, so
+        // tolerate losing the race. A missed wake costs the parking bound, nothing more.
+        try
+        {
+            wake?.Signal();
+        }
+        catch (ObjectDisposedException) { }
+    }
+
+    /// <summary>Runtime loop: stops handing out its wake source before disposing it.</summary>
+    public void ClearWake()
+    {
+        wake = null;
     }
 
     /// <summary>Render loop: blocks until the map to attach against exists.</summary>

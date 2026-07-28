@@ -62,6 +62,17 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
       return NativeSurfaceRenderResult.Skipped
     }
     val map = loop.map ?: return NativeSurfaceRenderResult.Skipped
+    return try {
+      renderAttached(map, frame)
+    } catch (error: Throwable) {
+      // The caller records a failure and stops driving frames, so nothing else would close this
+      // session. The runtime loop would then keep pumping a map it can never destroy.
+      close()
+      throw error
+    }
+  }
+
+  private fun renderAttached(map: MapHandle, frame: NativeSurfaceFrame): NativeSurfaceRenderResult {
     val attached = ensureAttachedRenderSession(map, frame)
 
     // Consume before rendering, so a request the runtime loop publishes during the render call is
