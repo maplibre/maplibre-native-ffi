@@ -4,6 +4,7 @@ using System.Runtime.ExceptionServices;
 using Maplibre.Native.Camera;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
+using Maplibre.Native.Runtime;
 
 namespace Maplibre.Native.Examples.DotnetMap;
 
@@ -35,33 +36,29 @@ internal sealed record AdjustPitchCommand(double Delta, AnimationOptions? Animat
 internal sealed record ResetOrientationCommand(AnimationOptions Animation) : CameraCommand;
 
 /// <summary>Camera commands queued by the render loop for the runtime loop to apply.</summary>
-internal sealed class CommandQueue : IDisposable
+internal sealed class CommandQueue
 {
     private readonly ConcurrentQueue<CameraCommand> queue = new();
-    private readonly AutoResetEvent pending = new(false);
+
+    /// <summary>
+    /// Released by <see cref="Push" /> so a queued command reaches the runtime loop without waiting
+    /// out its parking bound. The runtime loop parks inside the native pump rather than on a host
+    /// event, so the native wake source is what releases it; that also wakes the loop for the
+    /// runtime's own work, which a host event cannot see.
+    /// </summary>
+    public Action? OnEnqueue { get; set; }
 
     /// <summary>Render loop: queues a command and wakes the runtime loop.</summary>
     public void Push(CameraCommand command)
     {
         queue.Enqueue(command);
-        pending.Set();
+        OnEnqueue?.Invoke();
     }
 
     /// <summary>Runtime loop: takes the next queued command, if there is one.</summary>
     public bool TryDequeue([NotNullWhen(true)] out CameraCommand? command)
     {
         return queue.TryDequeue(out command);
-    }
-
-    /// <summary>Runtime loop: waits for the next command, giving up after <paramref name="timeout"/>.</summary>
-    public void Wait(TimeSpan timeout)
-    {
-        pending.WaitOne(timeout);
-    }
-
-    public void Dispose()
-    {
-        pending.Dispose();
     }
 }
 
@@ -101,15 +98,23 @@ internal sealed class MapChannel : IDisposable
     private readonly ManualResetEventSlim mapPublished = new();
     private readonly ManualResetEventSlim shutdownRequested = new();
     private MapHandle? map;
+    private WakeSource? wake;
     private ExceptionDispatchInfo? failure;
 
     public bool ShutdownRequested => shutdownRequested.IsSet;
 
     /// <summary>Runtime loop: announces the map it just created.</summary>
-    public void PublishMap(MapHandle value)
+    public void PublishMap(MapHandle value, WakeSource source)
     {
+        wake = source;
         map = value;
         mapPublished.Set();
+    }
+
+    /// <summary>Render loop: releases the runtime loop's parked pump.</summary>
+    public void WakeRuntimeLoop()
+    {
+        wake?.Signal();
     }
 
     /// <summary>Render loop: blocks until the map to attach against exists.</summary>
@@ -130,6 +135,8 @@ internal sealed class MapChannel : IDisposable
     public void RequestShutdown()
     {
         shutdownRequested.Set();
+        // Release the pump so shutdown is observed now rather than after the parking bound expires.
+        WakeRuntimeLoop();
     }
 
     /// <summary>Runtime loop: blocks until the render loop is done with its session.</summary>

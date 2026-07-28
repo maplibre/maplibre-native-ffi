@@ -234,7 +234,7 @@ auto fill_frame(
     static_cast<MTL::Texture*>(texture->texture.rendered_native_texture);
   if (metal_texture == nullptr) {
     mln::core::set_thread_error("rendered Metal texture is not available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   *out_frame = mln_metal_owned_texture_frame{

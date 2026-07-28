@@ -25,6 +25,17 @@ const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 // woken by the render loop. See Cadence.
 const LOOP_PERIOD: Duration = Duration::from_millis(4);
 
+/// Backstop for the runtime loop's park. The render loop's wake source is what
+/// normally releases it, so this only bounds a pump that nothing signals.
+const PARK_TIMEOUT: Duration = Duration::from_millis(100);
+
+/// What the runtime loop hands the render loop once the map exists: the map
+/// reference to attach against, and the wake source that releases its park.
+pub struct RuntimeLoopHandles {
+    pub attach_ref: MapAttachRef,
+    pub wake: Arc<maplibre_native::WakeSource>,
+}
+
 /// Runs the runtime loop until the render loop asks for shutdown.
 ///
 /// Failures land in [`Shared::fail`] rather than propagating, because this is a
@@ -32,7 +43,7 @@ const LOOP_PERIOD: Duration = Duration::from_millis(4);
 pub fn run(
     viewport: Viewport,
     commands: Receiver<CameraCommand>,
-    attach: Sender<MapAttachRef>,
+    attach: Sender<RuntimeLoopHandles>,
     shared: Arc<Shared>,
 ) {
     let state = match MapState::new(viewport) {
@@ -62,26 +73,30 @@ pub fn run(
 fn pump(
     state: &MapState,
     commands: &Receiver<CameraCommand>,
-    attach: Sender<MapAttachRef>,
+    attach: Sender<RuntimeLoopHandles>,
     shared: &Shared,
 ) -> Result<(), Box<dyn Error>> {
     // Publishing the attach reference is what lets the render loop create and
-    // own its session. Every other map call stays on this thread.
-    if attach.send(state.map.attach_ref()?).is_err() {
+    // own its session, and the wake source is how it releases the park below.
+    // Every other map call stays on this thread.
+    let handles = RuntimeLoopHandles {
+        attach_ref: state.map.attach_ref()?,
+        wake: Arc::new(state.runtime.wake_source()?),
+    };
+    if attach.send(handles).is_err() {
         return Ok(());
     }
     drop(attach);
 
     while !shared.shutdown_requested() {
         state.apply_commands(commands)?;
-        state.runtime.run_once()?;
+        // This thread has no display to pace it, so it takes its cadence from
+        // the runtime's own work and parks in between. The render loop signals
+        // the wake source, so the bound is a backstop rather than the cadence.
+        state.runtime.pump(Some(PARK_TIMEOUT))?;
         if state.drain_events()? {
             shared.request_render();
         }
-
-        // `run_once` never blocks waiting for work, so pace the loop instead of
-        // spinning on it. One display refresh period is the spec's ceiling.
-        thread::sleep(LOOP_PERIOD);
     }
     Ok(())
 }

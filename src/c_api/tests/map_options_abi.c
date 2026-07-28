@@ -560,7 +560,7 @@ static void map_size_tracks_attach_and_resize(void) {
   TEST_ASSERT_EQUAL_UINT32(512, width);
   TEST_ASSERT_EQUAL_UINT32(256, height);
 
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
   );
@@ -571,7 +571,7 @@ static void map_size_tracks_attach_and_resize(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_render_session_resize(render.session, 96, 48, 1.0)
   );
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_run_once(runtime));
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_get_size(map, &width, &height, &scale_factor)
   );

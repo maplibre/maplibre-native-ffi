@@ -17,10 +17,9 @@ import os
 /// Apple platforms the view and its window belong to the main thread, so main
 /// is the render loop and this is the thread that gets spawned.
 final class RuntimeLoopThread: Thread {
-  /// Pacing ceiling for one iteration, one display refresh period. `runOnce`
-  /// never blocks waiting for work, and a queued camera command wakes the wait
-  /// early.
-  private static let idleTimeout = 1.0 / 60.0
+  /// Backstop for this loop's park. The render loop's wake source is what
+  /// normally releases it, so this only bounds a pump that nothing signals.
+  private static let parkTimeout = 0.1
 
   private let channels: Channels
   private let initialViewport: Viewport
@@ -58,17 +57,25 @@ final class RuntimeLoopThread: Thread {
     }
 
     let attachRef = try state.attachRef()
-    channels.publish(attachRef: attachRef)
+    // The render loop signals this to release the parked pump, so a queued
+    // command or a shutdown
+    // request lands without waiting out the bound below.
+    let wake = try state.wakeSource()
+    channels.publish(attachRef: attachRef, wake: wake)
 
     while !channels.isShutdownRequested, channels.failureMessage == nil {
       for command in channels.drainCommands() {
         try state.apply(command)
       }
-      try state.runOnce()
+      // This thread has no display to pace it, so it takes its cadence from the
+      // runtime's own
+      // work and parks in between. The render loop signals the wake source, so
+      // the bound is a
+      // backstop rather than the cadence.
+      try state.pump(timeout: Self.parkTimeout)
       if try state.drainEvents() {
         channels.setRenderRequest()
       }
-      channels.waitForWork(timeout: Self.idleTimeout)
     }
   }
 }

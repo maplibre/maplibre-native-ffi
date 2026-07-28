@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
  * Runtime and map, owned for their whole lifetime by the runtime loop thread.
@@ -22,12 +23,18 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 internal class MapState
 private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
+  /** Acquires the wake source the render loop uses to release this loop's parked pump. */
+  fun acquireWakeSource(): WakeSource = runtime.acquireWakeSource()
+
   /** One runtime loop iteration: apply queued commands, pump once, drain events. */
   fun step(commands: CommandQueue, renderRequest: RenderRequest) {
     for (command in commands.drain()) {
       apply(command)
     }
-    runtime.runOnce()
+    // This thread has no display to pace it, so it takes its cadence from the runtime's own work
+    // and parks in between. The render loop signals the wake source, so the bound is a backstop
+    // rather than the cadence.
+    runtime.pump(PARK_TIMEOUT_MS)
     if (drainEvents()) {
       renderRequest.set()
     }
@@ -103,6 +110,12 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
 
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
+
+    /**
+     * Backstop for the runtime loop's park. The render loop's wake source is what normally releases
+     * it, so this only bounds a pump that nothing signals.
+     */
+    private const val PARK_TIMEOUT_MS = 100L
 
     fun create(viewport: Viewport): MapState {
       val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })

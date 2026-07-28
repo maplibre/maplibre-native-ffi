@@ -369,7 +369,7 @@ public sealed class MapCameraOptionsTests
         Assert.DoesNotContain(CameraChangeMode.Animated, tally.DidChangeModes);
 
         // The transition ended, so no later pump repeats the event.
-        runtime.RunOnce();
+        runtime.Pump(TimeSpan.Zero);
         Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
     }
 
@@ -445,13 +445,13 @@ public sealed class MapCameraOptionsTests
         // A static map advances its transitions to their end state the next time it
         // updates, so requesting a still image runs this ease to completion.
         map.RequestStillImage();
-        runtime.RunOnce();
+        runtime.Pump(TimeSpan.Zero);
 
         var tally = DrainCameraEvents(runtime);
         Assert.Equal([31ul], tally.FinishedTransitionIds);
         Assert.Equal(11, map.GetCamera().Zoom);
 
-        runtime.RunOnce();
+        runtime.Pump(TimeSpan.Zero);
         Assert.Empty(DrainCameraEvents(runtime).FinishedTransitionIds);
     }
 

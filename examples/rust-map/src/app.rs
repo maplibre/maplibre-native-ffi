@@ -24,6 +24,9 @@ use crate::viewport::Viewport;
 pub struct App {
     target: Option<RenderTarget>,
     attach_ref: MapAttachRef,
+    /// Releases the runtime loop's parked pump, so a queued camera command is
+    /// applied now rather than after its parking bound.
+    wake: Arc<maplibre_native::WakeSource>,
     runtime_thread: Option<JoinHandle<()>>,
     commands: Sender<CameraCommand>,
     shared: Arc<Shared>,
@@ -60,8 +63,8 @@ impl App {
 
         // The runtime loop creates the map; this loop attaches its own session
         // against it and owns that session for the rest of the run.
-        let attach_ref = match attach_queue.recv() {
-            Ok(attach_ref) => attach_ref,
+        let handles = match attach_queue.recv() {
+            Ok(handles) => handles,
             Err(_) => {
                 return Err(stop_runtime_loop(
                     &shared,
@@ -70,7 +73,7 @@ impl App {
                 ));
             }
         };
-        let target = match RenderTarget::attach(mode, &attach_ref, &graphics, viewport) {
+        let target = match RenderTarget::attach(mode, &handles.attach_ref, &graphics, viewport) {
             Ok(target) => target,
             Err(error) => {
                 return Err(stop_runtime_loop(
@@ -83,7 +86,8 @@ impl App {
 
         Ok(Self {
             target: Some(target),
-            attach_ref,
+            attach_ref: handles.attach_ref,
+            wake: handles.wake,
             runtime_thread: Some(runtime_thread),
             commands,
             shared,
@@ -119,6 +123,10 @@ impl App {
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => {
                 if self.input.handle(&event, &self.commands, self.viewport) {
+                    // Release the runtime loop's parked pump so the command just
+                    // queued is applied on this frame rather than after its
+                    // parking bound.
+                    let _ = self.wake.signal();
                     self.shared.request_render();
                     self.window.request_redraw();
                 }
@@ -126,7 +134,7 @@ impl App {
         }
     }
 
-    /// One render loop iteration. It never calls `run_once` or `poll_event`.
+    /// One render loop iteration. It never calls `pump` or `poll_event`.
     pub fn step(&mut self) {
         if let Some(error) = self.shared.failure() {
             eprintln!("runtime loop failed: {error}");
@@ -203,7 +211,7 @@ impl App {
             .render_update(&self.graphics)?
         {
             // The map applies a new logical size on the runtime loop's next
-            // `run_once`, so an attach or resize leaves nothing to render until
+            // `pump`, so an attach or resize leaves nothing to render until
             // then. Keep the request and retry.
             self.shared.request_render();
         }
@@ -239,6 +247,9 @@ impl App {
             append_error(&mut first_error, error.to_string());
         }
         self.shared.request_shutdown();
+        // Release the pump so shutdown is observed now rather than after the
+        // parking bound expires.
+        let _ = self.wake.signal();
         if let Some(runtime_thread) = self.runtime_thread.take()
             && runtime_thread.join().is_err()
         {

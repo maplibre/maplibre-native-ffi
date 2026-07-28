@@ -81,26 +81,43 @@ pub const RenderRequest = struct {
     }
 };
 
-/// Publishes the map from the runtime loop to the render loop, and carries
-/// shutdown and failure the other way.
+/// Publishes the map and the runtime's wake source from the runtime loop to the
+/// render loop, and carries shutdown and failure the other way.
 ///
 /// The map handle is a plain value over a lock-guarded registry, so the render
 /// loop may hold a copy. It uses that copy only to attach, which native serves
-/// from any thread; every other map call stays on the runtime loop.
+/// from any thread; every other map call stays on the runtime loop. The wake
+/// source is signalled from this side to release the runtime loop's parked
+/// pump.
 pub const MapChannel = struct {
     lock: std.Io.Mutex = std.Io.Mutex.init,
     map: ?maplibre.MapHandle = null,
+    wake: ?maplibre.WakeSourceHandle = null,
     published: std.atomic.Value(bool) = .init(false),
     shutdown: std.atomic.Value(bool) = .init(false),
     failure: ?anyerror = null,
     failed: std.atomic.Value(bool) = .init(false),
 
-    /// Runtime loop: announces the map it just created.
-    pub fn publishMap(self: *MapChannel, map: maplibre.MapHandle) void {
+    /// Runtime loop: announces the map it just created and its wake source.
+    pub fn publish(
+        self: *MapChannel,
+        map: maplibre.MapHandle,
+        wake: maplibre.WakeSourceHandle,
+    ) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         self.map = map;
+        self.wake = wake;
         self.published.store(true, .release);
+    }
+
+    /// Render loop: releases the runtime loop's parked pump. A no-op before the
+    /// runtime loop has published, when there is nothing parked yet.
+    pub fn wakeRuntimeLoop(self: *MapChannel) void {
+        if (!self.published.load(.acquire)) return;
+        std.Io.Threaded.mutexLock(&self.lock);
+        defer std.Io.Threaded.mutexUnlock(&self.lock);
+        if (self.wake) |wake| wake.signal() catch {};
     }
 
     /// Render loop: the map to attach against, once the runtime loop has one.
@@ -115,6 +132,9 @@ pub const MapChannel = struct {
     /// session is closed, because the map cannot be destroyed before then.
     pub fn requestShutdown(self: *MapChannel) void {
         self.shutdown.store(true, .release);
+        // Release the pump so shutdown is observed now rather than after the
+        // parking bound expires.
+        self.wakeRuntimeLoop();
     }
 
     pub fn shutdownRequested(self: *MapChannel) bool {

@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
  * A camera change decoded on the render loop and applied on the map's thread.
@@ -45,6 +46,13 @@ internal sealed interface CameraCommand {
 internal class CommandQueue {
   private val items = ArrayDeque<CameraCommand>(CAPACITY)
 
+  /**
+   * Released by [push] so a queued command reaches the runtime loop without waiting out its parking
+   * bound. Set once the runtime loop has published its wake source; enqueues before that need no
+   * wake, because the loop has not started parking yet.
+   */
+  @Volatile var onEnqueue: (() -> Unit)? = null
+
   fun push(command: CameraCommand) {
     synchronized(items) {
       if (items.size == CAPACITY) {
@@ -52,6 +60,7 @@ internal class CommandQueue {
       }
       items.addLast(command)
     }
+    onEnqueue?.invoke()
   }
 
   fun drain(): List<CameraCommand> =
@@ -85,20 +94,28 @@ internal class RenderRequest {
 }
 
 /**
- * Publishes the map from the runtime loop to the render loop, and carries shutdown and failure the
- * other way.
+ * Publishes the map and the runtime's wake source from the runtime loop to the render loop, and
+ * carries shutdown and failure the other way.
  *
  * The render loop uses the published handle only to attach its own render session, which native
- * serves from any thread; every other map call stays on the runtime loop.
+ * serves from any thread; every other map call stays on the runtime loop. It signals the wake
+ * source to release the runtime loop's parked pump.
  */
 internal class MapChannel {
   private val map = AtomicReference<MapHandle?>(null)
+  private val wake = AtomicReference<WakeSource?>(null)
   private val shutdown = AtomicBoolean(false)
   private val failure = AtomicReference<Throwable?>(null)
 
-  /** Runtime loop: announces the map it just created. */
-  fun publishMap(handle: MapHandle) {
+  /** Runtime loop: announces the map it just created and its wake source. */
+  fun publish(handle: MapHandle, source: WakeSource) {
+    wake.set(source)
     map.set(handle)
+  }
+
+  /** Render loop: releases the runtime loop's parked pump. */
+  fun wakeRuntimeLoop() {
+    wake.get()?.signal()
   }
 
   /** Render loop: the map to attach against, once the runtime loop has one. */
@@ -110,6 +127,8 @@ internal class MapChannel {
    */
   fun requestShutdown() {
     shutdown.set(true)
+    // Release the pump so shutdown is observed now rather than after the parking bound expires.
+    wakeRuntimeLoop()
   }
 
   fun shutdownRequested(): Boolean = shutdown.get()

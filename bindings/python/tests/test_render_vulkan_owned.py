@@ -114,7 +114,7 @@ def wait_for_texture_info(
     fixture.map.set_style_json(EMPTY_STYLE_JSON)
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -137,7 +137,7 @@ def wait_for_vulkan_frame(
     request_still_image_if_needed(fixture.map)
     last_frame: render.VulkanOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -234,12 +234,12 @@ def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
     # than setting it in place, because the session may be owned by another
     # thread, so the map keeps its previous size until the runtime is pumped.
     assert vulkan_owned_session.map.get_size() == (64, 64, pytest.approx(1.0))
-    vulkan_owned_session.runtime.run_once()
+    vulkan_owned_session.runtime.pump()
     assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
 
     # Resizing at a different scale factor leaves the map's own pixel ratio.
     vulkan_owned_session.session.resize(48, 24, 2.0)
-    vulkan_owned_session.runtime.run_once()
+    vulkan_owned_session.runtime.pump()
     assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(1.0))
 
 
@@ -290,7 +290,9 @@ def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
             worker = threading.Thread(target=attach_render_close, args=(map_handle,))
             worker.start()
             while worker.is_alive():
-                runtime.run_once()
+                # A short park rather than zero: this waits on the worker, so
+                # spinning would burn the deadline before it made progress.
+                runtime.pump(0.002)
                 while runtime.poll_event():
                     pass
             worker.join()

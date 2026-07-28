@@ -175,6 +175,16 @@ void mln_test_sleep_milliseconds(unsigned int milliseconds) {
 #endif
 }
 
+uint64_t mln_test_monotonic_milliseconds(void) {
+#if defined(_WIN32)
+  return (uint64_t)GetTickCount64();
+#else
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (uint64_t)now.tv_sec * 1000u + (uint64_t)(now.tv_nsec / 1000000L);
+#endif
+}
+
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;
@@ -725,7 +735,9 @@ bool mln_test_pump_until(mln_runtime* runtime, atomic_bool* flag) {
     if (atomic_load(flag)) {
       return true;
     }
-    if (mln_runtime_run_once(runtime) != MLN_STATUS_OK) {
+    // A short park rather than zero: this waits on another thread's flag, so
+    // spinning would burn the whole loop budget before that thread ran.
+    if (mln_runtime_pump(runtime, 2) != MLN_STATUS_OK) {
       return false;
     }
     mln_runtime_event event = {

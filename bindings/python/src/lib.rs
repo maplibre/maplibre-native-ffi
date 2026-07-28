@@ -79,6 +79,15 @@ struct ResourceRequestHandle {
     state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
 }
 
+// Holds the native wake source as an address rather than a pointer, so the
+// pyclass stays `Send + Sync` without an unsafe assertion. The C API accepts
+// signals and destruction from any thread, and the mutex is what makes close
+// once-only against a concurrent signal.
+#[pyclass(name = "_WakeSource")]
+struct WakeSource {
+    address: Mutex<Option<usize>>,
+}
+
 #[derive(Debug, Clone)]
 struct CopiedLogRecordRaw {
     severity: u32,
@@ -861,12 +870,42 @@ impl RuntimeHandle {
         Ok(())
     }
 
-    fn run_once(&self) -> PyResult<()> {
+    fn pump(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<()> {
+        let _operation = self.operation_gate.begin_detached_operation()?;
+        let runtime_address = {
+            let state = self.state_for_operation()?;
+            let Some(runtime_address) = state.address() else {
+                return Err(invalid_state_error("runtime handle is closed"));
+            };
+            runtime_address
+        };
+        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // binding lifecycle gate, and the C API validates that it is live and
+        // called on the owner thread. A non-zero timeout parks until native
+        // work, a wake source, or the timeout releases it, so the GIL is
+        // released for the call and the Rust handle-state mutex is not held
+        // across it: another Python thread signalling a wake source is what
+        // ends the park.
+        let status = py.detach(|| unsafe {
+            sys::mln_runtime_pump(runtime_address as *mut sys::mln_runtime, timeout_ms)
+        });
+        maplibre_core::check(status).map_err(map_error)
+    }
+
+    fn wake_source(&self) -> PyResult<WakeSource> {
         let state = self.state_for_operation()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
         // SAFETY: The C API validates that the pointer is a live runtime handle
-        // and that the call occurs on the runtime owner thread.
-        maplibre_core::check(unsafe { sys::mln_runtime_run_once(state.as_ptr()) })
-            .map_err(map_error)
+        // and that the call occurs on the runtime owner thread, and out is a
+        // null-initialized out-pointer owned by this call.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_wake_source_acquire(state.as_ptr(), out.as_mut_ptr())
+        })
+        .map_err(map_error)?;
+        let source = out.into_non_null("mln_wake_source").map_err(map_error)?;
+        Ok(WakeSource {
+            address: Mutex::new(Some(source.as_ptr() as usize)),
+        })
     }
 
     fn run_ambient_cache_operation_start(&self, operation: u32) -> PyResult<u64> {
@@ -3938,6 +3977,46 @@ impl CustomGeometrySourceHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .closed
+    }
+}
+
+#[pymethods]
+impl WakeSource {
+    fn signal(&self) -> PyResult<()> {
+        let address = self
+            .address
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(address) = *address else {
+            return Err(invalid_state_error("wake source is closed"));
+        };
+        // SAFETY: address came from a successful acquire and is still owned by
+        // this handle, and the C API accepts signals from any thread.
+        maplibre_core::check(unsafe {
+            sys::mln_wake_source_signal(address as *mut sys::mln_wake_source)
+        })
+        .map_err(map_error)
+    }
+
+    fn close(&self) {
+        let mut address = self
+            .address
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(address) = address.take() else {
+            return;
+        };
+        // SAFETY: address came from a successful acquire, the mutex makes this
+        // the only close, and the C API accepts destruction from any thread.
+        unsafe { sys::mln_wake_source_destroy(address as *mut sys::mln_wake_source) };
+    }
+
+    #[getter]
+    fn closed(&self) -> bool {
+        self.address
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_none()
     }
 }
 
@@ -7464,6 +7543,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<MapHandle>()?;
     module.add_class::<MapProjectionHandle>()?;
     module.add_class::<ResourceRequestHandle>()?;
+    module.add_class::<WakeSource>()?;
     module.add_class::<LogReceiver>()?;
     module.add_class::<CustomGeometrySourceHandle>()?;
     module.add_class::<RenderSessionHandle>()?;

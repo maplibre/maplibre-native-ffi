@@ -86,7 +86,7 @@ def _wait_for_runtime_event(
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if event.event_type == event_type:
                 return event
@@ -101,7 +101,7 @@ def _wait_for_provider_handle(
     iterations: int = 5000,
 ) -> resource.ResourceRequestHandle:
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         if handles:
             return handles.pop(0)
         time.sleep(0.001)
@@ -116,7 +116,7 @@ def _wait_for_offline_operation(
 ) -> mln.RuntimeEvent:
     operation_id = operation._operation_id  # noqa: SLF001
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if (
                 event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
@@ -419,11 +419,89 @@ def test_public_modules_avoid_runtime_annotation_fallbacks() -> None:
 def test_runtime_handle_context_manager_closes_once() -> None:
     with mln.RuntimeHandle() as runtime:
         assert not runtime.closed
-        runtime.run_once()
+        runtime.pump()
 
     assert runtime.closed
     runtime.close()
     assert runtime.closed
+
+
+def quiesce(runtime: mln.RuntimeHandle) -> None:
+    """Pump until the runtime is idle, so a park that follows needs a fresh signal."""
+    for _ in range(100):
+        runtime.pump()
+        drained = False
+        while runtime.poll_event() is not None:
+            drained = True
+        if not drained:
+            return
+    pytest.fail("the runtime kept producing events while idle")
+
+
+def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        quiesce(runtime)
+
+        # The style is malformed, so native reports the failure from its own
+        # threads and the failure reaches the parked owner thread.
+        map_handle.set_style_url("unsupported://style.json")
+        loading_failed = False
+        load_started = time.monotonic()
+        for _ in range(20):
+            runtime.pump(10.0)
+            assert time.monotonic() - load_started < 5.0, (
+                "parks sat out their timeouts while loading was pending"
+            )
+            while (event := runtime.poll_event()) is not None:
+                if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                    loading_failed = True
+            if loading_failed:
+                break
+        assert loading_failed
+
+        # A source signalled from another thread matches a host's submission path,
+        # and the park it releases has no other work to end it. The park also
+        # releases the GIL.
+        source = runtime.wake_source()
+        quiesce(runtime)
+        thread = threading.Thread(target=lambda: (time.sleep(0.02), source.signal()))
+        thread.start()
+        park_started = time.monotonic()
+        runtime.pump(10.0)
+        assert time.monotonic() - park_started < 5.0, (
+            "the parked owner thread timed out instead of taking the signal"
+        )
+        thread.join()
+
+        map_handle.close()
+
+    # A wake source stays usable after its runtime closes, so hosts tear the two
+    # down in either order.
+    source.signal()
+    source.close()
+    assert source.closed
+
+
+def test_pump_clears_the_wake_flag_it_returns_on() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.wake_source() as source:
+            quiesce(runtime)
+
+            source.signal()
+            signalled_started = time.monotonic()
+            runtime.pump(10.0)
+            assert time.monotonic() - signalled_started < 5.0, (
+                "a pump waited even though the wake flag was set"
+            )
+
+            # The pump above cleared the wake flag, so this one waits its
+            # full timeout.
+            idle_started = time.monotonic()
+            runtime.pump(0.2)
+            assert time.monotonic() - idle_started >= 0.1, (
+                "the first pump left the wake flag set"
+            )
 
 
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
@@ -511,7 +589,7 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     raised_errors: list[BaseException] = []
 
     def call_owner_thread_methods() -> None:
-        for call in (runtime.run_once, runtime.poll_event, map_handle.request_repaint):
+        for call in (runtime.pump, runtime.poll_event, map_handle.request_repaint):
             try:
                 call()
             except BaseException as error:
@@ -1554,13 +1632,13 @@ def test_completed_ease_reports_transition_finished_once() -> None:
                     "ease did not finish while the runtime was pumped"
                 )
                 map_handle.request_repaint()
-                runtime.run_once()
+                runtime.pump()
                 events.extend(_drain_runtime_events(runtime))
 
             trailing: list[mln.RuntimeEvent] = []
             for _ in range(8):
                 map_handle.request_repaint()
-                runtime.run_once()
+                runtime.pump()
                 trailing.extend(_drain_runtime_events(runtime))
 
     assert _finished_transition_ids(events) == [401]
@@ -1637,14 +1715,14 @@ def test_poll_event_returns_copied_map_event() -> None:
             assert loading_failed.message
 
 
-def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
+def test_pump_and_poll_event_return_copied_style_loaded_event() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
 
             style_loaded = None
             for _ in range(32):
-                runtime.run_once()
+                runtime.pump()
                 while event := runtime.poll_event():
                     if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
                         style_loaded = event
@@ -1655,7 +1733,7 @@ def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
             assert style_loaded is not None
             assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
             assert style_loaded.source.map_handle is map_handle
-            runtime.run_once()
+            runtime.pump()
             assert runtime.poll_event() is None
 
 
@@ -2947,7 +3025,7 @@ def test_resource_provider_replacement_and_clear_retire_previous_callback() -> N
         # style URL proves the request reached the network file source.
         map_handle.set_style_url(style_url)
         for _ in range(5000):
-            runtime.run_once()
+            runtime.pump()
             while event := runtime.poll_event():
                 if (
                     event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
@@ -3207,7 +3285,7 @@ def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
 
         map_handle.close()
         for _ in range(5000):
-            runtime.run_once()
+            runtime.pump()
             if handle.is_cancelled():
                 break
             time.sleep(0.001)

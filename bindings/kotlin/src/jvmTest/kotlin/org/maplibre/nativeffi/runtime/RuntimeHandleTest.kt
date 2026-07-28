@@ -30,12 +30,12 @@ class RuntimeHandleTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
 
     assertFalse(runtime.isClosed)
-    runtime.runOnce()
+    runtime.pump(0)
     runtime.close()
     runtime.close()
 
     assertTrue(runtime.isClosed)
-    assertFailsWith<InvalidStateException> { runtime.runOnce() }
+    assertFailsWith<InvalidStateException> { runtime.pump(0) }
   }
 
   @Test
@@ -224,7 +224,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("custom://close-during-provider.json")
         assertTrue(
           waitForCondition {
-            runtime.runOnce()
+            runtime.pump(0)
             closeError.get() != null
           }
         )
@@ -259,7 +259,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("http://example.invalid/close-during-transform.json")
         assertTrue(
           waitForCondition {
-            runtime.runOnce()
+            runtime.pump(0)
             closeError.get() != null
           }
         )
@@ -275,7 +275,7 @@ class RuntimeHandleTest {
     operation: OfflineOperationHandle<*>,
   ): RuntimeEventPayload.OfflineOperationCompleted {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
@@ -297,7 +297,7 @@ class RuntimeHandleTest {
     type: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == type && event.mapSource == map) return true
@@ -323,7 +323,7 @@ class RuntimeHandleTest {
     styleUrl: String,
   ): String {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (

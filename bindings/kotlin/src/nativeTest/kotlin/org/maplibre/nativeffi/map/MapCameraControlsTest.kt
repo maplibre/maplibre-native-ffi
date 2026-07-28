@@ -241,7 +241,7 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         val finished = mutableListOf<Long>()
         var rounds = 0
         while (finished.isEmpty() && rounds < 10_000) {
-          runtime.runOnce()
+          runtime.pump(0)
           finished += drainCameraEvents(runtime).finishedTransitionIds
           rounds++
           usleep(1_000U)
@@ -251,7 +251,7 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
 
         // The completed transition reports its end once; later pumping adds nothing.
         repeat(100) {
-          runtime.runOnce()
+          runtime.pump(0)
           finished += drainCameraEvents(runtime).finishedTransitionIds
         }
         assertEquals(listOf(21L), finished)

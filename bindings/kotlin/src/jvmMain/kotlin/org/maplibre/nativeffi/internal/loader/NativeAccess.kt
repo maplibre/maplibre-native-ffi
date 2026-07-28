@@ -343,8 +343,30 @@ internal object NativeAccess {
       }
     }
 
-  internal fun runRuntimeOnce(runtime: MemorySegment) {
-    Status.check(runtimeStatusFunction("mln_runtime_run_once").invokeWithArguments(runtime) as Int)
+  internal fun pumpRuntime(runtime: MemorySegment, timeoutMillis: Long) {
+    Status.check(runtimePumpFunction().invokeWithArguments(runtime, timeoutMillis) as Int)
+  }
+
+  internal fun acquireWakeSource(runtime: MemorySegment): MemorySegment =
+    Arena.ofConfined().use { arena ->
+      val outSource = arena.allocate(ValueLayout.ADDRESS)
+      outSource.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
+      Status.check(
+        runtimeWakeSourceAcquireFunction().invokeWithArguments(runtime, outSource) as Int
+      )
+      outSource.get(ValueLayout.ADDRESS, 0).also { source ->
+        require(source != MemorySegment.NULL) {
+          "mln_runtime_wake_source_acquire returned a null wake source"
+        }
+      }
+    }
+
+  internal fun signalWakeSource(source: MemorySegment) {
+    Status.check(wakeSourceSignalFunction().invokeWithArguments(source) as Int)
+  }
+
+  internal fun destroyWakeSource(source: MemorySegment) {
+    wakeSourceDestroyFunction().invokeWithArguments(source)
   }
 
   internal fun destroyRuntime(runtime: MemorySegment): Int =
@@ -2731,6 +2753,15 @@ internal object NativeAccess {
   private fun runtimeCreateFunction(): MethodHandle = downcall("mln_runtime_create")
 
   private fun runtimeStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun runtimePumpFunction(): MethodHandle = downcall("mln_runtime_pump")
+
+  private fun runtimeWakeSourceAcquireFunction(): MethodHandle =
+    downcall("mln_runtime_wake_source_acquire")
+
+  private fun wakeSourceSignalFunction(): MethodHandle = downcall("mln_wake_source_signal")
+
+  private fun wakeSourceDestroyFunction(): MethodHandle = downcall("mln_wake_source_destroy")
 
   private fun runtimeAmbientCacheOperationStartFunction(): MethodHandle =
     downcall("mln_runtime_run_ambient_cache_operation_start")

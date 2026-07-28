@@ -46,6 +46,7 @@ from .runtime import (
     TileId,
     TileOperation,
     UnknownRuntimeEventPayload,
+    WakeSource,
 )
 
 __all__ = [
@@ -83,6 +84,7 @@ __all__ = [
     "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
+    "WakeSource",
     "WrongThreadError",
     "c_version",
     "network_status",

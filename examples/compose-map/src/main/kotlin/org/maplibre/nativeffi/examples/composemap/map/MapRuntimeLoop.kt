@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
  * Owns the runtime and the map for their whole lifetime, on a dedicated thread that is not the one
@@ -45,6 +46,8 @@ internal class MapRuntimeLoop(
   /** The map to attach against, once the loop has created one. */
   val map: MapHandle?
     get() = publishedMap
+
+  @Volatile private var wake: WakeSource? = null
 
   private val thread = Thread({ run() }, "compose-map-runtime").apply { isDaemon = true }
 
@@ -100,18 +103,21 @@ internal class MapRuntimeLoop(
   }
 
   private fun pump(runtime: RuntimeHandle, map: MapHandle) {
+    val source = runtime.acquireWakeSource()
+    wake = source
+    commands.onEnqueue = { source.signal() }
     val batch = ArrayList<CameraCommand>()
     while (!shutdownRequested.get()) {
       batch.clear()
       commands.drainInto(batch)
       batch.forEach { command -> apply(map, command) }
-      runtime.runOnce()
+      // This thread has no display to pace it, so it takes its cadence from the runtime's own
+      // work and parks in between. The render loop signals the wake source, so the bound is a
+      // backstop rather than the cadence.
+      runtime.pump(PARK_TIMEOUT_MS)
       if (drainEvents(runtime, map)) {
         renderRequest.set()
       }
-      // runOnce never blocks waiting for work, so pace the loop instead of spinning on it. One
-      // display refresh period is the spec's ceiling; enqueued commands wake it sooner.
-      commands.await(PUMP_INTERVAL_MS)
     }
   }
 
@@ -182,7 +188,11 @@ internal class MapRuntimeLoop(
 
   private companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
-    private const val PUMP_INTERVAL_MS = 4L
+    /**
+     * Backstop for the runtime loop's park. The render loop's wake source is what normally releases
+     * it, so this only bounds a pump that nothing signals.
+     */
+    private const val PARK_TIMEOUT_MS = 100L
     private val KEYBOARD_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
     private val RESET_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
   }

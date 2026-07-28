@@ -107,8 +107,14 @@ final class MapState {
     }
   }
 
-  func runOnce() throws {
-    try runtime.runOnce()
+  /// Pumps the runtime, parking up to `timeout` when there is nothing to do.
+  func pump(timeout: TimeInterval) throws {
+    try runtime.pump(timeout: timeout)
+  }
+
+  /// Acquires the wake source the render loop uses to release this loop's park.
+  func wakeSource() throws -> WakeSource {
+    try runtime.wakeSource()
   }
 
   /// Drains runtime events, reporting whether the map wants another frame.

@@ -328,10 +328,29 @@ auto mln_runtime_destroy(mln_runtime* runtime) noexcept -> mln_status {
   });
 }
 
-auto mln_runtime_run_once(mln_runtime* runtime) noexcept -> mln_status {
+auto mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::run_runtime_once(runtime);
+    return mln::core::pump_runtime(runtime, timeout_ms);
   });
+}
+
+auto mln_runtime_wake_source_acquire(
+  mln_runtime* runtime, mln_wake_source** out_source
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::acquire_wake_source(runtime, out_source);
+  });
+}
+
+auto mln_wake_source_signal(mln_wake_source* source) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::signal_wake_source(source);
+  });
+}
+
+auto mln_wake_source_destroy(mln_wake_source* source) noexcept -> void {
+  mln::core::destroy_wake_source(source);
 }
 
 auto mln_runtime_poll_event(

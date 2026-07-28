@@ -68,7 +68,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 @Test func runtimeCreateRunPollAndClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-  try runtime.runOnce()
+  try runtime.pump()
   _ = try runtime.pollEvent()
   try runtime.close()
 
@@ -100,7 +100,7 @@ private func loadProbeStyle(
 ) throws -> String? {
   try map.setStyleURL(styleURL)
   for _ in 0 ..< 5000 {
-    try runtime.runOnce()
+    try runtime.pump()
     while let event = try runtime.pollEvent() {
       guard event.type == .mapLoadingFailed,
             event.message.contains(styleURL)

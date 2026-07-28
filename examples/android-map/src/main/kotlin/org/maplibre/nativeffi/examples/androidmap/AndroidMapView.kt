@@ -95,7 +95,7 @@ internal class AndroidMapView(context: Context) :
           if (target.renderUpdate()) {
             finishPendingDrawing()
           } else {
-            // The map applies its logical size on the runtime loop's next runOnce, so an attach is
+            // The map applies its logical size on the runtime loop's next pump, so an attach is
             // followed by frames with nothing to render. Keep pacing and retry.
             loop.renderRequest.set()
           }

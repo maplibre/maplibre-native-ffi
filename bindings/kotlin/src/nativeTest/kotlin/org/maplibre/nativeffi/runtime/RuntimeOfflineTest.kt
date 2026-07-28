@@ -129,7 +129,7 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
     operation: OfflineOperationHandle<*>,
   ): RuntimeEventPayload.OfflineOperationCompleted {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = pollEvent(runtime) ?: break
         val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted
@@ -190,7 +190,7 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
     regionId: Long,
   ): RuntimeEvent {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = pollEvent(runtime) ?: break
         when (val payload = event.payload) {

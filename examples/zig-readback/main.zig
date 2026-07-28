@@ -16,6 +16,7 @@ const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @i
 const width = 512;
 const height = 512;
 const style_url = "https://tiles.openfreemap.org/styles/bright";
+const park_timeout_milliseconds = 100;
 
 const RuntimeLoopArgs = struct {
     allocator: std.mem.Allocator,
@@ -57,11 +58,17 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     try map.setStyleUrl(args.allocator, style_url);
     try map.requestStillImage();
 
-    shared.publishMap(map);
+    // The render loop signals this so a closed session ends the loop without
+    // waiting out the parking bound below.
+    const wake = try runtime.wakeSource();
+    defer wake.release();
+    shared.publish(map, wake);
 
     const map_id = try map.id();
     while (shared.failureValue() == null and !shared.sessionClosed()) {
-        runtime.runOnce() catch |err| {
+        // Headless readback has no display, so this loop takes its cadence from
+        // the runtime's own work and parks in between.
+        runtime.pump(park_timeout_milliseconds) catch |err| {
             logLatestDiagnostic(&diagnostic_store);
             return err;
         };
@@ -79,10 +86,6 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
                 else => {},
             }
         }
-
-        // run_once never blocks waiting for work, so pace the loop rather than
-        // spinning on it.
-        shared.io.sleep(.fromMilliseconds(2), .awake) catch {};
     }
 }
 
@@ -218,6 +221,7 @@ const Shared = struct {
     /// Published by the runtime loop once it has created the map. The render
     /// loop attaches its own session against this.
     map: ?maplibre.MapHandle = null,
+    wake: ?maplibre.WakeSourceHandle = null,
     /// First fatal error from either loop.
     failure: ?anyerror = null,
 
@@ -247,11 +251,24 @@ const Shared = struct {
         return self.failure;
     }
 
-    fn publishMap(self: *Shared, handle: maplibre.MapHandle) void {
+    fn publish(
+        self: *Shared,
+        handle: maplibre.MapHandle,
+        wake: maplibre.WakeSourceHandle,
+    ) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
         self.map = handle;
+        self.wake = wake;
         self.map_published.store(true, .release);
+    }
+
+    /// Render loop: releases the runtime loop's parked pump.
+    fn wakeRuntimeLoop(self: *Shared) void {
+        if (!self.map_published.load(.acquire)) return;
+        std.Io.Threaded.mutexLock(&self.lock);
+        defer std.Io.Threaded.mutexUnlock(&self.lock);
+        if (self.wake) |wake| wake.signal() catch {};
     }
 
     fn tryTakeMap(self: *Shared) ?maplibre.MapHandle {
@@ -291,6 +308,8 @@ const Shared = struct {
 
     fn markSessionClosed(self: *Shared) void {
         self.session_closed.store(true, .release);
+        // Release the pump so the runtime loop observes this now.
+        self.wakeRuntimeLoop();
     }
 
     fn sessionClosed(self: *Shared) bool {

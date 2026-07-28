@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.runtime
 import cnames.structs.mln_offline_region_list
 import cnames.structs.mln_offline_region_snapshot
 import cnames.structs.mln_runtime
+import cnames.structs.mln_wake_source
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.WeakReference
 import kotlinx.cinterop.BooleanVar
@@ -46,10 +47,11 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_datab
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_pump
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
-import org.maplibre.nativeffi.internal.c.mln_runtime_run_once
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
+import org.maplibre.nativeffi.internal.c.mln_runtime_wake_source_acquire
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
@@ -77,8 +79,15 @@ internal constructor(
   private var resourceTransformState: ResourceTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
 
-  public actual fun runOnce() {
-    Status.check(mln_runtime_run_once(state.requireLive()))
+  public actual fun pump(timeoutMillis: Long) {
+    Status.check(mln_runtime_pump(state.requireLive(), timeoutMillis))
+  }
+
+  public actual fun acquireWakeSource(): WakeSource = memScoped {
+    val outSource = alloc<CPointerVarOf<CPointer<mln_wake_source>>>()
+    outSource.value = null
+    Status.check(mln_runtime_wake_source_acquire(state.requireLive(), outSource.ptr))
+    WakeSource(outSource.value)
   }
 
   public actual fun startAmbientCacheOperation(

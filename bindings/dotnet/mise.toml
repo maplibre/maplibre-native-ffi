@@ -5,10 +5,9 @@
 auto = true
 dir = "../.."
 sources = ["dotnet-tools.json", "bindings/dotnet/dotnet-tools.json"]
-run = '''
-dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet
-dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet
-'''
+# Dependency providers run through the platform shell, so both manifests restore
+# from one `&&` line that `sh` and `cmd` each understand.
+run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet"
 
 [tasks.generate]
 run = "scripts/generate-clangsharp.sh"

@@ -1,8 +1,6 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.Semaphore
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import org.maplibre.nativeffi.geo.ScreenPoint
 
@@ -37,11 +35,15 @@ internal sealed interface CameraCommand {
 /**
  * Queue of pending camera commands, written by input handlers and read by the runtime loop.
  *
- * [await] lets the runtime loop pace itself while still waking as soon as input arrives.
+ * [onEnqueue] releases the runtime loop's parked pump, so input reaches it without waiting out the
+ * parking bound. The loop parks inside the native pump rather than on a host primitive, so the same
+ * park also wakes for the runtime's own work.
  */
 internal class CameraCommandQueue {
   private val queue = ConcurrentLinkedQueue<CameraCommand>()
-  private val wakeup = Semaphore(0)
+
+  /** Set once the runtime loop has acquired its wake source. */
+  @Volatile var onEnqueue: (() -> Unit)? = null
 
   fun enqueue(command: CameraCommand) {
     queue.add(command)
@@ -55,14 +57,8 @@ internal class CameraCommandQueue {
     }
   }
 
-  /** Waits up to [timeoutMs] for new work. */
-  fun await(timeoutMs: Long) {
-    wakeup.tryAcquire(timeoutMs, TimeUnit.MILLISECONDS)
-    wakeup.drainPermits()
-  }
-
   fun wake() {
-    wakeup.release()
+    onEnqueue?.invoke()
   }
 }
 

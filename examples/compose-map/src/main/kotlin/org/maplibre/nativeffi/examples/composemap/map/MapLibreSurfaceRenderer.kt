@@ -72,7 +72,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     if (attached.session.renderUpdate()) {
       return NativeSurfaceRenderResult.Rendered
     }
-    // The map applies a new logical size on the runtime loop's next runOnce, so an attach or resize
+    // The map applies a new logical size on the runtime loop's next pump, so an attach or resize
     // is followed by frames with nothing to render. Keep pacing and retry.
     requestRender()
     return NativeSurfaceRenderResult.Skipped

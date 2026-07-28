@@ -531,7 +531,7 @@ public sealed unsafe class ResourceProviderTests
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
             if (signal.IsSet)
             {
                 return;
@@ -550,7 +550,7 @@ public sealed unsafe class ResourceProviderTests
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
             if (handle.IsCancelled())
             {
                 return;

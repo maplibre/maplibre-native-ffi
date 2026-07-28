@@ -4,6 +4,7 @@
 #include <stdatomic.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "maplibre_native_c.h"
 
@@ -18,6 +19,9 @@ typedef struct mln_test_thread mln_test_thread;
 mln_test_thread* mln_test_thread_start(void (*entry)(void*), void* argument);
 void mln_test_thread_join(mln_test_thread* thread);
 void mln_test_sleep_milliseconds(unsigned int milliseconds);
+// Monotonic milliseconds, for tests that assert a pump returned promptly rather
+// than sat out its timeout.
+uint64_t mln_test_monotonic_milliseconds(void);
 
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.

@@ -150,8 +150,8 @@ loop**.
   viewport, the graphics API context and presentation resources, the compositor,
   and the render session for the session's whole lifetime. It attaches the
   session, renders through it, resizes it, and closes it.
-- The runtime loop thread owns the runtime, the map, `run_once`, `poll_event`,
-  and every map mutation. It never calls a render-session function.
+- The runtime loop thread owns the runtime, the map, `pump`, `poll_event`, and
+  every map mutation. It never calls a render-session function.
 - Each loop MUST run on a native thread whose identity is stable for the life of
   the loop. Host mechanisms that may move a logical task between native threads,
   such as thread pools, green threads, and coroutine dispatchers without thread
@@ -164,10 +164,9 @@ loop**.
   runtime loop to the render loop so the render loop can attach against it. A
   shutdown signal and a first-failure record MAY accompany them.
 
-This split exists because `run_once` drains the work it finds rather than a
-fixed slice, so a single call can take as long as a style parse. Keeping it off
-the display-paced loop is what lets presentation continue during heavy runtime
-work.
+This split exists because `pump` drains the work it finds rather than a fixed
+slice, so a single call can take as long as a style parse. Keeping it off the
+display-paced loop is what lets presentation continue during heavy runtime work.
 
 ##### Render loop thread by host toolkit
 
@@ -320,7 +319,7 @@ fails.
 
 #### Handle ownership
 
-- One runtime per process (the runtime loop thread drives `run_once` / pump).
+- One runtime per process (the runtime loop thread drives `pump`).
 - One map per runtime for the demo, sharing the runtime's owner thread.
 - One live render target per map at a time.
 - One render session owner thread, fixed for the session's lifetime: the thread
@@ -330,22 +329,25 @@ fails.
 
 ### Frame loop
 
-The C API treats runtime pumping and presentation as separate concerns.
-`run_once` advances native scheduler work and fills the event queue; it is not
+The C API treats runtime pumping and presentation as separate concerns. `pump`
+advances native scheduler work and fills the event queue; it is not
 display-driven. One call drains the work it finds instead of running a fixed
 slice, so a single call can take as long as a style parse. `render_update` draws
 only when the render request is set.
 
 `*-map` examples split the two across the loops described in
 [Threads and loops](#threads-and-loops): the render loop is display-paced and
-draws, and the runtime loop pumps. `run_once` returns as soon as its iteration
-finishes and never blocks waiting for more work, so a runtime loop paces itself
-by waiting on a host condition between iterations.
+draws, and the runtime loop pumps. The runtime loop owns its own thread, so it
+passes a positive `timeout_ms` and takes its cadence from the runtime's own work
+rather than from the display. `pump` parks the thread for up to that bound,
+which is what lets the runtime loop idle while the map is quiet instead of
+polling.
 
 #### Render loop iteration
 
 1. Handle window, input, and resize events; translate camera input into commands
-   and enqueue them for the runtime loop; set the render request.
+   and enqueue them for the runtime loop; signal the runtime loop's wake source;
+   set the render request.
 2. Apply pending viewport changes to graphics resources and to the render
    session, or run the [reattach](#reattach).
 3. Consume the render request; when it was set, call `render_update`.
@@ -359,7 +361,7 @@ sequenceDiagram
   participant BE as Backend
 
   RL->>RL: Input and resize
-  RL->>RQ: enqueue camera commands, set request
+  RL->>RQ: enqueue camera commands, signal wake source, set request
   RL->>RQ: consume request
   RL->>RS: render_update() when it was set
   RL->>BE: finishFrame()
@@ -368,12 +370,12 @@ sequenceDiagram
 `finishFrame()` runs every iteration: swapchain or surface upkeep, resize
 handling, and present hooks as required by the host graphics API.
 
-A render loop iteration MUST NOT call `run_once` or `poll_event`.
+A render loop iteration MUST NOT call `pump` or `poll_event`.
 
 #### Runtime loop iteration
 
 1. Apply every queued camera command.
-2. Call `run_once` exactly once.
+2. Call `pump` exactly once, with a positive `timeout_ms`.
 3. Drain runtime events until the queue is empty, updating the render request.
 
 ```mermaid
@@ -384,7 +386,7 @@ sequenceDiagram
   participant RQ as Render request
 
   RTL->>CQ: apply queued camera commands
-  RTL->>RT: run_once()
+  RTL->>RT: pump(timeout_ms)
   RTL->>RT: drain events
   RTL->>RQ: set request when a frame is needed
 ```
@@ -397,14 +399,17 @@ While the map is visible and the example is active:
   and MUST subscribe to the host toolkit's display refresh mechanism (for
   example swapchain frame callbacks, `CADisplayLink`, or `Choreographer`) to
   pace it.
-- The runtime loop MUST run at least one iteration per display refresh period,
-  and MUST wake immediately when the render loop enqueues a camera command or a
-  viewport change. Between iterations it MUST wait on a host condition with a
-  timeout no longer than one display refresh period.
+- The runtime loop MUST wake immediately when the render loop enqueues a camera
+  command or a viewport change. It acquires a wake source on its own thread,
+  publishes it to the render loop, and the render loop signals it. The parking
+  bound it passes to `pump` is a backstop rather than the cadence, so it MAY be
+  longer than one display refresh period.
 
-Display refresh paces the render loop; it does not replace `run_once`. Each
-runtime loop iteration MUST call `run_once` exactly once, and no other loop
-calls it.
+Display refresh paces the render loop; it does not pump. Each runtime loop
+iteration MUST call `pump` exactly once, and no other loop calls it. A
+single-loop host instead passes zero so the refresh mechanism remains its only
+cadence; a two-loop example passes a positive bound because its pump thread has
+no display to pace it.
 
 When the profile stops the loops (for example mobile background), runtime
 progress stalls until they resume.
@@ -435,6 +440,7 @@ Requirements:
 
 - The render request MUST be published and observed through the host language's
   atomic or synchronized mechanism. An unsynchronized field is not sufficient.
+- The runtime loop MUST call `pump` once per iteration while it is running.
 - The runtime loop MUST drain runtime events each iteration and set the render
   request when:
   - `map_render_update_available` targets this map (new map content to draw), or
@@ -449,12 +455,12 @@ Requirements:
   update was rendered. Consuming afterwards would discard a request the runtime
   loop published during the render call, and that frame would never be drawn.
 - `map_render_frame_finished` and `map_idle` are delivered by the runtime loop's
-  next `run_once` after the render loop rendered. An example MUST NOT treat
-  either as a synchronous result of the `render_update` it follows, and MUST NOT
-  block a render loop iteration waiting for one.
+  next `pump` after the render loop rendered. An example MUST NOT treat either
+  as a synchronous result of the `render_update` it follows, and MUST NOT block
+  a render loop iteration waiting for one.
 - After a session resize, the map applies its logical size on the runtime loop's
-  next `run_once`, so `render_update` reports no update until then. The render
-  loop MUST keep pacing and retry rather than treating it as a failure.
+  next `pump`, so `render_update` reports no update until then. The render loop
+  MUST keep pacing and retry rather than treating it as a failure.
 
 Texture modes: after `render_update` reports an update was rendered, MUST run
 the compositor pass to copy the map texture into the host swapchain before
@@ -592,7 +598,7 @@ that pass.
   graphics context and active render target in place.
 - Set the render request after any resize.
 - The render loop owns the session, so an in-place resize is a local call. The
-  map applies the new logical size on the runtime loop's next `run_once`, so
+  map applies the new logical size on the runtime loop's next `pump`, so
   `render_update` reports no update until then.
 
 #### Reattach

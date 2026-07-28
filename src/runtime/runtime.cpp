@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -55,6 +56,12 @@ struct mln_offline_region_snapshot {
 
 struct mln_offline_region_list {
   std::vector<OfflineRegionData> regions;
+};
+
+// Holds its own reference to the wake state, so the state stays readable for a
+// signal that races runtime teardown and hosts destroy the two in either order.
+struct mln_wake_source {
+  std::shared_ptr<mln::core::WakeState> state;
 };
 
 namespace mln::core {
@@ -513,11 +520,16 @@ auto push_offline_region_event(
     .offline_region_id = region_id
   };
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  if (!runtime->observed_offline_regions.contains(region_id)) {
-    return;
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    if (!runtime->observed_offline_regions.contains(region_id)) {
+      return;
+    }
+    runtime->events.push_back(std::move(event));
   }
-  runtime->events.push_back(std::move(event));
+  // The offline region observer runs off the owner-thread run loop, so this
+  // signal is what tells a parked owner thread the event arrived.
+  mln::core::signal_wake(runtime->wake_state);
 }
 
 class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
@@ -808,8 +820,11 @@ auto complete_offline_operation(
     .offline_operation_id = operation_id
   };
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  runtime->events.push_back(std::move(event));
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    runtime->events.push_back(std::move(event));
+  }
+  mln::core::signal_wake(runtime->wake_state);
 }
 
 auto complete_offline_operation_error(
@@ -1025,8 +1040,15 @@ auto create_runtime(
 
   auto owned_runtime = std::make_unique<mln_runtime>();
   owned_runtime->owner_thread = owner_thread;
+  owned_runtime->wake_state = std::make_shared<WakeState>();
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
+  // `setPlatformCallback` is an unlocked assignment, so it is set here while
+  // the run loop is reachable only from this thread. MapLibre calls it from
+  // every thread that queues owner-thread work.
+  owned_runtime->run_loop->setPlatformCallback(
+    [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
+  );
   owned_runtime->asset_path =
     options == nullptr || options->asset_path == nullptr
       ? std::string{}
@@ -2462,20 +2484,105 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
     });
   }
 
+  // Retiring the wake state before the run loop is released covers a late
+  // `mln_wake_source_signal()` and the run loop teardown's final iteration.
+  // Wake sources the host still holds keep the state readable.
+  {
+    const std::scoped_lock wake_lock(owned_runtime->wake_state->mutex);
+    owned_runtime->wake_state->alive = false;
+    owned_runtime->wake_state->signaled = false;
+  }
+
   // Releasing the run loop and the database file source can join native
   // threads, and that happens here with the registry lock released.
   owned_runtime.reset();
   return MLN_STATUS_OK;
 }
 
-auto run_runtime_once(mln_runtime* runtime) -> mln_status {
+auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
+  if (!state) {
+    return;
+  }
+  {
+    const std::scoped_lock lock(state->mutex);
+    if (!state->alive) {
+      return;
+    }
+    state->signaled = true;
+  }
+  // MapLibre calls this while it holds the `RunLoop` mutex, which every thread
+  // that queues owner-thread work needs, so the notify happens outside the wake
+  // lock to keep the path short.
+  state->condition.notify_all();
+}
+
+auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
   const auto status = validate_runtime(runtime);
   if (status != MLN_STATUS_OK) {
     return status;
   }
 
+  // Queued unread events return the call without parking, so a host that
+  // stopped polling before the queue emptied keeps making progress.
+  auto queued_events = false;
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    queued_events = !runtime->events.empty();
+  }
+
+  {
+    auto& wake = *runtime->wake_state;
+    std::unique_lock lock(wake.mutex);
+    if (!queued_events && timeout_ms != 0 && !wake.signaled) {
+      if (timeout_ms < 0) {
+        wake.condition.wait(lock, [&wake]() -> bool { return wake.signaled; });
+      } else {
+        wake.condition.wait_for(
+          lock, std::chrono::milliseconds{timeout_ms},
+          [&wake]() -> bool { return wake.signaled; }
+        );
+      }
+    }
+    // The flag is cleared before the drain, so work arriving during the drain
+    // leaves it set for the next pump.
+    wake.signaled = false;
+  }
+
   runtime->run_loop->runOnce();
   return MLN_STATUS_OK;
+}
+
+auto acquire_wake_source(mln_runtime* runtime, mln_wake_source** out_source)
+  -> mln_status {
+  const auto status = validate_runtime(runtime);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_source == nullptr) {
+    set_thread_error("out_source must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_source != nullptr) {
+    set_thread_error("out_source must point to a null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_source = new mln_wake_source{.state = runtime->wake_state};
+  return MLN_STATUS_OK;
+}
+
+auto signal_wake_source(mln_wake_source* source) -> mln_status {
+  if (source == nullptr) {
+    set_thread_error("wake source must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  signal_wake(source->state);
+  return MLN_STATUS_OK;
+}
+
+auto destroy_wake_source(mln_wake_source* source) noexcept -> void {
+  delete source;
 }
 
 auto poll_runtime_event(
@@ -2705,14 +2812,31 @@ auto push_runtime_map_event_payload(
     .message = std::move(message)
   };
 
-  const std::scoped_lock lock(runtime->event_mutex);
-  if (map != nullptr && !runtime->event_maps.contains(map)) {
-    return;
+  {
+    const std::scoped_lock lock(runtime->event_mutex);
+    if (map != nullptr && !runtime->event_maps.contains(map)) {
+      return;
+    }
+    if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
+      runtime->map_loading_failures[map] = event.message;
+    }
+    // A render draws the latest update, so one unread render-update event
+    // covers every invalidation queued behind it. This matches the
+    // `uv_async_send` coalescing MapLibre's own headless frontend relies on.
+    // Comparing against the tail alone preserves the order of every other
+    // event.
+    if (
+      type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE && map != nullptr &&
+      !runtime->events.empty() && runtime->events.back().type == type &&
+      runtime->events.back().map == map
+    ) {
+      // The unread event already asks the host to render and already returns
+      // the next pump without parking.
+      return;
+    }
+    runtime->events.push_back(std::move(event));
   }
-  if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
-    runtime->map_loading_failures[map] = event.message;
-  }
-  runtime->events.push_back(std::move(event));
+  signal_wake(runtime->wake_state);
 }
 
 auto register_runtime_map_events(mln_runtime* runtime, const mln_map* map)

@@ -3,7 +3,7 @@
 # repository tasks.
 
 monorepo_root = true
-min_version = "2026.7.10"
+min_version = "2026.7.15"
 
 [settings]
 lockfile = true
@@ -29,6 +29,18 @@ dotnet.isolated = true
 [monorepo]
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
+
+# Inline task scripts across the workspace are Bash. Cascading the shell gives
+# every monorepo config root the same contract without repeating it, and keeps
+# the choice scoped to tasks: hooks, tool installs, and dependency providers
+# still use the platform shell.
+#
+# This default reaches file tasks too, and on Windows mise applies it in place
+# of the shebang, so each file task names its own interpreter with
+# `#MISE shell=`.
+[task_config]
+cascade = true
+shell = "bash -e -c"
 
 [vars]
 actionlint_version = "1.7.8"
@@ -105,9 +117,10 @@ auto = true
 run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
-# The built-in provider runs pnpm directly. A `run` script would go through Git
-# Bash, and on Windows ARM64 the lifecycle scripts pnpm spawns through cmd then
-# fail to resolve mise's node, so the workspace-wide install stays.
+# The built-in provider runs pnpm directly. A `run` script would put a shell
+# between mise and pnpm, and on Windows ARM64 the lifecycle scripts pnpm spawns
+# through cmd then fail to resolve mise's node, so the workspace-wide install
+# stays.
 auto = true
 
 [deps.submodules]

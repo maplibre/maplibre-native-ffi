@@ -73,10 +73,16 @@ internal sealed class MapState : IDisposable
         }
     }
 
+    /// <summary>Acquires the wake source the render loop uses to release this loop's parked pump.</summary>
+    public WakeSource AcquireWakeSource() => runtime.AcquireWakeSource();
+
     /// <summary>Pumps the runtime once, reporting whether the map wants another frame.</summary>
-    public bool Step()
+    public bool Step(TimeSpan parkTimeout)
     {
-        runtime.RunOnce();
+        // This thread has no display to pace it, so it takes its cadence from the runtime's own
+        // work and parks in between. The render loop signals the wake source, so the bound is a
+        // backstop rather than the cadence.
+        runtime.Pump(parkTimeout);
         return DrainEvents();
     }
 

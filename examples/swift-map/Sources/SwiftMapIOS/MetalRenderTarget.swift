@@ -81,7 +81,7 @@ final class MetalRenderTarget {
 
   /// Renders the latest map update, reporting whether a frame was drawn.
   ///
-  /// The map applies a new logical size on the runtime loop's next `runOnce`,
+  /// The map applies a new logical size on the runtime loop's next `pump`,
   /// so this reports no update for a few iterations after attach or resize.
   /// That is normal: the render loop keeps pacing and asks again.
   func renderUpdate() throws -> Bool {

@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.WakeSource
 
 /**
  * Owns the runtime and the map for their whole lifetime, off the UI thread.
@@ -34,6 +35,12 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   private val handler = Handler(thread.looper)
   private var runtime: RuntimeHandle? = null
   private var owned: MapHandle? = null
+
+  /**
+   * Releases the parked pump on the handler thread. Every path that posts work to that thread
+   * signals this too, because a parked pump would otherwise hold the message until its bound.
+   */
+  @Volatile private var wake: WakeSource? = null
 
   /** The map to attach against, once the loop has created one. */
   @Volatile
@@ -54,7 +61,10 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             while (true) {
               apply(currentMap, commands.poll() ?: break)
             }
-            currentRuntime.runOnce()
+            // This thread has no display to pace it, so it takes its cadence from the runtime's
+            // own work and parks in between. The render loop signals the wake source on enqueue,
+            // and close() signals it too, so the bound is a backstop rather than the cadence.
+            currentRuntime.pump(PARK_TIMEOUT_MS)
             if (drainEvents(currentRuntime, currentMap)) {
               renderRequest.set()
             }
@@ -62,9 +72,9 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
             Log.e(TAG, "runtime loop iteration failed", error)
           }
         }
-        // runOnce never blocks waiting for work, so pace the loop instead of spinning on it. One
-        // display refresh period is the ceiling; enqueued commands wake it sooner.
-        handler.postDelayed(this, PUMP_INTERVAL_MS)
+        // The pump above provides the pacing, so requeue immediately rather than adding a delay
+        // on top of the park.
+        handler.post(this)
       }
     }
 
@@ -75,16 +85,20 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   fun enqueue(command: CameraCommand) {
     commands.add(command)
     handler.post(pump)
+    wake?.signal()
   }
 
   /** Asks the map to redraw, for instance after the render loop attached a fresh session. */
   fun requestRepaint() {
     handler.post { owned?.requestRepaint() }
+    wake?.signal()
   }
 
   override fun close() {
     handler.removeCallbacks(pump)
     handler.post { closeHandles() }
+    // Release the parked pump so the close above runs now rather than after its bound.
+    wake?.signal()
     thread.quitSafely()
     thread.join()
   }
@@ -93,6 +107,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
     try {
       val createdRuntime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
       runtime = createdRuntime
+      wake = createdRuntime.acquireWakeSource()
       val createdMap =
         MapHandle.create(
           createdRuntime,
@@ -125,12 +140,19 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
     map = null
     val closingMap = owned
     val closingRuntime = runtime
+    val closingWake = wake
     owned = null
     runtime = null
+    wake = null
     try {
       closingMap?.close()
     } finally {
-      closingRuntime?.close()
+      try {
+        closingRuntime?.close()
+      } finally {
+        // A wake source outlives its runtime, so this is safe in either order.
+        closingWake?.close()
+      }
     }
   }
 
@@ -189,7 +211,11 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   private companion object {
     private const val TAG = "MapLibreRuntimeLoop"
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
-    private const val PUMP_INTERVAL_MS = 4L
+    /**
+     * Backstop for the runtime loop's park. The wake source is what normally releases it, so this
+     * only bounds a pump that nothing signals.
+     */
+    private const val PARK_TIMEOUT_MS = 100L
     private const val MIN_PITCH = 0.0
     private const val MAX_PITCH = 60.0
     private val DOUBLE_TAP_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }

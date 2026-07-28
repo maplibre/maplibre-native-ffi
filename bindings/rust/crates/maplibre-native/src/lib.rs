@@ -78,7 +78,7 @@ pub use resource::{
 };
 pub use runtime::{
     OfflineOperationHandle, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions,
+    RuntimeOptions, WakeSource,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,

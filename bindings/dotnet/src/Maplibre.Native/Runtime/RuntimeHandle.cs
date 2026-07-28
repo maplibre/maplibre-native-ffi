@@ -615,20 +615,51 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
     }
 
-    /// <summary>
-    /// Runs one iteration of this runtime's owner-thread run loop. The iteration
-    /// drains the high-priority task queue and then the default queue until both
-    /// are empty, including tasks enqueued during the drain, and also dispatches
-    /// expired timers and ready I/O.
-    /// </summary>
+    /// <summary>Advances this runtime.</summary>
     /// <remarks>
-    /// <see cref="RunOnce" /> returns without blocking on new work, but its
-    /// duration is unbounded: a single iteration can span a style parse. Treat it
-    /// as "make progress now" rather than as a fixed per-frame time slice.
+    /// The call parks the owner thread when <paramref name="timeout" /> allows it,
+    /// then drains the owner-thread task queues. Drain the queued runtime events
+    /// with <see cref="PollEvent" /> afterwards.
+    /// <para>
+    /// <paramref name="timeout" /> sets the park bound. <see cref="TimeSpan.Zero" />
+    /// drains and returns; hosts pumping from a frame callback pass it. A positive
+    /// value parks for up to that long; hosts that own their pump thread pass one
+    /// and take their cadence from the runtime's own work. A negative value parks
+    /// until a wake arrives.
+    /// </para>
+    /// <para>
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
+    /// </para>
+    /// <para>
+    /// The runtime holds a wake flag. Style, tile, offline, and resource responses
+    /// set it, as do queued runtime events and <see cref="WakeSource.Signal" />. A
+    /// parking call returns as soon as the flag is set and clears it before
+    /// returning, and work arriving during the drain sets it again. A call also
+    /// returns without parking while unread runtime events are queued. Timers and
+    /// ready file descriptors set the flag only when they queue owner-thread work,
+    /// so pass a bounded timeout to cap how long a call waits.
+    /// </para>
+    /// <para>
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock that a
+    /// thread signalling a <see cref="WakeSource" /> takes.
+    /// </para>
     /// </remarks>
-    public void RunOnce()
+    public void Pump(TimeSpan timeout)
     {
-        NativeStatus.Check(NativeMethods.mln_runtime_run_once(Pointer));
+        var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
+        NativeStatus.Check(NativeMethods.mln_runtime_pump(Pointer, timeoutMilliseconds));
+    }
+
+    /// <summary>
+    /// Acquires a wake source that releases this runtime's parked owner thread. The
+    /// returned source is usable from any thread, and the caller disposes it.
+    /// </summary>
+    public WakeSource AcquireWakeSource()
+    {
+        mln_wake_source* source = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_wake_source_acquire(Pointer, &source));
+        return new WakeSource(source);
     }
 
     /// <summary>

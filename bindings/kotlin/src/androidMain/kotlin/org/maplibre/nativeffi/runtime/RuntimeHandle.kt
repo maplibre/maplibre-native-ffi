@@ -49,9 +49,22 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun runOnce() {
+  public actual fun pump(timeoutMillis: Long) {
     NativeAccess.ensureLoaded()
-    Status.check(MaplibreNativeC.mln_runtime_run_once(runtime(requireLiveAddress())))
+    Status.check(MaplibreNativeC.mln_runtime_pump(runtime(requireLiveAddress()), timeoutMillis))
+  }
+
+  public actual fun acquireWakeSource(): WakeSource {
+    NativeAccess.ensureLoaded()
+    val address = requireLiveAddress()
+    PointerPointer<MaplibreNativeC.mln_wake_source>(1).use { outSource ->
+      outSource.put(0, null as Pointer?)
+      Status.check(MaplibreNativeC.mln_runtime_wake_source_acquire(runtime(address), outSource))
+      val source = outSource.get(MaplibreNativeC.mln_wake_source::class.java, 0)
+      val sourceAddress = if (source == null || source.isNull) 0L else source.address()
+      require(sourceAddress != 0L) { "mln_runtime_wake_source_acquire returned a null wake source" }
+      return WakeSource(sourceAddress)
+    }
   }
 
   public actual fun startAmbientCacheOperation(

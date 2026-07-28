@@ -47,6 +47,8 @@ final class Channels: @unchecked Sendable {
   private var commands: [CameraCommand] = []
   private var renderRequested = true
   private var publishedAttachRef: MapAttachRef?
+  /// Releases the runtime loop's parked pump. Set once the loop has published.
+  private var wake: WakeSource?
   private var shutdown = false
   private var failure: String?
   private var runtimeLoopFinished = false
@@ -61,7 +63,11 @@ final class Channels: @unchecked Sendable {
       commands.removeFirst()
     }
     commands.append(command)
+    let source = wake
     condition.signal()
+    // Release the parked pump so this command is applied now rather than after
+    // the parking bound.
+    source?.signal()
   }
 
   /// Runtime loop: takes every queued command so it can apply them without
@@ -98,7 +104,8 @@ final class Channels: @unchecked Sendable {
   // MARK: - Attach reference (runtime loop to render loop)
 
   /// Runtime loop: announces the map it just created.
-  func publish(attachRef: MapAttachRef) {
+  func publish(attachRef: MapAttachRef, wake: WakeSource) {
+    self.wake = wake
     condition.lock()
     defer { condition.unlock() }
     publishedAttachRef = attachRef
@@ -120,7 +127,10 @@ final class Channels: @unchecked Sendable {
     condition.lock()
     defer { condition.unlock() }
     shutdown = true
+    let source = wake
     condition.broadcast()
+    // Release the pump so shutdown is observed now.
+    source?.signal()
   }
 
   var isShutdownRequested: Bool {
@@ -173,10 +183,8 @@ final class Channels: @unchecked Sendable {
 
   /// Runtime loop: paces one iteration, waking early for a queued command or a
   /// shutdown request.
-  func waitForWork(timeout: TimeInterval) {
-    condition.lock()
-    defer { condition.unlock() }
-    guard commands.isEmpty, !shutdown, failure == nil else { return }
-    _ = condition.wait(until: Date(timeIntervalSinceNow: timeout))
+  /// Render loop: releases the runtime loop's parked pump.
+  func wakeRuntimeLoop() {
+    wake?.signal()
   }
 }

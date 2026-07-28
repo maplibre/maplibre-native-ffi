@@ -10,7 +10,12 @@ internal static class Shell
 
     // TODO(map-example-spec): Replace the fixed interval with a display-paced host loop. See Frame loop.
     private static readonly TimeSpan RenderLoopInterval = TimeSpan.FromMilliseconds(8);
-    private static readonly TimeSpan RuntimeLoopInterval = TimeSpan.FromMilliseconds(4);
+
+    /// <summary>
+    /// Backstop for the runtime loop's park. The render loop's wake source is what normally
+    /// releases it, so this only bounds a pump that nothing signals.
+    /// </summary>
+    private static readonly TimeSpan ParkTimeout = TimeSpan.FromMilliseconds(100);
 
     public static void Run(RenderTargetMode mode, RenderBackend backends)
     {
@@ -22,7 +27,7 @@ internal static class Shell
             InitialHeight,
             backends
         );
-        using var commands = new CommandQueue();
+        var commands = new CommandQueue();
         using var channel = new MapChannel();
         var renderRequest = new RenderRequest();
         var initialViewport = graphics.ReadViewport();
@@ -69,19 +74,17 @@ internal static class Shell
         try
         {
             state = MapState.Create(initialViewport);
-            channel.PublishMap(state.Map);
+            using var wake = state.AcquireWakeSource();
+            channel.PublishMap(state.Map, wake);
+            commands.OnEnqueue = channel.WakeRuntimeLoop;
 
             while (!channel.ShutdownRequested)
             {
                 state.ApplyCommands(commands);
-                if (state.Step())
+                if (state.Step(ParkTimeout))
                 {
                     renderRequest.Set();
                 }
-
-                // RunOnce never blocks waiting for work, so pace the loop instead of spinning on
-                // it, waking early whenever the render loop queues a camera command.
-                commands.Wait(RuntimeLoopInterval);
             }
         }
         catch (Exception error)
@@ -156,7 +159,7 @@ internal static class Shell
                 // render call is not discarded.
                 if (graphics.CanRenderFrame && renderRequest.Consume() && !Render(graphics, target))
                 {
-                    // The map applies its logical size on the runtime loop's next RunOnce, so no
+                    // The map applies its logical size on the runtime loop's next Pump, so no
                     // update is rendered until then. Ask again rather than dropping the frame.
                     renderRequest.Set();
                 }

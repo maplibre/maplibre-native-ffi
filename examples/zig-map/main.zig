@@ -14,6 +14,10 @@ const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
 const RenderTarget = render.RenderTarget;
+
+/// Backstop for the runtime loop's park. The render loop's wake source is what
+/// normally releases it, so this only bounds a pump that nothing signals.
+const park_timeout_milliseconds = 100;
 const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
 const RuntimeLoopArgs = struct {
@@ -36,18 +40,22 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     var state = try map_state.MapState.init(args.allocator, args.initial_viewport);
     defer state.deinit();
 
-    args.map_channel.publishMap(state.map);
+    // The render loop signals this to release the parked pump, so a camera
+    // command or a shutdown request lands without waiting out the bound below.
+    const wake = try state.runtime.wakeSource();
+    defer wake.release();
+
+    args.map_channel.publish(state.map, wake);
 
     while (!args.map_channel.shutdownRequested() and args.map_channel.failureValue() == null) {
         try state.applyCommands(args.commands);
-        try state.runtime.runOnce();
+        // This thread has no display to pace it, so it takes its cadence from
+        // the runtime's own work and parks in between. The bound is a backstop
+        // for work that queues nothing on the owner thread, not the cadence.
+        try state.runtime.pump(park_timeout_milliseconds);
         if (try map_state.drainEvents(args.allocator, &state.runtime, &state.map)) {
             args.render_request.set();
         }
-
-        // run_once never blocks waiting for work, so pace the loop instead of
-        // spinning on it. One display refresh period is the spec's ceiling.
-        args.io.sleep(.fromMilliseconds(4), .awake) catch {};
     }
 }
 
@@ -207,6 +215,12 @@ fn renderLoop(
                         commands,
                         current_viewport.*,
                     );
+                    if (input_result.handled) {
+                        // Release the runtime loop's parked pump so the command
+                        // just queued is applied on this frame rather than after
+                        // the parking bound.
+                        map_channel.wakeRuntimeLoop();
+                    }
                     if (input_result.camera_changed) render_request.set();
                 },
             }

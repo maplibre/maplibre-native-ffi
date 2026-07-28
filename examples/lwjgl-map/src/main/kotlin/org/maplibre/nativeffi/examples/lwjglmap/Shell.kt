@@ -67,19 +67,21 @@ internal object Shell {
   ) {
     try {
       MapState.create(viewport).use { state ->
-        channel.publishMap(state.map)
-        while (!channel.shutdownRequested()) {
-          // After a failure this loop idles instead of tearing down, because the render loop still
-          // holds a session attached to the map.
-          if (channel.failure() == null) {
-            try {
-              state.step(commands, renderRequest)
-            } catch (error: Throwable) {
-              channel.fail(error)
+        state.acquireWakeSource().use { wake ->
+          channel.publish(state.map, wake)
+          commands.onEnqueue = { channel.wakeRuntimeLoop() }
+          while (!channel.shutdownRequested()) {
+            // After a failure this loop idles instead of tearing down, because the render loop
+            // still
+            // holds a session attached to the map.
+            if (channel.failure() == null) {
+              try {
+                state.step(commands, renderRequest)
+              } catch (error: Throwable) {
+                channel.fail(error)
+              }
             }
           }
-          // run_once never blocks waiting for work, so pace the loop instead of spinning on it.
-          Thread.sleep(RUNTIME_LOOP_INTERVAL_MS)
         }
       }
     } catch (error: Throwable) {
