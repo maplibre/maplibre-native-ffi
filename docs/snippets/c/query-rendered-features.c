@@ -1,5 +1,5 @@
-// Ask what is drawn under a screen point. Queries hang off the render session,
-// not the map, because they read what was actually rendered.
+// Ask what is drawn under a screen point. Queries hang off the render session
+// because they read what the renderer produced.
 
 #include <maplibre_native_c.h>
 #include <string.h>

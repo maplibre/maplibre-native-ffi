@@ -1,6 +1,6 @@
 // Attaches an EGL surface the host window toolkit already created. Metal and
-// Vulkan follow the same shape with their own descriptor type and attach
-// function; only the handles in the descriptor differ.
+// Vulkan use their own descriptor type and attach function, carrying their own
+// handles.
 
 #include <maplibre_native_c.h>
 
@@ -17,7 +17,7 @@ mln_render_session* attach_surface(
   descriptor.extent.height = logical_height;
   descriptor.extent.scale_factor = scale_factor;
 
-  // The session joins your context's share group rather than taking it over.
+  // The session joins your context's share group.
   descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   descriptor.context.data.egl.display = egl_display;
   descriptor.context.data.egl.config = egl_config;

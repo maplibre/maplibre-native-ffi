@@ -8,81 +8,81 @@ sidebar:
 import { Code } from "@astrojs/starlight/components";
 import camera from "../../../../snippets/c/camera.c?raw";
 
-The camera is the familiar one: center, zoom, bearing, pitch, plus roll, field
-of view, padding, and center altitude. It lives on the map, not on the render
-session, so you can move it before anything is drawing. Transitions advance as
-you pump the runtime.
+Camera state covers center, zoom, bearing, pitch, roll, field of view, padding,
+and center altitude. It lives on the map, so you can move it before anything
+draws. Transitions advance as you pump the runtime.
 
-## Fields you set, fields you get
+## Camera options
 
-Camera options are a **field mask plus values**. Only the fields flagged in
-`fields` are applied, so setting the zoom leaves the center alone — there is no
-read-modify-write dance and no need to fill in values you do not care about.
-Reading the camera gives you a snapshot with the current values filled in.
+Camera options pair a field mask with values. MapLibre applies only the fields
+you flag, so setting the zoom leaves the center where it was. Reading the camera
+gives you a snapshot with the current values filled in.
 
-Screen positions are in **logical pixels**, origin top-left — the same units as
-the map's `width` and `height`, never device pixels.
+Screen positions use logical pixels with the origin at top left, the same units
+as the map's `width` and `height`.
 
-One field is input-only: `anchor`, the screen point a camera command pivots
-around. Snapshots never report it back.
+`anchor` is input-only. It sets the screen point a camera command pivots around,
+and snapshots leave it clear.
 
 ## Jump, ease, fly
 
-Three commands apply camera options, and the difference between them is time:
+Three commands apply camera options, and time separates them.
 
-* `jump_to` — immediate.
-* `ease_to` — eased, but the default duration is **zero**. Without an explicit
-  `duration_ms` it behaves exactly like a jump.
-* `fly_to` — the one command that animates by default. Left alone it derives a
-  duration from how far it is flying, at 1.2 screenfuls per second.
+`jump_to` applies the camera immediately.
+
+`ease_to` eases, and its duration defaults to zero. Without an explicit
+`duration_ms` it behaves like a jump.
+
+`fly_to` animates by default. Left alone it derives a duration from the flight
+distance at 1.2 screenfuls per second.
 
 Animation options also take a cubic easing curve, and `cancel_transitions()`
-stops whatever is in flight.
+stops a transition in flight.
 
 <Code code={camera} lang="c" title="camera.c" />
 
 ## Gestures
 
-Pan, zoom, rotate, and pitch come in relative form, for wiring straight to input
-events: `move_by` (screen-space pan), `scale_by` (zoom by a factor around an
-optional anchor), `rotate_by` (rotate between two screen points), and `pitch_by`
-(a delta in degrees). Each has an animated variant with the same zero-duration
-default as `ease_to`.
+Pan, zoom, rotate, and pitch come in relative form, which wires straight to
+input events. `move_by` pans in screen space, `scale_by` zooms by a factor
+around an optional anchor, `rotate_by` rotates between two screen points, and
+`pitch_by` takes a delta in degrees. Each has an animated variant with the same
+zero-duration default as `ease_to`.
 
 Absolute targets go through `jump_to`, `ease_to`, or `fly_to`.
 
 ## Fit the camera to content
 
-The `camera_for_*` family computes a camera that fits something into the current
-viewport — a bounding box, a list of coordinates, or a geometry — and hands it
-back without applying it. Pass the result to a transition to actually move
-there. Fit options add padding, bearing, and pitch. Going the other way,
+The `camera_for_*` family computes a camera that fits a bounding box, a
+coordinate list, or a geometry into the current viewport, and returns it without
+applying it. Pass the result to a transition to move there. Fit options add
+padding, bearing, and pitch. Going the other way,
 `lat_lng_bounds_for_camera()` reports the bounds a camera covers.
 
-Because these answer against the current viewport, the map's size matters:
-before you attach a render session, that is the `width` and `height` you created
-the map with.
+These answer against the current viewport, so the map's size decides the result.
+Before you attach a render session, that size is the `width` and `height` you
+created the map with.
 
 ## Constrain the camera
 
-`mln_map_set_bounds()` limits where the camera may go — geographic bounds,
-min/max zoom, min/max pitch — using the same field-mask pattern. Paired limits
-have to be consistent with each other.
+`mln_map_set_bounds()` limits where the camera may go through geographic bounds,
+min and max zoom, and min and max pitch, using the same field-mask pattern.
+Paired limits have to agree with each other. `mln_map_get_bounds()` reads back
+the active constraints.
 
 ## Screen and world coordinates
 
 `pixel_for_lat_lng` and `lat_lng_for_pixel` convert against the live map, with
 batch variants for many points at once.
 
-For overlays, `mln_map_projection_create()` is often the better tool: it freezes
-the map's current transform into a standalone projection object that keeps
-answering conversions even as the camera moves on, and even after the map is
-gone. That is what you want when placing UI on top of a frame you already
-rendered.
+`mln_map_projection_create()` freezes the map's current transform into a
+standalone projection object. That object answers the same conversions after the
+camera moves on and after the map is gone, which is what overlay placement needs
+between frames.
 
 `projected_meters_for_lat_lng` and its inverse are stateless spherical Mercator
-conversions needing no map at all. Metrics like meters-per-pixel are arithmetic
-on top of those.
+conversions that need no map. Metrics like meters-per-pixel are arithmetic on
+top of those.
 
 ## Watch the camera move
 

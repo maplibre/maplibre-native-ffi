@@ -1,6 +1,5 @@
 // One turn of a host frame loop: pump the runtime, drain its events, and render
-// when the map has something new. Call this from whatever paces your frames —
-// a vsync callback, a toolkit frame callback, or a sleep in a headless loop.
+// when the map has something new. Call it from whatever paces your frames.
 
 #include <maplibre_native_c.h>
 
@@ -41,8 +40,8 @@ void run_one_frame(
 
   if (!*pending) return;
 
-  // A false result means no frame was produced — normal before the map has
-  // published its first update. Stay pending and try again next turn.
+  // A false result means no frame was produced, which is normal before the map
+  // publishes its first update. Stay pending and try again next turn.
   bool rendered = false;
   const mln_status status =
     mln_render_session_render_update(session, &rendered);

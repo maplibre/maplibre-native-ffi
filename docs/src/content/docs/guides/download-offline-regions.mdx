@@ -8,49 +8,49 @@ sidebar:
 import { Aside, Code } from "@astrojs/starlight/components";
 import offlineRegion from "../../../../snippets/c/offline-region.c?raw";
 
-An offline region downloads everything a style needs for an area ahead of time,
-so the map keeps working with no network. Regions live in the runtime's cache
-database, which means `cache_path` has to be a real filesystem path — with
-`":memory:"` they last exactly as long as the process.
+An offline region downloads what a style needs for an area ahead of time, so the
+map keeps working with no network. Regions live in the runtime's cache database,
+so `cache_path` has to name a filesystem path. Under `":memory:"` a region lasts
+as long as the process.
 
-## Every offline call is asynchronous, the same way
+## The asynchronous operation pattern
 
-This is the one pattern to learn; every operation follows it.
+Every offline call follows the same three steps.
 
-1. Call a `..._start` function. It validates and returns an **operation ID**.
+1. Call a `..._start` function. It validates the request and returns an
+   operation ID.
 2. Keep pumping the runtime. Completion arrives as an
-   `OFFLINE_OPERATION_COMPLETED` event carrying that ID, what kind of operation
-   it was, and its own result status — separate from the status that starting it
-   returned.
-3. Take the result with the matching `..._take_result` function, if the
-   operation produces one.
+   `OFFLINE_OPERATION_COMPLETED` event carrying that ID, the operation kind, and
+   a result status separate from the status that starting it returned.
+3. Call the matching `..._take_result` function, for the operations that produce
+   a result.
 
-Operations that produce no result — delete, invalidate, set download state, set
-observed, ambient cache maintenance — finish at step 2. Either way the operation
-holds runtime state until it is consumed or discarded, so discard the ones you
-do not take. A failed take deliberately leaves the operation alive so you can
-retry it; discard it when you give up.
+Delete, invalidate, set download state, set observed, and ambient cache
+maintenance produce no result and finish at step 2. Either way the operation
+holds runtime state until you consume or discard it, so discard the ones you do
+not take. A failed take leaves the operation alive for a retry; discard it when
+you give up.
 
 ## Create a region
 
-Two kinds of definition:
+A tile-pyramid definition covers everything inside a bounding box, between a min
+and max zoom, at a given pixel ratio. An infinite max zoom gives each source its
+own maximum.
 
-* **Tile pyramid** — everything inside a bounding box, between a min and max
-  zoom, at a given pixel ratio. An infinite max zoom means "each source's own
-  maximum".
-* **Geometry** — the tiles covering an arbitrary geometry, across a zoom range.
+A geometry definition covers the tiles under an arbitrary geometry, across a
+zoom range.
 
-Creation also takes **metadata**: opaque bytes stored with the region and handed
-back on every later inspection.
+Creation also takes metadata: opaque bytes stored with the region and returned
+on every later inspection.
 
-A new region is inactive and silent. Mark it observed to get progress events,
+A new region starts inactive and silent. Mark it observed for progress events,
 then set its download state to active to start the work.
 
 <Code code={offlineRegion} lang="c" title="offline-region.c" />
 
 ## Watch it download
 
-Three events report on a region being observed:
+An observed region reports through three events.
 
 | Event                                      | Tells you                                                       |
 | ------------------------------------------ | --------------------------------------------------------------- |
@@ -59,34 +59,32 @@ Three events report on a region being observed:
 | `OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED` | The region wants more tiles than the ceiling allows             |
 
 <Aside type="caution">
-  Deriving a percentage from the status snapshot needs care: while MapLibre is
+  Take care deriving a percentage from the status snapshot. While MapLibre is
   still discovering what the region contains, the required-resource count is an
-  estimate, and it is zero before discovery finds anything. Check that the count
-  is marked precise and non-zero before dividing by it, or the first events
-  produce `NaN`.
+  estimate, and it reads zero before discovery finds anything. Check that the
+  count is marked precise and greater than zero before you divide by it, or the
+  first events produce `NaN`.
 </Aside>
 
-Exceeding the tile ceiling is not something you can raise through this API — the
-event reports the limit, and the fix is a smaller region: tighter bounds or a
-narrower zoom range.
+The tile ceiling is fixed. The event reports the limit it hit, and the remedy is
+a smaller region through tighter bounds or a narrower zoom range.
 
 ## Manage what you have downloaded
 
-* `list` — every region in the database, with definitions and metadata.
-* `get` — one region; the completion event's `found` flag says whether it exists.
-* `update_metadata` — replace the stored bytes.
-* `merge_database` — import regions from a side database.
-* `invalidate` — mark a region's resources stale so their next use revalidates
-  against the server. This frees no space: the bytes stay and get reused when
-  revalidation succeeds.
-* `delete` — remove the region and its resources.
+`list` returns every region in the database with its definition and metadata,
+and `get` returns one, where the completion event's `found` flag reports
+existence. `update_metadata` replaces the stored bytes, and `merge_database`
+imports regions from a side database.
+
+`invalidate` marks a region's resources stale, so their next use revalidates
+them against the server. It frees no space: the bytes stay and get reused when
+revalidation succeeds. `delete` removes the region and its resources.
 
 Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE` and
-`CLEAR` act on ambient cached resources and leave offline regions alone, and
+`CLEAR` act on ambient cached resources and leave offline regions in place, and
 `PACK_DATABASE` compacts the file.
 
 <Aside type="danger">
-  `RESET_DATABASE` is different in kind: it deletes and recreates the whole
-  shared database, so downloaded regions go with it. It is not a bigger cache
-  clear.
+  `RESET_DATABASE` deletes and recreates the whole shared database, so your
+  downloaded regions go with it.
 </Aside>

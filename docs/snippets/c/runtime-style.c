@@ -1,6 +1,5 @@
 // Adding a source and a layer to a style that has already loaded. Layers and
-// property values are style-spec JSON, passed as a value descriptor rather than
-// a JSON string.
+// property values are style-spec JSON, passed as a value descriptor.
 
 #include <maplibre_native_c.h>
 #include <string.h>

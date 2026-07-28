@@ -56,7 +56,7 @@ int main(void) {
         settled = true;
       }
     }
-    // A host with its own event loop waits in it here rather than spinning.
+    // A host with its own event loop waits in it here.
   }
 
   // Children first: a runtime refuses to close while its maps are live.

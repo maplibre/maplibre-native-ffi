@@ -8,42 +8,41 @@ sidebar:
 import { Aside, Code } from "@astrojs/starlight/components";
 import queryRendered from "../../../../snippets/c/query-rendered-features.c?raw";
 
-Queries read map data back out: what is drawn at a point on screen, what a
-source holds, what a cluster expands to.
+Queries read map data back out: what is drawn at a point on screen, and what a
+source holds.
 
-They hang off the **render session**, not the map — because they read what was
-actually rendered. That means a session must be attached and must have rendered
-at least once before a query returns anything.
+They hang off the render session, because they read what the renderer produced.
+A session has to be attached and has to have rendered once before a query
+returns anything.
 
 ## Query rendered features
 
-`query_rendered_features` takes a screen geometry — a point, a box, or a line
-string, in logical pixels — and returns the features drawn under it. Options
-narrow it to a list of layer IDs and can apply a
+`query_rendered_features` takes a screen geometry in logical pixels, either a
+point, a box, or a line string, and returns the features drawn under it. Options
+narrow the query to a list of layer IDs and can apply a
 [style-spec filter](https://maplibre.org/maplibre-style-spec/expressions/)
 expression as JSON.
 
-Passing layer IDs is usually what you want. Without them the query matches
-everything rendered there, background fills included.
+Pass layer IDs. Without them the query matches everything rendered at that spot,
+background fills included.
 
 Each result carries the feature, its source ID, its source layer where known,
-and its feature state where set. The results are copies you own; the pointers
-inside them belong to the result handle, so copy anything that has to outlive
-it, then destroy the handle.
+and its feature state where set. You own the results. The pointers inside them
+belong to the result handle, so copy anything that has to outlive it, then
+destroy the handle.
 
 <Code code={queryRendered} lang="c" title="query-rendered-features.c" />
 
 ## Query source features
 
-`query_source_features` reads out of a loaded source, skipping layer visibility,
+`query_source_features` reads a loaded source, skipping layer visibility,
 styling, and the viewport. Vector sources need their source layer IDs in the
-options; GeoJSON sources ignore them.
+options, and GeoJSON sources ignore them.
 
-The important limit: it reads only the source data the renderer currently
-holds — in practice, the tiles loaded for the current camera. Features in tiles
-that have not loaded are simply absent, and results change as the camera moves.
-It is not a search over your whole dataset. If you need that, query the dataset
-itself.
+It reads the source data the renderer currently holds, which in practice means
+the tiles loaded for the current camera. Features in tiles that have not loaded
+are absent, and results change as the camera moves. Query the underlying dataset
+when you need coverage of the whole source.
 
 ## Expanding clusters
 
@@ -54,24 +53,24 @@ feature from a clustered GeoJSON source and ask for its `"leaves"`,
 
 <Aside type="caution" title="Unsigned numbers, specifically">
   Supercluster reads `cluster_id` from the feature's properties, and the `limit`
-  and `offset` arguments, strictly as **unsigned** JSON values. A JSON layer that
+  and `offset` arguments, strictly as unsigned JSON values. A JSON layer that
   turns every number into a double produces an empty result and a success
-  status — no error to chase. Feed the queried feature back unmodified (its
-  property types are preserved), and build `limit` and `offset` as unsigned.
+  status, with no error to chase. Feed the queried feature back unmodified,
+  since it preserves its property types, and build `limit` and `offset` as
+  unsigned.
 </Aside>
 
 ## Feature state
 
-Feature state attaches per-feature key-value data — `"hover": true` and friends
-— that style expressions read through `feature-state`, so per-feature appearance
-can change without touching the style.
+Feature state attaches per-feature key-value data, such as `"hover": true`, that
+style expressions read through `feature-state`. Per-feature appearance can then
+change while the style stays put.
 
-State lives on the session's renderer, which has two consequences worth
-planning around: the renderer has to exist first, so render once after the style
-loads before setting state; and state does not survive a resize or a reattach,
-so reapply it when either happens. Setting or removing state requests a repaint
-on its own.
+State lives on the session's renderer, which has two consequences. The renderer
+has to exist first, so render once after the style loads before you set state.
+State also does not survive a resize or a reattach, so reapply it after either.
+Setting or removing state requests a repaint.
 
-The selector picks the target: source ID (always), source layer ID (to
-disambiguate vector sources), feature ID, and a state key when removing a single
-entry.
+The selector picks the target. `source_id` is required, `source_layer_id`
+disambiguates vector sources, `feature_id` picks the feature, and `state_key`
+removes a single entry.

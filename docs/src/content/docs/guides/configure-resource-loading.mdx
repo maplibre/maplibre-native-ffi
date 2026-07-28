@@ -8,82 +8,76 @@ sidebar:
 import { Aside, Code } from "@astrojs/starlight/components";
 import resourceTransform from "../../../../snippets/c/resource-transform.c?raw";
 
-By default the map fetches what its style names, over the network, and caches
-the results. This guide covers changing that: rewriting URLs, serving requests
-yourself, and controlling the cache.
-
-Some of it is per-runtime and has to happen before the first map exists; some is
-process-global. Where a callback runs on a MapLibre thread rather than yours, it
-is called out below.
+By default the map fetches what its style names over the network and caches the
+results. You can rewrite those URLs, answer the requests yourself, or move the
+cache.
 
 ## Cache and asset paths
 
-These are runtime options, set at creation (see
-[Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/)):
-`cache_path` for the ambient cache database, `asset_path` for the root that
-`asset://` URLs resolve against, and `maximum_cache_size` for a byte cap — which
-applies only when you also set its flag in `flags`.
+Runtime options set these at creation, covered in
+[Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).
+`cache_path` points at the ambient cache database and `asset_path` at the root
+that `asset://` URLs resolve against. `maximum_cache_size` caps the cache in
+bytes when `flags` includes `MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE`.
 
 ## Rewriting URLs
 
 A resource transform rewrites the URL of every network request the runtime
-makes. It is the normal way to attach an API key, swap a host, or route through
-a proxy. Register it whenever, even with maps already running.
+makes, which is how you attach an API key, swap a host, or route through a
+proxy. Register it at any point, including with maps already running.
 
-Two things shape how you write one. It runs on a worker or network thread, so it
-must be thread-safe and quick, and it must not call back into the API apart from
-setting the replacement URL. And it can only change the URL — not headers, not
-the body, not the cache policy — so returning a failure means "no rewrite", not
-"fail this request".
+MapLibre invokes the callback on a worker or network thread, so keep it
+thread-safe and quick, and call no other C API function from inside it beyond
+`mln_resource_transform_response_set_url()`. The callback changes the URL and
+nothing else, leaving headers, bodies, and cache policy alone. Returning a
+non-OK status leaves the URL unchanged, and the request still proceeds.
 
-The subtlety worth pausing on: a style can name sprites, glyphs, and tiles on
-origins you do not control, and your transform runs for those too. Match the
-host you own before adding a credential to it.
+A style names sprites, glyphs, and tiles on origins you do not control, and your
+transform runs for those requests too. Match the host you own before you attach
+a credential to it.
 
 <Code code={resourceTransform} lang="c" title="resource-transform.c" />
 
 Transforms apply to MapLibre's online file source, including nested PMTiles
-range requests. They do not apply to `file`, `asset`, or `mbtiles` URLs, or to
+range requests. They skip `file`, `asset`, and `mbtiles` URLs, along with
 requests a provider already intercepted.
 
 ## Serving requests yourself
 
-A resource provider intercepts network requests outright and answers them from
-your code — for custom URL schemes, app storage, or your own HTTP stack. It has
-to be registered **before any map is created** from the runtime.
+A resource provider intercepts network requests and answers them from your code,
+which covers custom URL schemes, app storage, and your own HTTP stack. Register
+it before you create any map from the runtime.
 
 The callback runs synchronously on a network thread and returns one of two
-decisions. *Pass through* means MapLibre handles the request normally, and you
-touch nothing. *Handle* means you own that request: complete it with a response
-— inline or later, from any thread — and then release it exactly once.
-Completion is one-shot, response bytes are copied before it returns, and a
-long-running fetch should check whether the request was cancelled before
-bothering to finish.
+decisions. Pass-through leaves the request to MapLibre, and you touch the handle
+no further. Handle gives you the request: complete it with a response, inline or
+later from any thread, then release it once. Completion is one-shot, the C API
+copies response bytes before returning, and a long fetch should check whether
+MapLibre cancelled the request before finishing the work.
 
-Built-in schemes (`file`, `asset`, `mbtiles`, `pmtiles`) are resolved before
-your provider sees them. Everything else reaches it, including invented schemes
-like `custom://style.json` — which, if you pass them through, become HTTP
-requests and fail. Serving those is exactly what the provider is for.
+MapLibre resolves the built-in schemes `file`, `asset`, `mbtiles`, and `pmtiles`
+before your provider sees them. Every other scheme reaches the provider,
+including invented ones like `custom://style.json`, which become failed HTTP
+requests if you pass them through. Serving those is what the provider is for.
 
 <Aside>
-  The provider callback and its `user_data` are held by reference for as long as
-  the runtime lives. Keep them alive that long — not just until registration
-  returns, and not just until your last map closes.
+  The runtime stores the provider callback and its `user_data` by reference and
+  can invoke them until the runtime is destroyed. Keep both alive that long.
 </Aside>
 
 ## Process-global switches
 
-Two settings are per-process rather than per-runtime.
+Two settings apply per process.
 
-**Network status.** `mln_network_status_set()` toggles whether the online file
-source starts requests at all. Going offline stops new network work until
-reachability returns. Drive it from your platform's connectivity monitor.
+`mln_network_status_set()` toggles whether the online file source starts
+requests. Going offline halts new network work until reachability returns. Drive
+it from your platform's connectivity monitor.
 
-**Logging.** `mln_log_set_callback()` installs the process-global log sink. It
-can be called on logging or worker threads while internal locks are held, so
-keep it thread-safe, fast, and free of calls back into the API. Return
-"consumed" to suppress the platform logger.
+`mln_log_set_callback()` installs the process-global log sink. MapLibre can
+invoke it on logging or worker threads while holding internal locks, so keep it
+thread-safe, fast, and free of calls back into the API. Return "consumed" to
+suppress the platform logger. The callback and its state must stay valid until
+`mln_log_clear_callback()` replaces or clears it.
 
-On Android, call `mln_android_init` (`MaplibreAndroid.initialize(context)` from
-Kotlin) once at startup, or HTTPS requests cannot validate TLS against the
-platform trust store.
+On Android, call `mln_android_init` once at startup, or HTTPS requests cannot
+validate TLS against the platform trust store.

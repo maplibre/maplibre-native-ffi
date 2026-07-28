@@ -9,15 +9,14 @@ import { Aside, Code } from "@astrojs/starlight/components";
 import attachSurface from "../../../../snippets/c/attach-opengl-surface.c?raw";
 import frameLoop from "../../../../snippets/c/frame-loop.c?raw";
 
-A surface session draws the map into a native surface your window toolkit owns,
-and presents through it. You own the window and the graphics context; MapLibre
-draws into them.
+A surface session draws the map into a native surface your window toolkit owns
+and presents through it. You own the window and the graphics context, and
+MapLibre draws into them.
 
 ## What you hand over
 
-You do not give MapLibre a window. You give it the low-level surface handle your
-toolkit already produced, which depends on the render backend your artifact was
-built with:
+Attach the low-level surface handle your toolkit already produced. Which handle
+depends on the render backend your artifact was built with.
 
 | Backend      | You supply      | Presented with       |
 | ------------ | --------------- | -------------------- |
@@ -26,76 +25,74 @@ built with:
 | OpenGL (EGL) | `EGLSurface`    | `eglSwapBuffers`     |
 | OpenGL (WGL) | `HDC`           | `SwapBuffers`        |
 
-Getting that handle is the platform's job, not MapLibre's: wrap an
-`ANativeWindow*` in an `EGLSurface` or `VkSurfaceKHR` on Android, create one
-from your X11 or Wayland window on Linux, take the window's `HDC` on Windows,
-hand over the view's `CAMetalLayer` on Apple platforms.
+Each platform produces that handle its own way. On Android you wrap an
+`ANativeWindow*` in an `EGLSurface` or a `VkSurfaceKHR`. On Linux you create one
+from your X11 or Wayland window, on Windows you take the window's `HDC`, and on
+Apple platforms you hand over the view's `CAMetalLayer`.
 
-Along with the surface you supply a **context** — the backend objects the
-session shares with your application, so the map's textures and buffers live in
-the same world as yours. A Metal device; a Vulkan instance, device, and graphics
-queue; an EGL or WGL share context. The session joins that share group rather
-than taking it over.
+The descriptor also carries a context: the backend objects the session shares
+with your code, so the map's textures and buffers live alongside yours. That
+means a Metal device, or a Vulkan instance with its device and graphics queue,
+or an EGL or WGL share context. The session joins that share group.
 
-Finally the descriptor carries an **extent**: the logical size in UI pixels plus
-the scale factor. Attaching replaces whatever size the map was created with.
+Last, the descriptor carries an extent: the logical size in UI pixels plus the
+scale factor. Attaching overwrites whatever size you created the map with.
 
 <Code code={attachSurface} lang="c" title="attach-opengl-surface.c" />
 
 <Aside>
-  Ownership differs a little by backend. Metal sessions retain the layer and
-  device you pass, so you can release your own references afterward. Vulkan and
-  OpenGL handles are borrowed — keep them alive until you detach or destroy the
-  session. The [C API reference](/maplibre-native-ffi/reference/c/) states this
-  per attach function.
+  Ownership varies by backend. A Metal session retains the layer and device you
+  pass, so you can release your own references after a successful attach. Vulkan
+  and OpenGL handles stay borrowed, so keep them alive until you detach or
+  destroy the session. The
+  [C API reference](/maplibre-native-ffi/reference/c/) states this per attach
+  function.
 </Aside>
 
 ## Drive the frame loop
 
-Rendering is pull-based. MapLibre never draws on its own; it tells you it has
-something to draw and waits for you to ask for it. Each turn of your loop:
+Rendering is pull-based. MapLibre tells you it has something to draw and waits
+for you to ask for it. Each turn of your loop:
 
 1. Pump the runtime and drain its events.
-2. `MAP_RENDER_UPDATE_AVAILABLE` for your map means new content is ready — mark
-   a frame as pending.
-3. If a frame is pending, call `mln_render_session_render_update()`. For a
-   surface session this renders *and* presents.
+2. On `MAP_RENDER_UPDATE_AVAILABLE` for your map, mark a frame as pending.
+3. While a frame is pending, call `mln_render_session_render_update()`. A
+   surface session renders and presents in that one call.
 
-Two details make the difference between a map that settles and one that stalls.
-A render call reports whether it actually produced a frame; `false` early on is
-normal, because the map has not published its first update yet — stay pending
-and try again. And finished-frame events carry a `needs_repaint` flag, which is
-how camera animations and label placement ask for the next frame. Ignore it and
-animations freeze partway.
+Two details keep a map moving. The render call reports whether it produced a
+frame, and a `false` result is normal at startup, before the map publishes its
+first update; stay pending and call again. Finished-frame events carry a
+`needs_repaint` flag, which is how camera animations and label placement ask for
+the next frame. Drop that flag and animations freeze partway.
 
 <Code code={frameLoop} lang="c" title="frame-loop.c" />
 
-What paces the loop is up to you. Prefer the display where you can — a vsync or
-frame callback from your toolkit. The example apps poll with a short sleep,
-which is simple and burns CPU.
+What paces the loop is your choice. Prefer the display where you can, through a
+vsync or frame callback from your toolkit. The example apps poll with a short
+sleep, which is simple and burns CPU.
 
 ## Resize
 
 When the window changes size, call `mln_render_session_resize()` with the new
-logical size and scale factor, then render again. The camera, style, and sources
-live on the map and survive; renderer-held state such as feature state does not,
-so reapply it afterward.
+logical size and scale factor, then render again. Camera, style, and sources
+live on the map and survive the resize. Renderer-held state such as feature
+state does not, so reapply it afterward.
 
-A scale factor that disagrees with the map's own logs a warning and renders
-imagery chosen for the map's density. Pick the map's `scale_factor` for the
-displays you actually target.
+A scale factor that disagrees with the map's own logs a warning, and MapLibre
+renders imagery chosen for the map's density. Choose the map's `scale_factor`
+for the displays you target.
 
 ## Follow the surface's life
 
 Surfaces come and go as windows close and views detach. When the surface goes
 away:
 
-1. Destroy the session with `mln_render_session_destroy()`, or release the map's
-   slot with `mln_render_session_detach()` and destroy the handle after. A
-   detached handle is finished: it cannot render, and it cannot be reattached.
+1. Call `mln_render_session_destroy()`. To release the map's slot first, call
+   `mln_render_session_detach()` and destroy the handle afterward. A detached
+   handle can only be destroyed.
 2. Release your surface and context.
-3. When a new surface arrives, attach a fresh session. The map kept its camera
-   and style the whole time.
+3. When a new surface arrives, attach a fresh session. The map keeps its camera
+   and style throughout.
 
 Complete working loops for each backend live in the example apps: `zig-map`,
 `rust-map`, `lwjgl-map`, `swift-map`, `dotnet-map`, and `android-map`.

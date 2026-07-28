@@ -46,8 +46,23 @@ run = "pnpm exec astro sync"
 description = "Syntax-check the C snippets the guides embed"
 dir = ".."
 run = '''
+compiler="${CC:-cc}"
+# GCC named this standard c2x until GCC 14, and CI runners still ship those.
+standard=""
+for candidate in c23 c2x; do
+  if "$compiler" "-std=$candidate" -fsyntax-only -x c /dev/null 2>/dev/null; then
+    standard="$candidate"
+    break
+  fi
+done
+if [ -z "$standard" ]; then
+  echo "$compiler supports neither -std=c23 nor -std=c2x" >&2
+  exit 1
+fi
+
 for file in docs/snippets/c/*.c; do
-  "${CC:-cc}" -fsyntax-only -std=c23 -Wall -Wextra -Iinclude "$file" || exit 1
+  "$compiler" -fsyntax-only "-std=$standard" -Wall -Wextra -Iinclude "$file" ||
+    exit 1
 done
 '''
 
