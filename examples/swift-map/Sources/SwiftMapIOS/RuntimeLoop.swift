@@ -68,6 +68,9 @@ final class RuntimeLoopThread: Thread {
     // command or a shutdown
     // request lands without waiting out the bound below.
     let wake = try state.wakeSource()
+    // A wake source is its own native handle and outlives the runtime, so
+    // closing the runtime does not release it.
+    defer { try? wake.close() }
     channels.publish(attachRef: attachRef, wake: wake)
 
     while !channels.isShutdownRequested, channels.failureMessage == nil {

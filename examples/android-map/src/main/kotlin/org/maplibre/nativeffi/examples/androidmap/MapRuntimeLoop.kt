@@ -77,7 +77,12 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
               renderRequest.set()
             }
           } catch (error: RuntimeException) {
+            // Reposting after a failing pump spins the handler thread forever with nothing to
+            // show for it. Record it so the view stops scheduling frames, and stop the loop.
             Log.e(TAG, "runtime loop iteration failed", error)
+            setupFailure = error
+            closeHandles()
+            return
           }
         }
         // The pump above provides the pacing, so requeue immediately rather than adding a delay

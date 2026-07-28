@@ -101,6 +101,11 @@ internal class MapRuntimeLoop(
       // wait for the render loop to close it and shut this loop down. Bounded,
       // so a render loop that already stopped cannot wedge teardown.
       awaitShutdown()
+      // A wake source is its own native handle and outlives the runtime, so
+      // closing the runtime does not release it.
+      commands.onEnqueue = null
+      wake?.close()
+      wake = null
       try {
         map?.close()
       } finally {

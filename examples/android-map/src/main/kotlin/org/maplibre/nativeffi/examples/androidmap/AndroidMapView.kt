@@ -24,6 +24,9 @@ internal class AndroidMapView(context: Context) :
   private var viewVisible = false
   private var appForeground = false
   private var frameCallbackPosted = false
+
+  /** Set when a frame threw, so the view stops scheduling against a broken target. */
+  private var frameFailed = false
   private var closed = false
   private val pendingDrawingFinished = ArrayDeque<Runnable>()
 
@@ -101,8 +104,11 @@ internal class AndroidMapView(context: Context) :
           }
         }
       } catch (error: RuntimeException) {
+        // Re-arming here would repost every vsync against a target that keeps throwing. Close it
+        // so the map can be destroyed, and stop scheduling frames.
         Log.e(TAG, "frame failed", error)
-        loop.renderRequest.set()
+        frameFailed = true
+        detachSurface()
       }
     }
     startLoopIfReady()
@@ -186,6 +192,7 @@ internal class AndroidMapView(context: Context) :
       viewVisible &&
       appForeground &&
       graphics != null &&
+      !frameFailed &&
       runtimeLoop != null &&
       // A loop whose setup failed never publishes a map, so reposting every
       // vsync would spin against a blank view instead of surfacing the failure.
