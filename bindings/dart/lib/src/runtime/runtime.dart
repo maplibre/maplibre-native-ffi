@@ -101,6 +101,14 @@ final class RuntimeHandle {
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
 
   /// Creates a runtime on the current native thread.
+  ///
+  /// Do not `await` I/O on this isolate while the runtime or any handle under it
+  /// is live. The C API keys its owner-thread checks on the OS thread, and the
+  /// Dart VM moves an isolate to another OS thread when it resumes from awaited
+  /// I/O. Every call on the handle then fails with `wrongThread`, including
+  /// [close], which leaves the native runtime undestroyable for the rest of the
+  /// process. See the package README and
+  /// https://github.com/maplibre/maplibre-native-ffi/issues/412.
   factory RuntimeHandle.create({
     RuntimeOptions options = const RuntimeOptions(),
   }) {

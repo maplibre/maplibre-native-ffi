@@ -34,9 +34,32 @@ operations before their parent runtime. Scoped backend values remain valid only
 until their frame or owner is closed.
 
 Runtime and map work is synchronous and owner-thread-affine. Keep a handle and
-all calls that use it on the execution context that created it. Poll queued
-callbacks and events with `RuntimeHandle.runOnce()` and
-`RuntimeHandle.pollEvent()`.
+all calls that use it on the isolate that created it. Poll queued callbacks and
+events with `RuntimeHandle.pump()` and `RuntimeHandle.pollEvent()`.
+
+A render session is the exception: it belongs to the isolate that attached it,
+which need not be the map's. A `MapHandle` cannot cross isolates, so
+`MapHandle.attachRef()` produces a `MapAttachRef` that can. It carries the
+native address and attaches; every other map call stays on the map's isolate.
+
+## Known draft deviation: do not await in an isolate that holds a handle
+
+The C API keys owner-thread checks on the OS thread. This binding keys them on
+`Isolate.current.hashCode`, and the two are not equivalent: the Dart VM moves an
+isolate between OS threads, and it does so when an isolate resumes from awaited
+I/O. The isolate hash does not change, so the binding's own check still passes
+while the native check starts failing.
+
+Until that is addressed, do not `await` I/O on an isolate that holds a runtime,
+map, projection, or render session. Create the handles, use them, and close them
+without yielding to I/O in between. Dart offers no equivalent of Go's
+`runtime.LockOSThread()`, so the binding cannot pin the isolate on your behalf.
+
+Exceeding this produces `wrongThread` from every call on the handle, including
+`close()`. Because close fails too, the native runtime is never destroyed and
+`mln_runtime_destroy` refuses for the rest of the process.
+
+Tracked in [#412](https://github.com/maplibre/maplibre-native-ffi/issues/412).
 
 Resource-request completion is one-shot. Calling `complete()` or `close()`
 releases the provider reference even when completion reports a native error.
