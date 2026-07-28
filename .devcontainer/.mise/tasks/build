@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Build the local devcontainer image for the host architecture."
+#MISE shell="bash"
 #USAGE flag "--tag <tag>" help="Final image tag" default="maplibre-native-ffi-devcontainer:local"
 #USAGE flag "--push" help="Push the final image instead of loading it into Docker"
 set -euo pipefail
