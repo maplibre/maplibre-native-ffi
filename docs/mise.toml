@@ -39,20 +39,47 @@ run = [
 [tasks.install]
 run = "pnpm exec astro sync"
 
+# The guides embed these files verbatim, so a compiler decides whether a
+# documented snippet is valid rather than a reader or a review bot. Only the
+# public headers are needed, so this runs without building the library.
+[tasks."check-snippets"]
+description = "Syntax-check the C snippets the guides embed"
+dir = ".."
+run = '''
+compiler="${CC:-cc}"
+# GCC named this standard c2x until GCC 14, and CI runners still ship those.
+standard=""
+for candidate in c23 c2x; do
+  if "$compiler" "-std=$candidate" -fsyntax-only -x c /dev/null 2>/dev/null; then
+    standard="$candidate"
+    break
+  fi
+done
+if [ -z "$standard" ]; then
+  echo "$compiler supports neither -std=c23 nor -std=c2x" >&2
+  exit 1
+fi
+
+for file in docs/snippets/c/*.c; do
+  "$compiler" -fsyntax-only "-std=$standard" -Wall -Wextra -Iinclude "$file" ||
+    exit 1
+done
+'''
+
 [tasks.dev]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run dev"
 
 [tasks.start]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run start"
 
 [tasks.build]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run build"
 
 [tasks.preview]
-depends = ["api", "install", "generate-support-matrix"]
+depends = ["api", "install", "generate-support-matrix", "check-snippets"]
 run = "pnpm run preview"
 
 [tasks.astro]

@@ -1,0 +1,81 @@
+---
+title: Render to a Texture
+description: Render offscreen, read the pixels back, or use the frame on the GPU.
+sidebar:
+  order: 4
+---
+
+import { Aside, Code } from "@astrojs/starlight/components";
+import stillImage from "../../../../snippets/c/still-image.c?raw";
+
+A texture session renders the map into a GPU texture. From there you can read
+the pixels back to the CPU, or use the texture in your own rendering.
+
+## Who owns the texture
+
+|                 | Session-owned ("owned")                  | Caller-owned ("borrowed")            |
+| --------------- | ---------------------------------------- | ------------------------------------ |
+| Created by      | The session, on your device or context   | You                                  |
+| Resizing        | `mln_render_session_resize()` in place   | Recreate the texture and the session |
+| Using the frame | Acquire it, use it, release it           | It is already yours                  |
+| CPU readback    | `mln_texture_read_premultiplied_rgba8()` | Read it back yourself                |
+
+Both modes attach through a backend-specific function,
+`mln_<backend>_owned_texture_attach()` or
+`mln_<backend>_borrowed_texture_attach()`, taking the same logical extent and
+context a surface session takes.
+
+A borrowed descriptor adds the texture handle and its physical pixel size. You
+state that size, because the session cannot measure a texture you created: a
+`VkImage` exposes no queryable extent, and the OpenGL ES 3.0 contexts targeted
+here cannot query level-0 dimensions.
+
+## Still images
+
+Create the map in `MLN_MAP_MODE_STATIC` for any viewport, or `MLN_MAP_MODE_TILE`
+for a single tile. Attach an owned-texture session and call
+`mln_map_request_still_image()`. Completion arrives as
+`MAP_STILL_IMAGE_FINISHED` or `MAP_STILL_IMAGE_FAILED`.
+
+A still image takes several render calls. While the request is pending the map
+keeps publishing render updates, and you render each one. Static mode drops the
+continuous repaint machinery and gives you a defined finish line, and it keeps
+the pump-and-render loop.
+
+Readback copies the last rendered frame as premultiplied RGBA8 in physical
+pixels. Size it in two calls: ask with no buffer to learn the layout, then ask
+again with a buffer that fits. Build the `mln_texture_image_info` from
+`mln_texture_image_info_default()`, since readback validates its `size` field
+before filling in anything else.
+
+<Code code={stillImage} lang="c" title="still-image.c" />
+
+`zig-readback` does this end to end, and runs headless in CI.
+
+## Using the frame on the GPU
+
+`mln_<backend>_owned_texture_acquire_frame()` hands you the most recent frame's
+backend handles, meaning a Metal texture, a Vulkan image and view, or an OpenGL
+texture name. Keep that borrow short: while a frame is acquired, rendering,
+resizing, detaching, destroying, and a second acquire all return
+`MLN_STATUS_INVALID_STATE`. Acquire, use, release, once per frame.
+
+A borrowed texture skips all of that, since the texture was yours to begin with.
+You allocate it and keep it valid until the session detaches. The session
+renders into it when you call `render_update()`, and offers no acquire,
+readback, or resize. To follow a resize, destroy the session, make a new
+texture, and attach again.
+
+How much synchronization you owe depends on the backend. An OpenGL session
+finishes its render before `render_update()` returns, so you can sample the
+texture from any context in the share group without adding your own. Vulkan
+hands you the most work: make the image available on the descriptor's graphics
+queue in `initial_layout`, keep it out of concurrent use, and take it back in
+`final_layout`. The
+[C API reference](/maplibre-native-ffi/reference/c/) states this per attach
+function, along with the state each backend requires of the texture itself.
+
+<Aside type="tip">
+  `compose-map` is a complete borrowed-texture integration, including
+  reattach-on-resize.
+</Aside>
