@@ -1,51 +1,18 @@
-// Renders one still image with no window and reads the pixels back to the CPU.
-// The map runs in static mode, the session owns its texture, and the loop ends
-// on the completion event.
+// Requests one still image and reads the pixels back to the CPU. The map is in
+// static or tile mode, and the session owns its texture.
 
 #include <maplibre_native_c.h>
 #include <stdlib.h>
-#include <time.h>
 
-// Returns malloc'd premultiplied RGBA8 pixels, or NULL. On success out_info
-// describes the image layout.
-uint8_t* render_still_image(
-  mln_runtime* runtime, const char* style_url, uint32_t width, uint32_t height,
-  const mln_opengl_context_descriptor* context, mln_texture_image_info* out_info
+void render_still_image(
+  mln_runtime* runtime, mln_map* map, mln_render_session* session
 ) {
-  mln_map_options map_options = mln_map_options_default();
-  map_options.width = width;
-  map_options.height = height;
-  map_options.scale_factor = 1.0;
-  map_options.map_mode = MLN_MAP_MODE_STATIC;
+  if (mln_map_request_still_image(map) != MLN_STATUS_OK) return;
 
-  mln_map* map = NULL;
-  if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) return NULL;
-
-  mln_opengl_owned_texture_descriptor descriptor =
-    mln_opengl_owned_texture_descriptor_default();
-  descriptor.extent.width = width;
-  descriptor.extent.height = height;
-  descriptor.extent.scale_factor = 1.0;
-  descriptor.context = *context;
-
-  uint8_t* pixels = NULL;
-  mln_render_session* session = NULL;
-  const mln_status attached =
-    mln_opengl_owned_texture_attach(map, &descriptor, &session);
-  if (attached != MLN_STATUS_OK) {
-    mln_map_destroy(map);
-    return NULL;
-  }
-
-  if (mln_map_set_style_url(map, style_url) != MLN_STATUS_OK) goto done;
-  if (mln_map_request_still_image(map) != MLN_STATUS_OK) goto done;
-
-  // The still image is not one render call. Keep rendering the updates the map
-  // publishes until it reports the image is finished.
+  // The request takes several render calls. Render each update the map
+  // publishes until it reports the image finished.
   bool finished = false;
-  bool failed = false;
-  const time_t deadline = time(NULL) + 30;
-  while (!finished && !failed && time(NULL) < deadline) {
+  while (!finished) {
     mln_runtime_pump(runtime, 100);
 
     mln_runtime_event event = {.size = sizeof(event)};
@@ -54,46 +21,33 @@ uint8_t* render_still_image(
              MLN_STATUS_OK &&
            has_event) {
       if (event.source != map) continue;
-      switch (event.type) {
-        case MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE: {
-          bool rendered = false;
-          mln_render_session_render_update(session, &rendered);
-          break;
-        }
-        case MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED:
-          finished = true;
-          break;
-        case MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED:
-        case MLN_RUNTIME_EVENT_MAP_LOADING_FAILED:
-          failed = true;
-          break;
-        default:
-          break;
+      if (event.type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE) {
+        bool rendered = false;
+        mln_render_session_render_update(session, &rendered);
+      } else if (event.type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED) {
+        finished = true;
+      } else if (
+        event.type == MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED ||
+        event.type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED
+      ) {
+        return;
       }
     }
   }
-  if (!finished) goto done;
 
-  // Two-call sizing: ask for the layout first, then read into a buffer that
-  // fits. Readback checks out_info->size, so set it from the defaults before
-  // the sizing call, which reports INVALID_ARGUMENT and still fills out_info.
-  *out_info = mln_texture_image_info_default();
-  mln_texture_read_premultiplied_rgba8(session, NULL, 0, out_info);
-  if (out_info->byte_length == 0) goto done;
+  // Two-call sizing. The default constructor fills the size field that readback
+  // checks before it writes anything else.
+  mln_texture_image_info info = mln_texture_image_info_default();
+  mln_texture_read_premultiplied_rgba8(session, NULL, 0, &info);
 
-  pixels = malloc(out_info->byte_length);
-  if (pixels == NULL) goto done;
-
-  const mln_status read = mln_texture_read_premultiplied_rgba8(
-    session, pixels, out_info->byte_length, out_info
-  );
-  if (read != MLN_STATUS_OK) {
-    free(pixels);
-    pixels = NULL;
+  uint8_t* pixels = malloc(info.byte_length);
+  if (pixels == NULL) return;
+  if (
+    mln_texture_read_premultiplied_rgba8(
+      session, pixels, info.byte_length, &info
+    ) == MLN_STATUS_OK
+  ) {
+    // info.width by info.height premultiplied RGBA8, info.stride per row.
   }
-
-done:
-  mln_render_session_destroy(session);
-  mln_map_destroy(map);
-  return pixels;
+  free(pixels);
 }

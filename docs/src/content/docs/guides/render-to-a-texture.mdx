@@ -44,11 +44,13 @@ the pump-and-render loop.
 
 Readback copies the last rendered frame as premultiplied RGBA8 in physical
 pixels. Size it in two calls: ask with no buffer to learn the layout, then ask
-again with a buffer that fits.
+again with a buffer that fits. Build the `mln_texture_image_info` from
+`mln_texture_image_info_default()`, since readback validates its `size` field
+before filling in anything else.
 
 <Code code={stillImage} lang="c" title="still-image.c" />
 
-`zig-readback` is this program end to end, and runs headless in CI.
+`zig-readback` does this end to end, and runs headless in CI.
 
 ## Using the frame on the GPU
 
