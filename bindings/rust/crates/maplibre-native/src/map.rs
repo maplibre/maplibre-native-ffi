@@ -4,8 +4,7 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
 
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
@@ -59,19 +58,59 @@ pub use style::{
 /// pointer value, so an address reused by a new map would attach to the wrong
 /// one.
 #[derive(Debug)]
-pub(crate) struct MapAddress(AtomicUsize);
+pub(crate) struct MapAddress(RwLock<Option<NonNull<sys::mln_map>>>);
+
+// SAFETY: the pointer is only ever read out and handed to the C API, which
+// validates it under its own registry lock. The `RwLock` is what makes the read
+// and the native call that consumes it atomic against `retire`.
+unsafe impl Send for MapAddress {}
+unsafe impl Sync for MapAddress {}
 
 impl MapAddress {
     fn new(ptr: NonNull<sys::mln_map>) -> Self {
-        Self(AtomicUsize::new(ptr.as_ptr() as usize))
+        Self(RwLock::new(Some(ptr)))
     }
 
-    fn get(&self) -> Option<NonNull<sys::mln_map>> {
-        NonNull::new(self.0.load(Ordering::Acquire) as *mut sys::mln_map)
+    /// Runs `use_ptr` with the map held live, or reports a closed handle.
+    ///
+    /// The guard spans the call, so a `close` on the map's owner thread waits
+    /// rather than destroying the map midway through. Without that, the address
+    /// could be freed between the read and the C API's registry lookup, and a
+    /// map allocated at the same address would be attached to instead.
+    fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Option<T> {
+        let guard = self
+            .0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (*guard).map(|ptr| use_ptr(ptr.as_ptr()))
     }
 
+    fn is_retired(&self) -> bool {
+        self.0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_none()
+    }
+
+    /// Blocks until no attach is in flight, then runs `close` and retires the
+    /// address only if it succeeded.
+    fn retire_with(&self, close: impl FnOnce() -> Result<()>) -> Result<()> {
+        let mut guard = self
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        close()?;
+        *guard = None;
+        Ok(())
+    }
+
+    /// Retires without closing, for a drop whose destroy already succeeded.
     fn retire(&self) {
-        self.0.store(0, Ordering::Release);
+        let mut guard = self
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *guard = None;
     }
 }
 
@@ -114,10 +153,10 @@ impl MapState {
 
     fn close(&self) -> Result<()> {
         let ptr = self.handle.as_ptr();
-        self.handle.close()?;
-        // Retire only after a successful destroy. A failed close leaves the
-        // native map live, so an attach reference must still resolve to it.
-        self.address.retire();
+        // Retire under the same guard as the destroy, so an attach already
+        // inside C finishes first and a later one sees a closed handle. A failed
+        // close leaves the native map live and the address published.
+        self.address.retire_with(|| self.handle.close())?;
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(ptr);
         }
@@ -864,13 +903,13 @@ impl MapAttachRef {
     /// across a map's lifetime can check here instead of relying on the error
     /// from a failed attach.
     pub fn is_map_closed(&self) -> bool {
-        self.address.get().is_none()
+        self.address.is_retired()
     }
 
-    pub(crate) fn as_ptr(&self) -> Result<*mut sys::mln_map> {
+    /// Runs `attach` with the map held live for the duration of the call.
+    pub(crate) fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
         self.address
-            .get()
-            .map(NonNull::as_ptr)
+            .with_live(attach)
             .ok_or_else(|| closed_handle_error("MapHandle"))
     }
 

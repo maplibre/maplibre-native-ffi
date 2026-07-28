@@ -33,13 +33,22 @@ const RuntimeLoopArgs = struct {
 /// not the one presenting. It never touches the render session: the render loop
 /// attaches its own against the map published here.
 fn runtimeLoop(args: RuntimeLoopArgs) void {
-    runtimeLoopFallible(args) catch |err| args.map_channel.fail(err);
+    var state = map_state.MapState.init(args.allocator, args.initial_viewport) catch |err| {
+        args.map_channel.fail(err);
+        return;
+    };
+    // However this loop exits, the render loop still owns the session, and a map
+    // with an attached session cannot be destroyed. The body publishes any
+    // failure before these run, so the render loop stops, closes its session,
+    // and requests shutdown; only then is the map destroyed. Defers run in
+    // reverse, so the wait happens first.
+    defer state.deinit();
+    defer args.map_channel.awaitShutdown(args.io);
+
+    runtimeLoopBody(args, &state) catch |err| args.map_channel.fail(err);
 }
 
-fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
-    var state = try map_state.MapState.init(args.allocator, args.initial_viewport);
-    defer state.deinit();
-
+fn runtimeLoopBody(args: RuntimeLoopArgs, state: *map_state.MapState) !void {
     // The render loop signals this to release the parked pump, so a camera
     // command or a shutdown request lands without waiting out the bound below.
     const wake = try state.runtime.wakeSource();

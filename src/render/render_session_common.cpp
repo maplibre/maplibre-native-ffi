@@ -1242,11 +1242,11 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
 
-  const auto detach_status =
-    map_detach_render_target_session(session->map, session);
-  if (detach_status != MLN_STATUS_OK) {
-    return detach_status;
-  }
+  // Tear the renderer down before releasing the map's slot. The renderer holds
+  // the map's forwarding observer, which the map's frontend owns, and queued
+  // work can reach it while it drains. Releasing the slot first would let the
+  // map owner thread see no attached session and destroy the map — freeing that
+  // observer underneath the drain and reset below.
   {
     auto current = ScopedCurrentScheduler{session->scheduler};
     // Let queued results land while the renderer they target still exists.
@@ -1258,6 +1258,12 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
     // continuation whose target is already gone, so running it would be a
     // no-op. Drop it rather than execute arbitrary work mid-teardown.
     session->scheduler.discard();
+  }
+
+  const auto detach_status =
+    map_detach_render_target_session(session->map, session);
+  if (detach_status != MLN_STATUS_OK) {
+    return detach_status;
   }
   session->attached = false;
   session->rendered_generation = 0;

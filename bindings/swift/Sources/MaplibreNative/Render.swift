@@ -917,8 +917,11 @@ public struct MapAttachRef: Sendable {
     handle.isClosed
   }
 
-  func mapPointer() throws -> OpaquePointer {
-    try handle.requireLive()
+  /// Runs `attach` with the map held live for the duration of the call, so a
+  /// concurrent `MapHandle.close()` waits instead of freeing the address
+  /// underneath it.
+  func withLiveMap<T>(_ attach: (OpaquePointer) throws -> T) throws -> T {
+    try handle.withLive(attach)
   }
 }
 
@@ -927,11 +930,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalSurfaceAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.metalSurfaceAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -941,11 +946,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanSurfaceAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.vulkanSurfaceAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -955,11 +962,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLSurfaceAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.openGLSurfaceAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -969,11 +978,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalOwnedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.metalOwnedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -985,11 +996,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalBorrowedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.metalBorrowedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -1001,11 +1014,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanOwnedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.vulkanOwnedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -1017,11 +1032,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanBorrowedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.vulkanBorrowedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -1033,11 +1050,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLOwnedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.openGLOwnedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)
@@ -1049,11 +1068,13 @@ public extension MapAttachRef {
     -> RenderSessionHandle
   {
     let pointer = try mapNativeFailure {
-      try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLBorrowedTextureAttach(
-          map: mapPointer(),
-          descriptor: nativeDescriptor
-        )
+      try withLiveMap { map in
+        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+          try NativeRender.openGLBorrowedTextureAttach(
+            map: map,
+            descriptor: nativeDescriptor
+          )
+        }
       }
     }
     return try RenderSessionHandle(pointer: pointer)

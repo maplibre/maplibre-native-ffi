@@ -141,6 +141,14 @@ pub const MapChannel = struct {
         return self.shutdown.load(.acquire);
     }
 
+    /// Runtime loop: blocks until the render loop has closed its session. The
+    /// map cannot be destroyed before then.
+    pub fn awaitShutdown(self: *MapChannel, io: std.Io) void {
+        while (!self.shutdownRequested()) {
+            io.sleep(.fromMilliseconds(1), .awake) catch {};
+        }
+    }
+
     pub fn fail(self: *MapChannel, err: anyerror) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);

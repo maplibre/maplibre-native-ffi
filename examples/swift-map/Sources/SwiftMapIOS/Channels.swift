@@ -121,8 +121,21 @@ final class Channels: @unchecked Sendable {
     condition.lock()
     defer { condition.unlock() }
     shutdown = true
+    condition.broadcast()
     // Release the pump so shutdown is observed now.
     wake?.signal()
+  }
+
+  /// Runtime loop: blocks until the render loop has closed its session. The map
+  /// cannot be destroyed before then. Bounded so a render loop that died
+  /// without signalling cannot wedge teardown.
+  func waitForShutdown(timeout: TimeInterval) {
+    let deadline = Date(timeIntervalSinceNow: timeout)
+    condition.lock()
+    defer { condition.unlock() }
+    while !shutdown {
+      if !condition.wait(until: deadline) { return }
+    }
   }
 
   var isShutdownRequested: Bool {

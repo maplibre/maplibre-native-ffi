@@ -21,6 +21,9 @@ final class RuntimeLoopThread: Thread {
   /// normally releases it, so this only bounds a pump that nothing signals.
   private static let parkTimeout = 0.1
 
+  /// Bound on waiting for the render loop to close its session during teardown.
+  private static let shutdownWaitTimeout = 5.0
+
   private let channels: Channels
   private let initialViewport: Viewport
   private let log = Logger(
@@ -46,9 +49,13 @@ final class RuntimeLoopThread: Thread {
 
   private func run() throws {
     let state = try MapState(viewport: initialViewport)
-    // The render loop closes the session before it requests shutdown, so by the
-    // time this runs the map has no session attached and can be destroyed.
+    // However this loop exits, the render loop still owns the session, and a
+    // map
+    // with an attached session cannot be destroyed. On the failure path the
+    // render loop has not closed it yet, so wait for the shutdown signal before
+    // closing rather than failing and swallowing the error.
     defer {
+      channels.waitForShutdown(timeout: Self.shutdownWaitTimeout)
       do {
         try state.close()
       } catch {
