@@ -6,10 +6,10 @@ swift.platform = "ubuntu24.04"
 
 [vars]
 host_native_preset = "linux-{{ arch() }}-vulkan"
-# Highest glibc release our published Linux natives may require. Raising this
-# drops support for distributions that ship an older glibc, so change it
-# together with the CI runner images in ci/workflow.py.
-glibc_floor = "2.39"
+# Highest glibc release our published Linux natives may require. The zig
+# toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
+# so change it together with cmake/toolchains/zig-linux.cmake.
+glibc_floor = "2.17"
 
 [bootstrap.packages]
 "apt:build-essential" = "latest"
@@ -35,7 +35,6 @@ glibc_floor = "2.39"
 "dnf:glslang" = "latest"
 "dnf:libicu-devel" = "latest"
 "dnf:libglvnd-devel" = "latest"
-"dnf:libstdc++-static" = "latest"
 "dnf:libxml2" = "latest"
 "dnf:mesa-libEGL-devel" = "latest"
 "dnf:ncurses-libs" = "latest"

@@ -1,7 +1,7 @@
 function(mln_configure_render_dependencies target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
-      include(egl)
+      include(render/egl)
       mln_import_egl()
       target_link_libraries(
         ${target}
@@ -81,8 +81,38 @@ function(mln_configure_renderer target)
         PRIVATE "${PROJECT_SOURCE_DIR}/third_party/egl_compat/include")
     endif()
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
-    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+    # Upstream's table binds each GL entry point to a linked loader. On Linux
+    # that is rewritten to resolve at run time so the artifacts carry no GL
+    # dependency of their own. Other EGL platforms keep the linked table: their
+    # loader comes from the SDK, and the run-time resolver only knows how to
+    # open a Linux client library.
+    set(MLN_FFI_GL_FUNCTIONS_SOURCE
+        ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      set(MLN_FFI_GL_FUNCTIONS_GENERATED
+          ${CMAKE_CURRENT_BINARY_DIR}/generated/gl_functions.cpp)
+      execute_process(
+        COMMAND
+          "${CMAKE_COMMAND}"
+          -E
+          env
+          python3
+          "${PROJECT_SOURCE_DIR}/scripts/generate-gl-functions.py"
+          "${MLN_FFI_GL_FUNCTIONS_SOURCE}"
+          "${MLN_FFI_GL_FUNCTIONS_GENERATED}"
+        RESULT_VARIABLE MLN_FFI_GL_FUNCTIONS_RESULT
+        OUTPUT_VARIABLE MLN_FFI_GL_FUNCTIONS_OUTPUT
+        ERROR_VARIABLE MLN_FFI_GL_FUNCTIONS_OUTPUT)
+      if(NOT MLN_FFI_GL_FUNCTIONS_RESULT EQUAL 0)
+        message(FATAL_ERROR "${MLN_FFI_GL_FUNCTIONS_OUTPUT}")
+      endif()
+      set_property(
+        DIRECTORY
+        APPEND
+        PROPERTY CMAKE_CONFIGURE_DEPENDS "${MLN_FFI_GL_FUNCTIONS_SOURCE}")
+      set(MLN_FFI_GL_FUNCTIONS_SOURCE "${MLN_FFI_GL_FUNCTIONS_GENERATED}")
+    endif()
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES "${MLN_FFI_GL_FUNCTIONS_SOURCE}")
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_WGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
@@ -111,6 +141,11 @@ function(mln_configure_renderer target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     list(APPEND MLN_FFI_OPENGL_SOURCES
          ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+      # Supplies the EGL entry points, so nothing links an EGL loader.
+      list(APPEND MLN_FFI_OPENGL_SOURCES
+           ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_dispatch.cpp)
+    endif()
   endif()
   set_source_files_properties(
     ${MLN_FFI_OPENGL_SOURCES}

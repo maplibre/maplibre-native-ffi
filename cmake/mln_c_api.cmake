@@ -1,114 +1,7 @@
 include(mln_lint)
+include(mln_archive)
 include(mln_platform)
 include(mln_render_backend)
-
-set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
-    mbgl-core
-    mbgl-freetype
-    mbgl-harfbuzz
-    mbgl-vendor-csscolorparser
-    mbgl-vendor-nunicode
-    mbgl-vendor-parsedate
-    mbgl-vendor-sqlite
-    mlt-cpp)
-
-function(mln_append_existing_targets out_var)
-  set(MLN_FFI_TARGETS "${${out_var}}")
-  foreach(MLN_FFI_TARGET ${ARGN})
-    if(TARGET ${MLN_FFI_TARGET})
-      list(APPEND MLN_FFI_TARGETS ${MLN_FFI_TARGET})
-    endif()
-  endforeach()
-  set(${out_var} ${MLN_FFI_TARGETS} PARENT_SCOPE)
-endfunction()
-
-function(mln_configure_complete_static_archive target)
-  get_target_property(MLN_FFI_ARCHIVE_FORMAT mln_ffi_platform_dependencies
-                      MLN_FFI_ARCHIVE_FORMAT)
-  set(MLN_FFI_COMPLETE_STATIC_DIR
-      "${CMAKE_CURRENT_BINARY_DIR}/${target}-complete-static")
-  if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "coff")
-    set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
-        "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c-static.lib")
-  else()
-    set(MLN_FFI_COMPLETE_STATIC_OBJECT
-        "${MLN_FFI_COMPLETE_STATIC_DIR}/maplibre-native-c.o")
-    set(MLN_FFI_COMPLETE_STATIC_ARCHIVE
-        "${MLN_FFI_COMPLETE_STATIC_DIR}/libmaplibre-native-c.a")
-  endif()
-
-  set(MLN_FFI_INPUT_ARCHIVES "$<TARGET_FILE:${target}>")
-  set(MLN_FFI_INPUT_TARGETS ${target})
-  foreach(MLN_FFI_STATIC_DEPENDENCY ${ARGN})
-    if(TARGET ${MLN_FFI_STATIC_DEPENDENCY})
-      list(APPEND MLN_FFI_INPUT_ARCHIVES
-           "$<TARGET_FILE:${MLN_FFI_STATIC_DEPENDENCY}>")
-      list(APPEND MLN_FFI_INPUT_TARGETS ${MLN_FFI_STATIC_DEPENDENCY})
-    else()
-      list(APPEND MLN_FFI_INPUT_ARCHIVES "${MLN_FFI_STATIC_DEPENDENCY}")
-      list(APPEND MLN_FFI_INPUT_TARGETS "${MLN_FFI_STATIC_DEPENDENCY}")
-    endif()
-  endforeach()
-  list(REMOVE_DUPLICATES MLN_FFI_INPUT_ARCHIVES)
-  list(REMOVE_DUPLICATES MLN_FFI_INPUT_TARGETS)
-
-  if(MLN_FFI_ARCHIVE_FORMAT STREQUAL "coff")
-    add_custom_command(
-      OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_AR}" /NOLOGO "/OUT:${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-        ${MLN_FFI_INPUT_ARCHIVES}
-      DEPENDS ${MLN_FFI_INPUT_TARGETS}
-      VERBATIM)
-  elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "apple")
-    get_target_property(MLN_FFI_ARCHIVE_TOOL mln_ffi_platform_dependencies
-                        MLN_FFI_ARCHIVE_TOOL)
-    add_custom_command(
-      OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${MLN_FFI_ARCHIVE_TOOL}" -static -o
-        "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}" ${MLN_FFI_INPUT_ARCHIVES}
-      DEPENDS ${MLN_FFI_INPUT_TARGETS}
-      VERBATIM)
-  elseif(MLN_FFI_ARCHIVE_FORMAT STREQUAL "elf")
-    add_custom_command(
-      OUTPUT "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      COMMAND "${CMAKE_COMMAND}" -E rm -rf "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_COMMAND}" -E make_directory "${MLN_FFI_COMPLETE_STATIC_DIR}"
-      COMMAND
-        "${CMAKE_LINKER}"
-        -r
-        -o
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
-        --whole-archive
-        ${MLN_FFI_INPUT_ARCHIVES}
-        --no-whole-archive
-      COMMAND
-        "${CMAKE_AR}" qc "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-        "${MLN_FFI_COMPLETE_STATIC_OBJECT}"
-      COMMAND "${CMAKE_RANLIB}" "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}"
-      DEPENDS ${MLN_FFI_INPUT_TARGETS}
-      VERBATIM)
-  else()
-    message(FATAL_ERROR "Unsupported archive format: ${MLN_FFI_ARCHIVE_FORMAT}")
-  endif()
-
-  set(MLN_FFI_COMPLETE_STATIC_TARGET "${target}_complete_static")
-  add_custom_target(
-    ${MLN_FFI_COMPLETE_STATIC_TARGET}
-    ALL
-    DEPENDS "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
-  set_property(
-    TARGET ${target}
-    PROPERTY MLN_FFI_INSTALL_ARCHIVE "${MLN_FFI_COMPLETE_STATIC_ARCHIVE}")
-endfunction()
 
 function(mln_configure_shared_exports target)
   set(export_dir "${CMAKE_CURRENT_BINARY_DIR}/exports")
@@ -127,19 +20,6 @@ function(mln_configure_shared_exports target)
     target_link_options(
       ${target}
       PRIVATE "LINKER:--version-script,${export_file}")
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-      target_link_options(${target} PRIVATE "LINKER:--exclude-libs,ALL")
-    endif()
-  endif()
-endfunction()
-
-function(mln_configure_static_cxx_runtime target)
-  # Bundle the C++ runtime so the shared library carries no libstdc++ ABI
-  # requirement from the build host. The C ABI never passes C++ types or
-  # exceptions across the boundary, and the version script plus --exclude-libs
-  # keep the bundled runtime symbols private to the library.
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_link_options(${target} PRIVATE -static-libstdc++ -static-libgcc)
   endif()
 endfunction()
 
@@ -302,29 +182,7 @@ endfunction()
 function(mln_configure_shared_c_api_wrapper target implementation_target)
   mln_configure_c_api_wrapper(${target} ${implementation_target})
   mln_configure_shared_exports(${target})
-  mln_configure_static_cxx_runtime(${target})
   mln_configure_install_rpath(${target})
-endfunction()
-
-function(mln_complete_static_dependencies_for_target out_var)
-  set(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-      ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
-
-  get_target_property(MLN_FFI_PLATFORM_STATIC_DEPENDENCIES
-                      mln_ffi_platform_dependencies MLN_FFI_STATIC_ARCHIVES)
-  if(MLN_FFI_PLATFORM_STATIC_DEPENDENCIES)
-    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-         ${MLN_FFI_PLATFORM_STATIC_DEPENDENCIES})
-  endif()
-
-  get_target_property(MLN_FFI_RENDER_STATIC_DEPENDENCIES
-                      mln_ffi_render_dependencies MLN_FFI_STATIC_ARCHIVES)
-  if(MLN_FFI_RENDER_STATIC_DEPENDENCIES)
-    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-                                ${MLN_FFI_RENDER_STATIC_DEPENDENCIES})
-  endif()
-
-  set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
 endfunction()
 
 function(mln_add_c_api_library target)

@@ -49,15 +49,13 @@ fun nativeTargets(
   targetFamily: MaplibreRuntimeTargetFamily,
 ): Map<String, NativeTargetConfiguration> =
   when (targetFamily) {
-    // The OpenGL and Vulkan runtimes reach Linux through the JVM and Android
-    // artifacts. Kotlin/Native links the runtime archive statically, and its
-    // Linux toolchain targets a far older glibc than the archive requires, so
-    // these backends register no Kotlin/Native targets.
+    // Linux arm64 is absent because Kotlin/Native has no arm64 Linux host, so
+    // that target would have to be cross-compiled from x64.
     MaplibreRuntimeTargetFamily.LINUX -> {
       require(backend != MaplibreRuntimeBackend.METAL) {
         "Metal does not support the Linux runtime target family"
       }
-      emptyMap()
+      mapOf("linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-x64"))
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
       require(backend == MaplibreRuntimeBackend.METAL) {
@@ -327,8 +325,14 @@ extensions.configure<KotlinMultiplatformExtension> {
         )
       }
 
+    val runtimeArchive = runtimeInstallDir.resolve("lib/libmaplibre-native-c.a")
     val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
     tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
+      // cinterop takes the archive through -staticLibrary, which Gradle cannot
+      // see, so the task would otherwise stay up to date across a rebuild of the
+      // archive and embed a stale copy in the published KLIB. A file collection
+      // tolerates the archive being absent on a host that does not build it.
+      inputs.files(runtimeArchive).withPropertyName("maplibreNativeCArchive")
       embedMaplibreLicenseBundle(runtimeLicenseDirectory)
     }
 
@@ -373,7 +377,11 @@ canonicalizeKmpRootMetadata(
   targetModules =
     when (targetFamily) {
       MaplibreRuntimeTargetFamily.LINUX ->
-        mapOf("android" to "$mavenArtifact-android", "jvm" to "$mavenArtifact-jvm")
+        mapOf(
+          "android" to "$mavenArtifact-android",
+          "jvm" to "$mavenArtifact-jvm",
+          "linuxX64" to "$mavenArtifact-linuxx64",
+        )
       MaplibreRuntimeTargetFamily.APPLE ->
         mapOf(
           "iosArm64" to "$mavenArtifact-iosarm64",

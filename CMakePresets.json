@@ -24,12 +24,14 @@
       "name": "_linux-x64",
       "hidden": true,
       "inherits": "_single-config",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/zig-linux.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "x64" }
     },
     {
       "name": "_linux-arm64",
       "hidden": true,
       "inherits": "_single-config",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/zig-linux.cmake",
       "cacheVariables": { "MLN_FFI_TARGET_ARCHITECTURE": "arm64" }
     },
     {

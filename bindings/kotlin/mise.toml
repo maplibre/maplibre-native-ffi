@@ -8,21 +8,31 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
+runtime_backend=
 case "$usage_preset" in
+  linux-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl ;;
+  linux-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-*|windows-*) kotlin_target= ;;
+  linux-arm64-*|windows-*) kotlin_target= ;;
   *)
     echo "Unsupported Kotlin build preset: $usage_preset" >&2
     exit 2
     ;;
 esac
+gradle_args=(-PmaplibreNativeCInstallDir="build/$usage_preset/install")
 tasks=(:bindings:kotlin:jvmJar)
 if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Klib")
 fi
-./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  "${tasks[@]}"
+# The runtime KLIB embeds the backend-specific static archive, so it only
+# builds for a preset whose backend has a matching runtime publication.
+if [[ -n "$runtime_backend" ]]; then
+  tasks+=(":bindings:kotlin-runtime-${runtime_backend}:${kotlin_target}Klib")
+  gradle_args+=(
+    "-Pmaplibre.runtime.${runtime_backend}.${kotlin_target}.installDir=build/$usage_preset/install"
+  )
+fi
+./gradlew "${gradle_args[@]}" "${tasks[@]}"
 '''
 
 [tasks.test]
@@ -31,8 +41,9 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 case "$usage_preset" in
+  linux-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-*|windows-*) kotlin_target= ;;
+  linux-arm64-*|windows-*) kotlin_target= ;;
   *)
     echo "Unsupported Kotlin test preset: $usage_preset" >&2
     exit 2
@@ -63,9 +74,10 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 dir = "../.."
 run = '''
 case "$usage_preset" in
+  linux-x64-*) kotlin_target=linuxX64 ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
-  linux-*|windows-*)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms only, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on macOS to cover nativeMain." >&2
+  linux-arm64-*|windows-*)
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms and Linux x64, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on a Linux x64 or macOS host to cover nativeMain." >&2
     exit 2
     ;;
   *)

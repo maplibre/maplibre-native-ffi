@@ -42,9 +42,9 @@ def runner(preset: str) -> str:
     target_platform = platform(preset)
     target_architecture = architecture(preset)
     if target_platform == "linux":
-        # Linux runners are pinned because the runner image's glibc sets the
-        # minimum glibc our published natives require. See the glibc_floor
-        # variable in mise.linux.toml.
+        # The zig toolchain sets the glibc floor, so the runner image no longer
+        # decides it. These stay pinned for reproducibility; the graphics
+        # loaders and drivers the tests use still come from the image.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
