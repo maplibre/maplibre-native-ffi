@@ -1,0 +1,9 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  exclude:
+    - lib/src/internal/c/*.g.dart
+  language:
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true

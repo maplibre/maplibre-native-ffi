@@ -14,3 +14,12 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  - package-ecosystem: pub
+    directory: /bindings/dart
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      pub:
+        patterns: ["*"]
