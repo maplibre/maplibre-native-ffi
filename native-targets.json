@@ -1,0 +1,116 @@
+[
+  {
+    "name": "linux-x64-egl",
+    "platform": "linux",
+    "architecture": "x64",
+    "backend": "egl"
+  },
+  {
+    "name": "linux-x64-vulkan",
+    "platform": "linux",
+    "architecture": "x64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "linux-arm64-egl",
+    "platform": "linux",
+    "architecture": "arm64",
+    "backend": "egl"
+  },
+  {
+    "name": "linux-arm64-vulkan",
+    "platform": "linux",
+    "architecture": "arm64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "macos-arm64-metal",
+    "platform": "macos",
+    "architecture": "arm64",
+    "backend": "metal"
+  },
+  {
+    "name": "macos-arm64-vulkan",
+    "platform": "macos",
+    "architecture": "arm64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "macos-arm64-egl",
+    "platform": "macos",
+    "architecture": "arm64",
+    "backend": "egl"
+  },
+  {
+    "name": "ios-arm64-metal",
+    "platform": "ios",
+    "architecture": "arm64",
+    "backend": "metal"
+  },
+  {
+    "name": "ios-simulator-arm64-metal",
+    "platform": "ios_simulator",
+    "architecture": "arm64",
+    "backend": "metal"
+  },
+  {
+    "name": "android-arm64-egl",
+    "platform": "android",
+    "architecture": "arm64",
+    "backend": "egl"
+  },
+  {
+    "name": "android-arm64-vulkan",
+    "platform": "android",
+    "architecture": "arm64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "android-x64-egl",
+    "platform": "android",
+    "architecture": "x64",
+    "backend": "egl"
+  },
+  {
+    "name": "android-x64-vulkan",
+    "platform": "android",
+    "architecture": "x64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "ohos-arm64-egl",
+    "platform": "ohos",
+    "architecture": "arm64",
+    "backend": "egl"
+  },
+  {
+    "name": "ohos-arm64-vulkan",
+    "platform": "ohos",
+    "architecture": "arm64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "windows-x64-wgl",
+    "platform": "windows",
+    "architecture": "x64",
+    "backend": "wgl"
+  },
+  {
+    "name": "windows-x64-vulkan",
+    "platform": "windows",
+    "architecture": "x64",
+    "backend": "vulkan"
+  },
+  {
+    "name": "windows-arm64-wgl",
+    "platform": "windows",
+    "architecture": "arm64",
+    "backend": "wgl"
+  },
+  {
+    "name": "windows-arm64-vulkan",
+    "platform": "windows",
+    "architecture": "arm64",
+    "backend": "vulkan"
+  }
+]

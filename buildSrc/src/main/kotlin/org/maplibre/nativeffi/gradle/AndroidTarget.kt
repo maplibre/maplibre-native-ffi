@@ -30,7 +30,7 @@ enum class AndroidTarget(
 
   fun ndkCompilerName(apiLevel: Int): String = "$ndkTargetTriple$apiLevel-clang++"
 
-  fun cmakePreset(backend: String): String =
+  fun nativeTarget(backend: String): String =
     "android-$cmakeArchitecture-${if (backend == "opengl") "egl" else "vulkan"}"
 
   companion object {

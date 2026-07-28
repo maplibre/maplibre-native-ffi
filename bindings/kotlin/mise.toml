@@ -4,15 +4,15 @@
 "aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-case "$usage_preset" in
+case "$usage_target" in
   macos-arm64-*) kotlin_target=macosArm64 ;;
   linux-*|windows-*) kotlin_target= ;;
   *)
-    echo "Unsupported Kotlin build preset: $usage_preset" >&2
+    echo "Unsupported Kotlin build target: $usage_target" >&2
     exit 2
     ;;
 esac
@@ -21,20 +21,20 @@ if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Klib")
 fi
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_target/install" \
   "${tasks[@]}"
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-case "$usage_preset" in
+case "$usage_target" in
   macos-arm64-*) kotlin_target=macosArm64 ;;
   linux-*|windows-*) kotlin_target= ;;
   *)
-    echo "Unsupported Kotlin test preset: $usage_preset" >&2
+    echo "Unsupported Kotlin test target: $usage_target" >&2
     exit 2
     ;;
 esac
@@ -43,58 +43,58 @@ if [[ -n "$kotlin_target" ]]; then
   tasks+=(":bindings:kotlin:${kotlin_target}Test")
 fi
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_target/install" \
   "${tasks[@]}"
 '''
 
 [tasks.jvmTest]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_target/install" \
   :bindings:kotlin:jvmTest
 '''
 
 [tasks.nativeTest]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-case "$usage_preset" in
+case "$usage_target" in
   macos-arm64-*) kotlin_target=macosArm64 ;;
   linux-*|windows-*)
-    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms only, so preset $usage_preset has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on macOS to cover nativeMain." >&2
+    echo "The Kotlin binding declares Kotlin/Native targets for Apple platforms only, so target $usage_target has no Kotlin/Native tests to run. Use //bindings/kotlin:jvmTest here, and run this task on macOS to cover nativeMain." >&2
     exit 2
     ;;
   *)
-    echo "Unsupported Kotlin/Native test preset: $usage_preset" >&2
+    echo "Unsupported Kotlin/Native test target: $usage_target" >&2
     exit 2
     ;;
 esac
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_target/install" \
   ":bindings:kotlin:${kotlin_target}Test"
 '''
 
 [tasks.iosBuild]
 description = "Build the Kotlin binding and embedded Metal runtime for an iOS target."
 usage = '''
-arg "<preset>" {
+arg "<target>" {
   choices "ios-arm64-metal" "ios-simulator-arm64-metal"
 }
 '''
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-case "$usage_preset" in
+case "$usage_target" in
   ios-arm64-metal) kotlin_target=iosArm64 ;;
   ios-simulator-arm64-metal) kotlin_target=iosSimulatorArm64 ;;
 esac
 ./gradlew \
-  -PmaplibreNativeCInstallDir="build/$usage_preset/install" \
-  -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_preset/install" \
+  -PmaplibreNativeCInstallDir="build/$usage_target/install" \
+  -Pmaplibre.runtime.metal.$kotlin_target.installDir="build/$usage_target/install" \
   ":bindings:kotlin:${kotlin_target}Klib" \
   ":bindings:kotlin-runtime-metal:${kotlin_target}Klib"
 '''

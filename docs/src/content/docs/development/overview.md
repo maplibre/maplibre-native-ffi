@@ -82,8 +82,8 @@ Run the headless Zig readback example:
 mise run //examples/zig-readback:run
 ```
 
-The default host preset uses Metal on macOS and Vulkan on Linux and Windows.
-Pass another preset to select a different native target or backend:
+The default host target uses Metal on macOS and Vulkan on Linux and Windows.
+Pass another target to select a different platform or backend:
 
 ```bash
 mise run build linux-x64-egl
@@ -92,10 +92,10 @@ mise run build linux-x64-egl
 ## Compiler Cache
 
 Native builds use [`sccache`](https://github.com/mozilla/sccache) through mise.
-`mise.toml` pins the tool and sets the public read-only R2 backend plus CMake
-compiler-launcher env, so `mise run build` and other mise tasks pick up the
-shared cache automatically. CI overrides those settings with write credentials
-when available.
+`mise.toml` pins the tool and sets the public read-only R2 backend. The native
+sub-build and Cargo use it as a compiler launcher, so `mise run build` and other
+mise tasks pick up the shared cache automatically. CI overrides those settings
+with write credentials when available.
 
 ## Common Commands
 
@@ -127,15 +127,17 @@ toolchain inputs.
 and project-specific tools, installs system packages and Git hooks, and runs
 repository tasks. Root configuration owns tools used across the repository;
 bindings, examples, and docs declare additional tools in their own `mise.toml`
-files. CMake presets define native targets and render backends. CMake uses
-platform SDKs and system libraries where available, and acquires pinned native
-libraries that are not available from system package managers. Gradle selects
-CMake presets and packages Android applications.
+files. `native-targets.json` defines native targets and render backends.
+`build.zig` is the native entrypoint. Following the
+[`allyourcodebase`](https://github.com/allyourcodebase/.github/blob/main/profile/README.md)
+model, it builds pinned source archives for zlib and libuv on Linux and Windows,
+then configures MapLibre Native through its upstream CMake build. Gradle selects
+native targets and packages Android applications.
 
-Native installs and CPack archives carry the notices for redistributed
-dependencies under `share/maplibre-native-c/licenses`. CMake collects notice
-files from the selected platform and render targets, and generates Rust
-dependency notices from the locked Cargo graph.
+Native installs and archives carry the notices for redistributed dependencies
+under `share/maplibre-native-c/licenses`. CMake collects notice files from the
+selected platform and render targets, and generates Rust dependency notices from
+the locked Cargo graph.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

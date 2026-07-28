@@ -15,27 +15,27 @@ timeout = "10m"
 run = "zig build --fetch=needed"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 run = '''
 zig build \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_target/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 '''
 
 [tasks.run]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 run = '''
 mkdir -p zig-out
 zig build run \
-  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+  -Dnative-install-dir="$MISE_MONOREPO_ROOT/build/$usage_target/install" \
   -Ddependency-include-dir="$MISE_MONOREPO_ROOT/third_party/maplibre-native/vendor/Vulkan-Headers/include" \
   -- zig-out/zig-readback.ppm
 '''
 run_windows = '''
 mkdir -p zig-out
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 zig build run \
   -Dnative-install-dir="$native_install_dir" \

@@ -78,6 +78,7 @@ zig_version = "0.16.0"
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
 "aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
 "github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
 
@@ -93,8 +94,8 @@ sccache = "{{vars.sccache_version}}"
 # Swift compiler.
 swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
-# The native CMake build compiles the Rust platform support library, so Rust is
-# part of the repository-wide native toolchain.
+# The native build compiles the Rust platform support library, so Rust is part
+# of the repository-wide native toolchain.
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
 
 [env]
@@ -133,16 +134,17 @@ postinstall = [
 ]
 
 [tasks.configure]
-description = "Configure a native CMake preset."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'cmake --preset "$usage_preset"'
+description = "Configure a native target."
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+run = 'zig build configure -Dnative-target="$usage_target"'
 
 [tasks.build]
-description = "Configure, build, and install a native CMake preset."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+description = "Configure, build, and install a native target."
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
 sources = [
+  "build.zig",
+  "build.zig.zon",
   "CMakeLists.txt",
-  "CMakePresets.json",
   "Cargo.lock",
   "Cargo.toml",
   "LICENSE",
@@ -153,36 +155,34 @@ sources = [
   "third_party/**/*",
 ]
 outputs = { auto = true }
-run = 'cmake --workflow --preset "$usage_preset"'
+run = 'zig build -Dnative-target="$usage_target"'
 
 [tasks.clean]
-description = "Remove one native preset build tree."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'rm -rf "$MISE_MONOREPO_ROOT/build/$usage_preset"'
+description = "Remove one native target build tree."
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+run = 'zig build clean -Dnative-target="$usage_target"'
 
 [tasks.package-native]
-description = "Build and archive a native CMake preset."
-usage = 'arg "<preset>"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
-run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
+description = "Build and archive a native target."
+usage = 'arg "<target>"'
+run = [{ task = "//:archive-native", args = ["{{usage.target}}"] }]
 
 [tasks.archive-native]
-description = "Archive an already-built native CMake preset."
-usage = 'arg "<preset>"'
+description = "Archive an already-built native target."
+usage = 'arg "<target>"'
 run = [
-  'cpack --preset "$usage_preset"',
-  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+  'zig build package -Dnative-target="$usage_target"',
+  { task = "//:verify-native-package", args = ["{{usage.target}}"] },
 ]
 
 [tasks.test]
-description = "Build and run C API tests for a CMake preset."
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+description = "Build and run C API tests for a native target."
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
 run = '''
-if [[ "$usage_preset" == ios-simulator-* ]]; then
+if [[ "$usage_target" == ios-simulator-* ]]; then
   mise run //:ios-simulator:boot
 fi
-ctest --preset "$usage_preset"
+zig build test -Dnative-target="$usage_target"
 '''
 
 [tasks.check]

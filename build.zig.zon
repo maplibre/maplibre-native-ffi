@@ -1,0 +1,29 @@
+.{
+    .name = .maplibre_native_ffi,
+    .version = "0.1.0",
+    .fingerprint = 0x4a5753fe88a87b43,
+    .minimum_zig_version = "0.16.0",
+    .dependencies = .{
+        .zlib_source = .{
+            .url = "https://github.com/madler/zlib/archive/refs/tags/v1.3.2.tar.gz",
+            .hash = "N-V-__8AAI4ANwDM8MWhHTUFLKfvLE_n2NQk6mh0sFDzhTqO",
+        },
+        .libuv = .{
+            .url = "https://github.com/allyourcodebase/libuv/archive/c1ccce24e1077ae7780857c89fb4b3aeb9080315.tar.gz",
+            .hash = "libuv-1.52.0-htqqvzNqAAAB6cHIx-wIffe_mqMW5GOKjHeDBJYHGwls",
+        },
+    },
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "CMakeLists.txt",
+        "Cargo.lock",
+        "Cargo.toml",
+        "LICENSE",
+        "cmake",
+        "include",
+        "native-targets.json",
+        "src",
+        "third_party",
+    },
+}

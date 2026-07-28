@@ -13,23 +13,23 @@ run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet &
 run = "scripts/generate-clangsharp.sh"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "../.."
 run = '''
-MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_target/install" \
   dotnet build \
     Maplibre.Native.slnx \
     -p:Platform="Any CPU"
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_target/install" \
   dotnet test \
     bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj \
     -p:Platform="Any CPU"

@@ -136,12 +136,12 @@ pub fn installedIncludeDirs(b: *std.Build, install_dir: std.Build.LazyPath, depe
 }
 
 pub fn nativeInstallDirPath(b: *std.Build) std.Build.LazyPath {
-    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c") orelse
-        @panic("missing required -Dnative-install-dir=<path-to-cmake-install-prefix>");
+    return b.option(std.Build.LazyPath, "native-install-dir", "Native install prefix for maplibre-native-c") orelse
+        @panic("missing required -Dnative-install-dir=<path-to-native-install-prefix>");
 }
 
 pub fn maybeNativeInstallDirPath(b: *std.Build) ?std.Build.LazyPath {
-    return b.option(std.Build.LazyPath, "native-install-dir", "CMake install prefix for maplibre-native-c");
+    return b.option(std.Build.LazyPath, "native-install-dir", "Native install prefix for maplibre-native-c");
 }
 
 pub fn dependencyIncludeDirs(b: *std.Build) []const std.Build.LazyPath {

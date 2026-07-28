@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #MISE description="Replace a native build tree with its packaged install."
 #MISE shell="bash"
-#USAGE arg "<preset>" help="Native CMake preset"
+#USAGE arg "<target>" help="Native target"
 #USAGE arg "<archive>" help="Native package archive"
 
 set -euo pipefail
 
-preset="${usage_preset?}"
-if [[ ! "$preset" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
-  echo "Invalid native preset: $preset" >&2
+target="${usage_target?}"
+if [[ ! "$target" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  echo "Invalid native target: $target" >&2
   exit 2
 fi
 
@@ -19,12 +19,12 @@ if [[ ! -f "$archive_arg" ]]; then
 fi
 archive="$(realpath "$archive_arg")"
 
-build_dir="$MISE_MONOREPO_ROOT/build/$preset"
+build_dir="$MISE_MONOREPO_ROOT/build/$target"
 staging_dir="$build_dir/.package-staging"
-package_root="$staging_dir/maplibre-native-c-$preset"
+package_root="$staging_dir/maplibre-native-c-$target"
 install_dir="$build_dir/install"
 
-mise run //:clean "$preset"
+mise run //:clean "$target"
 mkdir -p "$staging_dir"
 (
   cd "$staging_dir"

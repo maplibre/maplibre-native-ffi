@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # [MISE] description="Reject build-host paths in a packaged native artifact."
 # [MISE] shell="python3"
-# USAGE arg "<preset>" help="Native CMake preset"
+# USAGE arg "<target>" help="Native target"
 
 """Check that a packaged shared library only names portable dependencies.
 
@@ -122,9 +122,9 @@ def binary_problems(binary: pathlib.Path) -> list[str]:
 
 
 def main() -> int:
-    preset = os.environ["usage_preset"]
+    target = os.environ["usage_target"]
     root = pathlib.Path(os.environ["MISE_MONOREPO_ROOT"])
-    archive = root / "build/packages/native/dist" / f"maplibre-native-c-{preset}.tar.gz"
+    archive = root / "build/packages/native/dist" / f"maplibre-native-c-{target}.tar.gz"
     if not archive.is_file():
         print(f"error: native package does not exist: {archive}", file=sys.stderr)
         return 1

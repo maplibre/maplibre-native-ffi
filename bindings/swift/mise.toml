@@ -2,24 +2,24 @@
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
-swift_args=(--scratch-path ".build/$usage_preset")
+swift_args=(--scratch-path ".build/$usage_target")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNative "${swift_args[@]}"
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = ":build", args = ["{{usage.target}}"] }]
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 swift test \
-  --scratch-path ".build/$usage_preset" \
+  --scratch-path ".build/$usage_target" \
   -Xlinker -rpath \
   -Xlinker "$native_install_dir/lib"
 swift package describe --type json >/dev/null

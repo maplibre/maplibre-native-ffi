@@ -1,9 +1,9 @@
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo build \
     -p maplibre-native-sys \
@@ -11,7 +11,7 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
     -p maplibre-native
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   cargo build \
     -p maplibre-native-sys \
@@ -20,16 +20,16 @@ MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
 '''
 
 [tasks.test]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 # The sys crate emits its own rpath, but cargo:rustc-link-arg only covers that
 # crate's link targets, so the core and umbrella test binaries need the library
 # located at run time. Resolving it here instead of through RUSTFLAGS keeps the
-# preset out of the compiler command line, which is what sccache keys on: every
-# preset would otherwise get its own copy of every dependency crate.
+# target out of the compiler command line, which is what sccache keys on: every
+# target would otherwise get its own copy of every dependency crate.
 lib_dirs="$native_install_dir/lib"
 if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
   lib_dirs="$lib_dirs:$MLN_FFI_VULKAN_LOADER_DIR"
@@ -49,7 +49,7 @@ cargo clippy \
   --all-targets -- -D warnings
 '''
 run_windows = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 cargo test \
@@ -66,16 +66,16 @@ cargo clippy \
 
 [tasks."build:ohos"]
 usage = '''
-arg "<preset>" {
+arg "<target>" {
   choices "ohos-arm64-egl" "ohos-arm64-vulkan"
 }
 '''
 depends = [
-  { task = "//:build", args = ["{{usage.preset}}"] },
+  { task = "//:build", args = ["{{usage.target}}"] },
 ]
 dir = "../.."
 run = '''
-native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_target/install"
 sysroot="$OHOS_SDK_NATIVE/sysroot"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
 BINDGEN_EXTRA_CLANG_ARGS_aarch64_unknown_linux_ohos="--target=aarch64-linux-ohos --sysroot=$sysroot -I$sysroot/usr/include/aarch64-linux-ohos" \

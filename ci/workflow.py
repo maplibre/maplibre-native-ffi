@@ -10,37 +10,37 @@ DESKTOP = {"linux", "macos", "windows"}
 
 def load_configuration(
     root: pathlib.Path,
-) -> tuple[dict[str, object], dict[str, object]]:
+) -> tuple[dict[str, object], list[dict[str, str]]]:
     with (root / "ci" / "workflow.toml").open("rb") as file:
         source = tomllib.load(file)
-    presets = json.loads((root / "CMakePresets.json").read_text())
-    return source, presets
+    targets = json.loads((root / "native-targets.json").read_text())
+    return source, targets
 
 
-def platform(preset: str) -> str:
-    if preset.startswith("ios-simulator-"):
+def platform(target: str) -> str:
+    if target.startswith("ios-simulator-"):
         return "ios-simulator"
-    return preset.split("-", 1)[0]
+    return target.split("-", 1)[0]
 
 
-def architecture(preset: str) -> str:
-    parts = preset.split("-")
+def architecture(target: str) -> str:
+    parts = target.split("-")
     for candidate in ("x64", "arm64"):
         if candidate in parts:
             return candidate
-    raise SystemExit(f"error: cannot determine architecture from preset {preset!r}")
+    raise SystemExit(f"error: cannot determine architecture from target {target!r}")
 
 
-def backend(preset: str) -> str:
-    value = preset.rsplit("-", 1)[-1]
+def backend(target: str) -> str:
+    value = target.rsplit("-", 1)[-1]
     if value not in {"egl", "metal", "vulkan", "wgl"}:
-        raise SystemExit(f"error: cannot determine backend from preset {preset!r}")
+        raise SystemExit(f"error: cannot determine backend from target {target!r}")
     return value
 
 
-def runner(preset: str) -> str:
-    target_platform = platform(preset)
-    target_architecture = architecture(preset)
+def runner(target: str) -> str:
+    target_platform = platform(target)
+    target_architecture = architecture(target)
     if target_platform == "linux":
         # Linux runners are pinned because the runner image's glibc sets the
         # minimum glibc our published natives require. See the glibc_floor
@@ -49,35 +49,37 @@ def runner(preset: str) -> str:
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
     if target_platform == "windows":
-        return "windows-11-arm" if target_architecture == "arm64" else "windows-2022"
+        # Zig 0.16 cannot run reliably on Windows ARM64, but its x64 build can
+        # cross-compile the complete ARM64 dependency graph on an x64 runner.
+        return "windows-2022"
     if target_platform in {"android", "ohos"}:
         return "ubuntu-latest"
-    raise SystemExit(f"error: cannot determine runner from preset {preset!r}")
+    raise SystemExit(f"error: cannot determine runner from target {target!r}")
 
 
-def suite_commands(source: dict[str, object], preset: str) -> list[str]:
+def suite_commands(source: dict[str, object], target: str) -> list[str]:
     commands = []
     for suite in source["suites"]:
-        if platform(preset) not in suite["platforms"]:
+        if platform(target) not in suite["platforms"]:
             continue
-        if preset in suite.get("exclude", []):
+        if target in suite.get("exclude", []):
             continue
         for command in suite["commands"]:
             if (
                 command.get("platforms")
-                and platform(preset) not in command["platforms"]
+                and platform(target) not in command["platforms"]
             ):
                 continue
-            if command.get("include") and preset not in command["include"]:
+            if command.get("include") and target not in command["include"]:
                 continue
-            if preset in command.get("exclude", []):
+            if target in command.get("exclude", []):
                 continue
-            commands.append(f"mise run {command['task']} {preset}")
+            commands.append(f"mise run {command['task']} {target}")
     return commands
 
 
-def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
-    render_backend = "opengl" if backend(preset) == "egl" else backend(preset)
+def android_commands(target: str, abi: str, build_map: bool) -> list[str]:
+    render_backend = "opengl" if backend(target) == "egl" else backend(target)
     arguments = f"{render_backend} {abi}"
     commands = [f"mise run //bindings/kotlin:androidBuild {arguments} --prebuilt"]
     if build_map:
@@ -85,26 +87,26 @@ def android_commands(preset: str, abi: str, build_map: bool) -> list[str]:
     return commands
 
 
-def native_commands(preset: str, tested: set[str]) -> list[str]:
-    target_platform = platform(preset)
+def native_commands(target: str, tested: set[str]) -> list[str]:
+    target_platform = platform(target)
     if target_platform == "ohos":
-        return [f"mise run //bindings/rust:build:ohos {preset}"]
-    commands = [f"mise run {'test' if preset in tested else 'build'} {preset}"]
+        return [f"mise run //bindings/rust:build:ohos {target}"]
+    commands = [f"mise run {'test' if target in tested else 'build'} {target}"]
     if target_platform == "linux":
-        commands.append(f"mise run check-glibc-floor {preset}")
+        commands.append(f"mise run check-glibc-floor {target}")
     return commands
 
 
-def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
-    target_platform = platform(preset)
+def consumer_commands(source: dict[str, object], target: str) -> list[str]:
+    target_platform = platform(target)
     commands = []
     if target_platform == "android":
-        abi = "arm64-v8a" if architecture(preset) == "arm64" else "x86_64"
-        commands.extend(android_commands(preset, abi, backend(preset) == "egl"))
+        abi = "arm64-v8a" if architecture(target) == "arm64" else "x86_64"
+        commands.extend(android_commands(target, abi, backend(target) == "egl"))
     elif target_platform == "ios":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
+                f"mise run //bindings/kotlin:iosBuild {target}",
                 "mise run //bindings/swift:build:ios",
                 "mise run //examples/swift-map:build:ios",
             ]
@@ -112,7 +114,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
     elif target_platform == "ios-simulator":
         commands.extend(
             [
-                f"mise run //bindings/kotlin:iosBuild {preset}",
+                f"mise run //bindings/kotlin:iosBuild {target}",
                 "mise run //bindings/swift:build:ios-simulator",
                 "mise run //bindings/zig:test:ios-simulator",
                 "bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120",
@@ -120,7 +122,7 @@ def consumer_commands(source: dict[str, object], preset: str) -> list[str]:
             ]
         )
     elif target_platform in DESKTOP:
-        commands.extend(suite_commands(source, preset))
+        commands.extend(suite_commands(source, target))
     return commands
 
 
@@ -170,57 +172,45 @@ def uses_gradle(commands: list[str]) -> bool:
     )
 
 
-def preset_sets(
-    presets: dict[str, object],
-) -> tuple[list[str], set[str], set[str], set[str]]:
-    def names(kind: str) -> list[str]:
-        # Hidden presets carry shared settings for other presets to inherit and
-        # name no target of their own, so they take part in no preset pairing.
-        return [
-            preset["name"]
-            for preset in presets.get(kind, [])
-            if not preset.get("hidden", False)
-        ]
-
-    configured = names("configurePresets")
-    built = set(names("buildPresets"))
-    tested = set(names("testPresets"))
-    packaged = set(names("packagePresets"))
-    if set(configured) != built:
-        raise SystemExit(
-            "error: configure and build presets differ: "
-            f"missing={sorted(set(configured) - built)}, extra={sorted(built - set(configured))}"
-        )
-    if not tested <= set(configured) or not packaged <= set(configured):
-        raise SystemExit(
-            "error: test and package presets must reference configure presets"
-        )
-    return configured, built, tested, packaged
+def target_sets(
+    targets: list[dict[str, str]],
+) -> tuple[list[str], set[str], set[str]]:
+    configured = [target["name"] for target in targets]
+    if len(configured) != len(set(configured)):
+        raise SystemExit("error: native target names must be unique")
+    tested = {
+        target
+        for target in configured
+        if platform(target) in DESKTOP | {"ios-simulator"}
+        and not (platform(target) == "windows" and architecture(target) == "arm64")
+    }
+    packaged = {target for target in configured if platform(target) != "ohos"}
+    return configured, tested, packaged
 
 
 def target_rows(
-    source: dict[str, object], presets: dict[str, object]
+    source: dict[str, object], targets: list[dict[str, str]]
 ) -> list[dict[str, object]]:
-    configured, _, tested, packaged = preset_sets(presets)
+    configured, tested, packaged = target_sets(targets)
     rows = []
     # The toolchain cache key covers the runner OS, architecture and image, so
     # one row per runner label is enough to write every entry the others read.
     claimed_runners: set[str] = set()
-    for preset in configured:
-        native = native_commands(preset, tested)
-        consumers = consumer_commands(source, preset)
-        row_runner = runner(preset)
+    for target in configured:
+        native = native_commands(target, tested)
+        consumers = consumer_commands(source, target)
+        row_runner = runner(target)
         row = {
-            "preset": preset,
+            "target": target,
             "runner": row_runner,
-            "package": preset in packaged,
+            "package": target in packaged,
             "zig": uses_zig(native + consumers),
             "gradle": uses_gradle(native + consumers),
             "save_toolchains": row_runner not in claimed_runners,
-            "native_commands": native if preset in packaged else native + consumers,
+            "native_commands": native if target in packaged else native + consumers,
         }
         claimed_runners.add(row_runner)
-        if preset in packaged:
+        if target in packaged:
             row["consumer_commands"] = consumers
         rows.append(row)
     return rows

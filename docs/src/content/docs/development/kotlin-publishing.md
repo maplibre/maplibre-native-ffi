@@ -62,7 +62,7 @@ macosMain.dependencies {
 ### Kotlin/Native
 
 Each native runtime KLIB embeds the complete backend-specific static archive
-produced by the CMake build. Its cinterop definition also carries the system
+produced by the native build. Its cinterop definition also carries the system
 link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
@@ -121,7 +121,7 @@ Explicit native-library path configuration remains available as an override.
 
 Snapshot versions end in `-SNAPSHOT` and publish from the exact commit that
 passed the main CI workflow. A Linux x64 runner builds the Android publications,
-reusing the matrix's CMake install archives to build only the JNI bridge and
+reusing the matrix's native install archives to build only the JNI bridge and
 final AARs, while macOS runners build the JVM, macOS, and iOS publications. Each
 consumes native build artifacts produced by the platform and backend CI matrix.
 

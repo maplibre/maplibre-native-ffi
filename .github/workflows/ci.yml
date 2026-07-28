@@ -988,7 +988,7 @@ jobs:
 
   target-windows-arm64-wgl:
     name: target / windows-arm64-wgl
-    runs-on: windows-11-arm
+    runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
@@ -998,10 +998,9 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         with:
           target: windows-arm64-wgl
-          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test windows-arm64-wgl
+      - run: mise run build windows-arm64-wgl
       - name: Archive native artifact
         run: mise run archive-native windows-arm64-wgl
       - name: Install packaged native artifact
@@ -1039,7 +1038,7 @@ jobs:
 
   target-windows-arm64-vulkan:
     name: target / windows-arm64-vulkan
-    runs-on: windows-11-arm
+    runs-on: windows-2022
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     steps:
@@ -1051,7 +1050,7 @@ jobs:
           target: windows-arm64-vulkan
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - run: mise run test windows-arm64-vulkan
+      - run: mise run build windows-arm64-vulkan
       - name: Archive native artifact
         run: mise run archive-native windows-arm64-vulkan
       - name: Install packaged native artifact

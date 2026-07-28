@@ -97,10 +97,6 @@ runs:
           mesa-utils \
           mesa-utils-extra \
           mesa-vulkan-drivers
-        {
-          echo "EGL_PLATFORM=surfaceless"
-          echo "LIBGL_ALWAYS_SOFTWARE=true"
-        } >> "$GITHUB_ENV"
 
     - name: Use Windows Vulkan software driver
       if: ${{ runner.os == 'Windows' && endsWith(inputs.target, '-vulkan') }}
@@ -267,8 +263,19 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
+    - name: Select Windows target architecture
+      if: ${{ runner.os == 'Windows' && startsWith(inputs.target, 'windows-') }}
+      shell: bash
+      run: |
+        case "${{ inputs.target }}" in
+          windows-arm64-*) architecture=arm64 ;;
+          windows-x64-*) architecture=x64 ;;
+          *) echo "Unsupported Windows target: ${{ inputs.target }}" >&2; exit 1 ;;
+        esac
+        echo "MLN_FFI_WINDOWS_TARGET_ARCHITECTURE=$architecture" >> "$GITHUB_ENV"
+
     - name: Install Windows Vulkan SDK
-      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      if: ${{ startsWith(inputs.target, 'windows-x64-') && endsWith(inputs.target, '-vulkan') }}
       uses: jakoch/install-vulkan-sdk-action@37effcfa045411f8bfbbda26df2fd1b3bf3436fa # v1.6.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
@@ -288,7 +295,7 @@ runs:
     # directory to both ordinary processes and runtimes with isolated DLL
     # search paths, such as Python 3.8+.
     - name: Expose the Vulkan loader
-      if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
+      if: ${{ startsWith(inputs.target, 'windows-x64-') && endsWith(inputs.target, '-vulkan') }}
       shell: pwsh
       run: |
         # Where the loader sits differs by runner: the x64 SDK groups it under

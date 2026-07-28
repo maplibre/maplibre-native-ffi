@@ -215,7 +215,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     )
   val selectedInstalls = mutableListOf<File>()
   androidTargets.forEach { target ->
-    val preset = target.cmakePreset(backend.id)
+    val nativeTarget = target.nativeTarget(backend.id)
     val propertyName =
       if (prebuiltBuildRoot.isPresent) {
         "maplibre.android.prebuiltBuildRoot"
@@ -224,9 +224,9 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
       }
     val selectedInstall =
       prebuiltBuildRoot
-        .map { rootProject.file(it).resolve(preset).resolve("install") }
-        .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(preset) })
-        .getOrElse(rootProject.file("build/$preset/install"))
+        .map { rootProject.file(it).resolve(nativeTarget).resolve("install") }
+        .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(nativeTarget) })
+        .getOrElse(rootProject.file("build/$nativeTarget/install"))
     selectedInstalls.add(selectedInstall)
     val verifyInput =
       registerRuntimeInstallVerification(

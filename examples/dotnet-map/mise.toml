@@ -2,11 +2,11 @@
 "core:dotnet" = "{{vars.dotnet_version}}"
 
 [tasks.build]
-usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+usage = 'arg "[target]" default="{{vars.host_native_target}}"'
+depends = [{ task = "//:build", args = ["{{usage.target}}"] }]
 dir = "../.."
 run = '''
-MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/$usage_target/install" \
   dotnet build \
     examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj \
     -p:Platform="Any CPU"
@@ -21,7 +21,7 @@ arg "[render-target]" default="owned-texture" {
 }
 '''
 run = '''
-MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_preset}}/install" \
+MaplibreNativeCInstallDir="$MISE_MONOREPO_ROOT/build/{{vars.host_native_target}}/install" \
   dotnet run \
     --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj \
     -p:Platform="Any CPU" \

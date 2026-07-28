@@ -7,9 +7,15 @@ esac
 
 windows_host_architecture="${MLN_FFI_WINDOWS_HOST_ARCHITECTURE:-$(uname -m)}"
 case "$windows_host_architecture" in
-  aarch64 | arm64) msvc_arch=arm64 ;;
-  x64 | x86_64 | amd64) msvc_arch=x64 ;;
+  aarch64 | arm64) msvc_host_arch=arm64 ;;
+  x64 | x86_64 | amd64) msvc_host_arch=x64 ;;
   *) echo "Unsupported Windows host architecture: $windows_host_architecture" >&2; return 1 ;;
+esac
+windows_target_architecture="${MLN_FFI_WINDOWS_TARGET_ARCHITECTURE:-$windows_host_architecture}"
+case "$windows_target_architecture" in
+  aarch64 | arm64) msvc_target_arch=arm64 ;;
+  x64 | x86_64 | amd64) msvc_target_arch=x64 ;;
+  *) echo "Unsupported Windows target architecture: $windows_target_architecture" >&2; return 1 ;;
 esac
 
 standalone_llvm_bin='/c/Program Files/LLVM/bin'
@@ -37,7 +43,7 @@ prefer_standalone_llvm || return 1
 
 current_vscmd_arch="${VSCMD_ARG_TGT_ARCH:-}"
 if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" &&
-  "${current_vscmd_arch,,}" == "$msvc_arch" ]]; then
+  "${current_vscmd_arch,,}" == "$msvc_target_arch" ]]; then
   return 0
 fi
 
@@ -90,7 +96,7 @@ is_vsdevcmd_contribution() {
 # installed version, and the target architecture. An in-place Visual Studio
 # update changes the version and so retires the entry.
 vs_version="$(vs_query installationVersion)"
-cache_key="${vs_install//[^A-Za-z0-9]/_}-${vs_version//[^A-Za-z0-9]/_}-${msvc_arch}"
+cache_key="${vs_install//[^A-Za-z0-9]/_}-${vs_version//[^A-Za-z0-9]/_}-${msvc_host_arch}-${msvc_target_arch}"
 cache_file="${TMPDIR:-/tmp}/mln-msvc-env-${cache_key}.sh"
 
 vs_path_prefix=
@@ -114,7 +120,7 @@ if [[ -z "$cache_complete" ]]; then
   # success, and now that the result is cached it would be replayed all job.
   cat > "$loader" <<EOF
 @echo off
-call "$vs_dev_cmd" -arch=$msvc_arch -host_arch=$msvc_arch >nul
+call "$vs_dev_cmd" -arch=$msvc_target_arch -host_arch=$msvc_host_arch >nul
 if errorlevel 1 exit /b 1
 set
 EOF
@@ -180,7 +186,7 @@ EOF
   done < <(tr ':' '\n' <<< "$msvc_path")
 
   redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
-  crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
+  crt_path="$(find "$redist_root" -path "*/${msvc_host_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
   if [[ -n "$crt_path" ]]; then
     crt_path="$(dirname "$crt_path")"
   fi

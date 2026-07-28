@@ -46,7 +46,7 @@ val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/and
 // allowing the publication job to reuse them instead of rebuilding MapLibre Native.
 val prebuiltAndroidInstallRoot =
   providers.gradleProperty("maplibre.android.prebuiltInstallRoot").map(rootProject::file)
-// Target CI round-trips packages into each CMake preset's install directory.
+// Target CI round-trips packages into each native target's install directory.
 val prebuiltAndroidBuildRoot =
   providers.gradleProperty("maplibre.android.prebuiltBuildRoot").map(rootProject::file)
 
@@ -106,15 +106,15 @@ val packageAndroidNativeLibraries =
 
 androidTargets.forEach { target ->
   val targetRoot = layout.buildDirectory.dir("android-native/$androidBackend/${target.cargoTarget}")
-  val cmakePreset = target.cmakePreset(androidBackend)
+  val nativeTarget = target.nativeTarget(androidBackend)
   val configuredInstallDir =
     prebuiltAndroidBuildRoot
-      .map { it.resolve(cmakePreset).resolve("install") }
-      .orElse(prebuiltAndroidInstallRoot.map { it.resolve(cmakePreset) })
+      .map { it.resolve(nativeTarget).resolve("install") }
+      .orElse(prebuiltAndroidInstallRoot.map { it.resolve(nativeTarget) })
   val installDir =
     rootProject.layout
       .dir(configuredInstallDir)
-      .orElse(rootProject.layout.projectDirectory.dir("build/$cmakePreset/install"))
+      .orElse(rootProject.layout.projectDirectory.dir("build/$nativeTarget/install"))
       .get()
   val javaCppNativeBuild = targetRoot.map { it.dir("javacpp") }
   val packageDir = packagedAndroidNativeLibs.map { it.dir("$androidBackend/${target.cargoTarget}") }
@@ -135,10 +135,10 @@ androidTargets.forEach { target ->
     tasks.register<Exec>("buildMaplibreNativeCAndroid${target.taskSuffix}") {
       group = "build"
       description = "Builds and installs MapLibre Native C for Android ${target.ndkAbi}."
-      doNotTrackState("CMake owns native incremental build state")
+      doNotTrackState("Zig and the upstream CMake sub-build own native incremental state")
       workingDir(repositoryRoot)
-      executable("cmake")
-      args("--workflow", "--preset", cmakePreset)
+      executable("zig")
+      args("build", "-Dnative-target=$nativeTarget")
       environment("ANDROID_HOME", androidSdkDirectory.get().asFile.absolutePath)
       enabled = !configuredInstallDir.isPresent
     }

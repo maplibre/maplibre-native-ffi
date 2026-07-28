@@ -12,7 +12,7 @@ fi
 
 input_root="$1"
 install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/android-multi-install"
-presets=(
+targets=(
   android-arm64-egl
   android-arm64-vulkan
   android-x64-egl
@@ -21,15 +21,15 @@ presets=(
 
 rm -rf "$install_root"
 mkdir -p "$install_root"
-for preset in "${presets[@]}"; do
-  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+for target in "${targets[@]}"; do
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${target}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
-    echo "Missing native package for ${preset} under ${input_root}" >&2
+    echo "Missing native package for ${target} under ${input_root}" >&2
     exit 1
   fi
 
   archive="$(realpath "$archive")"
-  archive_root="maplibre-native-c-${preset}"
+  archive_root="maplibre-native-c-${target}"
   (
     cd "$install_root"
     # The AAR bundles the native notices, and assembly now rejects an install
@@ -39,7 +39,7 @@ for preset in "${presets[@]}"; do
       "${archive_root}/share/maplibre-native-c/artifact.json" \
       "${archive_root}/share/maplibre-native-c/licenses"
   )
-  mv "${install_root}/${archive_root}" "${install_root}/${preset}"
+  mv "${install_root}/${archive_root}" "${install_root}/${target}"
 done
 
 for backend in opengl vulkan; do

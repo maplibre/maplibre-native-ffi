@@ -16,13 +16,13 @@ usage() {
   echo "       $(basename "$0") verify <maven-staging>" >&2
 }
 
-extract_preset() {
-  local preset="$1"
+extract_target() {
+  local target="$1"
   local archive
-  local destination="${install_root}/${preset}"
-  archive="$(find "$input_root" -type f -name "maplibre-native-c-${preset}.tar.gz" -print -quit)"
+  local destination="${install_root}/${target}"
+  archive="$(find "$input_root" -type f -name "maplibre-native-c-${target}.tar.gz" -print -quit)"
   if [[ -z "$archive" ]]; then
-    echo "Missing native package for ${preset} under ${input_root}" >&2
+    echo "Missing native package for ${target} under ${input_root}" >&2
     return 1
   fi
 
@@ -32,11 +32,11 @@ extract_preset() {
 
 prepare_native_inputs() {
   local partition="$1"
-  local presets=()
+  local targets=()
 
   case "$partition" in
     android)
-      presets=(
+      targets=(
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
@@ -44,7 +44,7 @@ prepare_native_inputs() {
       )
       ;;
     apple)
-      presets=(
+      targets=(
         linux-x64-egl
         linux-arm64-egl
         linux-x64-vulkan
@@ -67,21 +67,21 @@ prepare_native_inputs() {
   esac
 
   rm -rf "$install_root"
-  for preset in "${presets[@]}"; do
-    extract_preset "$preset"
+  for target in "${targets[@]}"; do
+    extract_target "$target"
   done
 }
 
 prepare_apple_root_inputs() {
-  local presets=(
+  local targets=(
     macos-arm64-metal
     ios-arm64-metal
     ios-simulator-arm64-metal
   )
 
   rm -rf "$install_root"
-  for preset in "${presets[@]}"; do
-    extract_preset "$preset"
+  for target in "${targets[@]}"; do
+    extract_target "$target"
   done
 }
 

@@ -101,6 +101,9 @@ function(mln_link_rust_platform target)
       "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "CARGO_TARGET_DIR=${MLN_FFI_CARGO_TARGET_DIR}")
+  if(MLN_FFI_BUILD_JOBS)
+    list(APPEND rust_environment "CARGO_BUILD_JOBS=${MLN_FFI_BUILD_JOBS}")
+  endif()
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND rust_environment
          "CARGO_TARGET_${rust_target_env}_RUSTFLAGS=-Ctarget-feature=+crt-static")

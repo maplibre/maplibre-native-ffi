@@ -1,35 +1,34 @@
 function(mln_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
 
-  include(FetchContent)
-  set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-  set(LIBUV_BUILD_BENCH OFF CACHE BOOL "" FORCE)
-  fetchcontent_declare(
-    mln_ffi_zlib_source
-    URL
-      "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
-    URL_HASH
-      "SHA256=9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23"
-    EXCLUDE_FROM_ALL)
-  fetchcontent_declare(
-    mln_ffi_libuv_source
-    URL "https://dist.libuv.org/dist/v1.48.0/libuv-v1.48.0.tar.gz"
-    URL_HASH
-      "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
-    EXCLUDE_FROM_ALL)
-  fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
-  mln_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
-                  "zlib.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
-                  "libuv.txt")
-  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
-                  "libuv-extra.txt")
+  foreach(dependency IN ITEMS ZLIB LIBUV)
+    if(NOT MLN_FFI_${dependency}_LIBRARY
+       OR NOT MLN_FFI_${dependency}_INCLUDE_DIR)
+      message(
+        FATAL_ERROR
+          "${dependency} must be supplied by build.zig; run `zig build` instead of configuring CMake directly")
+    endif()
+  endforeach()
+
+  add_library(mln_ffi_zlib STATIC IMPORTED GLOBAL)
+  set_target_properties(
+    mln_ffi_zlib
+    PROPERTIES
+      IMPORTED_LOCATION "${MLN_FFI_ZLIB_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES
+      "${MLN_FFI_ZLIB_INCLUDE_DIR}")
+  add_library(mln_ffi_libuv STATIC IMPORTED GLOBAL)
+  set_target_properties(
+    mln_ffi_libuv
+    PROPERTIES
+      IMPORTED_LOCATION "${MLN_FFI_LIBUV_LIBRARY}" INTERFACE_INCLUDE_DIRECTORIES
+      "${MLN_FFI_LIBUV_INCLUDE_DIR}")
+
+  mln_add_license(${target} "${MLN_FFI_ZLIB_LICENSE}" "zlib.txt")
+  mln_add_license(${target} "${MLN_FFI_LIBUV_LICENSE}" "libuv.txt")
 
   target_link_libraries(
     ${target}
-    INTERFACE Threads::Threads zlibstatic uv_a ${CMAKE_DL_LIBS})
+    INTERFACE Threads::Threads mln_ffi_zlib mln_ffi_libuv ${CMAKE_DL_LIBS} rt)
   set_target_properties(
     ${target}
     PROPERTIES
@@ -42,7 +41,7 @@ function(mln_configure_platform_dependencies target)
       MLN_FFI_ARCHIVE_FORMAT
       elf
       MLN_FFI_STATIC_ARCHIVES
-      "mbgl-vendor-icu;maplibre_native_platform_rust;zlibstatic;uv_a"
+      "mbgl-vendor-icu;maplibre_native_platform_rust;mln_ffi_zlib;mln_ffi_libuv"
       MLN_FFI_PKG_CONFIG_LIBS
       -ldl
       MLN_FFI_TEST_SUPPORTED

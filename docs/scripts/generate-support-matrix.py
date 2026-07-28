@@ -20,7 +20,7 @@ from ci.workflow import (  # noqa: E402
     load_configuration,
     native_commands,
     platform,
-    preset_sets,
+    target_sets,
 )
 
 
@@ -70,13 +70,13 @@ class Coverage:
         return f"{self.platform}-{self.arch}"
 
 
-def coverage_from_preset(preset: str, status: str) -> Coverage:
-    target_platform = platform(preset)
+def coverage_from_target(target: str, status: str) -> Coverage:
+    target_platform = platform(target)
     return Coverage(
         platform="ios" if target_platform == "ios-simulator" else target_platform,
-        arch=architecture(preset),
+        arch=architecture(target),
         backend={"egl": "opengl", "wgl": "opengl"}.get(
-            backend(preset), backend(preset)
+            backend(target), backend(target)
         ),
         status=status,
         simulator=target_platform == "ios-simulator",
@@ -206,24 +206,24 @@ def project_rows(
 
 
 def support_matrix() -> dict[str, Any]:
-    source, presets = load_configuration(REPO_ROOT)
-    configured, _, tested, _ = preset_sets(presets)
+    source, targets = load_configuration(REPO_ROOT)
+    configured, tested, _ = target_sets(targets)
     native = environment_rows(
         [
-            coverage_from_preset(preset, "tested" if preset in tested else "build-only")
-            for preset in configured
+            coverage_from_target(target, "tested" if target in tested else "build-only")
+            for target in configured
         ]
     )
 
     projects: dict[str, list[Coverage]] = defaultdict(list)
-    for preset in configured:
-        commands = native_commands(preset, tested) + consumer_commands(source, preset)
+    for target in configured:
+        commands = native_commands(target, tested) + consumer_commands(source, target)
         for command in commands:
             support = command_support(command)
             if support is None:
                 continue
             project_id, status = support
-            projects[project_id].append(coverage_from_preset(preset, status))
+            projects[project_id].append(coverage_from_target(target, status))
 
     return {
         "statuses": [

@@ -60,9 +60,10 @@ mise run fix
 hk fix [FILES...]
 ```
 
-Native targets and render backends are defined in `CMakePresets.json`. Gradle
-selects the Android presets when building platform packages; OpenHarmony and
-host workflows use the presets directly.
+Native targets and render backends are defined in `native-targets.json`.
+`build.zig` orchestrates native builds and keeps CMake behind the MapLibre
+Native upstream boundary. Gradle selects Android targets when building platform
+packages.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.
@@ -83,8 +84,8 @@ the PR description if more detail is needed. More context:
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- Mise defines tools, system packages, and common workflows. CMake presets
-  define portable native builds, and Gradle defines Android builds.
+- Mise defines tools, system packages, and common workflows. Zig defines
+  portable native build orchestration, and Gradle defines Android builds.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and

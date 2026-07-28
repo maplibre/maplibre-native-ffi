@@ -25,6 +25,26 @@ endif()
 # C++ source file.
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
+foreach(
+  dependency_path
+  IN
+  ITEMS
+  MLN_FFI_ZLIB_LIBRARY
+  MLN_FFI_ZLIB_INCLUDE_DIR
+  MLN_FFI_ZLIB_LICENSE
+  MLN_FFI_LIBUV_LIBRARY
+  MLN_FFI_LIBUV_INCLUDE_DIR
+  MLN_FFI_LIBUV_LICENSE)
+  if(DEFINED ${dependency_path} AND NOT IS_ABSOLUTE "${${dependency_path}}")
+    cmake_path(
+      ABSOLUTE_PATH ${dependency_path}
+      BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
+      NORMALIZE
+      OUTPUT_VARIABLE absolute_dependency_path)
+    set(${dependency_path} "${absolute_dependency_path}")
+  endif()
+endforeach()
+
 if(MSVC)
   # sccache cannot reliably cache MSVC compilations that emit shared compiler
   # PDBs with /Zi. Embed debug information in objects instead; link.exe may

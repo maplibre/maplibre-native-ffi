@@ -4,7 +4,7 @@
 shell = '"C:/Program Files/Git/bin/bash.exe" -e -lc'
 
 [vars]
-host_native_preset = "windows-{{ arch() }}-vulkan"
+host_native_target = "windows-{{ arch() }}-vulkan"
 
 [env]
 # Mise tasks use non-interactive Git Bash on Windows. Source VsDevCmd before each

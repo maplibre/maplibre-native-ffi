@@ -1,5 +1,5 @@
 [vars]
-host_native_preset = "macos-arm64-metal"
+host_native_target = "macos-arm64-metal"
 
 [bootstrap.packages]
 "brew:docker-buildx" = "latest"

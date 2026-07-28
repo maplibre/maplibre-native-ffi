@@ -7,6 +7,19 @@ function(mln_configure_render_dependencies target)
   mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
                   "glslang.txt")
 
+  get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
+                      INTERFACE_INCLUDE_DIRECTORIES)
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}"
+      MLN_FFI_STATIC_ARCHIVES
+      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
+
+  if(NOT BUILD_TESTING)
+    return()
+  endif()
+
   set(MLN_FFI_VULKAN_LIBRARY_SUFFIXES Lib Lib32 Lib/arm64)
   if(MLN_FFI_TARGET_ARCHITECTURE STREQUAL "arm64"
      OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
@@ -27,18 +40,12 @@ function(mln_configure_render_dependencies target)
   set_property(
     TARGET ${target}
     PROPERTY MLN_FFI_TEST_LINK_LIBRARIES mln_ffi_vulkan_loader)
-
   get_filename_component(
     MLN_FFI_VULKAN_LOADER_DIR "${MLN_FFI_VULKAN_LOADER_LIBRARY}"
     DIRECTORY)
-  get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
-                      INTERFACE_INCLUDE_DIRECTORIES)
-  set_target_properties(
-    ${target}
-    PROPERTIES
-      MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}" MLN_FFI_RUNTIME_DIRS
-      "${MLN_FFI_VULKAN_LOADER_DIR}" MLN_FFI_STATIC_ARCHIVES
-      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
+  set_property(
+    TARGET ${target}
+    PROPERTY MLN_FFI_RUNTIME_DIRS "${MLN_FFI_VULKAN_LOADER_DIR}")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(MLN_FFI_VULKAN_ICD_FILE "$ENV{VK_DRIVER_FILES}")

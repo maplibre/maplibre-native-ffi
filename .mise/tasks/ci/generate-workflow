@@ -29,8 +29,8 @@ SCCACHE_ENVIRONMENT = (
 )
 
 
-def job_id(preset: str) -> str:
-    return f"target-{preset}"
+def job_id(target: str) -> str:
+    return f"target-{target}"
 
 
 def setup(
@@ -78,21 +78,21 @@ CONSUMER_ENV = {"MISE_TASK_SKIP": '"//:build"'}
 
 
 def target_job(row: dict[str, object]) -> list[str]:
-    preset = str(row["preset"])
+    target = str(row["target"])
     package = bool(row["package"])
     zig = bool(row["zig"])
     native = list(row["native_commands"])
     consumers = list(row.get("consumer_commands", []))
 
     lines = [
-        f"  {job_id(preset)}:",
-        f"    name: target / {preset}",
+        f"  {job_id(target)}:",
+        f"    name: target / {target}",
         f"    runs-on: {row['runner']}",
         "    timeout-minutes: 120",
         SCCACHE_ENVIRONMENT,
         "    steps:",
         *setup(
-            preset,
+            target,
             zig=zig,
             gradle=bool(row["gradle"]),
             save_toolchains=bool(row["save_toolchains"]),
@@ -104,12 +104,12 @@ def target_job(row: dict[str, object]) -> list[str]:
         lines.extend(
             [
                 "      - name: Archive native artifact",
-                f"        run: mise run archive-native {preset}",
+                f"        run: mise run archive-native {target}",
                 "      - name: Install packaged native artifact",
                 "        run: >-",
                 "          mise run install-native-package",
-                f"          {preset}",
-                f"          build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
+                f"          {target}",
+                f"          build/packages/native/dist/maplibre-native-c-{target}.tar.gz",
             ]
         )
         for command in consumers:
@@ -139,8 +139,8 @@ def target_job(row: dict[str, object]) -> list[str]:
                 "      - name: Upload native artifact",
                 f"        uses: {UPLOAD}",
                 "        with:",
-                f"          name: native-package-{preset}-${{{{ github.sha }}}}",
-                f"          path: build/packages/native/dist/maplibre-native-c-{preset}.tar.gz",
+                f"          name: native-package-{target}-${{{{ github.sha }}}}",
+                f"          path: build/packages/native/dist/maplibre-native-c-{target}.tar.gz",
                 "          if-no-files-found: error",
             ]
         )
@@ -148,13 +148,13 @@ def target_job(row: dict[str, object]) -> list[str]:
     return lines
 
 
-def render(source: dict[str, object], presets: dict[str, object]) -> str:
-    rows = target_rows(source, presets)
-    target_ids = [job_id(str(row["preset"])) for row in rows]
+def render(source: dict[str, object], targets: dict[str, object]) -> str:
+    rows = target_rows(source, targets)
+    target_ids = [job_id(str(row["target"])) for row in rows]
     android_package_ids = [
-        job_id(str(row["preset"]))
+        job_id(str(row["target"]))
         for row in rows
-        if str(row["preset"]).startswith("android-") and row["package"]
+        if str(row["target"]).startswith("android-") and row["package"]
     ]
 
     lines = [
@@ -256,8 +256,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
-    source, presets = load_configuration(ROOT)
-    expected = render(source, presets)
+    source, targets = load_configuration(ROOT)
+    expected = render(source, targets)
     actual = OUTPUT.read_text() if OUTPUT.exists() else ""
     if args.check:
         if actual == expected:
