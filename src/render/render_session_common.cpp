@@ -1088,7 +1088,7 @@ auto render_session_render_update(
   auto* backend = renderer_backend(session);
   if (backend == nullptr) {
     set_thread_error("render session renderer backend is not available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
   auto guard = mbgl::gfx::BackendScope{*backend};
   map_run_render_jobs(session->map);
