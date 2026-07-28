@@ -2199,6 +2199,11 @@ fn resize_updates_owned_texture_frame_extent() {
             resized_extent.scale_factor,
         )
         .unwrap();
+    // The map applies the new logical size on its next pump, and a static map
+    // renders only on request. Requesting the still image before the size lands
+    // spends it on an update the session's size gate discards, and nothing
+    // publishes another, so pump the resize through first.
+    runtime.pump(Some(Duration::ZERO)).unwrap();
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {

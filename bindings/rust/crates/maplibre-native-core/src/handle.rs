@@ -51,7 +51,10 @@ pub fn report_leak(leak: NativeHandleLeak) {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(reporter) = slot.as_ref() {
-        reporter(leak);
+        // A caller-installed reporter is arbitrary code, and this runs from
+        // `Drop`. Letting it unwind through a destructor during another unwind
+        // aborts the process, so a panicking reporter loses its report instead.
+        let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reporter(leak)));
     }
 }
 

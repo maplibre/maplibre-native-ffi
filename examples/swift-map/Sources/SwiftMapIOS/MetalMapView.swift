@@ -182,7 +182,11 @@ final class MetalMapView: UIView {
       channels.setRenderRequest()
     } catch {
       showError(error)
+      // The runtime loop is already running and waits for the session to close
+      // before destroying the map, so stopping the display link alone would
+      // leave it pumping a map it can never tear down.
       stopHostLoop()
+      teardown()
     }
   }
 
