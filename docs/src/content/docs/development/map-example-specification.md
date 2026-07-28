@@ -210,7 +210,7 @@ On host termination or fatal error, close resources in order:
 
 #### Handle ownership
 
-- One runtime per process (owner thread drives `run_once` / pump).
+- One runtime per process (owner thread drives `pump`).
 - One map per runtime for the demo.
 - One live render target per map at a time.
 - Map configuration (style, camera) uses the map handle; render-target extent
@@ -218,8 +218,8 @@ On host termination or fatal error, close resources in order:
 
 ### Frame loop
 
-The C API treats runtime pumping and presentation as separate concerns.
-`run_once` advances native scheduler work and fills the event queue; it is not
+The C API treats runtime pumping and presentation as separate concerns. `pump`
+advances native scheduler work and fills the event queue; it is not
 display-driven. One call drains the work it finds instead of running a fixed
 slice, so a single call can take as long as a style parse. `render_update` draws
 only when `render_pending` is true.
@@ -234,7 +234,7 @@ Each iteration has two phases: pump (always) and render (only when
 `render_pending` is true).
 
 1. Handle input and resize (may set `render_pending`).
-2. Pump: call `run_once`, drain runtime events, run `finishFrame()`.
+2. Pump: call `pump`, drain runtime events, run `finishFrame()`.
 3. Render: call `render_update` when `render_pending` is true.
 
 ```mermaid
@@ -244,7 +244,7 @@ sequenceDiagram
   participant BE as Backend
 
   EL->>EL: Input and resize
-  EL->>RT: run_once()
+  EL->>RT: pump(0)
   EL->>RT: drain events → may set render_pending
   EL->>BE: finishFrame()
 ```
@@ -261,8 +261,9 @@ While the map is visible and the example is active:
   swapchain frame callbacks, `CADisplayLink`, or `Choreographer`) to pace the
   loop.
 
-Display refresh paces the loop; it does not replace `run_once`. Each iteration
-MUST call `run_once` exactly once.
+Display refresh paces the loop. Each iteration MUST call `pump` exactly once,
+with the timeout its profile selects. A display-paced profile passes zero, so
+the refresh mechanism remains the loop's only cadence.
 
 When the profile stops the loop (for example mobile background), runtime
 progress stalls until the loop resumes.
@@ -288,7 +289,7 @@ sequenceDiagram
 
 Requirements:
 
-- MUST call runtime `run_once` once per host loop iteration while the loop is
+- MUST call runtime `pump` once per host loop iteration while the loop is
   running.
 - MUST drain runtime events each iteration and set `render_pending` when:
   - `map_render_update_available` targets this map (new map content to draw), or

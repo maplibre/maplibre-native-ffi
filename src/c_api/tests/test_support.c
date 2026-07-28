@@ -175,6 +175,16 @@ void mln_test_sleep_milliseconds(unsigned int milliseconds) {
 #endif
 }
 
+uint64_t mln_test_monotonic_milliseconds(void) {
+#if defined(_WIN32)
+  return (uint64_t)GetTickCount64();
+#else
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return (uint64_t)now.tv_sec * 1000u + (uint64_t)(now.tv_nsec / 1000000L);
+#endif
+}
+
 struct mln_test_thread {
   void (*entry)(void*);
   void* argument;

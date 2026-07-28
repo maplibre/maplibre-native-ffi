@@ -95,7 +95,7 @@ final class MetalMapView: UIView {
   @objc private func displayLinkTick() {
     guard let mapState else { return }
     do {
-      try mapState.runOnce()
+      try mapState.pump()
       renderPending = try mapState.drainEvents() || renderPending
       guard let viewport = currentViewport, !viewport.isEmpty else { return }
       guard renderPending else { return }

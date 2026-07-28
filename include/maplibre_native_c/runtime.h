@@ -823,18 +823,49 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
 MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
- * Runs one iteration of this runtime's owner-thread run loop.
+ * Advances this runtime.
  *
- * A single call drains the owner-thread task queues. It runs every task queued
- * when the call begins plus every task those tasks enqueue, and it services
- * expired timers and file descriptors that are ready for the runtime's own
- * network and database work. The call returns as soon as that iteration
- * finishes and never blocks waiting for new work, so an idle runtime returns
- * promptly.
+ * The call parks the owner thread when timeout_ms allows it, then drains the
+ * owner-thread task queues. Drain the queued runtime events with
+ * mln_runtime_poll_event() afterwards.
  *
- * The promise is drain, not slice. The duration of one call is bounded only by
- * the work it finds and can span a full style parse, so treat it as work that
- * runs to completion rather than as a fixed-cost per-frame slice.
+ * timeout_ms sets the park bound:
+ *
+ * - Zero drains and returns. Hosts pumping from a frame callback pass zero and
+ *   take their cadence from that callback.
+ * - A positive value parks for up to that many milliseconds, then drains. Hosts
+ *   that own their pump thread pass a positive value and take their cadence
+ *   from the runtime's own work.
+ * - A negative value parks until a wake arrives, then drains.
+ *
+ * The drain runs every task queued when it begins plus every task those tasks
+ * enqueue, and services expired timers and ready file descriptors for the
+ * runtime's own network and database work. Its duration follows the work it
+ * finds and can span a full style parse, so treat it as work that runs to
+ * completion rather than as a fixed-cost per-frame slice.
+ *
+ * The runtime holds a wake flag. These set it:
+ *
+ * - the owner-thread run loop receiving queued work from any thread, which
+ *   covers style, tile, offline database, and resource responses;
+ * - the runtime queueing a runtime event;
+ * - mln_wake_source_signal() from any thread.
+ *
+ * A parking call returns as soon as the flag is set, and clears the flag before
+ * it returns. Work that arrives during the drain sets the flag again, so the
+ * next call returns right away and may find that work already done.
+ *
+ * A call also returns without parking while unread runtime events are queued.
+ *
+ * Timers and file descriptors set the flag only when they queue owner-thread
+ * work, and the runtime registers none of its own on the owner-thread run loop.
+ * Pass a positive timeout_ms so a call returns even when nothing sets the flag.
+ *
+ * A non-zero timeout_ms makes this a blocking query. Call it outside any host
+ * lock that a thread signalling a wake source acquires, and outside C API
+ * callbacks. Acquire a wake source with mln_runtime_wake_source_acquire() to
+ * release the owner thread for host-driven work such as submitted tasks or
+ * shutdown.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -844,7 +875,54 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_runtime_run_once(mln_runtime* runtime) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) MLN_NOEXCEPT;
+
+/**
+ * Acquires a wake source that releases this runtime's parked owner thread.
+ *
+ * Each call returns a distinct handle the host destroys with
+ * mln_wake_source_destroy(). A wake source holds its own reference to the
+ * runtime's wake state, so it stays valid after the runtime is destroyed and
+ * hosts tear the two down in either order.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not a live runtime
+ *   handle, out_source is null, or *out_source is not null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_wake_source_acquire(
+  mln_runtime* runtime, mln_wake_source** out_source
+) MLN_NOEXCEPT;
+
+/**
+ * Sets the runtime's wake flag and releases the parked owner thread.
+ *
+ * This function may be called from any thread. It takes one small lock and
+ * returns, so a host calls it from its task submission path.
+ *
+ * A signal raised while the owner thread is running sets the wake flag, so the
+ * next mln_runtime_pump() call returns without parking. Signalling a wake
+ * source whose runtime is destroyed succeeds and does nothing, so hosts shut
+ * the two down in either order.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success, including after the runtime is destroyed.
+ * - MLN_STATUS_INVALID_ARGUMENT when source is null.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_wake_source_signal(mln_wake_source* source) MLN_NOEXCEPT;
+
+/**
+ * Destroys a wake source.
+ *
+ * This function may be called from any thread. Null is a no-op. Destroy each
+ * handle exactly once, once every thread that signals it has finished.
+ */
+MLN_API void mln_wake_source_destroy(mln_wake_source* source) MLN_NOEXCEPT;
 
 /**
  * Pops the next queued runtime event.

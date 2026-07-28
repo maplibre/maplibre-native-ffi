@@ -64,7 +64,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val currentMap = ensureMap(frame.extent)
     val currentRuntime = checkNotNull(runtime) { "runtime was not created" }
 
-    currentRuntime.runOnce()
+    currentRuntime.pump(0)
     drainEvents(currentRuntime, currentMap)
 
     val attached = ensureAttachedRenderSession(currentMap, frame)

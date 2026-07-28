@@ -357,7 +357,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L393_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L394_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -433,7 +433,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L450_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L451_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -517,7 +517,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint identifier_type;
 
-        [NativeTypeName("__AnonymousRecord_map_L505_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L506_C3")]
         public _identifier_e__Union identifier;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -564,7 +564,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L536_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L537_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -658,7 +658,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L607_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L608_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

@@ -180,7 +180,7 @@ final class MetalMapView: NSView {
   private func tick() {
     guard let mapState else { return }
     do {
-      try mapState.runOnce()
+      try mapState.pump()
       renderPending = try mapState.drainEvents() || renderPending
       try mapState.finishFrame()
       guard let viewport = currentViewport, !viewport.isEmpty else { return }

@@ -88,7 +88,7 @@ fn waitForRenderedFeatureQuery(
         var result = try session.queryRenderedFeatures(testing.allocator, geometry, options);
         if (result.features.len > 0) return result;
         result.deinit();
-        try runtime.runOnce();
+        try runtime.pump(0);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -109,7 +109,7 @@ fn waitForSourceFeatureQuery(
         });
         if (result.features.len > 0) return result;
         result.deinit();
-        try runtime.runOnce();
+        try runtime.pump(0);
         _ = try session.renderUpdate();
         try std.Thread.yield();
     }
@@ -158,7 +158,7 @@ fn queriedFeatureAsBorrowed(allocator: std.mem.Allocator, queried: *const maplib
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -187,7 +187,7 @@ fn pumpTransitionFrame(
     // Match the public host loop: camera invalidation, one native pump, event
     // coalescing, and at most one render of the latest update.
     try map.requestRepaint();
-    try runtime.runOnce();
+    try runtime.pump(0);
 
     var result = TransitionFramePump{};
     var render_update_available = false;

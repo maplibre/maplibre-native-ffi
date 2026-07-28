@@ -14,7 +14,7 @@ fn requestRepaintOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void 
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -39,16 +39,16 @@ test "runtime and map vertical slice" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
 
-    try runtime.runOnce();
+    try runtime.pump(0);
     try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try runtime.runOnce();
+    try runtime.pump(0);
 
     try map.close();
-    try runtime.runOnce();
+    try runtime.pump(0);
 
     var map_after_close = try maplibre.MapHandle.create(&runtime, .{});
     defer map_after_close.close() catch @panic("map close failed");
@@ -80,7 +80,7 @@ test "copied runtime and map handles share closed state" {
 
     try runtime.close();
     try runtime_alias.close();
-    try testing.expectError(error.ClosedHandle, runtime_alias.runOnce());
+    try testing.expectError(error.ClosedHandle, runtime_alias.pump(0));
 }
 
 test "successful close releases lifecycle handles" {
@@ -156,7 +156,7 @@ test "runtime supports multiple maps" {
     var second = try maplibre.MapHandle.create(&runtime, .{});
     defer second.close() catch @panic("second map close failed");
 
-    try runtime.runOnce();
+    try runtime.pump(0);
 }
 
 test "live map string methods reject embedded NUL before C calls" {
