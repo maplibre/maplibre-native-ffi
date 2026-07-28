@@ -2309,6 +2309,15 @@ class MaplibreNativeC {
   late final _mln_thread_last_error_message = _mln_thread_last_error_messagePtr
       .asFunction<ffi.Pointer<ffi.Char> Function()>();
 
+  int mln_thread_token() {
+    return _mln_thread_token();
+  }
+
+  late final _mln_thread_tokenPtr =
+      _lookup<ffi.NativeFunction<ffi.Uint64 Function()>>('mln_thread_token');
+  late final _mln_thread_token = _mln_thread_tokenPtr
+      .asFunction<int Function()>();
+
   mln_status mln_log_set_callback(
     mln_log_callback callback,
     ffi.Pointer<ffi.Void> user_data,

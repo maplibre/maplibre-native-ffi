@@ -354,8 +354,38 @@ static void render_thread_is_not_poisoned_for_runtime_creation(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+typedef struct token_probe {
+  atomic_bool finished;
+  uint64_t token;
+} token_probe;
+
+static void read_thread_token(void* argument) {
+  token_probe* probe = (token_probe*)argument;
+  probe->token = mln_thread_token();
+  atomic_store(&probe->finished, true);
+}
+
+// Hosts whose unit of execution is not pinned to a native thread compare this
+// token to detect that they moved, so it has to be stable within a thread and
+// distinct between live ones.
+static void thread_tokens_are_stable_and_distinct(void) {
+  const uint64_t first = mln_thread_token();
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, first);
+  TEST_ASSERT_EQUAL_UINT64(first, mln_thread_token());
+
+  token_probe probe = {0};
+  atomic_init(&probe.finished, false);
+  mln_test_thread* thread = mln_test_thread_start(read_thread_token, &probe);
+  mln_test_thread_join(thread);
+
+  TEST_ASSERT_NOT_EQUAL_UINT64(0, probe.token);
+  TEST_ASSERT_NOT_EQUAL_UINT64(first, probe.token);
+  TEST_ASSERT_EQUAL_UINT64(first, mln_thread_token());
+}
+
 void run_render_thread_abi_tests(void) {
   UnitySetTestFile(__FILE__);
+  RUN_TEST(thread_tokens_are_stable_and_distinct);
   RUN_TEST(a_second_thread_attaches_and_renders);
   RUN_TEST(session_entry_points_reject_a_foreign_thread);
   RUN_TEST(map_destroy_rejects_a_session_owned_by_another_thread);

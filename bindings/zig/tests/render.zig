@@ -1978,7 +1978,11 @@ test "Metal owned texture frame handle scopes native pointers" {
     try frame_alias.release();
     try testing.expectError(error.ClosedHandle, frame_alias.info());
 
+    // Resizing hands the new logical size to the map's owner thread, so the
+    // map publishes an update matching the new target only once pumped.
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
+    try testing.expect(!try session.renderUpdate());
+    try runtime.pump(0);
     try testing.expect(try session.renderUpdate());
     var resized_frame = try session.acquireMetalOwnedTextureFrame();
     const resized_info = try resized_frame.info();

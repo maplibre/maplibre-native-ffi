@@ -213,6 +213,38 @@ void main() {
       );
     });
 
+    test('owner native thread mismatch reports the isolate moved', () {
+      // The C API keys owner-thread checks on the native thread while this
+      // binding keys them on the isolate. When the VM moves an isolate off its
+      // original thread the isolate check still passes, so this one has to
+      // catch it and say why, rather than letting a bare wrong-thread status
+      // surface from an unrelated-looking call.
+      final state = NativeHandleState<_FakeNativeHandle>(
+        Pointer.fromAddress(0x1234),
+        'fake_handle',
+        ownerThreadToken: -1,
+        leakReporting: false,
+      );
+
+      expect(
+        () => state.pointer,
+        throwsA(
+          isA<WrongThreadException>().having(
+            (error) => error.diagnostic,
+            'diagnostic',
+            allOf(
+              contains('native thread its isolate has since left'),
+              contains('awaited I/O'),
+            ),
+          ),
+        ),
+      );
+      expect(
+        () => state.close((_) => nativeStatusOk, () => 'unused'),
+        throwsA(isA<WrongThreadException>()),
+      );
+    });
+
     test('failed close leaves handle live for retry', () {
       final state = NativeHandleState<_FakeNativeHandle>(
         Pointer.fromAddress(0x1234),

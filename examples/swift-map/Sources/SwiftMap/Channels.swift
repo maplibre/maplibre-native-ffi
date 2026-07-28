@@ -66,7 +66,7 @@ final class Channels: @unchecked Sendable {
     // Release the parked pump so this command is applied now rather than after
     // the parking bound. The runtime loop parks inside the native pump, not on
     // this condition, so there is nothing here to signal.
-    wake?.signal()
+    try? wake?.signal()
   }
 
   /// Runtime loop: takes every queued command so it can apply them without
@@ -128,7 +128,7 @@ final class Channels: @unchecked Sendable {
     shutdown = true
     condition.broadcast()
     // Release the pump so shutdown is observed now.
-    wake?.signal()
+    try? wake?.signal()
   }
 
   /// Runtime loop: blocks until the render loop has closed its session. The map
@@ -195,6 +195,6 @@ final class Channels: @unchecked Sendable {
   /// shutdown request.
   /// Render loop: releases the runtime loop's parked pump.
   func wakeRuntimeLoop() {
-    wake?.signal()
+    try? wake?.signal()
   }
 }

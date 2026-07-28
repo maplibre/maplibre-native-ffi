@@ -1434,30 +1434,32 @@ void main() {
     // A MapHandle cannot cross isolates, so the reference carries the address.
     final attachRef = map.attachRef();
 
-    // Attaching from another isolate must reach the C API and be rejected by
-    // its descriptor validation, not by a Dart owner-isolate check. Before the
-    // session was decoupled from the map's isolate, this threw wrongThread
-    // without ever calling native.
-    final kind = await Isolate.run(() {
+    // Close before awaiting. The isolate may resume on a different OS thread
+    // after an await, which would make these handles unusable; see the README's
+    // draft deviation. The reference outliving them is the point here.
+    map.close();
+    runtime.close();
+
+    // Attaching from another isolate must reach the C API. The extent is valid
+    // so the binding's own checks pass and native answers: it validates the map
+    // before the descriptor, and this one has been retired. Before the session
+    // was decoupled from the map's isolate, this threw wrongThread from the
+    // binding without ever calling native.
+    final diagnostic = await Isolate.run(() {
       try {
         attachRef.attachMetalSurface(
           const MetalSurfaceDescriptor(
-            extent: RenderTargetExtent(width: -1, height: 16),
+            extent: RenderTargetExtent(width: 16, height: 16),
             context: MetalContextDescriptor(device: NativePointer.nullPointer),
             layer: NativePointer.nullPointer,
           ),
         );
         return 'attached';
-      } on InvalidArgumentException {
-        return 'invalidArgument';
       } on MaplibreException catch (error) {
-        return 'other:${error.status}';
+        return error.diagnostic;
       }
     });
-    expect(kind, 'invalidArgument');
-
-    map.close();
-    runtime.close();
+    expect(diagnostic, contains('map is not a live handle'));
   });
 }
 
