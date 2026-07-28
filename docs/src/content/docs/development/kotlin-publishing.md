@@ -53,7 +53,7 @@ androidMain.dependencies {
 }
 
 linuxMain.dependencies {
-  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-opengl:$version")
+  implementation("org.maplibre.nativeffi:maplibre-native-ffi-runtime-vulkan:$version")
 }
 
 macosMain.dependencies {
@@ -71,11 +71,16 @@ link requirements for that target and backend. The final application links the
 archive without acquiring a separate MapLibre Native FFI shared library or
 framework.
 
-The native runtime publications are OpenGL and Vulkan for Linux x64, plus Metal
-for macOS arm64, iOS arm64, and the iOS arm64 simulator. Each published
-Kotlin/Native target has a matching runtime variant. Linux arm64 is absent
-because Kotlin/Native has no arm64 Linux host, so that target would have to be
+The native runtime publications are Vulkan for Linux x64, plus Metal for macOS
+arm64, iOS arm64, and the iOS arm64 simulator. Linux arm64 is absent because
+Kotlin/Native has no arm64 Linux host, so that target would have to be
 cross-compiled.
+
+OpenGL has no Linux Kotlin/Native runtime. That backend links EGL and GLES, and
+the Kotlin/Native sysroot carries no graphics libraries for a consumer's link to
+resolve them against. Vulkan loads its loader at run time and so declares no
+graphics link requirements at all. Linux applications that need OpenGL reach it
+through the JVM publication.
 
 The Kotlin/Native Linux toolchain is the tightest consumer of the Linux archive.
 Its sysroot supplies glibc 2.19 and GCC 8.3, and it statically links its own
@@ -88,9 +93,6 @@ link working, and both come from the zig toolchain described in the
 - The archive carries its own C++ runtime with internal linkage, so it never
   needs, and never collides with, the C++ runtime a consumer links. Only the
   `mln_*` entry points keep external linkage.
-
-The archive declares no graphics link requirements, because the EGL and Vulkan
-loaders are opened at run time.
 
 Kotlin/Native test binaries in this repository link the C API shared library
 instead of the archive. That library carries the same glibc floor, so the
