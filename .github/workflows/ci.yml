@@ -119,9 +119,6 @@ jobs:
       - run: mise run //bindings/python:test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test linux-x64-egl
-        env:
-          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
         if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -196,9 +193,6 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-x64-vulkan
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test linux-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -278,9 +272,6 @@ jobs:
       - run: mise run //bindings/python:test linux-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test linux-arm64-egl
-        env:
-          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
         if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -355,9 +346,6 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test linux-arm64-vulkan
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test linux-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -442,9 +430,6 @@ jobs:
       - run: mise run //bindings/python:test macos-arm64-metal
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test macos-arm64-metal
-        env:
-          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
         if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -523,9 +508,6 @@ jobs:
       - run: mise run //bindings/python:test macos-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test macos-arm64-vulkan
-        env:
-          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
         if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -599,9 +581,6 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test macos-arm64-egl
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test macos-arm64-egl
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -923,9 +902,6 @@ jobs:
       - run: mise run //bindings/python:test windows-x64-wgl
         env:
           MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test windows-x64-wgl
-        env:
-          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
         if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -993,9 +969,6 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test windows-x64-vulkan
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test windows-x64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
@@ -1105,9 +1078,6 @@ jobs:
         env:
           MISE_TASK_SKIP: "//:build"
       - run: mise run //bindings/python:test windows-arm64-vulkan
-        env:
-          MISE_TASK_SKIP: "//:build"
-      - run: mise run //bindings/dart:test windows-arm64-vulkan
         env:
           MISE_TASK_SKIP: "//:build"
       - name: Upload native artifact

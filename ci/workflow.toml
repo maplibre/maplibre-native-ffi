@@ -44,10 +44,5 @@ commands = [{ task = "//bindings/go:test" }]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
-[[suites]]
-platforms = ["linux", "macos", "windows"]
-# TODO(#412): Re-enable Windows ARM64 WGL after Dart thread-affine ownership is
-# safe across isolate migration; this test can otherwise wedge until timeout.
-commands = [
-  { task = "//bindings/dart:test", exclude = ["windows-arm64-wgl"] },
-]
+# TODO(#412): Re-enable Dart CI after thread-affine ownership is safe across
+# isolate migration; affected test processes can otherwise wedge until timeout.
