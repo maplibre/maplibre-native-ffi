@@ -136,12 +136,14 @@ pub fn main(init_args: std.process.Init) !void {
         .map_channel = &map_channel,
     }});
 
+    var target_live = true;
     const result = renderLoop(
         init_args.io,
         allocator,
         window_handle,
         target_mode,
         &target,
+        &target_live,
         &current_viewport,
         &commands,
         &render_request,
@@ -149,8 +151,9 @@ pub fn main(init_args: std.process.Init) !void {
     );
 
     // Destroy the session before the runtime loop destroys the map: a map with
-    // an attached session cannot be destroyed.
-    target.deinit();
+    // an attached session cannot be destroyed. A reattach that failed partway
+    // already destroyed it and left the slot dead.
+    if (target_live) target.deinit();
     map_channel.requestShutdown();
     runtime_thread.join();
 
@@ -166,6 +169,7 @@ fn renderLoop(
     window_handle: *c.SDL_Window,
     target_mode: types.RenderTargetMode,
     target: *RenderTarget,
+    target_live: *bool,
     current_viewport: *types.Viewport,
     commands: *channel.CommandQueue,
     render_request: *channel.RenderRequest,
@@ -205,13 +209,18 @@ fn renderLoop(
                     if (target.needsReattachOnResize()) {
                         // Reattach is entirely local now: close the session,
                         // rebuild the target, attach again, all on this thread.
+                        // The slot holds a destroyed target between the two, so
+                        // mark it dead: a failure here returns and the caller
+                        // must not deinit it a second time.
                         target.deinit();
+                        target_live.* = false;
                         target.* = try RenderTarget.init(
                             allocator,
                             window_handle,
                             current_viewport.*,
                             target_mode,
                         );
+                        target_live.* = true;
                         try target.attach(&map, current_viewport.*);
                     } else {
                         try target.resize(current_viewport.*);

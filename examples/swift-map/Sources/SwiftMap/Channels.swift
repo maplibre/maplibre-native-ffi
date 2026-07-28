@@ -58,15 +58,17 @@ final class Channels: @unchecked Sendable {
   /// Render loop: queues a decoded camera change and wakes the runtime loop.
   func push(_ command: CameraCommand) {
     condition.lock()
-    defer { condition.unlock() }
     if commands.count >= Self.commandCapacity {
       commands.removeFirst()
     }
     commands.append(command)
+    let source = wake
+    condition.unlock()
     // Release the parked pump so this command is applied now rather than after
     // the parking bound. The runtime loop parks inside the native pump, not on
-    // this condition, so there is nothing here to signal.
-    try? wake?.signal()
+    // this condition, so there is nothing here to signal. Signal outside the
+    // lock so a native call never runs under it.
+    try? source?.signal()
   }
 
   /// Runtime loop: takes every queued command so it can apply them without
@@ -104,9 +106,11 @@ final class Channels: @unchecked Sendable {
 
   /// Runtime loop: announces the map it just created.
   func publish(attachRef: MapAttachRef, wake: WakeSource) {
-    self.wake = wake
     condition.lock()
     defer { condition.unlock() }
+    // Under the same lock as every other reader, so a render loop that wakes
+    // during publication sees either no source or the published one.
+    self.wake = wake
     publishedAttachRef = attachRef
   }
 
@@ -124,11 +128,12 @@ final class Channels: @unchecked Sendable {
   /// session is closed, because the map cannot be destroyed before then.
   func requestShutdown() {
     condition.lock()
-    defer { condition.unlock() }
     shutdown = true
     condition.broadcast()
+    let source = wake
+    condition.unlock()
     // Release the pump so shutdown is observed now.
-    try? wake?.signal()
+    try? source?.signal()
   }
 
   /// Runtime loop: blocks until the render loop has closed its session. The map
@@ -195,6 +200,9 @@ final class Channels: @unchecked Sendable {
   /// shutdown request.
   /// Render loop: releases the runtime loop's parked pump.
   func wakeRuntimeLoop() {
-    try? wake?.signal()
+    condition.lock()
+    let source = wake
+    condition.unlock()
+    try? source?.signal()
   }
 }

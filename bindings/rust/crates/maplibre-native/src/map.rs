@@ -214,13 +214,13 @@ impl Drop for MapState {
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(self.handle.as_ptr());
         }
-        // `ThreadAffineNativeHandle`'s own `Drop` runs after this and attempts
-        // the native destroy. It leaves the handle live when that fails, which
-        // it does while a render session is still attached, so the address is
-        // retired only once the handle really is closed.
-        if self.handle.is_closed() {
-            self.address.retire();
-        }
+        // Destroy here, under the address guard, so the address retires exactly
+        // when the native map goes away. Leaving it to the handle's own `Drop`
+        // would run the destroy after this body, so the address would stay
+        // published for a map that no longer exists. A failed destroy, which is
+        // what happens while a render session is still attached, leaves both the
+        // map and the address live and is reported through the leak channel.
+        let _ = self.address.retire_with(|| self.handle.close());
     }
 }
 

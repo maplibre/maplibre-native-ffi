@@ -2305,6 +2305,32 @@ fn dropping_a_map_with_an_attached_session_reports_a_leak() {
 }
 
 #[test]
+// Dropping a map without closing it must retire the shared address too. The
+// destroy happens during the drop, so a reference that only checked the handle
+// before the field destructor ran would keep reporting the map live and hand a
+// freed address to attach.
+fn dropping_a_map_retires_its_attach_refs() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
+    let attach_ref = map.attach_ref().unwrap();
+    assert!(!attach_ref.is_map_closed());
+
+    drop(map);
+    assert!(attach_ref.is_map_closed());
+
+    let error = attach_ref
+        .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            MetalContextDescriptor::new(NativePointer::NULL),
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.to_string().contains("MapHandle is closed"));
+
+    runtime.close().unwrap();
+}
+
+#[test]
 // A `MapAttachRef` can outlive the `MapHandle` it came from, and the C API's
 // map registry keys on the pointer value, so an address the allocator reuses
 // for a later map would otherwise attach a session to the wrong map. The

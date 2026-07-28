@@ -3,6 +3,8 @@ package org.maplibre.nativeffi.examples.composemap.map
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.examples.composemap.surface.SurfaceExtent
@@ -94,11 +96,24 @@ internal class MapRuntimeLoop(
       failure = error
     } finally {
       publishedMap = null
+      // The render loop owns the session and only sees `failure` on a later
+      // frame. Native refuses to destroy a map that still has one attached, so
+      // wait for the render loop to close it and shut this loop down. Bounded,
+      // so a render loop that already stopped cannot wedge teardown.
+      awaitShutdown()
       try {
         map?.close()
       } finally {
         runtime?.close()
       }
+    }
+  }
+
+  /** Blocks until [close] is called, or the bound expires. */
+  private fun awaitShutdown() {
+    val deadline = TimeSource.Monotonic.markNow() + SHUTDOWN_WAIT
+    while (!shutdownRequested.get() && deadline.hasNotPassedNow()) {
+      Thread.sleep(SHUTDOWN_POLL_MS)
     }
   }
 
@@ -193,6 +208,10 @@ internal class MapRuntimeLoop(
      * it, so this only bounds a pump that nothing signals.
      */
     private const val PARK_TIMEOUT_MS = 100L
+
+    /** Bound on waiting for the render loop to close its session at teardown. */
+    private val SHUTDOWN_WAIT = 5.seconds
+    private const val SHUTDOWN_POLL_MS = 2L
     private val KEYBOARD_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
     private val RESET_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
   }

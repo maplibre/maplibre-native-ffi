@@ -182,7 +182,14 @@ internal class AndroidMapView(context: Context) :
   }
 
   private fun canRenderFrame(): Boolean =
-    !closed && viewVisible && appForeground && graphics != null && runtimeLoop != null
+    !closed &&
+      viewVisible &&
+      appForeground &&
+      graphics != null &&
+      runtimeLoop != null &&
+      // A loop whose setup failed never publishes a map, so reposting every
+      // vsync would spin against a blank view instead of surfacing the failure.
+      runtimeLoop?.setupFailure == null
 
   private fun finishPendingDrawing() {
     while (pendingDrawingFinished.isNotEmpty()) {

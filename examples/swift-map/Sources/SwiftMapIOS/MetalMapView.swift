@@ -142,7 +142,11 @@ final class MetalMapView: UIView {
       try renderTarget.finishFrame()
     } catch {
       showError(error)
+      // Stopping the display link leaves the session attached, and the runtime
+      // loop would then hold a map it can never destroy. Run the same teardown
+      // the normal path does.
       stopHostLoop()
+      teardown()
     }
   }
 

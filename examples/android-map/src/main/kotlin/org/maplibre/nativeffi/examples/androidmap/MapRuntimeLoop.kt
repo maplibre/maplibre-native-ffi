@@ -47,6 +47,14 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   var map: MapHandle? = null
     private set
 
+  /**
+   * Set when setup failed, so the view stops scheduling frames instead of reposting every vsync
+   * against a loop that will never publish a map.
+   */
+  @Volatile
+  var setupFailure: Throwable? = null
+    private set
+
   /** Set by the runtime loop when the map wants another frame, consumed by the render loop. */
   val renderRequest: RenderRequest = RenderRequest()
 
@@ -132,6 +140,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
       handler.post(pump)
     } catch (error: RuntimeException) {
       Log.e(TAG, "runtime loop setup failed", error)
+      setupFailure = error
       closeHandles()
     }
   }

@@ -49,11 +49,6 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     });
     defer map.close() catch {};
 
-    // The map must outlive the render loop's session, and native refuses to
-    // destroy a map that still has one attached, so wait for the render loop to
-    // report its session closed before the deferred map close above runs.
-    defer shared.awaitSessionClosed();
-
     try setInitialCamera(&map);
     try map.setStyleUrl(args.allocator, style_url);
     try map.requestStillImage();
@@ -62,6 +57,13 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     // waiting out the parking bound below.
     const wake = try runtime.wakeSource();
     defer wake.release();
+
+    // Only past the fallible setup above. The render loop can attach a session
+    // once the map is published, and native refuses to destroy a map that still
+    // has one, so wait for it to report the session closed before the deferred
+    // map close runs. Installing this earlier would deadlock a setup failure:
+    // the render loop would still be in awaitMap() with nothing to close.
+    defer shared.awaitSessionClosed();
     shared.publish(map, wake);
 
     const map_id = try map.id();

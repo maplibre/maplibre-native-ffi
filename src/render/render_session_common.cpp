@@ -1041,13 +1041,6 @@ auto attach_render_session(
     return attach_status;
   }
   try {
-    const auto size_status =
-      map_post_set_size(map, session->width, session->height);
-    if (size_status != MLN_STATUS_OK) {
-      static_cast<void>(map_detach_render_target_session(map, handle));
-      return size_status;
-    }
-    warn_on_scale_factor_mismatch(map, session->scale_factor);
     // Set before priming: renderer_backend() dispatches on kind.
     session->kind = kind;
     // Create the backend's graphics context here, on the thread that will drive
@@ -1061,6 +1054,18 @@ auto attach_render_session(
     if (auto* backend = renderer_backend(handle); backend != nullptr) {
       const auto prime = mbgl::gfx::BackendScope{*backend};
     }
+
+    // Only now that the graphics setup has succeeded. The map applies this on
+    // its own thread, so a size queued before a throwing prime would still land
+    // and resize the map to an extent whose attach failed.
+    const auto size_status =
+      map_post_set_size(map, session->width, session->height);
+    if (size_status != MLN_STATUS_OK) {
+      static_cast<void>(map_detach_render_target_session(map, handle));
+      return size_status;
+    }
+    warn_on_scale_factor_mismatch(map, session->scale_factor);
+
     register_render_session(handle, std::move(session));
   } catch (...) {
     static_cast<void>(map_detach_render_target_session(map, handle));
