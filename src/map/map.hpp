@@ -377,7 +377,7 @@ auto map_scale_factor(const mln_map* map) -> double;
 auto map_native(mln_map* map) -> mbgl::Map*;
 
 // Queue a map mutation for the map's owner thread. Callable from any thread;
-// the effect lands on the map's next mln_runtime_run_once(). Returns
+// the effect lands on the map's next mln_runtime_pump(). Returns
 // MLN_STATUS_INVALID_ARGUMENT when the map handle is null or no longer live.
 auto map_post_set_size(mln_map* map, uint32_t width, uint32_t height)
   -> mln_status;

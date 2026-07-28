@@ -285,7 +285,7 @@ auto retain_runtime_map(mln_runtime* runtime) -> mln_status;
 auto release_runtime_map(mln_runtime* runtime) noexcept -> void;
 auto validate_runtime(mln_runtime* runtime) -> mln_status;
 
-// The run loop this runtime pumps from mln_runtime_run_once(). Callers use it
+// The run loop this runtime pumps from mln_runtime_pump(). Callers use it
 // as the mbgl::Scheduler backing a Mailbox, so work posted from a foreign
 // thread is delivered on the runtime owner thread. Prefer this over
 // mbgl::util::RunLoop::Get(), which reads the calling thread's ambient

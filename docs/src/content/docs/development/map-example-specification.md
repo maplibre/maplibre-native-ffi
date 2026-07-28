@@ -160,9 +160,10 @@ loop**.
   window, input, and display-refresh callbacks.
 - Cross-thread state MUST be limited to three channels: a camera-command queue
   from the render loop to the runtime loop, a render request from the runtime
-  loop to the render loop, and a one-time publication of the map from the
-  runtime loop to the render loop so the render loop can attach against it. A
-  shutdown signal and a first-failure record MAY accompany them.
+  loop to the render loop, and a one-time publication from the runtime loop to
+  the render loop carrying the map to attach against and the wake source that
+  releases the runtime loop's parked pump. A shutdown signal and a first-failure
+  record MAY accompany them.
 
 This split exists because `pump` drains the work it finds rather than a fixed
 slice, so a single call can take as long as a style parse. Keeping it off the

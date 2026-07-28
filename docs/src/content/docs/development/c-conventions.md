@@ -95,7 +95,7 @@ Map state a render session reaches for is enqueued to the map owner thread
 rather than mutated in place, so resizing a session applies the map's logical
 size on the map's next pump. Renderer observer callbacks are forwarded to the
 map's run loop for the same reason, so the events a frame produces are drained
-by a later `mln_runtime_run_once()` rather than inside the render call.
+by a later `mln_runtime_pump()` rather than inside the render call.
 
 Graphics contexts that bind to a thread, such as OpenGL, are made current for
 the duration of a session call and released before it returns, so a host keeps

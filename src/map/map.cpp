@@ -1525,7 +1525,7 @@ class HeadlessObserver final : public mbgl::MapObserver {
 // the next update, and completes still-image requests. Handing that pointer
 // straight to a renderer on another thread would be a data race, so every
 // callback becomes a message on a mailbox bound to the runtime's run loop and
-// runs during the host's next mln_runtime_run_once().
+// runs during the host's next mln_runtime_pump().
 //
 // This forwards unconditionally, including when the render session shares the
 // map's owner thread, so there is one delivery order rather than two.

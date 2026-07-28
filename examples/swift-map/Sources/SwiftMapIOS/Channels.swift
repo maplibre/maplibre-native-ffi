@@ -58,11 +58,10 @@ final class Channels: @unchecked Sendable {
       commands.removeFirst()
     }
     commands.append(command)
-    let source = wake
-    condition.signal()
     // Release the parked pump so this command is applied now rather than after
-    // the parking bound.
-    source?.signal()
+    // the parking bound. The runtime loop parks inside the native pump, not on
+    // this condition, so there is nothing here to signal.
+    wake?.signal()
   }
 
   /// Runtime loop: takes every queued command so it can apply them without
@@ -122,10 +121,8 @@ final class Channels: @unchecked Sendable {
     condition.lock()
     defer { condition.unlock() }
     shutdown = true
-    let source = wake
-    condition.broadcast()
     // Release the pump so shutdown is observed now.
-    source?.signal()
+    wake?.signal()
   }
 
   var isShutdownRequested: Bool {

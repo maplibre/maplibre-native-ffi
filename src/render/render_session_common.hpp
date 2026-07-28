@@ -97,9 +97,8 @@ class TextureSessionBackend {
 // would create a data race that does not exist today. They belong on the thread
 // that owns the renderer, which is this one.
 //
-// Lifetime is the session, not the ownership epoch. Mailboxes hold a WeakPtr to
-// this; recreating it on adopt would strand every message in flight across a
-// transfer.
+// Lifetime is the session's, and mailboxes created during a render hold a
+// WeakPtr to it, so it outlives every message in flight.
 class RenderSessionScheduler final : public mbgl::Scheduler {
  public:
   RenderSessionScheduler() = default;
@@ -171,11 +170,11 @@ class RenderSessionScheduler final : public mbgl::Scheduler {
 //
 //   - The session shares its owner thread with the runtime, which is the
 //     default. GetCurrent() is already that runtime's run loop, and the host
-//     pumps it every iteration through mln_runtime_run_once(). Leave it alone:
+//     pumps it every iteration through mln_runtime_pump(). Leave it alone:
 //     it drains more often than rendering does, and overriding it would strand
 //     results behind a render that the results themselves are needed to
 //     trigger.
-//   - The session was adopted by a thread of its own, which has no scheduler.
+//   - The session was attached on a thread of its own, which has no scheduler.
 //     Install the session's, drained around each render. A host that gives a
 //     session its own thread runs a display-paced render loop by definition, so
 //     that queue drains continuously.
@@ -223,10 +222,9 @@ struct RenderTextureState {
 struct mln_render_session {
   mln::core::RenderSessionKind kind = mln::core::RenderSessionKind::Surface;
   mln_map* map = nullptr;
-  // A default-constructed thread id means "no owner", the state between
-  // release and adopt. It never equals a running thread's id, so the ordinary
-  // owner-thread comparison already rejects every entry point while unowned;
-  // only the diagnostic text distinguishes the two cases.
+  // The thread that attached the session, fixed for its lifetime. Set before
+  // the session is registered, so it is never default-constructed while any
+  // entry point can reach it.
   std::thread::id owner_thread;
   uint32_t width = 0;
   uint32_t height = 0;

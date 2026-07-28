@@ -21,7 +21,6 @@ internal object Shell {
   private const val INITIAL_WIDTH = 960
   private const val INITIAL_HEIGHT = 640
   private const val IDLE_WAIT_SECONDS = 0.004
-  private const val RUNTIME_LOOP_INTERVAL_MS = 4L
 
   fun run(mode: RenderTargetMode, backends: Set<RenderBackend>) {
     GraphicsContext.create("MapLibre LWJGL Map", INITIAL_WIDTH, INITIAL_HEIGHT, backends).use {
