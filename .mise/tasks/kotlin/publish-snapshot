@@ -140,6 +140,13 @@ publish_linux_leaves() {
     "$@"
 
   publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    LinuxX64 -- \
+    "$@" \
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+
+  publish_tasks \
     :bindings:kotlin-runtime-vulkan \
     "$repository" \
     LinuxX64 -- \

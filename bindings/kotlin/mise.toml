@@ -10,7 +10,7 @@ dir = "../.."
 run = '''
 runtime_backend=
 case "$usage_preset" in
-  linux-x64-egl) kotlin_target=linuxX64 ;;
+  linux-x64-egl) kotlin_target=linuxX64; runtime_backend=opengl ;;
   linux-x64-vulkan) kotlin_target=linuxX64; runtime_backend=vulkan ;;
   macos-arm64-*) kotlin_target=macosArm64 ;;
   linux-arm64-*|windows-*) kotlin_target= ;;

@@ -81,8 +81,33 @@ function(mln_configure_renderer target)
         PRIVATE "${PROJECT_SOURCE_DIR}/third_party/egl_compat/include")
     endif()
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
+    # Upstream's table binds to a linked GL loader. Rewrite it to resolve at
+    # run time so the shipped binaries carry no GL dependency of their own.
+    set(MLN_FFI_GL_FUNCTIONS_SOURCE
+        ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+    set(MLN_FFI_GL_FUNCTIONS_GENERATED
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/gl_functions.cpp)
+    execute_process(
+      COMMAND
+        "${CMAKE_COMMAND}"
+        -E
+        env
+        python3
+        "${PROJECT_SOURCE_DIR}/scripts/generate-gl-functions.py"
+        "${MLN_FFI_GL_FUNCTIONS_SOURCE}"
+        "${MLN_FFI_GL_FUNCTIONS_GENERATED}"
+      RESULT_VARIABLE MLN_FFI_GL_FUNCTIONS_RESULT
+      OUTPUT_VARIABLE MLN_FFI_GL_FUNCTIONS_OUTPUT
+      ERROR_VARIABLE MLN_FFI_GL_FUNCTIONS_OUTPUT)
+    if(NOT MLN_FFI_GL_FUNCTIONS_RESULT EQUAL 0)
+      message(FATAL_ERROR "${MLN_FFI_GL_FUNCTIONS_OUTPUT}")
+    endif()
+    set_property(
+      DIRECTORY
+      APPEND
+      PROPERTY CMAKE_CONFIGURE_DEPENDS "${MLN_FFI_GL_FUNCTIONS_SOURCE}")
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+         "${MLN_FFI_GL_FUNCTIONS_GENERATED}")
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_WGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
