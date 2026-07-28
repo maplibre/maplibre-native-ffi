@@ -1,3 +1,5 @@
+import Foundation
+
 internal import CMaplibreNativeC
 
 /// Releases a runtime owner thread parked in `RuntimeHandle.pump(timeout:)`.
@@ -6,11 +8,13 @@ internal import CMaplibreNativeC
 /// shutdown paths rely on. It stays usable after its runtime closes, and
 /// signalling it then does nothing.
 ///
-/// The unchecked conformance rests on two invariants: `NativeHandleState`
-/// serializes pointer reads against close under its own lock, and the C API
-/// documents `mln_wake_source_signal` and `mln_wake_source_destroy` as callable
-/// from any thread against wake state that carries its own synchronization.
+/// The unchecked conformance rests on two invariants: `nativeCallGate` is held
+/// across the native signal and across close, so close cannot destroy the
+/// pointer a signal is using, and the C API documents `mln_wake_source_signal`
+/// and `mln_wake_source_destroy` as callable from any thread against wake state
+/// that carries its own synchronization.
 public final class WakeSource: @unchecked Sendable {
+  private let nativeCallGate = NSLock()
   private let state: NativeHandleState
 
   init(pointer: OpaquePointer?) throws {
@@ -27,16 +31,20 @@ public final class WakeSource: @unchecked Sendable {
   /// the next `RuntimeHandle.pump(timeout:)` returns without parking.
   /// Signalling after the runtime closes succeeds and does nothing.
   public func signal() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_wake_source_signal(state.requireLive()))
+    try nativeCallGate.withLock {
+      try mapNativeFailure {
+        try checkStatus(mln_wake_source_signal(state.requireLive()))
+      }
     }
   }
 
   /// Releases the wake source.
   public func close() throws {
-    try mapNativeFailure {
-      try state.closeOnce { pointer in
-        mln_wake_source_destroy(pointer)
+    try nativeCallGate.withLock {
+      try mapNativeFailure {
+        try state.closeOnce { pointer in
+          mln_wake_source_destroy(pointer)
+        }
       }
     }
   }

@@ -11,8 +11,9 @@ import org.maplibre.nativeffi.internal.status.Status
 /** Owned wake source backed by the Android JNI bridge. */
 public actual class WakeSource internal constructor(private val sourceAddress: Long) :
   AutoCloseable {
-  // HandleStateCore serializes close against a concurrent signal, so this
-  // handle is usable from any thread.
+  // Held across the native signal and across close, so a close on another
+  // thread cannot destroy the source between the live check and the call.
+  private val nativeCallGate = Any()
   private val core = HandleStateCore("WakeSource", sourceAddress)
 
   init {
@@ -24,17 +25,21 @@ public actual class WakeSource internal constructor(private val sourceAddress: L
 
   public actual fun signal() {
     NativeAccess.ensureLoaded()
-    core.requireLive()
-    Status.check(MaplibreNativeC.mln_wake_source_signal(wakeSource(sourceAddress)))
+    synchronized(nativeCallGate) {
+      core.requireLive()
+      Status.check(MaplibreNativeC.mln_wake_source_signal(wakeSource(sourceAddress)))
+    }
   }
 
   public actual override fun close() {
-    core.closeOnce(
-      destroy = {
-        MaplibreNativeC.mln_wake_source_destroy(wakeSource(sourceAddress))
-        MaplibreStatus.OK.nativeCode
-      }
-    )
+    synchronized(nativeCallGate) {
+      core.closeOnce(
+        destroy = {
+          MaplibreNativeC.mln_wake_source_destroy(wakeSource(sourceAddress))
+          MaplibreStatus.OK.nativeCode
+        }
+      )
+    }
   }
 }
 
