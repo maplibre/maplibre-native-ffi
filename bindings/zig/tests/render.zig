@@ -1868,7 +1868,7 @@ test "OpenGL borrowed texture renders through public bindings" {
     defer testing.allocator.free(pixels);
     @memset(pixels, 0);
     try borrowed.readRGBA8(pixels);
-    try testing.expect(hasNonZeroByte(pixels));
+    try expectPixelApprox(pixels[0..4].*, .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 
     try testing.expectError(error.Unsupported, session.acquireOpenGLOwnedTextureFrame());
     var readback_buffer: [128 * 128 * 4]u8 = undefined;

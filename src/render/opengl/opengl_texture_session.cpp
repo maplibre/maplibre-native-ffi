@@ -376,7 +376,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         borrowed_texture_(descriptor.texture) {}
