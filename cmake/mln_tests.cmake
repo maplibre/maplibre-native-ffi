@@ -129,6 +129,12 @@ function(mln_add_c_api_test)
     target_link_libraries(mln_c_api_tests PRIVATE Threads::Threads)
   endif()
 
+  get_target_property(test_link_options mln_ffi_platform_dependencies
+                      MLN_FFI_TEST_LINK_OPTIONS)
+  if(test_link_options)
+    target_link_options(mln_c_api_tests PRIVATE ${test_link_options})
+  endif()
+
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
     add_test(
       NAME c-api

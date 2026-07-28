@@ -44,7 +44,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(mln_options)
 include(mln_maplibre_native)
-include(mln_target)
+include(mln_c_api)
 include(mln_licenses)
 include(mln_install)
 

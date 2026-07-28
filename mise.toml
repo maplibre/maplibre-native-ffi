@@ -100,6 +100,11 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 # part of the repository-wide native toolchain.
 "core:rust" = { version = "{{vars.rust_version}}", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android,aarch64-unknown-linux-ohos,x86_64-pc-windows-msvc,aarch64-pc-windows-msvc" }
 
+# The native CMake build compiles the Linux targets with `zig cc`, so Zig joins
+# the native toolchain there. See cmake/toolchains/zig-linux.cmake. The Zig
+# binding declares its own wider platform set in bindings/zig/mise.toml.
+"core:zig" = { version = "{{vars.zig_version}}", os = ["linux"] }
+
 [env]
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
