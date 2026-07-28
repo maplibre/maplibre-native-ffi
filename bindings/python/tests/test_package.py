@@ -86,7 +86,7 @@ def _wait_for_runtime_event(
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if event.event_type == event_type:
                 return event
@@ -101,7 +101,7 @@ def _wait_for_provider_handle(
     iterations: int = 5000,
 ) -> resource.ResourceRequestHandle:
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         if handles:
             return handles.pop(0)
         time.sleep(0.001)
@@ -116,7 +116,7 @@ def _wait_for_offline_operation(
 ) -> mln.RuntimeEvent:
     operation_id = operation._operation_id  # noqa: SLF001
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if (
                 event.event_type == mln.RuntimeEventType.OFFLINE_OPERATION_COMPLETED
@@ -419,11 +419,89 @@ def test_public_modules_avoid_runtime_annotation_fallbacks() -> None:
 def test_runtime_handle_context_manager_closes_once() -> None:
     with mln.RuntimeHandle() as runtime:
         assert not runtime.closed
-        runtime.run_once()
+        runtime.pump()
 
     assert runtime.closed
     runtime.close()
     assert runtime.closed
+
+
+def quiesce(runtime: mln.RuntimeHandle) -> None:
+    """Pump until the runtime is idle, so a park that follows needs a fresh signal."""
+    for _ in range(100):
+        runtime.pump()
+        drained = False
+        while runtime.poll_event() is not None:
+            drained = True
+        if not drained:
+            return
+    pytest.fail("the runtime kept producing events while idle")
+
+
+def test_parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() -> None:
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        quiesce(runtime)
+
+        # The style is malformed, so native reports the failure from its own
+        # threads and the failure reaches the parked owner thread.
+        map_handle.set_style_url("unsupported://style.json")
+        loading_failed = False
+        load_started = time.monotonic()
+        for _ in range(20):
+            runtime.pump(10.0)
+            assert time.monotonic() - load_started < 5.0, (
+                "parks sat out their timeouts while loading was pending"
+            )
+            while (event := runtime.poll_event()) is not None:
+                if event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED:
+                    loading_failed = True
+            if loading_failed:
+                break
+        assert loading_failed
+
+        # A source signalled from another thread matches a host's submission path,
+        # and the park it releases has no other work to end it. The park also
+        # releases the GIL.
+        source = runtime.wake_source()
+        quiesce(runtime)
+        thread = threading.Thread(target=lambda: (time.sleep(0.02), source.signal()))
+        thread.start()
+        park_started = time.monotonic()
+        runtime.pump(10.0)
+        assert time.monotonic() - park_started < 5.0, (
+            "the parked owner thread timed out instead of taking the signal"
+        )
+        thread.join()
+
+        map_handle.close()
+
+    # A wake source stays usable after its runtime closes, so hosts tear the two
+    # down in either order.
+    source.signal()
+    source.close()
+    assert source.closed
+
+
+def test_pump_clears_the_wake_flag_it_returns_on() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.wake_source() as source:
+            quiesce(runtime)
+
+            source.signal()
+            signalled_started = time.monotonic()
+            runtime.pump(10.0)
+            assert time.monotonic() - signalled_started < 5.0, (
+                "a pump waited even though the wake flag was set"
+            )
+
+            # The pump above cleared the wake flag, so this one waits its
+            # full timeout.
+            idle_started = time.monotonic()
+            runtime.pump(0.2)
+            assert time.monotonic() - idle_started >= 0.1, (
+                "the first pump left the wake flag set"
+            )
 
 
 def test_closed_handle_finalizers_are_quiet_at_interpreter_shutdown() -> None:
@@ -511,7 +589,7 @@ def test_owner_thread_methods_report_wrong_thread_diagnostics() -> None:
     raised_errors: list[BaseException] = []
 
     def call_owner_thread_methods() -> None:
-        for call in (runtime.run_once, runtime.poll_event, map_handle.request_repaint):
+        for call in (runtime.pump, runtime.poll_event, map_handle.request_repaint):
             try:
                 call()
             except BaseException as error:
@@ -869,6 +947,19 @@ def test_style_url_rejects_embedded_nul_before_native_call() -> None:
     assert raised.value.diagnostic != stale
 
 
+@pytest.mark.parametrize(
+    "field",
+    ("tile_size", "buffer", "cluster_radius", "cluster_min_points"),
+)
+def test_geojson_source_options_reject_negative_unsigned_fields(field: str) -> None:
+    with pytest.raises(mln.InvalidArgumentError) as raised:
+        style.GeoJsonSourceOptions(**{field: -1})
+
+    assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
+    assert raised.value.native_status_code is None
+    assert field in raised.value.diagnostic
+
+
 def test_style_source_url_metadata_and_removal_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
@@ -886,7 +977,16 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                 ),
             )
             map_handle.add_geojson_source_url(
-                "points", "https://example.test/points.geojson"
+                "points",
+                "https://example.test/points.geojson",
+                style.GeoJsonSourceOptions(
+                    min_zoom=1.0,
+                    max_zoom=14.0,
+                    tolerance=0.5,
+                    tile_size=256,
+                    buffer=64,
+                    line_metrics=True,
+                ),
             )
             inline_points = geo.FeatureCollection(
                 (
@@ -897,7 +997,19 @@ def test_style_source_url_metadata_and_removal_public_api() -> None:
                     ),
                 )
             )
-            map_handle.add_geojson_source_data("inline-points", inline_points)
+            map_handle.add_geojson_source_data(
+                "inline-points",
+                inline_points,
+                style.GeoJsonSourceOptions(
+                    cluster=True,
+                    cluster_radius=40,
+                    cluster_max_zoom=12.0,
+                    cluster_min_points=3,
+                    cluster_properties=json.from_python(
+                        {"name_count": ["+", ["case", ["has", "name"], 1, 0]]}
+                    ),
+                ),
+            )
             map_handle.set_geojson_source_url(
                 "inline-points",
                 "https://example.test/inline-points.geojson",
@@ -1322,7 +1434,11 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_bounds(
-                camera.BoundOptions(bounds=bounds, min_zoom=0.0, max_zoom=10.0)
+                camera.BoundOptions(
+                    bounds=camera.Bounded(bounds),
+                    min_zoom=0.0,
+                    max_zoom=10.0,
+                )
             )
             constraints = map_handle.get_bounds()
             fit_bounds = map_handle.camera_for_lat_lng_bounds(bounds, fit)
@@ -1340,7 +1456,7 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
                 unwrapped=True,
             )
 
-            assert constraints.bounds == bounds
+            assert constraints.bounds == camera.Bounded(bounds)
             assert constraints.min_zoom == pytest.approx(0.0)
             assert constraints.max_zoom == pytest.approx(10.0)
             assert isinstance(fit_bounds, camera.CameraOptions)
@@ -1348,6 +1464,48 @@ def test_camera_fit_bounds_and_constraints_public_api() -> None:
             assert isinstance(fit_geometry, camera.CameraOptions)
             assert isinstance(visible_bounds, geo.LatLngBounds)
             assert isinstance(unwrapped_bounds, geo.LatLngBounds)
+
+
+def _jumped_longitude(map_handle: mln.MapHandle, longitude: float) -> float:
+    map_handle.jump_to(
+        camera.CameraOptions(center=geo.LatLng(0.0, longitude), zoom=2.0)
+    )
+    center = map_handle.get_camera().center
+    assert center is not None
+    return center.longitude
+
+
+def test_camera_bounds_distinguish_unbounded_from_world() -> None:
+    world = geo.LatLngBounds(
+        southwest=geo.LatLng(-90.0, -180.0),
+        northeast=geo.LatLng(90.0, 180.0),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
+            # An unbounded map wraps across the antimeridian.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                -160.0, abs=1e-6
+            )
+
+            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Bounded(world)))
+
+            constrained = map_handle.get_bounds().bounds
+            assert isinstance(constrained, camera.Bounded)
+            assert constrained.bounds.northeast.longitude == pytest.approx(180.0)
+            # World bounds clamp at the antimeridian instead of wrapping.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                180.0, abs=1e-6
+            )
+
+            map_handle.set_bounds(camera.BoundOptions(bounds=camera.Unbounded()))
+
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
+            # Releasing the constraint restores antimeridian wrapping.
+            assert _jumped_longitude(map_handle, 200.0) == pytest.approx(
+                -160.0, abs=1e-6
+            )
 
 
 def test_camera_transition_commands_accept_public_values() -> None:
@@ -1373,6 +1531,157 @@ def test_camera_transition_commands_accept_public_values() -> None:
             map_handle.pitch_by(0.0)
             map_handle.pitch_by_animated(0.0, animation)
             map_handle.cancel_transitions()
+
+
+def _drain_runtime_events(runtime: mln.RuntimeHandle) -> list[mln.RuntimeEvent]:
+    events: list[mln.RuntimeEvent] = []
+    while (event := runtime.poll_event()) is not None:
+        events.append(event)
+    return events
+
+
+def _finished_transition_ids(events: list[mln.RuntimeEvent]) -> list[int]:
+    ids: list[int] = []
+    for event in events:
+        if event.event_type != mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED:
+            continue
+        assert isinstance(event.payload, mln.CameraTransitionFinishedPayload)
+        ids.append(event.payload.transition_id)
+    return ids
+
+
+def _camera_change_modes(
+    events: list[mln.RuntimeEvent], event_type: mln.RuntimeEventType
+) -> list[mln.CameraChangeMode]:
+    return [
+        mln.CameraChangeMode(event.code)
+        for event in events
+        if event.event_type == event_type
+    ]
+
+
+def test_zero_duration_ease_reports_transition_finished_once() -> None:
+    target = camera.CameraOptions(center=geo.LatLng(12.0, 34.0), zoom=4.0)
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=0.0, transition_id=101),
+            )
+            events = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(events) == [101]
+    assert _camera_change_modes(events, mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE) == [
+        mln.CameraChangeMode.IMMEDIATE
+    ]
+
+
+def test_superseded_transition_reports_transition_finished_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(20.0, 40.0), zoom=6.0),
+                camera.AnimationOptions(duration_ms=5_000.0, transition_id=201),
+            )
+            started = _drain_runtime_events(runtime)
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(-20.0, -40.0), zoom=2.0)
+            )
+            superseded = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(started) == []
+    assert _finished_transition_ids(superseded) == [201]
+
+
+def test_cancelled_transition_reports_transition_finished_once() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.fly_to(
+                camera.CameraOptions(center=geo.LatLng(30.0, 60.0), zoom=8.0),
+                camera.AnimationOptions(duration_ms=5_000.0, transition_id=301),
+            )
+            started = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            cancelled = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            cancelled_again = _drain_runtime_events(runtime)
+
+    assert _finished_transition_ids(started) == []
+    assert _finished_transition_ids(cancelled) == [301]
+    assert _finished_transition_ids(cancelled_again) == []
+
+
+def test_completed_ease_reports_transition_finished_once() -> None:
+    target = camera.CameraOptions(center=geo.LatLng(5.0, 10.0), zoom=3.0)
+    deadline = time.monotonic() + 10.0
+    events: list[mln.RuntimeEvent] = []
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                target,
+                camera.AnimationOptions(duration_ms=20.0, transition_id=401),
+            )
+            while not _finished_transition_ids(events):
+                assert time.monotonic() < deadline, (
+                    "ease did not finish while the runtime was pumped"
+                )
+                map_handle.request_repaint()
+                runtime.pump()
+                events.extend(_drain_runtime_events(runtime))
+
+            trailing: list[mln.RuntimeEvent] = []
+            for _ in range(8):
+                map_handle.request_repaint()
+                runtime.pump()
+                trailing.extend(_drain_runtime_events(runtime))
+
+    assert _finished_transition_ids(events) == [401]
+    assert _finished_transition_ids(trailing) == []
+    assert mln.CameraChangeMode.ANIMATED in _camera_change_modes(
+        events, mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
+    )
+
+
+def test_camera_change_events_report_immediate_and_animated_modes() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            _drain_runtime_events(runtime)
+            map_handle.jump_to(
+                camera.CameraOptions(center=geo.LatLng(1.0, 2.0), zoom=3.0)
+            )
+            jumped = _drain_runtime_events(runtime)
+            map_handle.ease_to(
+                camera.CameraOptions(center=geo.LatLng(-1.0, -2.0), zoom=7.0),
+                camera.AnimationOptions(duration_ms=5_000.0),
+            )
+            eased = _drain_runtime_events(runtime)
+            map_handle.cancel_transitions()
+            eased.extend(_drain_runtime_events(runtime))
+
+    will_change = mln.RuntimeEventType.MAP_CAMERA_WILL_CHANGE
+    did_change = mln.RuntimeEventType.MAP_CAMERA_DID_CHANGE
+    assert _camera_change_modes(jumped, will_change) == [mln.CameraChangeMode.IMMEDIATE]
+    assert _camera_change_modes(jumped, did_change) == [mln.CameraChangeMode.IMMEDIATE]
+    assert _camera_change_modes(eased, will_change) == [mln.CameraChangeMode.ANIMATED]
+    assert _camera_change_modes(eased, did_change) == [mln.CameraChangeMode.ANIMATED]
+
+
+def test_camera_transition_finished_payload_validates_native_payload_size() -> None:
+    event = mln.RuntimeEvent._from_native(
+        _native.camera_transition_finished_event_for_test(909, 0)
+    )
+    assert event.event_type == mln.RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED
+    assert isinstance(event.payload, mln.CameraTransitionFinishedPayload)
+    assert event.payload.transition_id == 909
+
+    with pytest.raises(mln.InvalidArgumentError):
+        _native.camera_transition_finished_event_for_test(909, 1)
 
 
 def test_poll_event_returns_none_when_queue_is_empty() -> None:
@@ -1406,14 +1715,14 @@ def test_poll_event_returns_copied_map_event() -> None:
             assert loading_failed.message
 
 
-def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
+def test_pump_and_poll_event_return_copied_style_loaded_event() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
             map_handle.set_style_json('{"version":8,"sources":{},"layers":[]}')
 
             style_loaded = None
             for _ in range(32):
-                runtime.run_once()
+                runtime.pump()
                 while event := runtime.poll_event():
                     if event.event_type == mln.RuntimeEventType.MAP_STYLE_LOADED:
                         style_loaded = event
@@ -1424,7 +1733,7 @@ def test_run_once_and_poll_event_return_copied_style_loaded_event() -> None:
             assert style_loaded is not None
             assert style_loaded.source.source_type == mln.RuntimeEventSourceType.MAP
             assert style_loaded.source.map_handle is map_handle
-            runtime.run_once()
+            runtime.pump()
             assert runtime.poll_event() is None
 
 
@@ -2603,14 +2912,22 @@ def test_resource_callback_registration_validates_bounds_and_lifecycle() -> None
         handle.close()
         return resource.ResourceProviderDecision.PASS_THROUGH
 
-    with mln.RuntimeHandle() as runtime:
-        with pytest.raises(mln.InvalidArgumentError):
-            runtime.set_resource_provider(provider, max_pending_callbacks=0)
+    runtime = mln.RuntimeHandle()
+    with pytest.raises(mln.InvalidArgumentError):
+        runtime.set_resource_provider(provider, max_pending_callbacks=0)
 
+    runtime.set_resource_provider(provider, max_pending_callbacks=1)
+    runtime.close()
+
+    with pytest.raises(mln.InvalidStateError) as replaced:
         runtime.set_resource_provider(provider, max_pending_callbacks=1)
-        with runtime.create_map():
-            with pytest.raises(mln.InvalidStateError):
-                runtime.set_resource_provider(provider, max_pending_callbacks=1)
+    assert replaced.value.native_status_code is None
+    assert replaced.value.diagnostic == "runtime handle is closed"
+
+    with pytest.raises(mln.InvalidStateError) as cleared:
+        runtime.clear_resource_provider()
+    assert cleared.value.native_status_code is None
+    assert cleared.value.diagnostic == "runtime handle is closed"
 
 
 def test_resource_provider_pass_through_delegates_to_native_http() -> None:
@@ -2683,6 +3000,67 @@ def test_resource_transform_can_be_cleared_after_map_creation() -> None:
 
     assert served.is_set()
     assert calls == []
+
+
+def test_resource_provider_replacement_and_clear_retire_previous_callback() -> None:
+    first_urls: list[str] = []
+    second_urls: list[str] = []
+
+    def counting_provider(seen: list[str]) -> resource.ResourceProviderCallback:
+        def provider(
+            request: resource.ResourceRequest,
+            handle: resource.ResourceRequestHandle,
+        ) -> resource.ResourceProviderDecision:
+            seen.append(request.url)
+            return resource.ResourceProviderDecision.PASS_THROUGH
+
+        return provider
+
+    def load_unservable_style(
+        runtime: mln.RuntimeHandle,
+        map_handle: mln.MapHandle,
+        style_url: str,
+    ) -> None:
+        # No file source serves the jar scheme, so a loading failure naming this
+        # style URL proves the request reached the network file source.
+        map_handle.set_style_url(style_url)
+        for _ in range(5000):
+            runtime.pump()
+            while event := runtime.poll_event():
+                if (
+                    event.event_type == mln.RuntimeEventType.MAP_LOADING_FAILED
+                    and event.message is not None
+                    and style_url in event.message
+                    and '"jar"' in event.message
+                ):
+                    return
+            time.sleep(0.001)
+        raise AssertionError(f"style {style_url!r} did not report a loading failure")
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(
+            counting_provider(first_urls), max_pending_callbacks=4
+        )
+        with runtime.create_map() as map_handle:
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/first.json")
+            assert "jar:file:/packaged/first.json" in first_urls
+
+            runtime.set_resource_provider(
+                counting_provider(second_urls), max_pending_callbacks=4
+            )
+            first_urls_after_replace = list(first_urls)
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/second.json")
+            assert "jar:file:/packaged/second.json" in second_urls
+            assert first_urls == first_urls_after_replace
+
+            runtime.clear_resource_provider()
+            second_urls_after_clear = list(second_urls)
+            load_unservable_style(runtime, map_handle, "jar:file:/packaged/third.json")
+            assert first_urls == first_urls_after_replace
+            assert second_urls == second_urls_after_clear
+
+            # Clearing an already cleared provider stays a successful no-op.
+            runtime.clear_resource_provider()
 
 
 def test_resource_provider_inline_completion_overrides_pass_through_return() -> None:
@@ -2907,7 +3285,7 @@ def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
 
         map_handle.close()
         for _ in range(5000):
-            runtime.run_once()
+            runtime.pump()
             if handle.is_cancelled():
                 break
             time.sleep(0.001)
@@ -3104,4 +3482,36 @@ def test_custom_geometry_source_rejects_empty_queue_capacity() -> None:
                 map_handle.add_custom_geometry_source(
                     "custom",
                     style.CustomGeometrySourceOptions(max_queued_events=0),
+                )
+
+
+def test_set_bounds_rejects_unsupported_constraint() -> None:
+    # Annotations do not bind at runtime, so a stale LatLngBounds would
+    # otherwise be treated as absent and silently leave the constraint alone.
+    world = geo.LatLngBounds(
+        southwest=geo.LatLng(-90.0, -180.0),
+        northeast=geo.LatLng(90.0, 180.0),
+    )
+
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.set_bounds(
+                    camera.BoundOptions(bounds=world)  # type: ignore[arg-type]
+                )
+            assert map_handle.get_bounds().bounds == camera.Unbounded()
+
+
+@pytest.mark.parametrize("transition_id", [-1, 2**64])
+def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> None:
+    # PyO3 extracts this as Option<u64>, so without a range check the caller
+    # would see a bare OverflowError instead of the binding's error shape.
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.ease_to(
+                    camera.CameraOptions(zoom=2.0),
+                    camera.AnimationOptions(
+                        duration_ms=0.0, transition_id=transition_id
+                    ),
                 )

@@ -3,7 +3,7 @@
 # repository tasks.
 
 monorepo_root = true
-min_version = "2026.7.10"
+min_version = "2026.7.15"
 
 [settings]
 lockfile = true
@@ -30,8 +30,21 @@ dotnet.isolated = true
 config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 lockfile = true
 
+# Inline task scripts across the workspace are Bash. Cascading the shell gives
+# every monorepo config root the same contract without repeating it, and keeps
+# the choice scoped to tasks: hooks, tool installs, and dependency providers
+# still use the platform shell.
+#
+# This default reaches file tasks too, and on Windows mise applies it in place
+# of the shebang, so each file task names its own interpreter with
+# `#MISE shell=`.
+[task_config]
+cascade = true
+shell = "bash -e -c"
+
 [vars]
 actionlint_version = "1.7.8"
+cargo_about_version = "0.9.1"
 cmake_version = "4.3.3"
 dotnet_version = "10.0.203"
 doxygen_version = "1.13.2"
@@ -65,6 +78,7 @@ zig_version = "0.16.0"
 "aqua:rhysd/actionlint" = "{{vars.actionlint_version}}" # GH Actions linter
 "aqua:koalaman/shellcheck" = "{{vars.shellcheck_version}}" # Shell script linter (used by actionlint)
 "aqua:Kitware/CMake" = "{{vars.cmake_version}}"
+"github:EmbarkStudios/cargo-about" = "{{vars.cargo_about_version}}" # Rust dependency notices
 sccache = "{{vars.sccache_version}}"
 
 # Node.js ecosystem
@@ -103,9 +117,10 @@ auto = true
 run = "uv sync --locked --all-packages --all-groups --no-install-workspace"
 
 [deps.pnpm]
-# The built-in provider runs pnpm directly. A `run` script would go through Git
-# Bash, and on Windows ARM64 the lifecycle scripts pnpm spawns through cmd then
-# fail to resolve mise's node, so the workspace-wide install stays.
+# The built-in provider runs pnpm directly. A `run` script would put a shell
+# between mise and pnpm, and on Windows ARM64 the lifecycle scripts pnpm spawns
+# through cmd then fail to resolve mise's node, so the workspace-wide install
+# stays.
 auto = true
 
 [deps.submodules]
@@ -154,7 +169,10 @@ run = [{ task = "//:archive-native", args = ["{{usage.preset}}"] }]
 [tasks.archive-native]
 description = "Archive an already-built native CMake preset."
 usage = 'arg "<preset>"'
-run = 'cpack --preset "$usage_preset"'
+run = [
+  'cpack --preset "$usage_preset"',
+  { task = "//:verify-native-package", args = ["{{usage.preset}}"] },
+]
 
 [tasks.test]
 description = "Build and run C API tests for a CMake preset."

@@ -169,6 +169,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -181,7 +182,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
-  private val runtimeRetention = runtime.retainChild()
+  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
@@ -272,25 +273,35 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
+          StyleStructs.geoJsonSourceOptions(options, this),
         )
       )
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     memScoped {
       Status.check(
         mln_map_add_geojson_source_data(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
           ValueStructs.geoJson(data, this),
+          StyleStructs.geoJsonSourceOptions(options, this),
         )
       )
     }
@@ -1436,7 +1447,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   internal fun nativeAddress(): Long = state.address()
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = state.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    state.retainChild(childTypeName)
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

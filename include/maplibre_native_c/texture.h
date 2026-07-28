@@ -434,8 +434,11 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * texture-session call are owner-thread affine to the map owner thread.
  * The session renders into descriptor->texture. The caller owns the texture,
  * keeps it valid until detach or destroy, and synchronizes any use outside
- * this session. On success, *out_session receives a handle the caller destroys
- * with mln_render_session_destroy().
+ * this session. Each render completes before
+ * mln_render_session_render_update() returns, so the caller reads or samples
+ * the texture from any context in the share group of descriptor->context
+ * without adding synchronization of its own. On success, *out_session receives
+ * a handle the caller destroys with mln_render_session_destroy().
  *
  * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
  * Follow a resized host by destroying the session, recreating the texture at
@@ -472,12 +475,14 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *   null, out_info->size is too small, out_data is null, or out_data_capacity
  *   is too small.
  * - MLN_STATUS_INVALID_STATE when no rendered frame is available, the session
- *   is detached, a frame is currently acquired, or readback produces no image.
+ *   is detached, or a frame is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session is not a texture session or when the
  *   texture session uses a caller-owned target.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when readback produces no image or an image whose
+ *   layout does not match the session, when the render backend reports no
+ *   renderer backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
   mln_render_session* session, uint8_t* out_data, size_t out_data_capacity,
@@ -503,7 +508,8 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session cannot expose a Metal texture frame.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no rendered Metal
+ *   texture, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_acquire_frame(
   mln_render_session* session, mln_metal_owned_texture_frame* out_frame
@@ -579,6 +585,11 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
  * mln_opengl_owned_texture_release_frame() is called for the same frame.
  * While acquired, resize, render update, detach, destroy, and a second acquire
  * return MLN_STATUS_INVALID_STATE.
+ *
+ * Acquiring completes the session rendering for the frame, so the caller reads
+ * or samples the texture from any context in the share group of the context
+ * passed to mln_opengl_owned_texture_attach() without adding synchronization
+ * of its own.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

@@ -18,11 +18,7 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: VulkanOwnedTextureFrame,
 ) : AutoCloseable {
-  private val core =
-    OwnedTextureFrameHandleCore(
-      "VulkanOwnedTextureFrameHandle",
-      "Vulkan owned texture frame handle is closed",
-    )
+  private val core = OwnedTextureFrameHandleCore("VulkanOwnedTextureFrameHandle")
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
   public actual fun frame(): VulkanOwnedTextureFrame {

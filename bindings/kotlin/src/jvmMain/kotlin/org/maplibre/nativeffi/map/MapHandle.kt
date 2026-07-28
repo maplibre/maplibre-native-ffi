@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.json.JsonValue
@@ -27,6 +28,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -41,8 +43,13 @@ private constructor(
   private val runtime: RuntimeHandle,
   private val handle: java.lang.foreign.MemorySegment,
 ) : AutoCloseable {
-  private val runtimeRetention = runtime.retainChild()
+  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val core = HandleStateCore("MapHandle", handle.address())
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual val isClosed: Boolean
@@ -93,14 +100,22 @@ private constructor(
     return NativeAccess.styleSourceIds(requireLiveHandle())
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url)
+    NativeAccess.addGeoJsonSourceUrl(requireLiveHandle(), sourceId, url, options)
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
-    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data)
+    NativeAccess.addGeoJsonSourceData(requireLiveHandle(), sourceId, data, options)
   }
 
   public actual fun setGeoJsonSourceUrl(sourceId: String, url: String) {
@@ -121,7 +136,8 @@ private constructor(
     val sourceState = CustomGeometrySourceState(options)
     try {
       NativeAccess.addCustomGeometrySource(requireLiveHandle(), sourceId, sourceState.descriptor())
-      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
     } catch (error: Throwable) {
       closeQuietly(sourceState)
       throw error
@@ -710,14 +726,15 @@ private constructor(
 
   internal fun nativeAddress(): Long = handle.address()
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
     val iterator = customGeometrySources.iterator()
     while (iterator.hasNext()) {
       val entry = iterator.next()
       if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.value)
+        releaseCallbackRoot(entry.value)
         iterator.remove()
       }
     }
@@ -729,13 +746,18 @@ private constructor(
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    closeQuietly(customGeometrySources.remove(sourceId))
+    releaseCallbackRoot(customGeometrySources.remove(sourceId))
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {

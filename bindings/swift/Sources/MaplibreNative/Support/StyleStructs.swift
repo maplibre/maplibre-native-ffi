@@ -93,7 +93,110 @@ struct NativeStyleTileSourceOptions: Equatable {
       options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING.rawValue
       options.raster_encoding = rasterEncoding
     }
-    return try withUnsafePointer(to: &options, body)
+    return try withUnsafePointer(to: &options) { options in
+      try withExtendedLifetime(arena) { try body(options) }
+    }
+  }
+}
+
+struct NativeGeoJSONSourceOptions: Equatable {
+  var minZoom: Double?
+  var maxZoom: Double?
+  var tolerance: Double?
+  var clusterMaxZoom: Double?
+  var clusterProperties: NativeJSONValue?
+  var tileSize: UInt32?
+  var buffer: UInt32?
+  var clusterRadius: UInt32?
+  var clusterMinPoints: UInt32?
+  var lineMetrics: Bool?
+  var cluster: Bool?
+
+  init(
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    clusterMaxZoom: Double? = nil,
+    clusterProperties: NativeJSONValue? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clusterRadius: UInt32? = nil,
+    clusterMinPoints: UInt32? = nil,
+    lineMetrics: Bool? = nil,
+    cluster: Bool? = nil
+  ) {
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.clusterMaxZoom = clusterMaxZoom
+    self.clusterProperties = clusterProperties
+    self.tileSize = tileSize
+    self.buffer = buffer
+    self.clusterRadius = clusterRadius
+    self.clusterMinPoints = clusterMinPoints
+    self.lineMetrics = lineMetrics
+    self.cluster = cluster
+  }
+
+  func withNativeOptions<Result>(
+    _ body: (UnsafePointer<mln_geojson_source_options>?) throws -> Result
+  ) throws -> Result {
+    if minZoom == nil, maxZoom == nil, tolerance == nil, clusterMaxZoom == nil,
+       clusterProperties == nil, tileSize == nil, buffer == nil,
+       clusterRadius == nil, clusterMinPoints == nil, lineMetrics == nil,
+       cluster == nil
+    {
+      return try body(nil)
+    }
+    let arena = NativeInputArena()
+    var options = mln_geojson_source_options_default()
+    if let minZoom {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM.rawValue
+      options.min_zoom = minZoom
+    }
+    if let maxZoom {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM.rawValue
+      options.max_zoom = maxZoom
+    }
+    if let tolerance {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_TOLERANCE.rawValue
+      options.tolerance = tolerance
+    }
+    if let clusterMaxZoom {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM.rawValue
+      options.cluster_max_zoom = clusterMaxZoom
+    }
+    if let clusterProperties {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES.rawValue
+      options.cluster_properties = arena.allocate(clusterProperties)
+    }
+    if let tileSize {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE.rawValue
+      options.tile_size = tileSize
+    }
+    if let buffer {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_BUFFER.rawValue
+      options.buffer = buffer
+    }
+    if let clusterRadius {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS.rawValue
+      options.cluster_radius = clusterRadius
+    }
+    if let clusterMinPoints {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS.rawValue
+      options.cluster_min_points = clusterMinPoints
+    }
+    if let lineMetrics {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS.rawValue
+      options.line_metrics = lineMetrics
+    }
+    if let cluster {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue
+      options.cluster = cluster
+    }
+    return try withUnsafePointer(to: &options) { options in
+      try withExtendedLifetime(arena) { try body(options) }
+    }
   }
 }
 

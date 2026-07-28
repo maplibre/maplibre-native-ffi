@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_EASING
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_TRANSITION_ID
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ANCHOR
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_CENTER
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ZOOM
@@ -78,16 +79,23 @@ class MapStructsTest : org.maplibre.nativeffi.NativeTestBase() {
             AnimationOptions().apply {
               durationMs = 0.0
               easing = UnitBezier(0.0, 0.0, 1.0, 1.0)
+              transitionId = 0L
             },
             this,
           )
           .pointed
 
       assertEquals(sizeOf<mln_animation_options>().toUInt(), animation.size)
-      assertEquals(MLN_ANIMATION_OPTION_DURATION or MLN_ANIMATION_OPTION_EASING, animation.fields)
+      assertEquals(
+        MLN_ANIMATION_OPTION_DURATION or
+          MLN_ANIMATION_OPTION_EASING or
+          MLN_ANIMATION_OPTION_TRANSITION_ID,
+        animation.fields,
+      )
       assertEquals(0.0, animation.duration_ms)
       assertEquals(0.0, animation.easing.x1)
       assertEquals(1.0, animation.easing.x2)
+      assertEquals(0UL, animation.transition_id)
     }
   }
 

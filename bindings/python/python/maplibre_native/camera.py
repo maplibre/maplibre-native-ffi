@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from .geo import LatLng, LatLngBounds
 
@@ -96,12 +97,21 @@ class CameraOptions:
 
 @dataclass(frozen=True, slots=True)
 class AnimationOptions:
-    """Optional animation controls for camera transitions."""
+    """Optional animation controls for camera transitions.
+
+    ``transition_id`` is a caller-chosen identity for the transition these
+    options start. When it is set, the transition reports its end once through
+    a ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event carrying that value in a
+    ``CameraTransitionFinishedPayload``. The C API passes the value through
+    without interpreting it, so callers pick their own scheme, such as a
+    monotonically increasing counter. Leaving it unset reports no such event.
+    """
 
     duration_ms: float | None = None
     velocity: float | None = None
     min_zoom: float | None = None
     easing: UnitBezier | None = None
+    transition_id: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -114,10 +124,29 @@ class CameraFitOptions:
 
 
 @dataclass(frozen=True, slots=True)
+class Bounded:
+    """Keeps the camera center inside the given bounds."""
+
+    bounds: LatLngBounds
+
+
+@dataclass(frozen=True, slots=True)
+class Unbounded:
+    """Leaves the camera center unconstrained.
+
+    The map pans freely across the antimeridian. This differs from world bounds
+    of -90/-180 to 90/180, which clamp longitude to that range.
+    """
+
+
+BoundsConstraint: TypeAlias = Bounded | Unbounded
+
+
+@dataclass(frozen=True, slots=True)
 class BoundOptions:
     """Optional map camera constraint fields."""
 
-    bounds: LatLngBounds | None = None
+    bounds: BoundsConstraint | None = None
     min_zoom: float | None = None
     max_zoom: float | None = None
     min_pitch: float | None = None
@@ -126,12 +155,17 @@ class BoundOptions:
     @classmethod
     def _from_native(cls, raw: dict[str, object]) -> "BoundOptions":
         """Build bound options from private native bridge values."""
-        bounds = raw["bounds"]
-        if isinstance(bounds, dict):
-            bounds = LatLngBounds(
-                southwest=LatLng(**bounds["southwest"]),
-                northeast=LatLng(**bounds["northeast"]),
+        raw_bounds = raw["bounds"]
+        bounds: BoundsConstraint | None
+        if isinstance(raw_bounds, dict):
+            bounds = Bounded(
+                LatLngBounds(
+                    southwest=LatLng(**raw_bounds["southwest"]),
+                    northeast=LatLng(**raw_bounds["northeast"]),
+                )
             )
+        elif raw["unbounded"]:
+            bounds = Unbounded()
         else:
             bounds = None
         return cls(
@@ -184,6 +218,8 @@ class ProjectionMode:
 __all__ = [
     "AnimationOptions",
     "BoundOptions",
+    "Bounded",
+    "BoundsConstraint",
     "CameraFitOptions",
     "CameraOptions",
     "EdgeInsets",
@@ -191,6 +227,7 @@ __all__ = [
     "ProjectionMode",
     "Quaternion",
     "ScreenPoint",
+    "Unbounded",
     "UnitBezier",
     "Vec3",
 ]

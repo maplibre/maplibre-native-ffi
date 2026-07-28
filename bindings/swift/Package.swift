@@ -21,6 +21,7 @@ let testSourceFiles = [
   "MaplibreNativeTests/StyleTests.swift",
   "MaplibreNativeTests/SupportHelperTests.swift",
   "MaplibreNativeTests/ValueTests.swift",
+  "MaplibreNativeTests/WakeSourceTests.swift",
 ]
 
 let products: [Product] = [

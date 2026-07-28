@@ -6,6 +6,7 @@ import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
@@ -13,6 +14,10 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 public actual class MapProjectionHandle internal constructor(private val handle: MemorySegment) :
   AutoCloseable {
   private val core = HandleStateCore("MapProjectionHandle", handle.address())
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
 
   public actual val camera: CameraOptions
     get() {

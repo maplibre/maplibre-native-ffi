@@ -444,6 +444,35 @@ conda_deps = [
 version = "10.0.203"
 backend = "core:dotnet"
 
+[[tools."github:EmbarkStudios/cargo-about"]]
+version = "0.9.1"
+backend = "github:EmbarkStudios/cargo-about"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-arm64"]
+checksum = "sha256:d13ff19fedb566f859831c0b71c22120e7c598c7753d5f1018dd7353c6ced02a"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461985054"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-x64"]
+checksum = "sha256:c0e7dc6f5d74b0beec5c0053d39ab24514c717d19acd91886907a22457ea9e98"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984931"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.macos-arm64"]
+checksum = "sha256:6a38fe166d17a674269d4373256c0b6bd93acc2553e12de0517cb9ecc73c9c02"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984679"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-arm64"]
+checksum = "sha256:e2b695e4787381fa36e99ee85d5c6439eec21dd09d875572802124867da42af7"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986459"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-x64"]
+checksum = "sha256:318893aff6b9efd60f70470f5827b9577ae20a805cf9732d5612862a78508581"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986502"
+
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
 backend = "github:sargunv/jvl"

@@ -28,31 +28,34 @@ use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 pub use camera::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
+    FreeCameraOptions, ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    MapId, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, MapId, OfflineOperationCompletedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
+    TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
-    LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
-    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo,
+    SourceType, StyleImage, StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 pub use maplibre_core::{
-    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
-    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
-    NorthOrientation, OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    OpenGLContextProviderMask, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
-    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
-    ResourceUsage, Result, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
+    LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
+    MapViewportOptions, NetworkStatus, NorthOrientation, OfflineOperationKind,
+    OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLContextProviderMask,
+    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
+    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
@@ -74,7 +77,7 @@ pub use resource::{
 };
 pub use runtime::{
     OfflineOperationHandle, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions,
+    RuntimeOptions, WakeSource,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,

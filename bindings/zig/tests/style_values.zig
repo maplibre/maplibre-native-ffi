@@ -6,7 +6,7 @@ const support = @import("support.zig");
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -72,7 +72,7 @@ test "style layer JSON helpers manage lifecycle and order" {
     defer map.close() catch @panic("map close failed");
 
     const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] });
+    try map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] }, null);
 
     const layer_members = [_]maplibre.JsonMember{
         .{ .key = "id", .value = .{ .string = "empty-circle" } },

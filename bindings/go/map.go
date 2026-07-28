@@ -109,6 +109,18 @@ func validateCStringArgument(name string, value string) error {
 	return nil
 }
 
+// ID returns this map's runtime-local event source identity. It matches
+// RuntimeEventSource.MapID on runtime events this map raises, so a host holding
+// several maps can route an event to the map that produced it.
+func (m *MapHandle) ID() (MapID, error) {
+	_, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	return m.id, nil
+}
+
 // RequestRepaint requests a repaint for a continuous map.
 func (m *MapHandle) RequestRepaint() error {
 	ptr, release, err := m.ptr()
@@ -675,7 +687,10 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	rawOptions := cBoundOptions(options)
+	rawOptions, err := cBoundOptions(options)
+	if err != nil {
+		return err
+	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
 	})

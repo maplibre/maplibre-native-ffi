@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
@@ -18,8 +19,13 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 public actual class RenderSessionHandle
 internal constructor(private val map: MapHandle, private val handle: MemorySegment) :
   AutoCloseable {
-  private val mapRetention = map.retainChild()
+  private val mapRetention = map.retainChild("RenderSessionHandle")
   private val core = HandleStateCore("RenderSessionHandle", handle.address(), map)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private val activeFrame = ActiveFrameState()
 
   public actual val isClosed: Boolean
@@ -45,6 +51,7 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("detach")
     NativeAccess.detachRenderSession(requireLiveHandle())
+    mapRetention.close()
   }
 
   public actual fun reduceMemoryUse() {

@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.internal.struct
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -15,15 +16,23 @@ import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_SDF
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
+import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
+import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
+import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
@@ -73,6 +82,62 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(0U, source.tile_size)
       assertEquals(0.0, source.bounds.southwest.latitude)
       assertEquals(0.0, source.bounds.northeast.longitude)
+    }
+  }
+
+  @Test
+  fun geoJsonSourceOptionsKeepNativeDefaultsAndMaskPresentZeroValues() {
+    memScoped {
+      assertNull(StyleStructs.geoJsonSourceOptions(null, this))
+
+      val clusterProperties =
+        JsonValue.ObjectValue(
+          listOf(
+            JsonValue.Member(
+              "weight",
+              JsonValue.Array(
+                listOf(
+                  JsonValue.StringValue("+"),
+                  JsonValue.Array(
+                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
+                  ),
+                )
+              ),
+            )
+          )
+        )
+      val options =
+        StyleStructs.geoJsonSourceOptions(
+            GeoJsonSourceOptions().apply {
+              minZoom = 0.0
+              clusterMinPoints = 0
+              cluster = false
+              this.clusterProperties = clusterProperties
+            },
+            this,
+          )!!
+          .pointed
+
+      assertEquals(sizeOf<mln_geojson_source_options>().toUInt(), options.size)
+      assertEquals(
+        MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM or
+          MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS or
+          MLN_GEOJSON_SOURCE_OPTION_CLUSTER or
+          MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES,
+        options.fields,
+      )
+      assertEquals(0.0, options.min_zoom)
+      assertEquals(0U, options.cluster_min_points)
+      assertEquals(false, options.cluster)
+      assertEquals(clusterProperties, ValueStructs.jsonSnapshot(options.cluster_properties))
+
+      // Fields left absent keep the values mln_geojson_source_options_default() wrote.
+      val defaults = alloc<mln_geojson_source_options>()
+      mln_geojson_source_options_default().place(defaults.ptr)
+      assertEquals(defaults.max_zoom, options.max_zoom)
+      assertEquals(defaults.tolerance, options.tolerance)
+      assertEquals(defaults.tile_size, options.tile_size)
+      assertEquals(defaults.cluster_radius, options.cluster_radius)
     }
   }
 

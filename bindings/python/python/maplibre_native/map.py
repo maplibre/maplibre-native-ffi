@@ -13,13 +13,16 @@ from . import _native
 from .camera import (
     AnimationOptions,
     BoundOptions,
+    Bounded,
     CameraFitOptions,
     CameraOptions,
     EdgeInsets,
     FreeCameraOptions,
     ProjectionMode,
     ScreenPoint,
+    Unbounded,
 )
+from .errors import InvalidArgumentError
 from .geo import GeoJson, Geometry, LatLng, LatLngBounds
 from .json import JsonObject, JsonValue
 from .render import (
@@ -41,6 +44,7 @@ from .style import (
     CanonicalTileId,
     CustomGeometrySourceHandle,
     CustomGeometrySourceOptions,
+    GeoJsonSourceOptions,
     LocationIndicatorImageKind,
     StyleImage,
     StyleImageInfo,
@@ -239,21 +243,31 @@ def _bounds_parts(
     bounds: BoundOptions,
 ) -> tuple[
     tuple[tuple[float, float], tuple[float, float]] | None,
+    bool,
     float | None,
     float | None,
     float | None,
     float | None,
 ]:
-    raw_bounds = (
-        (
-            (bounds.bounds.southwest.latitude, bounds.bounds.southwest.longitude),
-            (bounds.bounds.northeast.latitude, bounds.bounds.northeast.longitude),
+    constraint = bounds.bounds
+    raw_bounds: tuple[tuple[float, float], tuple[float, float]] | None = None
+    if isinstance(constraint, Bounded):
+        box = constraint.bounds
+        raw_bounds = (
+            (box.southwest.latitude, box.southwest.longitude),
+            (box.northeast.latitude, box.northeast.longitude),
         )
-        if bounds.bounds is not None
-        else None
-    )
+    elif constraint is not None and not isinstance(constraint, Unbounded):
+        # Annotations do not bind at runtime, so an unsupported value would
+        # otherwise read as "leave the geographic constraint alone" and the
+        # caller would see a silent no-op instead of a rejection.
+        raise InvalidArgumentError(
+            "BoundOptions.bounds must be Bounded, Unbounded, or None, "
+            f"not {type(constraint).__name__}"
+        )
     return (
         raw_bounds,
+        isinstance(constraint, Unbounded),
         bounds.min_zoom,
         bounds.max_zoom,
         bounds.min_pitch,
@@ -269,6 +283,7 @@ def _animation_parts(
         float | None,
         float | None,
         tuple[float, float, float, float] | None,
+        int | None,
     ]
     | None
 ):
@@ -284,7 +299,22 @@ def _animation_parts(
         if animation.easing is not None
         else None
     )
-    return animation.duration_ms, animation.velocity, animation.min_zoom, easing
+    transition_id = animation.transition_id
+    if transition_id is not None and not 0 <= transition_id < 2**64:
+        # PyO3 extracts this as `Option<u64>` and raises a bare OverflowError
+        # before the binding's error conversion runs, so range-check it here to
+        # keep invalid binding-owned input on the documented error shape.
+        raise InvalidArgumentError(
+            f"AnimationOptions.transition_id must fit in 64 unsigned bits, "
+            f"not {transition_id}"
+        )
+    return (
+        animation.duration_ms,
+        animation.velocity,
+        animation.min_zoom,
+        easing,
+        transition_id,
+    )
 
 
 def _coordinate_parts(
@@ -330,6 +360,50 @@ def _tile_source_parts(
         int(options.raster_dem_encoding)
         if options.raster_dem_encoding is not None
         else None,
+    )
+
+
+def _geojson_source_parts(
+    options: GeoJsonSourceOptions | None,
+) -> tuple[
+    float | None,
+    float | None,
+    float | None,
+    float | None,
+    JsonValue | None,
+    int | None,
+    int | None,
+    int | None,
+    int | None,
+    bool | None,
+    bool | None,
+]:
+    if options is None:
+        return (
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+    return (
+        options.min_zoom,
+        options.max_zoom,
+        options.tolerance,
+        options.cluster_max_zoom,
+        options.cluster_properties,
+        options.tile_size,
+        options.buffer,
+        options.cluster_radius,
+        options.cluster_min_points,
+        options.line_metrics,
+        options.cluster,
     )
 
 
@@ -577,13 +651,27 @@ class MapHandle(NativeHandleMixin):
         """Add one style source from a style-spec source JSON object."""
         self._native.add_style_source_json(source_id, source_json)
 
-    def add_geojson_source_url(self, source_id: str, url: str) -> None:
+    def add_geojson_source_url(
+        self,
+        source_id: str,
+        url: str,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source that loads data from a URL."""
-        self._native.add_geojson_source_url(source_id, url)
+        self._native.add_geojson_source_url(
+            source_id, url, *_geojson_source_parts(options)
+        )
 
-    def add_geojson_source_data(self, source_id: str, data: GeoJson) -> None:
+    def add_geojson_source_data(
+        self,
+        source_id: str,
+        data: GeoJson,
+        options: GeoJsonSourceOptions | None = None,
+    ) -> None:
         """Add a GeoJSON source with inline data."""
-        self._native.add_geojson_source_data(source_id, data)
+        self._native.add_geojson_source_data(
+            source_id, data, *_geojson_source_parts(options)
+        )
 
     def set_geojson_source_url(self, source_id: str, url: str) -> None:
         """Update one GeoJSON source to load data from a URL."""
@@ -1125,7 +1213,13 @@ class MapHandle(NativeHandleMixin):
         self._native.pitch_by_animated(pitch, _animation_parts(animation))
 
     def cancel_transitions(self) -> None:
-        """Cancel active camera transitions."""
+        """Cancel active camera transitions.
+
+        A cancelled transition that carried an ``AnimationOptions``
+        ``transition_id`` reports its end through a
+        ``MAP_CAMERA_TRANSITION_FINISHED`` runtime event, the same event a
+        transition that runs to completion reports.
+        """
         self._native.cancel_transitions()
 
     def get_free_camera_options(self) -> FreeCameraOptions:

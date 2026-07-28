@@ -6,6 +6,7 @@ import kotlin.test.assertNotEquals
 import kotlin.test.assertNotSame
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -29,6 +30,7 @@ import org.maplibre.nativeffi.map.ViewportOptions
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -104,6 +106,7 @@ class OptionsValueSemanticsTest {
           velocity = 2.0
           minZoom = 3.0
           easing = UnitBezier(0.1, 0.2, 0.3, 0.4)
+          transitionId = 4L
         }
       },
       copyOf = { it.copy() },
@@ -113,6 +116,7 @@ class OptionsValueSemanticsTest {
           { velocity = 20.0 },
           { minZoom = 30.0 },
           { easing = UnitBezier(0.9, 0.8, 0.7, 0.6) },
+          { transitionId = 40L },
         ),
     )
   }
@@ -122,7 +126,7 @@ class OptionsValueSemanticsTest {
     assertValueSemantics(
       baseline = {
         BoundOptions().apply {
-          bounds = LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
+          bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)))
           minZoom = 2.0
           maxZoom = 3.0
           minPitch = 4.0
@@ -132,7 +136,8 @@ class OptionsValueSemanticsTest {
       copyOf = { it.copy() },
       mutators =
         listOf(
-          { bounds = LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0)) },
+          { bounds = BoundsConstraint.Bounded(LatLngBounds(LatLng(-1.0, -1.0), LatLng(2.0, 2.0))) },
+          { bounds = BoundsConstraint.Unbounded },
           { minZoom = 20.0 },
           { maxZoom = 30.0 },
           { minPitch = 40.0 },
@@ -300,6 +305,58 @@ class OptionsValueSemanticsTest {
         ),
     )
   }
+
+  @Test
+  fun geoJsonSourceOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        GeoJsonSourceOptions().apply {
+          minZoom = 1.0
+          maxZoom = 2.0
+          tolerance = 0.5
+          clusterMaxZoom = 14.0
+          clusterProperties = clusterProperties("sum")
+          tileSize = 256
+          buffer = 64
+          clusterRadius = 40
+          clusterMinPoints = 3
+          lineMetrics = true
+          cluster = true
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { minZoom = 10.0 },
+          { maxZoom = 20.0 },
+          { tolerance = 0.25 },
+          { clusterMaxZoom = 12.0 },
+          { clusterProperties = clusterProperties("max") },
+          { tileSize = 512 },
+          { buffer = 128 },
+          { clusterRadius = 50 },
+          { clusterMinPoints = 2 },
+          { lineMetrics = false },
+          { cluster = false },
+        ),
+    )
+  }
+
+  /** Builds a `clusterProperties` object whose aggregation operator is [operator]. */
+  private fun clusterProperties(operator: String): JsonValue =
+    JsonValue.ObjectValue(
+      listOf(
+        JsonValue.Member(
+          "weight",
+          JsonValue.Array(
+            listOf(
+              JsonValue.StringValue(operator),
+              JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))),
+            )
+          ),
+        )
+      )
+    )
 
   @Test
   fun styleImageOptionsComparesByFieldValue() {

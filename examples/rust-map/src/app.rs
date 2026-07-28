@@ -3,6 +3,7 @@ use maplibre_native::{
     RuntimeEventType, RuntimeHandle, RuntimeOptions,
 };
 use std::error::Error;
+use std::time::Duration;
 use winit::event::WindowEvent;
 use winit::window::{Window, WindowId};
 
@@ -198,7 +199,7 @@ impl App {
         }
         self.apply_pending_resize()?;
         let runtime = self.runtime.as_ref().expect("runtime is open");
-        runtime.run_once()?;
+        runtime.pump(Some(Duration::ZERO))?;
         while let Some(event) = runtime.poll_event()? {
             match event.event_type {
                 RuntimeEventType::MapRenderUpdateAvailable

@@ -419,8 +419,13 @@ Resource provider invocation follows this operation:
    or release.
 4. Treat inline completion during the provider callback as handled ownership,
    even if the callback return path would otherwise pass through.
-5. Allow deferred or cross-thread completion when the C API allows it, without
+5. Defer inline request release until the callback returns handled ownership.
+6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
+
+Provider registration is replaceable for a runtime's whole life. A binding keeps
+the registered callback state reachable until the C call that replaces or clears
+the provider returns, and releases it after that call returns.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -458,6 +463,34 @@ The helper follows this design:
    thread, and leaves later submissions in the binding's closed-state error
    shape.
 
+A helper that parks its owner thread between iterations acquires a wake source
+and signals it from submission and close, so a submitted operation runs at
+submission time.
+
+### Parking and wake
+
+The pump is one method taking a timeout. Bindings expose it alongside a wake
+source handle.
+
+The pump wrapper follows this design:
+
+1. It takes the host language's duration or timeout type, maps zero to a
+   non-blocking drain, and maps the language's "no timeout" spelling to an
+   unbounded park.
+2. It releases the host runtime's blocking-call machinery for the duration of
+   the call, including any interpreter lock, so other host threads run while the
+   owner thread parks.
+3. Its documentation states that a wake signal sets a flag the pump clears, and
+   that callers drain events after every return.
+
+The wake source follows this design:
+
+1. It is a distinct owned handle that the host releases explicitly, and
+   releasing it is independent of the runtime's lifetime in both orders.
+2. It is transferable and callable from any thread, and the binding declares
+   that where the host language can express it.
+3. Signalling after the runtime is closed succeeds and does nothing.
+
 ### Event polling
 
 The public event API is explicit: host code pumps native runtime work, then
@@ -488,7 +521,9 @@ When the language can declare or enforce cross-thread transferability, ordinary
 owner-thread handles MUST be non-transferable. A transferable owner-thread
 helper handle is allowed only when every operation is submitted back to the
 bound native owner thread. Copied immutable values can be transferable when
-their contents are independent of native owner-thread state. Unchecked or unsafe
+their contents are independent of native owner-thread state. A wake source
+handle is transferable: it reaches native wake state that carries its own
+synchronization and holds no owner-thread pointer. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
 
@@ -653,7 +688,7 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                        |
+| BND-080 | `pump` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                            |
 | BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.                                             |
 | BND-082 | Event message and payload data remain valid after the next event poll.                                                                                              |
 | BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |
@@ -661,6 +696,8 @@ that a real native failure would expose.
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
 | BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
+| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
+| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |
 
 ### Map, camera, projection, style, and query
 
@@ -702,6 +739,7 @@ that a real native failure would expose.
 | BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                    |
 | BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
 | BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
 
 ### Rendering
 

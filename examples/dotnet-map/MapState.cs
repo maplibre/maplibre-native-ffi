@@ -91,7 +91,7 @@ internal sealed class MapState : IDisposable
 
     public bool Step(bool canRender)
     {
-        runtime.RunOnce();
+        runtime.Pump(TimeSpan.Zero);
         DrainEvents();
         if (!canRender || !RenderPending)
         {

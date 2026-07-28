@@ -69,6 +69,16 @@ const ResourceRequestRegistrySlot = struct {
     generation: u64,
 };
 
+const WakeSourceState = struct {
+    native: ?*c.mln_wake_source,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+};
+
+const WakeSourceRegistrySlot = struct {
+    state: ?*WakeSourceState,
+    generation: u64,
+};
+
 const OfflineOperationState = struct {
     runtime: RuntimeHandle,
     operation_id: OfflineOperationId,
@@ -93,6 +103,10 @@ var runtime_handle_free_list: std.ArrayList(usize) = .empty;
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
 var resource_request_registry: std.ArrayList(ResourceRequestRegistrySlot) = .empty;
 var resource_request_free_list: std.ArrayList(usize) = .empty;
+
+var wake_source_registry_lock = std.atomic.Value(bool).init(false);
+var wake_source_registry: std.ArrayList(WakeSourceRegistrySlot) = .empty;
+var wake_source_free_list: std.ArrayList(usize) = .empty;
 
 var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
 var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
@@ -540,6 +554,41 @@ pub const ResourceRequestHandle = enum(u128) {
     }
 };
 
+/// Releases a runtime owner thread parked in `RuntimeHandle.pump`.
+///
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. It stays usable after its runtime closes, and
+/// signalling it then does nothing. The diagnostic store the runtime was
+/// created with must outlive the source.
+pub const WakeSourceHandle = enum(u128) {
+    _,
+
+    /// Sets the runtime's wake flag and releases the parked owner thread.
+    ///
+    /// A signal raised while the owner thread is running sets the wake flag,
+    /// so the next `RuntimeHandle.pump` returns without parking.
+    pub fn signal(self: WakeSourceHandle) status.Error!void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = wakeSourceState(self) orelse return error.ClosedHandle;
+        const native_source = source_state.native orelse return error.ClosedHandle;
+        try status.checkStatus(c.mln_wake_source_signal(native_source), source_state.diagnostic_store);
+    }
+
+    /// Releases the wake source. Later signals report a closed handle.
+    pub fn release(self: WakeSourceHandle) void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = unregisterWakeSourceState(self) orelse return;
+        defer std.heap.smp_allocator.destroy(source_state);
+        const native_source = source_state.native orelse return;
+        c.mln_wake_source_destroy(native_source);
+        source_state.native = null;
+    }
+};
+
 const RuntimeEvent = struct {
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
@@ -548,12 +597,22 @@ const RuntimeEvent = struct {
     code: i32,
 };
 
+/// One polled runtime event, copied into storage this value owns.
 pub const OwnedRuntimeEvent = struct {
     allocator: std.mem.Allocator,
     event_type: RuntimeEventType,
     source_type: RuntimeEventSourceType,
     source_id: ?values.MapId,
     payload_type: RuntimeEventPayloadType,
+    /// Secondary detail whose meaning `event_type` selects.
+    ///
+    /// For `map_camera_will_change` and `map_camera_did_change` it is a
+    /// `CameraChangeMode` raw value, decoded with `CameraChangeMode.fromRaw`.
+    /// For `map_loading_failed` it is the ordinal of MapLibre Native's internal
+    /// map load error kind, with the failure text in `message`. For
+    /// `offline_operation_completed` it is the raw native status of the
+    /// operation, the same value the payload reports in `result_status`. Every
+    /// other event type reports 0.
     code: i32,
     message: []const u8,
     payload: RuntimeEventPayload,
@@ -576,6 +635,7 @@ pub const RuntimeEventPayload = union(enum) {
     offline_region_response_error: OfflineRegionResponseErrorPayload,
     offline_region_tile_count_limit: OfflineRegionTileCountLimitPayload,
     offline_operation_completed: OfflineOperationCompletedPayload,
+    camera_transition_finished: CameraTransitionFinishedPayload,
     unknown: UnknownPayload,
 
     pub fn deinit(self: *RuntimeEventPayload, allocator: std.mem.Allocator) void {
@@ -586,6 +646,26 @@ pub const RuntimeEventPayload = union(enum) {
             else => {},
         }
         self.* = .none;
+    }
+};
+
+/// Camera change kind carried by the `code` of camera change events.
+pub const CameraChangeMode = union(enum) {
+    /// The camera reached its new value without an animated transition.
+    immediate,
+    /// The camera moved as part of an animated transition.
+    animated,
+    /// A change mode this binding does not name yet, kept as its raw value.
+    unknown: i32,
+
+    /// Decodes the `code` of a `map_camera_will_change` or
+    /// `map_camera_did_change` event.
+    pub fn fromRaw(raw: i32) CameraChangeMode {
+        return switch (raw) {
+            c.MLN_CAMERA_CHANGE_MODE_IMMEDIATE => .immediate,
+            c.MLN_CAMERA_CHANGE_MODE_ANIMATED => .animated,
+            else => .{ .unknown = raw },
+        };
     }
 };
 
@@ -781,6 +861,25 @@ pub const OfflineOperationCompletedPayload = struct {
     found: bool,
 };
 
+/// Payload for `map_camera_transition_finished` events.
+///
+/// A camera command that carries `AnimationOptions.transition_id` reports this
+/// payload once for the transition it starts, whichever way that transition
+/// ends: running to completion, being superseded by a later camera command,
+/// being cancelled by `cancelTransitions`, or completing instantly as a
+/// zero-duration jump. A command this API rejects, such as one carrying a
+/// non-finite enabled camera field, starts no transition and emits no such
+/// event. MapLibre Native reports the moment a transition releases
+/// the camera and leaves the outcome unreported, so this payload establishes
+/// transition identity rather than a completion reason. A host that needs to
+/// tell completion from cancellation compares the resulting camera against the
+/// requested one, or tracks which transition ID is current.
+pub const CameraTransitionFinishedPayload = struct {
+    /// The `AnimationOptions.transition_id` of the command that started this
+    /// transition.
+    transition_id: u64,
+};
+
 pub const UnknownPayload = struct {
     payload_type: u32,
     bytes: []const u8,
@@ -809,6 +908,7 @@ pub const RuntimeEventType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit_exceeded,
     offline_operation_completed,
+    map_camera_transition_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventType {
@@ -835,6 +935,7 @@ pub const RuntimeEventType = union(enum) {
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => .offline_region_tile_count_limit_exceeded,
             c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
+            c.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED => .map_camera_transition_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -958,6 +1059,7 @@ pub const RuntimeEventPayloadType = union(enum) {
     offline_region_response_error,
     offline_region_tile_count_limit,
     offline_operation_completed,
+    camera_transition_finished,
     unknown: u32,
 
     fn fromRaw(raw: u32) RuntimeEventPayloadType {
@@ -971,6 +1073,7 @@ pub const RuntimeEventPayloadType = union(enum) {
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => .offline_region_response_error,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => .offline_region_tile_count_limit,
             c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => .offline_operation_completed,
+            c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => .camera_transition_finished,
             else => .{ .unknown = raw },
         };
     }
@@ -1006,19 +1109,68 @@ pub const RuntimeHandle = enum(u128) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Runs one iteration of this runtime's owner-thread run loop.
+    /// Advances this runtime.
     ///
-    /// The iteration drains the high-priority task queue and then the default
-    /// queue until both are empty, including tasks enqueued during the drain,
-    /// and also dispatches expired timers and ready I/O.
+    /// The call parks the owner thread when `timeout_ms` allows it, then drains
+    /// the owner-thread task queues. Drain the queued runtime events with
+    /// `pollEvent` afterwards.
     ///
-    /// `runOnce` returns without blocking on new work, but its duration is
-    /// unbounded: a single iteration can span a style parse. Treat it as "make
-    /// progress now" rather than as a fixed per-frame time slice.
-    pub fn runOnce(self: *RuntimeHandle) status.Error!void {
+    /// `timeout_ms` sets the park bound. Zero drains and returns; hosts pumping
+    /// from a frame callback pass it. A positive value parks for up to that many
+    /// milliseconds; hosts that own their pump thread pass one and take their
+    /// cadence from the runtime's own work. Null parks until a wake arrives.
+    ///
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
+    ///
+    /// The runtime holds a wake flag. Style, tile, offline, and resource
+    /// responses set it, as do queued runtime events and
+    /// `WakeSourceHandle.signal`. A parking call returns as soon as the flag is
+    /// set and clears it before returning, and work arriving during the drain
+    /// sets it again. A call also returns without parking while unread runtime
+    /// events are queued. Timers and ready file descriptors set the flag only
+    /// when they queue owner-thread work, so pass a bounded timeout to cap how
+    /// long a call waits.
+    ///
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock
+    /// that a thread signalling a wake source takes.
+    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        try status.checkStatus(c.mln_runtime_run_once(runtime_lease.native), runtime_lease.diagnostic_store);
+        const native_timeout: i64 = if (timeout_ms) |value|
+            std.math.cast(i64, value) orelse std.math.maxInt(i64)
+        else
+            -1;
+        try status.checkStatus(
+            c.mln_runtime_pump(runtime_lease.native, native_timeout),
+            runtime_lease.diagnostic_store,
+        );
+    }
+
+    /// Acquires a wake source that releases this runtime's parked owner thread.
+    /// The returned handle is usable from any thread, and the caller releases
+    /// it.
+    pub fn wakeSource(self: *RuntimeHandle) status.Error!WakeSourceHandle {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+
+        var native_source: ?*c.mln_wake_source = null;
+        try status.checkStatus(
+            c.mln_runtime_wake_source_acquire(runtime_lease.native, &native_source),
+            runtime_lease.diagnostic_store,
+        );
+        const source = native_source orelse return error.NativeError;
+
+        const source_state = std.heap.smp_allocator.create(WakeSourceState) catch {
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
+        source_state.* = .{ .native = source, .diagnostic_store = runtime_lease.diagnostic_store };
+        return registerWakeSourceState(source_state) catch {
+            std.heap.smp_allocator.destroy(source_state);
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
     }
 
     /// Polls and copies the next queued runtime event, returning null when the
@@ -1297,6 +1449,13 @@ pub const RuntimeHandle = enum(u128) {
         return offlineStatusFromNative(native_status_value);
     }
 
+    /// Registers, replaces, or clears the runtime-scoped URL transform for
+    /// network resources; passing null clears it.
+    ///
+    /// Registering and clearing are both available for the whole life of the
+    /// runtime, including while maps exist. The binding keeps the handler and
+    /// context alive until the call that replaces or clears them returns, and
+    /// releases them when the runtime closes.
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
@@ -1330,25 +1489,46 @@ pub const RuntimeHandle = enum(u128) {
         }
     }
 
-    pub fn setResourceProvider(self: *RuntimeHandle, provider: ResourceProvider) status.Error!void {
+    /// Registers, replaces, or clears the runtime-scoped network resource
+    /// provider; passing null clears it.
+    ///
+    /// Registering and clearing are both available for the whole life of the
+    /// runtime, including while maps exist. The binding keeps the handler and
+    /// context alive until the call that replaces or clears them returns, and
+    /// releases them when the runtime closes. Requests the previous provider
+    /// already took a handle for keep that handle: complete and release each
+    /// one as usual.
+    pub fn setResourceProvider(self: *RuntimeHandle, provider: ?ResourceProvider) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const runtime_state = runtime_lease.state;
-        const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
-        errdefer std.heap.smp_allocator.destroy(replacement);
-        replacement.* = .{ .provider = provider, .diagnostic_store = runtime_lease.diagnostic_store };
-        var native_provider = c.mln_resource_provider{
-            .size = @sizeOf(c.mln_resource_provider),
-            .callback = resourceProviderTrampoline,
-            .user_data = replacement,
-        };
+        if (provider) |value| {
+            const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
+            errdefer std.heap.smp_allocator.destroy(replacement);
+            replacement.* = .{ .provider = value, .diagnostic_store = runtime_lease.diagnostic_store };
+            var native_provider = c.mln_resource_provider{
+                .size = @sizeOf(c.mln_resource_provider),
+                .callback = resourceProviderTrampoline,
+                .user_data = replacement,
+            };
+            try status.checkStatus(
+                c.mln_runtime_set_resource_provider(runtime_lease.native, &native_provider),
+                runtime_lease.diagnostic_store,
+            );
+            const previous = runtime_state.resource_provider;
+            runtime_state.resource_provider = replacement;
+            if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
+            return;
+        }
+
         try status.checkStatus(
-            c.mln_runtime_set_resource_provider(runtime_lease.native, &native_provider),
+            c.mln_runtime_clear_resource_provider(runtime_lease.native),
             runtime_lease.diagnostic_store,
         );
-        const previous = runtime_state.resource_provider;
-        runtime_state.resource_provider = replacement;
-        if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
+        if (runtime_state.resource_provider) |old_provider| {
+            runtime_state.resource_provider = null;
+            std.heap.smp_allocator.destroy(old_provider);
+        }
     }
 
     pub fn close(self: *RuntimeHandle) status.Error!void {
@@ -1770,6 +1950,68 @@ fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
 }
 
+fn registerWakeSourceState(source_state: *WakeSourceState) std.mem.Allocator.Error!WakeSourceHandle {
+    lockWakeSourceRegistry();
+    defer unlockWakeSourceRegistry();
+
+    if (wake_source_free_list.items.len > 0) {
+        const slot_index = wake_source_free_list.pop().?;
+        wake_source_registry.items[slot_index].state = source_state;
+        wake_source_registry.items[slot_index].generation = nextHandleGeneration();
+        return wakeSourceHandle(slot_index + 1, wake_source_registry.items[slot_index].generation);
+    }
+
+    const generation = nextHandleGeneration();
+    try wake_source_free_list.ensureTotalCapacity(std.heap.smp_allocator, wake_source_registry.items.len + 1);
+    try wake_source_registry.append(std.heap.smp_allocator, .{ .state = source_state, .generation = generation });
+    return wakeSourceHandle(wake_source_registry.items.len, generation);
+}
+
+fn wakeSourceHandle(index: usize, generation: u64) WakeSourceHandle {
+    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
+}
+
+fn wakeSourceIndex(handle: WakeSourceHandle) ?usize {
+    const index = @intFromEnum(handle) & std.math.maxInt(u64);
+    if (index == 0 or index > std.math.maxInt(usize)) return null;
+    return @intCast(index);
+}
+
+fn wakeSourceGeneration(handle: WakeSourceHandle) u64 {
+    return @intCast(@intFromEnum(handle) >> 64);
+}
+
+fn wakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot = wake_source_registry.items[index - 1];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    return slot.state;
+}
+
+fn unregisterWakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot_index = index - 1;
+    const slot = &wake_source_registry.items[slot_index];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    const source_state = slot.state orelse return null;
+    slot.state = null;
+    slot.generation = nextHandleGeneration();
+    wake_source_free_list.appendAssumeCapacity(slot_index);
+    return source_state;
+}
+
+fn lockWakeSourceRegistry() void {
+    while (wake_source_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn unlockWakeSourceRegistry() void {
+    wake_source_registry_lock.store(false, .seq_cst);
+}
+
 fn registerOfflineOperationState(operation_state: *OfflineOperationState) std.mem.Allocator.Error!OfflineOperationHandle {
     lockOfflineOperationRegistry();
     defer unlockOfflineOperationRegistry();
@@ -1966,6 +2208,10 @@ fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) 
                 .result_status = payload.result_status,
                 .found = payload.found,
             } };
+        },
+        c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED => blk: {
+            const payload = try payloadAs(c.mln_runtime_event_camera_transition_finished, native_event.payload, native_event.payload_size);
+            break :blk .{ .camera_transition_finished = .{ .transition_id = payload.transition_id } };
         },
         else => .{ .unknown = .{
             .payload_type = native_event.payload_type,
@@ -2224,7 +2470,7 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
 fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OfflineOperationHandle) !void {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(std.testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -2245,6 +2491,7 @@ test "runtime event raw domains preserve unknown values" {
     try std.testing.expect(std.meta.eql(RuntimeEventType.fromRaw(0xfeed), RuntimeEventType{ .unknown = 0xfeed }));
     try std.testing.expect(std.meta.eql(RuntimeEventSourceType.fromRaw(0xbeef), RuntimeEventSourceType{ .unknown = 0xbeef }));
     try std.testing.expect(std.meta.eql(RuntimeEventPayloadType.fromRaw(0xace), RuntimeEventPayloadType{ .unknown = 0xace }));
+    try std.testing.expect(std.meta.eql(CameraChangeMode.fromRaw(0x7ace), CameraChangeMode{ .unknown = 0x7ace }));
     try std.testing.expect(std.meta.eql(RenderMode.fromRaw(0xbad), RenderMode{ .unknown = 0xbad }));
     try std.testing.expect(std.meta.eql(TileOperation.fromRaw(0xcafe), TileOperation{ .unknown = 0xcafe }));
     try std.testing.expect(std.meta.eql(OfflineRegionDownloadState.fromRaw(0xd00d), OfflineRegionDownloadState{ .unknown = 0xd00d }));

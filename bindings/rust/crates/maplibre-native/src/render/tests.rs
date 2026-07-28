@@ -26,8 +26,9 @@ use static_assertions::assert_not_impl_any;
 use super::*;
 use crate::logging::test_support::LoggingTestGuard;
 use crate::{
-    CameraOptions, ErrorKind, FeatureIdentifier, Geometry, JsonMember, LatLng, LogSeverity,
-    LogSeverityMask, MapMode, MapOptions, OpenGLContextProviderMask, RenderBackendMask,
+    AnimationOptions, CameraChangeMode, CameraOptions, ErrorKind, FeatureIdentifier, GeoJson,
+    GeoJsonSourceOptions, Geometry, JsonMember, LatLng, LogSeverity, LogSeverityMask, MapMode,
+    MapOptions, OpenGLContextProviderMask, RenderBackendMask, RuntimeEventPayload,
     RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
@@ -41,7 +42,7 @@ assert_not_impl_any!(OpenGLOwnedTextureFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
-const CLUSTER_STYLE_JSON: &str = r##"{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}},{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}]}"##;
+const CLUSTER_BASE_STYLE_JSON: &str = r##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}}]}"##;
 fn create_owned_texture_session(
     map: &MapHandle,
     extent: RenderTargetExtent,
@@ -1196,7 +1197,7 @@ fn pick_vulkan_physical_device(
 fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == event_type {
                 return true;
@@ -1235,13 +1236,79 @@ fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSe
     render_available_updates(runtime, session, 5);
 }
 
+fn cluster_point(latitude: f64, longitude: f64, name: &str, weight: u64) -> Feature {
+    Feature::new(
+        Geometry::Point(LatLng::new(latitude, longitude)),
+        vec![
+            JsonMember::new("name", JsonValue::String(name.to_owned())),
+            JsonMember::new("weight", JsonValue::UInt(weight)),
+        ],
+    )
+}
+
+/// Builds the clustered source through the typed GeoJSON adder so the render
+/// tests exercise `GeoJsonSourceOptions` rather than raw style JSON.
 fn load_cluster_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
     let mut camera = CameraOptions::default();
     camera.center = Some(LatLng::new(0.0, 0.0));
     camera.zoom = Some(0.0);
     map.jump_to(&camera).unwrap();
-    map.set_style_json(CLUSTER_STYLE_JSON).unwrap();
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+
+    let data = GeoJson::FeatureCollection(vec![
+        cluster_point(0.0, 0.0, "one", 1),
+        cluster_point(0.001, 0.001, "two", 2),
+        cluster_point(0.002, 0.002, "three", 3),
+    ]);
+    let mut options = GeoJsonSourceOptions::default();
+    options.cluster = Some(true);
+    options.cluster_radius = Some(60);
+    options.cluster_min_points = Some(2);
+    options.cluster_max_zoom = Some(17.0);
+    options.cluster_properties = Some(JsonValue::Object(vec![JsonMember::new(
+        "weight_sum",
+        JsonValue::Array(vec![
+            JsonValue::String("+".to_owned()),
+            JsonValue::Array(vec![
+                JsonValue::String("get".to_owned()),
+                JsonValue::String("weight".to_owned()),
+            ]),
+        ]),
+    )]));
+    map.add_geojson_source_data("cluster-source", &data, Some(&options))
+        .unwrap();
+
+    let layer = JsonValue::Object(vec![
+        JsonMember::new("id", JsonValue::String("cluster-circle".to_owned())),
+        JsonMember::new("type", JsonValue::String("circle".to_owned())),
+        JsonMember::new("source", JsonValue::String("cluster-source".to_owned())),
+        JsonMember::new(
+            "filter",
+            JsonValue::Array(vec![
+                JsonValue::String("has".to_owned()),
+                JsonValue::String("point_count".to_owned()),
+            ]),
+        ),
+        JsonMember::new(
+            "paint",
+            JsonValue::Object(vec![
+                JsonMember::new("circle-color", JsonValue::String("#2563eb".to_owned())),
+                JsonMember::new("circle-radius", JsonValue::Double(20.0)),
+            ]),
+        ),
+    ]);
+    map.add_style_layer_json(&layer, None).unwrap();
+
     render_available_updates(runtime, session, 5);
+}
+
+fn numeric_member(feature: &Feature, key: &str) -> Option<f64> {
+    match feature_member(feature, key)? {
+        JsonValue::UInt(value) => Some(*value as f64),
+        JsonValue::Int(value) => Some(*value as f64),
+        JsonValue::Double(value) => Some(*value),
+        _ => None,
+    }
 }
 
 fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle, count: usize) {
@@ -1253,7 +1320,7 @@ fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHand
 }
 
 fn render_pending_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle) {
-    let _ = runtime.run_once();
+    let _ = runtime.pump(Some(Duration::ZERO));
     for _ in 0..100 {
         let Ok(Some(event)) = runtime.poll_event() else {
             return;
@@ -1930,6 +1997,12 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         Some(&JsonValue::UInt(_))
     ));
 
+    // The rendered cluster exists only because the typed GeoJSON adder passed
+    // GeoJsonSourceOptions::cluster, and weight_sum is produced by the
+    // cluster_properties aggregation lowered through the same options.
+    assert_eq!(numeric_member(&cluster.feature, "point_count"), Some(3.0));
+    assert_eq!(numeric_member(&cluster.feature, "weight_sum"), Some(6.0));
+
     let children = session
         .query_feature_extension(
             "cluster-source",
@@ -1967,6 +2040,58 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         expansion_zoom,
         FeatureExtensionResult::Value(JsonValue::UInt(_))
     ));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+/// A host frame loop renders far more frames than a graphics queue keeps in
+/// flight at once. On Apple targets each frame takes objects that a pool owns
+/// until it drains, and Metal blocks a queue that reaches its in-flight command
+/// buffer limit, so a library that leaves draining to the host wedges partway
+/// through a loop like this one.
+#[test]
+fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    // A background-only style keeps each frame to the passes that take command
+    // buffers, without the tile work that would make the loop slow.
+    map.set_style_json(CLUSTER_BASE_STYLE_JSON).unwrap();
+    render_available_updates(&runtime, &session, 3);
+
+    // Metal allows 64 command buffers in flight per queue, and a frame takes
+    // several, so this many frames clears that limit many times over. Each
+    // camera change gives the next frame something to draw.
+    const TARGET_FRAMES: u32 = 256;
+    let mut rendered_frames = 0;
+    let mut step = 0;
+    while rendered_frames < TARGET_FRAMES && step < 200 {
+        let mut camera = CameraOptions::default();
+        camera.center = Some(LatLng::new(37.0, -122.0));
+        camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
+        map.jump_to(&camera).unwrap();
+        let _ = runtime.pump(Some(Duration::ZERO));
+        while let Ok(Some(event)) = runtime.poll_event() {
+            if event.event_type == RuntimeEventType::MapRenderUpdateAvailable
+                && session.render_update().unwrap()
+            {
+                rendered_frames += 1;
+            }
+        }
+        step += 1;
+    }
+
+    assert!(
+        rendered_frames >= TARGET_FRAMES,
+        "the loop rendered {rendered_frames} frames before running out of steps"
+    );
 
     session.close().unwrap();
     map.close().unwrap();
@@ -2050,7 +2175,7 @@ fn resize_updates_owned_texture_frame_extent() {
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type != RuntimeEventType::MapRenderUpdateAvailable {
                 continue;
@@ -2220,7 +2345,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     let mut info = None;
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
                 let _ = session.render_update();
@@ -2389,6 +2514,77 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
     assert_eq!(error.kind(), ErrorKind::Unsupported);
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_UNSUPPORTED));
 
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-102. Rendered frames are what advance a camera
+// transition, so a session-backed map is the fixture that can run an ease to
+// completion instead of ending it early.
+fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::new(64, 64, 1.0);
+    options.mode = MapMode::Continuous;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
+    let (_context, session) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+    load_query_style(&runtime, &map, &session);
+
+    let mut animation = AnimationOptions::default();
+    animation.transition_id = Some(31);
+    animation.duration_ms = Some(200.0);
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(37.0, -122.0));
+    camera.zoom = Some(12.0);
+    map.ease_to(&camera, Some(&animation)).unwrap();
+
+    // Keep rendering for a while after the transition ends so a repeated
+    // report would show up in the tally.
+    let mut finished_transition_ids = Vec::new();
+    let mut saw_animated_did_change = false;
+    let mut finished_at: Option<Instant> = None;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    while Instant::now() < deadline {
+        let _ = runtime.pump(Some(Duration::ZERO));
+        while let Ok(Some(event)) = runtime.poll_event() {
+            match event.event_type {
+                RuntimeEventType::MapCameraTransitionFinished => {
+                    let RuntimeEventPayload::CameraTransitionFinished(payload) = event.payload
+                    else {
+                        panic!("transition-finished event should carry its typed payload");
+                    };
+                    finished_transition_ids.push(payload.transition_id);
+                    finished_at.get_or_insert_with(Instant::now);
+                }
+                RuntimeEventType::MapCameraDidChange => {
+                    saw_animated_did_change |=
+                        CameraChangeMode::from_raw(event.code as u32) == CameraChangeMode::Animated;
+                }
+                RuntimeEventType::MapRenderUpdateAvailable => {
+                    let _ = session.render_update();
+                }
+                _ => {}
+            }
+        }
+        if finished_at.is_some_and(|at| at.elapsed() >= Duration::from_millis(500)) {
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+
+    assert_eq!(finished_transition_ids, vec![31]);
+    assert!(saw_animated_did_change);
+    // The transition reached the requested camera, so it ended by running to
+    // completion rather than by being superseded or cancelled.
+    let settled = map.camera().unwrap();
+    assert!((settled.zoom.unwrap() - 12.0).abs() < 1e-6);
+
+    session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
 }

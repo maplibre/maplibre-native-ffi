@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
+    assert_typed_geojson_cluster_source,
     skip_or_fail_fixture_setup,
 )
 
@@ -113,7 +114,7 @@ def wait_for_texture_info(
     fixture.map.set_style_json(EMPTY_STYLE_JSON)
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -136,7 +137,7 @@ def wait_for_metal_frame(
     request_still_image_if_needed(fixture.map)
     last_frame: render.MetalOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -420,6 +421,16 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
     metal_owned_session: MetalOwnedSession,
 ) -> None:
     assert_cluster_feature_extensions(
+        metal_owned_session.runtime,
+        metal_owned_session.map,
+        metal_owned_session.session,
+    )
+
+
+def test_typed_geojson_source_options_cluster_nearby_points(
+    metal_owned_session: MetalOwnedSession,
+) -> None:
+    assert_typed_geojson_cluster_source(
         metal_owned_session.runtime,
         metal_owned_session.map,
         metal_owned_session.session,

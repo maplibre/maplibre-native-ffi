@@ -83,11 +83,34 @@ Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build
 threaded models above the C API.
 
+On Apple targets each entry point drains its own Objective-C autorelease pool,
+so a host may pump frames from a thread that never returns to a run loop.
+Objects that cross the C boundary are retained rather than autoreleased, which
+keeps them valid after the entry point that produced them returns.
+
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop. One
-call drains the queued tasks, expired timers, and ready I/O it finds, including
-work enqueued while it runs, and returns without blocking for more. Document
-pump entry points as draining rather than as a bounded per-call budget.
+one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
+thread when asked, then drains the queued tasks, expired timers, and ready I/O
+it finds, including work enqueued while it runs. Document pump entry points as
+draining rather than as a bounded per-call budget.
+
+One entry point carries both cadence sources: the timeout selects the cadence,
+with zero for hosts driven by a callback they do not own and a positive value
+for hosts that own their pump thread and take their cadence from the runtime's
+own work. Park-and-wake follows these rules:
+
+- The C API owns the parking primitive. Wake signals reach the owner thread
+  through runtime state rather than through a host callback, because MapLibre
+  raises them from arbitrary threads while it holds locks that every thread
+  queueing owner-thread work needs.
+- Wake signals set a flag that the pump clears before it returns. Document a
+  pump as advancing the runtime, and require the event drain after every return.
+- Any-thread wake entry points take a handle that carries its own reference to
+  the wake state, never the thread-affine runtime pointer.
+- Document each blocking entry point's deadlock risk, naming the host locks a
+  caller must not hold across it.
+- Queue one event per host-visible outcome. An event whose handling acts on the
+  latest state, such as a render update, coalesces against an unread one.
 
 ## Status And Diagnostics
 

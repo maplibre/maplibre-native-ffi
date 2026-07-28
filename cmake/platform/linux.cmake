@@ -20,6 +20,12 @@ function(mln_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
+  mln_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+                  "zlib.txt")
+  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+                  "libuv.txt")
+  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+                  "libuv-extra.txt")
 
   target_link_libraries(
     ${target}

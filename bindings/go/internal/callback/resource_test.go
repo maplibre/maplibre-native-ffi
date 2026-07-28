@@ -2,7 +2,6 @@ package callback
 
 import (
 	"errors"
-	"runtime/cgo"
 	"testing"
 )
 
@@ -13,6 +12,7 @@ const (
 	testStatusNativeError     int32  = -5
 	testResourceKindStyle     uint32 = 1
 	testResourceKindTile      uint32 = 3
+	testProviderPassThrough   uint32 = 0
 	testProviderUnknown       uint32 = ^uint32(0)
 )
 
@@ -82,10 +82,9 @@ func TestResourceTransformTrampolineRecoversPanic(t *testing.T) {
 }
 
 func TestResourceProviderTrampolineRecoversPanic(t *testing.T) {
-	state := &ResourceProviderState{callback: func(ResourceRequest, *ResourceRequestHandle) uint32 {
+	state := newResourceProviderState(func(ResourceRequest, *ResourceRequestHandle) uint32 {
 		panic("boom")
-	}}
-	state.handle = cgo.NewHandle(state)
+	})
 	defer state.Release()
 
 	if decision := invokeResourceProviderTrampolineForTest(state); decision != testProviderUnknown {
@@ -94,10 +93,9 @@ func TestResourceProviderTrampolineRecoversPanic(t *testing.T) {
 }
 
 func TestResourceProviderTrampolinePreservesUnknownDecision(t *testing.T) {
-	state := &ResourceProviderState{callback: func(ResourceRequest, *ResourceRequestHandle) uint32 {
+	state := newResourceProviderState(func(ResourceRequest, *ResourceRequestHandle) uint32 {
 		return testProviderUnknown
-	}}
-	state.handle = cgo.NewHandle(state)
+	})
 	defer state.Release()
 
 	if decision := invokeResourceProviderTrampolineForTest(state); decision != testProviderUnknown {
@@ -205,6 +203,30 @@ func TestResourceRequestHandleCancelledAfterCloseFailsBeforeNative(t *testing.T)
 	status, cancelled, err := handle.CancelledChecked()
 	if !errors.Is(err, ErrResourceRequestClosed) || status != 0 || cancelled {
 		t.Fatalf("CancelledChecked after Close = (%v, %v, %v), want closed", status, cancelled, err)
+	}
+}
+
+// Clearing or replacing a provider retires its state once native code can no
+// longer invoke it, so a later inbound call must stop at the trampoline instead
+// of reaching freed Go callback state.
+func TestResourceProviderReleasedStateStopsReachingCallback(t *testing.T) {
+	var calls int
+	state := newResourceProviderState(func(ResourceRequest, *ResourceRequestHandle) uint32 {
+		calls++
+		return testProviderPassThrough
+	})
+
+	if decision := invokeResourceProviderTrampolineForTest(state); decision != testProviderPassThrough {
+		t.Fatalf("decision = %v, want pass through", decision)
+	}
+	state.Release()
+	state.Release()
+
+	if decision := invokeResourceProviderTrampolineForTest(state); decision != testProviderUnknown {
+		t.Fatalf("decision after release = %v, want ResourceProviderDecisionUnknown", decision)
+	}
+	if calls != 1 {
+		t.Fatalf("callback calls = %d, want 1", calls)
 	}
 }
 

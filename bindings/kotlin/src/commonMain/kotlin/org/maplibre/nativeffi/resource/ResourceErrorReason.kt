@@ -2,7 +2,13 @@ package org.maplibre.nativeffi.resource
 
 import kotlin.jvm.JvmInline
 
-/** Resource error reason copied from native events. */
+/**
+ * Resource error reason copied from native events.
+ *
+ * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
+ * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
+ * [nativeValue] rather than collapsed to a known constant.
+ */
 @JvmInline
 public value class ResourceErrorReason(public val nativeValue: Int) {
   public companion object {

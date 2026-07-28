@@ -50,6 +50,22 @@ public sealed interface RuntimeEventPayload {
     public val found: Boolean,
   ) : RuntimeEventPayload
 
+  /**
+   * Reports that a camera transition released the camera.
+   *
+   * See [org.maplibre.nativeffi.camera.AnimationOptions.transitionId] for how a caller stamps an
+   * identity onto a transition and which terminal outcomes this payload covers.
+   */
+  public data class CameraTransitionFinished(
+    /**
+     * The transition id the caller set on the animation options that started this transition.
+     *
+     * Native `uint64_t` preserved as a [Long] bit pattern: compare it for equality with the id the
+     * caller passed in, and format ids above [Long.MAX_VALUE] through `toULong()`.
+     */
+    public val transitionId: Long
+  ) : RuntimeEventPayload
+
   public class Unknown(
     public val rawPayloadType: Int,
     public val payloadSize: Long,

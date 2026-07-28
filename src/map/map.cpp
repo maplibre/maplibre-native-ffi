@@ -14,6 +14,7 @@
 #include <ratio>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -33,9 +34,10 @@
 #include <mbgl/renderer/renderer_observer.hpp>
 #include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/conversion.hpp>
-#include <mbgl/style/conversion/layer.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/light.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/layer.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/light.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/source.hpp>           // IWYU pragma: keep
 #include <mbgl/style/conversion_impl.hpp>
 #include <mbgl/style/image.hpp>
 #include <mbgl/style/layer.hpp>
@@ -60,6 +62,7 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/image.hpp>
+#include <mbgl/util/immutable.hpp>
 #include <mbgl/util/projection.hpp>
 #include <mbgl/util/range.hpp>
 #include <mbgl/util/size.hpp>
@@ -515,6 +518,290 @@ auto to_native_tileset(
     tileset.bounds = to_native_lat_lng_bounds(options.bounds);
   }
   return tileset;
+}
+
+auto has_geojson_source_option(
+  const mln_geojson_source_options& options, uint32_t field
+) -> bool {
+  return (options.fields & field) != 0U;
+}
+
+auto effective_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_geojson_source_options {
+  auto result = mln::core::geojson_source_options_default();
+  if (options == nullptr) {
+    return result;
+  }
+
+  result.fields = options->fields;
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)) {
+    result.min_zoom = options->min_zoom;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)) {
+    result.max_zoom = options->max_zoom;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
+  ) {
+    result.tolerance = options->tolerance;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+    )
+  ) {
+    result.cluster_max_zoom = options->cluster_max_zoom;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    )
+  ) {
+    result.cluster_properties = options->cluster_properties;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
+  ) {
+    result.tile_size = options->tile_size;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
+    result.buffer = options->buffer;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+    )
+  ) {
+    result.cluster_radius = options->cluster_radius;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+    )
+  ) {
+    result.cluster_min_points = options->cluster_min_points;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
+  ) {
+    result.line_metrics = options->line_metrics;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
+    result.cluster = options->cluster;
+  }
+  return result;
+}
+
+auto validate_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_status {
+  if (options == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (options->size < sizeof(mln_geojson_source_options)) {
+    mln::core::set_thread_error("mln_geojson_source_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
+    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error(
+      "mln_geojson_source_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto effective = effective_geojson_source_options(options);
+  for (const auto& [zoom, name] : {
+         std::pair{effective.min_zoom, "min_zoom"},
+         std::pair{effective.max_zoom, "max_zoom"},
+         std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
+       }) {
+    if (
+      !std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0 ||
+      std::floor(zoom) != zoom
+    ) {
+      auto message = std::string{name} + " must be an integer within [0, 255]";
+      mln::core::set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  if (effective.min_zoom > effective.max_zoom) {
+    mln::core::set_thread_error(
+      "min_zoom must be less than or equal to max_zoom"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!std::isfinite(effective.tolerance) || effective.tolerance < 0.0) {
+    mln::core::set_thread_error("tolerance must be finite and non-negative");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
+    mln::core::set_thread_error("tile_size must be within [1, 65535]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.buffer > 65535U) {
+    mln::core::set_thread_error("buffer must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.cluster_radius > 65535U) {
+    mln::core::set_thread_error("cluster_radius must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    ) &&
+    effective.cluster_properties == nullptr
+  ) {
+    mln::core::set_thread_error(
+      "cluster_properties must not be null when its field is present"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.cluster_properties != nullptr) {
+    if (!mln::core::validate_style_json_value(effective.cluster_properties)) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (effective.cluster_properties->type != MLN_JSON_VALUE_TYPE_OBJECT) {
+      mln::core::set_thread_error("cluster_properties must be a JSON object");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+/**
+ * Converts validated options into mbgl form.
+ *
+ * Cluster properties are handed to Converter<GeoJSONOptions> as a one-member
+ * object so MapLibre Native parses the aggregation expressions.
+ */
+auto to_native_geojson_source_options(const mln_geojson_source_options& options)
+  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
+  auto native = mbgl::style::GeoJSONOptions{};
+  native.minzoom = static_cast<uint8_t>(options.min_zoom);
+  native.maxzoom = static_cast<uint8_t>(options.max_zoom);
+  native.tileSize = static_cast<uint16_t>(options.tile_size);
+  native.buffer = static_cast<uint16_t>(options.buffer);
+  native.tolerance = options.tolerance;
+  native.lineMetrics = options.line_metrics;
+  native.cluster = options.cluster;
+  native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
+  native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
+  native.clusterMinPoints = options.cluster_min_points;
+
+  if (options.cluster_properties != nullptr) {
+    constexpr auto key = std::string_view{"clusterProperties"};
+    const auto member = mln_json_member{
+      .key = {.data = key.data(), .size = key.size()},
+      .value = options.cluster_properties
+    };
+    const auto wrapper = mln_json_value{
+      .size = sizeof(mln_json_value),
+      .type = MLN_JSON_VALUE_TYPE_OBJECT,
+      .data = {.object_value = {.members = &member, .member_count = 1}}
+    };
+    auto error = mbgl::style::conversion::Error{};
+    auto converted =
+      mbgl::style::conversion::convert<mbgl::style::GeoJSONOptions>(
+        mbgl::style::conversion::Convertible{&wrapper}, error
+      );
+    if (!converted) {
+      mln::core::set_style_conversion_error("GeoJSON source options", error);
+      return std::nullopt;
+    }
+    native.clusterProperties = std::move(converted->clusterProperties);
+  }
+
+  return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
+}
+
+auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
+  -> std::string_view {
+  return geometry.match(
+    [](const mbgl::EmptyGeometry&) -> std::string_view { return "empty"; },
+    [](const mbgl::Point<double>&) -> std::string_view { return "point"; },
+    [](const mbgl::LineString<double>&) -> std::string_view {
+      return "line string";
+    },
+    [](const mbgl::Polygon<double>&) -> std::string_view { return "polygon"; },
+    [](const mbgl::MultiPoint<double>&) -> std::string_view {
+      return "multi-point";
+    },
+    [](const mbgl::MultiLineString<double>&) -> std::string_view {
+      return "multi-line string";
+    },
+    [](const mbgl::MultiPolygon<double>&) -> std::string_view {
+      return "multi-polygon";
+    },
+    [](const mapbox::geometry::geometry_collection<double>&)
+      -> std::string_view { return "geometry collection"; }
+  );
+}
+
+auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
+  -> std::string_view {
+  return geojson.match(
+    [](const mbgl::Geometry<double>&) -> std::string_view {
+      return "a bare geometry";
+    },
+    [](const mbgl::GeoJSONFeature&) -> std::string_view {
+      return "a single feature";
+    },
+    [](const mbgl::FeatureCollection&) -> std::string_view {
+      return "a feature collection";
+    }
+  );
+}
+
+/**
+ * Reports whether clustered data satisfies supercluster's input requirements.
+ *
+ * MapLibre Native engages clustering for feature collections only, and it reads
+ * each feature's geometry as a point. A bare geometry or a single feature tiles
+ * without clustering, and a feature carrying other geometry raises a variant
+ * access error inside supercluster while mln_map_add_geojson_source_data() or
+ * mln_map_set_geojson_source_data() builds the index. Checking here names the
+ * source and the constraint instead of clustering silently or failing deep
+ * inside MapLibre Native.
+ *
+ * An empty feature collection stays accepted: it carries nothing to cluster,
+ * and a later mln_map_set_geojson_source_data() clusters the features it
+ * supplies.
+ */
+auto validate_clustered_geojson(
+  const std::string& source_id, const mbgl::GeoJSON& geojson
+) -> bool {
+  if (!geojson.is<mbgl::FeatureCollection>()) {
+    const auto message = "clustered GeoJSON source \"" + source_id +
+                         "\" requires a feature collection; the data is " +
+                         std::string{geojson_alternative_name(geojson)};
+    mln::core::set_thread_error(message.c_str());
+    return false;
+  }
+
+  const auto& features = geojson.get<mbgl::FeatureCollection>();
+  for (std::size_t index = 0; index < features.size(); ++index) {
+    const auto& geometry = features.at(index).geometry;
+    if (geometry.is<mbgl::Point<double>>()) {
+      continue;
+    }
+    const auto message =
+      "clustered GeoJSON source \"" + source_id +
+      "\" requires point geometry on every feature; feature " +
+      std::to_string(index) + " has " +
+      std::string{geojson_geometry_type_name(geometry)} + " geometry";
+    mln::core::set_thread_error(message.c_str());
+    return false;
+  }
+  return true;
 }
 
 auto has_custom_geometry_source_option(
@@ -1001,6 +1288,18 @@ auto payload_bytes(const Payload& payload) -> std::vector<std::byte> {
   return result;
 }
 
+auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
+  -> int32_t {
+  switch (mode) {
+    case mbgl::MapObserver::CameraChangeMode::Immediate:
+      return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+    case mbgl::MapObserver::CameraChangeMode::Animated:
+      return MLN_CAMERA_CHANGE_MODE_ANIMATED;
+  }
+  assert(false);
+  return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+}
+
 auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
   switch (mode) {
     case mbgl::MapObserver::RenderMode::Partial:
@@ -1102,7 +1401,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
       : runtime_(runtime), map_(map) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onCameraIsChanging() override {
@@ -1110,7 +1411,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
   }
 
   void onCameraDidChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onWillStartLoadingMap() override {
@@ -1414,7 +1717,7 @@ auto validate_animation_options(const mln_animation_options* animation)
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
-    MLN_ANIMATION_OPTION_EASING;
+    MLN_ANIMATION_OPTION_EASING | MLN_ANIMATION_OPTION_TRANSITION_ID;
   if ((animation->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_animation_options.fields contains unknown bits"
@@ -1514,10 +1817,20 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_BOUND_OPTION_BOUNDS) | MLN_BOUND_OPTION_MIN_ZOOM |
     MLN_BOUND_OPTION_MAX_ZOOM | MLN_BOUND_OPTION_MIN_PITCH |
-    MLN_BOUND_OPTION_MAX_PITCH;
+    MLN_BOUND_OPTION_MAX_PITCH | MLN_BOUND_OPTION_UNBOUNDED;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_bound_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    (options->fields & MLN_BOUND_OPTION_BOUNDS) != 0U &&
+    (options->fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U
+  ) {
+    mln::core::set_thread_error(
+      "MLN_BOUND_OPTION_BOUNDS and MLN_BOUND_OPTION_UNBOUNDED are mutually "
+      "exclusive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2011,11 +2324,35 @@ auto from_native_camera(const mbgl::CameraOptions& camera)
   return result;
 }
 
-auto to_native_animation(const mln_animation_options* animation)
-  -> mbgl::AnimationOptions {
+auto camera_transition_finished_payload(uint64_t transition_id)
+  -> mln_runtime_event_camera_transition_finished {
+  return mln_runtime_event_camera_transition_finished{
+    .size = sizeof(mln_runtime_event_camera_transition_finished),
+    .transition_id = transition_id
+  };
+}
+
+// MapLibre Native owns the returned AnimationOptions for the lifetime of the
+// transition it starts, and Transform invokes transitionFinishFn on the map
+// owner thread. Enqueuing the finish event therefore uses the same push path as
+// the map observer. Events for a destroyed map are discarded by the push, so a
+// transition still holding this callback during map teardown enqueues nothing.
+auto to_native_animation(
+  mln_runtime* runtime, mln_map* map, const mln_animation_options* animation
+) -> mbgl::AnimationOptions {
   auto result = mbgl::AnimationOptions{};
   if (animation == nullptr) {
     return result;
+  }
+  if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
+    result.transitionFinishFn = [runtime, map,
+                                 transition_id = animation->transition_id] {
+      mln::core::push_runtime_map_event_payload(
+        runtime, map, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+        payload_bytes(camera_transition_finished_payload(transition_id))
+      );
+    };
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
     result.duration = std::chrono::duration_cast<mbgl::Duration>(
@@ -2254,6 +2591,14 @@ auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
   };
 }
 
+// mbgl keeps the unbounded flag private, so compare against a
+// default-constructed value. mbgl::LatLngBounds::operator== treats any two
+// unbounded values as equal and an unbounded value as distinct from every
+// bounded one, which makes this an exact test for the flag.
+auto is_unbounded_lat_lng_bounds(const mbgl::LatLngBounds& bounds) -> bool {
+  return bounds == mbgl::LatLngBounds{};
+}
+
 auto to_native_lat_lngs(const mln_lat_lng* coordinates, size_t coordinate_count)
   -> std::vector<mbgl::LatLng> {
   auto result = std::vector<mbgl::LatLng>{};
@@ -2299,6 +2644,11 @@ auto to_native_bound_options(const mln_bound_options& options)
   if ((options.fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
   }
+  if ((options.fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U) {
+    // A default-constructed LatLngBounds is the mbgl unbounded constraint:
+    // constrain() returns its input unchanged.
+    result.withLatLngBounds(mbgl::LatLngBounds{});
+  }
   if ((options.fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
     result.withMinZoom(options.min_zoom);
   }
@@ -2318,8 +2668,12 @@ auto from_native_bound_options(const mbgl::BoundOptions& options)
   -> mln_bound_options {
   auto result = mln::core::bound_options_default();
   if (options.bounds) {
-    result.fields |= MLN_BOUND_OPTION_BOUNDS;
-    result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    if (is_unbounded_lat_lng_bounds(*options.bounds)) {
+      result.fields |= MLN_BOUND_OPTION_UNBOUNDED;
+    } else {
+      result.fields |= MLN_BOUND_OPTION_BOUNDS;
+      result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    }
   }
   if (options.minZoom) {
     result.fields |= MLN_BOUND_OPTION_MIN_ZOOM;
@@ -2484,7 +2838,8 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .duration_ms = 0,
     .velocity = 0,
     .min_zoom = 0,
-    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1}
+    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
+    .transition_id = 0
   };
 }
 
@@ -2570,6 +2925,25 @@ auto style_tile_source_options_default() noexcept
     .tile_size = mbgl::util::tileSize_I,
     .vector_encoding = MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
     .raster_encoding = MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX
+  };
+}
+
+auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
+  const auto defaults = mbgl::style::GeoJSONOptions{};
+  return mln_geojson_source_options{
+    .size = sizeof(mln_geojson_source_options),
+    .fields = 0,
+    .min_zoom = static_cast<double>(defaults.minzoom),
+    .max_zoom = static_cast<double>(defaults.maxzoom),
+    .tolerance = defaults.tolerance,
+    .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
+    .cluster_properties = nullptr,
+    .tile_size = defaults.tileSize,
+    .buffer = defaults.buffer,
+    .cluster_radius = defaults.clusterRadius,
+    .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
+    .line_metrics = defaults.lineMetrics,
+    .cluster = defaults.cluster
   };
 }
 
@@ -3187,7 +3561,8 @@ auto map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids)
 }
 
 auto map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3204,6 +3579,10 @@ auto map_add_geojson_source_url(
     set_thread_error("url must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3212,14 +3591,23 @@ auto map_add_geojson_source_url(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  auto native_options =
+    to_native_geojson_source_options(effective_geojson_source_options(options));
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setURL(string_from_view(url));
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
 }
 
 auto map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3234,6 +3622,10 @@ auto map_add_geojson_source_data(
   if (!geojson) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3242,7 +3634,19 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  const auto effective = effective_geojson_source_options(options);
+  if (effective.cluster && !validate_clustered_geojson(id, *geojson)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto native_options = to_native_geojson_source_options(effective);
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setGeoJSON(*geojson);
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
@@ -3307,6 +3711,12 @@ auto map_set_geojson_source_data(
   auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    geojson_source->getOptions().cluster &&
+    !validate_clustered_geojson(string_from_view(source_id), *geojson)
+  ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -4928,7 +5338,9 @@ auto map_ease_to(
     return animation_status;
   }
 
-  map->map->easeTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->easeTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -4949,7 +5361,9 @@ auto map_fly_to(
     return animation_status;
   }
 
-  map->map->flyTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->flyTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5557,7 +5971,8 @@ auto map_move_by_animated(
   }
 
   map->map->moveBy(
-    mbgl::ScreenCoordinate{delta_x, delta_y}, to_native_animation(animation)
+    mbgl::ScreenCoordinate{delta_x, delta_y},
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -5592,7 +6007,9 @@ auto map_scale_by_animated(
     return animation_status;
   }
 
-  map->map->scaleBy(scale, native_anchor, to_native_animation(animation));
+  map->map->scaleBy(
+    scale, native_anchor, to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5624,7 +6041,8 @@ auto map_rotate_by_animated(
   }
 
   map->map->rotateBy(
-    screen_point(first), screen_point(second), to_native_animation(animation)
+    screen_point(first), screen_point(second),
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -5649,7 +6067,7 @@ auto map_pitch_by_animated(
     return animation_status;
   }
 
-  map->map->pitchBy(pitch, to_native_animation(animation));
+  map->map->pitchBy(pitch, to_native_animation(map->runtime, map, animation));
   return MLN_STATUS_OK;
 }
 

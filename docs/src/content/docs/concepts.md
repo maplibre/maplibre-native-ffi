@@ -22,6 +22,10 @@ events flow through that owner thread.
 Each owner thread may have one live runtime. The host pumps that runtime to let
 MapLibre Native make progress and to collect completed work.
 
+A host paces the pump itself. Display-paced hosts pump once per frame. A host
+that owns its pump thread parks that thread until the runtime has work, and
+wakes it from its own threads through a wake source.
+
 ## Map
 
 A map belongs to a runtime. It owns map state: style documents, sources, layers,

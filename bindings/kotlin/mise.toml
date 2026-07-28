@@ -101,6 +101,8 @@ esac
 
 [tasks.androidBuild]
 description = "Build the Kotlin Android binding."
+# The floor check runs as a dependency of the Gradle androidBuild task, so it
+# covers direct Gradle invocations too and needs no wiring here.
 usage = '''
 arg "[backend]" default="opengl" {
   choices "opengl" "vulkan"
@@ -121,3 +123,8 @@ if [[ "$usage_prebuilt" == "true" ]]; then
 fi
 ./gradlew "${gradle_args[@]}" :bindings:kotlin:androidBuild
 '''
+
+[tasks.check-android-api-floor]
+description = "Verify the Android binding stays on the android-minSdk floor."
+dir = "../.."
+run = "./gradlew :bindings:kotlin:checkAndroidApiFloor"

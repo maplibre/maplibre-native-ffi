@@ -4,7 +4,7 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native");
 
 fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    runtime.runOnce() catch |err| {
+    runtime.pump(0) catch |err| {
         out_error.* = err;
         return;
     };
@@ -81,7 +81,7 @@ test "wrong-thread runtime failures propagate diagnostics" {
     try testing.expectEqual(error.WrongThread, close_error.?);
     try testing.expect(diagnostics.get().?.message.len > 0);
 
-    try runtime.runOnce();
+    try runtime.pump(0);
     try runtime.close();
     runtime_open = false;
 }
@@ -113,7 +113,7 @@ test "owned runtime events copy message and resolve map identity" {
 
     var found: ?maplibre.OwnedRuntimeEvent = null;
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
                 found = event;
@@ -153,6 +153,110 @@ test "closing a map discards queued runtime events" {
     try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 }
 
+// Pumps until the runtime is idle, so a park that follows is released by the
+// signal the test raises.
+fn quiesce(runtime: *maplibre.RuntimeHandle) !void {
+    for (0..100) |_| {
+        try runtime.pump(0);
+        var drained = false;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            owned_event.deinit();
+            drained = true;
+        }
+        if (!drained) return;
+    }
+    return error.RuntimeKeptProducingEvents;
+}
+
+fn elapsedMilliseconds(started: std.Io.Timestamp) u64 {
+    const elapsed = started.durationTo(std.Io.Clock.awake.now(testing.io));
+    return @intCast(@divTrunc(elapsed.toNanoseconds(), std.time.ns_per_ms));
+}
+
+fn signalWakeSourceOnThread(source: maplibre.WakeSourceHandle, out_error: *?anyerror) void {
+    testing.io.sleep(.fromMilliseconds(20), .awake) catch |err| {
+        out_error.* = err;
+        return;
+    };
+    source.signal() catch |err| {
+        out_error.* = err;
+        return;
+    };
+    out_error.* = null;
+}
+
+test "a parked owner thread wakes for native work and for a wake source" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    var runtime_open = true;
+    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_open = true;
+    defer if (map_open) map.close() catch @panic("map close failed");
+    try quiesce(&runtime);
+
+    // The style is malformed, so native reports the failure from its own threads
+    // and the failure reaches the parked owner thread.
+    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
+    var loading_failed = false;
+    const load_started = std.Io.Clock.awake.now(testing.io);
+    for (0..20) |_| {
+        try runtime.pump(10_000);
+        if (elapsedMilliseconds(load_started) > 5_000) return error.ParkTimedOut;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
+                loading_failed = true;
+            }
+        }
+        if (loading_failed) break;
+    }
+    try testing.expect(loading_failed);
+
+    // A source signalled from another thread matches a host's submission path,
+    // and the park it releases has no other work to end it.
+    const source = try runtime.wakeSource();
+    try quiesce(&runtime);
+    var thread_error: ?anyerror = error.Unexpected;
+    const thread = try std.Thread.spawn(.{}, signalWakeSourceOnThread, .{ source, &thread_error });
+    const park_started = std.Io.Clock.awake.now(testing.io);
+    try runtime.pump(10_000);
+    try testing.expect(elapsedMilliseconds(park_started) < 5_000);
+    thread.join();
+    try testing.expect(thread_error == null);
+
+    // A wake source stays usable after its runtime closes, so hosts tear the two
+    // down in either order.
+    try map.close();
+    map_open = false;
+    try runtime.close();
+    runtime_open = false;
+    try source.signal();
+    source.release();
+    try testing.expectError(error.ClosedHandle, source.signal());
+}
+
+test "a pump clears the wake flag it returns on" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const source = try runtime.wakeSource();
+    defer source.release();
+    try quiesce(&runtime);
+
+    try source.signal();
+    const signalled_started = std.Io.Clock.awake.now(testing.io);
+    try runtime.pump(10_000);
+    try testing.expect(elapsedMilliseconds(signalled_started) < 5_000);
+
+    // The pump above cleared the wake flag, so this one waits its full timeout.
+    const idle_started = std.Io.Clock.awake.now(testing.io);
+    try runtime.pump(200);
+    try testing.expect(elapsedMilliseconds(idle_started) >= 100);
+}
+
 test "runtime event polling reports empty queues" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -161,7 +265,7 @@ test "runtime event polling reports empty queues" {
     defer map.close() catch @panic("map close failed");
 
     for (0..100) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         var drained = false;
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;

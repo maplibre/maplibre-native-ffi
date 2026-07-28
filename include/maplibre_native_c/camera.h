@@ -249,6 +249,11 @@ mln_map_jump_to(mln_map* map, const mln_camera_options* camera) MLN_NOEXCEPT;
  * immediately and reports it on the next snapshot without any pumping. Set
  * MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id. A zero-duration ease reports its end
+ * during this call, so the event is already queued when the call returns.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, camera is null,
@@ -274,6 +279,10 @@ MLN_API mln_status mln_map_ease_to(
  * duration from the flight distance and the velocity, which defaults to 1.2
  * screenfuls per second, so the camera reaches the target over several pumped
  * frames.
+ *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -309,6 +318,10 @@ mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
  *
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
+ *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -348,6 +361,10 @@ MLN_API mln_status mln_map_scale_by(
  * command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, scale is
@@ -384,6 +401,10 @@ MLN_API mln_status mln_map_rotate_by(
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, a point contains
@@ -417,6 +438,10 @@ MLN_API mln_status mln_map_pitch_by(mln_map* map, double pitch) MLN_NOEXCEPT;
  * This command eases, so it inherits the zero default duration described on
  * mln_map_ease_to(). Set MLN_ANIMATION_OPTION_DURATION to animate.
  *
+ * Set MLN_ANIMATION_OPTION_TRANSITION_ID to have this transition report its end
+ * once through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, as described
+ * on mln_animation_options.transition_id.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, pitch is
@@ -432,6 +457,10 @@ MLN_API mln_status mln_map_pitch_by_animated(
 
 /**
  * Cancels active camera transitions.
+ *
+ * A cancelled transition that carried MLN_ANIMATION_OPTION_TRANSITION_ID
+ * reports its end through MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED, the
+ * same way a completed one does.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -540,6 +569,9 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  * Copies map camera constraint options.
  *
  * On success, *out_options is overwritten and all known fields are marked.
+ * The geographic constraint is reported as exactly one of
+ * MLN_BOUND_OPTION_BOUNDS, which also fills out_options->bounds, or
+ * MLN_BOUND_OPTION_UNBOUNDED, which leaves out_options->bounds at its default.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -555,14 +587,17 @@ mln_map_get_bounds(mln_map* map, mln_bound_options* out_options) MLN_NOEXCEPT;
 /**
  * Applies selected map camera constraint options.
  *
- * Only fields indicated by options->fields affect the map.
+ * Only fields indicated by options->fields affect the map. Set
+ * MLN_BOUND_OPTION_BOUNDS to constrain the camera center to options->bounds,
+ * or MLN_BOUND_OPTION_UNBOUNDED to release the geographic constraint entirely.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null,
- *   options->size is too small, options->fields contains unknown bits, bounds
- *   are invalid, a numeric field is non-finite, or paired min/max fields are
- *   inconsistent.
+ *   options->size is too small, options->fields contains unknown bits,
+ *   options->fields contains both MLN_BOUND_OPTION_BOUNDS and
+ *   MLN_BOUND_OPTION_UNBOUNDED, bounds are invalid, a numeric field is
+ *   non-finite, or paired min/max fields are inconsistent.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
