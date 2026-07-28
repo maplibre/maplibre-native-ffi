@@ -19,13 +19,20 @@ static mln_status add_api_key(
     return MLN_STATUS_OK;  // Leaving the URL unset keeps the original.
   }
 
+  // The key belongs in the query, so split off any fragment and put it back
+  // afterwards. A key appended past '#' never reaches the server.
+  const char* fragment = strchr(url, '#');
+  const size_t base_length =
+    fragment != NULL ? (size_t)(fragment - url) : strlen(url);
+  const char* separator = memchr(url, '?', base_length) != NULL ? "&" : "?";
+
   char rewritten[2048];
-  const char* separator = strchr(url, '?') != NULL ? "&" : "?";
   const int written = snprintf(
-    rewritten, sizeof(rewritten), "%s%skey=%s", url, separator, api_key
+    rewritten, sizeof(rewritten), "%.*s%skey=%s%s", (int)base_length, url,
+    separator, api_key, fragment != NULL ? fragment : ""
   );
   if (written < 0 || (size_t)written >= sizeof(rewritten)) {
-    return MLN_STATUS_OK;  // Rather no key than a truncated URL.
+    return MLN_STATUS_OK;  // A truncated URL is worse than an unkeyed one.
   }
 
   return mln_resource_transform_response_set_url(

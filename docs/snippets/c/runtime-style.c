@@ -9,7 +9,8 @@ static mln_string_view sv(const char* text) {
 }
 
 void add_cities_layer(mln_map* map, const char* geojson_url) {
-  mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url));
+  // Null options takes the defaults.
+  mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url), NULL);
 
   // {"id": "cities", "type": "circle", "source": "cities"}
   const mln_json_value id = {

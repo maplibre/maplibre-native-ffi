@@ -35,7 +35,9 @@ int main(void) {
 
   const time_t deadline = time(NULL) + 30;
   while (!settled && time(NULL) < deadline) {
-    mln_runtime_run_once(runtime);
+    // A positive timeout parks the thread until work arrives or the timeout
+    // expires, so this loop waits without spinning.
+    mln_runtime_pump(runtime, 100);
 
     mln_runtime_event event = {.size = sizeof(event)};
     bool has_event = false;

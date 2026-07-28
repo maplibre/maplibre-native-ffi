@@ -39,6 +39,11 @@ with a matching `set_*` that swaps in new data later. Adding an ID that already
 exists fails, so reach for the setter to replace data on a live source. Inline
 data arrives as geometry and feature descriptors.
 
+Both adders take `mln_geojson_source_options`, or null for the defaults. Those
+options cover tiling zoom range, simplification tolerance, tile size and buffer,
+and clustering, and they are fixed for the life of the source, so the setters
+keep whatever the source was added with.
+
 Vector, raster, and raster-DEM sources use `add_*_source_url` for TileJSON or
 `add_*_source_tiles` for explicit tile URL templates, with tile options for zoom
 range, attribution, scheme, bounds, tile size, and encoding.

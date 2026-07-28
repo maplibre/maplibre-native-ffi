@@ -11,7 +11,7 @@ static mln_status await_operation(
   mln_runtime* runtime, mln_offline_operation_id operation_id
 ) {
   for (;;) {
-    mln_runtime_run_once(runtime);
+    mln_runtime_pump(runtime, 100);
 
     mln_runtime_event event = {.size = sizeof(event)};
     bool has_event = false;
@@ -82,23 +82,24 @@ mln_offline_region_id download_region(
   // Observing turns on the progress events; the download state starts the work.
   // Neither produces a result, so discard the operations once they complete.
   mln_offline_operation_id observe_id = 0;
-  const mln_status observing = mln_runtime_offline_region_set_observed_start(
+  mln_status observing = mln_runtime_offline_region_set_observed_start(
     runtime, region_id, true, &observe_id
   );
   if (observing == MLN_STATUS_OK) {
-    await_operation(runtime, observe_id);
+    observing = await_operation(runtime, observe_id);
     mln_runtime_offline_operation_discard(runtime, observe_id);
   }
+  if (observing != MLN_STATUS_OK) return 0;
 
   mln_offline_operation_id download_id = 0;
-  const mln_status downloading =
-    mln_runtime_offline_region_set_download_state_start(
-      runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download_id
-    );
+  mln_status downloading = mln_runtime_offline_region_set_download_state_start(
+    runtime, region_id, MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE, &download_id
+  );
   if (downloading == MLN_STATUS_OK) {
-    await_operation(runtime, download_id);
+    downloading = await_operation(runtime, download_id);
     mln_runtime_offline_operation_discard(runtime, download_id);
   }
+  if (downloading != MLN_STATUS_OK) return 0;
 
   // From here, keep pumping and watch for status-changed events on region_id.
   return region_id;

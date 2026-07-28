@@ -70,11 +70,25 @@ style errors from there.
 
 MapLibre makes progress while you pump the runtime, in two calls.
 
-`mln_runtime_run_once()` drains the owner thread's work: queued tasks, the tasks
-those tasks queue, expired timers, and ready network and database work. It
-returns promptly on an idle runtime. One call runs until that work finishes and
-can span an entire style parse, so budget for it as work, not as a fixed
-per-frame slice.
+`mln_runtime_pump()` drains the owner thread's work: queued tasks, the tasks
+those tasks queue, expired timers, and ready network and database work. One call
+runs until that work finishes and can span an entire style parse, so budget for
+it as work, not as a fixed per-frame slice.
+
+Its `timeout_ms` decides whether the thread waits for work:
+
+| `timeout_ms` | Behavior                                          |
+| ------------ | ------------------------------------------------- |
+| Zero         | Drain and return                                  |
+| Positive     | Park for up to that many milliseconds, then drain |
+| Negative     | Park until a wake arrives, then drain             |
+
+Pass zero when a frame callback sets your cadence. Pass a positive value when
+you own the pump thread, which parks it instead of spinning. Pass a negative
+value to wait indefinitely, and reach for
+`mln_runtime_wake_source_acquire()` to get a handle that
+`mln_wake_source_signal()` can fire from another thread to release it. A parking
+call also returns while unread events are queued.
 
 `mln_runtime_poll_event()` pops one queued event per call until it reports none
 left. Every map under the runtime shares this queue, so compare `event.source`
@@ -90,8 +104,8 @@ until the next poll. Copy what you keep.
 | `MAP_STILL_IMAGE_FINISHED` / `FAILED`     | A requested still image resolved, in static and tile modes |
 | `MAP_STYLE_IMAGE_MISSING`                 | The style wants an image ID nobody supplied                |
 
-How often you pump is your call: once per frame, or in a loop until the event
-you want arrives.
+How often you pump is your call: once per frame, or in a loop that parks until
+the event you want arrives.
 
 ## A complete program
 

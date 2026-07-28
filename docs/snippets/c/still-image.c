@@ -46,7 +46,7 @@ uint8_t* render_still_image(
   bool failed = false;
   const time_t deadline = time(NULL) + 30;
   while (!finished && !failed && time(NULL) < deadline) {
-    mln_runtime_run_once(runtime);
+    mln_runtime_pump(runtime, 100);
 
     mln_runtime_event event = {.size = sizeof(event)};
     bool has_event = false;
@@ -75,8 +75,12 @@ uint8_t* render_still_image(
   if (!finished) goto done;
 
   // Two-call sizing: ask for the layout first, then read into a buffer that
-  // fits. The size query reports INVALID_ARGUMENT and still fills out_info.
+  // fits. Readback checks out_info->size, so set it from the defaults before
+  // the sizing call, which reports INVALID_ARGUMENT and still fills out_info.
+  *out_info = mln_texture_image_info_default();
   mln_texture_read_premultiplied_rgba8(session, NULL, 0, out_info);
+  if (out_info->byte_length == 0) goto done;
+
   pixels = malloc(out_info->byte_length);
   if (pixels == NULL) goto done;
 

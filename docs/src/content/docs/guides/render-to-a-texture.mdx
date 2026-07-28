@@ -59,16 +59,19 @@ resizing, detaching, destroying, and a second acquire all return
 `MLN_STATUS_INVALID_STATE`. Acquire, use, release, once per frame.
 
 A borrowed texture skips all of that, since the texture was yours to begin with.
-You allocate it, keep it valid until the session detaches, and synchronize
-anything else that touches it. The session renders into it when you call
-`render_update()`, and offers no acquire, readback, or resize. To follow a
-resize, destroy the session, make a new texture, and attach again.
+You allocate it and keep it valid until the session detaches. The session
+renders into it when you call `render_update()`, and offers no acquire,
+readback, or resize. To follow a resize, destroy the session, make a new
+texture, and attach again.
 
-Each backend constrains the state the texture must be in, covering Vulkan image
-layouts and queue availability, Metal usage flags, and OpenGL share groups and
-level-0 dimensions. The
-[C API reference](/maplibre-native-ffi/reference/c/) states those per attach
-function.
+How much synchronization you owe depends on the backend. An OpenGL session
+finishes its render before `render_update()` returns, so you can sample the
+texture from any context in the share group without adding your own. Vulkan
+hands you the most work: make the image available on the descriptor's graphics
+queue in `initial_layout`, keep it out of concurrent use, and take it back in
+`final_layout`. The
+[C API reference](/maplibre-native-ffi/reference/c/) states this per attach
+function, along with the state each backend requires of the texture itself.
 
 <Aside type="tip">
   `compose-map` is a complete borrowed-texture integration, including
