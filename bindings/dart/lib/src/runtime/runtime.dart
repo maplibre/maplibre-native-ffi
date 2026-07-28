@@ -119,9 +119,39 @@ final class RuntimeHandle {
   /// Whether this runtime has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
 
-  /// Runs one pending owner-thread task for this runtime.
-  void runOnce() {
-    _check(_c.raw.mln_runtime_run_once(_pointer));
+  /// Advances this runtime, parking the owner isolate until there is work.
+  ///
+  /// The default zero [timeout] drains without parking, which is what a host
+  /// driven by a callback it does not own wants. A null timeout parks until
+  /// something sets the runtime's wake flag. A negative timeout is a caller
+  /// mistake rather than a request for an unbounded park, so it collapses to no
+  /// wait.
+  ///
+  /// Native work, a queued runtime event, and [WakeSource.signal] all set the
+  /// wake flag, and this call clears it before returning. Drain events with
+  /// [pollEvent] after every return.
+  ///
+  /// A non-null, non-zero [timeout] blocks the calling isolate's event loop for
+  /// the duration of the park. Other isolates keep running. Acquire a
+  /// [WakeSource] with [acquireWakeSource] so another isolate can release this
+  /// one for host-driven work such as submitted tasks or shutdown.
+  void pump({Duration? timeout = Duration.zero}) {
+    _check(
+      _c.raw.mln_runtime_pump(_pointer, _pumpTimeoutMilliseconds(timeout)),
+    );
+  }
+
+  /// Acquires a wake source that releases this runtime's parked owner isolate.
+  ///
+  /// Each call returns a distinct handle. A wake source holds its own reference
+  /// to the runtime's wake state, so the two close in either order.
+  WakeSource acquireWakeSource() {
+    return withNativeArena((arena) {
+      final outSource = arena<Pointer<raw.mln_wake_source>>();
+      outSource.value = nullptr;
+      _check(_c.raw.mln_runtime_wake_source_acquire(_pointer, outSource));
+      return WakeSource._(outSource.value);
+    });
   }
 
   /// Polls one queued runtime event and copies borrowed fields into Dart values.
@@ -530,6 +560,60 @@ final class RuntimeHandle {
     _resourceProviderRulesState = null;
     _resourceProviderCallbackState?.retire();
     _resourceProviderCallbackState = null;
+  }
+}
+
+int _pumpTimeoutMilliseconds(Duration? timeout) {
+  if (timeout == null) {
+    return -1;
+  }
+  final milliseconds = timeout.inMilliseconds;
+  return milliseconds < 0 ? 0 : milliseconds;
+}
+
+/// Releases a runtime owner isolate parked in [RuntimeHandle.pump].
+///
+/// A wake source reaches native wake state that carries its own
+/// synchronization and holds no owner-isolate pointer, so [signal] runs from
+/// any isolate. Sending one to another isolate copies the wrapper around that
+/// shared native handle: every copy may signal, and exactly one copy calls
+/// [close], after every isolate that signals has finished.
+///
+/// A wake source outlives its runtime. Signalling after the runtime closes
+/// succeeds and does nothing.
+///
+/// Unlike the binding's owner-isolate handles, this one carries no native
+/// finalizer, because a [Finalizable] class cannot cross an isolate boundary
+/// and cross-isolate signalling is the reason this handle exists. An unclosed
+/// wake source therefore leaks silently rather than reporting itself.
+final class WakeSource {
+  WakeSource._(this._pointer);
+
+  Pointer<raw.mln_wake_source> _pointer;
+
+  /// Whether this wake source has released its native handle.
+  bool get isClosed => _pointer == nullptr;
+
+  /// Sets the runtime's wake flag and releases the parked owner isolate.
+  ///
+  /// A signal raised while the owner isolate is running sets the flag, so the
+  /// next [RuntimeHandle.pump] returns without parking.
+  void signal() {
+    final pointer = _pointer;
+    if (pointer == nullptr) {
+      throwInvalidArgument('WakeSource is closed');
+    }
+    _check(_c.raw.mln_wake_source_signal(pointer));
+  }
+
+  /// Releases the wake source.
+  void close() {
+    final pointer = _pointer;
+    if (pointer == nullptr) {
+      return;
+    }
+    _pointer = nullptr;
+    _c.raw.mln_wake_source_destroy(pointer);
   }
 }
 

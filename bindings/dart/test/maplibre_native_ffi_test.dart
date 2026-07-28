@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
 
@@ -667,7 +668,7 @@ void main() {
     expect(() => runtime.close(), throwsA(isA<InvalidStateException>()));
     RuntimeEventOfflineOperationCompleted? offlineCompletion;
     await _waitUntil(() {
-      runtime.runOnce();
+      runtime.pump();
       RuntimeEvent? event;
       while ((event = runtime.pollEvent()) != null) {
         final payload = event!.payload;
@@ -757,7 +758,7 @@ void main() {
     expect(styleImage!.bytes, [255, 0, 0, 255]);
     expect(map.removeStyleImage('dart-image'), isTrue);
     expect(map.styleImageExists('dart-image'), isFalse);
-    runtime.runOnce();
+    runtime.pump();
     final copiedEvents = <RuntimeEvent>[];
     RuntimeEvent? copiedEvent;
     while ((copiedEvent = runtime.pollEvent()) != null) {
@@ -1323,6 +1324,143 @@ void main() {
     expect(resultKind.rawValue, 100);
     expect(unknownDefinition.rawType, 101);
   });
+
+  test(
+    'a parked owner isolate wakes for native work and for a signal',
+    () async {
+      final ready = ReceivePort();
+      final signalled = ReceivePort();
+      await Isolate.spawn(_signalWakeSource, [
+        ready.sendPort,
+        signalled.sendPort,
+      ]);
+      final worker = await ready.first as SendPort;
+
+      // Every await below this line would be a hazard: the VM may resume an
+      // isolate on another OS thread after an asynchronous suspension, and
+      // runtime calls are owner-thread affine. The worker handshake is finished
+      // above so this isolate owns the runtime from creation through close.
+      final runtime = RuntimeHandle.create(
+        options: const RuntimeOptions(cachePath: ':memory:'),
+      );
+      final map = runtime.createMap();
+      _quiesce(runtime);
+
+      // The scheme is unsupported, so native reports the failure from its own
+      // threads and that failure reaches the parked owner isolate.
+      map.setStyleUrl('unsupported://style.json');
+      var loadingFailed = false;
+      final loadStarted = Stopwatch()..start();
+      for (var attempt = 0; attempt < 20 && !loadingFailed; attempt += 1) {
+        runtime.pump(timeout: _parkTimeout);
+        expect(
+          loadStarted.elapsed,
+          lessThan(_promptReturn),
+          reason: 'parks sat out their timeouts while loading was pending',
+        );
+        RuntimeEvent? event;
+        while ((event = runtime.pollEvent()) != null) {
+          if (event!.eventType == RuntimeEventType.mapLoadingFailed) {
+            loadingFailed = true;
+          }
+        }
+      }
+      expect(loadingFailed, isTrue);
+
+      // A source signalled from another isolate matches a host's submission
+      // path, and the park it releases has no other work to end it.
+      final source = runtime.acquireWakeSource();
+      _quiesce(runtime);
+      worker.send(source);
+
+      final parkStarted = Stopwatch()..start();
+      runtime.pump(timeout: _parkTimeout);
+      expect(
+        parkStarted.elapsed,
+        lessThan(_promptReturn),
+        reason:
+            'the parked owner isolate timed out instead of taking the signal',
+      );
+
+      // A wake source stays usable after its runtime closes, so hosts tear the
+      // two down in either order.
+      map.close();
+      runtime.close();
+      source.signal();
+      source.close();
+      expect(source.isClosed, isTrue);
+      expect(source.close, returnsNormally);
+      expect(source.signal, throwsA(isA<InvalidArgumentException>()));
+
+      await signalled.first;
+      ready.close();
+      signalled.close();
+    },
+  );
+
+  test('a pump clears the wake flag it returns on', () {
+    final runtime = RuntimeHandle.create(
+      options: const RuntimeOptions(cachePath: ':memory:'),
+    );
+    final source = runtime.acquireWakeSource();
+    _quiesce(runtime);
+
+    source.signal();
+    final signalledStarted = Stopwatch()..start();
+    runtime.pump(timeout: _parkTimeout);
+    expect(
+      signalledStarted.elapsed,
+      lessThan(_promptReturn),
+      reason: 'a pump waited even though the wake flag was set',
+    );
+
+    // The pump above cleared the wake flag, so this one waits its full timeout.
+    final idleStarted = Stopwatch()..start();
+    runtime.pump(timeout: const Duration(milliseconds: 200));
+    expect(
+      idleStarted.elapsed,
+      greaterThanOrEqualTo(const Duration(milliseconds: 100)),
+      reason: 'the first pump left the wake flag set',
+    );
+
+    source.close();
+    runtime.close();
+  });
+}
+
+/// Long enough that a park only ends early because something woke it.
+const _parkTimeout = Duration(seconds: 10);
+
+/// Well below [_parkTimeout], and far above the scheduling noise a loaded CI
+/// machine adds to a wake.
+const _promptReturn = Duration(seconds: 5);
+
+/// Pumps until the runtime is idle, so a park that follows is released by the
+/// signal the test raises rather than by leftover work.
+void _quiesce(RuntimeHandle runtime) {
+  for (var attempt = 0; attempt < 100; attempt += 1) {
+    runtime.pump();
+    var drained = false;
+    while (runtime.pollEvent() != null) {
+      drained = true;
+    }
+    if (!drained) {
+      return;
+    }
+  }
+  fail('the runtime kept producing events while idle');
+}
+
+/// Signals a wake source transferred from the owner isolate, once that isolate
+/// has had time to enter its park.
+Future<void> _signalWakeSource(List<SendPort> ports) async {
+  final inbox = ReceivePort();
+  ports[0].send(inbox.sendPort);
+  final source = await inbox.first as WakeSource;
+  sleep(const Duration(milliseconds: 20));
+  source.signal();
+  ports[1].send(null);
+  inbox.close();
 }
 
 Future<bool> _completeTransferredRequest(ResourceRequestToken token) {
@@ -1380,7 +1518,7 @@ Future<void> _pumpUntil(
   Duration timeout = const Duration(seconds: 5),
 }) async {
   await _waitUntil(() {
-    runtime.runOnce();
+    runtime.pump();
     runtime.drainEvents();
     return condition();
   }, timeout: timeout);
@@ -1392,7 +1530,7 @@ Future<RuntimeEvent> _pumpUntilEvent(
 ) async {
   RuntimeEvent? matched;
   await _waitUntil(() {
-    runtime.runOnce();
+    runtime.pump();
     RuntimeEvent? event;
     while ((event = runtime.pollEvent()) != null) {
       if (predicate(event!)) {

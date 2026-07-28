@@ -372,16 +372,70 @@ class MaplibreNativeC {
   late final _mln_runtime_destroy = _mln_runtime_destroyPtr
       .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
 
-  mln_status mln_runtime_run_once(ffi.Pointer<mln_runtime> runtime) {
-    return mln_status.fromValue(_mln_runtime_run_once(runtime));
+  mln_status mln_runtime_pump(
+    ffi.Pointer<mln_runtime> runtime,
+    int timeout_ms,
+  ) {
+    return mln_status.fromValue(_mln_runtime_pump(runtime, timeout_ms));
   }
 
-  late final _mln_runtime_run_oncePtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_runtime>)>>(
-        'mln_runtime_run_once',
-      );
-  late final _mln_runtime_run_once = _mln_runtime_run_oncePtr
-      .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
+  late final _mln_runtime_pumpPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(ffi.Pointer<mln_runtime>, ffi.Int64)
+        >
+      >('mln_runtime_pump');
+  late final _mln_runtime_pump = _mln_runtime_pumpPtr
+      .asFunction<int Function(ffi.Pointer<mln_runtime>, int)>();
+
+  mln_status mln_runtime_wake_source_acquire(
+    ffi.Pointer<mln_runtime> runtime,
+    ffi.Pointer<ffi.Pointer<mln_wake_source>> out_source,
+  ) {
+    return mln_status.fromValue(
+      _mln_runtime_wake_source_acquire(runtime, out_source),
+    );
+  }
+
+  late final _mln_runtime_wake_source_acquirePtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            ffi.Pointer<mln_runtime>,
+            ffi.Pointer<ffi.Pointer<mln_wake_source>>,
+          )
+        >
+      >('mln_runtime_wake_source_acquire');
+  late final _mln_runtime_wake_source_acquire =
+      _mln_runtime_wake_source_acquirePtr
+          .asFunction<
+            int Function(
+              ffi.Pointer<mln_runtime>,
+              ffi.Pointer<ffi.Pointer<mln_wake_source>>,
+            )
+          >();
+
+  mln_status mln_wake_source_signal(ffi.Pointer<mln_wake_source> source) {
+    return mln_status.fromValue(_mln_wake_source_signal(source));
+  }
+
+  late final _mln_wake_source_signalPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_wake_source>)>
+      >('mln_wake_source_signal');
+  late final _mln_wake_source_signal = _mln_wake_source_signalPtr
+      .asFunction<int Function(ffi.Pointer<mln_wake_source>)>();
+
+  void mln_wake_source_destroy(ffi.Pointer<mln_wake_source> source) {
+    return _mln_wake_source_destroy(source);
+  }
+
+  late final _mln_wake_source_destroyPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<mln_wake_source>)>
+      >('mln_wake_source_destroy');
+  late final _mln_wake_source_destroy = _mln_wake_source_destroyPtr
+      .asFunction<void Function(ffi.Pointer<mln_wake_source>)>();
 
   mln_status mln_runtime_poll_event(
     ffi.Pointer<mln_runtime> runtime,
@@ -6005,6 +6059,8 @@ final class mln_json_snapshot extends ffi.Opaque {}
 final class mln_resource_request_handle extends ffi.Opaque {}
 
 final class mln_render_session extends ffi.Opaque {}
+
+final class mln_wake_source extends ffi.Opaque {}
 
 enum mln_network_status {
   MLN_NETWORK_STATUS_ONLINE(1),
