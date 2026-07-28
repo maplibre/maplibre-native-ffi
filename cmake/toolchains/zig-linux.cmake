@@ -91,8 +91,6 @@ set(MLN_FFI_ZIG_DIAGNOSTIC_FLAGS
 set(CMAKE_C_FLAGS_INIT "${MLN_FFI_ZIG_DIAGNOSTIC_FLAGS}")
 set(CMAKE_CXX_FLAGS_INIT "${MLN_FFI_ZIG_DIAGNOSTIC_FLAGS}")
 
-# zig links libc++ statically already, and it rejects --exclude-libs in every
-# spelling. The version script alone restricts the shared library to its mln_*
-# exports, so neither is needed here.
+# zig links libc++ into every binary it produces, so the platform layer bundles
+# that runtime into the distributed archive rather than leaving it to consumers.
 set(MLN_FFI_CXX_RUNTIME_IS_BUNDLED TRUE)
-set(MLN_FFI_LINKER_SUPPORTS_EXCLUDE_LIBS FALSE)

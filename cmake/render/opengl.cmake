@@ -1,7 +1,7 @@
 function(mln_configure_render_dependencies target)
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" OR MLN_FFI_EGL_ROOT)
-      include(egl)
+      include(render/egl)
       mln_import_egl()
       target_link_libraries(
         ${target}

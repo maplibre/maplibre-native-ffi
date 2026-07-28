@@ -1,3 +1,69 @@
+# The toolchain builds against a glibc older than any the project supports and
+# links its own static C++ runtime, rather than taking either from the build
+# host. That keeps the artifacts loadable on older distributions, and it is what
+# lets the distributed archive stand on its own.
+#
+# See cmake/toolchains/zig-linux.cmake and the Kotlin publishing doc.
+function(mln_configure_linux_archive_contents target)
+  if(NOT MLN_FFI_CXX_RUNTIME_IS_BUNDLED)
+    return()
+  endif()
+
+  # The compiler builds its runtime on demand into content-addressed cache
+  # directories, and the paths differ per optimization level, so ask a release
+  # link which ones it resolves rather than guessing the layout.
+  set(probe_source "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe.cpp")
+  file(WRITE "${probe_source}"
+       "#include <stdexcept>\nint main() { try { throw std::runtime_error(\"\"); } catch (...) { return 1; } }\n"
+  )
+  separate_arguments(probe_flags NATIVE_COMMAND "${CMAKE_CXX_FLAGS_RELEASE}")
+  execute_process(
+    COMMAND
+      "${CMAKE_CXX_COMPILER}"
+      ${probe_flags}
+      "${probe_source}"
+      -o
+      "${CMAKE_CURRENT_BINARY_DIR}/mln-cxx-runtime-probe"
+      -v
+      OUTPUT_QUIET
+    ERROR_VARIABLE probe_log
+    RESULT_VARIABLE probe_result)
+  if(NOT probe_result EQUAL 0)
+    message(FATAL_ERROR "Could not probe the C++ runtime:\n${probe_log}")
+  endif()
+  string(
+    REGEX MATCHALL
+    "[^ \t\r\n]+/lib(c\\+\\+abi|c\\+\\+|unwind|compiler_rt|c_nonshared)\\.a"
+    runtime_archives "${probe_log}")
+  list(REMOVE_DUPLICATES runtime_archives)
+  if(NOT runtime_archives)
+    message(
+      FATAL_ERROR
+        "The toolchain reported no C++ runtime to bundle:\n${probe_log}")
+  endif()
+
+  # A consumer links this archive next to a C++ runtime of its own. Everything
+  # but the C API entry points becomes internal to the archive, and the one
+  # support symbol that has to keep a standard name is renamed, so the two
+  # cannot collide. The second rename is the compiler-generated reference to the
+  # first and has to move with it.
+  set_target_properties(
+    ${target}
+    PROPERTIES
+      MLN_FFI_ARCHIVE_BUNDLED_RUNTIME
+      "${runtime_archives}"
+      MLN_FFI_ARCHIVE_KEEP_GLOBAL
+      "mln_*;__mln_personality_v0"
+      MLN_FFI_ARCHIVE_RENAME_SYMBOLS
+      "__gxx_personality_v0=__mln_personality_v0;DW.ref.__gxx_personality_v0=DW.ref.__mln_personality_v0"
+      # The graphics loaders the test harness links come from the machine
+      # running the tests, so they are built against a newer glibc than this
+      # toolchain targets. The loader resolves their libc references at run
+      # time.
+      MLN_FFI_TEST_LINK_OPTIONS
+      "LINKER:--allow-shlib-undefined")
+endfunction()
+
 function(mln_configure_platform_dependencies target)
   find_package(Threads REQUIRED)
 
@@ -47,6 +113,7 @@ function(mln_configure_platform_dependencies target)
       -ldl
       MLN_FFI_TEST_SUPPORTED
       TRUE)
+  mln_configure_linux_archive_contents(${target})
   if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)$")
     set_target_properties(
       ${target}
