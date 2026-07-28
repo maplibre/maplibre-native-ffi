@@ -47,6 +47,10 @@ final class RuntimeLoopThread: Thread {
     // with an attached session cannot be destroyed. On the failure path the
     // render loop has not closed it yet, so wait for the shutdown signal before
     // closing rather than failing and swallowing the error.
+    //
+    // Everything below publishes its failure before this wait runs, so the
+    // render loop sees it, closes its session, and releases us. Waiting first
+    // would stall until the bound expires.
     defer {
       channels.waitForShutdown(timeout: Self.shutdownWaitTimeout)
       do {
@@ -56,6 +60,14 @@ final class RuntimeLoopThread: Thread {
       }
     }
 
+    do {
+      try pumpUntilShutdown(state: state)
+    } catch {
+      channels.fail(error)
+    }
+  }
+
+  private func pumpUntilShutdown(state: MapState) throws {
     let attachRef = try state.attachRef()
     // The render loop signals this to release the parked pump, so a queued
     // command or a shutdown

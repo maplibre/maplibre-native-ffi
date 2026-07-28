@@ -57,6 +57,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     val loop = ensureRuntimeLoop(frame.extent)
     loop.failure?.let { error ->
       if (failureReported.compareAndSet(false, true)) {
+        // Close for the same reason the render failure below does: the caller stops driving
+        // frames, so nothing else would close this session, and the runtime loop is already
+        // waiting on it to close before it can destroy the map.
+        close()
         throw IllegalStateException("map runtime loop failed", error)
       }
       return NativeSurfaceRenderResult.Skipped

@@ -63,15 +63,31 @@ fn runtimeLoopFallible(args: RuntimeLoopArgs) !void {
     // has one, so wait for it to report the session closed before the deferred
     // map close runs. Installing this earlier would deadlock a setup failure:
     // the render loop would still be in awaitMap() with nothing to close.
+    //
+    // The body below publishes any failure before this wait runs, so the render
+    // loop sees it, closes its session, and releases us. Waiting first would
+    // stall until the render loop's own deadline.
     defer shared.awaitSessionClosed();
     shared.publish(map, wake);
 
+    pumpUntilSessionCloses(args, &runtime, &map, &diagnostic_store) catch |err| {
+        shared.fail(err);
+    };
+}
+
+fn pumpUntilSessionCloses(
+    args: RuntimeLoopArgs,
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    diagnostic_store: *maplibre.DiagnosticStore,
+) !void {
+    const shared = args.shared;
     const map_id = try map.id();
     while (shared.failureValue() == null and !shared.sessionClosed()) {
         // Headless readback has no display, so this loop takes its cadence from
         // the runtime's own work and parks in between.
         runtime.pump(park_timeout_milliseconds) catch |err| {
-            logLatestDiagnostic(&diagnostic_store);
+            logLatestDiagnostic(diagnostic_store);
             return err;
         };
         while (try runtime.pollEvent(args.allocator)) |event| {

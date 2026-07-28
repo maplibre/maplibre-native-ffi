@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.examples.lwjglmap
 import java.util.ArrayDeque
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
+import kotlin.time.Duration.Companion.seconds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.runtime.WakeSource
@@ -133,9 +134,25 @@ internal class MapChannel {
 
   fun shutdownRequested(): Boolean = shutdown.get()
 
+  /**
+   * Runtime loop: blocks until [requestShutdown], or until the bound expires, so a render loop that
+   * already stopped without signalling cannot wedge teardown.
+   */
+  fun awaitShutdown() {
+    val deadline = System.nanoTime() + SHUTDOWN_WAIT.inWholeNanoseconds
+    while (!shutdown.get() && System.nanoTime() < deadline) {
+      Thread.sleep(SHUTDOWN_POLL_MS)
+    }
+  }
+
   fun fail(error: Throwable) {
     failure.compareAndSet(null, error)
   }
 
   fun failure(): Throwable? = failure.get()
+
+  private companion object {
+    val SHUTDOWN_WAIT = 5.seconds
+    const val SHUTDOWN_POLL_MS = 2L
+  }
 }

@@ -69,18 +69,18 @@ internal object Shell {
         state.acquireWakeSource().use { wake ->
           channel.publish(state.map, wake)
           commands.onEnqueue = { channel.wakeRuntimeLoop() }
-          while (!channel.shutdownRequested()) {
-            // After a failure this loop idles instead of tearing down, because the render loop
-            // still
-            // holds a session attached to the map.
-            if (channel.failure() == null) {
-              try {
-                state.step(commands, renderRequest)
-              } catch (error: Throwable) {
-                channel.fail(error)
-              }
+          try {
+            while (!channel.shutdownRequested()) {
+              state.step(commands, renderRequest)
             }
+          } catch (error: Throwable) {
+            // Publish before the wait below, so the render loop sees the failure, closes its
+            // session, and releases us rather than stalling until the bound expires.
+            channel.fail(error)
           }
+          // The render loop still holds a session attached to the map, and native refuses to
+          // destroy a map that has one, so wait for it to close before `use` tears this down.
+          channel.awaitShutdown()
         }
       }
     } catch (error: Throwable) {
