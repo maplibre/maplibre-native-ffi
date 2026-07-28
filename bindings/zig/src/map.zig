@@ -1970,7 +1970,7 @@ fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
 fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
     var attempts: usize = 0;
     while (attempts < 200) : (attempts += 1) {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(std.testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();

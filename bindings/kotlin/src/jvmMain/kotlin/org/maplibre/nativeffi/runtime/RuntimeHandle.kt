@@ -34,10 +34,16 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   public actual val isClosed: Boolean
     get() = core.isReleased()
 
-  public actual fun runOnce() {
+  public actual fun pump(timeoutMillis: Long) {
     NativeAccess.ensureLoaded()
     core.requireLive()
-    NativeAccess.runRuntimeOnce(handle)
+    NativeAccess.pumpRuntime(handle, timeoutMillis)
+  }
+
+  public actual fun acquireWakeSource(): WakeSource {
+    NativeAccess.ensureLoaded()
+    core.requireLive()
+    return WakeSource.fromNative(NativeAccess.acquireWakeSource(handle))
   }
 
   public actual fun startAmbientCacheOperation(

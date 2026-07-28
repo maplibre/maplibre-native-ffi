@@ -84,7 +84,7 @@ def wait_for_runtime_event(
     iterations: int = 5000,
 ) -> mln.RuntimeEvent:
     for _ in range(iterations):
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if event.event_type == event_type:
                 return event
@@ -134,7 +134,7 @@ def wait_for_rendered_layer_feature(
     options = query.RenderedFeatureQueryOptions(layer_ids=(layer_id,))
     for _ in range(iterations):
         request_still_image_if_needed(map_handle)
-        runtime.run_once()
+        runtime.pump()
         while event := runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:

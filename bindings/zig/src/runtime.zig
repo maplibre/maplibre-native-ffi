@@ -69,6 +69,16 @@ const ResourceRequestRegistrySlot = struct {
     generation: u64,
 };
 
+const WakeSourceState = struct {
+    native: ?*c.mln_wake_source,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+};
+
+const WakeSourceRegistrySlot = struct {
+    state: ?*WakeSourceState,
+    generation: u64,
+};
+
 const OfflineOperationState = struct {
     runtime: RuntimeHandle,
     operation_id: OfflineOperationId,
@@ -93,6 +103,10 @@ var runtime_handle_free_list: std.ArrayList(usize) = .empty;
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
 var resource_request_registry: std.ArrayList(ResourceRequestRegistrySlot) = .empty;
 var resource_request_free_list: std.ArrayList(usize) = .empty;
+
+var wake_source_registry_lock = std.atomic.Value(bool).init(false);
+var wake_source_registry: std.ArrayList(WakeSourceRegistrySlot) = .empty;
+var wake_source_free_list: std.ArrayList(usize) = .empty;
 
 var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
 var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
@@ -537,6 +551,41 @@ pub const ResourceRequestHandle = enum(u128) {
         const native_handle = request_state.native orelse return;
         c.mln_resource_request_release(native_handle);
         request_state.native = null;
+    }
+};
+
+/// Releases a runtime owner thread parked in `RuntimeHandle.pump`.
+///
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. It stays usable after its runtime closes, and
+/// signalling it then does nothing. The diagnostic store the runtime was
+/// created with must outlive the source.
+pub const WakeSourceHandle = enum(u128) {
+    _,
+
+    /// Sets the runtime's wake flag and releases the parked owner thread.
+    ///
+    /// A signal raised while the owner thread is running sets the wake flag,
+    /// so the next `RuntimeHandle.pump` returns without parking.
+    pub fn signal(self: WakeSourceHandle) status.Error!void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = wakeSourceState(self) orelse return error.ClosedHandle;
+        const native_source = source_state.native orelse return error.ClosedHandle;
+        try status.checkStatus(c.mln_wake_source_signal(native_source), source_state.diagnostic_store);
+    }
+
+    /// Releases the wake source. Later signals report a closed handle.
+    pub fn release(self: WakeSourceHandle) void {
+        lockWakeSourceRegistry();
+        defer unlockWakeSourceRegistry();
+
+        const source_state = unregisterWakeSourceState(self) orelse return;
+        defer std.heap.smp_allocator.destroy(source_state);
+        const native_source = source_state.native orelse return;
+        c.mln_wake_source_destroy(native_source);
+        source_state.native = null;
     }
 };
 
@@ -1060,19 +1109,68 @@ pub const RuntimeHandle = enum(u128) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    /// Runs one iteration of this runtime's owner-thread run loop.
+    /// Advances this runtime.
     ///
-    /// The iteration drains the high-priority task queue and then the default
-    /// queue until both are empty, including tasks enqueued during the drain,
-    /// and also dispatches expired timers and ready I/O.
+    /// The call parks the owner thread when `timeout_ms` allows it, then drains
+    /// the owner-thread task queues. Drain the queued runtime events with
+    /// `pollEvent` afterwards.
     ///
-    /// `runOnce` returns without blocking on new work, but its duration is
-    /// unbounded: a single iteration can span a style parse. Treat it as "make
-    /// progress now" rather than as a fixed per-frame time slice.
-    pub fn runOnce(self: *RuntimeHandle) status.Error!void {
+    /// `timeout_ms` sets the park bound. Zero drains and returns; hosts pumping
+    /// from a frame callback pass it. A positive value parks for up to that many
+    /// milliseconds; hosts that own their pump thread pass one and take their
+    /// cadence from the runtime's own work. Null parks until a wake arrives.
+    ///
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
+    ///
+    /// The runtime holds a wake flag. Style, tile, offline, and resource
+    /// responses set it, as do queued runtime events and
+    /// `WakeSourceHandle.signal`. A parking call returns as soon as the flag is
+    /// set and clears it before returning, and work arriving during the drain
+    /// sets it again. A call also returns without parking while unread runtime
+    /// events are queued. Timers and ready file descriptors set the flag only
+    /// when they queue owner-thread work, so pass a bounded timeout to cap how
+    /// long a call waits.
+    ///
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock
+    /// that a thread signalling a wake source takes.
+    pub fn pump(self: *RuntimeHandle, timeout_ms: ?u64) status.Error!void {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
-        try status.checkStatus(c.mln_runtime_run_once(runtime_lease.native), runtime_lease.diagnostic_store);
+        const native_timeout: i64 = if (timeout_ms) |value|
+            std.math.cast(i64, value) orelse std.math.maxInt(i64)
+        else
+            -1;
+        try status.checkStatus(
+            c.mln_runtime_pump(runtime_lease.native, native_timeout),
+            runtime_lease.diagnostic_store,
+        );
+    }
+
+    /// Acquires a wake source that releases this runtime's parked owner thread.
+    /// The returned handle is usable from any thread, and the caller releases
+    /// it.
+    pub fn wakeSource(self: *RuntimeHandle) status.Error!WakeSourceHandle {
+        const runtime_lease = try lease(self);
+        defer runtime_lease.release();
+
+        var native_source: ?*c.mln_wake_source = null;
+        try status.checkStatus(
+            c.mln_runtime_wake_source_acquire(runtime_lease.native, &native_source),
+            runtime_lease.diagnostic_store,
+        );
+        const source = native_source orelse return error.NativeError;
+
+        const source_state = std.heap.smp_allocator.create(WakeSourceState) catch {
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
+        source_state.* = .{ .native = source, .diagnostic_store = runtime_lease.diagnostic_store };
+        return registerWakeSourceState(source_state) catch {
+            std.heap.smp_allocator.destroy(source_state);
+            c.mln_wake_source_destroy(source);
+            return error.OutOfMemory;
+        };
     }
 
     /// Polls and copies the next queued runtime event, returning null when the
@@ -1852,6 +1950,68 @@ fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
 }
 
+fn registerWakeSourceState(source_state: *WakeSourceState) std.mem.Allocator.Error!WakeSourceHandle {
+    lockWakeSourceRegistry();
+    defer unlockWakeSourceRegistry();
+
+    if (wake_source_free_list.items.len > 0) {
+        const slot_index = wake_source_free_list.pop().?;
+        wake_source_registry.items[slot_index].state = source_state;
+        wake_source_registry.items[slot_index].generation = nextHandleGeneration();
+        return wakeSourceHandle(slot_index + 1, wake_source_registry.items[slot_index].generation);
+    }
+
+    const generation = nextHandleGeneration();
+    try wake_source_free_list.ensureTotalCapacity(std.heap.smp_allocator, wake_source_registry.items.len + 1);
+    try wake_source_registry.append(std.heap.smp_allocator, .{ .state = source_state, .generation = generation });
+    return wakeSourceHandle(wake_source_registry.items.len, generation);
+}
+
+fn wakeSourceHandle(index: usize, generation: u64) WakeSourceHandle {
+    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
+}
+
+fn wakeSourceIndex(handle: WakeSourceHandle) ?usize {
+    const index = @intFromEnum(handle) & std.math.maxInt(u64);
+    if (index == 0 or index > std.math.maxInt(usize)) return null;
+    return @intCast(index);
+}
+
+fn wakeSourceGeneration(handle: WakeSourceHandle) u64 {
+    return @intCast(@intFromEnum(handle) >> 64);
+}
+
+fn wakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot = wake_source_registry.items[index - 1];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    return slot.state;
+}
+
+fn unregisterWakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
+    const index = wakeSourceIndex(handle) orelse return null;
+    if (index > wake_source_registry.items.len) return null;
+    const slot_index = index - 1;
+    const slot = &wake_source_registry.items[slot_index];
+    if (slot.generation != wakeSourceGeneration(handle)) return null;
+    const source_state = slot.state orelse return null;
+    slot.state = null;
+    slot.generation = nextHandleGeneration();
+    wake_source_free_list.appendAssumeCapacity(slot_index);
+    return source_state;
+}
+
+fn lockWakeSourceRegistry() void {
+    while (wake_source_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn unlockWakeSourceRegistry() void {
+    wake_source_registry_lock.store(false, .seq_cst);
+}
+
 fn registerOfflineOperationState(operation_state: *OfflineOperationState) std.mem.Allocator.Error!OfflineOperationHandle {
     lockOfflineOperationRegistry();
     defer unlockOfflineOperationRegistry();
@@ -2310,7 +2470,7 @@ fn offlineTileDefinitionForTesting() OfflineRegionDefinition {
 fn waitForOfflineOperationForTesting(runtime: *RuntimeHandle, operation: OfflineOperationHandle) !void {
     const operation_id = try operation.operationId();
     for (0..5000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(std.testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();

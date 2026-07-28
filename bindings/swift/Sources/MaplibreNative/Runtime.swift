@@ -418,18 +418,60 @@ public final class RuntimeHandle {
     try handle.requireLive()
   }
 
-  /// Runs one iteration of this runtime's owner-thread run loop.
+  /// Advances this runtime.
   ///
-  /// The iteration drains the high-priority task queue and then the default
-  /// queue until both are empty, including tasks enqueued during the drain, and
-  /// also dispatches expired timers and ready I/O.
+  /// The call parks the owner thread when `timeout` allows it, then drains the
+  /// owner-thread task queues. Drain the queued runtime events with `pollEvent`
+  /// afterwards.
   ///
-  /// `runOnce` returns without blocking on new work, but its duration is
-  /// unbounded: a single iteration can span a style parse. Treat it as "make
-  /// progress now" rather than as a fixed per-frame time slice.
-  public func runOnce() throws {
+  /// `timeout` is in seconds and sets the park bound. Zero drains and returns;
+  /// hosts pumping from a frame callback pass it. A positive value parks for up
+  /// to that long; hosts that own their pump thread pass one and take their
+  /// cadence from the runtime's own work. `nil` parks until a wake arrives.
+  /// `Duration` reads better than `TimeInterval` and needs iOS 16, above this
+  /// package's deployment floor.
+  ///
+  /// The drain runs every task queued when it begins plus every task those
+  /// enqueue, so a single call can span a full style parse.
+  ///
+  /// The runtime holds a wake flag. Style, tile, offline, and resource
+  /// responses set it, as do queued runtime events and `WakeSource.signal()`. A
+  /// parking call returns as soon as the flag is set and clears it before
+  /// returning, and work arriving during the drain sets it again. A call also
+  /// returns without parking while unread runtime events are queued. Timers and
+  /// ready file descriptors set the flag only when they queue owner-thread
+  /// work, so pass a bounded timeout to cap how long a call waits.
+  ///
+  /// A non-zero timeout blocks the calling thread. Call it outside any lock
+  /// that a thread signalling a `WakeSource` takes.
+  public func pump(timeout: TimeInterval? = 0) throws {
     try mapNativeFailure {
-      try checkStatus(mln_runtime_run_once(handle.requireLive()))
+      let timeoutMilliseconds: Int64
+      if let timeout {
+        // A negative or non-finite timeout is a caller mistake rather than a
+        // request for an unbounded park, which `nil` spells, so it collapses to
+        // no wait. The upper clamp keeps the conversion inside Int64.
+        let milliseconds = timeout.isFinite ? (timeout * 1000).rounded() : 0
+        timeoutMilliseconds = Int64(min(max(milliseconds, 0), 9.0e18))
+      } else {
+        timeoutMilliseconds = -1
+      }
+      try checkStatus(
+        mln_runtime_pump(handle.requireLive(), timeoutMilliseconds)
+      )
+    }
+  }
+
+  /// Acquires a wake source that releases this runtime's parked owner thread.
+  /// The returned source is usable from any thread, and the caller closes it.
+  public func wakeSource() throws -> WakeSource {
+    try mapNativeFailure {
+      var source: OpaquePointer?
+      try checkStatus(mln_runtime_wake_source_acquire(
+        handle.requireLive(),
+        &source
+      ))
+      return try WakeSource(pointer: source)
     }
   }
 

@@ -175,6 +175,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.Native.Runtime.RuntimeEventType",
             "Maplibre.Native.Runtime.RuntimeHandle",
             "Maplibre.Native.Runtime.RuntimeOptions",
+            "Maplibre.Native.Runtime.WakeSource",
             "Maplibre.Native.Style.CustomGeometrySourceCallback",
             "Maplibre.Native.Style.CustomGeometrySourceOptions",
             "Maplibre.Native.Style.GeoJsonSourceOptions",

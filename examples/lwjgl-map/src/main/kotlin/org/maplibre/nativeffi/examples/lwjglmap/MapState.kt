@@ -44,7 +44,7 @@ private constructor(
   }
 
   fun step(): Boolean {
-    runtime.runOnce()
+    runtime.pump(0)
     drainEvents()
     if (!renderPending) {
       return false

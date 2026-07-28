@@ -434,8 +434,11 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * texture-session call are owner-thread affine to the map owner thread.
  * The session renders into descriptor->texture. The caller owns the texture,
  * keeps it valid until detach or destroy, and synchronizes any use outside
- * this session. On success, *out_session receives a handle the caller destroys
- * with mln_render_session_destroy().
+ * this session. Each render completes before
+ * mln_render_session_render_update() returns, so the caller reads or samples
+ * the texture from any context in the share group of descriptor->context
+ * without adding synchronization of its own. On success, *out_session receives
+ * a handle the caller destroys with mln_render_session_destroy().
  *
  * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
  * Follow a resized host by destroying the session, recreating the texture at
@@ -582,6 +585,11 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
  * mln_opengl_owned_texture_release_frame() is called for the same frame.
  * While acquired, resize, render update, detach, destroy, and a second acquire
  * return MLN_STATUS_INVALID_STATE.
+ *
+ * Acquiring completes the session rendering for the frame, so the caller reads
+ * or samples the texture from any context in the share group of the context
+ * passed to mln_opengl_owned_texture_attach() without adding synchronization
+ * of its own.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

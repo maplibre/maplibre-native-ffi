@@ -49,6 +49,7 @@ pub const ResourceResponse = runtime.ResourceResponse;
 pub const ResourceProviderHandler = runtime.ResourceProviderHandler;
 pub const ResourceProvider = runtime.ResourceProvider;
 pub const ResourceRequestHandle = runtime.ResourceRequestHandle;
+pub const WakeSourceHandle = runtime.WakeSourceHandle;
 pub const OwnedRuntimeEvent = runtime.OwnedRuntimeEvent;
 pub const RuntimeEventPayload = runtime.RuntimeEventPayload;
 pub const RuntimeEventType = runtime.RuntimeEventType;

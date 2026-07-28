@@ -13,7 +13,7 @@ internal static class RuntimeEventTestHelpers
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
             while (true)
             {
                 var runtimeEvent = runtime.PollEvent();

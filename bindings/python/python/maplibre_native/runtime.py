@@ -321,6 +321,38 @@ class RuntimeOptions:
     maximum_cache_size: int | None = None
 
 
+class WakeSource(NativeHandleMixin):
+    """Releases a runtime owner thread parked in :meth:`RuntimeHandle.pump`.
+
+    A wake source is usable from any thread, which a host's task submission and
+    shutdown paths rely on. It stays usable after its runtime closes, and
+    signalling it then does nothing.
+    """
+
+    _handle_name = "WakeSource"
+
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _WAKE_SOURCE_CREATE_KEY:
+            msg = "WakeSource instances are created by RuntimeHandle.wake_source()"
+            raise TypeError(msg)
+        self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> WakeSource:
+        return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
+
+    def signal(self) -> None:
+        """Set the runtime's wake flag and release the parked owner thread.
+
+        A signal raised while the owner thread is running sets the wake flag,
+        so the next :meth:`RuntimeHandle.pump` returns without parking.
+        """
+        self._native.signal()
+
+
+_WAKE_SOURCE_CREATE_KEY = object()
+
+
 class RuntimeHandle(NativeHandleMixin):
     """Owner-thread runtime handle."""
 
@@ -368,17 +400,43 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def run_once(self) -> None:
-        """Run one iteration of this runtime's owner-thread run loop.
+    def pump(self, timeout: float | None = 0.0) -> None:
+        """Advance this runtime.
 
-        One iteration drains the high-priority task queue and then the default
-        task queue until both are empty, including tasks enqueued while the
-        drain runs, and also services expired timers and ready I/O. The call
-        returns without blocking on new work, yet its duration is unbounded: a
-        single iteration can span a whole style parse. Drive it from a pump
-        loop rather than budgeting it as a fixed per-frame slice.
+        The call parks the owner thread when ``timeout`` allows it, then drains
+        the owner-thread task queues. Drain the queued runtime events with
+        :meth:`poll_event` afterwards.
+
+        ``timeout`` is in seconds and sets the park bound. Zero drains and
+        returns; hosts pumping from a frame callback pass it. A positive value
+        parks for up to that long; hosts that own their pump thread pass one and
+        take their cadence from the runtime's own work. ``None`` parks until a
+        wake arrives.
+
+        The drain runs every task queued when it begins plus every task those
+        enqueue, so a single call can span a full style parse.
+
+        The runtime holds a wake flag. Style, tile, offline, and resource
+        responses set it, as do queued runtime events and
+        :meth:`WakeSource.signal`. A parking call returns as soon as the flag is
+        set and clears it before returning, and work arriving during the drain
+        sets it again. A call also returns without parking while unread runtime
+        events are queued. Timers and ready file descriptors set the flag only
+        when they queue owner-thread work, so pass a bounded timeout to cap how
+        long a call waits.
+
+        A non-zero timeout releases the GIL while it parks, so other Python
+        threads run and can signal a wake source. Call it outside any lock that
+        a signalling thread takes.
         """
-        self._native.run_once()
+        # A negative timeout is a caller mistake rather than a request for an
+        # unbounded park, which ``None`` spells, so it collapses to no wait.
+        timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
+        self._native.pump(timeout_ms)
+
+    def wake_source(self) -> WakeSource:
+        """Acquire a wake source for this runtime, usable from any thread."""
+        return WakeSource._from_native(self._native.wake_source())  # noqa: SLF001
 
     def _offline_operation(
         self, start: Callable[..., int], *args: object

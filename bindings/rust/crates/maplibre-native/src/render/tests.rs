@@ -1197,7 +1197,7 @@ fn pick_vulkan_physical_device(
 fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == event_type {
                 return true;
@@ -1320,7 +1320,7 @@ fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHand
 }
 
 fn render_pending_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle) {
-    let _ = runtime.run_once();
+    let _ = runtime.pump(Some(Duration::ZERO));
     for _ in 0..100 {
         let Ok(Some(event)) = runtime.poll_event() else {
             return;
@@ -2077,7 +2077,7 @@ fn sustained_render_loop_outlasts_the_graphics_queue_depth() {
         camera.center = Some(LatLng::new(37.0, -122.0));
         camera.zoom = Some(10.0 + f64::from(step % 8) * 0.25);
         map.jump_to(&camera).unwrap();
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == RuntimeEventType::MapRenderUpdateAvailable
                 && session.render_update().unwrap()
@@ -2175,7 +2175,7 @@ fn resize_updates_owned_texture_frame_extent() {
     map.request_still_image().unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type != RuntimeEventType::MapRenderUpdateAvailable {
                 continue;
@@ -2345,7 +2345,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     let mut info = None;
     let deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
                 let _ = session.render_update();
@@ -2550,7 +2550,7 @@ fn identified_camera_transition_reports_its_end_once_when_it_runs_to_completion(
     let mut finished_at: Option<Instant> = None;
     let deadline = Instant::now() + Duration::from_secs(10);
     while Instant::now() < deadline {
-        let _ = runtime.run_once();
+        let _ = runtime.pump(Some(Duration::ZERO));
         while let Ok(Some(event)) = runtime.poll_event() {
             match event.event_type {
                 RuntimeEventType::MapCameraTransitionFinished => {
