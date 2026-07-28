@@ -42,6 +42,26 @@ function(mln_configure_linux_archive_contents target)
         "The toolchain reported no C++ runtime to bundle:\n${probe_log}")
   endif()
 
+  # The bundled runtime is redistributed inside every Linux artifact, so its
+  # notices ship with them. compiler-rt carries no separate notice in the
+  # toolchain tree; it is part of the same LLVM project as the three below.
+  execute_process(
+    COMMAND "${MLN_FFI_ZIG}" env
+    OUTPUT_VARIABLE zig_environment
+    RESULT_VARIABLE zig_environment_result)
+  if(NOT zig_environment_result EQUAL 0)
+    message(FATAL_ERROR "Could not read the toolchain environment")
+  endif()
+  if(NOT zig_environment MATCHES "\\.lib_dir = \"([^\"]+)\"")
+    message(FATAL_ERROR "No library directory in:\n${zig_environment}")
+  endif()
+  set(zig_library_directory "${CMAKE_MATCH_1}")
+  foreach(component libcxx libcxxabi libunwind)
+    mln_add_license(
+      ${target} "${zig_library_directory}/${component}/LICENSE.TXT"
+      "llvm-${component}.txt")
+  endforeach()
+
   # A consumer links this archive next to a C++ runtime of its own. Everything
   # but the C API entry points becomes internal to the archive, and the one
   # support symbol that has to keep a standard name is renamed, so the two

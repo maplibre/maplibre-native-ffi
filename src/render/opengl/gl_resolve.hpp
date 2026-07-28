@@ -9,6 +9,13 @@
 
 #include "render/opengl/egl_common.hpp"
 
+#if !defined(__linux__)
+// The resolver below only knows how to open a Linux GL client library, and it
+// returns null everywhere else, which would leave the whole table null and fail
+// on the first GL call. Other platforms link their loader instead.
+#error "the generated GL table is Linux only"
+#endif
+
 namespace mln::core::opengl {
 
 inline auto gl_proc_address(const char* name) -> void* {
