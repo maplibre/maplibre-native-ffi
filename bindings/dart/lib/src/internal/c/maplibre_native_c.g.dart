@@ -6550,6 +6550,9 @@ final class mln_map_options extends ffi.Struct {
 
   @ffi.Uint32()
   external int map_mode;
+
+  @ffi.Bool()
+  external bool fast_pfor_enabled;
 }
 
 final class mln_screen_point extends ffi.Struct {

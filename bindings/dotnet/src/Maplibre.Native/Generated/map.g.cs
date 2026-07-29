@@ -147,6 +147,9 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint map_mode;
+
+        [NativeTypeName("bool")]
+        public byte fast_pfor_enabled;
     }
 
     internal partial struct mln_screen_point
@@ -357,7 +360,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L394_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L405_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -433,7 +436,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L451_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L462_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -517,7 +520,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint identifier_type;
 
-        [NativeTypeName("__AnonymousRecord_map_L506_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L517_C3")]
         public _identifier_e__Union identifier;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -564,7 +567,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L537_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L548_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -658,7 +661,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L608_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L619_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]

@@ -113,12 +113,18 @@ class MapMode(NativeIntEnum):
 
 @dataclass(slots=True)
 class MapOptions:
-    """Options used when creating a map."""
+    """Options used when creating a map.
 
-    width: int = 64
-    height: int = 64
-    scale_factor: float = 1.0
-    mode: MapMode = MapMode.CONTINUOUS
+    A field left as ``None`` takes the C API default, matching
+    :class:`RuntimeOptions`, so these defaults never drift from
+    ``mln_map_options``.
+    """
+
+    width: int | None = None
+    height: int | None = None
+    scale_factor: float | None = None
+    mode: MapMode | None = None
+    fast_pfor_enabled: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -502,7 +508,13 @@ class MapHandle(NativeHandleMixin):
             raise TypeError(msg)
         options = options or MapOptions()
         map_mode = (
-            options.mode if isinstance(options.mode, MapMode) else MapMode(options.mode)
+            None
+            if options.mode is None
+            else (
+                options.mode
+                if isinstance(options.mode, MapMode)
+                else MapMode(options.mode)
+            )
         )
         self._runtime = runtime
         self._native = _native.create_map(
@@ -510,7 +522,8 @@ class MapHandle(NativeHandleMixin):
             options.width,
             options.height,
             options.scale_factor,
-            map_mode.native_code,
+            None if map_mode is None else map_mode.native_code,
+            options.fast_pfor_enabled,
         )
         self._native_id_value = int(self._native.id())
         runtime._register_map(self)  # noqa: SLF001

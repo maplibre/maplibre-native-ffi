@@ -868,6 +868,22 @@ def test_map_handle_context_manager_closes_once() -> None:
         assert map_handle.closed
 
 
+def test_map_options_accept_fast_pfor_decoding() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map(
+            mln.MapOptions(width=64, height=64, fast_pfor_enabled=True)
+        ) as map_handle:
+            assert map_handle.get_size() == (64, 64, 1.0)
+
+
+def test_unset_map_options_take_the_c_creation_defaults() -> None:
+    # Unset fields take the C API defaults rather than values this binding
+    # repeats, so mln_map_options_default() stays the single source for them.
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            assert map_handle.get_size() == (256, 256, 1.0)
+
+
 def test_runtime_rejects_close_while_map_is_live() -> None:
     runtime = mln.RuntimeHandle()
     map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))

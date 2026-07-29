@@ -41,6 +41,18 @@ int _dispatchLogRecord(
 }
 
 void main() {
+  test('map options carry FastPFOR decoding to native', () {
+    expect(const MapOptions().fastPforEnabled, isFalse);
+    expect(const MapOptions(fastPforEnabled: true), isNot(const MapOptions()));
+
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap(
+      options: const MapOptions(width: 64, height: 64, fastPforEnabled: true),
+    );
+    expect(map.size(), const MapSize(width: 64, height: 64, scaleFactor: 1));
+    map.close();
+    runtime.close();
+  });
   test('process-global APIs cross the native C ABI', () {
     expect(Maplibre.cVersion(), greaterThanOrEqualTo(0));
     final backends = Maplibre.supportedRenderBackends();

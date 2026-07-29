@@ -59,6 +59,12 @@ type MapOptions struct {
 	// imagery chosen for this density.
 	ScaleFactor float64
 	Mode        MapMode
+	// FastPFOREnabled decodes MapLibre Tile (MLT) tiles whose integer streams use
+	// FastPFOR encodings, fixed for the lifetime of the map. Enable it on maps
+	// that read vector sources created with StyleVectorTileEncodingMLT from a
+	// tile set that uses FastPFOR. A map created with this false decodes every
+	// other MLT encoding and logs a tile parse warning for the FastPFOR ones.
+	FastPFOREnabled bool
 }
 
 // Equal reports whether two descriptors hold the same field values, matching the Equal methods on

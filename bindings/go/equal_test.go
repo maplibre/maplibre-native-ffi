@@ -30,6 +30,30 @@ func assertValueSemantics[T any](
 	}
 }
 
+func TestMapOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"MapOptions",
+		func() MapOptions {
+			return MapOptions{
+				Width:           100,
+				Height:          200,
+				ScaleFactor:     2.0,
+				Mode:            MapModeContinuous,
+				FastPFOREnabled: false,
+			}
+		},
+		MapOptions.Equal,
+		[]func(*MapOptions){
+			func(o *MapOptions) { o.Width = 300 },
+			func(o *MapOptions) { o.Height = 400 },
+			func(o *MapOptions) { o.ScaleFactor = 3.0 },
+			func(o *MapOptions) { o.Mode = MapModeStatic },
+			func(o *MapOptions) { o.FastPFOREnabled = true },
+		},
+	)
+}
+
 func TestCameraOptionsEqualComparesFieldValues(t *testing.T) {
 	assertValueSemantics(
 		t,

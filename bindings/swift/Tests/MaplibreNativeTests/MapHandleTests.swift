@@ -28,6 +28,17 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
   return tally
 }
 
+@Test func mapOptionsMaterializeFastPFORDecoding() throws {
+  try MapOptions(width: 256, height: 256).nativeInput
+    .withNativeOptions { native in
+      #expect(native.pointee.fast_pfor_enabled == false)
+    }
+  try MapOptions(width: 256, height: 256, fastPFOREnabled: true).nativeInput
+    .withNativeOptions { native in
+      #expect(native.pointee.fast_pfor_enabled == true)
+    }
+}
+
 @Test func mapCreateCameraStyleAndClose() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

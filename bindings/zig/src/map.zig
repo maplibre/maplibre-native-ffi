@@ -55,21 +55,31 @@ pub const MapMode = enum {
     }
 };
 
+/// Map creation options. A null field takes the C API default, matching
+/// `RuntimeOptions`, so these defaults never drift from `mln_map_options`.
 pub const MapOptions = struct {
     /// Initial logical width in UI pixels, replaced by the extent of the first
     /// attached render session.
-    width: u32 = 512,
+    width: ?u32 = null,
     /// Initial logical height in UI pixels, replaced by the extent of the first
     /// attached render session.
-    height: u32 = 512,
+    height: ?u32 = null,
     /// UI-to-device pixel scale, fixed for the lifetime of the map.
     ///
     /// This selects sprites, glyphs, and raster tiles for every frame. Render
     /// targets carry their own scale factor for geometry, so attaching or
     /// resizing a session with a different one logs a warning and renders
     /// styled imagery chosen for this density.
-    scale_factor: f64 = 1.0,
-    mode: MapMode = .continuous,
+    scale_factor: ?f64 = null,
+    mode: ?MapMode = null,
+    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+    /// encodings, fixed for the lifetime of the map.
+    ///
+    /// Enable this on maps that read vector sources created with
+    /// `VectorTileEncoding.mlt` from a tile set that uses FastPFOR. A map
+    /// created with this false decodes every other MLT encoding and logs a tile
+    /// parse warning for the FastPFOR ones.
+    fast_pfor_enabled: ?bool = null,
 };
 
 pub const CanonicalTileId = struct {
@@ -101,10 +111,11 @@ pub const MapHandle = enum(c.mln_map) {
 
     pub fn create(runtime: *RuntimeHandle, options: MapOptions) status.Error!MapHandle {
         var native_options = c.mln_map_options_default();
-        native_options.width = options.width;
-        native_options.height = options.height;
-        native_options.scale_factor = options.scale_factor;
-        native_options.map_mode = options.mode.toRaw();
+        if (options.width) |value| native_options.width = value;
+        if (options.height) |value| native_options.height = value;
+        if (options.scale_factor) |value| native_options.scale_factor = value;
+        if (options.mode) |value| native_options.map_mode = value.toRaw();
+        if (options.fast_pfor_enabled) |value| native_options.fast_pfor_enabled = value;
 
         const runtime_lease = try runtime_module.lease(runtime);
         defer runtime_lease.release();

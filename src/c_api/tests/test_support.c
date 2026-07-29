@@ -3,6 +3,7 @@
 #endif
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -159,6 +160,48 @@ void mln_test_destroy_runtime(mln_runtime runtime) {
 void mln_test_destroy_map(mln_map map) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
   untrack_map(map);
+}
+
+uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
+  if (out_size != NULL) {
+    *out_size = 0;
+  }
+  char path[1024];
+  const int written =
+    snprintf(path, sizeof(path), "%s/%s", MLN_TEST_FIXTURE_DIR, relative_path);
+  if (written < 0 || (size_t)written >= sizeof(path)) {
+    return NULL;
+  }
+
+  FILE* file = fopen(path, "rb");
+  if (file == NULL) {
+    return NULL;
+  }
+  if (fseek(file, 0, SEEK_END) != 0) {
+    fclose(file);
+    return NULL;
+  }
+  const long length = ftell(file);
+  if (length < 0 || fseek(file, 0, SEEK_SET) != 0) {
+    fclose(file);
+    return NULL;
+  }
+
+  uint8_t* bytes = malloc((size_t)length == 0 ? 1 : (size_t)length);
+  if (bytes == NULL) {
+    fclose(file);
+    return NULL;
+  }
+  const size_t read_count = fread(bytes, 1, (size_t)length, file);
+  fclose(file);
+  if (read_count != (size_t)length) {
+    free(bytes);
+    return NULL;
+  }
+  if (out_size != NULL) {
+    *out_size = read_count;
+  }
+  return bytes;
 }
 
 void mln_test_sleep_millisecond(void) { mln_test_sleep_milliseconds(1); }

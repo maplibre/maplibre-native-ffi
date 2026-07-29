@@ -607,7 +607,12 @@ def create_runtime(
     asset_path: str | None, cache_path: str | None, maximum_cache_size: int | None
 ) -> _RuntimeHandle: ...
 def create_map(
-    runtime: _RuntimeHandle, width: int, height: int, scale_factor: float, map_mode: int
+    runtime: _RuntimeHandle,
+    width: int | None,
+    height: int | None,
+    scale_factor: float | None,
+    map_mode: int | None,
+    fast_pfor_enabled: bool | None,
 ) -> _MapHandle: ...
 def attach_metal_surface(
     map: _MapHandle,

@@ -180,6 +180,17 @@ typedef struct mln_map_options {
   double scale_factor;
   /** One of mln_map_mode. Defaults to MLN_MAP_MODE_CONTINUOUS. */
   uint32_t map_mode;
+  /**
+   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+   * encodings. Defaults to false.
+   *
+   * Enable this on maps that read vector sources created with
+   * MLN_STYLE_VECTOR_TILE_ENCODING_MLT from a tile set that uses FastPFOR. It
+   * is fixed for the lifetime of the map and applies to every MLT source the
+   * map loads. A map created with this false decodes every other MLT encoding
+   * and logs a tile parse warning for the FastPFOR ones.
+   */
+  bool fast_pfor_enabled;
 } mln_map_options;
 
 /** Screen-space point in logical map pixels. */

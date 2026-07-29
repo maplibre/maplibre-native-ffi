@@ -1523,6 +1523,7 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
         }
         nativeOptions.map_mode = it.nativeValue.toUInt()
       }
+      options.fastPforEnabled?.let { nativeOptions.fast_pfor_enabled = it }
       return nativeOptions.ptr
     }
   }

@@ -104,11 +104,6 @@ function(mln_configure_platform target)
 
   target_include_directories(
     ${target}
-    BEFORE
-    PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/windows/shims)
-
-  target_include_directories(
-    ${target}
     SYSTEM
     PRIVATE ${MLN_SOURCE_DIR}/platform/windows/include)
 

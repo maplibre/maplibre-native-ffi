@@ -36,6 +36,7 @@ endfunction()
 function(mln_complete_static_dependencies_for_target out_var)
   set(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
       ${MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES})
+  mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES fastpfor-lib)
 
   get_target_property(MLN_FFI_PLATFORM_STATIC_DEPENDENCIES
                       mln_ffi_platform_dependencies MLN_FFI_STATIC_ARCHIVES)
