@@ -12,7 +12,7 @@ maplibre-native-sys = { path = "../maplibre-native-sys" }
 
 [dev-dependencies]
 ash = "0.38.0"
-glow = "0.16.0"
+glow = "0.18.0"
 glutin_egl_sys = "0.7.1"
-libloading = "0.8.9"
+libloading = "0.9.0"
 static_assertions = "1.1.0"
