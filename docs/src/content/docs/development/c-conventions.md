@@ -79,9 +79,29 @@ The runtime and map use a host-pumped, owner-thread model. Runtime creation
 records the owner thread. Runtime, map, map-projection, and render session calls
 that touch thread-affine state validate the owner thread.
 
+A map shares its runtime's owner thread. A render session records its own: the
+thread that attached it, fixed for the session's lifetime. Attach validates that
+the map is live rather than that the caller owns it, so a session may be
+attached, driven, and destroyed on a thread that never touches the map. Session
+calls from any other thread report the owner-thread status. The host publishes
+the map pointer to the attaching thread with a happens-before edge; the C API
+does not synchronize that handoff.
+
 Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build
 threaded models above the C API.
+
+Map state a render session reaches for is enqueued to the map owner thread
+rather than mutated in place, so resizing a session applies the map's logical
+size on the map's next pump. Renderer observer callbacks are forwarded to the
+map's run loop for the same reason, so the events a frame produces are drained
+by a later `mln_runtime_pump()` rather than inside the render call.
+
+Graphics contexts that bind to a thread, such as OpenGL, are made current for
+the duration of a session call and released before it returns, so a host keeps
+its own context current only on the thread that owns the session. Attach creates
+the session's graphics resources on the calling thread, which is why attach
+belongs on the thread whose context is current rather than on the map's.
 
 On Apple targets each entry point drains its own Objective-C autorelease pool,
 so a host may pump frames from a thread that never returns to a run loop.
@@ -182,7 +202,9 @@ documented return behavior.
 
 Render session APIs document owner thread, render target backend handle
 ownership, synchronization, borrowed pointer lifetimes, generation or
-stale-frame behavior, and teardown rules.
+stale-frame behavior, and teardown rules. Attach entry points also document that
+the calling thread becomes the session's owner thread and what the calling
+thread's graphics context must provide.
 
 ## Callback Adapter
 

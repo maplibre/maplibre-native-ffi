@@ -30,14 +30,16 @@ struct Viewport: Equatable {
   }
 }
 
-@MainActor
+/// Runtime and map, owned for their whole lifetime by the runtime loop thread.
+///
+/// The render target is not here: it belongs to the render loop thread, which
+/// owns the view, the Metal objects, and the render session.
 final class MapState {
-  private nonisolated(unsafe) let runtime: RuntimeHandle
-  nonisolated(unsafe) let map: MapHandle
-  private var renderTarget: MetalRenderTarget?
+  private let runtime: RuntimeHandle
+  private let map: MapHandle
   private var isClosed = false
 
-  init(viewport: Viewport, graphics: MetalGraphicsContext) throws {
+  init(viewport: Viewport) throws {
     precondition(
       !viewport.isEmpty,
       "cannot create MapState with an empty viewport"
@@ -45,11 +47,9 @@ final class MapState {
     let runtime =
       try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
     var createdMap: MapHandle?
-    var createdRenderTarget: MetalRenderTarget?
     var didInitialize = false
     defer {
       if !didInitialize {
-        try? createdRenderTarget?.close()
         try? createdMap?.close()
         try? runtime.close()
       }
@@ -73,43 +73,29 @@ final class MapState {
       pitch: 30.0
     ))
     try map.requestRepaint()
-    let renderTarget = try MetalRenderTarget.attach(
-      map: map,
-      graphics: graphics,
-      viewport: viewport
-    )
-    createdRenderTarget = renderTarget
 
     self.runtime = runtime
     self.map = map
-    self.renderTarget = renderTarget
     didInitialize = true
   }
 
-  func resize(_ viewport: Viewport, graphics: MetalGraphicsContext) throws {
-    guard !viewport.isEmpty else { return }
-    if let renderTarget {
-      try renderTarget.resize(viewport)
-    } else {
-      renderTarget = try MetalRenderTarget.attach(
-        map: map,
-        graphics: graphics,
-        viewport: viewport
-      )
-    }
-    try map.requestRepaint()
+  /// The `Sendable` reference the render loop attaches its own session against.
+  ///
+  /// `MapHandle` stays on this thread; the reference is the only part of the
+  /// map that crosses.
+  func attachRef() throws -> MapAttachRef {
+    try map.attachRef()
   }
 
+  /// Closes the map and then the runtime.
+  ///
+  /// The render loop closes the render session before it asks this loop to
+  /// stop, because native refuses to destroy a map that still has a session
+  /// attached.
   func close() throws {
     guard !isClosed else { return }
     isClosed = true
     var firstError: Error?
-    do {
-      try renderTarget?.close()
-      renderTarget = nil
-    } catch {
-      firstError = firstError ?? error
-    }
     do {
       try map.close()
     } catch {
@@ -125,10 +111,17 @@ final class MapState {
     }
   }
 
-  func pump() throws {
-    try runtime.pump()
+  /// Pumps the runtime, parking up to `timeout` when there is nothing to do.
+  func pump(timeout: TimeInterval) throws {
+    try runtime.pump(timeout: timeout)
   }
 
+  /// Acquires the wake source the render loop uses to release this loop's park.
+  func wakeSource() throws -> WakeSource {
+    try runtime.wakeSource()
+  }
+
+  /// Drains runtime events, reporting whether the map wants another frame.
   func drainEvents() throws -> Bool {
     var renderPending = false
     while let event = try runtime.pollEvent() {
@@ -147,8 +140,43 @@ final class MapState {
     return renderPending
   }
 
-  func render() throws -> Bool {
-    guard let renderTarget else { return false }
-    return try renderTarget.renderUpdate()
+  /// Applies one decoded camera command.
+  ///
+  /// This runs on the map's owner thread, which is why the read-modify-write
+  /// commands read the current camera here rather than on the render loop that
+  /// produced them.
+  func apply(_ command: CameraCommand) throws {
+    switch command {
+    case .cancelTransitions:
+      try map.cancelTransitions()
+    case let .moveBy(dx, dy):
+      try map.moveBy(deltaX: dx, deltaY: dy)
+    case let .scaleBy(scale, anchor):
+      try map.scaleBy(scale, anchor: anchor)
+    case let .adjustBearing(delta, anchor):
+      let camera = try map.camera()
+      try map.jump(to: CameraOptions(
+        bearing: (camera.bearing ?? 0) + delta,
+        anchor: anchor
+      ))
+    case let .adjustPitch(delta):
+      let camera = try map.camera()
+      try map.jump(
+        to: CameraOptions(pitch: clampedPitch((camera.pitch ?? 0) + delta))
+      )
+    case let .zoomToNextStep(anchor, animation):
+      let camera = try map.camera()
+      let zoom = camera.zoom ?? 0
+      let targetZoom = round(zoom) + 1.0
+      try map.scaleBy(
+        pow(2.0, targetZoom - zoom),
+        anchor: anchor,
+        animation: animation
+      )
+    }
   }
+}
+
+private func clampedPitch(_ pitch: Double) -> Double {
+  min(max(pitch, 0.0), 60.0)
 }

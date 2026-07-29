@@ -7,16 +7,26 @@ import android.view.MotionEvent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 
+/**
+ * The render loop.
+ *
+ * The UI thread owns the surface, touch input, the viewport, the graphics context, and the render
+ * session it attaches. It touches the map only to attach, which native serves from any thread;
+ * every other map call belongs to [MapRuntimeLoop].
+ */
 internal class AndroidMapView(context: Context) :
   SurfaceView(context), SurfaceHolder.Callback2, Choreographer.FrameCallback, AutoCloseable {
-  private val input = InputController(context, { mapState?.map }, ::requestRender)
+  private val input = InputController(context, ::enqueueCameraCommand)
   private var graphics: GraphicsContext? = null
-  private var mapState: MapState? = null
+  private var renderTarget: SurfaceRenderTarget? = null
+  private var runtimeLoop: MapRuntimeLoop? = null
   private var viewport: Viewport? = null
   private var viewVisible = false
   private var appForeground = false
-  private var renderPending = true
   private var frameCallbackPosted = false
+
+  /** Set when a frame threw, so the view stops scheduling against a broken target. */
+  private var frameFailed = false
   private var closed = false
   private val pendingDrawingFinished = ArrayDeque<Runnable>()
 
@@ -78,25 +88,34 @@ internal class AndroidMapView(context: Context) :
 
   override fun doFrame(frameTimeNanos: Long) {
     frameCallbackPosted = false
-    val state = mapState ?: return
-    try {
-      state.pump()
-      renderPending = state.drainEvents() || renderPending
-      if (renderPending) {
-        if (state.renderUpdate()) {
-          renderPending = false
-          finishPendingDrawing()
+    val loop = runtimeLoop
+    if (loop != null) {
+      try {
+        val target = ensureRenderTarget(loop)
+        // Consume before rendering, so a request the runtime loop publishes during the render call
+        // is not discarded.
+        if (target != null && loop.renderRequest.consume()) {
+          if (target.renderUpdate()) {
+            finishPendingDrawing()
+          } else {
+            // The map applies its logical size on the runtime loop's next pump, so an attach is
+            // followed by frames with nothing to render. Keep pacing and retry.
+            loop.renderRequest.set()
+          }
         }
+      } catch (error: RuntimeException) {
+        // Re-arming here would repost every vsync against a target that keeps throwing. Close it
+        // so the map can be destroyed, and stop scheduling frames.
+        Log.e(TAG, "frame failed", error)
+        frameFailed = true
+        detachSurface()
       }
-    } catch (error: RuntimeException) {
-      Log.e(TAG, "frame failed", error)
-      renderPending = true
     }
     startLoopIfReady()
   }
 
   fun requestRender() {
-    renderPending = true
+    runtimeLoop?.renderRequest?.set()
     startLoopIfReady()
   }
 
@@ -104,9 +123,16 @@ internal class AndroidMapView(context: Context) :
     if (closed) return
     closed = true
     stopLoop()
+    // Close the session before the runtime loop closes the map: a map with an attached session
+    // cannot be destroyed.
     detachSurface()
-    mapState?.close()
-    mapState = null
+    runtimeLoop?.close()
+    runtimeLoop = null
+  }
+
+  private fun enqueueCameraCommand(command: CameraCommand) {
+    runtimeLoop?.enqueue(command)
+    requestRender()
   }
 
   private fun recreateSurface(holder: SurfaceHolder) {
@@ -114,29 +140,43 @@ internal class AndroidMapView(context: Context) :
     detachSurface()
     val nextViewport =
       Viewport.fromView(width, height, resources.displayMetrics.density).also { it.log("surface") }
+    viewport = nextViewport
     if (nextViewport.isEmpty) {
-      viewport = nextViewport
       finishPendingDrawing()
       return
     }
     val nextGraphics = GraphicsContext.create(holder.surface)
     graphics = nextGraphics
-    viewport = nextViewport
-    val state = mapState
-    if (state == null) {
-      mapState = MapState.create(nextGraphics, nextViewport)
-    } else {
-      state.attachOrResize(nextGraphics, nextViewport)
+    // The runtime loop outlives surface changes: it keeps the runtime and the map alive so loading
+    // continues while there is nothing to present to.
+    if (runtimeLoop == null) {
+      runtimeLoop = MapRuntimeLoop(nextViewport)
     }
     Log.i(TAG, "render-target=native-surface status=${nextGraphics.backendName}")
     requestRender()
   }
 
   private fun detachSurface() {
-    mapState?.detachRenderTarget()
+    renderTarget?.close()
+    renderTarget = null
     graphics?.close()
     graphics = null
     finishPendingDrawing()
+  }
+
+  /** Attaches a session against the published map, on this thread, which then owns it. */
+  private fun ensureRenderTarget(loop: MapRuntimeLoop): SurfaceRenderTarget? {
+    renderTarget?.let {
+      return it
+    }
+    val currentGraphics = graphics ?: return null
+    val currentViewport = viewport?.takeUnless { it.isEmpty } ?: return null
+    val map = loop.map ?: return null
+    val attached = SurfaceRenderTarget.attach(map, currentGraphics, currentViewport)
+    renderTarget = attached
+    loop.requestRepaint()
+    loop.renderRequest.set()
+    return attached
   }
 
   private fun startLoopIfReady() {
@@ -148,7 +188,15 @@ internal class AndroidMapView(context: Context) :
   }
 
   private fun canRenderFrame(): Boolean =
-    !closed && viewVisible && appForeground && graphics != null && mapState != null
+    !closed &&
+      viewVisible &&
+      appForeground &&
+      graphics != null &&
+      !frameFailed &&
+      runtimeLoop != null &&
+      // A loop whose setup failed never publishes a map, so reposting every
+      // vsync would spin against a blank view instead of surfacing the failure.
+      runtimeLoop?.setupFailure == null
 
   private fun finishPendingDrawing() {
     while (pendingDrawingFinished.isNotEmpty()) {

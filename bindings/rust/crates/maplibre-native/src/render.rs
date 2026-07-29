@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
@@ -10,7 +10,7 @@ use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::map::{MapHandle, MapState};
+use crate::map::MapAttachRef;
 #[cfg(test)]
 use crate::{Feature, JsonValue};
 use crate::{HandleOperationError, Result};
@@ -732,13 +732,12 @@ impl OpenGLBorrowedTextureDescriptor {
 #[derive(Debug)]
 struct RenderSessionState {
     handle: ThreadAffineNativeHandle<sys::mln_render_session>,
-    map: RefCell<Option<Rc<MapState>>>,
     detached: Cell<bool>,
     frame_acquired: Cell<bool>,
 }
 
 impl RenderSessionState {
-    fn new(ptr: NonNull<sys::mln_render_session>, map: Rc<MapState>) -> Self {
+    fn new(ptr: NonNull<sys::mln_render_session>) -> Self {
         // SAFETY: ptr came from a successful render-session attach call and is
         // paired with the matching render-session destroy function.
         let handle = unsafe {
@@ -750,7 +749,6 @@ impl RenderSessionState {
         };
         Self {
             handle,
-            map: RefCell::new(Some(map)),
             detached: Cell::new(false),
             frame_acquired: Cell::new(false),
         }
@@ -773,23 +771,15 @@ impl RenderSessionState {
         }
     }
 
-    /// Releases the retained parent map state at most once.
-    ///
-    /// Detach and close both call this. `Option::take` leaves the second call a
-    /// no-op, so the parent retention is released exactly once no matter which
-    /// order a detached session reaches close in.
-    fn release_map(&self) {
-        self.map.borrow_mut().take();
-    }
-
     fn close(&self) -> Result<()> {
-        self.handle.close()?;
-        self.release_map();
-        Ok(())
+        self.handle.close()
     }
 }
 
-/// Owner-thread render session handle bound to a retained map.
+/// Render session handle bound to the thread that attached it.
+///
+/// The session holds no Rust-level retention of its map. Native keeps the map
+/// alive instead: destroying a map fails while a session is attached to it.
 pub struct RenderSessionHandle {
     inner: Rc<RenderSessionState>,
 }
@@ -1235,17 +1225,18 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
 }
 
 impl RenderSessionHandle {
-    pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
+    pub(crate) fn attach<F>(map: &MapAttachRef, attach: F) -> Result<Self>
     where
         F: FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
     {
-        let map_ptr = map.inner.as_ptr()?;
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_render_session>::new();
-        let status = attach(map_ptr, out.as_mut_ptr());
+        // The map is held live across the native call, so a concurrent close on
+        // its owner thread waits instead of freeing the address underneath it.
+        let status = map.with_live(|map| attach(map, out.as_mut_ptr()))?;
         maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {
-            inner: Rc::new(RenderSessionState::new(ptr, Rc::clone(&map.inner))),
+            inner: Rc::new(RenderSessionState::new(ptr)),
         })
     }
 
@@ -1328,10 +1319,6 @@ impl RenderSessionHandle {
             return Err(HandleOperationError::new(error, self));
         }
         self.inner.detached.set(true);
-        // A detached session cannot reattach and never dereferences its map
-        // again, so the parent retention ends here and the map becomes free to
-        // close while this session is still open.
-        self.inner.release_map();
         Ok(DetachedRenderSessionHandle {
             inner: Rc::clone(&self.inner),
         })

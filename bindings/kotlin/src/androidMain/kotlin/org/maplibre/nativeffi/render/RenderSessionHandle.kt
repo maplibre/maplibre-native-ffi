@@ -27,7 +27,7 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
-/** Owned Android JNI render session handle. Close it on the map owner thread. */
+/** Owned Android JNI render session handle. Close it on the thread that attached it. */
 public actual class RenderSessionHandle
 private constructor(private val map: MapHandle, private val handleAddress: Long) : AutoCloseable {
   private val mapRetention = map.retainChild("RenderSessionHandle")

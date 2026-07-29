@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
-/** Owned JVM FFM render session handle. Close it on the map owner thread. */
+/** Owned JVM FFM render session handle. Close it on the thread that attached it. */
 public actual class RenderSessionHandle
 internal constructor(private val map: MapHandle, private val handle: MemorySegment) :
   AutoCloseable {

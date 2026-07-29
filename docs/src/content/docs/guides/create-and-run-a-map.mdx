@@ -12,12 +12,17 @@ You assemble three things: a runtime, a map, and a render session. You call the
 function that lets MapLibre do work, and you decide when frames happen. No map
 view drives a loop for you.
 
-## Everything happens on one thread
+## Pick the owner threads
 
-The runtime, its maps, and their render sessions are owner-thread affine.
-Whichever thread creates the runtime owns all of it, and the API rejects calls
-from any other thread with `MLN_STATUS_WRONG_THREAD`. One thread owns one
-runtime, so choose that thread before you write anything else.
+Every handle is owner-thread affine and rejects calls from any other thread with
+`MLN_STATUS_WRONG_THREAD`. A runtime and its maps take the thread that created
+the runtime, and one thread owns one runtime, so choose that thread before you
+write anything else.
+
+A render session takes the thread that attached it, which need not be the map's:
+attaching only requires the map to be live. Using one thread for both is
+simplest. Attaching on a second thread is what lets you draw frames there while
+you pump the runtime on the first, so a long pump does not stall presentation.
 
 Resource transforms and providers are the exception. MapLibre invokes those on
 its own network and worker threads, and the
@@ -44,8 +49,9 @@ that field only when `flags` includes
 A map belongs to a runtime, and one runtime can own several.
 
 `width` and `height` set the logical viewport in UI pixels, the same units the
-camera and hit-testing use. Attaching a render session overwrites both with the
-session's extent, so they matter until you attach one.
+camera and hit-testing use. Attaching a render session replaces both with the
+session's extent, which the map applies on its next pump, so they matter until
+you attach one.
 
 `scale_factor` sets the UI-to-device pixel ratio. It is fixed for the life of
 the map and picks which sprite, glyph, and raster densities MapLibre requests
@@ -115,7 +121,8 @@ the event you want arrives.
 
 A runtime owns maps and a map owns its render session. A parent refuses to close
 while a child is live, returning `MLN_STATUS_INVALID_STATE`, so close in the
-reverse of the order you created: session, map, runtime.
+reverse of the order you created: session, map, runtime. Close each on its own
+owner thread, which for the session is the thread that attached it.
 
 Destroying a map discards that map's queued events. MapLibre gives you no flush
 and no final event, so read the state you mirror from events while the map is

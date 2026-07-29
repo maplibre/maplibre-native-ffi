@@ -6,30 +6,26 @@ import android.view.MotionEvent
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.hypot
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.pow
-import org.maplibre.nativeffi.camera.AnimationOptions
-import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
 
-internal class InputController(
-  context: Context,
-  private val mapProvider: () -> MapHandle?,
-  private val requestRender: () -> Unit,
-) {
+/**
+ * Decodes touch input into camera commands.
+ *
+ * This runs on the render loop (the UI thread), which does not own the map, so it only produces
+ * commands; the runtime loop applies them on the map's owner thread. Anything needing the current
+ * viewport is converted to logical map coordinates here, where the viewport lives.
+ */
+internal class InputController(context: Context, private val enqueue: (CameraCommand) -> Unit) {
   private val density = context.resources.displayMetrics.density.takeIf { it > 0f } ?: 1f
   private val tapGestureDetector = GestureDetector(context, TapListener())
   private val pointerTracker = PointerTracker()
   private var doubleTapActive = false
 
   fun onTouchEvent(event: MotionEvent): Boolean {
-    val map = mapProvider() ?: return true
     val wasDoubleTapActive = doubleTapActive
     tapGestureDetector.onTouchEvent(event)
     if (doubleTapActive || wasDoubleTapActive) return true
-    pointerTracker.onTouchEvent(map, event)
+    pointerTracker.onTouchEvent(event)
     return true
   }
 
@@ -38,16 +34,8 @@ internal class InputController(
 
     override fun onDoubleTap(event: MotionEvent): Boolean {
       doubleTapActive = true
-      val map = mapProvider() ?: return false
-      map.cancelTransitions()
-      val zoom = map.camera.zoom ?: 0.0
-      val targetZoom = kotlin.math.round(zoom) + 1.0
-      map.scaleByAnimated(
-        2.0.pow(targetZoom - zoom),
-        screenPoint(event.x, event.y),
-        AnimationOptions().apply { durationMs = 160.0 },
-      )
-      requestRender()
+      enqueue(CameraCommand.CancelTransitions)
+      enqueue(CameraCommand.ZoomToNextWholeLevel(screenPoint(event.x, event.y)))
       return true
     }
 
@@ -69,21 +57,21 @@ internal class InputController(
     private var lastPrimaryY = 0f
     private var twoFingerBaseline: TwoFingerSample? = null
 
-    fun onTouchEvent(map: MapHandle, event: MotionEvent) {
+    fun onTouchEvent(event: MotionEvent) {
       when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
-          map.cancelTransitions()
+          enqueue(CameraCommand.CancelTransitions)
           beginPan(event)
         }
         MotionEvent.ACTION_POINTER_DOWN ->
           if (event.pointerCount == 2) {
-            map.cancelTransitions()
+            enqueue(CameraCommand.CancelTransitions)
             beginTwoFinger(event)
           }
         MotionEvent.ACTION_MOVE -> {
           when {
-            event.pointerCount == 1 && mode == Mode.PAN -> updatePan(map, event)
-            event.pointerCount == 2 && mode.isTwoFinger -> updateTwoFinger(map, event)
+            event.pointerCount == 1 && mode == Mode.PAN -> updatePan(event)
+            event.pointerCount == 2 && mode.isTwoFinger -> updateTwoFinger(event)
           }
         }
         MotionEvent.ACTION_POINTER_UP -> {
@@ -111,7 +99,7 @@ internal class InputController(
       twoFingerBaseline = null
     }
 
-    private fun updatePan(map: MapHandle, event: MotionEvent) {
+    private fun updatePan(event: MotionEvent) {
       val pointerIndex = event.findPointerIndex(primaryPointerId)
       if (pointerIndex < 0) return
       val x = event.getX(pointerIndex)
@@ -121,8 +109,7 @@ internal class InputController(
       lastPrimaryX = x
       lastPrimaryY = y
       if (dx == 0.0 && dy == 0.0) return
-      map.moveBy(dx, dy)
-      requestRender()
+      enqueue(CameraCommand.MoveBy(dx, dy))
     }
 
     private fun beginTwoFinger(event: MotionEvent) {
@@ -131,7 +118,7 @@ internal class InputController(
       twoFingerBaseline = TwoFingerSample.read(event)
     }
 
-    private fun updateTwoFinger(map: MapHandle, event: MotionEvent) {
+    private fun updateTwoFinger(event: MotionEvent) {
       val baseline = twoFingerBaseline ?: return
       val current = TwoFingerSample.read(event)
       if (current.distance <= 0.0 || baseline.distance <= 0.0) {
@@ -150,38 +137,23 @@ internal class InputController(
 
       var changed = false
       if (mode == Mode.SCALE_ROTATE) {
+        val anchor = screenPoint(current.centroidX, current.centroidY)
         if (scale.isFinite() && abs(scale - 1.0) >= SCALE_EPSILON) {
-          map.scaleBy(scale, screenPoint(current.centroidX, current.centroidY))
+          enqueue(CameraCommand.ScaleBy(scale, anchor))
           changed = true
         }
         if (abs(deltaDegrees) >= ROTATION_EPSILON_DEGREES) {
-          rotateBy(map, deltaDegrees, current.centroidX, current.centroidY)
+          enqueue(CameraCommand.AdjustBearing(-deltaDegrees, anchor))
           changed = true
         }
       } else if (mode == Mode.SHOVE && deltaY != 0.0) {
-        val camera = map.camera
-        map.jumpTo(
-          CameraOptions().apply {
-            pitch = min(max((camera.pitch ?: 0.0) - deltaY * 0.1, 0.0), 60.0)
-          }
-        )
+        enqueue(CameraCommand.AdjustPitch(-deltaY * SHOVE_PITCH_FACTOR))
         changed = true
       }
 
       if (changed) {
-        requestRender()
         twoFingerBaseline = current
       }
-    }
-
-    private fun rotateBy(map: MapHandle, deltaDegrees: Double, centroidX: Float, centroidY: Float) {
-      val camera = map.camera
-      map.jumpTo(
-        CameraOptions().apply {
-          bearing = (camera.bearing ?: 0.0) - deltaDegrees
-          anchor = screenPoint(centroidX, centroidY)
-        }
-      )
     }
 
     private fun classifyTwoFingerGesture(
@@ -262,5 +234,6 @@ internal class InputController(
     private const val ROTATION_START_DEGREES = 2.0
     private const val ROTATION_EPSILON_DEGREES = 0.1
     private const val SHOVE_START_LOGICAL_PX = 4.0
+    private const val SHOVE_PITCH_FACTOR = 0.1
   }
 }

@@ -20,6 +20,8 @@
 #include <utility>
 #include <vector>
 
+#include <mbgl/actor/actor_ref.hpp>
+#include <mbgl/actor/mailbox.hpp>
 #include <mbgl/actor/scheduler.hpp>
 #include <mbgl/gfx/rendering_stats.hpp>
 #include <mbgl/map/bound_options.hpp>
@@ -1514,13 +1516,187 @@ class HeadlessObserver final : public mbgl::MapObserver {
   mln_map* map_;
 };
 
+// Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
+// whichever thread rendered.
+//
+// mbgl::Map::Impl is itself the RendererObserver, and its handlers reach deep
+// into map-thread state: onInvalidate() calls onUpdate(), and
+// onDidFinishRenderingFrame() reads the transform's transition state, publishes
+// the next update, and completes still-image requests. Handing that pointer
+// straight to a renderer on another thread would be a data race, so every
+// callback becomes a message on a mailbox bound to the runtime's run loop and
+// runs during the host's next mln_runtime_pump().
+//
+// This forwards unconditionally, including when the render session shares the
+// map's owner thread, so there is one delivery order rather than two.
+//
+// onRegisterShaders is deliberately absent. mbgl calls it synchronously during
+// renderer setup with a gfx::ShaderRegistry reference that is only valid for
+// that call, and the type is not copyable, so it cannot become a message. The
+// inherited no-op matches both Android's forwarder and this repo's behavior
+// today, because HeadlessObserver does not implement the corresponding
+// MapObserver hook. A future shader-registry hook (issue #101) has to be a
+// synchronous render-thread callback rather than an observer event.
+class ForwardingRendererObserver final : public mbgl::RendererObserver {
+ public:
+  ForwardingRendererObserver(
+    mbgl::Scheduler& map_scheduler, mbgl::RendererObserver& delegate
+  )
+      : mailbox_(std::make_shared<mbgl::Mailbox>(map_scheduler)),
+        delegate_(delegate, mailbox_) {}
+
+  ForwardingRendererObserver(const ForwardingRendererObserver&) = delete;
+  auto operator=(const ForwardingRendererObserver&)
+    -> ForwardingRendererObserver& = delete;
+  ForwardingRendererObserver(ForwardingRendererObserver&&) = delete;
+  auto operator=(ForwardingRendererObserver&&)
+    -> ForwardingRendererObserver& = delete;
+
+  ~ForwardingRendererObserver() override { mailbox_->close(); }
+
+  // Stops delivery ahead of destruction. Mailbox::close() waits for an
+  // in-flight receive and drops anything queued, so the delegate can be torn
+  // down after this returns. Idempotent, so the destructor keeps its own call.
+  auto close() -> void { mailbox_->close(); }
+
+  void onInvalidate() override {
+    delegate_.invoke(&mbgl::RendererObserver::onInvalidate);
+  }
+
+  void onResourceError(std::exception_ptr error) override {
+    delegate_.invoke(&mbgl::RendererObserver::onResourceError, error);
+  }
+
+  void onWillStartRenderingMap() override {
+    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingMap);
+  }
+
+  void onWillStartRenderingFrame() override {
+    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingFrame);
+  }
+
+  void onDidFinishRenderingFrame(
+    RenderMode mode, bool repaint_needed, bool placement_changed,
+    const mbgl::gfx::RenderingStats& stats
+  ) override {
+    // Disambiguate: the name carries three overloads and only this one is
+    // implemented by mbgl::Map::Impl.
+    void (mbgl::RendererObserver::*method)(
+      RenderMode, bool, bool, const mbgl::gfx::RenderingStats&
+    ) = &mbgl::RendererObserver::onDidFinishRenderingFrame;
+    delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
+  }
+
+  void onDidFinishRenderingMap() override {
+    delegate_.invoke(&mbgl::RendererObserver::onDidFinishRenderingMap);
+  }
+
+  void onStyleImageMissing(
+    const std::string& id, const StyleImageMissingCallback& done
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onStyleImageMissing, id, done);
+  }
+
+  void onRemoveUnusedStyleImages(const std::vector<std::string>& ids) override {
+    delegate_.invoke(&mbgl::RendererObserver::onRemoveUnusedStyleImages, ids);
+  }
+
+  void onPreCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onPreCompileShader, id, type, defines
+    );
+  }
+
+  void onPostCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onPostCompileShader, id, type, defines
+    );
+  }
+
+  void onShaderCompileFailed(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onShaderCompileFailed, id, type, defines
+    );
+  }
+
+  void onGlyphsLoaded(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onGlyphsLoaded, stack, range);
+  }
+
+  void onGlyphsError(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range,
+    std::exception_ptr error
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onGlyphsError, stack, range, error
+    );
+  }
+
+  void onGlyphsRequested(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onGlyphsRequested, stack, range);
+  }
+
+  void onTileAction(
+    mbgl::TileOperation operation, const mbgl::OverscaledTileID& id,
+    const std::string& source_id
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onTileAction, operation, id, source_id
+    );
+  }
+
+  void onRenderError(std::exception_ptr error) override {
+    delegate_.invoke(&mbgl::RendererObserver::onRenderError, error);
+  }
+
+ private:
+  std::shared_ptr<mbgl::Mailbox> mailbox_;
+  mbgl::ActorRef<mbgl::RendererObserver> delegate_;
+};
+
+// Map mutations a render session reaches for from its own owner thread. Posting
+// them through a mailbox on the map's run loop keeps mbgl::Map single-threaded,
+// and Mailbox::close() during map teardown turns late messages into no-ops.
+class MapCommands {
+ public:
+  explicit MapCommands(mbgl::Map& map) : map_(map) {}
+
+  auto set_size(uint32_t width, uint32_t height) -> void {
+    map_.setSize(mbgl::Size{width, height});
+  }
+
+  auto trigger_repaint() -> void { map_.triggerRepaint(); }
+
+ private:
+  mbgl::Map& map_;
+};
+
 class HeadlessFrontend final : public mbgl::RendererFrontend {
  public:
+  // The thread pool tag buckets this map's background work in the
+  // process-global scheduler. A default-constructed identity is unique per map;
+  // SimpleIdentity::Empty is the id-0 sentinel, which pools every map's work
+  // into one bucket and, worse, makes waitForEmpty() unable to wait on it at
+  // all, because ThreadedSchedulerBase::waitForEmpty remaps the empty tag to
+  // the pool's own identity. Matches Android's MapRenderer.
   HeadlessFrontend(mln_runtime* runtime, mln_map* map)
       : runtime_(runtime),
         map_(map),
         thread_pool_(
-          mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity::Empty
+          mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity{}
         ) {}
 
   void reset() override {
@@ -1528,8 +1704,14 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     latest_update_.reset();
   }
 
+  // mbgl::Map calls this once, from its constructor, on the map owner thread.
+  // The forwarder it builds is what render sessions hand to their renderer, so
+  // observer callbacks land on the map's run loop no matter which thread
+  // rendered.
   void setObserver(mbgl::RendererObserver& observer) override {
-    observer_ = &observer;
+    observer_ = std::make_unique<ForwardingRendererObserver>(
+      mln::core::runtime_run_loop(runtime_), observer
+    );
   }
 
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
@@ -1548,8 +1730,25 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
 
+  // Drains and retires this map's buckets in the process-global scheduler.
+  // The unique tag above means the task bucket is created on first use and only
+  // waitForEmpty() erases it, so without this every map that ever scheduled
+  // background work would leave a bucket behind for the worker loop to walk.
+  auto shutdown_thread_pool() -> void {
+    thread_pool_.runRenderJobs(/*closeQueue=*/true);
+    thread_pool_.waitForEmpty();
+  }
+
   [[nodiscard]] auto renderer_observer() const -> mbgl::RendererObserver* {
-    return observer_;
+    return observer_.get();
+  }
+
+  // Stops observer delivery before the map that backs the delegate is torn
+  // down. Called from destroy_map() once the map is unreachable.
+  auto close_renderer_observer() -> void {
+    if (observer_ != nullptr) {
+      observer_->close();
+    }
   }
 
   [[nodiscard]] auto getThreadPool() const
@@ -1560,7 +1759,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
  private:
   mln_runtime* runtime_;
   mln_map* map_;
-  mbgl::RendererObserver* observer_ = nullptr;
+  std::unique_ptr<ForwardingRendererObserver> observer_;
   mbgl::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mbgl::UpdateParameters> latest_update_;
@@ -2754,6 +2953,13 @@ struct mln_map {
   std::unique_ptr<HeadlessObserver> observer;
   std::unique_ptr<HeadlessFrontend> frontend;
   std::unique_ptr<mbgl::Map> map;
+  // Declared after `map` so reverse-order destruction retires the command
+  // channel before the mbgl::Map it targets.
+  std::unique_ptr<MapCommands> commands;
+  std::shared_ptr<mbgl::Mailbox> command_mailbox;
+  std::optional<mbgl::ActorRef<MapCommands>> command_ref;
+  // Guarded by map_registry_mutex(); a render session on another thread clears
+  // it from map_detach_render_target_session().
   void* render_target_session = nullptr;
 };
 
@@ -2800,6 +3006,36 @@ auto finish_still_image_request(mln_map* map, std::exception_ptr error)
   push_runtime_map_event(
     map->runtime, map, MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED
   );
+}
+
+// Checks a map handle is non-null and live. The caller holds
+// map_registry_mutex(), so it can act on the result without the handle being
+// retired in between. Callers that only need the answer use
+// validate_map_live().
+auto validate_map_live_locked(mln_map* map) -> mln_status {
+  if (map == nullptr) {
+    set_thread_error("map must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!map_registry().contains(map)) {
+    set_thread_error("map is not a live handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+// Adds the owner-thread check to validate_map_live_locked(). Same locking
+// contract.
+auto validate_map_locked(mln_map* map) -> mln_status {
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (map->owner_thread != std::this_thread::get_id()) {
+    set_thread_error("map call must be made on its owner thread");
+    return MLN_STATUS_WRONG_THREAD;
+  }
+  return MLN_STATUS_OK;
 }
 
 }  // namespace
@@ -2998,24 +3234,14 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
   };
 }
 
-auto validate_map(mln_map* map) -> mln_status {
-  if (map == nullptr) {
-    set_thread_error("map must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+auto validate_map_live(mln_map* map) -> mln_status {
   const std::scoped_lock lock(map_registry_mutex());
-  if (!map_registry().contains(map)) {
-    set_thread_error("map is not a live handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  return validate_map_live_locked(map);
+}
 
-  if (map->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("map call must be made on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
-  }
-
-  return MLN_STATUS_OK;
+auto validate_map(mln_map* map) -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  return validate_map_locked(map);
 }
 
 auto validate_map_projection(mln_map_projection* projection) -> mln_status {
@@ -3081,6 +3307,13 @@ auto create_map(
       resource_options_for_runtime(runtime)
     );
 
+    owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
+    owned_map->command_mailbox =
+      std::make_shared<mbgl::Mailbox>(runtime_run_loop(runtime));
+    owned_map->command_ref.emplace(
+      *owned_map->commands, owned_map->command_mailbox
+    );
+
     const std::scoped_lock lock(map_registry_mutex());
     map_registry().emplace(handle, std::move(owned_map));
   } catch (...) {
@@ -3093,24 +3326,36 @@ auto create_map(
 }
 
 auto destroy_map(mln_map* map) -> mln_status {
-  const auto status = validate_map(map);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  if (map->render_target_session != nullptr) {
-    set_thread_error("map still has an attached render session");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
-  auto* runtime = map->runtime;
+  auto* runtime = static_cast<mln_runtime*>(nullptr);
   auto owned_map = std::unique_ptr<mln_map>{};
   {
+    // One critical section covers validation, the render-session check, and
+    // taking ownership. A render session on another thread can only detach by
+    // taking this same lock, so it either wins and clears the slot before we
+    // read it, or loses and finds the map already retired.
     const std::scoped_lock lock(map_registry_mutex());
+    const auto status = validate_map_locked(map);
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+    if (map->render_target_session != nullptr) {
+      set_thread_error("map still has an attached render session");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    runtime = map->runtime;
     const auto found = map_registry().find(map);
     owned_map = std::move(found->second);
     map_registry().erase(found);
   }
+  // Stop both cross-thread channels before tearing the map down. Nothing can
+  // produce new messages by now: the map is unreachable, and it only got here
+  // with no render session attached. Closing waits out anything in flight and
+  // drops the rest.
+  owned_map->frontend->close_renderer_observer();
+  owned_map->command_mailbox->close();
+  // Retire this map's scheduler buckets. This can block on in-flight background
+  // work, which is why it runs outside the registry lock.
+  owned_map->frontend->shutdown_thread_pool();
   discard_runtime_map_events(runtime, map);
   owned_map.reset();
   release_runtime_map(runtime);
@@ -3155,15 +3400,37 @@ auto map_request_still_image(mln_map* map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_owner_thread(const mln_map* map) -> std::thread::id {
-  return map->owner_thread;
-}
-
 auto map_scale_factor(const mln_map* map) -> double {
   return map->scale_factor;
 }
 
+// Map-thread only. The render path must not reach this; it posts through
+// map_post_set_size() / map_post_trigger_repaint() instead.
 auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
+
+// Both posting helpers hold map_registry_mutex() across the liveness check and
+// the send, so the map cannot be retired in between. Mailbox::push takes only
+// its own mutex and the run loop's, so there is no path back to this lock.
+auto map_post_set_size(mln_map* map, uint32_t width, uint32_t height)
+  -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  map->command_ref->invoke(&MapCommands::set_size, width, height);
+  return MLN_STATUS_OK;
+}
+
+auto map_post_trigger_repaint(mln_map* map) -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  map->command_ref->invoke(&MapCommands::trigger_repaint);
+  return MLN_STATUS_OK;
+}
 
 auto map_latest_update(mln_map* map)
   -> std::shared_ptr<mbgl::UpdateParameters> {
@@ -3178,9 +3445,16 @@ auto map_run_render_jobs(mln_map* map) -> void {
   map->frontend->run_render_jobs();
 }
 
+// Attaching claims the map's single render-session slot. It runs on the render
+// session's own thread, which may differ from the map owner thread, so this
+// validates liveness only. Holding map_registry_mutex() across the check and
+// the claim is what makes it race-free against a concurrent destroy_map() on
+// the map owner thread: either the slot is claimed first and destroy_map()
+// refuses, or the map is retired first and this returns an invalid handle.
 auto map_attach_render_target_session(mln_map* map, void* session)
   -> mln_status {
-  const auto status = validate_map(map);
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -3196,9 +3470,14 @@ auto map_attach_render_target_session(mln_map* map, void* session)
   return MLN_STATUS_OK;
 }
 
+// Detaching runs on the render session's owner thread, which may differ from
+// the map owner thread, so this validates liveness only. Holding
+// map_registry_mutex() across the check and the clear is what makes it
+// race-free against a concurrent destroy_map() on the map owner thread.
 auto map_detach_render_target_session(mln_map* map, void* session)
   -> mln_status {
-  const auto status = validate_map(map);
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
   if (status != MLN_STATUS_OK) {
     return status;
   }

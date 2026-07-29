@@ -22,6 +22,11 @@ glibc_floor = "2.17"
 "apt:libncurses6" = "latest"
 "apt:libsqlite3-0" = "latest"
 "apt:libvulkan-dev" = "latest"
+# The Swift toolchain's libFoundationXML.so links libxml2.so.2, which SwiftPM
+# needs. Ubuntu 26.04 and later ship only libxml2-16 (libxml2.so.16) and drop
+# this package, so Swift there needs a toolchain built for that release rather
+# than the ubuntu24.04 build pinned above.
+"apt:libxml2" = "latest"
 "apt:pkg-config" = "latest"
 "dnf:clang-devel" = "latest"
 "dnf:clang" = "latest"
@@ -30,6 +35,7 @@ glibc_floor = "2.17"
 "dnf:glslang" = "latest"
 "dnf:libicu-devel" = "latest"
 "dnf:libglvnd-devel" = "latest"
+"dnf:libxml2" = "latest"
 "dnf:mesa-libEGL-devel" = "latest"
 "dnf:ncurses-libs" = "latest"
 "dnf:pkgconf-pkg-config" = "latest"

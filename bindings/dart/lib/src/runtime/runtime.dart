@@ -101,6 +101,14 @@ final class RuntimeHandle {
   _ResourceProviderCallbackState? _resourceProviderCallbackState;
 
   /// Creates a runtime on the current native thread.
+  ///
+  /// Do not `await` I/O on this isolate while the runtime or any handle under it
+  /// is live. The C API keys its owner-thread checks on the OS thread, and the
+  /// Dart VM moves an isolate to another OS thread when it resumes from awaited
+  /// I/O. Every call on the handle then fails with `wrongThread`, including
+  /// [close], which leaves the native runtime undestroyable for the rest of the
+  /// process. See the package README and
+  /// https://github.com/maplibre/maplibre-native-ffi/issues/412.
   factory RuntimeHandle.create({
     RuntimeOptions options = const RuntimeOptions(),
   }) {
@@ -1621,184 +1629,18 @@ final class MapHandle {
     _check(_c.raw.mln_map_dump_debug_logs(_pointer));
   }
 
-  /// Attaches a Metal native surface render target.
-  RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_metal_surface_descriptor>();
-      nativeDescriptor.ref = _metalSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_metal_surface_attach(_pointer, nativeDescriptor, outSession),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches a Vulkan native surface render target.
-  RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_vulkan_surface_descriptor>();
-      nativeDescriptor.ref = _vulkanSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_vulkan_surface_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches an OpenGL native surface render target.
-  RenderSessionHandle attachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_opengl_surface_descriptor>();
-      nativeDescriptor.ref = _openglSurfaceDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_opengl_surface_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches a Metal texture render target owned by the render session.
-  RenderSessionHandle attachMetalOwnedTexture(
-    MetalOwnedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_metal_owned_texture_descriptor>();
-      nativeDescriptor.ref = _metalOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_metal_owned_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches a Metal caller-owned texture render target.
-  RenderSessionHandle attachMetalBorrowedTexture(
-    MetalBorrowedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_metal_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _metalBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_metal_borrowed_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches a Vulkan texture render target owned by the render session.
-  RenderSessionHandle attachVulkanOwnedTexture(
-    VulkanOwnedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_vulkan_owned_texture_descriptor>();
-      nativeDescriptor.ref = _vulkanOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_vulkan_owned_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches a Vulkan caller-owned texture render target.
-  RenderSessionHandle attachVulkanBorrowedTexture(
-    VulkanBorrowedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_vulkan_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _vulkanBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_vulkan_borrowed_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches an OpenGL texture render target owned by the render session.
-  RenderSessionHandle attachOpenGLOwnedTexture(
-    OpenGLOwnedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor = arena<raw.mln_opengl_owned_texture_descriptor>();
-      nativeDescriptor.ref = _openglOwnedTextureDescriptorToNative(descriptor);
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_opengl_owned_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
-
-  /// Attaches an OpenGL caller-owned texture render target.
-  RenderSessionHandle attachOpenGLBorrowedTexture(
-    OpenGLBorrowedTextureDescriptor descriptor,
-  ) {
-    return withNativeArena((arena) {
-      final nativeDescriptor =
-          arena<raw.mln_opengl_borrowed_texture_descriptor>();
-      nativeDescriptor.ref = _openglBorrowedTextureDescriptorToNative(
-        descriptor,
-      );
-      final outSession = arena<Pointer<raw.mln_render_session>>();
-      outSession.value = nullptr;
-      _check(
-        _c.raw.mln_opengl_borrowed_texture_attach(
-          _pointer,
-          nativeDescriptor,
-          outSession,
-        ),
-      );
-      return RenderSessionHandle._(this, outSession.value);
-    });
-  }
+  /// A reference to this map for attaching a render session, safe to send to
+  /// another isolate.
+  ///
+  /// A render session belongs to the isolate that attached it, which need not be
+  /// the map's, and attaching only requires the map to be live. A [MapHandle]
+  /// cannot cross isolates, so this carries the native address instead. Every
+  /// other map call stays on the map's own isolate.
+  ///
+  /// The reference does not keep the map alive. Attaching after the map closes
+  /// fails rather than dangling, because the C API resolves the address under
+  /// its own registry lock.
+  MapAttachRef attachRef() => MapAttachRef._(_pointer.address);
 
   /// Copies the current camera snapshot.
   CameraOptions camera() {

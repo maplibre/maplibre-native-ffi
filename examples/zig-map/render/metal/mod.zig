@@ -37,14 +37,22 @@ pub const MetalRenderTarget = union(enum) {
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-        map: *maplibre.MapHandle,
     ) !MetalRenderTarget {
         _ = allocator;
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = try MetalOwnedTextureBackend.init(window, viewport, map) },
-            .borrowed_texture => .{ .borrowed_texture = try MetalBorrowedTextureBackend.init(window, viewport, map) },
-            .native_surface => .{ .native_surface = try MetalSurfaceBackend.init(window, viewport, map) },
+            .owned_texture => .{ .owned_texture = try MetalOwnedTextureBackend.init(window, viewport) },
+            .borrowed_texture => .{ .borrowed_texture = try MetalBorrowedTextureBackend.init(window, viewport) },
+            .native_surface => .{ .native_surface = try MetalSurfaceBackend.init(window, viewport) },
         };
+    }
+
+    /// Attaches the render session on the map owner thread.
+    pub fn attach(self: *MetalRenderTarget, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        switch (self.*) {
+            .owned_texture => |*backend| try backend.attach(map, viewport),
+            .borrowed_texture => |*backend| try backend.attach(map, viewport),
+            .native_surface => |*backend| try backend.attach(map, viewport),
+        }
     }
 
     pub fn deinit(self: *MetalRenderTarget) void {
@@ -201,15 +209,19 @@ const MetalOwnedTextureBackend = struct {
     fn init(
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !MetalOwnedTextureBackend {
         var self = MetalOwnedTextureBackend{
             .compositor = try MetalTextureCompositor.init(window, viewport),
             .session = .none,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *MetalOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *MetalOwnedTextureBackend) void {
@@ -270,7 +282,6 @@ const MetalBorrowedTextureBackend = struct {
     fn init(
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !MetalBorrowedTextureBackend {
         var compositor = try MetalTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
@@ -280,8 +291,13 @@ const MetalBorrowedTextureBackend = struct {
             .borrowed_texture = try createBorrowedTexture(compositor.view.device, viewport),
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *MetalBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *MetalBorrowedTextureBackend) void {
@@ -329,15 +345,19 @@ const MetalSurfaceBackend = struct {
     fn init(
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !MetalSurfaceBackend {
         var self = MetalSurfaceBackend{
             .view = try MetalView.init(window, viewport),
             .session = .none,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *MetalSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *MetalSurfaceBackend) void {

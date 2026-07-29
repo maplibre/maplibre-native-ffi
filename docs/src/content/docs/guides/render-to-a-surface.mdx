@@ -59,9 +59,13 @@ for you to ask for it. Each turn of your loop:
 3. While a frame is pending, call `mln_render_session_render_update()`. A
    surface session renders and presents in that one call.
 
+Steps 1 and 2 run on the runtime's owner thread and step 3 on the session's. One
+thread can do all three.
+
 Two details keep a map moving. The render call reports whether it produced a
-frame, and a `false` result is normal at startup, before the map publishes its
-first update; stay pending and call again. Finished-frame events carry a
+frame, and a `false` result is normal whenever the map has yet to publish an
+update for the session's extent, which covers startup and the turns just after
+an attach or resize; stay pending and call again. Finished-frame events carry a
 `needs_repaint` flag, which is how camera animations and label placement ask for
 the next frame. Drop that flag and animations freeze partway.
 
@@ -87,9 +91,9 @@ for the displays you target.
 Surfaces come and go as windows close and views detach. When the surface goes
 away:
 
-1. Call `mln_render_session_destroy()`. To release the map's slot first, call
-   `mln_render_session_detach()` and destroy the handle afterward. A detached
-   handle can only be destroyed.
+1. Call `mln_render_session_destroy()` on the thread that attached the session.
+   To release the map's slot first, call `mln_render_session_detach()` and
+   destroy the handle afterward. A detached handle can only be destroyed.
 2. Release your surface and context.
 3. When a new surface arrives, attach a fresh session. The map keeps its camera
    and style throughout.

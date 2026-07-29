@@ -877,7 +877,7 @@ void main() {
     projection.close();
     expect(projection.isClosed, isTrue);
     expect(
-      () => map.attachMetalSurface(
+      () => map.attachRef().attachMetalSurface(
         const MetalSurfaceDescriptor(
           extent: RenderTargetExtent(width: -1, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -887,7 +887,7 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     expect(
-      () => map.attachMetalSurface(
+      () => map.attachRef().attachMetalSurface(
         const MetalSurfaceDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -897,7 +897,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachMetalOwnedTexture(
+      () => map.attachRef().attachMetalOwnedTexture(
         const MetalOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: MetalContextDescriptor(device: NativePointer.nullPointer),
@@ -906,7 +906,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachOpenGLOwnedTexture(
+      () => map.attachRef().attachOpenGLOwnedTexture(
         const OpenGLOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: -1, height: 16),
           context: EglContextDescriptor(
@@ -919,7 +919,7 @@ void main() {
       throwsA(isA<InvalidArgumentException>()),
     );
     expect(
-      () => map.attachOpenGLOwnedTexture(
+      () => map.attachRef().attachOpenGLOwnedTexture(
         const OpenGLOwnedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: EglContextDescriptor(
@@ -932,7 +932,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachOpenGLBorrowedTexture(
+      () => map.attachRef().attachOpenGLBorrowedTexture(
         const OpenGLBorrowedTextureDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           physicalWidth: 16,
@@ -949,7 +949,7 @@ void main() {
       throwsA(isA<MaplibreException>()),
     );
     expect(
-      () => map.attachOpenGLSurface(
+      () => map.attachRef().attachOpenGLSurface(
         const OpenGLSurfaceDescriptor(
           extent: RenderTargetExtent(width: 16, height: 16),
           context: EglContextDescriptor(
@@ -1425,6 +1425,41 @@ void main() {
 
     source.close();
     runtime.close();
+  });
+  test('an attach reference reaches native from another isolate', () async {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap(
+      options: const MapOptions(width: 64, height: 64),
+    );
+    // A MapHandle cannot cross isolates, so the reference carries the address.
+    final attachRef = map.attachRef();
+
+    // Close before awaiting. The isolate may resume on a different OS thread
+    // after an await, which would make these handles unusable; see the README's
+    // draft deviation. The reference outliving them is the point here.
+    map.close();
+    runtime.close();
+
+    // Attaching from another isolate must reach the C API. The extent is valid
+    // so the binding's own checks pass and native answers: it validates the map
+    // before the descriptor, and this one has been retired. Before the session
+    // was decoupled from the map's isolate, this threw wrongThread from the
+    // binding without ever calling native.
+    final diagnostic = await Isolate.run(() {
+      try {
+        attachRef.attachMetalSurface(
+          const MetalSurfaceDescriptor(
+            extent: RenderTargetExtent(width: 16, height: 16),
+            context: MetalContextDescriptor(device: NativePointer.nullPointer),
+            layer: NativePointer.nullPointer,
+          ),
+        );
+        return 'attached';
+      } on MaplibreException catch (error) {
+        return error.diagnostic;
+      }
+    });
+    expect(diagnostic, contains('map is not a live handle'));
   });
 }
 

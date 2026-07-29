@@ -730,6 +730,35 @@ bool mln_test_render_fixture_create(
   return true;
 }
 
+bool mln_test_pump_until(mln_runtime* runtime, atomic_bool* flag) {
+  for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
+    if (atomic_load(flag)) {
+      return true;
+    }
+    // A short park rather than zero: this waits on another thread's flag, so
+    // spinning would burn the whole loop budget before that thread ran.
+    if (mln_runtime_pump(runtime, 2) != MLN_STATUS_OK) {
+      return false;
+    }
+    mln_runtime_event event = {
+      .size = sizeof(mln_runtime_event),
+      .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+      .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+    };
+    bool has_event = false;
+    while (mln_runtime_poll_event(runtime, &event, &has_event) ==
+             MLN_STATUS_OK &&
+           has_event) {
+      // Drain so the queue does not grow without bound while we wait.
+    }
+    if (atomic_load(flag)) {
+      return true;
+    }
+    mln_test_sleep_millisecond();
+  }
+  return atomic_load(flag);
+}
+
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
   if (fixture == NULL) {
     return;

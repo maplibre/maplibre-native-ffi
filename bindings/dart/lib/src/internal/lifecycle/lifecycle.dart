@@ -18,6 +18,11 @@ final Pointer<Void> Function(Pointer<Char>, Pointer<Void>) _createLeakToken =
       Pointer<Void> Function(Pointer<Char>, Pointer<Void>)
     >('mln_adapter_handle_leak_token_create');
 
+/// Opaque token for the calling native thread, stable for its life. Looked up
+/// here rather than through the generated API so this module stays free of it.
+final int Function() _threadToken = _library
+    .lookupFunction<Uint64 Function(), int Function()>('mln_thread_token');
+
 final void Function(Pointer<Void>) _destroyLeakToken = _library
     .lookupFunction<Void Function(Pointer<Void>), void Function(Pointer<Void>)>(
       'mln_adapter_handle_leak_token_destroy',
@@ -62,8 +67,10 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
     this._pointer,
     this.typeName, {
     int? ownerIsolateHash,
+    int? ownerThreadToken,
     bool leakReporting = true,
-  }) : _ownerIsolateHash = ownerIsolateHash ?? Isolate.current.hashCode {
+  }) : _ownerIsolateHash = ownerIsolateHash ?? Isolate.current.hashCode,
+       _ownerThreadToken = ownerThreadToken ?? _threadToken() {
     if (_pointer == nullptr) {
       throwInvalidArgument('$typeName pointer must not be null');
     }
@@ -74,6 +81,11 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
 
   Pointer<T>? _pointer;
   final int _ownerIsolateHash;
+
+  /// The native thread this handle was created on. The C API keys its
+  /// owner-thread checks on that thread, not on the isolate, and the Dart VM
+  /// moves an isolate between threads when it resumes from awaited I/O.
+  final int _ownerThreadToken;
   final Object _finalizerDetachToken = Object();
   Pointer<Void>? _leakToken;
 
@@ -113,6 +125,18 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
   void _checkOwnerIsolate() {
     if (Isolate.current.hashCode != _ownerIsolateHash) {
       throwWrongThread('$typeName belongs to a different Dart isolate');
+    }
+    if (_threadToken() != _ownerThreadToken) {
+      // Same isolate, different native thread. Every native call on this handle
+      // would now fail, including close, which would leak it permanently. Say
+      // why here rather than let the C API report a bare wrong-thread status.
+      throwWrongThread(
+        '$typeName is owned by a native thread its isolate has since left. '
+        'The Dart VM moves an isolate between native threads when it resumes '
+        'from awaited I/O, so do not await I/O on an isolate that holds a '
+        'runtime, map, projection, or render session. See '
+        'https://github.com/maplibre/maplibre-native-ffi/issues/412',
+      );
     }
   }
 

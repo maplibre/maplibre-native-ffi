@@ -1,9 +1,10 @@
-use std::error::Error;
+use std::sync::mpsc::Sender;
 
-use maplibre_native::{AnimationOptions, CameraOptions, MapHandle, ScreenPoint};
+use maplibre_native::ScreenPoint;
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
 use winit::keyboard::{KeyCode, ModifiersState, PhysicalKey};
 
+use crate::channel::CameraCommand;
 use crate::viewport::Viewport;
 
 const DRAG_ROTATE_FACTOR: f64 = 0.5;
@@ -12,7 +13,15 @@ const KEYBOARD_PAN: f64 = 120.0;
 const KEYBOARD_ZOOM: f64 = 1.25;
 const KEYBOARD_BEARING: f64 = 10.0;
 const KEYBOARD_PITCH: f64 = 5.0;
+const KEYBOARD_ANIMATION_MS: f64 = 160.0;
+const RESET_ANIMATION_MS: f64 = 220.0;
 
+/// Decodes host input into camera commands.
+///
+/// This runs on the render loop, which does not own the map, so it only
+/// produces commands; the runtime loop applies them on the map's owner thread.
+/// Anything needing the current viewport is converted to logical map
+/// coordinates here, where the viewport lives.
 #[derive(Default)]
 pub struct Controller {
     left_down: bool,
@@ -37,32 +46,34 @@ impl Controller {
         println!("  0: reset pitch and bearing");
     }
 
+    /// Reports whether the camera changed, so the render loop can set the
+    /// render request.
     pub fn handle(
         &mut self,
         event: &WindowEvent,
-        map: &MapHandle,
+        commands: &Sender<CameraCommand>,
         viewport: Viewport,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> bool {
         match event {
             WindowEvent::CursorMoved { position, .. } => self.cursor(
-                map,
+                commands,
                 position.x / viewport.scale_factor,
                 position.y / viewport.scale_factor,
             ),
-            WindowEvent::MouseInput { state, button, .. } => self.mouse(map, *button, *state),
-            WindowEvent::MouseWheel { delta, .. } => self.wheel(map, viewport, *delta),
+            WindowEvent::MouseInput { state, button, .. } => self.mouse(commands, *button, *state),
+            WindowEvent::MouseWheel { delta, .. } => self.wheel(commands, viewport, *delta),
             WindowEvent::KeyboardInput { event, .. } => {
-                self.keyboard(map, viewport, event.physical_key, event.state)
+                keyboard(commands, viewport, event.physical_key, event.state)
             }
             WindowEvent::ModifiersChanged(modifiers) => {
                 self.modifiers = modifiers.state();
-                Ok(false)
+                false
             }
-            _ => Ok(false),
+            _ => false,
         }
     }
 
-    fn cursor(&mut self, map: &MapHandle, x: f64, y: f64) -> Result<bool, Box<dyn Error>> {
+    fn cursor(&mut self, commands: &Sender<CameraCommand>, x: f64, y: f64) -> bool {
         let dx = x - self.last_x;
         let dy = y - self.last_y;
         self.last_x = x;
@@ -72,132 +83,140 @@ impl Controller {
 
         if self.right_down || (self.left_down && self.modifiers.control_key()) {
             if dx != 0.0 {
-                let bearing = map.camera()?.bearing.unwrap_or(0.0) + dx * DRAG_ROTATE_FACTOR;
-                let mut camera = CameraOptions::default();
-                camera.bearing = Some(bearing);
-                map.jump_to(&camera)?;
+                push(
+                    commands,
+                    CameraCommand::AdjustBearing {
+                        delta: dx * DRAG_ROTATE_FACTOR,
+                    },
+                );
             }
             if dy != 0.0 {
-                map.pitch_by(dy * DRAG_PITCH_FACTOR)?;
+                push(
+                    commands,
+                    CameraCommand::PitchBy {
+                        delta: dy * DRAG_PITCH_FACTOR,
+                    },
+                );
             }
-            Ok(dx != 0.0 || dy != 0.0)
+            dx != 0.0 || dy != 0.0
         } else if self.left_down && (dx != 0.0 || dy != 0.0) {
-            map.move_by(dx, dy)?;
-            Ok(true)
+            push(commands, CameraCommand::MoveBy { dx, dy });
+            true
         } else {
-            Ok(false)
+            false
         }
     }
 
     fn mouse(
         &mut self,
-        map: &MapHandle,
+        commands: &Sender<CameraCommand>,
         button: MouseButton,
         state: ElementState,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> bool {
         match button {
             MouseButton::Left => self.left_down = state == ElementState::Pressed,
             MouseButton::Right => self.right_down = state == ElementState::Pressed,
-            _ => return Ok(false),
+            _ => return false,
         }
         if state == ElementState::Pressed {
-            map.cancel_transitions()?;
+            // Queued ahead of the drag's own commands, so the transition stops
+            // before the first delta lands.
+            push(commands, CameraCommand::CancelTransitions);
         }
-        Ok(false)
+        false
     }
 
     fn wheel(
         &mut self,
-        map: &MapHandle,
+        commands: &Sender<CameraCommand>,
         viewport: Viewport,
         delta: MouseScrollDelta,
-    ) -> Result<bool, Box<dyn Error>> {
+    ) -> bool {
         let lines = match delta {
             MouseScrollDelta::LineDelta(_, y) => f64::from(y),
             MouseScrollDelta::PixelDelta(position) => position.y / viewport.scale_factor / 120.0,
         };
         if lines == 0.0 {
-            return Ok(false);
+            return false;
         }
-        let scale = 2.0_f64.powf(lines * 0.25);
-        map.scale_by(scale, Some(ScreenPoint::new(self.cursor_x, self.cursor_y)))?;
-        Ok(true)
-    }
-
-    fn keyboard(
-        &mut self,
-        map: &MapHandle,
-        viewport: Viewport,
-        physical_key: PhysicalKey,
-        state: ElementState,
-    ) -> Result<bool, Box<dyn Error>> {
-        if state != ElementState::Pressed {
-            return Ok(false);
-        }
-        let PhysicalKey::Code(code) = physical_key else {
-            return Ok(false);
-        };
-        let mut animation = AnimationOptions::default();
-        animation.duration_ms = Some(160.0);
-        let mut reset_animation = AnimationOptions::default();
-        reset_animation.duration_ms = Some(220.0);
-        let center = Some(ScreenPoint::new(
-            f64::from(viewport.logical_width) / 2.0,
-            f64::from(viewport.logical_height) / 2.0,
-        ));
-        match code {
-            KeyCode::ArrowLeft | KeyCode::KeyA => {
-                map.move_by_animated(KEYBOARD_PAN, 0.0, Some(&animation))?
-            }
-            KeyCode::ArrowRight | KeyCode::KeyD => {
-                map.move_by_animated(-KEYBOARD_PAN, 0.0, Some(&animation))?
-            }
-            KeyCode::ArrowUp | KeyCode::KeyW => {
-                map.move_by_animated(0.0, KEYBOARD_PAN, Some(&animation))?
-            }
-            KeyCode::ArrowDown | KeyCode::KeyS => {
-                map.move_by_animated(0.0, -KEYBOARD_PAN, Some(&animation))?
-            }
-            KeyCode::Equal | KeyCode::NumpadAdd => {
-                map.scale_by_animated(KEYBOARD_ZOOM, center, Some(&animation))?
-            }
-            KeyCode::Minus | KeyCode::NumpadSubtract => {
-                map.scale_by_animated(1.0 / KEYBOARD_ZOOM, center, Some(&animation))?
-            }
-            KeyCode::KeyQ => adjust_bearing(map, -KEYBOARD_BEARING, &animation)?,
-            KeyCode::KeyE => adjust_bearing(map, KEYBOARD_BEARING, &animation)?,
-            KeyCode::BracketRight => adjust_pitch(map, KEYBOARD_PITCH, &animation)?,
-            KeyCode::BracketLeft => adjust_pitch(map, -KEYBOARD_PITCH, &animation)?,
-            KeyCode::Digit0 | KeyCode::Numpad0 => {
-                let mut camera = CameraOptions::default();
-                camera.bearing = Some(0.0);
-                camera.pitch = Some(0.0);
-                map.ease_to(&camera, Some(&reset_animation))?
-            }
-            _ => return Ok(false),
-        }
-        Ok(true)
+        push(
+            commands,
+            CameraCommand::ScaleBy {
+                scale: 2.0_f64.powf(lines * 0.25),
+                anchor: ScreenPoint::new(self.cursor_x, self.cursor_y),
+            },
+        );
+        true
     }
 }
 
-fn adjust_bearing(
-    map: &MapHandle,
-    delta: f64,
-    animation: &AnimationOptions,
-) -> maplibre_native::Result<()> {
-    let bearing = map.camera()?.bearing.unwrap_or(0.0) + delta;
-    let mut camera = CameraOptions::default();
-    camera.bearing = Some(bearing);
-    map.ease_to(&camera, Some(animation))
+fn keyboard(
+    commands: &Sender<CameraCommand>,
+    viewport: Viewport,
+    physical_key: PhysicalKey,
+    state: ElementState,
+) -> bool {
+    if state != ElementState::Pressed {
+        return false;
+    }
+    let PhysicalKey::Code(code) = physical_key else {
+        return false;
+    };
+    let center = ScreenPoint::new(
+        f64::from(viewport.logical_width) / 2.0,
+        f64::from(viewport.logical_height) / 2.0,
+    );
+    let command = match code {
+        KeyCode::ArrowLeft | KeyCode::KeyA => pan(KEYBOARD_PAN, 0.0),
+        KeyCode::ArrowRight | KeyCode::KeyD => pan(-KEYBOARD_PAN, 0.0),
+        KeyCode::ArrowUp | KeyCode::KeyW => pan(0.0, KEYBOARD_PAN),
+        KeyCode::ArrowDown | KeyCode::KeyS => pan(0.0, -KEYBOARD_PAN),
+        KeyCode::Equal | KeyCode::NumpadAdd => zoom(KEYBOARD_ZOOM, center),
+        KeyCode::Minus | KeyCode::NumpadSubtract => zoom(1.0 / KEYBOARD_ZOOM, center),
+        KeyCode::KeyQ => CameraCommand::AdjustBearingAnimated {
+            delta: -KEYBOARD_BEARING,
+            duration_ms: KEYBOARD_ANIMATION_MS,
+        },
+        KeyCode::KeyE => CameraCommand::AdjustBearingAnimated {
+            delta: KEYBOARD_BEARING,
+            duration_ms: KEYBOARD_ANIMATION_MS,
+        },
+        KeyCode::BracketRight => CameraCommand::AdjustPitchAnimated {
+            delta: KEYBOARD_PITCH,
+            duration_ms: KEYBOARD_ANIMATION_MS,
+        },
+        KeyCode::BracketLeft => CameraCommand::AdjustPitchAnimated {
+            delta: -KEYBOARD_PITCH,
+            duration_ms: KEYBOARD_ANIMATION_MS,
+        },
+        KeyCode::Digit0 | KeyCode::Numpad0 => CameraCommand::ResetOrientation {
+            duration_ms: RESET_ANIMATION_MS,
+        },
+        _ => return false,
+    };
+    push(commands, command);
+    true
 }
 
-fn adjust_pitch(
-    map: &MapHandle,
-    delta: f64,
-    animation: &AnimationOptions,
-) -> maplibre_native::Result<()> {
-    let pitch = (map.camera()?.pitch.unwrap_or(0.0) + delta).clamp(0.0, 60.0);
-    let mut camera = CameraOptions::default();
-    camera.pitch = Some(pitch);
-    map.ease_to(&camera, Some(animation))
+fn pan(dx: f64, dy: f64) -> CameraCommand {
+    CameraCommand::MoveByAnimated {
+        dx,
+        dy,
+        duration_ms: KEYBOARD_ANIMATION_MS,
+    }
+}
+
+fn zoom(scale: f64, anchor: ScreenPoint) -> CameraCommand {
+    CameraCommand::ScaleByAnimated {
+        scale,
+        anchor,
+        duration_ms: KEYBOARD_ANIMATION_MS,
+    }
+}
+
+/// A closed queue means the runtime loop already stopped, which the render loop
+/// reports through the shared failure. Dropping the command keeps input
+/// decoding free of error handling.
+fn push(commands: &Sender<CameraCommand>, command: CameraCommand) {
+    let _ = commands.send(command);
 }

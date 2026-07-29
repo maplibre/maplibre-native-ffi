@@ -324,7 +324,12 @@ class RenderSessionHandleTest {
           assertTrue(frameHandle.isClosed)
           assertFailsWith<IllegalStateException> { frame.width() }
 
+          // Resizing hands the new logical size to the map's owner thread, so
+          // the map publishes an update matching the new target only once
+          // pumped.
           session.resize(16, 8, 2.0)
+          assertFalse(session.renderUpdate())
+          runtime.pump(0)
           assertTrue(session.renderUpdate())
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }

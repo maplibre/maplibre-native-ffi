@@ -72,8 +72,16 @@ MLN_API mln_status mln_render_session_resize(
  * *out_rendered is false when no frame was rendered: the map has not
  * published a render update yet, or the renderer skipped producing a frame
  * for the latest update (for example the Metal texture backend before content
- * is ready). Both are normal during startup; keep pumping the runtime and
- * call again when an update is reported.
+ * is ready), or the map has yet to apply a size this session asked for. All are
+ * normal during startup; keep pumping the runtime and call again when an update
+ * is reported.
+ *
+ * The last of those needs care in MLN_MAP_MODE_STATIC. A session applies its
+ * extent on the map's owner thread, so the map still carries the previous size
+ * until it is pumped, and an update built for that size renders nothing here. A
+ * still-image request made before the resize lands is spent on that discarded
+ * update, and a static map publishes no further update on its own. Pump the
+ * resize through before requesting the still image.
  *
  * Returns:
  * - MLN_STATUS_OK on success, with *out_rendered set.
