@@ -5,6 +5,7 @@ import java.lang.foreign.MemorySegment
 import java.lang.foreign.ValueLayout
 import java.lang.ref.Cleaner
 import org.maplibre.nativeffi.internal.lifecycle.BorrowedResourceCore
+import org.maplibre.nativeffi.internal.status.Status
 
 private val nativeBufferCleaner: Cleaner = Cleaner.create()
 
@@ -28,7 +29,9 @@ private constructor(private val segment: MemorySegment, private val length: Long
 
   internal fun ensureCapacity(requiredBytes: Long) {
     withOpenBuffer {
-      require(length >= requiredBytes) { "buffer is smaller than required byte length" }
+      Status.requireArgument(length >= requiredBytes) {
+        "buffer is smaller than required byte length"
+      }
     }
   }
 
@@ -43,7 +46,7 @@ private constructor(private val segment: MemorySegment, private val length: Long
 
   public actual companion object {
     public actual fun allocate(byteLength: Long): NativeBuffer {
-      require(byteLength >= 0) { "byteLength must be non-negative" }
+      Status.requireArgument(byteLength >= 0) { "byteLength must be non-negative" }
       val arena = Arena.ofShared()
       val segment = if (byteLength == 0L) MemorySegment.NULL else arena.allocate(byteLength)
       return NativeBuffer(segment, byteLength, arena)

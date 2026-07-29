@@ -365,19 +365,22 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
 /**
  * Attaches a Metal texture render target owned by the session to a map.
  *
- * The map may have at most one live render session. The session and
- * every texture-session call are owner-thread affine to the map owner thread.
- * The session renders into a session-owned texture created on
- * descriptor->context.device. On success, *out_session receives a handle the
- * caller destroys with mln_render_session_destroy().
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session renders into a
+ * session-owned texture created on descriptor->context.device. On success,
+ * *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when Metal texture sessions are not supported by
  *   this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -390,11 +393,16 @@ MLN_API mln_status mln_metal_owned_texture_attach(
 /**
  * Attaches a Metal caller-owned texture render target to a map.
  *
- * The map may have at most one live render session. The session and
- * every texture-session call are owner-thread affine to the map owner thread.
- * The session renders into descriptor->texture. The caller owns the texture,
- * keeps it valid until detach or destroy, and synchronizes any use outside this
- * session. On success, *out_session receives a handle the caller destroys with
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session renders into
+ * descriptor->texture. The caller owns the texture, keeps it valid until detach
+ * or destroy, and synchronizes any use outside this session. On success,
+ * *out_session receives a handle the caller destroys with
  * mln_render_session_destroy().
  *
  * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
@@ -406,8 +414,6 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when Metal borrowed texture sessions are not
  *   supported by this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -420,20 +426,23 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
 /**
  * Attaches a Vulkan texture render target owned by the session to a map.
  *
- * The map may have at most one live render session. The session and
- * every texture-session call are owner-thread affine to the map owner thread.
- * The session renders into a session-owned image created on
- * descriptor->context.device. Vulkan handles are borrowed and must remain valid
- * until detach or destroy. On success, *out_session receives a handle the
- * caller destroys with mln_render_session_destroy().
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session renders into a
+ * session-owned image created on descriptor->context.device. Vulkan handles are
+ * borrowed and must remain valid until detach or destroy. On success,
+ * *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when Vulkan texture sessions are not supported by
  *   this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -446,13 +455,17 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
 /**
  * Attaches a Vulkan caller-owned texture render target to a map.
  *
- * The map may have at most one live render session. The session and
- * every texture-session call are owner-thread affine to the map owner thread.
- * The session renders into descriptor->image through descriptor->image_view.
- * The caller owns the image and view, keeps them valid until detach or destroy,
- * and handles queue-family ownership and synchronization outside this session.
- * On success, *out_session receives a handle the caller destroys with
- * mln_render_session_destroy().
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session renders into
+ * descriptor->image through descriptor->image_view. The caller owns the image
+ * and view, keeps them valid until detach or destroy, and handles queue-family
+ * ownership and synchronization outside this session. On success, *out_session
+ * receives a handle the caller destroys with mln_render_session_destroy().
  *
  * Before each mln_render_session_render_update(), make the image available on
  * descriptor->context.graphics_queue in descriptor->initial_layout and keep it
@@ -470,8 +483,6 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when Vulkan borrowed texture sessions are not
  *   supported by this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -484,21 +495,23 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
 /**
  * Attaches an OpenGL texture render target owned by the session to a map.
  *
- * The map may have at most one live render session. The session and every
- * texture-session call are owner-thread affine to the map owner thread.
- * The session creates an OpenGL texture in a context that shares objects with
- * descriptor->context. Host sampling may use the acquired texture from a
- * context in the same share group after acquire succeeds and before release.
- * On success, *out_session receives a handle the caller destroys with
- * mln_render_session_destroy().
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session creates an OpenGL texture
+ * in a context that shares objects with descriptor->context. Host sampling may
+ * use the acquired texture from a context in the same share group after acquire
+ * succeeds and before release. On success, *out_session receives a handle the
+ * caller destroys with mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when OpenGL texture sessions are not supported by
  *   this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -511,12 +524,20 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
 /**
  * Attaches an OpenGL caller-owned texture render target to a map.
  *
- * The map may have at most one live render session. The session and every
- * texture-session call are owner-thread affine to the map owner thread.
- * The session renders into descriptor->texture. The caller owns the texture,
- * keeps it valid until detach or destroy, and synchronizes any use outside
- * this session. On success, *out_session receives a handle the caller destroys
- * with mln_render_session_destroy().
+ * The map may have at most one live render session. The calling thread becomes
+ * the session's owner thread, and every texture-session call is affine to it.
+ * The map need only be live, so a host may attach on the thread that drives its
+ * render loop while the map stays on the runtime loop thread. Attach creates
+ * the session's graphics resources on the calling thread, so the host resources
+ * named by descriptor must be usable there; for OpenGL that means the host
+ * context must be current on this thread. The session renders into
+ * descriptor->texture. The caller owns the texture, keeps it valid until detach
+ * or destroy, and synchronizes any use outside this session. Each render
+ * completes before mln_render_session_render_update() returns, so the caller
+ * reads or samples the texture from any context in the share group of
+ * descriptor->context without adding synchronization of its own. On success,
+ * *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * mln_render_session_resize() returns MLN_STATUS_UNSUPPORTED for this target.
  * Follow a resized host by destroying the session, recreating the texture at
@@ -527,8 +548,6 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
  *   null or invalid, out_session is null, or *out_session is not null.
  * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
  * - MLN_STATUS_UNSUPPORTED when OpenGL borrowed texture sessions are not
  *   supported by this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -610,13 +629,15 @@ MLN_API mln_status mln_webgpu_borrowed_texture_attach(
  *   null, out_info->size is too small, out_data is null, or out_data_capacity
  *   is too small.
  * - MLN_STATUS_INVALID_STATE when no rendered frame is available, the session
- *   is detached, a frame is currently acquired, or readback produces no image.
+ *   is detached, or a frame is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session is not a texture session, the texture
  *   session uses a caller-owned target, or the configured backend does not
  *   support CPU readback.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when readback produces no image or an image whose
+ *   layout does not match the session, when the render backend reports no
+ *   renderer backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
   mln_render_session* session, uint8_t* out_data, size_t out_data_capacity,
@@ -642,7 +663,8 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when session cannot expose a Metal texture frame.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when the render backend reports no rendered Metal
+ *   texture, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_acquire_frame(
   mln_render_session* session, mln_metal_owned_texture_frame* out_frame
@@ -718,6 +740,11 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
  * mln_opengl_owned_texture_release_frame() is called for the same frame.
  * While acquired, resize, render update, detach, destroy, and a second acquire
  * return MLN_STATUS_INVALID_STATE.
+ *
+ * Acquiring completes the session rendering for the frame, so the caller reads
+ * or samples the texture from any context in the share group of the context
+ * passed to mln_opengl_owned_texture_attach() without adding synchronization
+ * of its own.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

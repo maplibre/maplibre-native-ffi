@@ -87,6 +87,7 @@ struct NativeMapOptionsInput: Equatable {
   let height: UInt32
   let scaleFactor: Double
   let mapMode: UInt32
+  let fastPFOREnabled: Bool
 
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_map_options>) throws -> Result
@@ -96,6 +97,7 @@ struct NativeMapOptionsInput: Equatable {
     options.height = height
     options.scale_factor = scaleFactor
     options.map_mode = mapMode
+    options.fast_pfor_enabled = fastPFOREnabled
     return try withUnsafePointer(to: &options, body)
   }
 }
@@ -221,24 +223,27 @@ struct NativeAnimationOptionsInput: Equatable {
   var velocity: Double?
   var minimumZoom: Double?
   var easing: NativeUnitBezier?
+  var transitionId: UInt64?
 
   init(
     durationMilliseconds: Double? = nil,
     velocity: Double? = nil,
     minimumZoom: Double? = nil,
-    easing: NativeUnitBezier? = nil
+    easing: NativeUnitBezier? = nil,
+    transitionId: UInt64? = nil
   ) {
     self.durationMilliseconds = durationMilliseconds
     self.velocity = velocity
     self.minimumZoom = minimumZoom
     self.easing = easing
+    self.transitionId = transitionId
   }
 
   func withOptionalNativeOptions<Result>(
     _ body: (UnsafePointer<mln_animation_options>?) throws -> Result
   ) throws -> Result {
     if durationMilliseconds == nil, velocity == nil, minimumZoom == nil,
-       easing == nil
+       easing == nil, transitionId == nil
     {
       return try body(nil)
     }
@@ -258,6 +263,10 @@ struct NativeAnimationOptionsInput: Equatable {
     if let easing {
       animation.fields |= MLN_ANIMATION_OPTION_EASING.rawValue
       animation.easing = easing.native
+    }
+    if let transitionId {
+      animation.fields |= MLN_ANIMATION_OPTION_TRANSITION_ID.rawValue
+      animation.transition_id = transitionId
     }
     return try withUnsafePointer(to: &animation, body)
   }
@@ -301,15 +310,20 @@ struct NativeCameraFitOptionsInput: Equatable {
   }
 }
 
+enum NativeBoundsConstraintInput: Equatable {
+  case bounded(NativeLatLngBounds)
+  case unbounded
+}
+
 struct NativeBoundOptionsInput: Equatable {
-  var bounds: NativeLatLngBounds?
+  var bounds: NativeBoundsConstraintInput?
   var minZoom: Double?
   var maxZoom: Double?
   var minPitch: Double?
   var maxPitch: Double?
 
   init(
-    bounds: NativeLatLngBounds? = nil,
+    bounds: NativeBoundsConstraintInput? = nil,
     minZoom: Double? = nil,
     maxZoom: Double? = nil,
     minPitch: Double? = nil,
@@ -323,8 +337,13 @@ struct NativeBoundOptionsInput: Equatable {
   }
 
   init(_ raw: mln_bound_options) {
-    bounds = (raw.fields & MLN_BOUND_OPTION_BOUNDS.rawValue) != 0 ?
-      NativeLatLngBounds(raw.bounds) : nil
+    if (raw.fields & MLN_BOUND_OPTION_BOUNDS.rawValue) != 0 {
+      bounds = .bounded(NativeLatLngBounds(raw.bounds))
+    } else if (raw.fields & MLN_BOUND_OPTION_UNBOUNDED.rawValue) != 0 {
+      bounds = .unbounded
+    } else {
+      bounds = nil
+    }
     minZoom = (raw.fields & MLN_BOUND_OPTION_MIN_ZOOM.rawValue) != 0 ? raw
       .min_zoom : nil
     maxZoom = (raw.fields & MLN_BOUND_OPTION_MAX_ZOOM.rawValue) != 0 ? raw
@@ -341,9 +360,14 @@ struct NativeBoundOptionsInput: Equatable {
     -> Result) throws -> Result
   {
     var options = mln_bound_options_default()
-    if let bounds {
+    switch bounds {
+    case let .bounded(bounds):
       options.fields |= MLN_BOUND_OPTION_BOUNDS.rawValue
       options.bounds = bounds.native
+    case .unbounded:
+      options.fields |= MLN_BOUND_OPTION_UNBOUNDED.rawValue
+    case nil:
+      break
     }
     if let minZoom {
       options.fields |= MLN_BOUND_OPTION_MIN_ZOOM.rawValue

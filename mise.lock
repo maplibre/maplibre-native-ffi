@@ -4,41 +4,41 @@
 url = "https://conda.anaconda.org/conda-forge/linux-aarch64/_openmp_mutex-4.5-20_gnu.conda"
 checksum = "sha256:a2527b1d81792a0ccd2c05850960df119c2b6d8f5fdec97f2db7d25dc23b1068"
 
-[conda-packages.linux-arm64."libgcc-15.2.0-h8acb6b2_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libgcc-15.2.0-h8acb6b2_20.conda"
-checksum = "sha256:b8274208cff283551c1a0eaa0f8970ee58bb954f96cd270dfc30ebeb355e6ca3"
+[conda-packages.linux-arm64."libgcc-16.1.0-h205dda4_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libgcc-16.1.0-h205dda4_0.conda"
+checksum = "sha256:24db32a7bf174bacef8b99f354e34132d393f5b5ef2d7a57eff1978555f5e724"
 
-[conda-packages.linux-arm64."libgomp-15.2.0-h8acb6b2_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libgomp-15.2.0-h8acb6b2_20.conda"
-checksum = "sha256:053c48747858d726f3236e7674c0e98fd0c50aed83c5389f8f3154bd24f459f2"
+[conda-packages.linux-arm64."libgomp-16.1.0-h8acb6b2_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libgomp-16.1.0-h8acb6b2_0.conda"
+checksum = "sha256:8a2422b2f42c2c3b4f8bd662ed22c4d6cc322f59e1182a2245d39cf843a71bba"
 
 [conda-packages.linux-arm64."libiconv-1.18-h90929bb_2"]
 url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libiconv-1.18-h90929bb_2.conda"
 checksum = "sha256:1473451cd282b48d24515795a595801c9b65b567fe399d7e12d50b2d6cdb04d9"
 
-[conda-packages.linux-arm64."libstdcxx-15.2.0-hef695bb_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libstdcxx-15.2.0-hef695bb_20.conda"
-checksum = "sha256:148c9c01c4fc647c98b0972397c9c51e8e83235355e22913d3acc2ee5c86a447"
+[conda-packages.linux-arm64."libstdcxx-16.1.0-hef695bb_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libstdcxx-16.1.0-hef695bb_0.conda"
+checksum = "sha256:a0f905aa6383f055fed544bdb254cfe1218db3065571db182b170f9259ece2ab"
 
 [conda-packages.linux-x64."_openmp_mutex-4.5-20_gnu"]
 url = "https://conda.anaconda.org/conda-forge/linux-64/_openmp_mutex-4.5-20_gnu.conda"
 checksum = "sha256:1dd3fffd892081df9726d7eb7e0dea6198962ba775bd88842135a4ddb4deb3c9"
 
-[conda-packages.linux-x64."libgcc-15.2.0-he0feb66_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-64/libgcc-15.2.0-he0feb66_20.conda"
-checksum = "sha256:e3b7bb287d1685b15781a6d9e3408d6ddaff23f5a1d0d6c0140619dd3950fe72"
+[conda-packages.linux-x64."libgcc-16.1.0-ha9f2e26_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libgcc-16.1.0-ha9f2e26_0.conda"
+checksum = "sha256:c06e9c8c1836dda7ba50a5f427c1d7bdc4bd31426207c4553221c75ae49c3ec2"
 
-[conda-packages.linux-x64."libgomp-15.2.0-he0feb66_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-64/libgomp-15.2.0-he0feb66_20.conda"
-checksum = "sha256:30b8ff1bf43871a17c9de99e56171ef54cfbe690ffa86681628db5a00af97cf7"
+[conda-packages.linux-x64."libgomp-16.1.0-he0feb66_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libgomp-16.1.0-he0feb66_0.conda"
+checksum = "sha256:24b6406687ad439e989071e05e7ddbe5980e048650165e61fff40f906c55cc83"
 
 [conda-packages.linux-x64."libiconv-1.18-h3b78370_2"]
 url = "https://conda.anaconda.org/conda-forge/linux-64/libiconv-1.18-h3b78370_2.conda"
 checksum = "sha256:c467851a7312765447155e071752d7bf9bf44d610a5687e32706f480aad2833f"
 
-[conda-packages.linux-x64."libstdcxx-15.2.0-h934c35e_20"]
-url = "https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-15.2.0-h934c35e_20.conda"
-checksum = "sha256:b5eadda8fb0df262f0d424c4a0c8c1c8d65d904ce622f07936c793ea1b8a39d9"
+[conda-packages.linux-x64."libstdcxx-16.1.0-h934c35e_0"]
+url = "https://conda.anaconda.org/conda-forge/linux-64/libstdcxx-16.1.0-h934c35e_0.conda"
+checksum = "sha256:a791d1b4bbdd8b6bfbe315b011d479975ab9524115035f474c70d7e438bca12f"
 
 [conda-packages.windows-x64."libiconv-1.18-hc1393d2_2"]
 url = "https://conda.anaconda.org/conda-forge/win-64/libiconv-1.18-hc1393d2_2.conda"
@@ -187,28 +187,28 @@ backend = "aqua:facebook/ktfmt"
 
 [tools."aqua:facebook/ktfmt"."platforms.linux-arm64"]
 checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9965"
-url = "https://github.com/fbtransfer/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
-url_api = "https://api.github.com/repos/fbtransfer/ktfmt/releases/assets/375830158"
+url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
+url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
 [tools."aqua:facebook/ktfmt"."platforms.linux-x64"]
 checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9965"
-url = "https://github.com/fbtransfer/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
-url_api = "https://api.github.com/repos/fbtransfer/ktfmt/releases/assets/375830158"
+url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
+url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
 [tools."aqua:facebook/ktfmt"."platforms.macos-arm64"]
 checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9965"
-url = "https://github.com/fbtransfer/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
-url_api = "https://api.github.com/repos/fbtransfer/ktfmt/releases/assets/375830158"
+url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
+url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
 [tools."aqua:facebook/ktfmt"."platforms.windows-arm64"]
 checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9965"
-url = "https://github.com/fbtransfer/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
-url_api = "https://api.github.com/repos/fbtransfer/ktfmt/releases/assets/375830158"
+url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
+url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
 [tools."aqua:facebook/ktfmt"."platforms.windows-x64"]
 checksum = "sha256:f39bf9a1f520d27f86f2bdf4d6dbb2574c05e84f656171ed65c4e534b86b9965"
-url = "https://github.com/fbtransfer/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
-url_api = "https://api.github.com/repos/fbtransfer/ktfmt/releases/assets/375830158"
+url = "https://github.com/Kotlin/ktfmt/releases/download/v0.62/ktfmt-0.62-with-dependencies.jar"
+url_api = "https://api.github.com/repos/Kotlin/ktfmt/releases/assets/375830158"
 
 [[tools."aqua:google/google-java-format"]]
 version = "1.35.0"
@@ -395,22 +395,22 @@ channel = "conda-forge"
 checksum = "sha256:671fc9849fcdb9138daf2ab6b2d45b0650055ba1496cda19c415f57cabc381b8"
 url = "https://conda.anaconda.org/conda-forge/linux-aarch64/doxygen-1.13.2-h5e0f5ae_0.conda"
 conda_deps = [
-    "libgcc-15.2.0-h8acb6b2_20",
-    "libstdcxx-15.2.0-hef695bb_20",
+    "libgcc-16.1.0-h205dda4_0",
+    "libstdcxx-16.1.0-hef695bb_0",
     "libiconv-1.18-h90929bb_2",
     "_openmp_mutex-4.5-20_gnu",
-    "libgomp-15.2.0-h8acb6b2_20",
+    "libgomp-16.1.0-h8acb6b2_0",
 ]
 
 [tools."conda:doxygen"."platforms.linux-x64"]
 checksum = "sha256:349c4c872357b4a533e127b2ade8533796e8e062abc2cd685756a1a063ae1e35"
 url = "https://conda.anaconda.org/conda-forge/linux-64/doxygen-1.13.2-h8e693c7_0.conda"
 conda_deps = [
-    "libgcc-15.2.0-he0feb66_20",
-    "libstdcxx-15.2.0-h934c35e_20",
+    "libgcc-16.1.0-ha9f2e26_0",
+    "libstdcxx-16.1.0-h934c35e_0",
     "libiconv-1.18-h3b78370_2",
     "_openmp_mutex-4.5-20_gnu",
-    "libgomp-15.2.0-he0feb66_20",
+    "libgomp-16.1.0-he0feb66_0",
 ]
 
 [tools."conda:doxygen"."platforms.macos-arm64"]
@@ -427,6 +427,30 @@ conda_deps = [
     "vc14_runtime-14.51.36231-h1b9f54f_39",
     "vcomp14-14.51.36231-h1b9f54f_39",
 ]
+
+[[tools.dart]]
+version = "3.12.2"
+backend = "http:dart"
+
+[tools.dart."platforms.linux-arm64"]
+checksum = "sha256:f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-arm64-release.zip"
+
+[tools.dart."platforms.linux-x64"]
+checksum = "sha256:28e47b44cf075f36771046c068bb0d174201cf9c7608744aed1cc23204299c2d"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip"
+
+[tools.dart."platforms.macos-arm64"]
+checksum = "sha256:cd8753928e77b6b665bd70dce0e64b4ec6d2e2fde141d6409bb716c8ac1f1c0a"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-macos-arm64-release.zip"
+
+[tools.dart."platforms.windows-arm64"]
+checksum = "sha256:ef0168b2bbceccda659e3d9a0f5ebebd5326ef84800ca6af7ccceeb1cfd3daf0"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-arm64-release.zip"
+
+[tools.dart."platforms.windows-x64"]
+checksum = "sha256:77fd96c823ed09a85e58209a2c5f16b0fc02e5ed4f3e3d46fddf4be763d498d6"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-x64-release.zip"
 
 [[tools.dotnet]]
 version = "10.0.203"
@@ -450,6 +474,35 @@ url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
 
 [tools.emsdk."platforms.windows-x64"]
 url = "https://github.com/emscripten-core/emsdk/archive/refs/heads/main.tar.gz"
+
+[[tools."github:EmbarkStudios/cargo-about"]]
+version = "0.9.1"
+backend = "github:EmbarkStudios/cargo-about"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-arm64"]
+checksum = "sha256:d13ff19fedb566f859831c0b71c22120e7c598c7753d5f1018dd7353c6ced02a"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461985054"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-x64"]
+checksum = "sha256:c0e7dc6f5d74b0beec5c0053d39ab24514c717d19acd91886907a22457ea9e98"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984931"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.macos-arm64"]
+checksum = "sha256:6a38fe166d17a674269d4373256c0b6bd93acc2553e12de0517cb9ecc73c9c02"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984679"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-arm64"]
+checksum = "sha256:e2b695e4787381fa36e99ee85d5c6439eec21dd09d875572802124867da42af7"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986459"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-x64"]
+checksum = "sha256:318893aff6b9efd60f70470f5827b9577ae20a805cf9732d5612862a78508581"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986502"
 
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
@@ -557,6 +610,35 @@ url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_aarch64.zip"
 checksum = "sha256:ddd68ee54e78b6b19388f517b8a61fbed2856ae3320febe42449bac3021e2729"
 url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_x64.zip"
 
+[[tools.ninja]]
+version = "1.13.2"
+backend = "aqua:ninja-build/ninja"
+
+[tools.ninja."platforms.linux-arm64"]
+checksum = "sha256:fd2cacc8050a7f12a16a2e48f9e06fca5c14fc4c2bee2babb67b58be17a607fc"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux-aarch64.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318864579"
+
+[tools.ninja."platforms.linux-x64"]
+checksum = "sha256:5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318865358"
+
+[tools.ninja."platforms.macos-arm64"]
+checksum = "sha256:c99048673aa765960a99cf10c6ddb9f1fad506099ff0a0e137ad8960a88f321b"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-mac.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863524"
+
+[tools.ninja."platforms.windows-arm64"]
+checksum = "sha256:e52f0bdef9dfb1003229dbd6508a508c4073fd017247002adc66e5e806cb0391"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-winarm64.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863570"
+
+[tools.ninja."platforms.windows-x64"]
+checksum = "sha256:07fc8261b42b20e71d1720b39068c2e14ffcee6396b76fb7a795fb460b78dc65"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-win.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863577"
+
 [[tools.node]]
 version = "24.11.0"
 backend = "core:node"
@@ -660,6 +742,23 @@ checksum = "blake3:8a95707e406fa824266e95319f9f906415871df8f8dce47304a90302ec997
 
 [tools.swift."platforms.macos-arm64"]
 checksum = "blake3:7c85377fa6d9bdbeec3f6724522835c59d31483906d5bee41ec41807eff0ab00"
+url = "https://download.swift.org/swift-6.3.1-release/xcode/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-osx.pkg"
+
+[tools.swift."platforms.windows-x64"]
+url = "https://download.swift.org/swift-6.3.1-release/windows10/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-windows10.exe"
+
+[[tools.swift]]
+version = "6.3.1"
+backend = "core:swift"
+
+[tools.swift.options]
+swift_platform = "ubuntu24.04"
+
+[tools.swift."platforms.linux-arm64"]
+url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404-aarch64/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-ubuntu24.04-aarch64.tar.gz"
+
+[tools.swift."platforms.linux-x64"]
+url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-ubuntu24.04.tar.gz"
 
 [[tools.swiftformat]]
 version = "0.61.1"

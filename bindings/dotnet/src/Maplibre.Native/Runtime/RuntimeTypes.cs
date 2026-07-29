@@ -68,8 +68,15 @@ public enum RuntimeEventType : uint
     OfflineRegionResponseError = 20,
     OfflineRegionTileCountLimitExceeded = 21,
     OfflineOperationCompleted = 22,
+    MapCameraTransitionFinished = 23,
 }
 
+/// <summary>One copied runtime event returned by <c>RuntimeHandle.PollEvent</c>.</summary>
+/// <param name="Type">The event kind, when this binding knows the raw value.</param>
+/// <param name="RawType">The raw native event kind.</param>
+/// <param name="SourceType">The source kind, when this binding knows the raw value.</param>
+/// <param name="RawSourceType">The raw native source kind.</param>
+/// <param name="RuntimeSource">The runtime that produced a runtime-sourced event.</param>
 /// <param name="MapSource">
 /// The map that raised this event, resolved from the runtime's weak map registry.
 /// Hold your own strong reference to a <see cref="MapHandle" /> for as long as you
@@ -77,6 +84,35 @@ public enum RuntimeEventType : uint
 /// weak one, the map can be collected and this member is <see langword="null" />
 /// even though <see cref="SourceType" /> still reports a map source.
 /// </param>
+/// <param name="Code">
+/// Secondary event detail whose meaning <paramref name="Type" /> selects:
+/// <list type="bullet">
+/// <item>
+/// <description>
+/// <see cref="RuntimeEventType.MapCameraWillChange" /> and
+/// <see cref="RuntimeEventType.MapCameraDidChange" />: a
+/// <see cref="Maplibre.Native.Camera.CameraChangeMode" /> value.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// <see cref="RuntimeEventType.MapLoadingFailed" />: the ordinal of MapLibre Native's internal map
+/// load error kind, which this binding does not name as an enum. Read
+/// <paramref name="Message" /> for the failure text.
+/// </description>
+/// </item>
+/// <item>
+/// <description>
+/// <see cref="RuntimeEventType.OfflineOperationCompleted" />: the operation result as a
+/// <c>MaplibreStatus</c> value, the same value the payload reports in its result status.
+/// </description>
+/// </item>
+/// <item><description>Every other event kind: 0.</description></item>
+/// </list>
+/// </param>
+/// <param name="RawPayloadType">The raw native payload kind.</param>
+/// <param name="Payload">The copied typed payload selected by the payload kind.</param>
+/// <param name="Message">The copied event message, empty when the event carries none.</param>
 public sealed record RuntimeEvent(
     RuntimeEventType Type,
     uint RawType,
@@ -143,6 +179,14 @@ public abstract record RuntimeEventPayload
         int ResultStatus,
         bool Found
     ) : RuntimeEventPayload;
+
+    /// <summary>Payload for a map camera transition-finished event.</summary>
+    /// <param name="TransitionId">
+    /// The transition ID the caller set on the <c>AnimationOptions</c> that started this
+    /// transition. See <c>AnimationOptions.TransitionId</c> for the terminal outcomes this event
+    /// covers.
+    /// </param>
+    public sealed record CameraTransitionFinished(ulong TransitionId) : RuntimeEventPayload;
 
     public sealed record Unknown : RuntimeEventPayload
     {

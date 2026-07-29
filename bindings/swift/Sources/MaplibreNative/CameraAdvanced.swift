@@ -25,15 +25,43 @@ public struct CameraFitOptions: Equatable, Sendable {
   }
 }
 
+/// Geographic constraint applied to the map camera center.
+public enum BoundsConstraint: Equatable, Sendable {
+  /// Keeps the camera center inside the given bounds.
+  case bounded(LatLngBounds)
+  /// Leaves the camera center unconstrained, so the map pans freely across
+  /// the antimeridian. This differs from world bounds of -90/-180 to 90/180,
+  /// which clamp longitude to that range.
+  case unbounded
+
+  init(native: NativeBoundsConstraintInput) {
+    switch native {
+    case let .bounded(bounds):
+      self = .bounded(LatLngBounds(native: bounds))
+    case .unbounded:
+      self = .unbounded
+    }
+  }
+
+  var nativeInput: NativeBoundsConstraintInput {
+    switch self {
+    case let .bounded(bounds):
+      .bounded(bounds.nativeInput)
+    case .unbounded:
+      .unbounded
+    }
+  }
+}
+
 public struct BoundOptions: Equatable, Sendable {
-  public var bounds: LatLngBounds?
+  public var bounds: BoundsConstraint?
   public var minZoom: Double?
   public var maxZoom: Double?
   public var minPitch: Double?
   public var maxPitch: Double?
 
   public init(
-    bounds: LatLngBounds? = nil,
+    bounds: BoundsConstraint? = nil,
     minZoom: Double? = nil,
     maxZoom: Double? = nil,
     minPitch: Double? = nil,
@@ -47,7 +75,7 @@ public struct BoundOptions: Equatable, Sendable {
   }
 
   init(native: NativeBoundOptionsInput) {
-    bounds = native.bounds.map(LatLngBounds.init(native:))
+    bounds = native.bounds.map(BoundsConstraint.init(native:))
     minZoom = native.minZoom
     maxZoom = native.maxZoom
     minPitch = native.minPitch
@@ -322,6 +350,16 @@ public extension MapHandle {
     try mapNativeFailure {
       try checkStatus(mln_map_dump_debug_logs(requireLivePointer()))
     }
+  }
+
+  /// Returns the map's logical viewport size in UI pixels and its pixel ratio.
+  ///
+  /// The size starts at the creation width and height, and follows the attach
+  /// and resize rules documented on `MapOptions`. The scale factor is fixed for
+  /// the lifetime of the map and is independent of any render target's scale
+  /// factor.
+  func size() throws -> (width: UInt32, height: UInt32, scaleFactor: Double) {
+    try mapNativeFailure { try NativeMap.size(requireLivePointer()) }
   }
 
   func viewportOptions() throws -> MapViewportOptions {

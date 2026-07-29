@@ -14,6 +14,7 @@ from maplibre_native import camera, geo, json, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
+    assert_typed_geojson_cluster_source,
     render_until_update,
     skip_or_fail_fixture_setup,
 )
@@ -185,7 +186,7 @@ def wait_for_texture_info(
     fixture.map.set_style_json(EMPTY_STYLE_JSON)
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -208,7 +209,7 @@ def wait_for_opengl_frame(
     request_still_image_if_needed(fixture.map)
     last_frame: render.OpenGLOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -305,6 +306,20 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
 
     assert raised.value.status == mln.MaplibreStatus.INVALID_STATE
     assert not session.closed
+
+
+def test_detached_session_leaves_the_map_free_to_close(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    session = opengl_owned_session.session
+
+    assert_invalid_state(opengl_owned_session.map.close)
+
+    detached = session.detach()
+    opengl_owned_session.map.close()
+    detached.close()
+
+    assert session.closed
 
 
 def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
@@ -574,6 +589,16 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
     opengl_owned_session: OpenGLOwnedSession,
 ) -> None:
     assert_cluster_feature_extensions(
+        opengl_owned_session.runtime,
+        opengl_owned_session.map,
+        opengl_owned_session.session,
+    )
+
+
+def test_typed_geojson_source_options_cluster_nearby_points(
+    opengl_owned_session: OpenGLOwnedSession,
+) -> None:
+    assert_typed_geojson_cluster_source(
         opengl_owned_session.runtime,
         opengl_owned_session.map,
         opengl_owned_session.session,

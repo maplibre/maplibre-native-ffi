@@ -31,9 +31,11 @@ Install the platform prerequisites:
 
 - On macOS Apple Silicon, install Homebrew and Xcode 26.0.1. Mise bootstrap
   installs the required Homebrew packages.
-- On Linux, mise bootstrap installs the compiler and development libraries
-  through apt on Ubuntu and dnf on Fedora. On other distributions, install the
-  packages analogous to those listed in `mise.linux.toml`.
+- On Linux, mise bootstrap installs the development libraries through apt on
+  Ubuntu and dnf on Fedora. On other distributions, install the packages
+  analogous to those listed in `mise.linux.toml`. The Linux presets compile with
+  `zig cc`, which mise installs, so the distribution compiler builds only the
+  tooling around them; see `cmake/toolchains/zig-linux.cmake`.
 - For Android, install the Android SDK packages pinned in `mise.toml`.
 - For OpenHarmony, install the native component of an API 24 SDK.
 
@@ -131,6 +133,11 @@ files. CMake presets define native targets and render backends. CMake uses
 platform SDKs and system libraries where available, and acquires pinned native
 libraries that are not available from system package managers. Gradle selects
 CMake presets and packages Android applications.
+
+Native installs and CPack archives carry the notices for redistributed
+dependencies under `share/maplibre-native-c/licenses`. CMake collects notice
+files from the selected platform and render targets, and generates Rust
+dependency notices from the locked Cargo graph.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

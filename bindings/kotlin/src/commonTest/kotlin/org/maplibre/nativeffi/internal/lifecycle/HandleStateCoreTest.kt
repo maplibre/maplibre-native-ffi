@@ -84,7 +84,7 @@ class HandleStateCoreTest {
   @Test
   fun liveChildrenBlockParentCloseUntilReleased() {
     val state = HandleStateCore("ParentHandle", 0x1234)
-    val child = state.retainChild()
+    val child = state.retainChild("ChildHandle")
     var attempts = 0
 
     val error =
@@ -98,7 +98,7 @@ class HandleStateCoreTest {
       }
 
     assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-    assertEquals("ParentHandle has 1 live child handle(s)", error.diagnostic)
+    assertEquals("ParentHandle has 1 live child handle(s): ChildHandle", error.diagnostic)
     assertEquals(0, attempts)
     assertFalse(state.isReleased())
 
@@ -111,6 +111,40 @@ class HandleStateCoreTest {
         MaplibreStatus.OK.nativeCode
       }
     )
+
+    assertEquals(1, attempts)
+    assertTrue(state.isReleased())
+  }
+
+  @Test
+  fun blockedParentCloseNamesEachLiveChildTypeUntilItIsReleased() {
+    val state = HandleStateCore("MapHandle", 0x1234)
+    val session = state.retainChild("RenderSessionHandle")
+    val projection = state.retainChild("MapProjectionHandle")
+    var attempts = 0
+    val destroy = {
+      attempts += 1
+      MaplibreStatus.OK.nativeCode
+    }
+
+    val bothLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
+    assertEquals(
+      "MapHandle has 2 live child handle(s): MapProjectionHandle, RenderSessionHandle",
+      bothLive.diagnostic,
+    )
+
+    // Releasing one retention early is the path a detached render session takes.
+    session.close()
+
+    val projectionLive = assertFailsWith<InvalidStateException> { state.closeOnce(destroy) }
+    assertEquals(
+      "MapHandle has 1 live child handle(s): MapProjectionHandle",
+      projectionLive.diagnostic,
+    )
+    assertEquals(0, attempts)
+
+    projection.close()
+    state.closeOnce(destroy)
 
     assertEquals(1, attempts)
     assertTrue(state.isReleased())

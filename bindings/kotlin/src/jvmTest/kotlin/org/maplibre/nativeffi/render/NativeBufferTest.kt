@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import org.maplibre.nativeffi.error.InvalidArgumentException
 
 class NativeBufferTest {
   @Test
@@ -12,7 +13,7 @@ class NativeBufferTest {
     assertEquals(4L, buffer.byteLength())
     assertEquals(4, buffer.toByteArray().size)
     buffer.ensureCapacity(4L)
-    assertFailsWith<IllegalArgumentException> { buffer.ensureCapacity(5L) }
+    assertFailsWith<InvalidArgumentException> { buffer.ensureCapacity(5L) }
 
     buffer.close()
     buffer.close()

@@ -30,12 +30,12 @@ class RuntimeHandleTest {
     val runtime = RuntimeHandle.create(RuntimeOptions())
 
     assertFalse(runtime.isClosed)
-    runtime.runOnce()
+    runtime.pump(0)
     runtime.close()
     runtime.close()
 
     assertTrue(runtime.isClosed)
-    assertFailsWith<InvalidStateException> { runtime.runOnce() }
+    assertFailsWith<InvalidStateException> { runtime.pump(0) }
   }
 
   @Test
@@ -149,6 +149,57 @@ class RuntimeHandleTest {
     }
   }
 
+  // BND-154: an installed provider is consulted, a replacement takes over while a
+  // map is live, and a cleared provider leaves requests to the network file source.
+  @Test
+  fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val firstCalls = AtomicInteger(0)
+      val secondCalls = AtomicInteger(0)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, _ ->
+          firstCalls.incrementAndGet()
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
+        assertTrue(firstCalls.get() > 0)
+
+        // Replacing the provider while a map is live is part of the C API contract.
+        runtime.setResourceProvider(
+          ResourceProviderCallback { _, _ ->
+            secondCalls.incrementAndGet()
+            ResourceProviderDecision.PASS_THROUGH
+          }
+        )
+        val firstCallsAfterReplace = firstCalls.get()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/second.json")
+        assertTrue(secondCalls.get() > 0)
+        assertEquals(firstCallsAfterReplace, firstCalls.get())
+
+        runtime.clearResourceProvider()
+        val secondCallsAfterClear = secondCalls.get()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/third.json")
+        assertEquals(firstCallsAfterReplace, firstCalls.get())
+        assertEquals(secondCallsAfterClear, secondCalls.get())
+
+        // Clearing an already cleared provider stays a successful no-op.
+        runtime.clearResourceProvider()
+      } finally {
+        map.close()
+      }
+    }
+  }
+
   @Test
   fun runtimeCloseDuringResourceProviderCallbackRejectsBeforeNativeDestroy() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
@@ -173,7 +224,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("custom://close-during-provider.json")
         assertTrue(
           waitForCondition {
-            runtime.runOnce()
+            runtime.pump(0)
             closeError.get() != null
           }
         )
@@ -208,7 +259,7 @@ class RuntimeHandleTest {
         map.setStyleUrl("http://example.invalid/close-during-transform.json")
         assertTrue(
           waitForCondition {
-            runtime.runOnce()
+            runtime.pump(0)
             closeError.get() != null
           }
         )
@@ -224,7 +275,7 @@ class RuntimeHandleTest {
     operation: OfflineOperationHandle<*>,
   ): RuntimeEventPayload.OfflineOperationCompleted {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
@@ -246,7 +297,7 @@ class RuntimeHandleTest {
     type: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == type && event.mapSource == map) return true
@@ -254,6 +305,38 @@ class RuntimeHandleTest {
       Thread.sleep(1)
     }
     return false
+  }
+
+  /**
+   * Loads a style URL whose scheme no file source serves, so the loading failure that names the
+   * scheme and the URL proves the request reached the network file source.
+   */
+  private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
+    map.setStyleUrl(styleUrl)
+    val message = waitForMapLoadingFailure(runtime, map, styleUrl)
+    assertTrue(message.contains("\"jar\""), "unexpected loading failure message: $message")
+  }
+
+  private fun waitForMapLoadingFailure(
+    runtime: RuntimeHandle,
+    map: MapHandle,
+    styleUrl: String,
+  ): String {
+    repeat(10_000) {
+      runtime.pump(0)
+      while (true) {
+        val event = runtime.pollEvent() ?: break
+        if (
+          event.type == RuntimeEventType.MAP_LOADING_FAILED &&
+            event.mapSource == map &&
+            event.message.contains(styleUrl)
+        ) {
+          return event.message
+        }
+      }
+      Thread.sleep(1)
+    }
+    error("map loading failure for $styleUrl did not arrive")
   }
 
   private fun waitForCondition(condition: () -> Boolean): Boolean {

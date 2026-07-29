@@ -65,6 +65,21 @@ typedef enum mln_style_raster_dem_encoding : uint32_t {
   MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
 } mln_style_raster_dem_encoding;
 
+/** Field mask values for mln_geojson_source_options. */
+typedef enum mln_geojson_source_option_field : uint32_t {
+  MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
+  MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 1U << 1U,
+  MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 1U << 2U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 1U << 4U,
+  MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 1U << 5U,
+  MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 6U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 7U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8U,
+  MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9U,
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10U,
+} mln_geojson_source_option_field;
+
 /** Field mask values for mln_custom_geometry_source_options. */
 typedef enum mln_custom_geometry_source_option_field : uint32_t {
   MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = 1U << 0U,
@@ -119,6 +134,53 @@ typedef struct mln_style_tile_source_options {
   /** One of mln_style_raster_dem_encoding. Defaults to Mapbox. */
   uint32_t raster_encoding;
 } mln_style_tile_source_options;
+
+/**
+ * Options for GeoJSON sources.
+ *
+ * MapLibre Native fixes these options when the source is created, so
+ * mln_map_set_geojson_source_url() and mln_map_set_geojson_source_data() keep
+ * the options the source was added with.
+ */
+typedef struct mln_geojson_source_options {
+  uint32_t size;
+  uint32_t fields;
+  /** Minimum tiling zoom. Defaults to 0. */
+  double min_zoom;
+  /** Maximum tiling zoom. Defaults to 18. */
+  double max_zoom;
+  /** Douglas-Peucker simplification tolerance. Defaults to 0.375. */
+  double tolerance;
+  /** Highest zoom that clusters points. Defaults to 17. */
+  double cluster_max_zoom;
+  /**
+   * Cluster aggregation expressions keyed by property name, as a JSON object
+   * whose members follow the MapLibre Style Spec clusterProperties form. The
+   * descriptor graph is borrowed for the call.
+   */
+  const mln_json_value* cluster_properties;
+  /** Tile extent in pixels. Defaults to 512. */
+  uint32_t tile_size;
+  /** Tile buffer in pixels. Defaults to 128. */
+  uint32_t buffer;
+  /** Cluster radius in pixels. Defaults to 50. */
+  uint32_t cluster_radius;
+  /** Points required to form a cluster. Defaults to 2. */
+  uint32_t cluster_min_points;
+  /** Adds line distance metrics to line features. Defaults to false. */
+  bool line_metrics;
+  /**
+   * Clusters point features. Defaults to false.
+   *
+   * Clustering applies to feature collections whose every feature carries point
+   * geometry. MapLibre Native clusters feature collections only, so
+   * mln_map_add_geojson_source_data() and mln_map_set_geojson_source_data()
+   * reject a bare geometry or a single feature, along with a feature collection
+   * that mixes in other geometry. An empty feature collection stays accepted
+   * and carries nothing to cluster.
+   */
+  bool cluster;
+} mln_geojson_source_options;
 
 /** Canonical tile identity used by custom geometry source callbacks. */
 typedef struct mln_canonical_tile_id {
@@ -189,6 +251,10 @@ typedef struct mln_style_image_info {
 /** Returns default tile source options. */
 MLN_API mln_style_tile_source_options
 mln_style_tile_source_options_default(void) MLN_NOEXCEPT;
+
+/** Returns default GeoJSON source options. */
+MLN_API mln_geojson_source_options
+mln_geojson_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default custom geometry source options. */
 MLN_API mln_custom_geometry_source_options
@@ -377,43 +443,56 @@ MLN_API mln_status mln_map_list_style_source_ids(
 /**
  * Adds a GeoJSON source with URL data.
  *
- * source_id and url are borrowed for the call. The source loads GeoJSON from
- * url through MapLibre Native's resource system.
+ * source_id, url, and options are borrowed for the call. The source loads
+ * GeoJSON from url through MapLibre Native's resource system. options may be
+ * null for defaults, and the options are fixed for the lifetime of the source.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id or url
- *   is invalid or empty, or the source ID already exists.
+ *   is invalid or empty, options is invalid, or the source ID already exists.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) MLN_NOEXCEPT;
 
 /**
  * Adds a GeoJSON source with inline data.
  *
- * source_id and data are borrowed for the call. The accepted GeoJSON descriptor
- * is copied into MapLibre Native before return.
+ * source_id, data, and options are borrowed for the call. The accepted GeoJSON
+ * descriptor is copied into MapLibre Native before return. options may be null
+ * for defaults, and the options are fixed for the lifetime of the source.
+ *
+ * When options enable clustering, the data must be a feature collection whose
+ * every feature carries point geometry. This call checks that before handing
+ * the data to MapLibre Native and names the source and the constraint in the
+ * thread-local diagnostic, so data MapLibre Native would tile without
+ * clustering is reported rather than accepted.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, or the source ID already exists.
+ *   invalid or empty, data is null or invalid, options is invalid, the source
+ *   ID already exists, or clustering is enabled and the data is a bare geometry
+ *   or a single feature, or a feature carries geometry other than a point.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) MLN_NOEXCEPT;
 
 /**
  * Updates one GeoJSON source to load data from a URL.
  *
- * source_id and url are borrowed for the call.
+ * source_id and url are borrowed for the call. The source keeps the
+ * mln_geojson_source_options it was added with.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -432,13 +511,22 @@ MLN_API mln_status mln_map_set_geojson_source_url(
  * Updates one GeoJSON source with inline data.
  *
  * source_id and data are borrowed for the call. The accepted GeoJSON descriptor
- * is copied into MapLibre Native before return.
+ * is copied into MapLibre Native before return. The source keeps the
+ * mln_geojson_source_options it was added with.
+ *
+ * When the source was added with clustering enabled, the data must be a feature
+ * collection whose every feature carries point geometry. This call checks that
+ * before handing the data to MapLibre Native and names the source and the
+ * constraint in the thread-local diagnostic, so data MapLibre Native would tile
+ * without clustering is reported rather than accepted.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
- *   invalid or empty, data is null or invalid, the source does not exist, or
- *   the source is not a GeoJSON source.
+ *   invalid or empty, data is null or invalid, the source does not exist, the
+ *   source is not a GeoJSON source, or the source clusters and the data is a
+ *   bare geometry or a single feature, or a feature carries geometry other than
+ *   a point.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.

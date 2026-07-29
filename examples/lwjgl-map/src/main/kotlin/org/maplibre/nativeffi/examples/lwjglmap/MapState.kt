@@ -1,97 +1,124 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import org.lwjgl.vulkan.VK10
+import kotlin.math.max
+import kotlin.math.min
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.map.MapOptions
-import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.MetalContextDescriptor
-import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
-import org.maplibre.nativeffi.render.NativePointer
-import org.maplibre.nativeffi.render.RenderSessionHandle
-import org.maplibre.nativeffi.render.RenderTargetExtent
-import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
-import org.maplibre.nativeffi.render.VulkanContextDescriptor
-import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
-import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
+import org.maplibre.nativeffi.runtime.WakeSource
 
+/**
+ * Runtime and map, owned for their whole lifetime by the runtime loop thread.
+ *
+ * The render target is not here: it belongs to the render loop thread, which owns the window and
+ * the graphics context.
+ */
 internal class MapState
-private constructor(
-  private val runtime: RuntimeHandle,
-  val map: MapHandle,
-  private val renderTarget: RenderTarget,
-) : AutoCloseable {
-  private var renderPending = true
+private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : AutoCloseable {
 
-  fun resize(viewport: Viewport) {
-    if (renderTarget.needsReattachOnResize()) {
-      renderTarget.reattach(viewport)
-    } else {
-      renderTarget.resize(viewport)
+  /** Acquires the wake source the render loop uses to release this loop's parked pump. */
+  fun acquireWakeSource(): WakeSource = runtime.acquireWakeSource()
+
+  /** One runtime loop iteration: apply queued commands, pump once, drain events. */
+  fun step(commands: CommandQueue, renderRequest: RenderRequest) {
+    for (command in commands.drain()) {
+      apply(command)
     }
-    renderPending = true
-  }
-
-  fun requestRender() {
-    renderPending = true
-  }
-
-  fun step(): Boolean {
-    runtime.runOnce()
-    drainEvents()
-    if (!renderPending) {
-      return false
+    // This thread has no display to pace it, so it takes its cadence from the runtime's own work
+    // and parks in between. The render loop signals the wake source, so the bound is a backstop
+    // rather than the cadence.
+    runtime.pump(PARK_TIMEOUT_MS)
+    if (drainEvents()) {
+      renderRequest.set()
     }
-    val rendered =
-      if (renderTarget.needsMetalAutoreleasePool()) {
-        MacObjectiveC.autoreleasePool().use { renderTarget.renderUpdate() }
-      } else {
-        renderTarget.renderUpdate()
-      }
-    renderPending = !rendered
-    return true
   }
 
-  private fun drainEvents() {
+  /**
+   * Applies one decoded camera command. Runs on the map's thread, which is why the
+   * read-modify-write commands read the current camera here rather than on the render loop that
+   * produced them.
+   */
+  private fun apply(command: CameraCommand) {
+    when (command) {
+      is CameraCommand.CancelTransitions -> map.cancelTransitions()
+      is CameraCommand.MoveBy -> map.moveBy(command.dx, command.dy)
+      is CameraCommand.MoveByAnimated ->
+        map.moveByAnimated(command.dx, command.dy, animation(command.durationMs))
+
+      is CameraCommand.ScaleBy -> map.scaleBy(command.scale, command.anchor)
+      is CameraCommand.ScaleByAnimated ->
+        map.scaleByAnimated(command.scale, command.anchor, animation(command.durationMs))
+
+      is CameraCommand.PitchBy -> map.pitchBy(command.delta)
+      is CameraCommand.AdjustBearing -> map.jumpTo(bearingCamera(command.delta))
+      is CameraCommand.AdjustBearingAnimated ->
+        map.easeTo(bearingCamera(command.delta), animation(command.durationMs))
+
+      is CameraCommand.AdjustPitchAnimated ->
+        map.easeTo(pitchCamera(command.delta), animation(command.durationMs))
+
+      is CameraCommand.ResetOrientation ->
+        map.easeTo(
+          CameraOptions().apply {
+            bearing = 0.0
+            pitch = 0.0
+          },
+          animation(command.durationMs),
+        )
+    }
+  }
+
+  private fun bearingCamera(delta: Double): CameraOptions =
+    CameraOptions().apply { bearing = (map.camera.bearing ?: 0.0) + delta }
+
+  private fun pitchCamera(delta: Double): CameraOptions =
+    CameraOptions().apply { pitch = max(0.0, min(60.0, (map.camera.pitch ?: 0.0) + delta)) }
+
+  /** Drains runtime events, reporting whether the map wants another frame. */
+  private fun drainEvents(): Boolean {
+    var renderUpdateAvailable = false
     while (true) {
-      val event = runtime.pollEvent() ?: return
-      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
-        renderPending = true
+      val event = runtime.pollEvent() ?: return renderUpdateAvailable
+      if (event.mapSource != map) {
+        continue
+      }
+      if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE) {
+        renderUpdateAvailable = true
       } else if (
         event.type == RuntimeEventType.MAP_RENDER_FRAME_FINISHED &&
-          event.mapSource == map &&
           (event.payload as? RuntimeEventPayload.RenderFrame)?.needsRepaint == true
       ) {
-        renderPending = true
+        renderUpdateAvailable = true
       }
     }
   }
 
   override fun close() {
     try {
-      renderTarget.close()
+      map.close()
     } finally {
-      try {
-        map.close()
-      } finally {
-        runtime.close()
-      }
+      runtime.close()
     }
   }
 
   companion object {
     private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
 
-    fun create(graphics: GraphicsContext, viewport: Viewport, mode: RenderTargetMode): MapState {
-      val runtimeOptions = RuntimeOptions().apply { cachePath = ":memory:" }
-      val runtime = RuntimeHandle.create(runtimeOptions)
+    /**
+     * Backstop for the runtime loop's park. The render loop's wake source is what normally releases
+     * it, so this only bounds a pump that nothing signals.
+     */
+    private const val PARK_TIMEOUT_MS = 100L
+
+    fun create(viewport: Viewport): MapState {
+      val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
       val mapOptions =
         MapOptions().apply {
           width = viewport.width()
@@ -99,8 +126,13 @@ private constructor(
           scaleFactor = viewport.scaleFactor()
           mapMode = MapMode.CONTINUOUS
         }
-      val map = MapHandle.create(runtime, mapOptions)
-      var target: RenderTarget? = null
+      val map =
+        try {
+          MapHandle.create(runtime, mapOptions)
+        } catch (error: RuntimeException) {
+          runtime.close()
+          throw error
+        }
       try {
         map.setStyleUrl(STYLE_URL)
         map.jumpTo(
@@ -111,411 +143,15 @@ private constructor(
             pitch = 30.0
           }
         )
-        target = attachRenderTarget(graphics, map, viewport, mode)
-        return MapState(runtime, map, target)
+        return MapState(runtime, map)
       } catch (error: RuntimeException) {
-        target?.close()
         map.close()
         runtime.close()
         throw error
       }
     }
 
-    private fun attachRenderTarget(
-      graphics: GraphicsContext,
-      map: MapHandle,
-      viewport: Viewport,
-      mode: RenderTargetMode,
-    ): RenderTarget =
-      when (graphics) {
-        is MetalContext -> attachMetalRenderTarget(graphics, map, viewport, mode)
-        is VulkanContext -> attachVulkanRenderTarget(graphics, map, viewport, mode)
-        is OpenGLContext -> OpenGLRenderTarget.attach(graphics, map, viewport, mode)
-        else -> error("Unsupported graphics context: ${graphics.backend()}")
-      }
-
-    private fun attachVulkanRenderTarget(
-      vulkan: VulkanContext,
-      map: MapHandle,
-      viewport: Viewport,
-      mode: RenderTargetMode,
-    ): RenderTarget =
-      when (mode) {
-        RenderTargetMode.NATIVE_SURFACE -> {
-          val descriptor =
-            VulkanSurfaceDescriptor(
-              extent(viewport),
-              vulkanContextDescriptor(vulkan),
-              NativePointer.ofAddress(vulkan.surfaceAddress()),
-            )
-          VulkanSurfaceRenderTarget(map.attachVulkanSurface(descriptor))
-        }
-        RenderTargetMode.OWNED_TEXTURE -> attachOwnedTextureRenderTarget(vulkan, map, viewport)
-        RenderTargetMode.BORROWED_TEXTURE ->
-          attachBorrowedTextureRenderTarget(vulkan, map, viewport)
-      }
-
-    private fun attachMetalRenderTarget(
-      metal: MetalContext,
-      map: MapHandle,
-      viewport: Viewport,
-      mode: RenderTargetMode,
-    ): RenderTarget =
-      when (mode) {
-        RenderTargetMode.NATIVE_SURFACE -> {
-          val descriptor =
-            MetalSurfaceDescriptor(
-              extent(viewport),
-              metalContextDescriptor(metal),
-              NativePointer.ofAddress(metal.layerAddress()),
-            )
-          MetalSurfaceRenderTarget(map.attachMetalSurface(descriptor))
-        }
-        RenderTargetMode.OWNED_TEXTURE -> attachMetalOwnedTextureRenderTarget(metal, map, viewport)
-        RenderTargetMode.BORROWED_TEXTURE ->
-          attachMetalBorrowedTextureRenderTarget(metal, map, viewport)
-      }
-
-    private fun attachOwnedTextureRenderTarget(
-      vulkan: VulkanContext,
-      map: MapHandle,
-      viewport: Viewport,
-    ): RenderTarget {
-      val descriptor =
-        VulkanOwnedTextureDescriptor(extent(viewport), vulkanContextDescriptor(vulkan))
-      var session: RenderSessionHandle? = null
-      var compositor: VulkanTextureCompositor? = null
-      try {
-        session = map.attachVulkanOwnedTexture(descriptor)
-        compositor = VulkanTextureCompositor(vulkan, viewport)
-        return VulkanOwnedTextureRenderTarget(session, compositor)
-      } catch (error: RuntimeException) {
-        closeSuppressed(error, compositor)
-        closeSuppressed(error, session)
-        throw error
-      }
-    }
-
-    private fun attachBorrowedTextureRenderTarget(
-      vulkan: VulkanContext,
-      map: MapHandle,
-      viewport: Viewport,
-    ): RenderTarget {
-      var image: VulkanBorrowedImage? = null
-      var session: RenderSessionHandle? = null
-      var compositor: VulkanTextureCompositor? = null
-      try {
-        image = VulkanBorrowedImage.create(vulkan, viewport)
-        val descriptor =
-          VulkanBorrowedTextureDescriptor(
-              extent(viewport),
-              viewport.framebufferWidth(),
-              viewport.framebufferHeight(),
-              vulkanContextDescriptor(vulkan),
-              NativePointer.ofAddress(image.imageAddress()),
-              NativePointer.ofAddress(image.viewAddress()),
-              VK10.VK_FORMAT_R8G8B8A8_UNORM,
-              VK10.VK_IMAGE_LAYOUT_UNDEFINED,
-            )
-            .apply { finalLayout = VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL }
-        session = map.attachVulkanBorrowedTexture(descriptor)
-        compositor = VulkanTextureCompositor(vulkan, viewport)
-        return VulkanBorrowedTextureRenderTarget(vulkan, map, session, compositor, image)
-      } catch (error: RuntimeException) {
-        closeSuppressed(error, compositor)
-        closeSuppressed(error, session)
-        closeSuppressed(error, image)
-        throw error
-      }
-    }
-
-    private fun vulkanContextDescriptor(vulkan: VulkanContext): VulkanContextDescriptor =
-      VulkanContextDescriptor(
-        NativePointer.ofAddress(vulkan.instanceAddress()),
-        NativePointer.ofAddress(vulkan.physicalDeviceAddress()),
-        NativePointer.ofAddress(vulkan.deviceAddress()),
-        NativePointer.ofAddress(vulkan.graphicsQueueAddress()),
-        vulkan.graphicsQueueFamilyIndex(),
-        NativePointer.ofAddress(vulkan.getInstanceProcAddrAddress()),
-        NativePointer.ofAddress(vulkan.getDeviceProcAddrAddress()),
-      )
-
-    private fun attachMetalOwnedTextureRenderTarget(
-      metal: MetalContext,
-      map: MapHandle,
-      viewport: Viewport,
-    ): RenderTarget {
-      val descriptor = MetalOwnedTextureDescriptor(extent(viewport), metalContextDescriptor(metal))
-      var session: RenderSessionHandle? = null
-      var compositor: MetalTextureCompositor? = null
-      try {
-        session = map.attachMetalOwnedTexture(descriptor)
-        compositor = MetalTextureCompositor(metal)
-        return MetalOwnedTextureRenderTarget(session, compositor)
-      } catch (error: RuntimeException) {
-        closeSuppressed(error, compositor)
-        closeSuppressed(error, session)
-        throw error
-      }
-    }
-
-    private fun attachMetalBorrowedTextureRenderTarget(
-      metal: MetalContext,
-      map: MapHandle,
-      viewport: Viewport,
-    ): RenderTarget {
-      var texture: MetalBorrowedTexture? = null
-      var session: RenderSessionHandle? = null
-      var compositor: MetalTextureCompositor? = null
-      try {
-        texture = MetalBorrowedTexture(metal, viewport)
-        val descriptor =
-          MetalBorrowedTextureDescriptor(
-            extent(viewport),
-            viewport.framebufferWidth(),
-            viewport.framebufferHeight(),
-            NativePointer.ofAddress(texture.texture()),
-          )
-        session = map.attachMetalBorrowedTexture(descriptor)
-        compositor = MetalTextureCompositor(metal)
-        return MetalBorrowedTextureRenderTarget(metal, map, session, compositor, texture)
-      } catch (error: RuntimeException) {
-        closeSuppressed(error, compositor)
-        closeSuppressed(error, session)
-        closeSuppressed(error, texture)
-        throw error
-      }
-    }
-
-    private fun metalContextDescriptor(metal: MetalContext): MetalContextDescriptor =
-      MetalContextDescriptor(NativePointer.ofAddress(metal.deviceAddress()))
-
-    fun extent(viewport: Viewport): RenderTargetExtent =
-      RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor())
-
-    fun closeSuppressed(error: RuntimeException, closeable: AutoCloseable?) {
-      if (closeable == null) {
-        return
-      }
-      try {
-        closeable.close()
-      } catch (cleanupError: Exception) {
-        error.addSuppressed(cleanupError)
-      }
-    }
-  }
-
-  private class VulkanSurfaceRenderTarget(private val session: RenderSessionHandle) : RenderTarget {
-    override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
-    }
-
-    override fun renderUpdate(): Boolean = session.renderUpdate()
-
-    override fun close() {
-      session.close()
-    }
-  }
-
-  private class MetalSurfaceRenderTarget(private val session: RenderSessionHandle) : RenderTarget {
-    override fun needsMetalAutoreleasePool(): Boolean = true
-
-    override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
-    }
-
-    override fun renderUpdate(): Boolean = session.renderUpdate()
-
-    override fun close() {
-      session.close()
-    }
-  }
-
-  private class VulkanOwnedTextureRenderTarget(
-    private val session: RenderSessionHandle,
-    private val compositor: VulkanTextureCompositor,
-  ) : RenderTarget {
-    override fun resize(viewport: Viewport) {
-      compositor.resize(viewport)
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
-    }
-
-    override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
-        return false
-      }
-      session.acquireVulkanOwnedTextureFrame().use { frameHandle ->
-        val frame = frameHandle.frame()
-        check(frame.width() > 0 && frame.height() > 0) {
-          "MapLibre returned an empty Vulkan owned texture frame"
-        }
-        check(frame.layout() == VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-          "MapLibre owned texture frame is not shader-readable: layout=${frame.layout()}"
-        }
-        compositor.drawImageView(frame.imageView().address)
-      }
-      return true
-    }
-
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        session.close()
-      }
-    }
-  }
-
-  private class MetalOwnedTextureRenderTarget(
-    private val session: RenderSessionHandle,
-    private val compositor: MetalTextureCompositor,
-  ) : RenderTarget {
-    override fun needsMetalAutoreleasePool(): Boolean = true
-
-    override fun resize(viewport: Viewport) {
-      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor())
-    }
-
-    override fun renderUpdate(): Boolean {
-      if (!session.renderUpdate()) {
-        return false
-      }
-      session.acquireMetalOwnedTextureFrame().use { frameHandle ->
-        val frame = frameHandle.frame()
-        check(frame.width() != 0 && frame.height() != 0 && !frame.texture().isNull) {
-          "owned Metal frame has an empty extent or null texture"
-        }
-        compositor.drawTexture(frame.texture().address)
-      }
-      return true
-    }
-
-    override fun close() {
-      try {
-        compositor.close()
-      } finally {
-        session.close()
-      }
-    }
-  }
-
-  private class VulkanBorrowedTextureRenderTarget(
-    private val vulkan: VulkanContext,
-    private val map: MapHandle,
-    private var session: RenderSessionHandle?,
-    private var compositor: VulkanTextureCompositor?,
-    private var image: VulkanBorrowedImage?,
-  ) : RenderTarget {
-    override fun needsReattachOnResize(): Boolean = true
-
-    override fun reattach(viewport: Viewport) {
-      close()
-      val replacement = attachBorrowedTextureRenderTarget(vulkan, map, viewport)
-      if (replacement is VulkanBorrowedTextureRenderTarget) {
-        session = replacement.session
-        compositor = replacement.compositor
-        image = replacement.image
-        replacement.session = null
-        replacement.compositor = null
-        replacement.image = null
-      } else {
-        error("unexpected borrowed texture replacement")
-      }
-    }
-
-    override fun resize(viewport: Viewport) {
-      error("borrowed texture resize requires render target reattachment")
-    }
-
-    override fun renderUpdate(): Boolean {
-      val currentSession = checkNotNull(session) { "Vulkan borrowed texture session is detached" }
-      val currentCompositor =
-        checkNotNull(compositor) { "Vulkan borrowed texture compositor is detached" }
-      val currentImage = checkNotNull(image) { "Vulkan borrowed image is detached" }
-      if (!currentSession.renderUpdate()) {
-        return false
-      }
-      currentCompositor.drawImageView(currentImage.view())
-      return true
-    }
-
-    override fun close() {
-      val closingCompositor = compositor
-      val closingSession = session
-      val closingImage = image
-      compositor = null
-      session = null
-      image = null
-      try {
-        closingCompositor?.close()
-      } finally {
-        try {
-          closingSession?.close()
-        } finally {
-          closingImage?.close()
-        }
-      }
-    }
-  }
-
-  private class MetalBorrowedTextureRenderTarget(
-    private val metal: MetalContext,
-    private val map: MapHandle,
-    private var session: RenderSessionHandle?,
-    private var compositor: MetalTextureCompositor?,
-    private var texture: MetalBorrowedTexture?,
-  ) : RenderTarget {
-    override fun needsMetalAutoreleasePool(): Boolean = true
-
-    override fun needsReattachOnResize(): Boolean = true
-
-    override fun reattach(viewport: Viewport) {
-      close()
-      val replacement = attachMetalBorrowedTextureRenderTarget(metal, map, viewport)
-      if (replacement is MetalBorrowedTextureRenderTarget) {
-        session = replacement.session
-        compositor = replacement.compositor
-        texture = replacement.texture
-        replacement.session = null
-        replacement.compositor = null
-        replacement.texture = null
-      } else {
-        error("unexpected borrowed texture replacement")
-      }
-    }
-
-    override fun resize(viewport: Viewport) {
-      error("borrowed texture resize requires render target reattachment")
-    }
-
-    override fun renderUpdate(): Boolean {
-      val currentSession = checkNotNull(session) { "Metal borrowed texture session is detached" }
-      val currentCompositor =
-        checkNotNull(compositor) { "Metal borrowed texture compositor is detached" }
-      val currentTexture = checkNotNull(texture) { "Metal borrowed texture is detached" }
-      if (!currentSession.renderUpdate()) {
-        return false
-      }
-      currentCompositor.drawTexture(currentTexture.texture())
-      return true
-    }
-
-    override fun close() {
-      val closingCompositor = compositor
-      val closingSession = session
-      val closingTexture = texture
-      compositor = null
-      session = null
-      texture = null
-      try {
-        closingCompositor?.close()
-      } finally {
-        try {
-          closingSession?.close()
-        } finally {
-          closingTexture?.close()
-        }
-      }
-    }
+    private fun animation(durationMs: Double): AnimationOptions =
+      AnimationOptions().apply { this.durationMs = durationMs }
   }
 }

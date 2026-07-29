@@ -1,11 +1,14 @@
+import com.android.build.api.variant.KotlinMultiplatformAndroidComponentsExtension
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import java.io.File
 import org.gradle.api.provider.Provider
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.tasks.bundling.Zip
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.jetbrains.kotlin.gradle.tasks.CInteropProcess
 import org.maplibre.nativeffi.gradle.AndroidTarget
 import org.maplibre.nativeffi.gradle.HostPlatform
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
@@ -15,6 +18,8 @@ import org.maplibre.nativeffi.gradle.MaplibreRuntimeTargetFamily
 import org.maplibre.nativeffi.gradle.VerifyAndroidRuntimeBackend
 import org.maplibre.nativeffi.gradle.VerifyMaplibreRuntimeInstall
 import org.maplibre.nativeffi.gradle.canonicalizeKmpRootMetadata
+import org.maplibre.nativeffi.gradle.embedMaplibreLicenseBundle
+import org.maplibre.nativeffi.gradle.requiredEnvironmentVariable
 
 data class NativeTargetConfiguration(val definitionFileName: String, val targetPlatform: String)
 
@@ -44,15 +49,13 @@ fun nativeTargets(
   targetFamily: MaplibreRuntimeTargetFamily,
 ): Map<String, NativeTargetConfiguration> =
   when (targetFamily) {
-    // The OpenGL and Vulkan runtimes reach Linux through the JVM and Android
-    // artifacts. Kotlin/Native links the runtime archive statically, and its
-    // Linux toolchain targets a far older glibc than the archive requires, so
-    // these backends register no Kotlin/Native targets.
+    // Linux arm64 is absent because Kotlin/Native has no arm64 Linux host, so
+    // that target would have to be cross-compiled from x64.
     MaplibreRuntimeTargetFamily.LINUX -> {
       require(backend != MaplibreRuntimeBackend.METAL) {
         "Metal does not support the Linux runtime target family"
       }
-      emptyMap()
+      mapOf("linuxX64" to NativeTargetConfiguration("linux-${backend.id}.def", "linux-x64"))
     }
     MaplibreRuntimeTargetFamily.APPLE -> {
       require(backend == MaplibreRuntimeBackend.METAL) {
@@ -140,6 +143,9 @@ fun configureJvmRuntimeArtifacts(
         include("*.dll")
         into(resourcePath)
       }
+      from(runtimeInstall.installDirectory.resolve("share/maplibre-native-c/licenses")) {
+        into("META-INF/licenses/maplibre-native-c")
+      }
       from(rootProject.file("LICENSE")) { into("META-INF") }
     }
   }
@@ -205,6 +211,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
     AndroidTarget.parseAbis(
       providers.gradleProperty("maplibre.android.abis").getOrElse(AndroidTarget.DEFAULT_ABIS)
     )
+  val selectedInstalls = mutableListOf<File>()
   androidTargets.forEach { target ->
     val preset = target.cmakePreset(backend.id)
     val propertyName =
@@ -218,6 +225,7 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         .map { rootProject.file(it).resolve(preset).resolve("install") }
         .orElse(prebuiltInstallRoot.map { rootProject.file(it).resolve(preset) })
         .getOrElse(rootProject.file("build/$preset/install"))
+    selectedInstalls.add(selectedInstall)
     val verifyInput =
       registerRuntimeInstallVerification(
         taskName = "verifyAndroid${target.taskSuffix}RuntimePublicationInput",
@@ -229,6 +237,34 @@ fun configureAndroidRuntimePublication(backend: MaplibreRuntimeBackend) {
         targetPlatform = target.targetPlatform,
       )
     verifyPublicationInputs.configure { dependsOn(verifyInput) }
+  }
+
+  val licenseInstall = selectedInstalls.first()
+  // Resolve the NOTICE from the SDK Gradle selected, which is the same SDK the
+  // redistributed libc++_shared.so is taken from. Reading ANDROID_HOME directly
+  // would pair the library with a notice from a different NDK whenever
+  // local.properties or ANDROID_SDK_ROOT selects another SDK.
+  val androidNdkVersion = requiredEnvironmentVariable("MLN_FFI_ANDROID_NDK_VERSION")
+  val androidNdkNotice =
+    extensions
+      .getByType<KotlinMultiplatformAndroidComponentsExtension>()
+      .sdkComponents
+      .sdkDirectory
+      .map { it.file("ndk/$androidNdkVersion/NOTICE") }
+  val licenseDirectory = licenseInstall.resolve("share/maplibre-native-c/licenses")
+  tasks.withType<Zip>().configureEach {
+    if (name == "bundleAndroidMainAar") {
+      // A missing directory would otherwise be skipped silently and ship an AAR
+      // with no native notices at all.
+      doFirst {
+        check(licenseDirectory.isDirectory) {
+          "Native license notices are missing at $licenseDirectory; the install " +
+            "this AAR is assembled from predates the license bundle."
+        }
+      }
+      from(licenseDirectory) { into("META-INF/licenses/maplibre-native-c") }
+      from(androidNdkNotice) { into("META-INF/licenses/android-ndk") }
+    }
   }
 
   tasks.configureEach {
@@ -276,8 +312,8 @@ extensions.configure<KotlinMultiplatformExtension> {
     val runtimeInstallDir =
       configuredInstall.map(rootProject::file).getOrElse(maplibreNativeC.installDir)
 
-    compilations.getByName("main") {
-      cinterops.create("maplibreNativeRuntime") {
+    val runtimeInterop =
+      compilations.getByName("main").cinterops.create("maplibreNativeRuntime") {
         defFile(runtimeInteropDirectory.file(targetConfiguration.definitionFileName))
         includeDirs.headerFilterOnly(runtimeInteropDirectory.asFile)
         compilerOpts("-I${runtimeInteropDirectory.asFile}")
@@ -288,6 +324,16 @@ extensions.configure<KotlinMultiplatformExtension> {
           "libmaplibre-native-c.a",
         )
       }
+
+    val runtimeArchive = runtimeInstallDir.resolve("lib/libmaplibre-native-c.a")
+    val runtimeLicenseDirectory = runtimeInstallDir.resolve("share/maplibre-native-c/licenses")
+    tasks.named<CInteropProcess>(runtimeInterop.interopProcessingTaskName) {
+      // cinterop takes the archive through -staticLibrary, which Gradle cannot
+      // see, so the task would otherwise stay up to date across a rebuild of the
+      // archive and embed a stale copy in the published KLIB. A file collection
+      // tolerates the archive being absent on a host that does not build it.
+      inputs.files(runtimeArchive).withPropertyName("maplibreNativeCArchive")
+      embedMaplibreLicenseBundle(runtimeLicenseDirectory)
     }
 
     val verifyPublicationInput =
@@ -331,7 +377,11 @@ canonicalizeKmpRootMetadata(
   targetModules =
     when (targetFamily) {
       MaplibreRuntimeTargetFamily.LINUX ->
-        mapOf("android" to "$mavenArtifact-android", "jvm" to "$mavenArtifact-jvm")
+        mapOf(
+          "android" to "$mavenArtifact-android",
+          "jvm" to "$mavenArtifact-jvm",
+          "linuxX64" to "$mavenArtifact-linuxx64",
+        )
       MaplibreRuntimeTargetFamily.APPLE ->
         mapOf(
           "iosArm64" to "$mavenArtifact-iosarm64",

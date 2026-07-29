@@ -14,7 +14,7 @@ fn requestRepaintOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void 
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -39,16 +39,16 @@ test "runtime and map vertical slice" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
 
-    try runtime.runOnce();
+    try runtime.pump(0);
     try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try runtime.runOnce();
+    try runtime.pump(0);
 
     try map.close();
-    try runtime.runOnce();
+    try runtime.pump(0);
 
     var map_after_close = try maplibre.MapHandle.create(&runtime, .{});
     defer map_after_close.close() catch @panic("map close failed");
@@ -80,7 +80,7 @@ test "copied runtime and map handles share closed state" {
 
     try runtime.close();
     try runtime_alias.close();
-    try testing.expectError(error.ClosedHandle, runtime_alias.runOnce());
+    try testing.expectError(error.ClosedHandle, runtime_alias.pump(0));
 }
 
 test "successful close releases lifecycle handles" {
@@ -120,6 +120,29 @@ test "map options validate through public binding" {
     try testing.expectError(error.InvalidArgument, maplibre.MapHandle.create(&runtime, .{ .scale_factor = 0 }));
 }
 
+test "map creation accepts FastPFOR decoding" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{ .fast_pfor_enabled = true });
+    defer map.close() catch @panic("map close failed");
+}
+
+// Unset fields take the C API defaults rather than values this binding repeats,
+// so mln_map_options_default() stays the single source for them.
+test "unset map options take the C creation defaults" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const size = try map.getSize();
+    try testing.expectEqual(@as(u32, 256), size.width);
+    try testing.expectEqual(@as(u32, 256), size.height);
+    try testing.expectEqual(@as(f64, 1.0), size.scale_factor);
+}
+
 test "continuous repaint request makes render update available" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -156,7 +179,7 @@ test "runtime supports multiple maps" {
     var second = try maplibre.MapHandle.create(&runtime, .{});
     defer second.close() catch @panic("second map close failed");
 
-    try runtime.runOnce();
+    try runtime.pump(0);
 }
 
 test "live map string methods reject embedded NUL before C calls" {

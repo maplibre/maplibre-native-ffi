@@ -460,7 +460,6 @@ auto webgpu_owned_texture_attach(
   try {
     auto session = std::make_unique<mln_render_session>();
     session->map = map;
-    session->owner_thread = map_owner_thread(map);
     set_session_extent(*session, descriptor->extent);
     session->texture.api_kind = TextureSessionApi::WebGPU;
     session->texture.mode = TextureSessionMode::Owned;
@@ -526,7 +525,6 @@ auto webgpu_borrowed_texture_attach(
   try {
     auto session = std::make_unique<mln_render_session>();
     session->map = map;
-    session->owner_thread = map_owner_thread(map);
     set_borrowed_session_extent(
       *session, descriptor->extent, descriptor->physical_width,
       descriptor->physical_height

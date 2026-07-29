@@ -234,7 +234,7 @@ auto fill_frame(
     static_cast<MTL::Texture*>(texture->texture.rendered_native_texture);
   if (metal_texture == nullptr) {
     mln::core::set_thread_error("rendered Metal texture is not available");
-    return MLN_STATUS_INVALID_STATE;
+    return MLN_STATUS_NATIVE_ERROR;
   }
 
   *out_frame = mln_metal_owned_texture_frame{
@@ -297,7 +297,7 @@ auto metal_owned_texture_attach(
   mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -322,7 +322,6 @@ auto metal_owned_texture_attach(
 
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
-  session->owner_thread = map_owner_thread(map);
   set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Metal;
   session->texture.mode = TextureSessionMode::Owned;
@@ -344,7 +343,7 @@ auto metal_borrowed_texture_attach(
   mln_map* map, const mln_metal_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -362,7 +361,6 @@ auto metal_borrowed_texture_attach(
 
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
-  session->owner_thread = map_owner_thread(map);
   set_borrowed_session_extent(
     *session, descriptor->extent, descriptor->physical_width,
     descriptor->physical_height
@@ -519,7 +517,7 @@ auto vulkan_owned_texture_attach(
   mln_map* map, const mln_vulkan_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -549,7 +547,7 @@ auto vulkan_borrowed_texture_attach(
   mln_map* map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -579,7 +577,7 @@ auto opengl_owned_texture_attach(
   mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -609,7 +607,7 @@ auto opengl_borrowed_texture_attach(
   mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }

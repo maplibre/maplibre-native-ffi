@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Stage, verify, or publish Kotlin Multiplatform snapshots."
+#MISE shell="bash"
 #MISE tools={java="{{vars.java_version}}"}
 
 set -euo pipefail
@@ -9,8 +10,8 @@ install_root="${MISE_MONOREPO_ROOT}/build/packages/kotlin/install"
 staging_base="${MISE_MONOREPO_ROOT}/build/packages/kotlin"
 
 usage() {
-  echo "usage: $(basename "$0") stage <android|apple>" >&2
-  echo "       $(basename "$0") publish-leaves <android|apple>" >&2
+  echo "usage: $(basename "$0") stage <linux|apple>" >&2
+  echo "       $(basename "$0") publish-leaves <linux|apple>" >&2
   echo "       $(basename "$0") publish-roots apple" >&2
   echo "       $(basename "$0") verify <maven-staging>" >&2
 }
@@ -34,12 +35,14 @@ prepare_native_inputs() {
   local presets=()
 
   case "$partition" in
-    android)
+    linux)
       presets=(
         android-arm64-egl
         android-arm64-vulkan
         android-x64-egl
         android-x64-vulkan
+        linux-x64-egl
+        linux-x64-vulkan
       )
       ;;
     apple)
@@ -99,7 +102,7 @@ publish_tasks() {
   ./gradlew "${tasks[@]}" "$@"
 }
 
-publish_android_leaves() {
+publish_linux_leaves() {
   local repository="$1"
   shift
   local common=(
@@ -129,6 +132,26 @@ publish_android_leaves() {
     "$@" \
     "${common[@]}" \
     -Pmaplibre.android.backend=vulkan
+
+  publish_tasks \
+    :bindings:kotlin \
+    "$repository" \
+    LinuxX64 -- \
+    "$@"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-opengl \
+    "$repository" \
+    LinuxX64 -- \
+    "$@" \
+    -Pmaplibre.runtime.opengl.linuxX64.installDir="$install_root/linux-x64-egl"
+
+  publish_tasks \
+    :bindings:kotlin-runtime-vulkan \
+    "$repository" \
+    LinuxX64 -- \
+    "$@" \
+    -Pmaplibre.runtime.vulkan.linuxX64.installDir="$install_root/linux-x64-vulkan"
 }
 
 publish_apple_leaves() {
@@ -224,8 +247,8 @@ publish_leaf_partition() {
   shift 2
 
   case "$partition" in
-    android)
-      publish_android_leaves "$repository" "$@"
+    linux)
+      publish_linux_leaves "$repository" "$@"
       ;;
     apple)
       publish_apple_leaves "$repository" "$@"
@@ -254,7 +277,7 @@ partition="${2:-}"
 case "$operation" in
   stage)
     case "$partition" in
-      android | apple) ;;
+      linux | apple) ;;
       *)
         usage
         exit 2
@@ -270,7 +293,7 @@ case "$operation" in
     ;;
   publish-leaves)
     case "$partition" in
-      android | apple) ;;
+      linux | apple) ;;
       *)
         usage
         exit 2

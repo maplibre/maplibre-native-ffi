@@ -5,6 +5,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ExperimentalForeignApi
+import org.maplibre.nativeffi.error.InvalidArgumentException
 
 @OptIn(ExperimentalForeignApi::class)
 class NativeBufferTest : org.maplibre.nativeffi.NativeTestBase() {
@@ -17,7 +18,7 @@ class NativeBufferTest : org.maplibre.nativeffi.NativeTestBase() {
     assertEquals(4L, buffer.byteLength())
     assertEquals(4, buffer.toByteArray().size)
     buffer.ensureCapacity(4UL)
-    assertFailsWith<IllegalArgumentException> { buffer.ensureCapacity(5UL) }
+    assertFailsWith<InvalidArgumentException> { buffer.ensureCapacity(5UL) }
 
     buffer.close()
     buffer.close()

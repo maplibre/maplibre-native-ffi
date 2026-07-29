@@ -1,7 +1,7 @@
 // Emscripten run loop without libuv. Default platform uses libuv for async wake
 // and FD watches; libuv's Emscripten port is not wired in this build. Worker
 // pthreads block on a condition variable; the main thread is driven by
-// mln_runtime_run_once() from requestAnimationFrame.
+// mln_runtime_pump() from requestAnimationFrame.
 
 #include <cassert>
 #include <stdexcept>

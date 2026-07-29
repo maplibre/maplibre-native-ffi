@@ -35,7 +35,7 @@ internal constructor(
     ::mln_resource_request_release,
 ) : AutoCloseable {
   private val core = ResourceRequestHandleCore { releaser(handle) }
-  @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.releaseIfOwned() }
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.close() }
 
   public actual fun complete(response: ResourceResponse) {
     val operation = core.beginComplete()

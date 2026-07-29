@@ -14,18 +14,9 @@ internal interface IRenderTarget : IDisposable
 
 internal static class RenderTargetFactory
 {
-    public static IRenderTarget Attach(
-        IGraphicsContext graphics,
-        MapState mapState,
-        RenderTargetMode mode
-    )
-    {
-        ArgumentNullException.ThrowIfNull(graphics);
-        ArgumentNullException.ThrowIfNull(mapState);
-
-        return Attach(graphics, mapState.Map, mode);
-    }
-
+    /// <summary>
+    /// Attaches a render session on the calling thread, which owns it for its whole lifetime.
+    /// </summary>
     public static IRenderTarget Attach(
         IGraphicsContext graphics,
         MapHandle map,

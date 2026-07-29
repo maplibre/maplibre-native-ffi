@@ -98,7 +98,7 @@ public sealed unsafe class StyleJsonTests
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
 
-        map.AddGeoJsonSourceUrl("geo-url", "https://example.test/data.geojson");
+        map.AddGeoJsonSourceUrl("geo-url", "https://example.test/data.geojson", null);
         map.SetGeoJsonSourceUrl("geo-url", "https://example.test/other.geojson");
         map.AddVectorSourceTiles(
             "vector-tiles",

@@ -25,9 +25,12 @@ set(MLN_EMSCRIPTEN_ALLOW_MEMORY_GROWTH OFF
 set(MLN_EMSCRIPTEN_MAXIMUM_MEMORY "2048MB"
     CACHE STRING "Maximum WASM linear memory when growth is enabled")
 
-add_compile_options(-fwasm-exceptions)
+# Emdawn WebGPU uses Asyncify for synchronous promise waits. Keep Emscripten's
+# JavaScript exception model because native Wasm exceptions cannot mix with
+# Asyncify.
+add_compile_options(-fexceptions)
 add_link_options(
-  -fwasm-exceptions "-sINITIAL_MEMORY=${MLN_EMSCRIPTEN_INITIAL_MEMORY}"
+  -fexceptions "-sINITIAL_MEMORY=${MLN_EMSCRIPTEN_INITIAL_MEMORY}"
   "-sSTACK_SIZE=${MLN_EMSCRIPTEN_STACK_SIZE}")
 
 if(MLN_EMSCRIPTEN_USE_PTHREADS)

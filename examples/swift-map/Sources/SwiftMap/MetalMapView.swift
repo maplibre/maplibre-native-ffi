@@ -2,18 +2,31 @@ import AppKit
 import MaplibreNative
 import QuartzCore
 
+/// The display-paced render loop.
+///
+/// This view runs on the main thread, which is the render loop thread: it owns
+/// the window, input decoding, the Metal objects, and the render session for
+/// the session's whole lifetime. The runtime and the map live on the runtime
+/// loop thread this view starts, and ``Channels`` is the only state that
+/// crosses between the two.
+///
+/// Input handlers never touch the map. They decode events into camera commands,
+/// because a read-modify-write camera change has to run whole on the map's own
+/// thread.
 @MainActor
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
   private let input = InputController()
   private let mode: RenderTargetMode
+  private let channels = Channels()
   private var graphics: MetalGraphicsContext?
-  private var mapState: MapState?
+  private var renderTarget: MetalRenderTarget?
+  private var runtimeLoop: RuntimeLoopThread?
   private var timer: Timer?
   private var currentViewport: Viewport?
-  private var renderPending = true
   private var consecutiveRenderFailures = 0
   private var didLogStartupStatus = false
+  private var isShutDown = false
   private var setupError: Error?
   private var errorLabel: NSTextField?
 
@@ -40,7 +53,7 @@ final class MetalMapView: NSView {
       object: nil
     )
     if let setupError {
-      showError(setupError)
+      showError(String(describing: setupError))
     }
   }
 
@@ -62,15 +75,26 @@ final class MetalMapView: NSView {
     }
   }
 
+  /// Closes the session before the runtime loop closes the map, because native
+  /// refuses to destroy a map that still has a session attached.
   @objc private func shutdown() {
+    guard !isShutDown else { return }
+    isShutDown = true
     timer?.invalidate()
     timer = nil
     do {
-      try mapState?.close()
+      try renderTarget?.close()
     } catch {
       print(error)
     }
-    mapState = nil
+    renderTarget = nil
+    if runtimeLoop != nil {
+      channels.requestShutdown()
+      if !channels.waitForRuntimeLoopExit(timeout: 5.0) {
+        print("runtime loop did not finish before the shutdown deadline")
+      }
+      runtimeLoop = nil
+    }
     NotificationCenter.default.removeObserver(self)
   }
 
@@ -85,46 +109,47 @@ final class MetalMapView: NSView {
   }
 
   override func mouseDown(with event: NSEvent) {
-    handleInput { map in try input.mouseDown(event, map: map) }
+    requestRenderIfCameraChanged(input.mouseDown(event, commands: channels))
   }
 
   override func rightMouseDown(with event: NSEvent) {
-    handleInput { map in try input.rightMouseDown(event, map: map) }
+    requestRenderIfCameraChanged(
+      input.rightMouseDown(event, commands: channels)
+    )
   }
 
   override func mouseUp(with event: NSEvent) {
-    if input.mouseUp(event) { renderPending = true }
+    requestRenderIfCameraChanged(input.mouseUp(event))
   }
 
   override func rightMouseUp(with event: NSEvent) {
-    if input.mouseUp(event) { renderPending = true }
+    requestRenderIfCameraChanged(input.mouseUp(event))
   }
 
   override func mouseDragged(with event: NSEvent) {
-    handleInput { map in try input.mouseDragged(event, map: map) }
+    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
   }
 
   override func rightMouseDragged(with event: NSEvent) {
-    handleInput { map in try input.mouseDragged(event, map: map) }
+    requestRenderIfCameraChanged(input.mouseDragged(event, commands: channels))
   }
 
   override func scrollWheel(with event: NSEvent) {
-    handleInput { map in try input.scrollWheel(event, map: map, in: self) }
+    requestRenderIfCameraChanged(
+      input.scrollWheel(event, commands: channels, in: self)
+    )
   }
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    handleInput { map in
-      try input.keyDown(event, map: map, viewport: viewport)
-    }
+    requestRenderIfCameraChanged(
+      input.keyDown(event, commands: channels, viewport: viewport)
+    )
   }
 
-  private func handleInput(_ action: (MapHandle) throws -> Bool) {
-    guard let map = mapState?.map else { return }
-    do {
-      if try action(map) { renderPending = true }
-    } catch {
-      print(error)
+  private func requestRenderIfCameraChanged(_ cameraChanged: Bool) {
+    if cameraChanged {
+      channels.setRenderRequest()
     }
   }
 
@@ -140,8 +165,21 @@ final class MetalMapView: NSView {
     RunLoop.main.add(timer!, forMode: .common)
   }
 
+  /// Starts the runtime loop once a non-empty viewport is known, because the
+  /// map takes its initial extent from it.
+  ///
+  /// The runtime loop needs a native thread whose identity is stable for its
+  /// whole life, so it is a `Thread` rather than a `DispatchQueue`, an `actor`,
+  /// or a `Task`.
+  private func startRuntimeLoopIfNeeded(viewport: Viewport) {
+    guard runtimeLoop == nil, !isShutDown else { return }
+    let loop = RuntimeLoopThread(channels: channels, viewport: viewport)
+    runtimeLoop = loop
+    loop.start()
+  }
+
   private func updateViewport() {
-    guard setupError == nil else { return }
+    guard !isShutDown, setupError == nil else { return }
     guard let graphics else { return }
     let viewport = readViewport()
 
@@ -150,56 +188,100 @@ final class MetalMapView: NSView {
     viewport.log(label)
     if viewport.isEmpty {
       currentViewport = viewport
-      renderPending = false
       return
     }
 
     do {
       graphics.resize(viewport)
-      if mapState == nil {
-        mapState = try MapState(
-          mode: mode,
-          viewport: viewport,
-          graphics: graphics
-        )
-        if !didLogStartupStatus {
-          logStartupStatus(mode: mode)
-          didLogStartupStatus = true
+      if let renderTarget {
+        if renderTarget.needsReattachOnResize {
+          // The host texture is fixed to the viewport size, so close the
+          // session and let the next tick attach a replacement against a fresh
+          // texture. Both halves run here, on the thread that owns the session
+          // either way.
+          try renderTarget.close()
+          self.renderTarget = nil
+        } else {
+          try renderTarget.resize(viewport)
         }
-      } else {
-        try mapState?.resize(viewport, graphics: graphics)
       }
       currentViewport = viewport
-      renderPending = true
+      channels.setRenderRequest()
+      startRuntimeLoopIfNeeded(viewport: viewport)
     } catch {
       print(error)
-      showError(error)
+      showError(String(describing: error))
+    }
+  }
+
+  /// Attaches the render session on this thread.
+  ///
+  /// Attach records the calling thread as the session's owner, so it happens
+  /// here, where the Metal objects live and where every later session call
+  /// runs.
+  private func attachIfNeeded() {
+    guard renderTarget == nil,
+          let graphics,
+          let viewport = currentViewport,
+          !viewport.isEmpty,
+          let attachRef = channels.attachRef()
+    else { return }
+
+    do {
+      renderTarget = try MetalRenderTarget.attach(
+        mode: mode,
+        attachRef: attachRef,
+        graphics: graphics,
+        viewport: viewport
+      )
+      if !didLogStartupStatus {
+        logStartupStatus(mode: mode)
+        didLogStartupStatus = true
+      }
+      channels.setRenderRequest()
+    } catch {
+      fail(String(describing: error))
     }
   }
 
   private func tick() {
-    guard let mapState else { return }
+    guard !isShutDown else { return }
+    if let failureMessage = channels.failureMessage {
+      fail(failureMessage)
+      return
+    }
+    attachIfNeeded()
+    guard let renderTarget,
+          let viewport = currentViewport,
+          !viewport.isEmpty
+    else { return }
+
     do {
-      try mapState.runOnce()
-      renderPending = try mapState.drainEvents() || renderPending
-      try mapState.finishFrame()
-      guard let viewport = currentViewport, !viewport.isEmpty else { return }
-      guard renderPending else { return }
-      if try mapState.render() {
-        renderPending = false
-        consecutiveRenderFailures = 0
+      // Consume the request before rendering, so one the runtime loop publishes
+      // during the render call is not discarded, and set it again when nothing
+      // was rendered.
+      if channels.consumeRenderRequest() {
+        let rendered = try renderTarget.renderUpdate()
+        if !rendered {
+          channels.setRenderRequest()
+        }
       }
+      try renderTarget.finishFrame()
+      consecutiveRenderFailures = 0
     } catch {
       print(error)
       consecutiveRenderFailures += 1
       if consecutiveRenderFailures >= 3 {
-        timer?.invalidate()
-        timer = nil
-        showError(error)
-        shutdown()
-        NSApp.terminate(nil)
+        fail(String(describing: error))
       }
     }
+  }
+
+  private func fail(_ message: String) {
+    print(message)
+    showError(message)
+    shutdown()
+    NSApp.terminate(nil)
   }
 
   private func readViewport() -> Viewport {
@@ -224,7 +306,7 @@ final class MetalMapView: NSView {
     )
   }
 
-  private func showError(_ error: Error) {
+  private func showError(_ message: String) {
     if errorLabel == nil {
       let label = NSTextField(labelWithString: "")
       label.translatesAutoresizingMaskIntoConstraints = false
@@ -245,6 +327,6 @@ final class MetalMapView: NSView {
       ])
       errorLabel = label
     }
-    errorLabel?.stringValue = String(describing: error)
+    errorLabel?.stringValue = message
   }
 }

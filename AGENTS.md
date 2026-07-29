@@ -9,8 +9,8 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `include/` — Public C API headers (the stable ABI surface).
 - `src/` — C++ implementation behind the C headers, plus render backend adapters
   (Vulkan, Metal, OpenGL) and the Zig test support shim.
-- `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET) that wrap the
-  C API in idiomatic target-language interfaces.
+- `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET, Python, Go,
+  Dart) that wrap the C API in idiomatic target-language interfaces.
 - `examples/` — Small demo apps per language/backend (`zig-map`, `rust-map`,
   `zig-readback`, `lwjgl-map`, `swift-map`).
 - `third_party/` — Vendored dependencies, primarily the MapLibre Native git

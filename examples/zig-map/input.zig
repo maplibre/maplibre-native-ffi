@@ -2,7 +2,7 @@ const std = @import("std");
 const maplibre = @import("maplibre_native");
 
 const c = @import("c.zig").c;
-const diagnostics = @import("diagnostics.zig");
+const channel = @import("channel.zig");
 const types = @import("types.zig");
 
 const DragMode = enum {
@@ -20,6 +20,12 @@ pub const Result = struct {
     camera_changed: bool = false,
 };
 
+/// Decodes host input into camera commands.
+///
+/// This runs on the render loop, which does not own the map, so it only
+/// produces commands; the runtime loop applies them on the map's owner thread.
+/// Anything needing the current viewport is converted to logical map
+/// coordinates here, where the viewport lives.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
     last_x: f64 = 0,
@@ -28,16 +34,15 @@ pub const Controller = struct {
     pub fn handleEvent(
         self: *Controller,
         event: *const c.SDL_Event,
-        map: *maplibre.MapHandle,
-        diagnostic_store: *const maplibre.DiagnosticStore,
+        commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
-    ) !Result {
+    ) Result {
         return switch (event.type) {
-            c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, map, diagnostic_store, current_viewport),
+            c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, commands, current_viewport),
             c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button),
-            c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, map, diagnostic_store, current_viewport),
-            c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, map, diagnostic_store, current_viewport),
-            c.SDL_EVENT_KEY_DOWN => handleKeyDown(event.key, map, diagnostic_store, current_viewport),
+            c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, commands, current_viewport),
+            c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, commands, current_viewport),
+            c.SDL_EVENT_KEY_DOWN => handleKeyDown(event.key, commands, current_viewport),
             else => .{},
         };
     }
@@ -45,10 +50,9 @@ pub const Controller = struct {
     fn handleMouseButtonDown(
         self: *Controller,
         button: c.SDL_MouseButtonEvent,
-        map: *maplibre.MapHandle,
-        diagnostic_store: *const maplibre.DiagnosticStore,
+        commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
-    ) !Result {
+    ) Result {
         const cursor = logicalPoint(button.x, button.y, current_viewport);
         self.last_x = cursor.x;
         self.last_y = cursor.y;
@@ -56,11 +60,9 @@ pub const Controller = struct {
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
 
-        try expectCameraStatus(
-            map.cancelTransitions(),
-            "cancel camera transitions failed",
-            diagnostic_store,
-        );
+        // Queued ahead of the drag's own commands, so the transition stops
+        // before the first delta lands.
+        commands.push(.cancel_transitions);
         self.drag_mode = mode;
         return .{ .handled = true };
     }
@@ -78,10 +80,9 @@ pub const Controller = struct {
     fn handleMouseMotion(
         self: *Controller,
         motion: c.SDL_MouseMotionEvent,
-        map: *maplibre.MapHandle,
-        diagnostic_store: *const maplibre.DiagnosticStore,
+        commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
-    ) !Result {
+    ) Result {
         const cursor = logicalPoint(motion.x, motion.y, current_viewport);
         const x = cursor.x;
         const y = cursor.y;
@@ -96,19 +97,19 @@ pub const Controller = struct {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return .{ .handled = true };
-                try expectCameraStatus(map.moveBy(dx, dy), "camera pan failed", diagnostic_store);
+                commands.push(.{ .move_by = .{ .dx = dx, .dy = dy } });
             },
             .rotate => {
                 const dx = x - self.last_x;
                 const dy = y - self.last_y;
                 if (dx == 0 and dy == 0) return .{ .handled = true };
-                try adjustBearing(map, dx * 0.5, diagnostic_store);
-                try expectCameraStatus(map.pitchBy(dy / 2.0), "camera pitch failed", diagnostic_store);
+                commands.push(.{ .adjust_bearing = .{ .delta = dx * 0.5 } });
+                commands.push(.{ .pitch_by = .{ .delta = dy / 2.0 } });
             },
             .pitch => {
                 const dy = y - self.last_y;
                 if (dy == 0) return .{ .handled = true };
-                try expectCameraStatus(map.pitchBy(dy / 2.0), "camera pitch failed", diagnostic_store);
+                commands.push(.{ .pitch_by = .{ .delta = dy / 2.0 } });
             },
         }
         return .{ .handled = true, .camera_changed = true };
@@ -132,30 +133,27 @@ pub fn logControls() void {
 
 fn handleMouseWheel(
     wheel: c.SDL_MouseWheelEvent,
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
+    commands: *channel.CommandQueue,
     current_viewport: types.Viewport,
-) !Result {
+) Result {
     const delta: f64 = wheel.y;
     if (delta == 0) return .{ .handled = true };
 
     const anchor = logicalPoint(wheel.mouse_x, wheel.mouse_y, current_viewport);
     const scale = std.math.pow(f64, 2.0, delta * 0.25);
-    try expectCameraStatus(map.scaleBy(scale, anchor), "camera zoom failed", diagnostic_store);
+    commands.push(.{ .scale_by = .{ .scale = scale, .anchor = anchor } });
     return .{ .handled = true, .camera_changed = true };
 }
 
 fn handleKeyDown(
     key: c.SDL_KeyboardEvent,
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
+    commands: *channel.CommandQueue,
     current_viewport: types.Viewport,
-) !Result {
+) Result {
     const pan_step = 120.0;
     const zoom_step = 1.25;
     const bearing_step = 10.0;
     const pitch_step = 5.0;
-    const animation = cameraAnimation(keyboard_animation_ms);
     const center = point(
         @as(f64, @floatFromInt(current_viewport.logical_width)) / 2.0,
         @as(f64, @floatFromInt(current_viewport.logical_height)) / 2.0,
@@ -163,33 +161,37 @@ fn handleKeyDown(
 
     switch (key.scancode) {
         scancode(c.SDL_SCANCODE_LEFT), scancode(c.SDL_SCANCODE_A) => {
-            try expectCameraStatus(map.moveByAnimated(pan_step, 0, animation), "keyboard pan failed", diagnostic_store);
+            commands.push(.{ .move_by_animated = .{ .dx = pan_step, .dy = 0, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_RIGHT), scancode(c.SDL_SCANCODE_D) => {
-            try expectCameraStatus(map.moveByAnimated(-pan_step, 0, animation), "keyboard pan failed", diagnostic_store);
+            commands.push(.{ .move_by_animated = .{ .dx = -pan_step, .dy = 0, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_UP), scancode(c.SDL_SCANCODE_W) => {
-            try expectCameraStatus(map.moveByAnimated(0, pan_step, animation), "keyboard pan failed", diagnostic_store);
+            commands.push(.{ .move_by_animated = .{ .dx = 0, .dy = pan_step, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_DOWN), scancode(c.SDL_SCANCODE_S) => {
-            try expectCameraStatus(map.moveByAnimated(0, -pan_step, animation), "keyboard pan failed", diagnostic_store);
+            commands.push(.{ .move_by_animated = .{ .dx = 0, .dy = -pan_step, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_EQUALS), scancode(c.SDL_SCANCODE_KP_PLUS) => {
-            try expectCameraStatus(map.scaleByAnimated(zoom_step, center, animation), "keyboard zoom failed", diagnostic_store);
+            commands.push(.{ .scale_by_animated = .{ .scale = zoom_step, .anchor = center, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_MINUS), scancode(c.SDL_SCANCODE_KP_MINUS) => {
-            try expectCameraStatus(map.scaleByAnimated(1.0 / zoom_step, center, animation), "keyboard zoom failed", diagnostic_store);
+            commands.push(.{ .scale_by_animated = .{ .scale = 1.0 / zoom_step, .anchor = center, .duration_ms = keyboard_animation_ms } });
         },
-        scancode(c.SDL_SCANCODE_Q) => try adjustBearingAnimated(map, -bearing_step, animation, diagnostic_store),
-        scancode(c.SDL_SCANCODE_E) => try adjustBearingAnimated(map, bearing_step, animation, diagnostic_store),
+        scancode(c.SDL_SCANCODE_Q) => {
+            commands.push(.{ .adjust_bearing_animated = .{ .delta = -bearing_step, .duration_ms = keyboard_animation_ms } });
+        },
+        scancode(c.SDL_SCANCODE_E) => {
+            commands.push(.{ .adjust_bearing_animated = .{ .delta = bearing_step, .duration_ms = keyboard_animation_ms } });
+        },
         scancode(c.SDL_SCANCODE_RIGHTBRACKET) => {
-            try adjustPitchAnimated(map, pitch_step, animation, diagnostic_store);
+            commands.push(.{ .adjust_pitch_animated = .{ .delta = pitch_step, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_LEFTBRACKET) => {
-            try adjustPitchAnimated(map, -pitch_step, animation, diagnostic_store);
+            commands.push(.{ .adjust_pitch_animated = .{ .delta = -pitch_step, .duration_ms = keyboard_animation_ms } });
         },
         scancode(c.SDL_SCANCODE_0) => {
-            try resetPitchAndBearingAnimated(map, cameraAnimation(reset_animation_ms), diagnostic_store);
+            commands.push(.{ .reset_orientation = .{ .duration_ms = reset_animation_ms } });
         },
         else => return .{},
     }
@@ -204,81 +206,6 @@ fn dragModeForButton(button: u8) DragMode {
     const mod_state = @as(c_uint, c.SDL_GetModState());
     if ((mod_state & c.SDL_KMOD_CTRL) != 0) return .rotate;
     return .pan;
-}
-
-fn adjustBearing(
-    map: *maplibre.MapHandle,
-    delta: f64,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    const camera = try currentCamera(map, diagnostic_store);
-    try expectCameraStatus(
-        map.jumpTo(.{ .bearing = (camera.bearing orelse 0) + delta }),
-        "keyboard rotate failed",
-        diagnostic_store,
-    );
-}
-
-fn adjustBearingAnimated(
-    map: *maplibre.MapHandle,
-    delta: f64,
-    animation: maplibre.AnimationOptions,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    const camera = try currentCamera(map, diagnostic_store);
-    try expectCameraStatus(
-        map.easeTo(.{ .bearing = (camera.bearing orelse 0) + delta }, animation),
-        "keyboard rotate failed",
-        diagnostic_store,
-    );
-}
-
-fn adjustPitchAnimated(
-    map: *maplibre.MapHandle,
-    delta: f64,
-    animation: maplibre.AnimationOptions,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    const camera = try currentCamera(map, diagnostic_store);
-    const current_pitch = camera.pitch orelse 0;
-    try expectCameraStatus(
-        map.easeTo(.{ .pitch = clamp(current_pitch + delta, 0.0, 60.0) }, animation),
-        "keyboard pitch failed",
-        diagnostic_store,
-    );
-}
-
-fn resetPitchAndBearingAnimated(
-    map: *maplibre.MapHandle,
-    animation: maplibre.AnimationOptions,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    try expectCameraStatus(
-        map.easeTo(.{ .bearing = 0, .pitch = 0 }, animation),
-        "camera reset failed",
-        diagnostic_store,
-    );
-}
-
-fn currentCamera(
-    map: *maplibre.MapHandle,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !maplibre.CameraOptions {
-    return map.getCamera() catch |err| {
-        diagnostics.logError("camera snapshot failed", err, diagnostic_store);
-        return types.AppError.CameraCommandFailed;
-    };
-}
-
-fn expectCameraStatus(
-    result: maplibre.Error!void,
-    message: []const u8,
-    diagnostic_store: *const maplibre.DiagnosticStore,
-) !void {
-    result catch |err| {
-        diagnostics.logError(message, err, diagnostic_store);
-        return types.AppError.CameraCommandFailed;
-    };
 }
 
 fn point(x: f64, y: f64) maplibre.ScreenPoint {
@@ -298,16 +225,6 @@ fn logicalCoordinate(value: f64, window_size: u32, logical_size: u32) f64 {
         @as(f64, @floatFromInt(window_size));
 }
 
-fn cameraAnimation(duration_ms: f64) maplibre.AnimationOptions {
-    return .{ .duration_ms = duration_ms };
-}
-
 fn scancode(value: c_int) c.SDL_Scancode {
     return @intCast(value);
-}
-
-fn clamp(value: f64, min: f64, max: f64) f64 {
-    if (value < min) return min;
-    if (value > max) return max;
-    return value;
 }

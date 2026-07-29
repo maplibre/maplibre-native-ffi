@@ -29,6 +29,16 @@ enum NativeMap {
     }.value
   }
 
+  static func size(_ map: OpaquePointer) throws
+    -> (width: UInt32, height: UInt32, scaleFactor: Double)
+  {
+    var width: UInt32 = 0
+    var height: UInt32 = 0
+    var scaleFactor: Double = 0
+    try checkStatus(mln_map_get_size(map, &width, &height, &scaleFactor))
+    return (width: width, height: height, scaleFactor: scaleFactor)
+  }
+
   static func viewportOptions(_ map: OpaquePointer) throws
     -> mln_map_viewport_options
   {

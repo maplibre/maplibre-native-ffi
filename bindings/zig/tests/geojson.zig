@@ -6,7 +6,7 @@ const support = @import("support.zig");
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
-        try runtime.runOnce();
+        try runtime.pump(0);
         while (try runtime.pollEvent(testing.allocator)) |event| {
             var owned_event = event;
             defer owned_event.deinit();
@@ -39,7 +39,7 @@ test "GeoJSON descriptors add and update sources through public binding" {
     defer map.close() catch @panic("map close failed");
 
     const empty_features = [_]maplibre.Feature{};
-    try map.addGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = empty_features[0..] });
+    try map.addGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = empty_features[0..] }, null);
     try testing.expect(try map.styleSourceExists(testing.allocator, "empty"));
 
     var source_ids = try map.listStyleSourceIds(testing.allocator);
@@ -58,11 +58,18 @@ test "GeoJSON descriptors add and update sources through public binding" {
     try map.setGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = features[0..] });
     try map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson");
 
-    try map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson");
+    try map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson", .{
+        .min_zoom = 1,
+        .max_zoom = 16,
+        .tolerance = 0.5,
+        .buffer = 0,
+        .tile_size = 256,
+        .line_metrics = true,
+    });
     try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "geo-url")).?);
     try map.setGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/updated.geojson");
 
-    try testing.expectError(error.InvalidArgument, map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson"));
+    try testing.expectError(error.InvalidArgument, map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson", null));
     try map.addVectorSourceUrl(testing.allocator, "vector-url", "https://example.com/vector.json", null);
     try testing.expectError(error.InvalidArgument, map.setGeoJsonSourceUrl(testing.allocator, "vector-url", "https://example.com/not-geojson"));
 }
@@ -89,7 +96,7 @@ test "geometry descriptor graphs support nested collections" {
         .{ .polygon = rings[0..] },
     };
 
-    try map.addGeoJsonSourceData(testing.allocator, "collection", .{ .geometry = .{ .collection = children[0..] } });
+    try map.addGeoJsonSourceData(testing.allocator, "collection", .{ .geometry = .{ .collection = children[0..] } }, null);
     try testing.expect(try map.styleSourceExists(testing.allocator, "collection"));
 }
 
@@ -101,7 +108,7 @@ test "GeoJSON descriptors reject invalid native values and pass explicit-length 
 
     try testing.expectError(
         error.InvalidArgument,
-        map.addGeoJsonSourceData(testing.allocator, "", .{ .geometry = .{ .empty = {} } }),
+        map.addGeoJsonSourceData(testing.allocator, "", .{ .geometry = .{ .empty = {} } }, null),
     );
     try testing.expectError(
         error.InvalidArgument,
@@ -109,13 +116,14 @@ test "GeoJSON descriptors reject invalid native values and pass explicit-length 
             testing.allocator,
             "bad-coordinate",
             .{ .geometry = .{ .point = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } } },
+            null,
         ),
     );
     const features = [_]maplibre.Feature{.{
         .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } },
         .identifier = .{ .string = "bad\x00id" },
     }};
-    try map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", .{ .feature_collection = features[0..] });
+    try map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", .{ .feature_collection = features[0..] }, null);
     try testing.expect(try map.styleSourceExists(testing.allocator, "embedded-nul-id"));
 }
 
@@ -139,6 +147,54 @@ test "geometry coordinate spans remain stable across nested materialization" {
         testing.allocator,
         "many-lines",
         .{ .geometry = .{ .multi_line_string = lines[0..] } },
+        null,
     );
     try testing.expect(try map.styleSourceExists(testing.allocator, "many-lines"));
+}
+
+test "GeoJSON source options carry cluster settings and reject malformed cluster properties" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const first_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 1 } }};
+    const second_properties = [_]maplibre.JsonMember{.{ .key = "rank", .value = .{ .uint = 2 } }};
+    const features = [_]maplibre.Feature{
+        .{ .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } }, .properties = first_properties[0..] },
+        .{ .geometry = .{ .point = .{ .latitude = 0.001, .longitude = 0.001 } }, .properties = second_properties[0..] },
+    };
+    const rank_expression = [_]maplibre.JsonValue{ .{ .string = "get" }, .{ .string = "rank" } };
+    const total_expression = [_]maplibre.JsonValue{ .{ .string = "+" }, .{ .array = rank_expression[0..] } };
+    const cluster_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = total_expression[0..] } }};
+    // MapLibre Native parses the aggregation expressions while the descriptor is borrowed, so a
+    // source that adds successfully proves the nested cluster property tree crossed the boundary.
+    try map.addGeoJsonSourceData(
+        testing.allocator,
+        "clustered",
+        .{ .feature_collection = features[0..] },
+        .{
+            .min_zoom = 0,
+            .buffer = 0,
+            .cluster = true,
+            .cluster_radius = 50,
+            .cluster_min_points = 2,
+            .cluster_max_zoom = 14,
+            .cluster_properties = .{ .object = cluster_properties[0..] },
+        },
+    );
+    try testing.expect(try map.styleSourceExists(testing.allocator, "clustered"));
+
+    // Options are fixed at creation, so replacing the data keeps the clustered source usable.
+    try map.setGeoJsonSourceData(testing.allocator, "clustered", .{ .feature_collection = features[0..] });
+    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "clustered")).?);
+
+    const malformed_expression = [_]maplibre.JsonValue{.{ .string = "+" }};
+    const malformed_properties = [_]maplibre.JsonMember{.{ .key = "total", .value = .{ .array = malformed_expression[0..] } }};
+    try testing.expectError(error.InvalidArgument, map.addGeoJsonSourceData(
+        testing.allocator,
+        "malformed-clustered",
+        .{ .feature_collection = features[0..] },
+        .{ .cluster = true, .cluster_properties = .{ .object = malformed_properties[0..] } },
+    ));
 }

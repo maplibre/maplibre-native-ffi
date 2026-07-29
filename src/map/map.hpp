@@ -26,6 +26,7 @@ auto map_viewport_options_default() noexcept -> mln_map_viewport_options;
 auto map_tile_options_default() noexcept -> mln_map_tile_options;
 auto style_tile_source_options_default() noexcept
   -> mln_style_tile_source_options;
+auto geojson_source_options_default() noexcept -> mln_geojson_source_options;
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options;
 auto premultiplied_rgba8_image_default() noexcept
@@ -70,10 +71,12 @@ auto map_copy_style_source_attribution(
 auto map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids)
   -> mln_status;
 auto map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) -> mln_status;
 auto map_set_geojson_source_url(
   mln_map* map, mln_string_view source_id, mln_string_view url
@@ -253,6 +256,10 @@ auto map_get_rendering_stats_view_enabled(mln_map* map, bool* out_enabled)
   -> mln_status;
 auto map_is_fully_loaded(mln_map* map, bool* out_loaded) -> mln_status;
 auto map_dump_debug_logs(mln_map* map) -> mln_status;
+auto map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) -> mln_status;
 auto map_get_viewport_options(
   mln_map* map, mln_map_viewport_options* out_options
 ) -> mln_status;
@@ -358,9 +365,23 @@ auto map_get_free_camera_options(
 auto map_set_free_camera_options(
   mln_map* map, const mln_free_camera_options* options
 ) -> mln_status;
+// Validates a map handle is non-null and live, from any thread. Use this only
+// where the caller genuinely runs off the map owner thread, such as the render
+// session detaching from its own owner thread. Everything that touches
+// thread-affine map state uses validate_map().
+auto validate_map_live(mln_map* map) -> mln_status;
 auto validate_map(mln_map* map) -> mln_status;
-auto map_owner_thread(const mln_map* map) -> std::thread::id;
+auto map_scale_factor(const mln_map* map) -> double;
+// Map-thread only. Code reachable from a render session's owner thread uses the
+// posting helpers below instead.
 auto map_native(mln_map* map) -> mbgl::Map*;
+
+// Queue a map mutation for the map's owner thread. Callable from any thread;
+// the effect lands on the map's next mln_runtime_pump(). Returns
+// MLN_STATUS_INVALID_ARGUMENT when the map handle is null or no longer live.
+auto map_post_set_size(mln_map* map, uint32_t width, uint32_t height)
+  -> mln_status;
+auto map_post_trigger_repaint(mln_map* map) -> mln_status;
 auto map_latest_update(mln_map* map) -> std::shared_ptr<mbgl::UpdateParameters>;
 auto map_renderer_observer(mln_map* map) -> mbgl::RendererObserver*;
 auto map_run_render_jobs(mln_map* map) -> void;

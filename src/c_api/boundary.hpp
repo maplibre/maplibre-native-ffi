@@ -2,6 +2,7 @@
 
 #include <exception>
 
+#include "c_api/autorelease_pool.hpp"
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 
@@ -11,7 +12,7 @@ template <typename Function>
 auto status_boundary(Function function) noexcept -> mln_status {
   mln::core::clear_thread_error();
   try {
-    return function();
+    return with_autorelease_pool(function);
   } catch (const std::exception& exception) {
     mln::core::set_thread_error(exception);
     return MLN_STATUS_NATIVE_ERROR;

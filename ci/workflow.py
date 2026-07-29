@@ -44,9 +44,9 @@ def runner(preset: str) -> str:
     if target_platform == "browser":
         return "ubuntu-latest"
     if target_platform == "linux":
-        # Linux runners are pinned because the runner image's glibc sets the
-        # minimum glibc our published natives require. See the glibc_floor
-        # variable in mise.linux.toml.
+        # The zig toolchain sets the glibc floor, so the runner image no longer
+        # decides it. These stay pinned for reproducibility; the graphics
+        # loaders and drivers the tests use still come from the image.
         return "ubuntu-24.04-arm" if target_architecture == "arm64" else "ubuntu-24.04"
     if target_platform in {"macos", "ios", "ios-simulator"}:
         return "macos-26"
@@ -150,6 +150,30 @@ def uses_zig(commands: list[str]) -> bool:
     )
 
 
+GRADLE_PROJECTS = (
+    "mise run //bindings/kotlin:",
+    "mise run //examples/android-map:",
+    "mise run //examples/compose-map:",
+    "mise run //examples/lwjgl-map:",
+    "mise run //:kotlin:",
+)
+
+
+def uses_gradle(commands: list[str]) -> bool:
+    """Whether a row runs any Gradle build.
+
+    `setup-gradle` restores a Gradle user home, and stops the daemons in its
+    post-action so Windows file locks do not outlive the job. A row that runs no
+    Gradle build has neither to manage, and pays the action's setup and teardown
+    for an empty cache entry.
+    """
+    return any(
+        command.startswith(project)
+        for command in commands
+        for project in GRADLE_PROJECTS
+    )
+
+
 def preset_sets(
     presets: dict[str, object],
 ) -> tuple[list[str], set[str], set[str], set[str]]:
@@ -183,16 +207,23 @@ def target_rows(
 ) -> list[dict[str, object]]:
     configured, _, tested, packaged = preset_sets(presets)
     rows = []
+    # The toolchain cache key covers the runner OS, architecture and image, so
+    # one row per runner label is enough to write every entry the others read.
+    claimed_runners: set[str] = set()
     for preset in configured:
         native = native_commands(preset, tested)
         consumers = consumer_commands(source, preset)
+        row_runner = runner(preset)
         row = {
             "preset": preset,
-            "runner": runner(preset),
+            "runner": row_runner,
             "package": preset in packaged,
             "zig": uses_zig(native + consumers),
+            "gradle": uses_gradle(native + consumers),
+            "save_toolchains": row_runner not in claimed_runners,
             "native_commands": native if preset in packaged else native + consumers,
         }
+        claimed_runners.add(row_runner)
         if preset in packaged:
             row["consumer_commands"] = consumers
         rows.append(row)

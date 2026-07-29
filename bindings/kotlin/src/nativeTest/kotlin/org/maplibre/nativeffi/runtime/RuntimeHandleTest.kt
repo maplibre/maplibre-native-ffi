@@ -64,13 +64,13 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
 
     assertFalse(runtime.isClosed)
-    runtime.runOnce()
+    runtime.pump(0)
     runtime.pollEvent()
     runtime.close()
 
     assertTrue(runtime.isClosed)
     runtime.close()
-    assertFailsWith<InvalidStateException> { runtime.runOnce() }
+    assertFailsWith<InvalidStateException> { runtime.pump(0) }
   }
 
   @Test
@@ -89,7 +89,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
 
       assertEquals(1, destroys)
       assertTrue(runtime.isClosed)
-      assertFailsWith<InvalidStateException> { runtime.runOnce() }
+      assertFailsWith<InvalidStateException> { runtime.pump(0) }
     }
   }
 
@@ -132,6 +132,8 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       runtime.setResourceProvider(
         ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
       )
+      runtime.clearResourceProvider()
+      runtime.clearResourceProvider()
     } finally {
       runtime.close()
     }
@@ -272,6 +274,65 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         assertEquals(RuntimeEventType.MAP_LOADING_FAILED, failure.type)
         assertEquals(map, failure.mapSource)
         assertEquals(1, calls.load())
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  // BND-154: an installed provider is consulted, a replacement takes over while a
+  // map is live, and a cleared provider leaves requests to the network file source.
+  @Test
+  fun resourceProviderIsConsultedUntilClearedWhileMapIsLive() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val firstCalls = AtomicInt(0)
+    val secondCalls = AtomicInt(0)
+    try {
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, _ ->
+          firstCalls.addAndFetch(1)
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+      val firstProvider = runtime.resourceProviderStateForTesting()
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+          },
+        )
+      try {
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/first.json")
+        assertTrue(firstCalls.load() > 0)
+
+        // Replacing the provider while a map is live is part of the C API contract.
+        runtime.setResourceProvider(
+          ResourceProviderCallback { _, _ ->
+            secondCalls.addAndFetch(1)
+            ResourceProviderDecision.PASS_THROUGH
+          }
+        )
+        val secondProvider = runtime.resourceProviderStateForTesting()
+        assertTrue(firstProvider?.isClosedForTesting() == true)
+        val firstCallsAfterReplace = firstCalls.load()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/second.json")
+        assertTrue(secondCalls.load() > 0)
+        assertEquals(firstCallsAfterReplace, firstCalls.load())
+
+        runtime.clearResourceProvider()
+        assertNull(runtime.resourceProviderStateForTesting())
+        assertTrue(secondProvider?.isClosedForTesting() == true)
+        val secondCallsAfterClear = secondCalls.load()
+        loadUnservedStyle(runtime, map, "jar:file:/packaged/third.json")
+        assertEquals(firstCallsAfterReplace, firstCalls.load())
+        assertEquals(secondCallsAfterClear, secondCalls.load())
+
+        // Clearing an already cleared provider stays a successful no-op.
+        runtime.clearResourceProvider()
       } finally {
         map.close()
       }
@@ -437,7 +498,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.WRONG_THREAD.nativeCode, error.nativeStatusCode)
       assertTrue(diagnostic.isNotBlank())
 
-      runtime.runOnce()
+      runtime.pump(0)
 
       assertEquals(diagnostic, error.diagnostic)
     } finally {
@@ -457,7 +518,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.WRONG_THREAD, error.status)
       assertFalse(runtime.isClosed)
 
-      runtime.runOnce()
+      runtime.pump(0)
     } finally {
       runtime.close()
     }
@@ -558,7 +619,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   // event copy, polling, stale-source, and unknown-domain behavior.
 
   @Test
-  fun runOnceProcessesStyleLoadedEventAndPollingDrainsQueue() {
+  fun pumpProcessesStyleLoadedEventAndPollingDrainsQueue() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
@@ -574,7 +635,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       var styleLoaded: RuntimeEvent? = null
       var reachedEmptyQueue = false
       repeat(20) {
-        runtime.runOnce()
+        runtime.pump(0)
         while (true) {
           val event = runtime.pollEvent()
           if (event == null) {
@@ -786,7 +847,10 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       val error = assertFailsWith<InvalidStateException> { runtime.close() }
       assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-      assertEquals("RuntimeHandle has 1 live child handle(s)", error.diagnostic)
+      assertEquals(
+        "RuntimeHandle has 1 live child handle(s): OfflineOperationHandle",
+        error.diagnostic,
+      )
       assertFalse(operation.isClosed)
     } finally {
       operation.markConsumed()
@@ -800,7 +864,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     eventType: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return true
@@ -823,7 +887,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     eventType: RuntimeEventType,
   ): RuntimeEvent {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return event
@@ -833,9 +897,41 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     error("runtime event $eventType did not arrive")
   }
 
+  /**
+   * Loads a style URL whose scheme no file source serves, so the loading failure that names the
+   * scheme and the URL proves the request reached the network file source.
+   */
+  private fun loadUnservedStyle(runtime: RuntimeHandle, map: MapHandle, styleUrl: String) {
+    map.setStyleUrl(styleUrl)
+    val message = waitForMapLoadingFailure(runtime, map, styleUrl)
+    assertTrue(message.contains("\"jar\""), "unexpected loading failure message: $message")
+  }
+
+  private fun waitForMapLoadingFailure(
+    runtime: RuntimeHandle,
+    map: MapHandle,
+    styleUrl: String,
+  ): String {
+    repeat(10_000) {
+      runtime.pump(0)
+      while (true) {
+        val event = runtime.pollEvent() ?: break
+        if (
+          event.type == RuntimeEventType.MAP_LOADING_FAILED &&
+            event.mapSource == map &&
+            event.message.contains(styleUrl)
+        ) {
+          return event.message
+        }
+      }
+      usleep(1_000U)
+    }
+    error("map loading failure for $styleUrl did not arrive")
+  }
+
   private fun waitForTransformCall(runtime: RuntimeHandle, calls: AtomicInt): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (runtime.pollEvent() != null) {
         // Drain events so native loading can keep advancing.
       }
@@ -851,7 +947,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     expected: Int,
   ) {
     repeat(100) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (runtime.pollEvent() != null) {
         // Drain events so native loading can keep advancing.
       }
@@ -868,7 +964,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       handledRequest.load()?.let {
         return it
       }
-      runtime.runOnce()
+      runtime.pump(0)
       usleep(1_000U)
     }
     error("resource provider did not receive handled request")
@@ -880,7 +976,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   ): Boolean {
     repeat(10_000) {
       if (handle.isCancelled()) return true
-      runtime.runOnce()
+      runtime.pump(0)
       usleep(1_000U)
     }
     return false
@@ -996,7 +1092,7 @@ private class BackgroundRuntimeCall(
 ) {
   fun run() {
     try {
-      runtime.runOnce()
+      runtime.pump(0)
     } catch (throwable: Throwable) {
       error.store(throwable)
     }

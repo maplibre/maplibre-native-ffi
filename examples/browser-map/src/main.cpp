@@ -52,8 +52,8 @@ class App {
   }
 
   auto renderFrame() -> bool {
-    const auto runLoopStatus = mln_runtime_run_once(runtime_);
-    if (!check("run runtime", runLoopStatus)) {
+    const auto pumpStatus = mln_runtime_pump(runtime_, 0);
+    if (!check("pump runtime", pumpStatus)) {
       return false;
     }
     const auto eventRequestedRender = drainEvents();
@@ -64,19 +64,24 @@ class App {
       return false;
     }
 
+    // Consume before rendering so this follows the shared render-request
+    // contract. A render update that has no frame restores the request for the
+    // next browser refresh.
+    renderPending_ = false;
     auto rendered = false;
     const auto status = mln_render_session_render_update(session_, &rendered);
     if (status == MLN_STATUS_INVALID_STATE) {
+      renderPending_ = true;
       return false;
     }
     if (!check("render update", status)) {
       return false;
     }
     if (!rendered) {
+      renderPending_ = true;
       return false;
     }
 
-    renderPending_ = false;
     return true;
   }
 

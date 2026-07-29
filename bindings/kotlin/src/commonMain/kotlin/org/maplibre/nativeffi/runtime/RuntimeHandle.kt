@@ -11,7 +11,37 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 public expect class RuntimeHandle : AutoCloseable {
   public val isClosed: Boolean
 
-  public fun runOnce()
+  /**
+   * Advances this runtime.
+   *
+   * The call parks the owner thread when [timeoutMillis] allows it, then drains the owner-thread
+   * task queues. Drain the queued runtime events with [pollEvent] afterwards.
+   *
+   * [timeoutMillis] sets the park bound. Zero drains and returns; hosts pumping from a frame
+   * callback pass it. A positive value parks for up to that many milliseconds; hosts that own their
+   * pump thread pass one and take their cadence from the runtime's own work. A negative value parks
+   * until a wake arrives.
+   *
+   * The drain runs every task queued when it begins plus every task those enqueue, so a single call
+   * can span a full style parse.
+   *
+   * The runtime holds a wake flag. Style, tile, offline, and resource responses set it, as do
+   * queued runtime events and [WakeSource.signal]. A parking call returns as soon as the flag is
+   * set and clears it before returning, and work arriving during the drain sets it again. A call
+   * also returns without parking while unread runtime events are queued. Timers and ready I/O set
+   * the flag only when they queue owner-thread work, so pass a bounded timeout to cap how long a
+   * call waits.
+   *
+   * A non-zero timeout blocks the calling thread and ignores interruption. Call it outside any lock
+   * that a thread signalling a [WakeSource] takes.
+   */
+  public fun pump(timeoutMillis: Long)
+
+  /**
+   * Acquires a [WakeSource] that releases this runtime's parked owner thread. The returned source
+   * is usable from any thread, and the caller closes it.
+   */
+  public fun acquireWakeSource(): WakeSource
 
   public fun startAmbientCacheOperation(
     operation: AmbientCacheOperation
@@ -77,10 +107,22 @@ public expect class RuntimeHandle : AutoCloseable {
 
   public fun setResourceProvider(callback: ResourceProviderCallback)
 
+  public fun clearResourceProvider()
+
   public fun setResourceTransform(callback: ResourceTransformCallback)
 
   public fun clearResourceTransform()
 
+  /**
+   * Removes and returns one queued runtime event, or null when the queue is empty.
+   *
+   * Polling also advances binding-owned state, so it is more than a read. On a
+   * [RuntimeEventType.MAP_STYLE_LOADED] event it releases the custom geometry sources that the
+   * newly loaded style dropped, closing their upcall stubs. That release happens only when the
+   * event is polled, so a host that stops polling keeps those stubs alive.
+   *
+   * Returned values are copies and stay valid across later polls.
+   */
   public fun pollEvent(): RuntimeEvent?
 
   override fun close()

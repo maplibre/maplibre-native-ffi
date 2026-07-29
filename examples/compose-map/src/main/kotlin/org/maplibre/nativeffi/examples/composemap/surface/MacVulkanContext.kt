@@ -112,7 +112,7 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
   private fun createInstance() {
     ensureVulkanFunctionProvider()
     MemoryStack.stackPush().use { stack ->
-      val available = stack.vulkanInstanceExtensions()
+      val available = vulkanInstanceExtensions()
       val extensions = LinkedHashSet<String>()
       val enablePortability = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME in available
       if (enablePortability) {
@@ -165,10 +165,10 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       )
       for (index in 0..<devices.capacity()) {
         val candidate = VkPhysicalDevice(devices[index], instance())
-        if (VK_EXT_METAL_OBJECTS_EXTENSION_NAME !in stack.vulkanDeviceExtensions(candidate)) {
+        if (VK_EXT_METAL_OBJECTS_EXTENSION_NAME !in vulkanDeviceExtensions(candidate)) {
           continue
         }
-        val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
+        val queueFamily = findVulkanGraphicsQueueFamily(candidate)
         if (queueFamily >= 0 && exportsRequiredMetalDevice(candidate, queueFamily)) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
@@ -188,7 +188,7 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
       return true
     }
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = stack.vulkanDeviceExtensions(candidate)
+      val deviceExtensions = vulkanDeviceExtensions(candidate)
       val extensions = LinkedHashSet<String>()
       extensions.add(VK_EXT_METAL_OBJECTS_EXTENSION_NAME)
       if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
@@ -228,7 +228,7 @@ internal class MacVulkanContext private constructor(private val requiredMetalDev
 
   private fun createDevice() {
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = stack.vulkanDeviceExtensions(physicalDevice())
+      val deviceExtensions = vulkanDeviceExtensions(physicalDevice())
       val extensions = LinkedHashSet<String>()
       check(VK_EXT_METAL_OBJECTS_EXTENSION_NAME in deviceExtensions) {
         "Selected Vulkan device does not support $VK_EXT_METAL_OBJECTS_EXTENSION_NAME"

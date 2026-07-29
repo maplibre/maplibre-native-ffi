@@ -1,0 +1,62 @@
+import 'dart:async';
+
+/// Retains native callback resources until queued and active Dart upcalls drain.
+abstract base class RetainedCallbackState {
+  var _activeUpcalls = 0;
+  var _retired = false;
+  var _closeScheduled = false;
+  var _closed = false;
+
+  /// Whether retirement has started, exposed for internal lifecycle tests.
+  bool get retiredForTesting => _retired;
+
+  /// Whether all callback resources have closed, exposed for lifecycle tests.
+  bool get closedForTesting => _closed;
+
+  /// Runs [body] as one active Dart upcall.
+  ///
+  /// Returns false when this state is already closed and [body] was not run.
+  /// Callers that own copied native payloads must release them on a false
+  /// return.
+  bool runUpcall(void Function() body) {
+    if (_retired || _closed) {
+      return false;
+    }
+    _activeUpcalls += 1;
+    try {
+      body();
+    } finally {
+      _activeUpcalls -= 1;
+      _scheduleCloseIfReady();
+    }
+    return true;
+  }
+
+  /// Retires this callback state after queued and active upcalls drain.
+  void close() {
+    if (_retired) {
+      return;
+    }
+    _retired = true;
+    _scheduleCloseIfReady();
+  }
+
+  void _scheduleCloseIfReady() {
+    if (!_retired || _closed || _closeScheduled || _activeUpcalls != 0) {
+      return;
+    }
+    _closeScheduled = true;
+    Timer.run(() {
+      _closeScheduled = false;
+      if (!_retired || _closed || _activeUpcalls != 0) {
+        _scheduleCloseIfReady();
+        return;
+      }
+      _closed = true;
+      closeResources();
+    });
+  }
+
+  /// Releases native resources after the state has retired and upcalls drained.
+  void closeResources();
+}

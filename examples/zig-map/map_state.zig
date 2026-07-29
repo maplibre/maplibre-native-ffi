@@ -1,23 +1,21 @@
 const std = @import("std");
 const maplibre = @import("maplibre_native");
 
+const channel = @import("channel.zig");
 const diagnostics = @import("diagnostics.zig");
-const render = @import("render/mod.zig");
 const types = @import("types.zig");
 
+/// Runtime and map, owned for their whole lifetime by the runtime loop thread.
+///
+/// The render target is not here: it belongs to the render loop thread, which
+/// owns the window and the graphics context.
 pub const MapState = struct {
     allocator: std.mem.Allocator,
     diagnostic_store: *maplibre.DiagnosticStore,
     runtime: maplibre.RuntimeHandle,
     map: maplibre.MapHandle,
-    target: ?render.RenderTarget,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
-        window: anytype,
-        viewport: types.Viewport,
-        mode: types.RenderTargetMode,
-    ) !MapState {
+    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport) !MapState {
         const diagnostic_store = try allocator.create(maplibre.DiagnosticStore);
         diagnostic_store.* = maplibre.DiagnosticStore.init(allocator);
         errdefer {
@@ -45,76 +43,112 @@ pub const MapState = struct {
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
 
-        var target = render.RenderTarget.init(allocator, window, viewport, mode, &map) catch |err| {
-            diagnostics.logError("render target attach failed", err, diagnostic_store);
-            return err;
-        };
-        errdefer target.deinit();
         return .{
             .allocator = allocator,
             .diagnostic_store = diagnostic_store,
             .runtime = runtime,
             .map = map,
-            .target = target,
         };
     }
 
     pub fn deinit(self: *MapState) void {
-        if (self.target) |*target| target.deinit();
-        self.target = null;
         self.map.close() catch {};
         self.runtime.close() catch {};
         self.diagnostic_store.deinit();
         self.allocator.destroy(self.diagnostic_store);
     }
 
-    pub fn finishFrame(self: *MapState) !void {
-        if (self.target) |*target| try target.finishFrame();
-    }
-
-    pub fn needsReattachOnResize(self: *const MapState) bool {
-        return if (self.target) |*target| target.needsReattachOnResize() else false;
-    }
-
-    pub fn renderUpdate(self: *MapState, viewport: types.Viewport) !bool {
-        return if (self.target) |*target|
-            try target.renderUpdate(self.diagnostic_store, viewport)
-        else
-            false;
-    }
-
-    pub fn resize(self: *MapState, viewport: types.Viewport) !void {
-        if (self.target) |*target| {
-            target.resize(viewport) catch |err| {
-                diagnostics.logError("render target resize failed", err, self.diagnostic_store);
-                return err;
-            };
-        } else {
-            return types.AppError.TextureResizeFailed;
+    /// Applies every queued camera command on the map's owner thread.
+    pub fn applyCommands(self: *MapState, commands: *channel.CommandQueue) !void {
+        var batch: [64]channel.CameraCommand = undefined;
+        while (true) {
+            const count = commands.drain(&batch);
+            if (count == 0) return;
+            for (batch[0..count]) |command| {
+                try applyCameraCommand(&self.map, command, self.diagnostic_store);
+            }
         }
-    }
-
-    pub fn resizeWithReattachedTarget(
-        self: *MapState,
-        window: anytype,
-        viewport: types.Viewport,
-        mode: types.RenderTargetMode,
-    ) !void {
-        if (self.target) |*target| target.deinit();
-        self.target = null;
-        self.target = render.RenderTarget.init(
-            self.allocator,
-            window,
-            viewport,
-            mode,
-            &self.map,
-        ) catch |err| {
-            diagnostics.logError("render target reattach failed", err, self.diagnostic_store);
-            return err;
-        };
     }
 };
 
+/// Applies one decoded camera command. Runs on the map's owner thread, which is
+/// why the read-modify-write commands read the current camera here rather than
+/// on the render loop that produced them.
+pub fn applyCameraCommand(
+    map: *maplibre.MapHandle,
+    command: channel.CameraCommand,
+    diagnostic_store: *const maplibre.DiagnosticStore,
+) !void {
+    switch (command) {
+        .cancel_transitions => try expectCameraStatus(
+            map.cancelTransitions(),
+            "cancel camera transitions failed",
+            diagnostic_store,
+        ),
+        .move_by => |move| try expectCameraStatus(
+            map.moveBy(move.dx, move.dy),
+            "camera pan failed",
+            diagnostic_store,
+        ),
+        .move_by_animated => |move| try expectCameraStatus(
+            map.moveByAnimated(move.dx, move.dy, .{ .duration_ms = move.duration_ms }),
+            "keyboard pan failed",
+            diagnostic_store,
+        ),
+        .scale_by => |zoom| try expectCameraStatus(
+            map.scaleBy(zoom.scale, zoom.anchor),
+            "camera zoom failed",
+            diagnostic_store,
+        ),
+        .scale_by_animated => |zoom| try expectCameraStatus(
+            map.scaleByAnimated(zoom.scale, zoom.anchor, .{ .duration_ms = zoom.duration_ms }),
+            "keyboard zoom failed",
+            diagnostic_store,
+        ),
+        .pitch_by => |pitch| try expectCameraStatus(
+            map.pitchBy(pitch.delta),
+            "camera pitch failed",
+            diagnostic_store,
+        ),
+        .adjust_bearing => |bearing| {
+            const camera = try currentCamera(map, diagnostic_store);
+            try expectCameraStatus(
+                map.jumpTo(.{ .bearing = (camera.bearing orelse 0) + bearing.delta }),
+                "camera rotate failed",
+                diagnostic_store,
+            );
+        },
+        .adjust_bearing_animated => |bearing| {
+            const camera = try currentCamera(map, diagnostic_store);
+            try expectCameraStatus(
+                map.easeTo(
+                    .{ .bearing = (camera.bearing orelse 0) + bearing.delta },
+                    .{ .duration_ms = bearing.duration_ms },
+                ),
+                "keyboard rotate failed",
+                diagnostic_store,
+            );
+        },
+        .adjust_pitch_animated => |pitch| {
+            const camera = try currentCamera(map, diagnostic_store);
+            try expectCameraStatus(
+                map.easeTo(
+                    .{ .pitch = clamp((camera.pitch orelse 0) + pitch.delta, 0.0, 60.0) },
+                    .{ .duration_ms = pitch.duration_ms },
+                ),
+                "keyboard pitch failed",
+                diagnostic_store,
+            );
+        },
+        .reset_orientation => |reset| try expectCameraStatus(
+            map.easeTo(.{ .bearing = 0, .pitch = 0 }, .{ .duration_ms = reset.duration_ms }),
+            "camera reset failed",
+            diagnostic_store,
+        ),
+    }
+}
+
+/// Drains runtime events, reporting whether the map wants another frame.
 pub fn drainEvents(
     allocator: std.mem.Allocator,
     runtime: *maplibre.RuntimeHandle,
@@ -136,6 +170,33 @@ pub fn drainEvents(
         }
     }
     return render_update_available;
+}
+
+fn currentCamera(
+    map: *maplibre.MapHandle,
+    diagnostic_store: *const maplibre.DiagnosticStore,
+) !maplibre.CameraOptions {
+    return map.getCamera() catch |err| {
+        diagnostics.logError("camera snapshot failed", err, diagnostic_store);
+        return types.AppError.CameraCommandFailed;
+    };
+}
+
+fn expectCameraStatus(
+    result: maplibre.Error!void,
+    message: []const u8,
+    diagnostic_store: *const maplibre.DiagnosticStore,
+) !void {
+    result catch |err| {
+        diagnostics.logError(message, err, diagnostic_store);
+        return types.AppError.CameraCommandFailed;
+    };
+}
+
+fn clamp(value: f64, min: f64, max: f64) f64 {
+    if (value < min) return min;
+    if (value > max) return max;
+    return value;
 }
 
 fn loadStyle(

@@ -36,12 +36,45 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         height = 240
         scaleFactor = 2.0
         mapMode = MapMode.STATIC
+        fastPforEnabled = true
       }
     ) { native ->
       assertEquals(320U, native.width)
       assertEquals(240U, native.height)
       assertEquals(2.0, native.scale_factor)
       assertEquals(MapMode.STATIC.nativeValue.toUInt(), native.map_mode)
+      assertTrue(native.fast_pfor_enabled)
+    }
+  }
+
+  @Test
+  fun mapCreationLeavesFastPforDecodingOffByDefault() {
+    MapHandle.mapOptionsForTesting(MapOptions()) { native -> assertFalse(native.fast_pfor_enabled) }
+  }
+
+  @Test
+  fun mapSizeReportsCreationExtentAndPixelRatio() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 512
+            height = 256
+            scaleFactor = 2.0
+          },
+        )
+      try {
+        val size = map.size
+        assertEquals(512, size.width)
+        assertEquals(256, size.height)
+        assertEquals(2.0, size.scaleFactor)
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
     }
   }
 
@@ -65,7 +98,7 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
 
       assertTrue(map.isClosed)
       map.close()
-      runtime.runOnce()
+      runtime.pump(0)
       assertFailsWith<InvalidStateException> { map.setStyleJson("{}") }
     } finally {
       runtime.close()
@@ -87,10 +120,10 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       val error = assertFailsWith<InvalidStateException> { runtime.close() }
       assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-      assertEquals("RuntimeHandle has 1 live child handle(s)", error.diagnostic)
+      assertEquals("RuntimeHandle has 1 live child handle(s): MapHandle", error.diagnostic)
       assertFalse(runtime.isClosed)
 
-      runtime.runOnce()
+      runtime.pump(0)
     } finally {
       map.close()
       runtime.close()
@@ -119,7 +152,7 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(MaplibreStatus.WRONG_THREAD.nativeCode, error.nativeStatusCode)
       assertTrue(diagnostic.isNotBlank())
 
-      runtime.runOnce()
+      runtime.pump(0)
 
       assertEquals(diagnostic, error.diagnostic)
     } finally {
