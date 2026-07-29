@@ -23,6 +23,11 @@ function(mln_add_core_licenses target)
   mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/icu/LICENSE" "icu.txt")
   mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/nunicode/LICENSE"
                   "nunicode.txt")
+  if(TARGET fastpfor-lib)
+    mln_add_license(
+      ${target} "${MLN_SOURCE_DIR}/vendor/maplibre-tile-spec/LICENSE-APACHE"
+      "fastpfor.txt")
+  endif()
   if(MLN_WITH_PMTILES)
     mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/PMTiles/LICENSE"
                     "pmtiles.txt")

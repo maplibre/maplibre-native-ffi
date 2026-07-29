@@ -26,7 +26,9 @@ function(mln_add_maplibre_native)
 
     # The vendored tile-spec library's Unix -Wall flag means -Weverything to
     # clang-cl. Neutralize it to match the dependency's MSVC warning behavior.
-    target_compile_options(mlt-cpp PRIVATE -Wno-everything)
+    foreach(MLN_FFI_MLT_TARGET mlt-cpp mlt-cpp-encoder)
+      target_compile_options(${MLN_FFI_MLT_TARGET} PRIVATE -Wno-everything)
+    endforeach()
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
