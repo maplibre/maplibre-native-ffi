@@ -14,7 +14,8 @@ use crate::{
 #[non_exhaustive]
 pub struct RawRuntimeEventSource {
     pub source_type: u32,
-    pub source_address: usize,
+    /// The source handle id, which names one object for the process's life.
+    pub source_id: u64,
 }
 
 /// Rendering statistics copied from a render-frame event payload.
@@ -265,7 +266,7 @@ pub unsafe fn runtime_event_from_native(
         event_type: RuntimeEventType::from_raw(raw.type_),
         source: RawRuntimeEventSource {
             source_type: raw.source_type,
-            source_address: raw.source as usize,
+            source_id: raw.source,
         },
         code: raw.code,
         message,
@@ -476,7 +477,7 @@ mod tests {
             event.source,
             RawRuntimeEventSource {
                 source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                source_address: source as usize,
+                source_id: source,
             }
         );
         assert_eq!(event.code, -7);

@@ -79,13 +79,12 @@ struct ResourceRequestHandle {
     state: Arc<maplibre_core::resource::ResourceRequestHandleState>,
 }
 
-// Holds the native wake source as an address rather than a pointer, so the
-// pyclass stays `Send + Sync` without an unsafe assertion. The C API accepts
-// signals and destruction from any thread, and the mutex is what makes close
-// once-only against a concurrent signal.
+// The C API accepts signals and destruction from any thread, and a handle is a
+// plain value, so this pyclass is `Send + Sync` without an unsafe assertion.
+// The mutex is what makes close once-only against a concurrent signal.
 #[pyclass(name = "_WakeSource")]
 struct WakeSource {
-    address: Mutex<Option<usize>>,
+    handle: Mutex<Option<sys::mln_wake_source>>,
 }
 
 #[derive(Debug, Clone)]
@@ -385,11 +384,11 @@ impl Drop for RuntimeDetachedOperationGuard<'_> {
 
 fn start_offline_operation<F>(runtime: &RuntimeHandle, start: F) -> PyResult<u64>
 where
-    F: FnOnce(*mut sys::mln_runtime, *mut u64) -> i32,
+    F: FnOnce(sys::mln_runtime, *mut u64) -> i32,
 {
     let state = runtime.state_for_operation()?;
     let mut operation_id = 0;
-    maplibre_core::check(start(state.as_ptr(), &mut operation_id)).map_err(map_error)?;
+    maplibre_core::check(start(state.handle(), &mut operation_id)).map_err(map_error)?;
     Ok(operation_id)
 }
 
@@ -527,7 +526,7 @@ impl MapHandle {
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
         add: unsafe extern "C" fn(
-            *mut sys::mln_map,
+            sys::mln_map,
             sys::mln_string_view,
             sys::mln_string_view,
             *const sys::mln_style_tile_source_options,
@@ -549,7 +548,7 @@ impl MapHandle {
         let options = maplibre_core::style::tile_source_options_to_native(&options);
         // SAFETY: The C API validates the map pointer, string views, and options.
         maplibre_core::check(unsafe {
-            add(state.as_ptr(), source_id.raw(), url.raw(), options.as_ptr())
+            add(state.handle(), source_id.raw(), url.raw(), options.as_ptr())
         })
         .map_err(map_error)
     }
@@ -568,7 +567,7 @@ impl MapHandle {
         vector_encoding: Option<u32>,
         raster_dem_encoding: Option<u32>,
         add: unsafe extern "C" fn(
-            *mut sys::mln_map,
+            sys::mln_map,
             sys::mln_string_view,
             *const sys::mln_string_view,
             usize,
@@ -592,7 +591,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, tile URL views, and options.
         maplibre_core::check(unsafe {
             add(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
@@ -606,7 +605,7 @@ impl MapHandle {
         &self,
         value: String,
         call: unsafe extern "C" fn(
-            *mut sys::mln_map,
+            sys::mln_map,
             sys::mln_string_view,
             *mut bool,
         ) -> sys::mln_status,
@@ -615,7 +614,7 @@ impl MapHandle {
         let value = maplibre_core::string::string_view(&value);
         let mut out = false;
         // SAFETY: The C API validates the map pointer, borrowed string view, and out pointer.
-        maplibre_core::check(unsafe { call(state.as_ptr(), value.raw(), &mut out) })
+        maplibre_core::check(unsafe { call(state.handle(), value.raw(), &mut out) })
             .map_err(map_error)?;
         Ok(out)
     }
@@ -799,21 +798,22 @@ unsafe extern "C" fn custom_geometry_cancel_tile_trampoline(
 }
 
 impl RenderSessionState {
-    fn new(ptr: std::ptr::NonNull<sys::mln_render_session>) -> Self {
-        // SAFETY: ptr came from a successful render-session attach function and
-        // is paired with mln_render_session_destroy in close.
+    fn new(native: sys::mln_render_session) -> PyResult<Self> {
+        // SAFETY: native came from a successful render-session attach function
+        // and is paired with mln_render_session_destroy in close.
         let handle = unsafe {
-            maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_render_session")
-        };
-        Self {
+            maplibre_core::handle::NativeHandleState::from_handle(native, "mln_render_session")
+        }
+        .map_err(map_error)?;
+        Ok(Self {
             handle,
             detached: false,
             frame_acquired: false,
-        }
+        })
     }
 
-    fn as_ptr(&self) -> *mut sys::mln_render_session {
-        self.handle.as_ptr()
+    fn native(&self) -> sys::mln_render_session {
+        self.handle.handle()
     }
 
     fn is_closed(&self) -> bool {
@@ -837,24 +837,22 @@ impl RuntimeHandle {
         if !self.operation_gate.begin_close()? {
             return Ok(());
         }
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state();
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 self.operation_gate.finish_successful_close();
                 return Ok(());
             };
             state.mark_closed();
-            runtime_address
+            runtime_handle
         };
-        // SAFETY: state owns an mln_runtime pointer created by mln_runtime_create
+        // SAFETY: state owns an mln_runtime handle created by mln_runtime_create
         // and pairs it with the matching status-returning destroy function. The
         // C API can wait for in-flight callbacks, so release the GIL while it runs
         // without holding the Rust handle-state mutex.
-        let status = py.detach(move || unsafe {
-            sys::mln_runtime_destroy(runtime_address as *mut sys::mln_runtime)
-        });
+        let status = py.detach(move || unsafe { sys::mln_runtime_destroy(runtime_handle) });
         if let Err(error) = maplibre_core::check(status) {
-            self.state().restore_address_for_retry(runtime_address);
+            self.state().restore_handle_for_retry(runtime_handle);
             self.operation_gate.finish_failed_close();
             return Err(map_error(error));
         }
@@ -872,39 +870,37 @@ impl RuntimeHandle {
 
     fn pump(&self, py: Python<'_>, timeout_ms: i64) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state_for_operation()?;
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
-            runtime_address
+            runtime_handle
         };
-        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // SAFETY: runtime_handle came from a runtime pointer that passed the
         // binding lifecycle gate, and the C API validates that it is live and
         // called on the owner thread. A non-zero timeout parks until native
         // work, a wake source, or the timeout releases it, so the GIL is
         // released for the call and the Rust handle-state mutex is not held
         // across it: another Python thread signalling a wake source is what
         // ends the park.
-        let status = py.detach(|| unsafe {
-            sys::mln_runtime_pump(runtime_address as *mut sys::mln_runtime, timeout_ms)
-        });
+        let status = py.detach(|| unsafe { sys::mln_runtime_pump(runtime_handle, timeout_ms) });
         maplibre_core::check(status).map_err(map_error)
     }
 
     fn wake_source(&self) -> PyResult<WakeSource> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_wake_source>::new();
         // SAFETY: The C API validates that the pointer is a live runtime handle
         // and that the call occurs on the runtime owner thread, and out is a
         // null-initialized out-pointer owned by this call.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_wake_source_acquire(state.as_ptr(), out.as_mut_ptr())
+            sys::mln_runtime_wake_source_acquire(state.handle(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        let source = out.into_non_null("mln_wake_source").map_err(map_error)?;
+        let source = out.into_live("mln_wake_source").map_err(map_error)?;
         Ok(WakeSource {
-            address: Mutex::new(Some(source.as_ptr() as usize)),
+            handle: Mutex::new(Some(source)),
         })
     }
 
@@ -915,7 +911,7 @@ impl RuntimeHandle {
         // owner-thread affinity, and writable operation_id pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_run_ambient_cache_operation_start(
-                state.as_ptr(),
+                state.handle(),
                 operation,
                 &mut operation_id,
             )
@@ -938,7 +934,7 @@ impl RuntimeHandle {
         // SAFETY: The C API validates the runtime, definition, metadata pointer/length, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create_start(
-                state.as_ptr(),
+                state.handle(),
                 &raw,
                 maplibre_core::runtime::metadata_ptr(&metadata),
                 metadata.len(),
@@ -1020,21 +1016,21 @@ impl RuntimeHandle {
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_offline_region_snapshot")
+        let native = out
+            .into_live("mln_offline_region_snapshot")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+        // SAFETY: native is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
             .map_err(map_error)?;
         offline_region_info_to_py(py, &info)
     }
@@ -1045,12 +1041,12 @@ impl RuntimeHandle {
         operation_id: u64,
     ) -> PyResult<Option<Py<PyAny>>> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
         // SAFETY: The C API validates the runtime handle, operation ID, output pointer, and found pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 out.as_mut_ptr(),
                 &mut found,
@@ -1060,11 +1056,11 @@ impl RuntimeHandle {
         if !found {
             return Ok(None);
         }
-        let ptr = out
-            .into_non_null("mln_offline_region_snapshot")
+        let native = out
+            .into_live("mln_offline_region_snapshot")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+        // SAFETY: native is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
             .map_err(map_error)?;
         offline_region_info_to_py(py, &info).map(Some)
     }
@@ -1075,22 +1071,22 @@ impl RuntimeHandle {
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_list_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_offline_region_list")
+        let native = out
+            .into_live("mln_offline_region_list")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned offline-region list returned by the C API.
-        let regions =
-            unsafe { maplibre_core::runtime::copy_offline_region_list(ptr) }.map_err(map_error)?;
+        // SAFETY: native is an owned offline-region list returned by the C API.
+        let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
+            .map_err(map_error)?;
         offline_region_list_to_py(py, &regions)
     }
 
@@ -1100,22 +1096,22 @@ impl RuntimeHandle {
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_offline_region_list")
+        let native = out
+            .into_live("mln_offline_region_list")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned offline-region list returned by the C API.
-        let regions =
-            unsafe { maplibre_core::runtime::copy_offline_region_list(ptr) }.map_err(map_error)?;
+        // SAFETY: native is an owned offline-region list returned by the C API.
+        let regions = unsafe { maplibre_core::runtime::copy_offline_region_list(native) }
+            .map_err(map_error)?;
         offline_region_list_to_py(py, &regions)
     }
 
@@ -1125,21 +1121,21 @@ impl RuntimeHandle {
         operation_id: u64,
     ) -> PyResult<Py<PyAny>> {
         let state = self.state_for_operation()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_offline_region_snapshot")
+        let native = out
+            .into_live("mln_offline_region_snapshot")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned offline-region snapshot returned by the C API.
-        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(ptr) }
+        // SAFETY: native is an owned offline-region snapshot returned by the C API.
+        let info = unsafe { maplibre_core::runtime::copy_offline_region_snapshot(native) }
             .map_err(map_error)?;
         offline_region_info_to_py(py, &info)
     }
@@ -1154,7 +1150,7 @@ impl RuntimeHandle {
         // SAFETY: The C API validates the runtime handle, operation ID, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_status_take_result(
-                state.as_ptr(),
+                state.handle(),
                 operation_id,
                 &mut status,
             )
@@ -1168,7 +1164,7 @@ impl RuntimeHandle {
         // SAFETY: The C API validates the runtime handle, owner-thread affinity,
         // and operation ID.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_offline_operation_discard(state.as_ptr(), operation_id)
+            sys::mln_runtime_offline_operation_discard(state.handle(), operation_id)
         })
         .map_err(map_error)
     }
@@ -1190,17 +1186,17 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let _operation = self.operation_gate.begin_detached_operation()?;
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state_for_operation()?;
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
-            runtime_address
+            runtime_handle
         };
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
-        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // SAFETY: runtime_handle came from a runtime pointer that passed the
         // binding lifecycle gate. The C API validates that it is live.
         // descriptor points to replacement state, which is retained after a
         // successful native registration. Replacement can wait for in-flight
@@ -1212,12 +1208,7 @@ impl RuntimeHandle {
                 callback,
                 user_data: user_data_address as *mut c_void,
             };
-            unsafe {
-                sys::mln_runtime_set_resource_provider(
-                    runtime_address as *mut sys::mln_runtime,
-                    &descriptor,
-                )
-            }
+            unsafe { sys::mln_runtime_set_resource_provider(runtime_handle, &descriptor) }
         });
         maplibre_core::check(status).map_err(map_error)?;
         // Native retired the previous provider before returning, so dropping
@@ -1231,20 +1222,19 @@ impl RuntimeHandle {
 
     fn clear_resource_provider(&self, py: Python<'_>) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state_for_operation()?;
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
-            runtime_address
+            runtime_handle
         };
-        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // SAFETY: runtime_handle came from a runtime pointer that passed the
         // binding lifecycle gate. The C API validates that it is live and waits
         // for in-flight callbacks that need the GIL before returning, so release
         // the GIL while it runs without holding the Rust handle-state mutex.
-        let status = py.detach(move || unsafe {
-            sys::mln_runtime_clear_resource_provider(runtime_address as *mut sys::mln_runtime)
-        });
+        let status =
+            py.detach(move || unsafe { sys::mln_runtime_clear_resource_provider(runtime_handle) });
         maplibre_core::check(status).map_err(map_error)?;
         // Native can no longer reach the cleared provider state, so drop it.
         self.resource_provider
@@ -1271,17 +1261,17 @@ impl RuntimeHandle {
         ));
         let descriptor = replacement.descriptor();
         let _operation = self.operation_gate.begin_detached_operation()?;
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state_for_operation()?;
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
-            runtime_address
+            runtime_handle
         };
         let callback = descriptor.callback;
         let user_data_address = descriptor.user_data as usize;
         let size = descriptor.size;
-        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // SAFETY: runtime_handle came from a runtime pointer that passed the
         // binding lifecycle gate. The C API validates that it is live.
         // descriptor points to replacement state, which is retained after a
         // successful native registration. Replacement can wait for in-flight
@@ -1293,12 +1283,7 @@ impl RuntimeHandle {
                 callback,
                 user_data: user_data_address as *mut c_void,
             };
-            unsafe {
-                sys::mln_runtime_set_resource_transform(
-                    runtime_address as *mut sys::mln_runtime,
-                    &descriptor,
-                )
-            }
+            unsafe { sys::mln_runtime_set_resource_transform(runtime_handle, &descriptor) }
         });
         maplibre_core::check(status).map_err(map_error)?;
         self.resource_transform
@@ -1310,20 +1295,19 @@ impl RuntimeHandle {
 
     fn clear_resource_transform(&self, py: Python<'_>) -> PyResult<()> {
         let _operation = self.operation_gate.begin_detached_operation()?;
-        let runtime_address = {
+        let runtime_handle = {
             let state = self.state_for_operation()?;
-            let Some(runtime_address) = state.address() else {
+            let Some(runtime_handle) = state.live_handle() else {
                 return Err(invalid_state_error("runtime handle is closed"));
             };
-            runtime_address
+            runtime_handle
         };
-        // SAFETY: runtime_address came from a runtime pointer that passed the
+        // SAFETY: runtime_handle came from a runtime pointer that passed the
         // binding lifecycle gate. The C API validates that it is live and waits
         // for in-flight callbacks before returning success, so release the GIL
         // while it runs without holding the Rust handle-state mutex.
-        let status = py.detach(move || unsafe {
-            sys::mln_runtime_clear_resource_transform(runtime_address as *mut sys::mln_runtime)
-        });
+        let status =
+            py.detach(move || unsafe { sys::mln_runtime_clear_resource_transform(runtime_handle) });
         maplibre_core::check(status).map_err(map_error)?;
         self.resource_transform
             .lock()
@@ -1340,7 +1324,7 @@ impl RuntimeHandle {
         // event has the correct size field and has_event points to writable
         // storage for one bool.
         maplibre_core::check(unsafe {
-            sys::mln_runtime_poll_event(state.as_ptr(), &mut event, &mut has_event)
+            sys::mln_runtime_poll_event(state.handle(), &mut event, &mut has_event)
         })
         .map_err(map_error)?;
         if !has_event {
@@ -1365,39 +1349,41 @@ impl RuntimeHandle {
 impl MapHandle {
     fn close(&self) -> PyResult<()> {
         let state = self.state();
-        // SAFETY: state owns an mln_map pointer created by mln_map_create and
+        // SAFETY: state owns an mln_map handle created by mln_map_create and
         // pairs it with the matching status-returning destroy function.
         unsafe { state.close_status(sys::mln_map_destroy) }.map_err(map_error)?;
         self.clear_custom_geometry_sources();
         Ok(())
     }
 
-    fn address(&self) -> PyResult<usize> {
+    /// This map's native handle, which names one map for the life of the
+    /// process. It carries no ownership and cannot operate on the map.
+    fn id(&self) -> PyResult<u64> {
         let state = self.state();
-        Ok(state.as_ptr() as usize)
+        Ok(state.handle().0)
     }
 
     fn request_repaint(&self) -> PyResult<()> {
         let state = self.state();
-        // SAFETY: The C API validates that the pointer is a live map handle and
+        // SAFETY: The C API validates that the handle is live and
         // that the call occurs on the map owner thread.
-        maplibre_core::check(unsafe { sys::mln_map_request_repaint(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_request_repaint(state.handle()) })
             .map_err(map_error)
     }
 
     fn request_still_image(&self) -> PyResult<()> {
         let state = self.state();
-        // SAFETY: The C API validates that the pointer is a live map handle and
+        // SAFETY: The C API validates that the handle is live and
         // that the call occurs on the map owner thread.
-        maplibre_core::check(unsafe { sys::mln_map_request_still_image(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_request_still_image(state.handle()) })
             .map_err(map_error)
     }
 
     fn dump_debug_logs(&self) -> PyResult<()> {
         let state = self.state();
-        // SAFETY: The C API validates that the pointer is a live map handle and
+        // SAFETY: The C API validates that the handle is live and
         // that the call occurs on the map owner thread.
-        maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(state.handle()) })
             .map_err(map_error)
     }
 
@@ -1405,7 +1391,7 @@ impl MapHandle {
         let state = self.state();
         // SAFETY: The C API validates the map pointer, owner-thread affinity,
         // and debug option mask bits.
-        maplibre_core::check(unsafe { sys::mln_map_set_debug_options(state.as_ptr(), options) })
+        maplibre_core::check(unsafe { sys::mln_map_set_debug_options(state.handle(), options) })
             .map_err(map_error)
     }
 
@@ -1414,7 +1400,7 @@ impl MapHandle {
         let mut options = 0;
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_debug_options(state.as_ptr(), &mut options)
+            sys::mln_map_get_debug_options(state.handle(), &mut options)
         })
         .map_err(map_error)?;
         Ok(options)
@@ -1424,7 +1410,7 @@ impl MapHandle {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and owner-thread affinity.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_rendering_stats_view_enabled(state.as_ptr(), enabled)
+            sys::mln_map_set_rendering_stats_view_enabled(state.handle(), enabled)
         })
         .map_err(map_error)
     }
@@ -1434,7 +1420,7 @@ impl MapHandle {
         let mut enabled = false;
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_rendering_stats_view_enabled(state.as_ptr(), &mut enabled)
+            sys::mln_map_get_rendering_stats_view_enabled(state.handle(), &mut enabled)
         })
         .map_err(map_error)?;
         Ok(enabled)
@@ -1444,7 +1430,7 @@ impl MapHandle {
         let state = self.state();
         let mut loaded = false;
         // SAFETY: The C API validates the map pointer and out pointer.
-        maplibre_core::check(unsafe { sys::mln_map_is_fully_loaded(state.as_ptr(), &mut loaded) })
+        maplibre_core::check(unsafe { sys::mln_map_is_fully_loaded(state.handle(), &mut loaded) })
             .map_err(map_error)?;
         Ok(loaded)
     }
@@ -1456,7 +1442,7 @@ impl MapHandle {
         let mut scale_factor = 0f64;
         // SAFETY: The C API validates the map pointer and out pointers.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_size(state.as_ptr(), &mut width, &mut height, &mut scale_factor)
+            sys::mln_map_get_size(state.handle(), &mut width, &mut height, &mut scale_factor)
         })
         .map_err(map_error)?;
         Ok((width, height, scale_factor))
@@ -1468,7 +1454,7 @@ impl MapHandle {
         let mut options = unsafe { sys::mln_map_viewport_options_default() };
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_viewport_options(state.as_ptr(), &mut options)
+            sys::mln_map_get_viewport_options(state.handle(), &mut options)
         })
         .map_err(map_error)?;
         viewport_options_to_py(py, &options)
@@ -1489,7 +1475,7 @@ impl MapHandle {
             frustum_offset,
         );
         // SAFETY: The C API validates the map pointer and viewport options.
-        maplibre_core::check(unsafe { sys::mln_map_set_viewport_options(state.as_ptr(), &options) })
+        maplibre_core::check(unsafe { sys::mln_map_set_viewport_options(state.handle(), &options) })
             .map_err(map_error)
     }
 
@@ -1499,7 +1485,7 @@ impl MapHandle {
         let mut options = unsafe { sys::mln_map_tile_options_default() };
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_tile_options(state.as_ptr(), &mut options)
+            sys::mln_map_get_tile_options(state.handle(), &mut options)
         })
         .map_err(map_error)?;
         tile_options_to_py(py, &options)
@@ -1524,25 +1510,26 @@ impl MapHandle {
             lod_mode,
         );
         // SAFETY: The C API validates the map pointer and tile options.
-        maplibre_core::check(unsafe { sys::mln_map_set_tile_options(state.as_ptr(), &options) })
+        maplibre_core::check(unsafe { sys::mln_map_set_tile_options(state.handle(), &options) })
             .map_err(map_error)
     }
 
     fn create_projection(&self) -> PyResult<MapProjectionHandle> {
         let state = self.state();
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
         // SAFETY: The C API validates the map handle, owner-thread affinity, and
         // output pointer. out starts null and is consumed immediately on success.
         maplibre_core::check(unsafe {
-            sys::mln_map_projection_create(state.as_ptr(), out.as_mut_ptr())
+            sys::mln_map_projection_create(state.handle(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        let ptr = out.into_non_null("mln_map_projection").map_err(map_error)?;
+        let native = out.into_live("mln_map_projection").map_err(map_error)?;
         // SAFETY: ptr came from mln_map_projection_create and is paired with
         // mln_map_projection_destroy in close.
         let handle = unsafe {
-            maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_map_projection")
-        };
+            maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map_projection")
+        }
+        .map_err(map_error)?;
         Ok(MapProjectionHandle {
             state: Mutex::new(handle),
         })
@@ -1553,7 +1540,7 @@ impl MapHandle {
         let url = maplibre_core::string::c_string(&url).map_err(map_error)?;
         // SAFETY: The C API validates that the pointer is a live map handle.
         // url is a null-terminated C string whose storage lives for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.as_ptr(), url.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_set_style_url(state.handle(), url.as_ptr()) })
             .map_err(map_error)?;
         // URL style replacement completes asynchronously when the new style loads.
         // Keep custom geometry callback state alive until map teardown, while
@@ -1567,7 +1554,7 @@ impl MapHandle {
         let json = maplibre_core::string::c_string(&json).map_err(map_error)?;
         // SAFETY: The C API validates that the pointer is a live map handle.
         // json is a null-terminated C string whose storage lives for this call.
-        maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.as_ptr(), json.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_set_style_json(state.handle(), json.as_ptr()) })
             .map_err(map_error)?;
         self.clear_custom_geometry_sources();
         Ok(())
@@ -1577,9 +1564,9 @@ impl MapHandle {
         let state = self.state();
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut camera = unsafe { sys::mln_camera_options_default() };
-        // SAFETY: The C API validates that the pointer is a live map handle and
+        // SAFETY: The C API validates that the handle is live and
         // camera points to initialized writable storage.
-        maplibre_core::check(unsafe { sys::mln_map_get_camera(state.as_ptr(), &mut camera) })
+        maplibre_core::check(unsafe { sys::mln_map_get_camera(state.handle(), &mut camera) })
             .map_err(map_error)?;
         camera_options_to_py(py, &camera)
     }
@@ -1610,7 +1597,7 @@ impl MapHandle {
             field_of_view,
         );
         // SAFETY: The C API validates the map pointer and camera fields.
-        maplibre_core::check(unsafe { sys::mln_map_jump_to(state.as_ptr(), &camera) })
+        maplibre_core::check(unsafe { sys::mln_map_jump_to(state.handle(), &camera) })
             .map_err(map_error)
     }
 
@@ -1645,7 +1632,7 @@ impl MapHandle {
         // optional animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_ease_to(
-                state.as_ptr(),
+                state.handle(),
                 &camera,
                 optional_ref_ptr(animation.as_ref()),
             )
@@ -1684,7 +1671,7 @@ impl MapHandle {
         // optional animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_fly_to(
-                state.as_ptr(),
+                state.handle(),
                 &camera,
                 optional_ref_ptr(animation.as_ref()),
             )
@@ -1708,7 +1695,7 @@ impl MapHandle {
         let mut camera = unsafe { sys::mln_camera_options_default() };
         // SAFETY: The C API validates the map pointer, bounds, fit options, and output pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_lat_lng_bounds(state.as_ptr(), bounds, &fit, &mut camera)
+            sys::mln_map_camera_for_lat_lng_bounds(state.handle(), bounds, &fit, &mut camera)
         })
         .map_err(map_error)?;
         camera_options_to_py(py, &camera)
@@ -1730,7 +1717,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, coordinate slice, fit options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_camera_for_lat_lngs(
-                state.as_ptr(),
+                state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 &fit,
@@ -1758,7 +1745,7 @@ impl MapHandle {
         let mut camera = unsafe { sys::mln_camera_options_default() };
         // SAFETY: The C API validates the map pointer, geometry, fit options, and output pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_camera_for_geometry(state.as_ptr(), geometry.as_ptr(), &fit, &mut camera)
+            sys::mln_map_camera_for_geometry(state.handle(), geometry.as_ptr(), &fit, &mut camera)
         })
         .map_err(map_error)?;
         camera_options_to_py(py, &camera)
@@ -1796,14 +1783,14 @@ impl MapHandle {
             // SAFETY: The C API validates the map pointer, camera options, and output pointer.
             unsafe {
                 sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
-                    state.as_ptr(),
+                    state.handle(),
                     &camera,
                     &mut bounds,
                 )
             }
         } else {
             // SAFETY: The C API validates the map pointer, camera options, and output pointer.
-            unsafe { sys::mln_map_lat_lng_bounds_for_camera(state.as_ptr(), &camera, &mut bounds) }
+            unsafe { sys::mln_map_lat_lng_bounds_for_camera(state.handle(), &camera, &mut bounds) }
         };
         maplibre_core::check(status).map_err(map_error)?;
         lat_lng_bounds_to_py(py, bounds)
@@ -1814,7 +1801,7 @@ impl MapHandle {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut bounds = unsafe { sys::mln_bound_options_default() };
         // SAFETY: The C API validates the map pointer and output pointer.
-        maplibre_core::check(unsafe { sys::mln_map_get_bounds(state.as_ptr(), &mut bounds) })
+        maplibre_core::check(unsafe { sys::mln_map_get_bounds(state.handle(), &mut bounds) })
             .map_err(map_error)?;
         bound_options_to_py(py, &bounds)
     }
@@ -1832,14 +1819,14 @@ impl MapHandle {
         let bounds =
             bound_options_from_parts(bounds, unbounded, min_zoom, max_zoom, min_pitch, max_pitch);
         // SAFETY: The C API validates the map pointer and bounds fields.
-        maplibre_core::check(unsafe { sys::mln_map_set_bounds(state.as_ptr(), &bounds) })
+        maplibre_core::check(unsafe { sys::mln_map_set_bounds(state.handle(), &bounds) })
             .map_err(map_error)
     }
 
     fn move_by(&self, delta_x: f64, delta_y: f64) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and delta values.
-        maplibre_core::check(unsafe { sys::mln_map_move_by(state.as_ptr(), delta_x, delta_y) })
+        maplibre_core::check(unsafe { sys::mln_map_move_by(state.handle(), delta_x, delta_y) })
             .map_err(map_error)
     }
 
@@ -1855,7 +1842,7 @@ impl MapHandle {
         // optional animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_move_by_animated(
-                state.as_ptr(),
+                state.handle(),
                 delta_x,
                 delta_y,
                 optional_ref_ptr(animation.as_ref()),
@@ -1869,7 +1856,7 @@ impl MapHandle {
         let anchor = anchor.map(screen_point_from_tuple);
         // SAFETY: The C API validates the map pointer, scale, and optional anchor.
         maplibre_core::check(unsafe {
-            sys::mln_map_scale_by(state.as_ptr(), scale, optional_ref_ptr(anchor.as_ref()))
+            sys::mln_map_scale_by(state.handle(), scale, optional_ref_ptr(anchor.as_ref()))
         })
         .map_err(map_error)
     }
@@ -1887,7 +1874,7 @@ impl MapHandle {
         // and optional animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_scale_by_animated(
-                state.as_ptr(),
+                state.handle(),
                 scale,
                 optional_ref_ptr(anchor.as_ref()),
                 optional_ref_ptr(animation.as_ref()),
@@ -1901,7 +1888,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and points.
         maplibre_core::check(unsafe {
             sys::mln_map_rotate_by(
-                state.as_ptr(),
+                state.handle(),
                 screen_point_from_tuple(first),
                 screen_point_from_tuple(second),
             )
@@ -1921,7 +1908,7 @@ impl MapHandle {
         // animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_rotate_by_animated(
-                state.as_ptr(),
+                state.handle(),
                 screen_point_from_tuple(first),
                 screen_point_from_tuple(second),
                 optional_ref_ptr(animation.as_ref()),
@@ -1933,7 +1920,7 @@ impl MapHandle {
     fn pitch_by(&self, pitch: f64) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer and pitch value.
-        maplibre_core::check(unsafe { sys::mln_map_pitch_by(state.as_ptr(), pitch) })
+        maplibre_core::check(unsafe { sys::mln_map_pitch_by(state.handle(), pitch) })
             .map_err(map_error)
     }
 
@@ -1944,7 +1931,7 @@ impl MapHandle {
         // animation fields.
         maplibre_core::check(unsafe {
             sys::mln_map_pitch_by_animated(
-                state.as_ptr(),
+                state.handle(),
                 pitch,
                 optional_ref_ptr(animation.as_ref()),
             )
@@ -1955,7 +1942,7 @@ impl MapHandle {
     fn cancel_transitions(&self) -> PyResult<()> {
         let state = self.state();
         // SAFETY: The C API validates the map pointer.
-        maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(state.handle()) })
             .map_err(map_error)
     }
 
@@ -1965,7 +1952,7 @@ impl MapHandle {
         let mut options = unsafe { sys::mln_free_camera_options_default() };
         // SAFETY: The C API validates the map pointer and output pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_free_camera_options(state.as_ptr(), &mut options)
+            sys::mln_map_get_free_camera_options(state.handle(), &mut options)
         })
         .map_err(map_error)?;
         free_camera_options_to_py(py, &options)
@@ -1980,7 +1967,7 @@ impl MapHandle {
         let options = free_camera_options_from_parts(position, orientation);
         // SAFETY: The C API validates the map pointer and free camera fields.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_free_camera_options(state.as_ptr(), &options)
+            sys::mln_map_set_free_camera_options(state.handle(), &options)
         })
         .map_err(map_error)
     }
@@ -1991,7 +1978,7 @@ impl MapHandle {
         let mut mode = unsafe { sys::mln_projection_mode_default() };
         // SAFETY: The C API validates the map pointer and output pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_projection_mode(state.as_ptr(), &mut mode)
+            sys::mln_map_get_projection_mode(state.handle(), &mut mode)
         })
         .map_err(map_error)?;
         projection_mode_to_py(py, &mode)
@@ -2006,7 +1993,7 @@ impl MapHandle {
         let state = self.state();
         let mode = projection_mode_from_parts(axonometric, x_skew, y_skew);
         // SAFETY: The C API validates the map pointer and projection mode fields.
-        maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(state.as_ptr(), &mode) })
+        maplibre_core::check(unsafe { sys::mln_map_set_projection_mode(state.handle(), &mode) })
             .map_err(map_error)
     }
 
@@ -2021,7 +2008,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, coordinate, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_pixel_for_lat_lng(
-                state.as_ptr(),
+                state.handle(),
                 sys::mln_lat_lng {
                     latitude,
                     longitude,
@@ -2042,7 +2029,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, point, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_lat_lng_for_pixel(
-                state.as_ptr(),
+                state.handle(),
                 sys::mln_screen_point { x, y },
                 &mut coordinate,
             )
@@ -2062,7 +2049,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and coordinate/output slices.
         maplibre_core::check(unsafe {
             sys::mln_map_pixels_for_lat_lngs(
-                state.as_ptr(),
+                state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 points.as_mut_ptr(),
@@ -2085,7 +2072,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and point/output slices.
         maplibre_core::check(unsafe {
             sys::mln_map_lat_lngs_for_pixels(
-                state.as_ptr(),
+                state.handle(),
                 points.as_ptr(),
                 points.len(),
                 coordinates.as_mut_ptr(),
@@ -2109,7 +2096,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, and JSON descriptor.
         maplibre_core::check(unsafe {
             sys::mln_map_add_style_source_json(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 source_json.as_ptr(),
             )
@@ -2155,7 +2142,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, borrowed string views, and options.
         maplibre_core::check(unsafe {
             sys::mln_map_add_geojson_source_url(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 url.raw(),
                 options.as_ptr(),
@@ -2203,7 +2190,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, GeoJSON descriptor, and options.
         maplibre_core::check(unsafe {
             sys::mln_map_add_geojson_source_data(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 data.as_ptr(),
                 options.as_ptr(),
@@ -2218,7 +2205,7 @@ impl MapHandle {
         let url = maplibre_core::string::string_view(&url);
         // SAFETY: The C API validates the map pointer and borrowed string views.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_url(state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_set_geojson_source_url(state.handle(), source_id.raw(), url.raw())
         })
         .map_err(map_error)
     }
@@ -2230,7 +2217,7 @@ impl MapHandle {
         let data = maplibre_core::geojson::geojson_try_to_native(&data).map_err(map_error)?;
         // SAFETY: The C API validates the map pointer, source ID, and GeoJSON descriptor.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_geojson_source_data(state.as_ptr(), source_id.raw(), data.as_ptr())
+            sys::mln_map_set_geojson_source_data(state.handle(), source_id.raw(), data.as_ptr())
         })
         .map_err(map_error)
     }
@@ -2416,7 +2403,7 @@ impl MapHandle {
         let mut removed = false;
         // SAFETY: The C API validates the map pointer, source ID view, and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_remove_style_source(state.as_ptr(), source_id.raw(), &mut removed)
+            sys::mln_map_remove_style_source(state.handle(), source_id.raw(), &mut removed)
         })
         .map_err(map_error)?;
         if removed {
@@ -2440,7 +2427,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID view, and out pointers.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_source_type(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 &mut source_type,
                 &mut found,
@@ -2462,7 +2449,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID view, info, and found pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_source_info(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 &mut info,
                 &mut found,
@@ -2480,7 +2467,7 @@ impl MapHandle {
             // for this call. The C API validates all pointers.
             maplibre_core::check(unsafe {
                 sys::mln_map_copy_style_source_attribution(
-                    state.as_ptr(),
+                    state.handle(),
                     source_id.raw(),
                     bytes.as_mut_ptr().cast::<c_char>(),
                     bytes.len(),
@@ -2506,15 +2493,15 @@ impl MapHandle {
 
     fn list_style_source_ids(&self) -> PyResult<Vec<String>> {
         let state = self.state();
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_list_style_source_ids(state.as_ptr(), out.as_mut_ptr())
+            sys::mln_map_list_style_source_ids(state.handle(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        let ptr = out.into_non_null("mln_style_id_list").map_err(map_error)?;
-        // SAFETY: ptr is an owned style ID list returned by native.
-        unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
+        let native = out.into_live("mln_style_id_list").map_err(map_error)?;
+        // SAFETY: native is an owned style ID list returned by native.
+        unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
     }
 
     fn add_hillshade_layer(
@@ -2531,7 +2518,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and borrowed layer/source ID views.
         maplibre_core::check(unsafe {
             sys::mln_map_add_hillshade_layer(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
@@ -2554,7 +2541,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and borrowed layer/source ID views.
         maplibre_core::check(unsafe {
             sys::mln_map_add_color_relief_layer(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
@@ -2575,7 +2562,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer and borrowed layer ID views.
         maplibre_core::check(unsafe {
             sys::mln_map_add_location_indicator_layer(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 before_layer_id.raw(),
             )
@@ -2595,7 +2582,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, coordinate, and altitude.
         maplibre_core::check(unsafe {
             sys::mln_map_set_location_indicator_location(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 sys::mln_lat_lng {
                     latitude,
@@ -2612,7 +2599,7 @@ impl MapHandle {
         let layer_id = maplibre_core::string::string_view(&layer_id);
         // SAFETY: The C API validates the map pointer, layer ID, and bearing.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_location_indicator_bearing(state.as_ptr(), layer_id.raw(), bearing)
+            sys::mln_map_set_location_indicator_bearing(state.handle(), layer_id.raw(), bearing)
         })
         .map_err(map_error)
     }
@@ -2627,7 +2614,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, and radius.
         maplibre_core::check(unsafe {
             sys::mln_map_set_location_indicator_accuracy_radius(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 radius,
             )
@@ -2647,7 +2634,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, image kind, and image ID.
         maplibre_core::check(unsafe {
             sys::mln_map_set_location_indicator_image_name(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 image_kind,
                 image_id.raw(),
@@ -2668,7 +2655,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, JSON descriptor, and before-layer ID.
         maplibre_core::check(unsafe {
             sys::mln_map_add_style_layer_json(
-                state.as_ptr(),
+                state.handle(),
                 layer_json.as_ptr(),
                 before_layer_id.raw(),
             )
@@ -2683,12 +2670,12 @@ impl MapHandle {
     ) -> PyResult<Option<Py<PyAny>>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         let mut found = false;
         // SAFETY: The C API validates the map pointer, layer ID, out pointer, and found pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_layer_json(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 out.as_mut_ptr(),
                 &mut found,
@@ -2698,7 +2685,7 @@ impl MapHandle {
         if !found {
             return Ok(None);
         }
-        json_snapshot_to_py(py, out.into_option())
+        json_snapshot_to_py(py, out.get())
     }
 
     fn set_style_light_json(&self, light_json: &Bound<'_, PyAny>) -> PyResult<()> {
@@ -2706,7 +2693,7 @@ impl MapHandle {
         let light_json = native_json_from_py(light_json)?;
         // SAFETY: The C API validates the map pointer and JSON descriptor.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_light_json(state.as_ptr(), light_json.as_ptr())
+            sys::mln_map_set_style_light_json(state.handle(), light_json.as_ptr())
         })
         .map_err(map_error)
     }
@@ -2722,7 +2709,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, property name, and JSON descriptor.
         maplibre_core::check(unsafe {
             sys::mln_map_set_style_light_property(
-                state.as_ptr(),
+                state.handle(),
                 property_name.raw(),
                 value.as_ptr(),
             )
@@ -2737,17 +2724,17 @@ impl MapHandle {
     ) -> PyResult<Option<Py<PyAny>>> {
         let state = self.state();
         let property_name = maplibre_core::string::string_view(&property_name);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: The C API validates the map pointer, property name, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_light_property(
-                state.as_ptr(),
+                state.handle(),
                 property_name.raw(),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.into_option())
+        json_snapshot_to_py(py, out.get())
     }
 
     fn set_layer_property(
@@ -2763,7 +2750,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer/property names, and JSON descriptor.
         maplibre_core::check(unsafe {
             sys::mln_map_set_layer_property(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 property_name.raw(),
                 value.as_ptr(),
@@ -2781,18 +2768,18 @@ impl MapHandle {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
         let property_name = maplibre_core::string::string_view(&property_name);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: The C API validates the map pointer, layer/property names, and out pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_get_layer_property(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 property_name.raw(),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.into_option())
+        json_snapshot_to_py(py, out.get())
     }
 
     fn set_layer_filter(
@@ -2811,7 +2798,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID, and optional JSON descriptor.
         maplibre_core::check(unsafe {
             sys::mln_map_set_layer_filter(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 optional_ref_ptr(filter.as_ref().map(|filter| filter.as_ref())),
             )
@@ -2822,13 +2809,13 @@ impl MapHandle {
     fn get_layer_filter(&self, py: Python<'_>, layer_id: String) -> PyResult<Option<Py<PyAny>>> {
         let state = self.state();
         let layer_id = maplibre_core::string::string_view(&layer_id);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_layer_filter(state.as_ptr(), layer_id.raw(), out.as_mut_ptr())
+            sys::mln_map_get_layer_filter(state.handle(), layer_id.raw(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        json_snapshot_to_py(py, out.into_option())
+        json_snapshot_to_py(py, out.get())
     }
 
     fn remove_style_layer(&self, layer_id: String) -> PyResult<bool> {
@@ -2850,7 +2837,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, layer ID view, and out pointers.
         maplibre_core::check(unsafe {
             sys::mln_map_get_style_layer_type(
-                state.as_ptr(),
+                state.handle(),
                 layer_id.raw(),
                 &mut layer_type,
                 &mut found,
@@ -2868,15 +2855,15 @@ impl MapHandle {
 
     fn list_style_layer_ids(&self) -> PyResult<Vec<String>> {
         let state = self.state();
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
         // SAFETY: The C API validates the map pointer and out pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_list_style_layer_ids(state.as_ptr(), out.as_mut_ptr())
+            sys::mln_map_list_style_layer_ids(state.handle(), out.as_mut_ptr())
         })
         .map_err(map_error)?;
-        let ptr = out.into_non_null("mln_style_id_list").map_err(map_error)?;
-        // SAFETY: ptr is an owned style ID list returned by native.
-        unsafe { maplibre_core::style::copy_style_id_list(ptr) }.map_err(map_error)
+        let native = out.into_live("mln_style_id_list").map_err(map_error)?;
+        // SAFETY: native is an owned style ID list returned by native.
+        unsafe { maplibre_core::style::copy_style_id_list(native) }.map_err(map_error)
     }
 
     fn move_style_layer(&self, layer_id: String, before_layer_id: Option<String>) -> PyResult<()> {
@@ -2886,7 +2873,7 @@ impl MapHandle {
         let before_layer_id = maplibre_core::string::string_view(&before_layer_id);
         // SAFETY: The C API validates the map pointer and borrowed layer ID views.
         maplibre_core::check(unsafe {
-            sys::mln_map_move_style_layer(state.as_ptr(), layer_id.raw(), before_layer_id.raw())
+            sys::mln_map_move_style_layer(state.handle(), layer_id.raw(), before_layer_id.raw())
         })
         .map_err(map_error)
     }
@@ -2914,7 +2901,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, image ID, image descriptor,
         // options, and pixel storage. pixels is retained for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_style_image(state.as_ptr(), image_id.raw(), &image, &options)
+            sys::mln_map_set_style_image(state.handle(), image_id.raw(), &image, &options)
         })
         .map_err(map_error)
     }
@@ -2938,7 +2925,7 @@ impl MapHandle {
         let mut found = false;
         // SAFETY: The C API validates the map pointer, image ID view, info, and found pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_image_info(state.as_ptr(), image_id.raw(), &mut info, &mut found)
+            sys::mln_map_get_style_image_info(state.handle(), image_id.raw(), &mut info, &mut found)
         })
         .map_err(map_error)?;
         if found {
@@ -2959,7 +2946,7 @@ impl MapHandle {
         let mut found = false;
         // SAFETY: The C API validates the map pointer, image ID view, info, and found pointer.
         maplibre_core::check(unsafe {
-            sys::mln_map_get_style_image_info(state.as_ptr(), image_id.raw(), &mut info, &mut found)
+            sys::mln_map_get_style_image_info(state.handle(), image_id.raw(), &mut info, &mut found)
         })
         .map_err(map_error)?;
         if !found {
@@ -2972,7 +2959,7 @@ impl MapHandle {
         // The C API validates all pointers and capacity.
         maplibre_core::check(unsafe {
             sys::mln_map_copy_style_image_premultiplied_rgba8(
-                state.as_ptr(),
+                state.handle(),
                 image_id.raw(),
                 pixels.as_mut_ptr(),
                 pixels.len(),
@@ -3001,7 +2988,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, coordinate slice, and URL.
         maplibre_core::check(unsafe {
             sys::mln_map_add_image_source_url(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -3028,7 +3015,7 @@ impl MapHandle {
         // image descriptor, and pixel storage. pixels is retained for this call.
         maplibre_core::check(unsafe {
             sys::mln_map_add_image_source_image(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -3044,7 +3031,7 @@ impl MapHandle {
         let url = maplibre_core::string::string_view(&url);
         // SAFETY: The C API validates the map pointer and borrowed string views.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_image_source_url(state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_set_image_source_url(state.handle(), source_id.raw(), url.raw())
         })
         .map_err(map_error)
     }
@@ -3063,7 +3050,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, image descriptor,
         // and pixel storage. pixels is retained for this call.
         maplibre_core::check(unsafe {
-            sys::mln_map_set_image_source_image(state.as_ptr(), source_id.raw(), &image)
+            sys::mln_map_set_image_source_image(state.handle(), source_id.raw(), &image)
         })
         .map_err(map_error)
     }
@@ -3079,7 +3066,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, and coordinate slice.
         maplibre_core::check(unsafe {
             sys::mln_map_set_image_source_coordinates(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -3108,7 +3095,7 @@ impl MapHandle {
         // all pointers and returns a copied coordinate count.
         maplibre_core::check(unsafe {
             sys::mln_map_get_image_source_coordinates(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 coordinates.as_mut_ptr(),
                 coordinates.len(),
@@ -3162,7 +3149,7 @@ impl MapHandle {
         // this call, and state is retained by this map after successful attach.
         maplibre_core::check(unsafe {
             sys::mln_map_add_custom_geometry_source(
-                map_state.as_ptr(),
+                map_state.handle(),
                 source_id_view.raw(),
                 &descriptor,
             )
@@ -3193,7 +3180,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, tile ID, and GeoJSON descriptor.
         maplibre_core::check(unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 sys::mln_canonical_tile_id { z, x, y },
                 data.as_ptr(),
@@ -3214,7 +3201,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, and tile ID.
         maplibre_core::check(unsafe {
             sys::mln_map_invalidate_custom_geometry_source_tile(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 sys::mln_canonical_tile_id { z, x, y },
             )
@@ -3234,7 +3221,7 @@ impl MapHandle {
         // SAFETY: The C API validates the map pointer, source ID, and bounds.
         maplibre_core::check(unsafe {
             sys::mln_map_invalidate_custom_geometry_source_region(
-                state.as_ptr(),
+                state.handle(),
                 source_id.raw(),
                 bounds,
             )
@@ -3252,7 +3239,7 @@ impl MapHandle {
 impl MapProjectionHandle {
     fn close(&self) -> PyResult<()> {
         let state = self.state();
-        // SAFETY: state owns an mln_map_projection pointer created by
+        // SAFETY: state owns an mln_map_projection handle created by
         // mln_map_projection_create and pairs it with the matching destroy.
         unsafe { state.close_status(sys::mln_map_projection_destroy) }.map_err(map_error)
     }
@@ -3264,7 +3251,7 @@ impl MapProjectionHandle {
         // SAFETY: The C API validates that the projection is live and camera
         // points to initialized writable storage.
         maplibre_core::check(unsafe {
-            sys::mln_map_projection_get_camera(state.as_ptr(), &mut camera)
+            sys::mln_map_projection_get_camera(state.handle(), &mut camera)
         })
         .map_err(map_error)?;
         camera_options_to_py(py, &camera)
@@ -3296,7 +3283,7 @@ impl MapProjectionHandle {
             field_of_view,
         );
         // SAFETY: The C API validates the projection pointer and camera fields.
-        maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(state.as_ptr(), &camera) })
+        maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(state.handle(), &camera) })
             .map_err(map_error)
     }
 
@@ -3318,7 +3305,7 @@ impl MapProjectionHandle {
         // padding. coordinates is retained for the duration of this call.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_coordinates(
-                state.as_ptr(),
+                state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 padding,
@@ -3339,7 +3326,7 @@ impl MapProjectionHandle {
         let padding = edge_insets_from_tuple(padding);
         // SAFETY: The C API validates the projection pointer, geometry descriptor, and padding.
         maplibre_core::check(unsafe {
-            sys::mln_map_projection_set_visible_geometry(state.as_ptr(), geometry.as_ptr(), padding)
+            sys::mln_map_projection_set_visible_geometry(state.handle(), geometry.as_ptr(), padding)
         })
         .map_err(map_error)
     }
@@ -3356,7 +3343,7 @@ impl MapProjectionHandle {
         // output pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_pixel_for_lat_lng(
-                state.as_ptr(),
+                state.handle(),
                 sys::mln_lat_lng {
                     latitude,
                     longitude,
@@ -3378,7 +3365,7 @@ impl MapProjectionHandle {
         // pointer.
         maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
-                state.as_ptr(),
+                state.handle(),
                 sys::mln_screen_point { x, y },
                 &mut coordinate,
             )
@@ -3404,7 +3391,7 @@ impl RenderSessionHandle {
             return Ok(());
         }
         state.ensure_no_frame_acquired()?;
-        // SAFETY: state owns an mln_render_session pointer created by an attach
+        // SAFETY: state owns an mln_render_session handle created by an attach
         // function and pairs it with the matching status-returning destroy.
         unsafe { state.handle.close_status(sys::mln_render_session_destroy) }.map_err(map_error)
     }
@@ -3418,7 +3405,7 @@ impl RenderSessionHandle {
         // SAFETY: The C API validates that the pointer is live, attached, and
         // called on the owner thread.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_resize(state.as_ptr(), width, height, scale_factor)
+            sys::mln_render_session_resize(state.native(), width, height, scale_factor)
         })
         .map_err(map_error)
     }
@@ -3433,7 +3420,7 @@ impl RenderSessionHandle {
         // SAFETY: The C API validates the render-session pointer and state, and
         // rendered points to caller-owned output storage.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_render_update(state.as_ptr(), &raw mut rendered)
+            sys::mln_render_session_render_update(state.native(), &raw mut rendered)
         })
         .map_err(map_error)?;
         Ok(rendered)
@@ -3446,7 +3433,7 @@ impl RenderSessionHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_detach(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_render_session_detach(state.native()) })
             .map_err(map_error)?;
         state.detached = true;
         drop(state);
@@ -3462,7 +3449,7 @@ impl RenderSessionHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_reduce_memory_use(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_render_session_reduce_memory_use(state.native()) })
             .map_err(map_error)
     }
 
@@ -3473,7 +3460,7 @@ impl RenderSessionHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_clear_data(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_render_session_clear_data(state.native()) })
             .map_err(map_error)
     }
 
@@ -3484,7 +3471,7 @@ impl RenderSessionHandle {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
         // SAFETY: The C API validates the render-session pointer and state.
-        maplibre_core::check(unsafe { sys::mln_render_session_dump_debug_logs(state.as_ptr()) })
+        maplibre_core::check(unsafe { sys::mln_render_session_dump_debug_logs(state.native()) })
             .map_err(map_error)
     }
 
@@ -3514,23 +3501,23 @@ impl RenderSessionHandle {
         }
         let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
         // SAFETY: The C API validates the render-session pointer, query geometry/options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_rendered_features(
-                state.as_ptr(),
+                state.native(),
                 geometry.as_ptr(),
                 options.as_ptr(),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_feature_query_result")
+        let native = out
+            .into_live("mln_feature_query_result")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned feature-query result returned by the C API.
-        let features =
-            unsafe { maplibre_core::query::copy_feature_query_result(ptr) }.map_err(map_error)?;
+        // SAFETY: native is an owned feature-query result returned by the C API.
+        let features = unsafe { maplibre_core::query::copy_feature_query_result(native) }
+            .map_err(map_error)?;
         queried_features_to_py(py, &features)
     }
 
@@ -3559,23 +3546,23 @@ impl RenderSessionHandle {
         }
         let options = maplibre_core::query::source_feature_query_options_to_native(&options)
             .map_err(map_error)?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
         // SAFETY: The C API validates the render-session pointer, source ID, query options, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_source_features(
-                state.as_ptr(),
+                state.native(),
                 source_id.raw(),
                 options.as_ptr(),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_feature_query_result")
+        let native = out
+            .into_live("mln_feature_query_result")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned feature-query result returned by the C API.
-        let features =
-            unsafe { maplibre_core::query::copy_feature_query_result(ptr) }.map_err(map_error)?;
+        // SAFETY: native is an owned feature-query result returned by the C API.
+        let features = unsafe { maplibre_core::query::copy_feature_query_result(native) }
+            .map_err(map_error)?;
         queried_features_to_py(py, &features)
     }
 
@@ -3610,11 +3597,11 @@ impl RenderSessionHandle {
         let arguments_ptr = arguments
             .as_ref()
             .map_or(ptr::null(), |value| value.as_ptr());
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_extension_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_extension_result>::new();
         // SAFETY: The C API validates the render-session pointer, feature, strings, arguments, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_query_feature_extensions(
-                state.as_ptr(),
+                state.native(),
                 source_id.raw(),
                 feature.as_ptr(),
                 extension.raw(),
@@ -3624,11 +3611,11 @@ impl RenderSessionHandle {
             )
         })
         .map_err(map_error)?;
-        let ptr = out
-            .into_non_null("mln_feature_extension_result")
+        let native = out
+            .into_live("mln_feature_extension_result")
             .map_err(map_error)?;
-        // SAFETY: ptr is an owned feature-extension result returned by the C API.
-        let result = unsafe { maplibre_core::query::copy_feature_extension_result(ptr) }
+        // SAFETY: native is an owned feature-extension result returned by the C API.
+        let result = unsafe { maplibre_core::query::copy_feature_extension_result(native) }
             .map_err(map_error)?;
         feature_extension_result_to_py(py, &result)
     }
@@ -3655,7 +3642,7 @@ impl RenderSessionHandle {
         // SAFETY: The C API validates the render-session pointer, selector, and JSON state.
         maplibre_core::check(unsafe {
             sys::mln_render_session_set_feature_state(
-                state.as_ptr(),
+                state.native(),
                 selector.as_ptr(),
                 state_value.as_ptr(),
             )
@@ -3679,18 +3666,18 @@ impl RenderSessionHandle {
         let selector =
             feature_state_selector_from_parts(source_id, source_layer_id, feature_id, state_key)?;
         let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: The C API validates the render-session pointer, selector, and output pointer.
         maplibre_core::check(unsafe {
             sys::mln_render_session_get_feature_state(
-                state.as_ptr(),
+                state.native(),
                 selector.as_ptr(),
                 out.as_mut_ptr(),
             )
         })
         .map_err(map_error)?;
-        let snapshot = out.into_option();
-        // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+        let snapshot = out.get();
+        // SAFETY: snapshot, when live, is an owned native JSON snapshot returned by the C API.
         let value =
             unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
         let value = value.unwrap_or_else(|| maplibre_core::json::JsonValue::Object(Vec::new()));
@@ -3714,7 +3701,7 @@ impl RenderSessionHandle {
         let selector = maplibre_core::query::feature_state_selector_to_native(&selector);
         // SAFETY: The C API validates the render-session pointer and selector.
         maplibre_core::check(unsafe {
-            sys::mln_render_session_remove_feature_state(state.as_ptr(), selector.as_ptr())
+            sys::mln_render_session_remove_feature_state(state.native(), selector.as_ptr())
         })
         .map_err(map_error)
     }
@@ -3725,7 +3712,7 @@ impl RenderSessionHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
-        let info = probe_texture_image_info(state.as_ptr())?;
+        let info = probe_texture_image_info(state.native())?;
         texture_image_info_to_py(py, info)
     }
 
@@ -3735,9 +3722,9 @@ impl RenderSessionHandle {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         state.ensure_no_frame_acquired()?;
-        let info = probe_texture_image_info(state.as_ptr())?;
+        let info = probe_texture_image_info(state.native())?;
         let mut data = vec![0; info.byte_length];
-        let info = read_texture_image_into(state.as_ptr(), &mut data)?;
+        let info = read_texture_image_into(state.native(), &mut data)?;
         image_to_py(py, info, &data)
     }
 
@@ -3766,7 +3753,7 @@ impl RenderSessionHandle {
         state.ensure_no_frame_acquired()?;
         // SAFETY: data points to the writable contiguous Python buffer borrowed
         // above for cells.len() u8 elements, or is null when the buffer is empty.
-        let info = read_texture_image_raw(state.as_ptr(), data, cells.len())?;
+        let info = read_texture_image_raw(state.native(), data, cells.len())?;
         texture_image_info_to_py(py, info)
     }
 
@@ -3784,7 +3771,7 @@ impl RenderSessionHandle {
         // SAFETY: raw points to initialized writable frame storage, and the C
         // API validates the session pointer and texture-session state.
         maplibre_core::check(unsafe {
-            sys::mln_metal_owned_texture_acquire_frame(state.as_ptr(), &mut raw)
+            sys::mln_metal_owned_texture_acquire_frame(state.native(), &mut raw)
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
@@ -3817,7 +3804,7 @@ impl RenderSessionHandle {
         // SAFETY: raw points to initialized writable frame storage, and the C
         // API validates the session pointer and texture-session state.
         maplibre_core::check(unsafe {
-            sys::mln_vulkan_owned_texture_acquire_frame(state.as_ptr(), &mut raw)
+            sys::mln_vulkan_owned_texture_acquire_frame(state.native(), &mut raw)
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
@@ -3850,7 +3837,7 @@ impl RenderSessionHandle {
         // SAFETY: raw points to initialized writable frame storage, and the C
         // API validates the session pointer and texture-session state.
         maplibre_core::check(unsafe {
-            sys::mln_opengl_owned_texture_acquire_frame(state.as_ptr(), &mut raw)
+            sys::mln_opengl_owned_texture_acquire_frame(state.native(), &mut raw)
         })
         .map_err(map_error)?;
         state.frame_acquired = true;
@@ -3897,7 +3884,7 @@ impl DetachedRenderSessionHandle {
             return Ok(());
         }
         state.ensure_no_frame_acquired()?;
-        // SAFETY: state owns an mln_render_session pointer created by an attach
+        // SAFETY: state owns an mln_render_session handle created by an attach
         // function and pairs it with the matching status-returning destroy.
         unsafe { state.handle.close_status(sys::mln_render_session_destroy) }.map_err(map_error)
     }
@@ -3983,37 +3970,34 @@ impl CustomGeometrySourceHandle {
 #[pymethods]
 impl WakeSource {
     fn signal(&self) -> PyResult<()> {
-        let address = self
-            .address
+        let handle = self
+            .handle
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let Some(address) = *address else {
+        let Some(handle) = *handle else {
             return Err(invalid_state_error("wake source is closed"));
         };
-        // SAFETY: address came from a successful acquire and is still owned by
-        // this handle, and the C API accepts signals from any thread.
-        maplibre_core::check(unsafe {
-            sys::mln_wake_source_signal(address as *mut sys::mln_wake_source)
-        })
-        .map_err(map_error)
+        // SAFETY: handle came from a successful acquire and is still owned by
+        // this wrapper, and the C API accepts signals from any thread.
+        maplibre_core::check(unsafe { sys::mln_wake_source_signal(handle) }).map_err(map_error)
     }
 
     fn close(&self) {
-        let mut address = self
-            .address
+        let mut handle = self
+            .handle
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        let Some(address) = address.take() else {
+        let Some(handle) = handle.take() else {
             return;
         };
-        // SAFETY: address came from a successful acquire, the mutex makes this
+        // SAFETY: handle came from a successful acquire, the mutex makes this
         // the only close, and the C API accepts destruction from any thread.
-        unsafe { sys::mln_wake_source_destroy(address as *mut sys::mln_wake_source) };
+        unsafe { sys::mln_wake_source_destroy(handle) };
     }
 
     #[getter]
     fn closed(&self) -> bool {
-        self.address
+        self.handle
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
             .is_none()
@@ -4093,7 +4077,7 @@ impl PyResourceProviderState {
     fn invoke(
         &self,
         request: *const sys::mln_resource_request,
-        handle: *mut sys::mln_resource_request_handle,
+        handle: sys::mln_resource_request_handle,
     ) -> u32 {
         let Some(_permit) =
             try_acquire_callback_permit(&self.pending_callbacks, self.max_pending_callbacks)
@@ -4148,7 +4132,7 @@ impl PyResourceProviderState {
 unsafe extern "C" fn resource_provider_trampoline(
     user_data: *mut c_void,
     request: *const sys::mln_resource_request,
-    handle: *mut sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request_handle,
 ) -> u32 {
     catch_unwind(AssertUnwindSafe(|| {
         let Some(state) = ptr::NonNull::new(user_data.cast::<PyResourceProviderState>()) else {
@@ -4250,7 +4234,7 @@ fn event_to_py(py: Python<'_>, event: maplibre_core::CopiedRuntimeEvent) -> PyRe
     let dict = PyDict::new(py);
     dict.set_item("event_type", event_type_raw(event.event_type))?;
     dict.set_item("source_type", event.source.source_type)?;
-    dict.set_item("source_address", event.source.source_address)?;
+    dict.set_item("source_id", event.source.source_id)?;
     dict.set_item("code", event.code)?;
     dict.set_item("message", event.message)?;
     dict.set_item("payload", payload_to_py(py, event.payload)?)?;
@@ -4539,9 +4523,9 @@ fn native_json_from_py(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::json::
 
 fn json_snapshot_to_py(
     py: Python<'_>,
-    snapshot: Option<std::ptr::NonNull<sys::mln_json_snapshot>>,
+    snapshot: sys::mln_json_snapshot,
 ) -> PyResult<Option<Py<PyAny>>> {
-    // SAFETY: snapshot, when present, is an owned native JSON snapshot returned by the C API.
+    // SAFETY: snapshot, when live, is an owned native JSON snapshot returned by the C API.
     let value = unsafe { maplibre_core::json::copy_json_snapshot(snapshot) }.map_err(map_error)?;
     value.map(|value| json_value_to_py(py, &value)).transpose()
 }
@@ -6136,7 +6120,7 @@ fn resource_response_status_from_raw(raw: u32) -> PyResult<ResourceResponseStatu
 }
 
 fn probe_texture_image_info(
-    session: *mut sys::mln_render_session,
+    session: sys::mln_render_session,
 ) -> PyResult<maplibre_core::TextureImageInfo> {
     // SAFETY: Default constructor takes no arguments and initializes size.
     let mut info = unsafe { sys::mln_texture_image_info_default() };
@@ -6155,7 +6139,7 @@ fn probe_texture_image_info(
 }
 
 fn read_texture_image_raw(
-    session: *mut sys::mln_render_session,
+    session: sys::mln_render_session,
     data: *mut u8,
     capacity: usize,
 ) -> PyResult<maplibre_core::TextureImageInfo> {
@@ -6171,7 +6155,7 @@ fn read_texture_image_raw(
 }
 
 fn read_texture_image_into(
-    session: *mut sys::mln_render_session,
+    session: sys::mln_render_session,
     data: &mut [u8],
 ) -> PyResult<maplibre_core::TextureImageInfo> {
     let data_ptr = if data.is_empty() {
@@ -6365,7 +6349,7 @@ impl Drop for OwnedTextureFrameAcquisitionGuard {
                 // SAFETY: raw reconstructs the frame returned by a successful
                 // native acquire call whose Python object construction failed.
                 let _ = maplibre_core::check(unsafe {
-                    sys::mln_metal_owned_texture_release_frame(session.as_ptr(), &raw)
+                    sys::mln_metal_owned_texture_release_frame(session.native(), &raw)
                 });
             }
             OwnedTextureFrameRelease::Vulkan(raw) => {
@@ -6373,7 +6357,7 @@ impl Drop for OwnedTextureFrameAcquisitionGuard {
                 // SAFETY: raw reconstructs the frame returned by a successful
                 // native acquire call whose Python object construction failed.
                 let _ = maplibre_core::check(unsafe {
-                    sys::mln_vulkan_owned_texture_release_frame(session.as_ptr(), &raw)
+                    sys::mln_vulkan_owned_texture_release_frame(session.native(), &raw)
                 });
             }
             OwnedTextureFrameRelease::OpenGL(raw) => {
@@ -6381,7 +6365,7 @@ impl Drop for OwnedTextureFrameAcquisitionGuard {
                 // SAFETY: raw reconstructs the frame returned by a successful
                 // native acquire call whose Python object construction failed.
                 let _ = maplibre_core::check(unsafe {
-                    sys::mln_opengl_owned_texture_release_frame(session.as_ptr(), &raw)
+                    sys::mln_opengl_owned_texture_release_frame(session.native(), &raw)
                 });
             }
         }
@@ -6407,7 +6391,7 @@ impl MetalOwnedTextureFrameHandle {
         // SAFETY: raw reconstructs the frame returned by the successful native
         // acquire call for this session and has not been released yet.
         maplibre_core::check(unsafe {
-            sys::mln_metal_owned_texture_release_frame(session.as_ptr(), &raw)
+            sys::mln_metal_owned_texture_release_frame(session.native(), &raw)
         })
         .map_err(map_error)?;
         session.frame_acquired = false;
@@ -6497,7 +6481,7 @@ impl VulkanOwnedTextureFrameHandle {
         // SAFETY: raw reconstructs the frame returned by the successful native
         // acquire call for this session and has not been released yet.
         maplibre_core::check(unsafe {
-            sys::mln_vulkan_owned_texture_release_frame(session.as_ptr(), &raw)
+            sys::mln_vulkan_owned_texture_release_frame(session.native(), &raw)
         })
         .map_err(map_error)?;
         session.frame_acquired = false;
@@ -6602,7 +6586,7 @@ impl OpenGLOwnedTextureFrameHandle {
         // SAFETY: raw reconstructs the frame returned by the successful native
         // acquire call for this session and has not been released yet.
         maplibre_core::check(unsafe {
-            sys::mln_opengl_owned_texture_release_frame(session.as_ptr(), &raw)
+            sys::mln_opengl_owned_texture_release_frame(session.native(), &raw)
         })
         .map_err(map_error)?;
         session.frame_acquired = false;
@@ -6952,7 +6936,7 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
         size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
         type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED,
         source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: ptr::null_mut(),
+        source: 0,
         code: 0,
         payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME,
         payload: ptr::addr_of!(render_frame_payload).cast(),
@@ -6980,7 +6964,7 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
         size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
         type_: sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
         source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: ptr::null_mut(),
+        source: 0,
         code: 0,
         payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
         payload: ptr::addr_of!(tile_action_payload).cast(),
@@ -7009,7 +6993,7 @@ fn runtime_event_payload_wire_shapes_for_test(py: Python<'_>) -> PyResult<Py<PyA
         size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
         type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
         source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        source: ptr::null_mut(),
+        source: 0,
         code: 0,
         payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
         payload: ptr::addr_of!(offline_status_payload).cast(),
@@ -7045,7 +7029,7 @@ fn camera_transition_finished_event_for_test(
         size: std::mem::size_of::<sys::mln_runtime_event>() as u32,
         type_: sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
         source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-        source: ptr::null_mut(),
+        source: 0,
         code: 0,
         payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
         payload: ptr::addr_of!(payload).cast(),
@@ -7081,16 +7065,18 @@ fn create_runtime(
     let native_options =
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
     let raw_options = native_options.to_raw();
-    let mut out = maplibre_core::ptr::OutPtr::<sys::mln_runtime>::new();
+    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
     // SAFETY: raw_options points to a materialized mln_runtime_options value
     // whose backing strings live for this call. out is a valid
     // null-initialized out-pointer owned by this call.
     maplibre_core::check(unsafe { sys::mln_runtime_create(&raw_options, out.as_mut_ptr()) })
         .map_err(map_error)?;
-    let ptr = out.into_non_null("mln_runtime").map_err(map_error)?;
-    // SAFETY: ptr came from successful mln_runtime_create and is paired with
+    let native = out.into_live("mln_runtime").map_err(map_error)?;
+    // SAFETY: native came from successful mln_runtime_create and is paired with
     // the matching status-returning destroy function in RuntimeHandle.close.
-    let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_runtime") };
+    let state =
+        unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_runtime") }
+            .map_err(map_error)?;
     Ok(RuntimeHandle {
         state: Mutex::new(state),
         operation_gate: RuntimeOperationGate::new(),
@@ -7113,19 +7099,20 @@ fn create_map(
     options.mode = mode;
     let raw_options = maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
     let runtime_state = runtime.state_for_operation()?;
-    let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();
+    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map>::new();
     // SAFETY: runtime_state owns a runtime pointer that passed the binding
     // lifecycle gate. The C API validates that it is live. raw_options is a
     // fully initialized value, and out is a valid null-initialized out-pointer
     // owned by this call.
     maplibre_core::check(unsafe {
-        sys::mln_map_create(runtime_state.as_ptr(), &raw_options, out.as_mut_ptr())
+        sys::mln_map_create(runtime_state.handle(), &raw_options, out.as_mut_ptr())
     })
     .map_err(map_error)?;
-    let ptr = out.into_non_null("mln_map").map_err(map_error)?;
-    // SAFETY: ptr came from successful mln_map_create and is paired with the
+    let native = out.into_live("mln_map").map_err(map_error)?;
+    // SAFETY: native came from successful mln_map_create and is paired with the
     // matching status-returning destroy function in MapHandle.close.
-    let state = unsafe { maplibre_core::handle::NativeHandleState::from_raw(ptr, "mln_map") };
+    let state = unsafe { maplibre_core::handle::NativeHandleState::from_handle(native, "mln_map") }
+        .map_err(map_error)?;
     Ok(MapHandle {
         state: Mutex::new(state),
         custom_geometry_sources: Mutex::new(HashMap::new()),
@@ -7135,14 +7122,14 @@ fn create_map(
 
 fn attach_render_session<F>(map: &MapHandle, attach: F) -> PyResult<RenderSessionHandle>
 where
-    F: FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
+    F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
 {
     let map_state = map.state();
-    let mut out = maplibre_core::ptr::OutPtr::<sys::mln_render_session>::new();
-    maplibre_core::check(attach(map_state.as_ptr(), out.as_mut_ptr())).map_err(map_error)?;
-    let ptr = out.into_non_null("mln_render_session").map_err(map_error)?;
+    let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
+    maplibre_core::check(attach(map_state.handle(), out.as_mut_ptr())).map_err(map_error)?;
+    let native = out.into_live("mln_render_session").map_err(map_error)?;
     Ok(RenderSessionHandle {
-        state: Arc::new(Mutex::new(RenderSessionState::new(ptr))),
+        state: Arc::new(Mutex::new(RenderSessionState::new(native)?)),
     })
 }
 
