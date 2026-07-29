@@ -116,10 +116,52 @@ static void releasing_a_scoped_handle_twice_is_a_no_op(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A runtime-sourced event names its runtime by handle, so a host can correlate
+// an event against the handle it holds.
+static void a_runtime_sourced_event_names_its_runtime_handle(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+
+  mln_offline_operation_id operation = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_runtime_offline_regions_list_start(runtime, &operation)
+  );
+
+  bool saw_completion = false;
+  for (int attempt = 0; attempt < 200 && !saw_completion; ++attempt) {
+    TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 50));
+    for (;;) {
+      mln_runtime_event event = {.size = sizeof(mln_runtime_event)};
+      bool has_event = false;
+      TEST_ASSERT_EQUAL_INT(
+        MLN_STATUS_OK, mln_runtime_poll_event(runtime, &event, &has_event)
+      );
+      if (!has_event) {
+        break;
+      }
+      if (event.source_type != MLN_RUNTIME_EVENT_SOURCE_RUNTIME) {
+        continue;
+      }
+      TEST_ASSERT_EQUAL_UINT64_MESSAGE(
+        runtime, event.source,
+        "A runtime-sourced event should carry the mln_runtime handle."
+      );
+      if (event.type == MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED) {
+        saw_completion = true;
+      }
+    }
+  }
+  TEST_ASSERT_TRUE_MESSAGE(
+    saw_completion, "The offline list operation should report completion."
+  );
+
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_handles_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(a_released_map_handle_never_names_a_later_map);
   RUN_TEST(a_handle_of_another_kind_is_rejected_by_kind);
   RUN_TEST(a_handle_this_process_never_issued_is_rejected);
   RUN_TEST(releasing_a_scoped_handle_twice_is_a_no_op);
+  RUN_TEST(a_runtime_sourced_event_names_its_runtime_handle);
 }

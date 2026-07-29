@@ -3005,10 +3005,9 @@ auto finish_still_image_request(mln_map map, std::exception_ptr error) -> void {
   );
 }
 
-// Checks a map handle is non-null and live. The caller holds
-// map_registry_mutex(), so it can act on the result without the handle being
-// retired in between. Callers that only need the answer use
-// validate_map_live().
+// Checks a map handle is non-null and live. The caller holds the map handle
+// table's mutex, so it can act on the result without the handle being retired
+// in between. Callers that only need the answer use validate_map_live().
 auto validate_map_live_locked(mln_map map, MapObject*& out_map) -> mln_status {
   out_map = handle_table<MapObject>().resolve_locked(map);
   return out_map == nullptr ? MLN_STATUS_INVALID_ARGUMENT : MLN_STATUS_OK;
@@ -3462,8 +3461,8 @@ auto map_run_render_jobs(mln_map map) -> void {
 
 // Attaching claims the map's single render-session slot. It runs on the render
 // session's own thread, which may differ from the map owner thread, so this
-// validates liveness only. Holding map_registry_mutex() across the check and
-// the claim is what makes it race-free against a concurrent destroy_map() on
+// validates liveness only. Holding the map handle table's mutex across the
+// check and the claim is what makes it race-free against a destroy_map() on
 // the map owner thread: either the slot is claimed first and destroy_map()
 // refuses, or the map is retired first and this returns an invalid handle.
 auto map_attach_render_target_session(mln_map map, void* session)
@@ -3487,8 +3486,8 @@ auto map_attach_render_target_session(mln_map map, void* session)
 }
 
 // Detaching runs on the render session's owner thread, which may differ from
-// the map owner thread, so this validates liveness only. Holding
-// map_registry_mutex() across the check and the clear is what makes it
+// the map owner thread, so this validates liveness only. Holding the map
+// handle table's mutex across the check and the clear is what makes it
 // race-free against a concurrent destroy_map() on the map owner thread.
 auto map_detach_render_target_session(mln_map map, void* session)
   -> mln_status {

@@ -554,7 +554,7 @@ auto push_offline_region_event(
   auto event = mln::core::QueuedRuntimeEvent{
     .type = type,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = reinterpret_cast<std::uint64_t>(runtime),
+    .source = runtime->self,
     .code = 0,
     .payload_type = payload_type,
     .payload = std::move(payload),
@@ -838,7 +838,7 @@ auto complete_offline_operation(
   auto event = mln::core::QueuedRuntimeEvent{
     .type = MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = reinterpret_cast<std::uint64_t>(runtime),
+    .source = runtime->self,
     .code = result_status,
     .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED,
     .payload = payload_bytes(payload),
@@ -2623,7 +2623,7 @@ auto poll_runtime_event(
     .size = sizeof(mln_runtime_event),
     .type = 0,
     .source_type = MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-    .source = reinterpret_cast<std::uint64_t>(runtime),
+    .source = runtime,
     .code = 0,
     .payload_type = MLN_RUNTIME_EVENT_PAYLOAD_NONE,
     .payload = nullptr,
