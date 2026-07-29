@@ -1,7 +1,10 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
+use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
@@ -41,13 +44,71 @@ use crate::{GeoJson, JsonValue, PremultipliedRgba8Image};
 
 mod style;
 pub use style::{
-    LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
-    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType,
+    StyleImage, StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
+
+/// Cross-thread liveness for one map address.
+///
+/// The map handle publishes its address here and retires it when the native map
+/// is destroyed, so a [`MapAttachRef`] on another thread observes a closed map
+/// rather than an address a later map could reuse. Without this the reference
+/// would carry a bare pointer, and the C API's registry lookup keys on the
+/// pointer value, so an address reused by a new map would attach to the wrong
+/// one.
+#[derive(Debug)]
+pub(crate) struct MapAddress(RwLock<Option<NonNull<sys::mln_map>>>);
+
+// SAFETY: the pointer is only ever read out and handed to the C API, which
+// validates it under its own registry lock. The `RwLock` is what makes the read
+// and the native call that consumes it atomic against `retire`.
+unsafe impl Send for MapAddress {}
+unsafe impl Sync for MapAddress {}
+
+impl MapAddress {
+    fn new(ptr: NonNull<sys::mln_map>) -> Self {
+        Self(RwLock::new(Some(ptr)))
+    }
+
+    /// Runs `use_ptr` with the map held live, or reports a closed handle.
+    ///
+    /// The guard spans the call, so a `close` on the map's owner thread waits
+    /// rather than destroying the map midway through. Without that, the address
+    /// could be freed between the read and the C API's registry lookup, and a
+    /// map allocated at the same address would be attached to instead.
+    fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Option<T> {
+        let guard = self
+            .0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (*guard).map(|ptr| use_ptr(ptr.as_ptr()))
+    }
+
+    fn is_retired(&self) -> bool {
+        self.0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_none()
+    }
+
+    /// Blocks until no attach is in flight, then runs `close` and retires the
+    /// address only if it succeeded.
+    fn retire_with(&self, close: impl FnOnce() -> Result<()>) -> Result<()> {
+        let mut guard = self
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        close()?;
+        *guard = None;
+        Ok(())
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct MapState {
     handle: ThreadAffineNativeHandle<sys::mln_map>,
+    address: Arc<MapAddress>,
     runtime: RefCell<Option<Rc<RuntimeState>>>,
     id: MapId,
     custom_geometry_sources: RefCell<HashMap<String, Box<CustomGeometrySourceState>>>,
@@ -61,6 +122,7 @@ impl MapState {
             unsafe { ThreadAffineNativeHandle::from_raw(ptr, sys::mln_map_destroy, "mln_map") };
         Self {
             handle,
+            address: Arc::new(MapAddress::new(ptr)),
             runtime: RefCell::new(Some(runtime)),
             id,
             custom_geometry_sources: RefCell::new(HashMap::new()),
@@ -82,7 +144,10 @@ impl MapState {
 
     fn close(&self) -> Result<()> {
         let ptr = self.handle.as_ptr();
-        self.handle.close()?;
+        // Retire under the same guard as the destroy, so an attach already
+        // inside C finishes first and a later one sees a closed handle. A failed
+        // close leaves the native map live and the address published.
+        self.address.retire_with(|| self.handle.close())?;
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(ptr);
         }
@@ -140,6 +205,13 @@ impl Drop for MapState {
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(self.handle.as_ptr());
         }
+        // Destroy here, under the address guard, so the address retires exactly
+        // when the native map goes away. Leaving it to the handle's own `Drop`
+        // would run the destroy after this body, so the address would stay
+        // published for a map that no longer exists. A failed destroy, which is
+        // what happens while a render session is still attached, leaves both the
+        // map and the address live and is reported through the leak channel.
+        let _ = self.address.retire_with(|| self.handle.close());
     }
 }
 
@@ -194,6 +266,12 @@ impl MapHandle {
     /// Native destruction errors are returned. When destruction fails, the
     /// underlying native handle remains live in the shared state so future child
     /// handles can continue to retain and close the map safely.
+    ///
+    /// Closing discards this map's queued runtime events and its recorded
+    /// loading failure. There is no flush and no terminal event, so read any
+    /// state you mirror from events before closing, and treat close as the end
+    /// of this map's event stream rather than awaiting an event during
+    /// teardown. Dropping the handle ends the stream the same way.
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
@@ -277,6 +355,25 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_dump_debug_logs(map) })
     }
 
+    /// Reads the map's logical viewport size in UI pixels and its pixel ratio.
+    ///
+    /// The size starts at the creation width and height, and follows the attach
+    /// and resize rules documented on [`MapOptions`]. The scale factor is fixed
+    /// for the lifetime of the map and is independent of any render target's
+    /// scale factor.
+    pub fn size(&self) -> Result<(u32, u32, f64)> {
+        let map = self.inner.as_ptr()?;
+        let mut width = 0u32;
+        let mut height = 0u32;
+        let mut scale_factor = 0f64;
+        // SAFETY: map is live and all three out pointers reference live locals
+        // for the duration of the call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_size(map, &mut width, &mut height, &mut scale_factor)
+        })?;
+        Ok((width, height, scale_factor))
+    }
+
     /// Reads live viewport and render-transform controls.
     pub fn viewport_options(&self) -> Result<MapViewportOptions> {
         let map = self.inner.as_ptr()?;
@@ -335,6 +432,10 @@ impl MapHandle {
     }
 
     /// Applies a camera ease transition command.
+    ///
+    /// An absent `animation`, or an animation with no duration, eases over zero
+    /// duration: the camera reaches the target before this call returns, with
+    /// no runtime pump in between. Set a duration to animate over time.
     pub fn ease_to(
         &self,
         camera: &CameraOptions,
@@ -351,6 +452,12 @@ impl MapHandle {
     }
 
     /// Applies a camera fly transition command.
+    ///
+    /// Fly is the one camera command that animates by default. When duration is
+    /// absent, native derives it from `AnimationOptions::velocity`; when
+    /// velocity is absent too, native defaults to 1.2 screenfuls per second.
+    /// The camera is therefore still en route when this call returns and
+    /// advances as the runtime is pumped.
     pub fn fly_to(
         &self,
         camera: &CameraOptions,
@@ -374,6 +481,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space pan command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the pan instantly
+    /// like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn move_by_animated(
         &self,
         delta_x: f64,
@@ -401,6 +512,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space zoom command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the zoom
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn scale_by_animated(
         &self,
         scale: f64,
@@ -432,6 +547,10 @@ impl MapHandle {
     }
 
     /// Applies an animated screen-space rotate command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the rotation
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn rotate_by_animated(
         &self,
         first: ScreenPoint,
@@ -460,6 +579,10 @@ impl MapHandle {
     }
 
     /// Applies an animated pitch delta command.
+    ///
+    /// Native routes this delta through the ease transition, so an absent
+    /// `animation`, or an animation with no duration, applies the pitch
+    /// instantly like [`Self::ease_to`]. Set a duration to animate over time.
     pub fn pitch_by_animated(
         &self,
         pitch: f64,
@@ -713,7 +836,75 @@ impl MapHandle {
         MapProjectionHandle::new(self)
     }
 
-    /// Attaches a Metal native surface render target to this map.
+    /// Produces a [`Send`] reference to this map for attaching a render session.
+    ///
+    /// A render session is owned by the thread that attaches it, which need not
+    /// be the map's owner thread. [`MapHandle`] is `!Send`, so this is how the
+    /// thread that drives a render loop names the map it renders while the map
+    /// itself stays on the runtime owner thread.
+    pub fn attach_ref(&self) -> Result<MapAttachRef> {
+        self.inner.as_ptr()?;
+        Ok(MapAttachRef {
+            address: Arc::clone(&self.inner.address),
+            _not_sync: PhantomData,
+        })
+    }
+}
+
+/// A reference to a map for the sole purpose of attaching a render session.
+///
+/// Produced by [`MapHandle::attach_ref`]. Every attach function lives here
+/// rather than on [`MapHandle`], because attaching is the one map operation
+/// that runs on the render session's thread instead of the map's.
+///
+/// This carries no Rust retention of the map, because [`MapHandle`] is `!Send`.
+/// Native keeps the map alive instead: destroying a map fails while a render
+/// session is attached to it. Closing the map retires the shared address, so a
+/// reference that outlives its map reports a closed handle rather than binding
+/// a session to whatever the allocator put at that address next.
+///
+/// Dropping a [`MapHandle`] instead of closing it, while a session is still
+/// attached, leaks the native map: the destroy fails and an infallible `Drop`
+/// cannot return the error. It reports the address through
+/// [`set_leak_reporter`](crate::set_leak_reporter) instead, and the runtime
+/// stays undestroyable until that map is destroyed. Close the session first,
+/// then the map.
+///
+/// This is `Send` and deliberately not `Sync`: one thread holds it at a time.
+/// It needs no `unsafe impl`, because the address it shares lives in an
+/// `AtomicUsize` and the attach it performs reaches no thread-affine map state
+/// — the C API claims the map's render-session slot under its registry lock and
+/// posts the new size to the map's own owner thread.
+#[derive(Clone)]
+pub struct MapAttachRef {
+    address: Arc<MapAddress>,
+    _not_sync: PhantomData<Cell<()>>,
+}
+
+impl fmt::Debug for MapAttachRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MapAttachRef").finish()
+    }
+}
+
+impl MapAttachRef {
+    /// Whether the map this reference names has been closed.
+    ///
+    /// A reference can outlive its [`MapHandle`], so a host that keeps one
+    /// across a map's lifetime can check here instead of relying on the error
+    /// from a failed attach.
+    pub fn is_map_closed(&self) -> bool {
+        self.address.is_retired()
+    }
+
+    /// Runs `attach` with the map held live for the duration of the call.
+    pub(crate) fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+        self.address
+            .with_live(attach)
+            .ok_or_else(|| closed_handle_error("MapHandle"))
+    }
+
+    /// Attaches a Metal native surface render target to the map.
     ///
     /// The layer and optional device pointers are backend-native handles. They
     /// must name valid Metal objects for this session and remain usable on the
@@ -730,7 +921,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan native surface render target to this map.
+    /// Attaches a Vulkan native surface render target to the map.
     ///
     /// Vulkan handles are borrowed. They must remain valid and externally
     /// synchronized until the session is detached or closed.
@@ -746,7 +937,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL native surface render target to this map.
+    /// Attaches an OpenGL native surface render target to the map.
     ///
     /// OpenGL context provider and surface handles are borrowed. They must
     /// remain valid and externally synchronized until the session is detached
@@ -763,7 +954,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Metal session-owned texture render target to this map.
+    /// Attaches a Metal session-owned texture render target to the map.
     ///
     /// The device pointer must name a valid Metal device that remains usable on
     /// the owner thread until the session is detached or closed.
@@ -779,7 +970,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Metal caller-owned texture render target to this map.
+    /// Attaches a Metal caller-owned texture render target to the map.
     ///
     /// The texture pointer is borrowed. The caller owns the texture, keeps it
     /// valid until detach or close, and synchronizes use outside this session.
@@ -795,7 +986,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan session-owned texture render target to this map.
+    /// Attaches a Vulkan session-owned texture render target to the map.
     ///
     /// Vulkan device and queue handles are borrowed. They must remain valid and
     /// externally synchronized until the session is detached or closed.
@@ -811,7 +1002,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches a Vulkan caller-owned texture render target to this map.
+    /// Attaches a Vulkan caller-owned texture render target to the map.
     ///
     /// Vulkan handles, image, and image view are borrowed. The caller owns the
     /// image resources, keeps them valid until detach or close, and handles
@@ -828,7 +1019,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL session-owned texture render target to this map.
+    /// Attaches an OpenGL session-owned texture render target to the map.
     ///
     /// The context provider handles are borrowed. They must remain valid until
     /// the session is detached or closed. Host sampling must use a context in
@@ -845,7 +1036,7 @@ impl MapHandle {
         })
     }
 
-    /// Attaches an OpenGL caller-owned texture render target to this map.
+    /// Attaches an OpenGL caller-owned texture render target to the map.
     ///
     /// The context provider handles and texture object are borrowed. The caller
     /// owns the texture, keeps it valid until detach or close, and synchronizes

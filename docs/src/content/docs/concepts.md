@@ -22,6 +22,10 @@ events flow through that owner thread.
 Each owner thread may have one live runtime. The host pumps that runtime to let
 MapLibre Native make progress and to collect completed work.
 
+A host paces the pump itself. Display-paced hosts pump once per frame. A host
+that owns its pump thread parks that thread until the runtime has work, and
+wakes it from its own threads through a wake source.
+
 ## Map
 
 A map belongs to a runtime. It owns map state: style documents, sources, layers,
@@ -49,6 +53,13 @@ A map may have one live render session at a time. Keeping render sessions
 separate from maps lets host code manage graphics backend lifecycle outside the
 map object itself.
 
+A render session records its own owner thread: the thread that attached it,
+fixed for the session's lifetime. Attaching requires only that the map be live,
+not that the calling thread own it, so host code attaches on the thread that
+owns its window, graphics context, and display refresh callback while the
+runtime and map are pumped on another thread. Session calls from any other
+thread report the owner-thread status.
+
 ## Events
 
 Events preserve MapLibre Native's observer-driven model across the FFI boundary.
@@ -57,6 +68,10 @@ events from the runtime.
 
 Events report map lifecycle, rendering progress, resource activity, diagnostics,
 and asynchronous failures.
+
+Rendering observer events reach the runtime queue through the map's run loop, so
+a frame's events are drained by a later pump rather than inside the render call
+that produced them.
 
 Queued events belong to their source. Destroying a map discards that map's
 queued events without a flush or a terminal event, so host state mirrored from

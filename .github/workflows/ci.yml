@@ -28,6 +28,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run ci:generate-workflow --check
@@ -51,291 +52,16 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
+          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - run: mise run //docs:build
 
-  target:
-    name: target / ${{ matrix.preset }}
-    runs-on: ${{ matrix.runner }}
+  target-linux-x64-egl:
+    name: target / linux-x64-egl
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - preset: linux-x64-egl
-            runner: ubuntu-24.04
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test linux-x64-egl &&
-              mise run check-glibc-floor linux-x64-egl
-            consumer_commands: >-
-              mise run //bindings/rust:test linux-x64-egl &&
-              mise run //examples/rust-map:check linux-x64-egl &&
-              mise run //bindings/zig:test linux-x64-egl &&
-              mise run //examples/zig-map:build linux-x64-egl &&
-              mise run //examples/zig-readback:run linux-x64-egl &&
-              mise run //bindings/kotlin:jvmTest linux-x64-egl &&
-              mise run //examples/compose-map:build linux-x64-egl &&
-              mise run //examples/lwjgl-map:build linux-x64-egl &&
-              mise run //bindings/swift:test linux-x64-egl &&
-              mise run //bindings/dotnet:test linux-x64-egl &&
-              mise run //bindings/go:test linux-x64-egl &&
-              mise run //examples/go-map:check linux-x64-egl &&
-              mise run //bindings/python:test linux-x64-egl
-          - preset: linux-x64-vulkan
-            runner: ubuntu-24.04
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test linux-x64-vulkan &&
-              mise run check-glibc-floor linux-x64-vulkan
-            consumer_commands: >-
-              mise run //bindings/rust:test linux-x64-vulkan &&
-              mise run //examples/rust-map:check linux-x64-vulkan &&
-              mise run //bindings/zig:test linux-x64-vulkan &&
-              mise run //examples/zig-map:build linux-x64-vulkan &&
-              mise run //examples/zig-readback:run linux-x64-vulkan &&
-              mise run //bindings/kotlin:jvmTest linux-x64-vulkan &&
-              mise run //examples/compose-map:build linux-x64-vulkan &&
-              mise run //examples/lwjgl-map:build linux-x64-vulkan &&
-              mise run //bindings/swift:test linux-x64-vulkan &&
-              mise run //bindings/dotnet:test linux-x64-vulkan &&
-              mise run //bindings/go:test linux-x64-vulkan &&
-              mise run //bindings/python:test linux-x64-vulkan
-          - preset: linux-arm64-egl
-            runner: ubuntu-24.04-arm
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test linux-arm64-egl &&
-              mise run check-glibc-floor linux-arm64-egl
-            consumer_commands: >-
-              mise run //bindings/rust:test linux-arm64-egl &&
-              mise run //examples/rust-map:check linux-arm64-egl &&
-              mise run //bindings/zig:test linux-arm64-egl &&
-              mise run //examples/zig-map:build linux-arm64-egl &&
-              mise run //examples/zig-readback:run linux-arm64-egl &&
-              mise run //bindings/kotlin:jvmTest linux-arm64-egl &&
-              mise run //examples/compose-map:build linux-arm64-egl &&
-              mise run //examples/lwjgl-map:build linux-arm64-egl &&
-              mise run //bindings/swift:test linux-arm64-egl &&
-              mise run //bindings/dotnet:test linux-arm64-egl &&
-              mise run //bindings/go:test linux-arm64-egl &&
-              mise run //examples/go-map:check linux-arm64-egl &&
-              mise run //bindings/python:test linux-arm64-egl
-          - preset: linux-arm64-vulkan
-            runner: ubuntu-24.04-arm
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test linux-arm64-vulkan &&
-              mise run check-glibc-floor linux-arm64-vulkan
-            consumer_commands: >-
-              mise run //bindings/rust:test linux-arm64-vulkan &&
-              mise run //examples/rust-map:check linux-arm64-vulkan &&
-              mise run //bindings/zig:test linux-arm64-vulkan &&
-              mise run //examples/zig-map:build linux-arm64-vulkan &&
-              mise run //examples/zig-readback:run linux-arm64-vulkan &&
-              mise run //bindings/kotlin:jvmTest linux-arm64-vulkan &&
-              mise run //examples/compose-map:build linux-arm64-vulkan &&
-              mise run //examples/lwjgl-map:build linux-arm64-vulkan &&
-              mise run //bindings/swift:test linux-arm64-vulkan &&
-              mise run //bindings/dotnet:test linux-arm64-vulkan &&
-              mise run //bindings/go:test linux-arm64-vulkan &&
-              mise run //bindings/python:test linux-arm64-vulkan
-          - preset: macos-arm64-metal
-            runner: macos-26
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test macos-arm64-metal
-            consumer_commands: >-
-              mise run //bindings/rust:test macos-arm64-metal &&
-              mise run //examples/rust-map:check macos-arm64-metal &&
-              mise run //bindings/zig:test macos-arm64-metal &&
-              mise run //examples/zig-map:build macos-arm64-metal &&
-              mise run //examples/zig-readback:run macos-arm64-metal &&
-              mise run //bindings/kotlin:jvmTest macos-arm64-metal &&
-              mise run //bindings/kotlin:nativeTest macos-arm64-metal &&
-              mise run //examples/compose-map:build macos-arm64-metal &&
-              mise run //examples/lwjgl-map:build macos-arm64-metal &&
-              mise run //bindings/swift:test macos-arm64-metal &&
-              mise run //examples/swift-map:build macos-arm64-metal &&
-              mise run //bindings/dotnet:test macos-arm64-metal &&
-              mise run //bindings/go:test macos-arm64-metal &&
-              mise run //bindings/python:test macos-arm64-metal
-          - preset: macos-arm64-vulkan
-            runner: macos-26
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test macos-arm64-vulkan
-            consumer_commands: >-
-              mise run //bindings/rust:test macos-arm64-vulkan &&
-              mise run //examples/rust-map:check macos-arm64-vulkan &&
-              mise run //bindings/zig:test macos-arm64-vulkan &&
-              mise run //examples/zig-map:build macos-arm64-vulkan &&
-              mise run //examples/zig-readback:run macos-arm64-vulkan &&
-              mise run //bindings/kotlin:jvmTest macos-arm64-vulkan &&
-              mise run //bindings/kotlin:nativeTest macos-arm64-vulkan &&
-              mise run //examples/compose-map:build macos-arm64-vulkan &&
-              mise run //examples/lwjgl-map:build macos-arm64-vulkan &&
-              mise run //bindings/swift:test macos-arm64-vulkan &&
-              mise run //bindings/dotnet:test macos-arm64-vulkan &&
-              mise run //bindings/go:test macos-arm64-vulkan &&
-              mise run //bindings/python:test macos-arm64-vulkan
-          - preset: macos-arm64-egl
-            runner: macos-26
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test macos-arm64-egl
-            consumer_commands: >-
-              mise run //bindings/rust:test macos-arm64-egl &&
-              mise run //bindings/zig:test macos-arm64-egl &&
-              mise run //examples/zig-map:build macos-arm64-egl &&
-              mise run //examples/zig-readback:run macos-arm64-egl &&
-              mise run //bindings/kotlin:jvmTest macos-arm64-egl &&
-              mise run //bindings/kotlin:nativeTest macos-arm64-egl &&
-              mise run //examples/compose-map:build macos-arm64-egl &&
-              mise run //examples/lwjgl-map:build macos-arm64-egl &&
-              mise run //bindings/swift:test macos-arm64-egl &&
-              mise run //bindings/dotnet:test macos-arm64-egl &&
-              mise run //bindings/go:test macos-arm64-egl &&
-              mise run //bindings/python:test macos-arm64-egl
-          - preset: ios-arm64-metal
-            runner: macos-26
-            package: true
-            zig: false
-            native_commands: >-
-              mise run build ios-arm64-metal
-            consumer_commands: >-
-              mise run //bindings/kotlin:iosBuild ios-arm64-metal &&
-              mise run //bindings/swift:build:ios &&
-              mise run //examples/swift-map:build:ios
-          - preset: ios-simulator-arm64-metal
-            runner: macos-26
-            package: true
-            zig: false
-            native_commands: >-
-              mise run test ios-simulator-arm64-metal
-            consumer_commands: >-
-              mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal &&
-              mise run //bindings/swift:build:ios-simulator &&
-              mise run //bindings/zig:test:ios-simulator &&
-              bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120 &&
-              mise run //examples/swift-map:build:ios-simulator
-          - preset: android-arm64-egl
-            runner: ubuntu-latest
-            package: true
-            zig: false
-            native_commands: >-
-              mise run build android-arm64-egl
-            consumer_commands: >-
-              mise run //bindings/kotlin:androidBuild opengl arm64-v8a --prebuilt &&
-              mise run //examples/android-map:build opengl arm64-v8a --prebuilt
-          - preset: android-arm64-vulkan
-            runner: ubuntu-latest
-            package: true
-            zig: false
-            native_commands: >-
-              mise run build android-arm64-vulkan
-            consumer_commands: >-
-              mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
-          - preset: android-x64-egl
-            runner: ubuntu-latest
-            package: true
-            zig: false
-            native_commands: >-
-              mise run build android-x64-egl
-            consumer_commands: >-
-              mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt &&
-              mise run //examples/android-map:build opengl x86_64 --prebuilt
-          - preset: android-x64-vulkan
-            runner: ubuntu-latest
-            package: true
-            zig: false
-            native_commands: >-
-              mise run build android-x64-vulkan
-            consumer_commands: >-
-              mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
-          - preset: ohos-arm64-egl
-            runner: ubuntu-latest
-            package: false
-            zig: false
-            native_commands: >-
-              mise run //bindings/rust:build:ohos ohos-arm64-egl
-          - preset: ohos-arm64-vulkan
-            runner: ubuntu-latest
-            package: false
-            zig: false
-            native_commands: >-
-              mise run //bindings/rust:build:ohos ohos-arm64-vulkan
-          - preset: windows-x64-wgl
-            runner: windows-2022
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test windows-x64-wgl
-            consumer_commands: >-
-              mise run //bindings/rust:test windows-x64-wgl &&
-              mise run //examples/rust-map:check windows-x64-wgl &&
-              mise run //bindings/zig:test windows-x64-wgl &&
-              mise run //examples/zig-map:build windows-x64-wgl &&
-              mise run //examples/zig-readback:run windows-x64-wgl &&
-              mise run //bindings/kotlin:jvmTest windows-x64-wgl &&
-              mise run //examples/compose-map:build windows-x64-wgl &&
-              mise run //examples/lwjgl-map:build windows-x64-wgl &&
-              mise run //bindings/dotnet:test windows-x64-wgl &&
-              mise run //bindings/python:test windows-x64-wgl
-          - preset: windows-x64-vulkan
-            runner: windows-2022
-            package: true
-            zig: true
-            native_commands: >-
-              mise run test windows-x64-vulkan
-            consumer_commands: >-
-              mise run //bindings/rust:test windows-x64-vulkan &&
-              mise run //examples/rust-map:check windows-x64-vulkan &&
-              mise run //bindings/zig:test windows-x64-vulkan &&
-              mise run //examples/zig-map:build windows-x64-vulkan &&
-              mise run //examples/zig-readback:run windows-x64-vulkan &&
-              mise run //bindings/kotlin:jvmTest windows-x64-vulkan &&
-              mise run //examples/compose-map:build windows-x64-vulkan &&
-              mise run //examples/lwjgl-map:build windows-x64-vulkan &&
-              mise run //bindings/dotnet:test windows-x64-vulkan &&
-              mise run //bindings/python:test windows-x64-vulkan
-          - preset: windows-arm64-wgl
-            runner: windows-11-arm
-            package: true
-            zig: false
-            native_commands: >-
-              mise run test windows-arm64-wgl
-            consumer_commands: >-
-              mise run //bindings/rust:test windows-arm64-wgl &&
-              mise run //examples/rust-map:check windows-arm64-wgl &&
-              mise run //bindings/kotlin:jvmTest windows-arm64-wgl &&
-              mise run //examples/compose-map:build windows-arm64-wgl &&
-              mise run //examples/lwjgl-map:build windows-arm64-wgl &&
-              mise run //bindings/dotnet:test windows-arm64-wgl &&
-              mise run //bindings/python:test windows-arm64-wgl
-          - preset: windows-arm64-vulkan
-            runner: windows-11-arm
-            package: true
-            zig: false
-            native_commands: >-
-              mise run test windows-arm64-vulkan
-            consumer_commands: >-
-              mise run //bindings/rust:test windows-arm64-vulkan &&
-              mise run //examples/rust-map:check windows-arm64-vulkan &&
-              mise run //bindings/kotlin:jvmTest windows-arm64-vulkan &&
-              mise run //examples/compose-map:build windows-arm64-vulkan &&
-              mise run //examples/lwjgl-map:build windows-arm64-vulkan &&
-              mise run //bindings/dotnet:test windows-arm64-vulkan &&
-              mise run //bindings/python:test windows-arm64-vulkan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -343,40 +69,1034 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
         id: setup
         with:
-          target: ${{ matrix.preset }}
-          zig: ${{ matrix.zig }}
+          target: linux-x64-egl
+          zig: true
+          save-toolchains: true
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
-      - name: Run native checks
-        run: ${{ matrix.native_commands }}
+      - run: mise run test linux-x64-egl
+      - run: mise run check-glibc-floor linux-x64-egl
       - name: Archive native artifact
-        if: ${{ matrix.package }}
-        run: mise run archive-native ${{ matrix.preset }}
+        run: mise run archive-native linux-x64-egl
       - name: Install packaged native artifact
-        if: ${{ matrix.package }}
         run: >-
           mise run install-native-package
-          ${{ matrix.preset }}
-          build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz
-      - name: Run binding and example checks
-        if: ${{ matrix.package }}
+          linux-x64-egl
+          build/packages/native/dist/maplibre-native-c-linux-x64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-x64-egl
         env:
           MISE_TASK_SKIP: "//:build"
-        run: ${{ matrix.consumer_commands }}
+      - run: mise run //examples/rust-map:check linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/go-map:check linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test linux-x64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
       - name: Save Zig packages
-        if: ${{ matrix.zig && steps.setup.outputs.zig-cache-hit != 'true' }}
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            ~/.cache/zig
-            ~/AppData/Local/zig
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
           key: ${{ steps.setup.outputs.zig-cache-key }}
       - name: Upload native artifact
-        if: ${{ matrix.package }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-package-${{ matrix.preset }}-${{ github.sha }}
-          path: build/packages/native/dist/maplibre-native-c-${{ matrix.preset }}.tar.gz
+          name: native-package-linux-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-x64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-x64-vulkan:
+    name: target / linux-x64-vulkan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: linux-x64-vulkan
+          zig: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-x64-vulkan
+      - run: mise run check-glibc-floor linux-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-x64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test linux-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-x64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-linux-arm64-egl:
+    name: target / linux-arm64-egl
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: linux-arm64-egl
+          zig: true
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-arm64-egl
+      - run: mise run check-glibc-floor linux-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native linux-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-arm64-egl
+          build/packages/native/dist/maplibre-native-c-linux-arm64-egl.tar.gz
+      - run: mise run //bindings/rust:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/go-map:check linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test linux-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-arm64-egl.tar.gz
+          if-no-files-found: error
+
+  target-linux-arm64-vulkan:
+    name: target / linux-arm64-vulkan
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: linux-arm64-vulkan
+          zig: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test linux-arm64-vulkan
+      - run: mise run check-glibc-floor linux-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native linux-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          linux-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test linux-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-linux-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-linux-arm64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-macos-arm64-metal:
+    name: target / macos-arm64-metal
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: macos-arm64-metal
+          zig: true
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test macos-arm64-metal
+      - name: Archive native artifact
+        run: mise run archive-native macos-arm64-metal
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          macos-arm64-metal
+          build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
+      - run: mise run //bindings/rust:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/swift-map:build macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test macos-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-macos-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-macos-arm64-metal.tar.gz
+          if-no-files-found: error
+
+  target-macos-arm64-vulkan:
+    name: target / macos-arm64-vulkan
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: macos-arm64-vulkan
+          zig: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test macos-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native macos-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          macos-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test macos-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-macos-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-macos-arm64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-macos-arm64-egl:
+    name: target / macos-arm64-egl
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: macos-arm64-egl
+          zig: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test macos-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native macos-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          macos-arm64-egl
+          build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
+      - run: mise run //bindings/rust:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:nativeTest macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/go:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test macos-arm64-egl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-macos-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-macos-arm64-egl.tar.gz
+          if-no-files-found: error
+
+  target-ios-arm64-metal:
+    name: target / ios-arm64-metal
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ios-arm64-metal
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build ios-arm64-metal
+      - name: Archive native artifact
+        run: mise run archive-native ios-arm64-metal
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ios-arm64-metal
+          build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
+      - run: mise run //bindings/kotlin:iosBuild ios-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:build:ios
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/swift-map:build:ios
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ios-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ios-arm64-metal.tar.gz
+          if-no-files-found: error
+
+  target-ios-simulator-arm64-metal:
+    name: target / ios-simulator-arm64-metal
+    runs-on: macos-26
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ios-simulator-arm64-metal
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test ios-simulator-arm64-metal
+      - name: Archive native artifact
+        run: mise run archive-native ios-simulator-arm64-metal
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          ios-simulator-arm64-metal
+          build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
+      - run: mise run //bindings/kotlin:iosBuild ios-simulator-arm64-metal
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/swift:build:ios-simulator
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test:ios-simulator
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: bash scripts/run-ios-simulator-test.sh bindings/swift/.build/ios-simulator/arm64-apple-ios-simulator/debug/MaplibreNativeIOSSimulatorTests 120
+      - run: mise run //examples/swift-map:build:ios-simulator
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-ios-simulator-arm64-metal-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-ios-simulator-arm64-metal.tar.gz
+          if-no-files-found: error
+
+  target-android-arm64-egl:
+    name: target / android-arm64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: android-arm64-egl
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build android-arm64-egl
+      - name: Archive native artifact
+        run: mise run archive-native android-arm64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          android-arm64-egl
+          build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
+      - run: mise run //bindings/kotlin:androidBuild opengl arm64-v8a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/android-map:build opengl arm64-v8a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-android-arm64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-android-arm64-egl.tar.gz
+          if-no-files-found: error
+
+  target-android-arm64-vulkan:
+    name: target / android-arm64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: android-arm64-vulkan
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build android-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native android-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          android-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:androidBuild vulkan arm64-v8a --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-android-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-android-arm64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-android-x64-egl:
+    name: target / android-x64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: android-x64-egl
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build android-x64-egl
+      - name: Archive native artifact
+        run: mise run archive-native android-x64-egl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          android-x64-egl
+          build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
+      - run: mise run //bindings/kotlin:androidBuild opengl x86_64 --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/android-map:build opengl x86_64 --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-android-x64-egl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-android-x64-egl.tar.gz
+          if-no-files-found: error
+
+  target-android-x64-vulkan:
+    name: target / android-x64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: android-x64-vulkan
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run build android-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native android-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          android-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
+      - run: mise run //bindings/kotlin:androidBuild vulkan x86_64 --prebuilt
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-android-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-android-x64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-ohos-arm64-egl:
+    name: target / ohos-arm64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ohos-arm64-egl
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run //bindings/rust:build:ohos ohos-arm64-egl
+
+  target-ohos-arm64-vulkan:
+    name: target / ohos-arm64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: ohos-arm64-vulkan
+          gradle: false
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run //bindings/rust:build:ohos ohos-arm64-vulkan
+
+  target-windows-x64-wgl:
+    name: target / windows-x64-wgl
+    runs-on: windows-2022
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: windows-x64-wgl
+          zig: true
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test windows-x64-wgl
+      - name: Archive native artifact
+        run: mise run archive-native windows-x64-wgl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          windows-x64-wgl
+          build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
+      - run: mise run //bindings/rust:test windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test windows-x64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-windows-x64-wgl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-windows-x64-wgl.tar.gz
+          if-no-files-found: error
+
+  target-windows-x64-vulkan:
+    name: target / windows-x64-vulkan
+    runs-on: windows-2022
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        id: setup
+        with:
+          target: windows-x64-vulkan
+          zig: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test windows-x64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native windows-x64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          windows-x64-vulkan
+          build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/zig:test windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-map:build windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/zig-readback:run windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test windows-x64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Save Zig packages
+        if: ${{ steps.setup.outputs.zig-cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/zig/p
+            ~/AppData/Local/zig/p
+          key: ${{ steps.setup.outputs.zig-cache-key }}
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-windows-x64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-windows-x64-vulkan.tar.gz
+          if-no-files-found: error
+
+  target-windows-arm64-wgl:
+    name: target / windows-arm64-wgl
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: windows-arm64-wgl
+          save-toolchains: true
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test windows-arm64-wgl
+      - name: Archive native artifact
+        run: mise run archive-native windows-arm64-wgl
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          windows-arm64-wgl
+          build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
+      - run: mise run //bindings/rust:test windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test windows-arm64-wgl
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-windows-arm64-wgl-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-windows-arm64-wgl.tar.gz
+          if-no-files-found: error
+
+  target-windows-arm64-vulkan:
+    name: target / windows-arm64-vulkan
+    runs-on: windows-11-arm
+    timeout-minutes: 120
+    environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+        with:
+          target: windows-arm64-vulkan
+          sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
+          sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - run: mise run test windows-arm64-vulkan
+      - name: Archive native artifact
+        run: mise run archive-native windows-arm64-vulkan
+      - name: Install packaged native artifact
+        run: >-
+          mise run install-native-package
+          windows-arm64-vulkan
+          build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
+      - run: mise run //bindings/rust:test windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/rust-map:check windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/kotlin:jvmTest windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/compose-map:build windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //examples/lwjgl-map:build windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/dotnet:test windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - run: mise run //bindings/python:test windows-arm64-vulkan
+        env:
+          MISE_TASK_SKIP: "//:build"
+      - name: Upload native artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-package-windows-arm64-vulkan-${{ github.sha }}
+          path: build/packages/native/dist/maplibre-native-c-windows-arm64-vulkan.tar.gz
           if-no-files-found: error
 
   android-multi:
@@ -385,20 +1105,23 @@ jobs:
     timeout-minutes: 30
     environment: ${{ github.event_name == 'push' && 'sccache' || '' }}
     needs:
-      - target
+      - target-android-arm64-egl
+      - target-android-arm64-vulkan
+      - target-android-x64-egl
+      - target-android-x64-vulkan
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
-          target: android-multi-vulkan
+          target: android-multi
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
       - name: Download Android native artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: native-package-android-*-vulkan-${{ github.sha }}
+          pattern: native-package-android-*-${{ github.sha }}
           path: build/packages/native/android-multi-input
       - run: >-
           mise run //:kotlin:verify-android-multi-abi
@@ -412,7 +1135,25 @@ jobs:
     needs:
       - hygiene
       - docs
-      - target
+      - target-linux-x64-egl
+      - target-linux-x64-vulkan
+      - target-linux-arm64-egl
+      - target-linux-arm64-vulkan
+      - target-macos-arm64-metal
+      - target-macos-arm64-vulkan
+      - target-macos-arm64-egl
+      - target-ios-arm64-metal
+      - target-ios-simulator-arm64-metal
+      - target-android-arm64-egl
+      - target-android-arm64-vulkan
+      - target-android-x64-egl
+      - target-android-x64-vulkan
+      - target-ohos-arm64-egl
+      - target-ohos-arm64-vulkan
+      - target-windows-x64-wgl
+      - target-windows-x64-vulkan
+      - target-windows-arm64-wgl
+      - target-windows-arm64-vulkan
       - android-multi
     steps:
       - name: Fail if required jobs failed

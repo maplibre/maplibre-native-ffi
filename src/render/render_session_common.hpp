@@ -3,10 +3,14 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <vector>
 
+#include <mbgl/actor/scheduler.hpp>
 #include <mbgl/gfx/headless_backend.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
@@ -79,6 +83,124 @@ class TextureSessionBackend {
   }
 };
 
+// The scheduler mbgl sees as current while a render session renders.
+//
+// mbgl reaches for Scheduler::GetCurrent() from inside Renderer::render: every
+// tile builds its worker mailbox from it, so do file-source requests and the
+// style-image-missing continuation. Whatever it returns is where those results
+// come back. With no scheduler installed, GetCurrent() manufactures a
+// thread_local RunLoop that nobody pumps and those results are simply lost —
+// tiles never finish parsing, with no error to show for it.
+//
+// Delivering them on the map's run loop instead would be worse than wasteful:
+// tile mailboxes mutate state that RenderOrchestrator reads every frame, so it
+// would create a data race that does not exist today. They belong on the thread
+// that owns the renderer, which is this one.
+//
+// Lifetime is the session's, and mailboxes created during a render hold a
+// WeakPtr to it, so it outlives every message in flight.
+class RenderSessionScheduler final : public mbgl::Scheduler {
+ public:
+  RenderSessionScheduler() = default;
+  RenderSessionScheduler(const RenderSessionScheduler&) = delete;
+  auto operator=(const RenderSessionScheduler&)
+    -> RenderSessionScheduler& = delete;
+  RenderSessionScheduler(RenderSessionScheduler&&) = delete;
+  auto operator=(RenderSessionScheduler&&) -> RenderSessionScheduler& = delete;
+  ~RenderSessionScheduler() override { weak_factory_.invalidateWeakPtrs(); }
+
+  void schedule(std::function<void()>&& task) override;
+  void schedule(
+    const mbgl::util::SimpleIdentity, std::function<void()>&& task
+  ) override;
+  auto makeWeakPtr() -> mapbox::base::WeakPtr<mbgl::Scheduler> override {
+    return weak_factory_.makeWeakPtr();
+  }
+  // Only the owner thread can run this queue, and it is the current scheduler
+  // exactly while that thread is inside a session call. A caller anywhere else
+  // cannot wait for work only the owner will run, so this drains when it can
+  // and otherwise does nothing rather than running tasks off the owner thread.
+  void waitForEmpty(
+    const mbgl::util::SimpleIdentity = mbgl::util::SimpleIdentity::Empty
+  ) override {
+    if (mbgl::Scheduler::GetCurrent(/*init=*/false) == this) {
+      drain();
+    }
+  }
+
+  // Runs queued work on the calling thread, which must be the session's owner
+  // thread. Loops until the queue is empty, because a task may enqueue more.
+  auto drain() -> void;
+
+  // Drops queued work without running it. Used during detach: every queued task
+  // is a mailbox receive or a bindOnce continuation guarded by a weak pointer
+  // that is already dead, so running them would be a no-op anyway.
+  auto discard() -> void;
+
+ private:
+  // Clears `draining_` however drain() leaves, so a throwing task cannot wedge
+  // the queue closed.
+  class DrainGuard {
+   public:
+    explicit DrainGuard(RenderSessionScheduler& scheduler)
+        : scheduler_(scheduler) {}
+    DrainGuard(const DrainGuard&) = delete;
+    auto operator=(const DrainGuard&) -> DrainGuard& = delete;
+    DrainGuard(DrainGuard&&) = delete;
+    auto operator=(DrainGuard&&) -> DrainGuard& = delete;
+    ~DrainGuard();
+
+   private:
+    RenderSessionScheduler& scheduler_;
+  };
+
+  std::mutex mutex_;
+  std::vector<std::function<void()>> queue_;
+  bool draining_ = false;
+  mapbox::base::WeakPtrFactory<mbgl::Scheduler> weak_factory_{this};
+  // Do not add members here, see `WeakPtrFactory`
+};
+
+// Gives the calling thread a current mbgl scheduler for the duration of a
+// session call, but only when it does not already have one.
+//
+// Work created during a render — tile mailboxes, file-source requests, the
+// style-image-missing continuation — is delivered to whatever
+// Scheduler::GetCurrent() returned when it was created. Two cases:
+//
+//   - The session shares its owner thread with the runtime, which is the
+//     default. GetCurrent() is already that runtime's run loop, and the host
+//     pumps it every iteration through mln_runtime_pump(). Leave it alone:
+//     it drains more often than rendering does, and overriding it would strand
+//     results behind a render that the results themselves are needed to
+//     trigger.
+//   - The session was attached on a thread of its own, which has no scheduler.
+//     Install the session's, drained around each render. A host that gives a
+//     session its own thread runs a display-paced render loop by definition, so
+//     that queue drains continuously.
+//
+// GetCurrent(false) is deliberate: the default GetCurrent() would create a
+// thread_local RunLoop on a bare render thread, which permanently disqualifies
+// that thread from mln_runtime_create().
+class ScopedCurrentScheduler {
+ public:
+  explicit ScopedCurrentScheduler(mbgl::Scheduler& scheduler)
+      : previous_(mbgl::Scheduler::GetCurrent(/*init=*/false)) {
+    if (previous_ == nullptr) {
+      mbgl::Scheduler::SetCurrent(&scheduler);
+    }
+  }
+  ScopedCurrentScheduler(const ScopedCurrentScheduler&) = delete;
+  auto operator=(const ScopedCurrentScheduler&)
+    -> ScopedCurrentScheduler& = delete;
+  ScopedCurrentScheduler(ScopedCurrentScheduler&&) = delete;
+  auto operator=(ScopedCurrentScheduler&&) -> ScopedCurrentScheduler& = delete;
+  ~ScopedCurrentScheduler() { mbgl::Scheduler::SetCurrent(previous_); }
+
+ private:
+  mbgl::Scheduler* previous_;
+};
+
 struct RenderSurfaceState {
   std::unique_ptr<SurfaceSessionBackend> backend = nullptr;
 };
@@ -100,6 +222,9 @@ struct RenderTextureState {
 struct mln_render_session {
   mln::core::RenderSessionKind kind = mln::core::RenderSessionKind::Surface;
   mln_map* map = nullptr;
+  // The thread that attached the session, fixed for its lifetime. Set before
+  // the session is registered, so it is never default-constructed while any
+  // entry point can reach it.
   std::thread::id owner_thread;
   uint32_t width = 0;
   uint32_t height = 0;
@@ -110,6 +235,9 @@ struct mln_render_session {
   uint64_t rendered_generation = 0;
   bool attached = true;
 
+  // Declared before `renderer` so reverse-order destruction tears the renderer
+  // down while the scheduler its mailboxes point at is still alive.
+  mln::core::RenderSessionScheduler scheduler;
   std::unique_ptr<mbgl::Renderer> renderer = nullptr;
   mln::core::RenderSurfaceState surface;
   mln::core::RenderTextureState texture;

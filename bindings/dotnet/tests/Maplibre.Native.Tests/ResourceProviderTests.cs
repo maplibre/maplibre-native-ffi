@@ -329,14 +329,56 @@ public sealed unsafe class ResourceProviderTests
         Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
-    [BindingSpecTest("BND-122")]
+    // Covers the runtime-scoped provider lifecycle end to end: an installed
+    // provider is consulted, a replacement takes over while a map is live, and a
+    // cleared provider stops being consulted while requests keep reaching the
+    // network file source. Each transition also releases the rooted state of the
+    // provider it retires, which the C call guarantees is unreachable once it
+    // returns.
+    [BindingSpecTest("BND-142")]
     [Fact]
-    public void CanInstallAndReplaceResourceProvider()
+    public void ResourceProviderIsConsultedUntilClearedWhileMapIsLive()
     {
+        var firstCalls = 0;
+        var secondCalls = 0;
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
-        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
-        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
+        runtime.SetResourceProvider(
+            (_, _) =>
+            {
+                Interlocked.Increment(ref firstCalls);
+                return ResourceProviderDecision.PassThrough;
+            }
+        );
+        var first = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
+        LoadProbeStyle(runtime, map, "jar:file:/packaged/first.json");
+        Assert.True(Volatile.Read(ref firstCalls) > 0);
+
+        // Replacing the provider while a map is live is part of the contract.
+        runtime.SetResourceProvider(
+            (_, _) =>
+            {
+                Interlocked.Increment(ref secondCalls);
+                return ResourceProviderDecision.PassThrough;
+            }
+        );
+        var second = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
+        Assert.NotSame(first, second);
+        Assert.False(first.IsHandleAllocatedForTest);
+        var firstCallsAfterReplace = Volatile.Read(ref firstCalls);
+        LoadProbeStyle(runtime, map, "jar:file:/packaged/second.json");
+        Assert.True(Volatile.Read(ref secondCalls) > 0);
+        Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
+
+        runtime.ClearResourceProvider();
+
+        Assert.Null(runtime.ResourceProviderStateForTest);
+        Assert.False(second.IsHandleAllocatedForTest);
+        var secondCallsAfterClear = Volatile.Read(ref secondCalls);
+        LoadProbeStyle(runtime, map, "jar:file:/packaged/third.json");
+        Assert.Equal(firstCallsAfterReplace, Volatile.Read(ref firstCalls));
+        Assert.Equal(secondCallsAfterClear, Volatile.Read(ref secondCalls));
     }
 
     [BindingSpecTest("BND-101", "BND-143", "BND-150")]
@@ -463,6 +505,25 @@ public sealed unsafe class ResourceProviderTests
         Assert.Contains("style", runtimeEvent.Message, StringComparison.OrdinalIgnoreCase);
     }
 
+    // Requests a style whose scheme no file source serves, so the loading
+    // failure that follows proves the request reached the network file source.
+    private static void LoadProbeStyle(RuntimeHandle runtime, MapHandle map, string styleUrl)
+    {
+        while (runtime.PollEvent() is not null)
+        {
+            // Drain earlier events so this probe observes its own failure.
+        }
+
+        map.SetStyleUrl(styleUrl);
+        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
+            runtime,
+            map,
+            RuntimeEventType.MapLoadingFailed
+        );
+
+        Assert.Contains("\"jar\"", runtimeEvent.Message, StringComparison.Ordinal);
+    }
+
     private static ResourceResponse StyleResponse() =>
         new(ResourceResponseStatus.Ok) { Bytes = Encoding.UTF8.GetBytes(StyleJson) };
 
@@ -470,7 +531,7 @@ public sealed unsafe class ResourceProviderTests
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
             if (signal.IsSet)
             {
                 return;
@@ -489,7 +550,7 @@ public sealed unsafe class ResourceProviderTests
     {
         for (var attempt = 0; attempt < 1000; attempt++)
         {
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
             if (handle.IsCancelled())
             {
                 return;

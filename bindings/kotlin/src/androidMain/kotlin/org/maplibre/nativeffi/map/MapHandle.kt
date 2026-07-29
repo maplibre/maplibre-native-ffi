@@ -8,6 +8,7 @@ import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -25,6 +26,7 @@ import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.internal.callback.CallbackGate
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -41,6 +43,7 @@ import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -53,8 +56,13 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 public actual class MapHandle
 private constructor(private val runtime: RuntimeHandle, private val handleAddress: Long) :
   AutoCloseable {
-  private val runtimeRetention = runtime.retainChild()
+  private val runtimeRetention = runtime.retainChild("MapHandle")
   private val core = HandleStateCore("MapHandle", handleAddress)
+
+  init {
+    HandleLeakCleaner.register(this, core.leakReport)
+  }
+
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual val isClosed: Boolean
@@ -176,32 +184,46 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     }
   }
 
-  public actual fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+  public actual fun addGeoJsonSourceUrl(
+    sourceId: String,
+    url: String,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       StringViewScope(url).use { nativeUrl ->
-        Status.check(
-          MaplibreNativeC.mln_map_add_geojson_source_url(
-            map(requireLiveAddress()),
-            nativeSourceId.view,
-            nativeUrl.view,
+        GeoJsonSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_geojson_source_url(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeUrl.view,
+              nativeOptions.options,
+            )
           )
-        )
+        }
       }
     }
   }
 
-  public actual fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+  public actual fun addGeoJsonSourceData(
+    sourceId: String,
+    data: GeoJson,
+    options: GeoJsonSourceOptions?,
+  ) {
     NativeAccess.ensureLoaded()
     StringViewScope(sourceId).use { nativeSourceId ->
       GeoJsonScope(data).use { nativeData ->
-        Status.check(
-          MaplibreNativeC.mln_map_add_geojson_source_data(
-            map(requireLiveAddress()),
-            nativeSourceId.view,
-            nativeData.value,
+        GeoJsonSourceOptionsScope(options).use { nativeOptions ->
+          Status.check(
+            MaplibreNativeC.mln_map_add_geojson_source_data(
+              map(requireLiveAddress()),
+              nativeSourceId.view,
+              nativeData.value,
+              nativeOptions.options,
+            )
           )
-        )
+        }
       }
     }
   }
@@ -252,7 +274,8 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
           )
         )
       }
-      closeQuietly(customGeometrySources.put(sourceId, sourceState))
+      HandleLeakCleaner.retainNativeCallbackRoot(sourceState)
+      releaseCallbackRoot(customGeometrySources.put(sourceId, sourceState))
     } catch (error: Throwable) {
       closeQuietly(sourceState)
       throw error
@@ -978,6 +1001,23 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
     Status.check(MaplibreNativeC.mln_map_dump_debug_logs(map(requireLiveAddress())))
   }
 
+  public actual val size: MapSize
+    get() {
+      NativeAccess.ensureLoaded()
+      val outWidth = intArrayOf(0)
+      val outHeight = intArrayOf(0)
+      val outScaleFactor = doubleArrayOf(0.0)
+      Status.check(
+        MaplibreNativeC.mln_map_get_size(
+          map(requireLiveAddress()),
+          outWidth,
+          outHeight,
+          outScaleFactor,
+        )
+      )
+      return MapSize(outWidth[0], outHeight[0], outScaleFactor[0])
+    }
+
   public actual var viewportOptions: ViewportOptions
     get() {
       NativeAccess.ensureLoaded()
@@ -1430,14 +1470,15 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
 
   internal fun nativeAddress(): Long = handleAddress
 
-  internal fun retainChild(): HandleStateCore.ChildRetention = core.retainChild()
+  internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
+    core.retainChild(childTypeName)
 
   internal fun releaseDetachedCustomGeometrySources() {
     val iterator = customGeometrySources.iterator()
     while (iterator.hasNext()) {
       val entry = iterator.next()
       if (styleSourceType(entry.key) != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.value)
+        releaseCallbackRoot(entry.value)
         iterator.remove()
       }
     }
@@ -1548,11 +1589,11 @@ private constructor(private val runtime: RuntimeHandle, private val handleAddres
   }
 
   private fun closeCustomGeometrySource(sourceId: String) {
-    closeQuietly(customGeometrySources.remove(sourceId))
+    releaseCallbackRoot(customGeometrySources.remove(sourceId))
   }
 
   private fun clearCustomGeometrySources() {
-    customGeometrySources.values.forEach(::closeQuietly)
+    customGeometrySources.values.forEach(::releaseCallbackRoot)
     customGeometrySources.clear()
   }
 }
@@ -1807,7 +1848,9 @@ private fun boundOptions(value: MaplibreNativeC.mln_bound_options): BoundOptions
   val fields = value.fields()
   return BoundOptions().apply {
     if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS) != 0) {
-      bounds = latLngBounds(value.bounds())
+      bounds = BoundsConstraint.Bounded(latLngBounds(value.bounds()))
+    } else if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_UNBOUNDED) != 0) {
+      bounds = BoundsConstraint.Unbounded
     }
     if ((fields and MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM) != 0) {
       minZoom = value.min_zoom()
@@ -2025,6 +2068,10 @@ private class AnimationOptionsScope(value: AnimationOptions?) : AutoCloseable {
         fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_EASING
         options.easing(MaplibreNativeC.mln_unit_bezier().x1(it.x1).y1(it.y1).x2(it.x2).y2(it.y2))
       }
+      value.transitionId?.let {
+        fields = fields or MaplibreNativeC.MLN_ANIMATION_OPTION_TRANSITION_ID
+        options.transition_id(it)
+      }
       options.fields(fields)
     }
   }
@@ -2068,9 +2115,15 @@ private class BoundOptionsScope(value: BoundOptions) : AutoCloseable {
 
   init {
     var fields = 0
-    value.bounds?.let {
-      fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS
-      options.bounds(latLngBounds(it))
+    when (val constraint = value.bounds) {
+      is BoundsConstraint.Bounded -> {
+        fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS
+        options.bounds(latLngBounds(constraint.bounds))
+      }
+      BoundsConstraint.Unbounded -> {
+        fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_UNBOUNDED
+      }
+      null -> {}
     }
     value.minZoom?.let {
       fields = fields or MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM
@@ -2590,6 +2643,66 @@ private class TileSourceOptionsScope(value: TileSourceOptions?) : AutoCloseable 
   }
 }
 
+private class GeoJsonSourceOptionsScope(value: GeoJsonSourceOptions?) : AutoCloseable {
+  private val clusterProperties: JsonScope? = value?.clusterProperties?.let(::JsonScope)
+  val options: MaplibreNativeC.mln_geojson_source_options =
+    MaplibreNativeC.mln_geojson_source_options_default()
+
+  init {
+    var fields = 0
+    value?.minZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+      options.min_zoom(it)
+    }
+    value?.maxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+      options.max_zoom(it)
+    }
+    value?.tolerance?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+      options.tolerance(it)
+    }
+    value?.clusterMaxZoom?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+      options.cluster_max_zoom(it)
+    }
+    clusterProperties?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+      options.cluster_properties(it.value)
+    }
+    value?.tileSize?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+      options.tile_size(it)
+    }
+    value?.buffer?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_BUFFER
+      options.buffer(it)
+    }
+    value?.clusterRadius?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+      options.cluster_radius(it)
+    }
+    value?.clusterMinPoints?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+      options.cluster_min_points(it)
+    }
+    value?.lineMetrics?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+      options.line_metrics(it)
+    }
+    value?.cluster?.let {
+      fields = fields or MaplibreNativeC.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+      options.cluster(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+    clusterProperties?.close()
+  }
+}
+
 private class ViewportOptionsScope(value: ViewportOptions) : AutoCloseable {
   val options: MaplibreNativeC.mln_map_viewport_options =
     MaplibreNativeC.mln_map_viewport_options_default()
@@ -2751,6 +2864,7 @@ private class MapOptionsScope(value: MapOptions) : AutoCloseable {
       }
       options.map_mode(it.nativeValue)
     }
+    value.fastPforEnabled?.let { options.fast_pfor_enabled(it) }
   }
 
   override fun close() {
@@ -2762,6 +2876,11 @@ private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address
   }
+}
+
+private fun releaseCallbackRoot(root: AutoCloseable?) {
+  HandleLeakCleaner.releaseNativeCallbackRoot(root)
+  closeQuietly(root)
 }
 
 private fun closeQuietly(closeable: AutoCloseable?) {

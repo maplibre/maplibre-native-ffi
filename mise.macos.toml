@@ -5,7 +5,6 @@ host_native_preset = "macos-arm64-metal"
 "brew:docker-buildx" = "latest"
 "brew:glslang" = "latest"
 "brew:molten-vk" = "latest"
-"brew:ninja" = "latest"
 "brew:pkgconf" = "latest"
 "brew:vulkan-loader" = "latest"
 

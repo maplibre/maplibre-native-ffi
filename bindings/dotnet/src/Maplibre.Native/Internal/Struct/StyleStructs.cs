@@ -94,6 +94,111 @@ internal sealed unsafe class NativeTileSourceOptions : IDisposable
     }
 }
 
+internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
+{
+    private readonly NativeJsonValue? clusterProperties;
+
+    private NativeGeoJsonSourceOptions(
+        mln_geojson_source_options value,
+        NativeJsonValue? clusterProperties
+    )
+    {
+        Value = value;
+        this.clusterProperties = clusterProperties;
+    }
+
+    internal mln_geojson_source_options Value { get; }
+
+    internal static NativeGeoJsonSourceOptions From(GeoJsonSourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        NativeJsonValue? clusterProperties = null;
+        try
+        {
+            var native = NativeMethods.mln_geojson_source_options_default();
+            if (options.MinimumZoom is { } minimumZoom)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM;
+                native.min_zoom = minimumZoom;
+            }
+            if (options.MaximumZoom is { } maximumZoom)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM;
+                native.max_zoom = maximumZoom;
+            }
+            if (options.Tolerance is { } tolerance)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE;
+                native.tolerance = tolerance;
+            }
+            if (options.ClusterMaximumZoom is { } clusterMaximumZoom)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM;
+                native.cluster_max_zoom = clusterMaximumZoom;
+            }
+            if (options.ClusterProperties is { } clusterPropertiesValue)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES;
+                clusterProperties = NativeJsonValue.From(clusterPropertiesValue);
+                native.cluster_properties = clusterProperties.Pointer;
+            }
+            if (options.TileSize is { } tileSize)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE;
+                native.tile_size = tileSize;
+            }
+            if (options.Buffer is { } buffer)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_BUFFER;
+                native.buffer = buffer;
+            }
+            if (options.ClusterRadius is { } clusterRadius)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS;
+                native.cluster_radius = clusterRadius;
+            }
+            if (options.ClusterMinimumPoints is { } clusterMinimumPoints)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS;
+                native.cluster_min_points = clusterMinimumPoints;
+            }
+            if (options.LineMetrics is { } lineMetrics)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS;
+                native.line_metrics = lineMetrics ? (byte)1 : (byte)0;
+            }
+            if (options.Cluster is { } cluster)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+                native.cluster = cluster ? (byte)1 : (byte)0;
+            }
+
+            return new NativeGeoJsonSourceOptions(native, clusterProperties);
+        }
+        catch
+        {
+            clusterProperties?.Dispose();
+            throw;
+        }
+    }
+
+    public void Dispose()
+    {
+        clusterProperties?.Dispose();
+    }
+}
+
 internal sealed unsafe class NativeStyleImage : IDisposable
 {
     private readonly nint pixels;

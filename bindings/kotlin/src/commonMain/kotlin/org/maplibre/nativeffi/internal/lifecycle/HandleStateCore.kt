@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.lifecycle
 
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import org.maplibre.nativeffi.internal.status.Status
 
@@ -14,7 +15,7 @@ internal class HandleStateCore(
   @Suppress("unused") private val parents: Array<out Any> = parents
   val leakReport: LeakReport = LeakReport(typeName, address)
   private val releaseState = AtomicInt(STATE_LIVE)
-  private val liveChildren = AtomicInt(0)
+  private val liveChildren = AtomicReference<List<String>>(emptyList())
 
   fun requireLive() {
     when (releaseState.load()) {
@@ -28,18 +29,24 @@ internal class HandleStateCore(
 
   fun address(): Long = address
 
-  fun retainChild(): ChildRetention {
+  /**
+   * Retains this handle on behalf of a live child wrapper.
+   *
+   * [childTypeName] names the child wrapper type so that a blocked parent release can identify the
+   * handles still holding it open.
+   */
+  fun retainChild(childTypeName: String): ChildRetention {
     while (true) {
       requireLive()
-      val count = liveChildren.load()
-      if (!liveChildren.compareAndSet(count, count + 1)) {
+      val children = liveChildren.load()
+      if (!liveChildren.compareAndSet(children, children + childTypeName)) {
         continue
       }
       try {
         requireLive()
-        return ChildRetention(this)
+        return ChildRetention(this, childTypeName)
       } catch (error: Throwable) {
-        releaseChild()
+        releaseChild(childTypeName)
         throw error
       }
     }
@@ -53,10 +60,10 @@ internal class HandleStateCore(
         else -> throw Status.released(typeName)
       }
     }
-    val childCount = liveChildren.load()
-    if (childCount > 0) {
+    val children = liveChildren.load()
+    if (children.isNotEmpty()) {
       releaseState.store(STATE_LIVE)
-      throw Status.liveChildren(typeName, childCount)
+      throw Status.liveChildren(typeName, children)
     }
     try {
       Status.check(destroy())
@@ -69,21 +76,30 @@ internal class HandleStateCore(
     afterSuccess()
   }
 
-  private fun releaseChild() {
+  private fun releaseChild(childTypeName: String) {
     while (true) {
-      val count = liveChildren.load()
-      if (count == 0 || liveChildren.compareAndSet(count, count - 1)) {
+      val children = liveChildren.load()
+      val index = children.indexOf(childTypeName)
+      if (index < 0) {
+        return
+      }
+      val remaining = children.toMutableList().apply { removeAt(index) }
+      if (liveChildren.compareAndSet(children, remaining)) {
         return
       }
     }
   }
 
-  internal class ChildRetention(private val owner: HandleStateCore) {
+  /** One child wrapper's retention of its parent handle. Releasing more than once is a no-op. */
+  internal class ChildRetention(
+    private val owner: HandleStateCore,
+    private val childTypeName: String,
+  ) {
     private val released = AtomicInt(0)
 
     fun close() {
       if (released.compareAndSet(0, 1)) {
-        owner.releaseChild()
+        owner.releaseChild(childTypeName)
       }
     }
   }

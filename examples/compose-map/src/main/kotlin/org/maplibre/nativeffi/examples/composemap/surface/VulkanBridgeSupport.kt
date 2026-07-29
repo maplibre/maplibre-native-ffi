@@ -32,32 +32,39 @@ internal fun vulkanFunctionAddress(name: String): Long {
   return VK.getFunctionProvider().getFunctionAddress(name)
 }
 
-internal fun MemoryStack.vulkanInstanceExtensions(): Set<String> {
-  val count = mallocInt(1)
-  checkVulkan(
-    vkEnumerateInstanceExtensionProperties(null as String?, count, null),
-    "vkEnumerateInstanceExtensionProperties(count)",
-  )
-  val props = VkExtensionProperties.calloc(count[0], this)
-  checkVulkan(
-    vkEnumerateInstanceExtensionProperties(null as String?, count, props),
-    "vkEnumerateInstanceExtensionProperties",
-  )
-  return buildSet { props.forEach { add(it.extensionNameString()) } }
+// Enumeration helpers that return heap values push their own frame so callers can invoke them once
+// per physical device without the intermediate buffers piling up on a single stack frame.
+
+internal fun vulkanInstanceExtensions(): Set<String> {
+  MemoryStack.stackPush().use { stack ->
+    val count = stack.mallocInt(1)
+    checkVulkan(
+      vkEnumerateInstanceExtensionProperties(null as String?, count, null),
+      "vkEnumerateInstanceExtensionProperties(count)",
+    )
+    val props = VkExtensionProperties.calloc(count[0], stack)
+    checkVulkan(
+      vkEnumerateInstanceExtensionProperties(null as String?, count, props),
+      "vkEnumerateInstanceExtensionProperties",
+    )
+    return buildSet { props.forEach { add(it.extensionNameString()) } }
+  }
 }
 
-internal fun MemoryStack.vulkanDeviceExtensions(device: VkPhysicalDevice): Set<String> {
-  val count = mallocInt(1)
-  checkVulkan(
-    vkEnumerateDeviceExtensionProperties(device, null as String?, count, null),
-    "vkEnumerateDeviceExtensionProperties(count)",
-  )
-  val props = VkExtensionProperties.calloc(count[0], this)
-  checkVulkan(
-    vkEnumerateDeviceExtensionProperties(device, null as String?, count, props),
-    "vkEnumerateDeviceExtensionProperties",
-  )
-  return buildSet { props.forEach { add(it.extensionNameString()) } }
+internal fun vulkanDeviceExtensions(device: VkPhysicalDevice): Set<String> {
+  MemoryStack.stackPush().use { stack ->
+    val count = stack.mallocInt(1)
+    checkVulkan(
+      vkEnumerateDeviceExtensionProperties(device, null as String?, count, null),
+      "vkEnumerateDeviceExtensionProperties(count)",
+    )
+    val props = VkExtensionProperties.calloc(count[0], stack)
+    checkVulkan(
+      vkEnumerateDeviceExtensionProperties(device, null as String?, count, props),
+      "vkEnumerateDeviceExtensionProperties",
+    )
+    return buildSet { props.forEach { add(it.extensionNameString()) } }
+  }
 }
 
 internal fun MemoryStack.vulkanStringBuffer(values: Set<String>): PointerBuffer {
@@ -68,14 +75,16 @@ internal fun MemoryStack.vulkanStringBuffer(values: Set<String>): PointerBuffer 
   return buffer.flip()
 }
 
-internal fun MemoryStack.findVulkanGraphicsQueueFamily(device: VkPhysicalDevice): Int {
-  val count = mallocInt(1)
-  vkGetPhysicalDeviceQueueFamilyProperties(device, count, null)
-  val families = VkQueueFamilyProperties.calloc(count[0], this)
-  vkGetPhysicalDeviceQueueFamilyProperties(device, count, families)
-  for (index in 0..<families.capacity()) {
-    if ((families[index].queueFlags() and VK_QUEUE_GRAPHICS_BIT) != 0) {
-      return index
+internal fun findVulkanGraphicsQueueFamily(device: VkPhysicalDevice): Int {
+  MemoryStack.stackPush().use { stack ->
+    val count = stack.mallocInt(1)
+    vkGetPhysicalDeviceQueueFamilyProperties(device, count, null)
+    val families = VkQueueFamilyProperties.calloc(count[0], stack)
+    vkGetPhysicalDeviceQueueFamilyProperties(device, count, families)
+    for (index in 0..<families.capacity()) {
+      if ((families[index].queueFlags() and VK_QUEUE_GRAPHICS_BIT) != 0) {
+        return index
+      }
     }
   }
   return -1

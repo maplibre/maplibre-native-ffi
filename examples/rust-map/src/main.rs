@@ -9,8 +9,10 @@ compile_error!("rust-map metal backend is only supported on macOS");
 compile_error!("rust-map opengl backend is only supported on Linux and Windows");
 
 mod app;
+mod channel;
 mod graphics;
 mod input;
+mod map_state;
 #[cfg(maplibre_render_backend = "metal")]
 mod metal;
 #[cfg(maplibre_render_backend = "opengl")]

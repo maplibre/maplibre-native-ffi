@@ -3,10 +3,13 @@ package org.maplibre.nativeffi.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -16,8 +19,13 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.Vec3
+import org.maplibre.nativeffi.runtime.CameraChangeMode
+import org.maplibre.nativeffi.runtime.RuntimeEventPayload
+import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import platform.posix.usleep
 
+@OptIn(ExperimentalForeignApi::class)
 class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-102, BND-103: camera commands, transitions, viewport state, and projection helpers.
 
@@ -115,8 +123,10 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
-        map.bounds = BoundOptions().apply { this.bounds = bounds }
-        assertNotNull(map.bounds.bounds)
+        map.bounds = BoundOptions().apply { this.bounds = BoundsConstraint.Bounded(bounds) }
+        assertEquals(BoundsConstraint.Bounded(bounds), map.bounds.bounds)
+        map.bounds = BoundOptions().apply { this.bounds = BoundsConstraint.Unbounded }
+        assertEquals(BoundsConstraint.Unbounded, map.bounds.bounds)
         map.freeCameraOptions =
           FreeCameraOptions().apply {
             position = Vec3(0.0, 0.0, 0.0)
@@ -155,6 +165,126 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
       }
     } finally {
       runtime.close()
+    }
+  }
+
+  // BND-087, BND-102: camera transitions report their identity through runtime events, and
+  // camera change events type their code.
+
+  @Test
+  fun cameraTransitionIdsReportEveryTerminalOutcomeOnce() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+          },
+        )
+      try {
+        // A zero-duration ease resolves inside the call and reports its end right away. An id above
+        // Long.MAX_VALUE round-trips as the unsigned bit pattern the caller passed in.
+        val instantId = (Long.MAX_VALUE.toULong() + 1UL).toLong()
+        map.easeTo(CameraOptions().apply { zoom = 2.0 }, transitionAnimation(instantId, 0.0))
+        val instant = drainCameraEvents(runtime)
+        assertEquals(listOf(instantId), instant.finishedTransitionIds)
+        assertEquals(CameraChangeMode.IMMEDIATE, instant.lastChangeMode)
+
+        // A running transition stays silent until it releases the camera.
+        map.easeTo(CameraOptions().apply { zoom = 12.0 }, transitionAnimation(11L, 5_000.0))
+        assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+
+        // A later camera command supersedes it, ending the transition it replaced.
+        map.easeTo(CameraOptions().apply { zoom = 13.0 }, transitionAnimation(12L, 5_000.0))
+        val superseded = drainCameraEvents(runtime)
+        assertEquals(listOf(11L), superseded.finishedTransitionIds)
+        assertEquals(CameraChangeMode.ANIMATED, superseded.lastChangeMode)
+
+        // Cancellation ends the superseding transition.
+        map.cancelTransitions()
+        assertEquals(listOf(12L), drainCameraEvents(runtime).finishedTransitionIds)
+
+        // Omitting the id leaves the transition silent.
+        map.easeTo(
+          CameraOptions().apply { zoom = 14.0 },
+          AnimationOptions().apply { durationMs = 0.0 },
+        )
+        assertEquals(emptyList(), drainCameraEvents(runtime).finishedTransitionIds)
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun completedCameraTransitionReportsItsIdOnceAndReachesTheRequestedCamera() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    try {
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+            mapMode = MapMode.STATIC
+          },
+        )
+      try {
+        map.easeTo(CameraOptions().apply { zoom = 5.0 }, transitionAnimation(21L, 5_000.0))
+        // A still-image request runs a static map's pending transitions to their end.
+        map.requestStillImage()
+
+        val finished = mutableListOf<Long>()
+        var rounds = 0
+        while (finished.isEmpty() && rounds < 10_000) {
+          runtime.pump(0)
+          finished += drainCameraEvents(runtime).finishedTransitionIds
+          rounds++
+          usleep(1_000U)
+        }
+        assertEquals(listOf(21L), finished)
+        assertEquals(5.0, assertNotNull(map.camera.zoom), 0.000001)
+
+        // The completed transition reports its end once; later pumping adds nothing.
+        repeat(100) {
+          runtime.pump(0)
+          finished += drainCameraEvents(runtime).finishedTransitionIds
+        }
+        assertEquals(listOf(21L), finished)
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  private fun transitionAnimation(transitionId: Long, durationMs: Double): AnimationOptions =
+    AnimationOptions().apply {
+      this.transitionId = transitionId
+      this.durationMs = durationMs
+    }
+
+  private class CameraEvents(
+    val finishedTransitionIds: List<Long>,
+    val lastChangeMode: CameraChangeMode?,
+  )
+
+  private fun drainCameraEvents(runtime: RuntimeHandle): CameraEvents {
+    val finished = mutableListOf<Long>()
+    var lastChangeMode: CameraChangeMode? = null
+    while (true) {
+      val event = runtime.pollEvent() ?: return CameraEvents(finished, lastChangeMode)
+      when (event.type) {
+        RuntimeEventType.MAP_CAMERA_TRANSITION_FINISHED ->
+          finished +=
+            assertIs<RuntimeEventPayload.CameraTransitionFinished>(event.payload).transitionId
+        RuntimeEventType.MAP_CAMERA_DID_CHANGE -> lastChangeMode = CameraChangeMode(event.code)
+      }
     }
   }
 }

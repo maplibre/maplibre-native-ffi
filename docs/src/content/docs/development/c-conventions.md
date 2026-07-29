@@ -79,15 +79,58 @@ The runtime and map use a host-pumped, owner-thread model. Runtime creation
 records the owner thread. Runtime, map, map-projection, and render session calls
 that touch thread-affine state validate the owner thread.
 
+A map shares its runtime's owner thread. A render session records its own: the
+thread that attached it, fixed for the session's lifetime. Attach validates that
+the map is live rather than that the caller owns it, so a session may be
+attached, driven, and destroyed on a thread that never touches the map. Session
+calls from any other thread report the owner-thread status. The host publishes
+the map pointer to the attaching thread with a happens-before edge; the C API
+does not synchronize that handoff.
+
 Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build
 threaded models above the C API.
 
+Map state a render session reaches for is enqueued to the map owner thread
+rather than mutated in place, so resizing a session applies the map's logical
+size on the map's next pump. Renderer observer callbacks are forwarded to the
+map's run loop for the same reason, so the events a frame produces are drained
+by a later `mln_runtime_pump()` rather than inside the render call.
+
+Graphics contexts that bind to a thread, such as OpenGL, are made current for
+the duration of a session call and released before it returns, so a host keeps
+its own context current only on the thread that owns the session. Attach creates
+the session's graphics resources on the calling thread, which is why attach
+belongs on the thread whose context is current rather than on the map's.
+
+On Apple targets each entry point drains its own Objective-C autorelease pool,
+so a host may pump frames from a thread that never returns to a run loop.
+Objects that cross the C boundary are retained rather than autoreleased, which
+keeps them valid after the entry point that produced them returns.
+
 MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop. One
-call drains the queued tasks, expired timers, and ready I/O it finds, including
-work enqueued while it runs, and returns without blocking for more. Document
-pump entry points as draining rather than as a bounded per-call budget.
+one live runtime. `mln_runtime_pump()` advances that runtime: it parks the owner
+thread when asked, then drains the queued tasks, expired timers, and ready I/O
+it finds, including work enqueued while it runs. Document pump entry points as
+draining rather than as a bounded per-call budget.
+
+One entry point carries both cadence sources: the timeout selects the cadence,
+with zero for hosts driven by a callback they do not own and a positive value
+for hosts that own their pump thread and take their cadence from the runtime's
+own work. Park-and-wake follows these rules:
+
+- The C API owns the parking primitive. Wake signals reach the owner thread
+  through runtime state rather than through a host callback, because MapLibre
+  raises them from arbitrary threads while it holds locks that every thread
+  queueing owner-thread work needs.
+- Wake signals set a flag that the pump clears before it returns. Document a
+  pump as advancing the runtime, and require the event drain after every return.
+- Any-thread wake entry points take a handle that carries its own reference to
+  the wake state, never the thread-affine runtime pointer.
+- Document each blocking entry point's deadlock risk, naming the host locks a
+  caller must not hold across it.
+- Queue one event per host-visible outcome. An event whose handling acts on the
+  latest state, such as a render update, coalesces against an unread one.
 
 ## Status And Diagnostics
 
@@ -159,4 +202,36 @@ documented return behavior.
 
 Render session APIs document owner thread, render target backend handle
 ownership, synchronization, borrowed pointer lifetimes, generation or
-stale-frame behavior, and teardown rules.
+stale-frame behavior, and teardown rules. Attach entry points also document that
+the calling thread becomes the session's owner thread and what the calling
+thread's graphics context must provide.
+
+## Callback Adapter
+
+`include/maplibre_native_c/callback_adapter.h` adapts these synchronous callback
+contracts for host runtimes that cannot meet them. It serves hosts with both of
+these constraints:
+
+- Host callbacks are delivered asynchronously and return void, so the host
+  cannot answer a decision the C API needs immediately, and cannot read a
+  borrowed payload that expires when the C callback returns.
+- The host has no native compilation unit of its own, because it consumes the
+  shared library through a pure foreign-function interface.
+
+A host that compiles native code writes this adaptation there instead, in
+whatever form its runtime prefers, and does not use this header.
+
+The layer answers on the host's behalf: it copies borrowed payloads into
+native-owned records the host releases explicitly, decides from native-owned
+routing tables when a result is needed immediately, and hands records to the
+host through void listener functions. Its entry points carry the `mln_adapter_`
+prefix and follow every rule in this document, including the callback
+documentation requirements above.
+
+This header is public but stays out of the `maplibre_native_c.h` umbrella, so
+binding generators that target the umbrella do not emit declarations for a layer
+their host does not need. Bindings that need it name the header directly.
+
+Keep test-only entry points out of this layer, as out of every other public
+header. A binding that needs to drive native dispatch from its own tests calls
+these public entry points directly with the state it registered.

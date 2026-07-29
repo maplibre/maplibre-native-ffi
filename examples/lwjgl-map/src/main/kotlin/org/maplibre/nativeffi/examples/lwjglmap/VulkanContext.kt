@@ -115,7 +115,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       val required =
         glfwGetRequiredInstanceExtensions()
           ?: error("GLFW did not return Vulkan instance extensions")
-      val available = instanceExtensions(stack)
+      val available = instanceExtensions()
       val extensions = LinkedHashSet<String>()
       for (index in 0..<required.remaining()) {
         extensions.add(required.getStringUTF8(index))
@@ -170,7 +170,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       check(vkEnumeratePhysicalDevices(instance(), count, devices), "vkEnumeratePhysicalDevices")
       for (index in 0..<devices.capacity()) {
         val candidate = VkPhysicalDevice(devices[index], instance())
-        val queueFamily = findGraphicsPresentQueueFamily(stack, candidate)
+        val queueFamily = findGraphicsPresentQueueFamily(candidate)
         if (queueFamily >= 0) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
@@ -181,23 +181,25 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
     }
   }
 
-  private fun findGraphicsPresentQueueFamily(stack: MemoryStack, candidate: VkPhysicalDevice): Int {
-    val count = stack.mallocInt(1)
-    vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, null)
-    val families = VkQueueFamilyProperties.calloc(count[0], stack)
-    vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, families)
-    val present = stack.mallocInt(1)
-    for (index in 0..<families.capacity()) {
-      val family = families[index]
-      if ((family.queueFlags() and VK_QUEUE_GRAPHICS_BIT) == 0) {
-        continue
-      }
-      check(
-        vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface, present),
-        "vkGetPhysicalDeviceSurfaceSupportKHR",
-      )
-      if (present[0] != 0) {
-        return index
+  private fun findGraphicsPresentQueueFamily(candidate: VkPhysicalDevice): Int {
+    MemoryStack.stackPush().use { stack ->
+      val count = stack.mallocInt(1)
+      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, null)
+      val families = VkQueueFamilyProperties.calloc(count[0], stack)
+      vkGetPhysicalDeviceQueueFamilyProperties(candidate, count, families)
+      val present = stack.mallocInt(1)
+      for (index in 0..<families.capacity()) {
+        val family = families[index]
+        if ((family.queueFlags() and VK_QUEUE_GRAPHICS_BIT) == 0) {
+          continue
+        }
+        check(
+          vkGetPhysicalDeviceSurfaceSupportKHR(candidate, index, surface, present),
+          "vkGetPhysicalDeviceSurfaceSupportKHR",
+        )
+        if (present[0] != 0) {
+          return index
+        }
       }
     }
     return -1
@@ -207,7 +209,7 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
     MemoryStack.stackPush().use { stack ->
       val extensions = LinkedHashSet<String>()
       extensions.add(VK_KHR_SWAPCHAIN_EXTENSION_NAME)
-      val deviceExtensions = deviceExtensions(stack, physicalDevice())
+      val deviceExtensions = deviceExtensions(physicalDevice())
       check(VK_KHR_SWAPCHAIN_EXTENSION_NAME in deviceExtensions) {
         "Selected Vulkan device does not support VK_KHR_swapchain"
       }
@@ -291,22 +293,27 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       }
     }
 
-    private fun instanceExtensions(stack: MemoryStack): Set<String> {
-      val count = stack.mallocInt(1)
-      check(
-        vkEnumerateInstanceExtensionProperties(null as String?, count, null),
-        "vkEnumerateInstanceExtensionProperties(count)",
-      )
-      val props = VkExtensionProperties.calloc(count[0], stack)
-      check(
-        vkEnumerateInstanceExtensionProperties(null as String?, count, props),
-        "vkEnumerateInstanceExtensionProperties",
-      )
-      val names = LinkedHashSet<String>()
-      for (prop in props) {
-        names.add(prop.extensionNameString())
+    // Enumeration helpers that return heap values push their own frame so callers can invoke them
+    // once per physical device without the intermediate buffers piling up on a single stack frame.
+
+    private fun instanceExtensions(): Set<String> {
+      MemoryStack.stackPush().use { stack ->
+        val count = stack.mallocInt(1)
+        check(
+          vkEnumerateInstanceExtensionProperties(null as String?, count, null),
+          "vkEnumerateInstanceExtensionProperties(count)",
+        )
+        val props = VkExtensionProperties.calloc(count[0], stack)
+        check(
+          vkEnumerateInstanceExtensionProperties(null as String?, count, props),
+          "vkEnumerateInstanceExtensionProperties",
+        )
+        val names = LinkedHashSet<String>()
+        for (prop in props) {
+          names.add(prop.extensionNameString())
+        }
+        return names
       }
-      return names
     }
 
     @Suppress("SENSELESS_COMPARISON")
@@ -316,22 +323,24 @@ internal class VulkanContext private constructor(private val window: Long) : Gra
       }
     }
 
-    private fun deviceExtensions(stack: MemoryStack, device: VkPhysicalDevice): Set<String> {
-      val count = stack.mallocInt(1)
-      check(
-        vkEnumerateDeviceExtensionProperties(device, null as String?, count, null),
-        "vkEnumerateDeviceExtensionProperties(count)",
-      )
-      val props = VkExtensionProperties.calloc(count[0], stack)
-      check(
-        vkEnumerateDeviceExtensionProperties(device, null as String?, count, props),
-        "vkEnumerateDeviceExtensionProperties",
-      )
-      val names = LinkedHashSet<String>()
-      for (prop in props) {
-        names.add(prop.extensionNameString())
+    private fun deviceExtensions(device: VkPhysicalDevice): Set<String> {
+      MemoryStack.stackPush().use { stack ->
+        val count = stack.mallocInt(1)
+        check(
+          vkEnumerateDeviceExtensionProperties(device, null as String?, count, null),
+          "vkEnumerateDeviceExtensionProperties(count)",
+        )
+        val props = VkExtensionProperties.calloc(count[0], stack)
+        check(
+          vkEnumerateDeviceExtensionProperties(device, null as String?, count, props),
+          "vkEnumerateDeviceExtensionProperties",
+        )
+        val names = LinkedHashSet<String>()
+        for (prop in props) {
+          names.add(prop.extensionNameString())
+        }
+        return names
       }
-      return names
     }
 
     private fun stringBuffer(stack: MemoryStack, values: Set<String>): PointerBuffer {

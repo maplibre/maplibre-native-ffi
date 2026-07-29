@@ -228,7 +228,7 @@ public sealed class CustomGeometrySourceTests
             {
                 break;
             }
-            runtime.RunOnce();
+            runtime.Pump(TimeSpan.Zero);
         }
 
         Assert.Equal(1, map.CustomGeometrySourceCountForTest);

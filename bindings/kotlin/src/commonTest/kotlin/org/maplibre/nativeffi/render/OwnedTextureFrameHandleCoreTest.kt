@@ -5,11 +5,13 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.error.MaplibreStatus
 
 class OwnedTextureFrameHandleCoreTest {
   @Test
   fun closeReleasesNativeThenLocalState() {
-    val core = OwnedTextureFrameHandleCore("TestFrameHandle", "test frame is closed")
+    val core = OwnedTextureFrameHandleCore("TestFrameHandle")
     var nativeReleases = 0
     var localReleases = 0
 
@@ -31,7 +33,7 @@ class OwnedTextureFrameHandleCoreTest {
 
   @Test
   fun liveOwnerNativeReleaseFailureLeavesLocalStateRetryable() {
-    val core = OwnedTextureFrameHandleCore("TestFrameHandle", "test frame is closed")
+    val core = OwnedTextureFrameHandleCore("TestFrameHandle")
     val failure = IllegalStateException("wrong thread")
     var nativeReleases = 0
     var localReleases = 0
@@ -56,7 +58,7 @@ class OwnedTextureFrameHandleCoreTest {
 
   @Test
   fun closedOwnerNativeReleaseFailureConsumesLocalState() {
-    val core = OwnedTextureFrameHandleCore("TestFrameHandle", "test frame is closed")
+    val core = OwnedTextureFrameHandleCore("TestFrameHandle")
     var localReleases = 0
 
     core.close(
@@ -70,18 +72,16 @@ class OwnedTextureFrameHandleCoreTest {
   }
 
   @Test
-  fun ensureOpenAndLeakReportUseConfiguredMessages() {
-    val core = OwnedTextureFrameHandleCore("TestFrameHandle", "test frame is closed")
+  fun closedFrameRejectsUseWithTheSharedReleasedHandleError() {
+    val core = OwnedTextureFrameHandleCore("TestFrameHandle")
     val leaks = mutableListOf<String>()
 
     core.reportLeak { leaks += it }
-    val error =
-      assertFailsWith<IllegalStateException> {
-        core.close(releaseNative = {}, ownerClosed = { false }, releaseLocal = {})
-        core.ensureOpen()
-      }
+    core.close(releaseNative = {}, ownerClosed = { false }, releaseLocal = {})
+    val error = assertFailsWith<InvalidStateException> { core.ensureOpen() }
 
-    assertEquals("test frame is closed", error.message)
+    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+    assertEquals("TestFrameHandle is already closed", error.diagnostic)
     assertEquals(
       listOf(
         "Leaked TestFrameHandle; close frame handles explicitly on the render session owner thread."

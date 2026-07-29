@@ -41,6 +41,12 @@ final class MetalGraphicsContext {
   }
 }
 
+/// The render session and its mode-specific resources.
+///
+/// Everything here belongs to the render loop thread. Attach records the
+/// calling thread as the session's owner for the session's lifetime, so this
+/// type is created, resized, rendered, and closed on the one thread that owns
+/// the Metal objects it draws with.
 @MainActor
 enum MetalRenderTarget {
   case ownedTexture(
@@ -54,28 +60,32 @@ enum MetalRenderTarget {
   )
   case nativeSurface(session: RenderSessionHandle)
 
+  /// Attaches a session against the map the runtime loop published.
+  ///
+  /// The attach reference is the only part of the map that crosses threads; the
+  /// map handle itself stays on the runtime loop.
   static func attach(
     mode: RenderTargetMode,
-    map: MapHandle,
+    attachRef: MapAttachRef,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
     switch mode {
     case .ownedTexture:
       return try attachOwnedTexture(
-        map: map,
+        attachRef: attachRef,
         graphics: graphics,
         viewport: viewport
       )
     case .borrowedTexture:
       return try attachBorrowedTexture(
-        map: map,
+        attachRef: attachRef,
         graphics: graphics,
         viewport: viewport
       )
     case .nativeSurface:
       return try attachNativeSurface(
-        map: map,
+        attachRef: attachRef,
         graphics: graphics,
         viewport: viewport
       )
@@ -113,6 +123,11 @@ enum MetalRenderTarget {
     }
   }
 
+  /// Renders the latest map update, reporting whether a frame was drawn.
+  ///
+  /// The map applies a new logical size on the runtime loop's next `pump`,
+  /// so this reports no update for a few iterations after attach or resize.
+  /// That is normal: the render loop keeps pacing and asks again.
   func renderUpdate() throws -> Bool {
     switch self {
     case let .ownedTexture(session, compositor):
@@ -142,6 +157,10 @@ enum MetalRenderTarget {
     }
   }
 
+  func finishFrame() throws {
+    // Metal surface and texture paths need no per-iteration host upkeep here.
+  }
+
   func close() throws {
     switch self {
     case let .ownedTexture(session, _):
@@ -154,14 +173,15 @@ enum MetalRenderTarget {
   }
 
   private static func attachOwnedTexture(
-    map: MapHandle,
+    attachRef: MapAttachRef,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let session = try map.attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
-      extent: viewport.extent,
-      context: graphics.contextDescriptor
-    ))
+    let session =
+      try attachRef.attachMetalOwnedTexture(MetalOwnedTextureDescriptor(
+        extent: viewport.extent,
+        context: graphics.contextDescriptor
+      ))
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
       return .ownedTexture(session: session, compositor: compositor)
@@ -172,7 +192,7 @@ enum MetalRenderTarget {
   }
 
   private static func attachBorrowedTexture(
-    map: MapHandle,
+    attachRef: MapAttachRef,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
@@ -180,7 +200,7 @@ enum MetalRenderTarget {
       graphics: graphics,
       viewport: viewport
     )
-    let session = try map
+    let session = try attachRef
       .attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
         extent: viewport.extent,
         physicalWidth: viewport.physicalWidth,
@@ -201,11 +221,11 @@ enum MetalRenderTarget {
   }
 
   private static func attachNativeSurface(
-    map: MapHandle,
+    attachRef: MapAttachRef,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let session = try map.attachMetalSurface(MetalSurfaceDescriptor(
+    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
       extent: viewport.extent,
       context: graphics.contextDescriptor,
       layer: graphics.layerPointer

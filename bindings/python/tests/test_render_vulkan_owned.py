@@ -13,6 +13,7 @@ from maplibre_native import camera, geo, json, query, render
 from render_backend_helpers.runtime import (
     EMPTY_STYLE_JSON,
     assert_cluster_feature_extensions,
+    assert_typed_geojson_cluster_source,
     skip_or_fail_fixture_setup,
 )
 
@@ -113,7 +114,7 @@ def wait_for_texture_info(
     fixture.map.set_style_json(EMPTY_STYLE_JSON)
     request_still_image_if_needed(fixture.map)
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -136,7 +137,7 @@ def wait_for_vulkan_frame(
     request_still_image_if_needed(fixture.map)
     last_frame: render.VulkanOwnedTextureFrame | None = None
     for _ in range(iterations):
-        fixture.runtime.run_once()
+        fixture.runtime.pump()
         while event := fixture.runtime.poll_event():
             if event.event_type == mln.RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE:
                 try:
@@ -180,6 +181,20 @@ def test_attach_returns_public_render_session_and_rejects_second_session(
     assert not session.closed
 
 
+def test_detached_session_leaves_the_map_free_to_close(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    session = vulkan_owned_session.session
+
+    assert_invalid_state(vulkan_owned_session.map.close)
+
+    detached = session.detach()
+    vulkan_owned_session.map.close()
+    detached.close()
+
+    assert session.closed
+
+
 def test_render_update_without_pending_update_reports_false_and_keeps_session_live(
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
@@ -195,6 +210,11 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
     vulkan_owned_session.render_once()
 
     vulkan_owned_session.session.resize(16, 8, 2.0)
+    # The map applies the new logical size on its next pump, and a static map
+    # renders only on request. Requesting the still image before the size lands
+    # spends it on an update the session's size gate discards, and nothing
+    # publishes another, so pump the resize through first.
+    vulkan_owned_session.runtime.pump()
     frame = wait_for_vulkan_frame(
         vulkan_owned_session,
         lambda info: (
@@ -209,6 +229,85 @@ def test_resize_updates_vulkan_owned_texture_frame_extent(
         assert info.generation >= 2
     finally:
         frame.close()
+
+
+def test_map_size_follows_attach_and_resize_and_keeps_the_creation_scale_factor(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    # The fixture creates a 64x64 map at scale factor 1.0 and attaches a 32x16
+    # target. A session enqueues the map size for the map's owner thread rather
+    # than setting it in place, because the session may be owned by another
+    # thread, so the map keeps its previous size until the runtime is pumped.
+    assert vulkan_owned_session.map.get_size() == (64, 64, pytest.approx(1.0))
+    vulkan_owned_session.runtime.pump()
+    assert vulkan_owned_session.map.get_size() == (32, 16, pytest.approx(1.0))
+
+    # Resizing at a different scale factor leaves the map's own pixel ratio.
+    vulkan_owned_session.session.resize(48, 24, 2.0)
+    vulkan_owned_session.runtime.pump()
+    assert vulkan_owned_session.map.get_size() == (48, 24, pytest.approx(1.0))
+
+
+def test_a_worker_thread_attaches_its_own_session_and_renders() -> None:
+    """Spec coverage: BND-193, BND-195.
+
+    A session is owned by the thread that attaches it, so a worker thread can
+    attach and drive its own session against a map owned by the main thread.
+    """
+    import threading
+
+    if not mln.supported_render_backends() & mln.RenderBackend.VULKAN:
+        pytest.skip("native library does not support Vulkan render sessions")
+    try:
+        context = VulkanContext.create()
+    except VulkanUnavailableError as error:
+        pytest.skip(f"Vulkan fixture creation is unavailable: {error}")
+
+    runtime = mln.RuntimeHandle()
+    failure: list[BaseException] = []
+    rendered: list[bool] = []
+
+    def attach_render_close(map_handle: mln.MapHandle) -> None:
+        try:
+            session = map_handle.attach_vulkan_owned_texture(
+                context.owned_texture_descriptor(32, 16, 1.0)
+            )
+            try:
+                # The map applies its logical size on its own thread, so the
+                # first renders report no frame until the main thread pumps.
+                deadline = time.monotonic() + 5.0
+                while time.monotonic() < deadline:
+                    if session.render_update():
+                        rendered.append(True)
+                        break
+                    time.sleep(0.002)
+            finally:
+                # Closing here proves the session is destroyed on the thread
+                # that attached it, which is what frees the map to close.
+                session.close()
+        except BaseException as error:  # noqa: BLE001
+            failure.append(error)
+
+    try:
+        map_handle = runtime.create_map(mln.MapOptions(width=64, height=64))
+        try:
+            map_handle.set_style_json(EMPTY_STYLE_JSON)
+            worker = threading.Thread(target=attach_render_close, args=(map_handle,))
+            worker.start()
+            while worker.is_alive():
+                # A short park rather than zero: this waits on the worker, so
+                # spinning would burn the deadline before it made progress.
+                runtime.pump(0.002)
+                while runtime.poll_event():
+                    pass
+            worker.join()
+            assert not failure, failure
+            assert rendered, "worker thread should render the map"
+        finally:
+            map_handle.close()
+    finally:
+        runtime.close()
+        context.close()
 
 
 def test_cpu_readback_metadata_capacity_and_reusable_buffer(
@@ -437,6 +536,16 @@ def test_cluster_feature_extension_queries_resolve_unsigned_cluster_id_and_limit
     vulkan_owned_session: VulkanOwnedSession,
 ) -> None:
     assert_cluster_feature_extensions(
+        vulkan_owned_session.runtime,
+        vulkan_owned_session.map,
+        vulkan_owned_session.session,
+    )
+
+
+def test_typed_geojson_source_options_cluster_nearby_points(
+    vulkan_owned_session: VulkanOwnedSession,
+) -> None:
+    assert_typed_geojson_cluster_source(
         vulkan_owned_session.runtime,
         vulkan_owned_session.map,
         vulkan_owned_session.session,

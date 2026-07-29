@@ -31,6 +31,9 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
 import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.geo.FeatureIdentifier
+import org.maplibre.nativeffi.geo.GeoJson
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenBox
 import org.maplibre.nativeffi.geo.ScreenPoint
@@ -47,6 +50,7 @@ import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import platform.CoreGraphics.CGSizeMake
 import platform.Metal.MTLCreateSystemDefaultDevice
 import platform.Metal.MTLDeviceProtocol
@@ -131,6 +135,9 @@ class RenderSessionHandleTest {
             )
           )
         try {
+          val featureCoordinate = LatLng(37.7749, -122.4194)
+          // Rendered box queries clip to the viewport, so put the fixture feature on screen.
+          map.jumpTo(CameraOptions().apply { center = featureCoordinate })
           assertSame(map, session.map())
           assertFailsWith<InvalidStateException> { session.textureImageInfo() }
           assertFailsWith<InvalidStateException> {
@@ -189,7 +196,7 @@ class RenderSessionHandleTest {
             assertEquals(info.byteLength.toInt(), buffer.toByteArray().size)
           }
 
-          val queryPoint = map.pixelForLatLng(LatLng(37.7749, -122.4194))
+          val queryPoint = map.pixelForLatLng(featureCoordinate)
           val queryGeometry =
             RenderedQueryGeometry.Box(
               ScreenBox(
@@ -317,7 +324,12 @@ class RenderSessionHandleTest {
           assertTrue(frameHandle.isClosed)
           assertFailsWith<IllegalStateException> { frame.width() }
 
+          // Resizing hands the new logical size to the map's owner thread, so
+          // the map publishes an update matching the new target only once
+          // pumped.
           session.resize(16, 8, 2.0)
+          assertFalse(session.renderUpdate())
+          runtime.pump(0)
           assertTrue(session.renderUpdate())
           session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
@@ -461,6 +473,8 @@ class RenderSessionHandleTest {
             }
           )
           map.setStyleJson(CLUSTER_STYLE_JSON)
+          map.addGeoJsonSourceData("cluster-source", clusterPoints(), clusterSourceOptions())
+          map.addStyleLayerJson(clusterCircleLayer(), "")
           assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
           assertTrue(session.renderUpdate())
 
@@ -483,6 +497,12 @@ class RenderSessionHandleTest {
           // feature must keep the unsigned alternative to resolve on the way
           // back in.
           assertTrue(member(cluster, "cluster_id") is JsonValue.UInt)
+
+          // The rendered cluster exists only because the typed GeoJSON adder
+          // passed GeoJsonSourceOptions.cluster, and weightSum comes from the
+          // clusterProperties aggregation lowered through the same options.
+          assertEquals(3.0, numericMember(cluster, "point_count"))
+          assertEquals(6.0, numericMember(cluster, "weightSum"))
 
           val children =
             featureCollectionResult(
@@ -560,7 +580,7 @@ class RenderSessionHandleTest {
     eventType: RuntimeEventType,
   ): Boolean {
     repeat(10_000) {
-      runtime.runOnce()
+      runtime.pump(0)
       while (true) {
         val event = runtime.pollEvent() ?: break
         if (event.type == eventType && event.mapSource == map) return true
@@ -590,7 +610,7 @@ class RenderSessionHandleTest {
     map: MapHandle,
     session: RenderSessionHandle,
   ) {
-    runtime.runOnce()
+    runtime.pump(0)
     repeat(100) {
       val event = runtime.pollEvent() ?: return
       if (event.type == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE && event.mapSource == map) {
@@ -628,6 +648,78 @@ class RenderSessionHandleTest {
     assertEquals(1, leaves.size)
     return leaves.first()
   }
+
+  /** Point features close enough together to collapse into one cluster at zoom 0. */
+  private fun clusterPoints(): GeoJson =
+    GeoJson.FeatureCollection(
+      listOf(clusterPoint("one", 0.0), clusterPoint("two", 0.001), clusterPoint("three", 0.002))
+    )
+
+  private fun clusterPoint(name: String, offset: Double): Feature =
+    Feature(
+      Geometry.Point(LatLng(offset, offset)),
+      listOf(
+        JsonValue.Member("name", JsonValue.StringValue(name)),
+        JsonValue.Member("weight", JsonValue.UInt(2)),
+      ),
+      FeatureIdentifier.Null,
+    )
+
+  private fun clusterSourceOptions(): GeoJsonSourceOptions =
+    GeoJsonSourceOptions().apply {
+      cluster = true
+      clusterRadius = 50
+      clusterMaxZoom = 14.0
+      clusterMinPoints = 2
+      clusterProperties =
+        JsonValue.ObjectValue(
+          listOf(
+            JsonValue.Member(
+              "weightSum",
+              JsonValue.Array(
+                listOf(
+                  JsonValue.StringValue("+"),
+                  JsonValue.Array(
+                    listOf(JsonValue.StringValue("get"), JsonValue.StringValue("weight"))
+                  ),
+                )
+              ),
+            )
+          )
+        )
+    }
+
+  private fun clusterCircleLayer(): JsonValue =
+    JsonValue.ObjectValue(
+      listOf(
+        JsonValue.Member("id", JsonValue.StringValue("cluster-circle")),
+        JsonValue.Member("type", JsonValue.StringValue("circle")),
+        JsonValue.Member("source", JsonValue.StringValue("cluster-source")),
+        JsonValue.Member(
+          "filter",
+          JsonValue.Array(
+            listOf(JsonValue.StringValue("has"), JsonValue.StringValue("point_count"))
+          ),
+        ),
+        JsonValue.Member(
+          "paint",
+          JsonValue.ObjectValue(
+            listOf(
+              JsonValue.Member("circle-color", JsonValue.StringValue("#2563eb")),
+              JsonValue.Member("circle-radius", JsonValue.UInt(20)),
+            )
+          ),
+        ),
+      )
+    )
+
+  private fun numericMember(feature: QueriedFeature, key: String): Double? =
+    when (val value = member(feature, key)) {
+      is JsonValue.UInt -> value.value.toDouble()
+      is JsonValue.Int -> value.value.toDouble()
+      is JsonValue.DoubleValue -> value.value
+      else -> null
+    }
 
   private fun member(feature: Feature, key: String): JsonValue? =
     feature.properties.firstOrNull { it.key == key }?.value
@@ -751,28 +843,18 @@ class RenderSessionHandleTest {
       }
       """
 
+    /**
+     * The clustered source and its layer are added afterwards through the typed GeoJSON adder, so
+     * clustering comes from [GeoJsonSourceOptions] rather than from style JSON.
+     */
     private const val CLUSTER_STYLE_JSON =
       """
       {
         "version": 8,
         "name": "kotlin-cluster-query-test",
-        "sources": {
-          "cluster-source": {
-            "type": "geojson",
-            "cluster": true,
-            "data": {
-              "type": "FeatureCollection",
-              "features": [
-                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.0, 0.0]}, "properties": {"name": "one"}},
-                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.001, 0.001]}, "properties": {"name": "two"}},
-                {"type": "Feature", "geometry": {"type": "Point", "coordinates": [0.002, 0.002]}, "properties": {"name": "three"}}
-              ]
-            }
-          }
-        },
+        "sources": {},
         "layers": [
-          {"id": "background", "type": "background", "paint": {"background-color": "#ffffff"}},
-          {"id": "cluster-circle", "type": "circle", "source": "cluster-source", "filter": ["has", "point_count"], "paint": {"circle-color": "#2563eb", "circle-radius": 20}}
+          {"id": "background", "type": "background", "paint": {"background-color": "#ffffff"}}
         ]
       }
       """

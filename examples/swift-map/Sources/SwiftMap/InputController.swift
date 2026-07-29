@@ -6,6 +6,15 @@ private let resetAnimationDurationMS = 220.0
 private let preciseScrollDeltaDivisor = 10.0
 private let maxScrollDeltaPerEvent = 4.0
 
+/// Decodes host input into camera commands.
+///
+/// This runs on the render loop, which does not own the map, so it only
+/// produces commands; the runtime loop applies them on the map's owner thread.
+/// Anything needing the current viewport is converted to logical map
+/// coordinates here, where the viewport lives.
+///
+/// Every handler returns whether the camera changed, so the render loop can set
+/// the render request.
 @MainActor
 final class InputController {
   enum DragMode {
@@ -17,17 +26,19 @@ final class InputController {
   private var dragMode = DragMode.none
   private var lastLocation = CGPoint.zero
 
-  func mouseDown(_ event: NSEvent, map: MapHandle) throws -> Bool {
+  func mouseDown(_ event: NSEvent, commands: Channels) -> Bool {
     lastLocation = event.locationInWindow
     dragMode = event.modifierFlags.contains(.control) ? .rotate : .pan
-    try map.cancelTransitions()
+    // Queued ahead of the drag's own commands, so the transition stops before
+    // the first delta lands.
+    commands.push(.cancelTransitions)
     return false
   }
 
-  func rightMouseDown(_ event: NSEvent, map: MapHandle) throws -> Bool {
+  func rightMouseDown(_ event: NSEvent, commands: Channels) -> Bool {
     lastLocation = event.locationInWindow
     dragMode = .rotate
-    try map.cancelTransitions()
+    commands.push(.cancelTransitions)
     return false
   }
 
@@ -37,7 +48,7 @@ final class InputController {
     return false
   }
 
-  func mouseDragged(_ event: NSEvent, map: MapHandle) throws -> Bool {
+  func mouseDragged(_ event: NSEvent, commands: Channels) -> Bool {
     let location = event.locationInWindow
     let dx = Double(location.x - lastLocation.x)
     let dy = Double(lastLocation.y - location.y)
@@ -48,17 +59,17 @@ final class InputController {
       return false
     case .pan:
       if dx == 0 && dy == 0 { return false }
-      try map.moveBy(deltaX: dx, deltaY: dy)
+      commands.push(.moveBy(dx: dx, dy: dy))
     case .rotate:
       if dx == 0 && dy == 0 { return false }
-      try adjustBearing(map, dx * 0.5)
-      try adjustPitch(map, -dy * 0.5)
+      commands.push(.adjustBearing(delta: dx * 0.5))
+      commands.push(.adjustPitch(delta: -dy * 0.5))
     }
     return true
   }
 
-  func scrollWheel(_ event: NSEvent, map: MapHandle,
-                   in view: NSView) throws -> Bool
+  func scrollWheel(_ event: NSEvent, commands: Channels,
+                   in view: NSView) -> Bool
   {
     let delta = scrollDelta(event)
     if delta == 0 { return false }
@@ -69,12 +80,12 @@ final class InputController {
       y: Double(view.bounds.height - location.y)
     )
     let scale = pow(2.0, delta * 0.25)
-    try map.scaleBy(scale, anchor: anchor)
+    commands.push(.scaleBy(scale: scale, anchor: anchor))
     return true
   }
 
-  func keyDown(_ event: NSEvent, map: MapHandle,
-               viewport: Viewport) throws -> Bool
+  func keyDown(_ event: NSEvent, commands: Channels,
+               viewport: Viewport) -> Bool
   {
     let panStep = 120.0
     let zoomStep = 1.25
@@ -89,79 +100,50 @@ final class InputController {
 
     switch event.keyCode {
     case 123, 0:
-      try map.moveBy(deltaX: panStep, deltaY: 0, animation: animation)
+      commands.push(.moveByAnimated(dx: panStep, dy: 0, animation: animation))
     case 124, 2:
-      try map.moveBy(deltaX: -panStep, deltaY: 0, animation: animation)
+      commands.push(.moveByAnimated(dx: -panStep, dy: 0, animation: animation))
     case 126, 13:
-      try map.moveBy(deltaX: 0, deltaY: panStep, animation: animation)
+      commands.push(.moveByAnimated(dx: 0, dy: panStep, animation: animation))
     case 125, 1:
-      try map.moveBy(deltaX: 0, deltaY: -panStep, animation: animation)
+      commands.push(.moveByAnimated(dx: 0, dy: -panStep, animation: animation))
     case 24, 69:
-      try map.scaleBy(zoomStep, anchor: center, animation: animation)
+      commands.push(.scaleByAnimated(
+        scale: zoomStep,
+        anchor: center,
+        animation: animation
+      ))
     case 27, 78:
-      try map.scaleBy(1.0 / zoomStep, anchor: center, animation: animation)
+      commands.push(.scaleByAnimated(
+        scale: 1.0 / zoomStep,
+        anchor: center,
+        animation: animation
+      ))
     case 12:
-      try adjustBearingAnimated(map, -bearingStep, animation: animation)
+      commands
+        .push(.adjustBearingAnimated(
+          delta: -bearingStep,
+          animation: animation
+        ))
     case 14:
-      try adjustBearingAnimated(map, bearingStep, animation: animation)
+      commands
+        .push(.adjustBearingAnimated(delta: bearingStep, animation: animation))
     case 30:
-      try adjustPitchAnimated(map, pitchStep, animation: animation)
+      commands
+        .push(.adjustPitchAnimated(delta: pitchStep, animation: animation))
     case 33:
-      try adjustPitchAnimated(map, -pitchStep, animation: animation)
+      commands
+        .push(.adjustPitchAnimated(delta: -pitchStep, animation: animation))
     case 29:
-      try resetPitchAndBearingAnimated(
-        map,
+      commands.push(.resetOrientation(
         animation: AnimationOptions(
           durationMilliseconds: resetAnimationDurationMS
         )
-      )
+      ))
     default:
       return false
     }
     return true
-  }
-
-  private func adjustBearing(_ map: MapHandle, _ delta: Double) throws {
-    let current = try map.camera()
-    try map.jump(to: CameraOptions(bearing: (current.bearing ?? 0) + delta))
-  }
-
-  private func adjustBearingAnimated(
-    _ map: MapHandle,
-    _ delta: Double,
-    animation: AnimationOptions
-  ) throws {
-    let current = try map.camera()
-    try map.ease(
-      to: CameraOptions(bearing: (current.bearing ?? 0) + delta),
-      animation: animation
-    )
-  }
-
-  private func adjustPitch(_ map: MapHandle, _ delta: Double) throws {
-    let current = try map.camera()
-    try map
-      .jump(to: CameraOptions(pitch: clampedPitch((current.pitch ?? 0) +
-          delta)))
-  }
-
-  private func adjustPitchAnimated(
-    _ map: MapHandle,
-    _ delta: Double,
-    animation: AnimationOptions
-  ) throws {
-    let current = try map.camera()
-    try map.ease(
-      to: CameraOptions(pitch: clampedPitch((current.pitch ?? 0) + delta)),
-      animation: animation
-    )
-  }
-
-  private func resetPitchAndBearingAnimated(
-    _ map: MapHandle,
-    animation: AnimationOptions
-  ) throws {
-    try map.ease(to: CameraOptions(bearing: 0, pitch: 0), animation: animation)
   }
 
   private func scrollDelta(_ event: NSEvent) -> Double {
@@ -170,9 +152,5 @@ final class InputController {
       .hasPreciseScrollingDeltas ? rawDelta / preciseScrollDeltaDivisor :
       rawDelta
     return min(max(wheelDelta, -maxScrollDeltaPerEvent), maxScrollDeltaPerEvent)
-  }
-
-  private func clampedPitch(_ pitch: Double) -> Double {
-    min(max(pitch, 0.0), 60.0)
   }
 }

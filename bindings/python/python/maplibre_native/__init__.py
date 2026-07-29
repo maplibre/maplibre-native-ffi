@@ -27,6 +27,8 @@ from .render import (
     RenderBackend,
 )
 from .runtime import (
+    CameraChangeMode,
+    CameraTransitionFinishedPayload,
     NetworkStatus,
     RenderFramePayload,
     RenderMapPayload,
@@ -44,10 +46,13 @@ from .runtime import (
     TileId,
     TileOperation,
     UnknownRuntimeEventPayload,
+    WakeSource,
 )
 
 __all__ = [
     "EXPECTED_C_ABI_VERSION",
+    "CameraChangeMode",
+    "CameraTransitionFinishedPayload",
     "FrameOpenGLTextureName",
     "InvalidArgumentError",
     "InvalidStateError",
@@ -79,6 +84,7 @@ __all__ = [
     "UnknownRuntimeEventPayload",
     "UnknownStatusError",
     "UnsupportedFeatureError",
+    "WakeSource",
     "WrongThreadError",
     "c_version",
     "network_status",

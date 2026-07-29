@@ -56,6 +56,7 @@ val extractRustlsPlatformVerifierAndroidJar =
 kotlin {
   iosArm64()
   iosSimulatorArm64()
+  linuxX64()
   macosArm64()
 
   jvmToolchain(libs.versions.java.toolchain.get().toInt())
@@ -150,6 +151,7 @@ canonicalizeKmpRootMetadata(
       "iosArm64" to "$mavenArtifact-iosarm64",
       "iosSimulatorArm64" to "$mavenArtifact-iossimulatorarm64",
       "jvm" to "$mavenArtifact-jvm",
+      "linuxX64" to "$mavenArtifact-linuxx64",
       "macosArm64" to "$mavenArtifact-macosarm64",
     ),
 )
@@ -210,12 +212,27 @@ tasks.named<Test>("jvmTest") {
   }
 }
 
+// AGP's KMP library plugin registers no lint variant, so `NewApi` never runs for
+// androidMain. This task stands in for it, and lives on the Gradle graph rather
+// than only on the mise wrapper so a direct Gradle invocation is covered too.
+val checkAndroidApiFloor =
+  tasks.register<Exec>("checkAndroidApiFloor") {
+    group = "verification"
+    description = "Verifies androidMain bytecode stays on the android-minSdk floor."
+    dependsOn("compileAndroidMain", "compileAndroidMainJavaWithJavac")
+    workingDir = rootProject.layout.projectDirectory.asFile
+    commandLine(
+      rootProject.layout.projectDirectory.file(".mise/tasks/kotlin/check-android-api-floor").asFile
+    )
+  }
+
 tasks.register("androidBuild") {
   group = "build"
   description = "Builds the Android binding and selected native runtime AAR."
   dependsOn(
     "packageAndroidNativeLibraries",
     "assembleAndroidMain",
+    checkAndroidApiFloor,
     ":bindings:kotlin-runtime-$androidBackend:assembleAndroidMain",
   )
 }

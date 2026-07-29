@@ -54,12 +54,21 @@ impl<T> ThreadAffineNativeHandle<T> {
 impl<T> Drop for ThreadAffineNativeHandle<T> {
     fn drop(&mut self) {
         // Drop keeps Rust's owner-thread behavior while delegating close-once
-        // state tracking to core. Drop cannot report errors, so it ignores
-        // non-OK statuses and never panics; failed closes leave the pointer live
-        // until process teardown, matching the previous Rust policy.
+        // state tracking to core. It cannot return an error and must not panic,
+        // so a refused destroy leaves the pointer live and is reported through
+        // the leak channel instead of being discarded. The common cause is
+        // dropping a map that still has a render session attached: the C API
+        // refuses that destroy, and the native map would otherwise be
+        // unreachable with its runtime pinned live.
+        let address = self.state.as_ptr() as usize;
         // SAFETY: from_raw binds this Rust handle to the matching C API destroy
         // function for its owned native pointer.
-        let _ = unsafe { self.state.close_status(self.destroy) };
+        if unsafe { self.state.close_status(self.destroy) }.is_err() {
+            maplibre_core::handle::report_leak(maplibre_core::handle::NativeHandleLeak {
+                type_name: self.state.type_name(),
+                address,
+            });
+        }
     }
 }
 

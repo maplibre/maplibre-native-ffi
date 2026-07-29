@@ -40,6 +40,12 @@ final class MetalGraphicsContext {
   }
 }
 
+/// The render session for the host `CAMetalLayer`.
+///
+/// Everything here belongs to the render loop thread. Attach records the
+/// calling thread as the session's owner for the session's lifetime, so this
+/// type is created, resized, rendered, and closed on the one thread that owns
+/// the view and its layer.
 @MainActor
 final class MetalRenderTarget {
   private let session: RenderSessionHandle
@@ -48,12 +54,16 @@ final class MetalRenderTarget {
     self.session = session
   }
 
+  /// Attaches a session against the map the runtime loop published.
+  ///
+  /// The attach reference is the only part of the map that crosses threads; the
+  /// map handle itself stays on the runtime loop.
   static func attach(
-    map: MapHandle,
+    attachRef: MapAttachRef,
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let session = try map.attachMetalSurface(MetalSurfaceDescriptor(
+    let session = try attachRef.attachMetalSurface(MetalSurfaceDescriptor(
       extent: viewport.extent,
       context: graphics.contextDescriptor,
       layer: graphics.layerPointer
@@ -69,8 +79,17 @@ final class MetalRenderTarget {
     )
   }
 
+  /// Renders the latest map update, reporting whether a frame was drawn.
+  ///
+  /// The map applies a new logical size on the runtime loop's next `pump`,
+  /// so this reports no update for a few iterations after attach or resize.
+  /// That is normal: the render loop keeps pacing and asks again.
   func renderUpdate() throws -> Bool {
     try session.renderUpdate()
+  }
+
+  func finishFrame() throws {
+    // The Metal surface path needs no per-iteration host upkeep here.
   }
 
   func close() throws {

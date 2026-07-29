@@ -16,6 +16,7 @@
     "**/*.lock.yml",
     "uv.lock",
     "Cargo.lock",
+    "src/platform/rust/about.hbs",
     "gradlew",
     "gradlew.bat",
     "**/*.g.cs",
@@ -54,7 +55,7 @@
         "command": "bash .mise/bin/dprint-csharpier {{file_path}}",
         "cwd": "${configDir}",
         "exts": ["cs"],
-        "cacheKeyFiles": ["dotnet-tools.json"],
+        "cacheKeyFiles": [".config/dotnet-tools.json"],
       },
       { "command": "bash .mise/bin/dprint-zig fmt --stdin", "exts": ["zig"] },
       {

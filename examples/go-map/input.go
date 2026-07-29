@@ -34,39 +34,37 @@ func logControls() {
   0: reset pitch and bearing`)
 }
 
-func (input *inputController) handleEvent(event *sdl.Event, m *maplibre.MapHandle, v viewport) (bool, error) {
+func (input *inputController) handleEvent(event *sdl.Event, commands chan<- cameraCommand, v viewport) bool {
 	switch event.Type() {
 	case sdl.EventMouseButtonDown:
-		return input.handleMouseButtonDown(event.MouseButton(), m, v)
+		return input.handleMouseButtonDown(event.MouseButton(), commands, v)
 	case sdl.EventMouseButtonUp:
-		return input.handleMouseButtonUp(event.MouseButton(), v), nil
+		return input.handleMouseButtonUp(event.MouseButton(), v)
 	case sdl.EventMouseMotion:
-		return input.handleMouseMotion(event.MouseMotion(), m, v)
+		return input.handleMouseMotion(event.MouseMotion(), commands, v)
 	case sdl.EventMouseWheel:
-		return handleMouseWheel(event.MouseWheel(), m, v)
+		return handleMouseWheel(event.MouseWheel(), commands, v)
 	case sdl.EventKeyDown:
-		return handleKeyDown(event.Keyboard(), m, v)
+		return handleKeyDown(event.Keyboard(), commands, v)
 	default:
-		return false, nil
+		return false
 	}
 }
 
-func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, m *maplibre.MapHandle, v viewport) (bool, error) {
+func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands chan<- cameraCommand, v viewport) bool {
 	if event == nil {
-		return false, nil
+		return false
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
 	mode := dragModeForButton(event.Button)
 	if mode == dragNone {
-		return false, nil
+		return false
 	}
-	if err := m.CancelTransitions(); err != nil {
-		return false, fmt.Errorf("cancel camera transitions failed: %w", err)
-	}
+	commands <- cameraCommand{kind: commandCancelTransitions}
 	input.dragMode = mode
-	return false, nil
+	return true
 }
 
 func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, v viewport) bool {
@@ -80,9 +78,9 @@ func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, v
 	return false
 }
 
-func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, m *maplibre.MapHandle, v viewport) (bool, error) {
+func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands chan<- cameraCommand, v viewport) bool {
 	if event == nil || input.dragMode == dragNone {
-		return false, nil
+		return false
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	dx := cursor.X - input.lastX
@@ -90,39 +88,31 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, m *
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
 	if dx == 0 && dy == 0 {
-		return false, nil
+		return false
 	}
 
 	switch input.dragMode {
 	case dragPan:
-		if err := m.MoveBy(maplibre.ScreenPoint{X: dx, Y: dy}); err != nil {
-			return false, fmt.Errorf("camera pan failed: %w", err)
-		}
+		commands <- cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy}
 	case dragRotate:
-		if err := adjustBearing(m, dx*0.5); err != nil {
-			return false, err
-		}
-		if err := m.PitchBy(dy * 0.5); err != nil {
-			return false, fmt.Errorf("camera pitch failed: %w", err)
-		}
+		commands <- cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5}
+		commands <- cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5}
 	}
-	return true, nil
+	return true
 }
 
-func handleMouseWheel(event *sdl.MouseWheelEvent, m *maplibre.MapHandle, v viewport) (bool, error) {
+func handleMouseWheel(event *sdl.MouseWheelEvent, commands chan<- cameraCommand, v viewport) bool {
 	if event == nil || event.Y == 0 {
-		return false, nil
+		return false
 	}
 	anchor := logicalPoint(float64(event.MouseX), float64(event.MouseY), v)
-	if err := m.ScaleBy(math.Pow(2, float64(event.Y)*0.25), &anchor); err != nil {
-		return false, fmt.Errorf("camera zoom failed: %w", err)
-	}
-	return true, nil
+	commands <- cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor}
+	return true
 }
 
-func handleKeyDown(event *sdl.KeyboardEvent, m *maplibre.MapHandle, v viewport) (bool, error) {
+func handleKeyDown(event *sdl.KeyboardEvent, commands chan<- cameraCommand, v viewport) bool {
 	if event == nil {
-		return false, nil
+		return false
 	}
 	const (
 		panStep     = 120.0
@@ -130,36 +120,37 @@ func handleKeyDown(event *sdl.KeyboardEvent, m *maplibre.MapHandle, v viewport) 
 		bearingStep = 10.0
 		pitchStep   = 5.0
 	)
-	animation := maplibre.AnimationOptions{}.WithDurationMS(160)
 	center := maplibre.ScreenPoint{X: float64(v.logicalWidth) / 2, Y: float64(v.logicalHeight) / 2}
+	command := cameraCommand{durationMS: 160}
 
 	switch event.Scancode {
 	case sdl.ScancodeLeft, sdl.ScancodeA:
-		return true, m.MoveByAnimated(maplibre.ScreenPoint{X: panStep}, &animation)
+		command.kind, command.deltaX = commandMoveByAnimated, panStep
 	case sdl.ScancodeRight, sdl.ScancodeD:
-		return true, m.MoveByAnimated(maplibre.ScreenPoint{X: -panStep}, &animation)
+		command.kind, command.deltaX = commandMoveByAnimated, -panStep
 	case sdl.ScancodeUp, sdl.ScancodeW:
-		return true, m.MoveByAnimated(maplibre.ScreenPoint{Y: panStep}, &animation)
+		command.kind, command.deltaY = commandMoveByAnimated, panStep
 	case sdl.ScancodeDown, sdl.ScancodeS:
-		return true, m.MoveByAnimated(maplibre.ScreenPoint{Y: -panStep}, &animation)
+		command.kind, command.deltaY = commandMoveByAnimated, -panStep
 	case sdl.ScancodeEquals, sdl.ScancodeKPPlus:
-		return true, m.ScaleByAnimated(zoomStep, &center, &animation)
+		command.kind, command.scale, command.anchor = commandScaleByAnimated, zoomStep, center
 	case sdl.ScancodeMinus, sdl.ScancodeKPMinus:
-		return true, m.ScaleByAnimated(1/zoomStep, &center, &animation)
+		command.kind, command.scale, command.anchor = commandScaleByAnimated, 1/zoomStep, center
 	case sdl.ScancodeQ:
-		return true, adjustBearingAnimated(m, -bearingStep, &animation)
+		command.kind, command.deltaX = commandAdjustBearingAnimated, -bearingStep
 	case sdl.ScancodeE:
-		return true, adjustBearingAnimated(m, bearingStep, &animation)
+		command.kind, command.deltaX = commandAdjustBearingAnimated, bearingStep
 	case sdl.ScancodeRightbracket:
-		return true, adjustPitchAnimated(m, pitchStep, &animation)
+		command.kind, command.deltaY = commandAdjustPitchAnimated, pitchStep
 	case sdl.ScancodeLeftbracket:
-		return true, adjustPitchAnimated(m, -pitchStep, &animation)
+		command.kind, command.deltaY = commandAdjustPitchAnimated, -pitchStep
 	case sdl.Scancode0:
-		resetAnimation := maplibre.AnimationOptions{}.WithDurationMS(160)
-		return true, m.EaseTo(maplibre.CameraOptions{}.WithBearing(0).WithPitch(0), &resetAnimation)
+		command.kind = commandResetOrientation
 	default:
-		return false, nil
+		return false
 	}
+	commands <- command
+	return true
 }
 
 func dragModeForButton(button byte) dragMode {
@@ -173,51 +164,6 @@ func dragModeForButton(button byte) dragMode {
 		return dragRotate
 	}
 	return dragPan
-}
-
-func adjustBearing(m *maplibre.MapHandle, delta float64) error {
-	camera, err := m.Camera()
-	if err != nil {
-		return fmt.Errorf("camera snapshot failed: %w", err)
-	}
-	current := 0.0
-	if camera.Bearing != nil {
-		current = *camera.Bearing
-	}
-	if err := m.JumpTo(maplibre.CameraOptions{}.WithBearing(current + delta)); err != nil {
-		return fmt.Errorf("camera rotate failed: %w", err)
-	}
-	return nil
-}
-
-func adjustBearingAnimated(m *maplibre.MapHandle, delta float64, animation *maplibre.AnimationOptions) error {
-	camera, err := m.Camera()
-	if err != nil {
-		return fmt.Errorf("camera snapshot failed: %w", err)
-	}
-	current := 0.0
-	if camera.Bearing != nil {
-		current = *camera.Bearing
-	}
-	if err := m.EaseTo(maplibre.CameraOptions{}.WithBearing(current+delta), animation); err != nil {
-		return fmt.Errorf("keyboard rotate failed: %w", err)
-	}
-	return nil
-}
-
-func adjustPitchAnimated(m *maplibre.MapHandle, delta float64, animation *maplibre.AnimationOptions) error {
-	camera, err := m.Camera()
-	if err != nil {
-		return fmt.Errorf("camera snapshot failed: %w", err)
-	}
-	current := 0.0
-	if camera.Pitch != nil {
-		current = *camera.Pitch
-	}
-	if err := m.EaseTo(maplibre.CameraOptions{}.WithPitch(clamp(current+delta, 0, 60)), animation); err != nil {
-		return fmt.Errorf("keyboard pitch failed: %w", err)
-	}
-	return nil
 }
 
 func logicalPoint(x, y float64, v viewport) maplibre.ScreenPoint {

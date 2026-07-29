@@ -2,7 +2,9 @@ package maplibre
 
 import (
 	"errors"
+	"math"
 	"testing"
+	"time"
 )
 
 func TestMapCameraCommandsUseNativeABI(t *testing.T) {
@@ -120,6 +122,186 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	}
 }
 
+// cameraTransitionTally summarizes the camera events queued since the last
+// drain.
+type cameraTransitionTally struct {
+	finishedIDs       []uint64
+	sawDidChange      bool
+	lastDidChangeCode int32
+}
+
+// drainCameraTransitionEvents polls the runtime until its event queue is empty
+// and reports the camera transition events it observed.
+func drainCameraTransitionEvents(t *testing.T, runtime *RuntimeHandle) cameraTransitionTally {
+	t.Helper()
+	var tally cameraTransitionTally
+	for {
+		event, err := runtime.PollEvent()
+		if err != nil {
+			t.Fatalf("PollEvent(): %v", err)
+		}
+		if event == nil {
+			return tally
+		}
+		switch event.Type {
+		case RuntimeEventMapCameraTransitionFinished:
+			if event.PayloadType != RuntimeEventPayloadCameraTransitionFinished {
+				t.Fatalf("transition-finished payload type = %v, want %v", event.PayloadType, RuntimeEventPayloadCameraTransitionFinished)
+			}
+			payload, ok := event.Payload.(RuntimeEventCameraTransitionFinishedPayload)
+			if !ok {
+				t.Fatalf("transition-finished payload type = %T, want RuntimeEventCameraTransitionFinishedPayload", event.Payload)
+			}
+			tally.finishedIDs = append(tally.finishedIDs, payload.TransitionID)
+		case RuntimeEventMapCameraDidChange:
+			tally.sawDidChange = true
+			tally.lastDidChangeCode = event.Code
+		}
+	}
+}
+
+func TestMapCameraTransitionIDReportsEachTerminalOutcomeOnce(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.CancelTransitions(); err != nil {
+			t.Errorf("CancelTransitions(): %v", err)
+		}
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	camera := CameraOptions{}.WithCenter(LatLng{Latitude: 1, Longitude: 2}).WithZoom(11)
+
+	// A zero-duration ease applies instantly, so it reports its end before the
+	// immediate did-change event it produced.
+	instant := AnimationOptions{}.WithDurationMS(0).WithTransitionID(7)
+	if err := m.EaseTo(camera, &instant); err != nil {
+		t.Fatalf("EaseTo(zero duration): %v", err)
+	}
+	tally := drainCameraTransitionEvents(t, runtime)
+	if len(tally.finishedIDs) != 1 || tally.finishedIDs[0] != 7 {
+		t.Fatalf("zero-duration ease finished IDs = %v, want [7]", tally.finishedIDs)
+	}
+	if !tally.sawDidChange || CameraChangeMode(tally.lastDidChangeCode) != CameraChangeModeImmediate {
+		t.Fatalf("zero-duration did-change code = %d, want %d", tally.lastDidChangeCode, CameraChangeModeImmediate)
+	}
+
+	// A running transition stays silent until something ends it.
+	running := AnimationOptions{}.WithDurationMS(5000).WithTransitionID(11)
+	if err := m.EaseTo(camera.WithZoom(12), &running); err != nil {
+		t.Fatalf("EaseTo(running transition): %v", err)
+	}
+	tally = drainCameraTransitionEvents(t, runtime)
+	if len(tally.finishedIDs) != 0 {
+		t.Fatalf("running transition finished IDs = %v, want none", tally.finishedIDs)
+	}
+
+	// A later camera command supersedes the running transition, which reports
+	// its end alongside an animated did-change event.
+	superseding := AnimationOptions{}.WithDurationMS(5000).WithTransitionID(12)
+	if err := m.EaseTo(camera.WithZoom(13), &superseding); err != nil {
+		t.Fatalf("EaseTo(superseding transition): %v", err)
+	}
+	tally = drainCameraTransitionEvents(t, runtime)
+	if len(tally.finishedIDs) != 1 || tally.finishedIDs[0] != 11 {
+		t.Fatalf("superseded transition finished IDs = %v, want [11]", tally.finishedIDs)
+	}
+	if !tally.sawDidChange || CameraChangeMode(tally.lastDidChangeCode) != CameraChangeModeAnimated {
+		t.Fatalf("superseded did-change code = %d, want %d", tally.lastDidChangeCode, CameraChangeModeAnimated)
+	}
+
+	// Cancellation ends the surviving transition, again exactly once.
+	if err := m.CancelTransitions(); err != nil {
+		t.Fatalf("CancelTransitions(): %v", err)
+	}
+	tally = drainCameraTransitionEvents(t, runtime)
+	if len(tally.finishedIDs) != 1 || tally.finishedIDs[0] != 12 {
+		t.Fatalf("cancelled transition finished IDs = %v, want [12]", tally.finishedIDs)
+	}
+
+	// Animation options that leave the transition ID absent stay silent.
+	silent := AnimationOptions{}.WithDurationMS(0)
+	if err := m.EaseTo(camera.WithZoom(14), &silent); err != nil {
+		t.Fatalf("EaseTo(absent transition ID): %v", err)
+	}
+	tally = drainCameraTransitionEvents(t, runtime)
+	if len(tally.finishedIDs) != 0 {
+		t.Fatalf("absent transition ID finished IDs = %v, want none", tally.finishedIDs)
+	}
+}
+
+func TestMapCameraTransitionIDReportsCompletionOnceWhenPumped(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.CancelTransitions(); err != nil {
+			t.Errorf("CancelTransitions(): %v", err)
+		}
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	camera := CameraOptions{}.WithCenter(LatLng{Latitude: 3, Longitude: 4}).WithZoom(6)
+	animation := AnimationOptions{}.WithDurationMS(50).WithTransitionID(21)
+	if err := m.EaseTo(camera, &animation); err != nil {
+		t.Fatalf("EaseTo(): %v", err)
+	}
+
+	// Advancing a transition needs the map to update, which a repaint request
+	// drives without touching the camera.
+	var finishedIDs []uint64
+	deadline := time.Now().Add(10 * time.Second)
+	for len(finishedIDs) == 0 && time.Now().Before(deadline) {
+		if err := m.RequestRepaint(); err != nil {
+			t.Fatalf("RequestRepaint(): %v", err)
+		}
+		tally := drainCameraTransitionEvents(t, runtime)
+		finishedIDs = append(finishedIDs, tally.finishedIDs...)
+		time.Sleep(time.Millisecond)
+	}
+	if len(finishedIDs) != 1 || finishedIDs[0] != 21 {
+		t.Fatalf("completed transition finished IDs = %v, want [21]", finishedIDs)
+	}
+
+	// The completed transition stays finished across further updates.
+	for range make([]struct{}, 50) {
+		if err := m.RequestRepaint(); err != nil {
+			t.Fatalf("RequestRepaint(): %v", err)
+		}
+		if tally := drainCameraTransitionEvents(t, runtime); len(tally.finishedIDs) != 0 {
+			t.Fatalf("repeated transition-finished IDs = %v, want none", tally.finishedIDs)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
 func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -184,9 +366,88 @@ func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Bounds(): %v", err)
 	}
-	if gotConstraints.Bounds == nil || *gotConstraints.Bounds != bounds {
-		t.Fatalf("Bounds().Bounds = %#v, want %#v", gotConstraints.Bounds, bounds)
+	if gotConstraints.Bounds == nil ||
+		gotConstraints.Bounds.Kind != BoundsConstraintBounded ||
+		gotConstraints.Bounds.Bounds != bounds {
+		t.Fatalf("Bounds().Bounds = %#v, want bounded %#v", gotConstraints.Bounds, bounds)
 	}
+}
+
+// The unbounded constraint is distinct from world bounds: an unbounded camera center pans across
+// the antimeridian, while world bounds clamp longitude to the -180..180 range.
+func TestMapBoundsSeparateUnboundedFromWorldBounds(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	constraintKind := func(want BoundsConstraintKind) {
+		t.Helper()
+		got, err := m.Bounds()
+		if err != nil {
+			t.Fatalf("Bounds(): %v", err)
+		}
+		if got.Bounds == nil || got.Bounds.Kind != want {
+			t.Fatalf("Bounds().Bounds = %#v, want kind %v", got.Bounds, want)
+		}
+	}
+	jumpedLongitude := func(longitude float64) float64 {
+		t.Helper()
+		camera := CameraOptions{}.
+			WithCenter(LatLng{Latitude: 0, Longitude: longitude}).
+			WithZoom(2)
+		if err := m.JumpTo(camera); err != nil {
+			t.Fatalf("JumpTo(%v): %v", longitude, err)
+		}
+		snapshot, err := m.Camera()
+		if err != nil {
+			t.Fatalf("Camera(): %v", err)
+		}
+		if snapshot.Center == nil {
+			t.Fatalf("Camera() missing center: %#v", snapshot)
+		}
+		return snapshot.Center.Longitude
+	}
+	assertLongitude := func(got, want float64) {
+		t.Helper()
+		if math.Abs(got-want) > 1e-6 {
+			t.Fatalf("camera longitude = %v, want %v", got, want)
+		}
+	}
+
+	constraintKind(BoundsConstraintUnbounded)
+	assertLongitude(jumpedLongitude(200), -160)
+
+	world := LatLngBounds{
+		Southwest: LatLng{Latitude: -90, Longitude: -180},
+		Northeast: LatLng{Latitude: 90, Longitude: 180},
+	}
+	if err := m.SetBounds(BoundOptions{}.WithBounds(world)); err != nil {
+		t.Fatalf("SetBounds(world): %v", err)
+	}
+	constraintKind(BoundsConstraintBounded)
+	assertLongitude(jumpedLongitude(200), 180)
+
+	if err := m.SetBounds(BoundOptions{}.WithUnbounded()); err != nil {
+		t.Fatalf("SetBounds(unbounded): %v", err)
+	}
+	constraintKind(BoundsConstraintUnbounded)
+	assertLongitude(jumpedLongitude(200), -160)
 }
 
 func TestMapFreeCameraOptionsRoundTripCurrentValues(t *testing.T) {
@@ -258,6 +519,12 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	invalidBounds := BoundOptions{}.WithMinZoom(3).WithMaxZoom(2)
 	if err := m.SetBounds(invalidBounds); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetBounds(invalid min/max) error = %v, want ErrInvalidArgument", err)
+	}
+	// An unknown kind sets neither constraint bit, so without validation the
+	// call would report success and leave the existing constraint in place.
+	unknownKind := BoundOptions{Bounds: &BoundsConstraint{Kind: BoundsConstraintKind(99)}}
+	if err := m.SetBounds(unknownKind); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetBounds(unknown kind) error = %v, want ErrInvalidArgument", err)
 	}
 	invalidFreeCamera := FreeCameraOptions{}.WithOrientation(Quaternion{})
 	if err := m.SetFreeCameraOptions(invalidFreeCamera); !errors.Is(err, ErrInvalidArgument) {

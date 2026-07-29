@@ -66,6 +66,7 @@ typedef struct mln_offline_region_list mln_offline_region_list;
 typedef struct mln_json_snapshot mln_json_snapshot;
 typedef struct mln_resource_request_handle mln_resource_request_handle;
 typedef struct mln_render_session mln_render_session;
+typedef struct mln_wake_source mln_wake_source;
 
 /**
  * Reports the C ABI contract version. The value is 0 while the ABI is unstable,

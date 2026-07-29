@@ -449,6 +449,7 @@ pub enum RuntimeEventType {
     MapCameraWillChange,
     MapCameraIsChanging,
     MapCameraDidChange,
+    MapCameraTransitionFinished,
     MapStyleLoaded,
     MapLoadingStarted,
     MapLoadingFinished,
@@ -477,6 +478,9 @@ impl RuntimeEventType {
             sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE => Self::MapCameraWillChange,
             sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING => Self::MapCameraIsChanging,
             sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE => Self::MapCameraDidChange,
+            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED => {
+                Self::MapCameraTransitionFinished
+            }
             sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED => Self::MapStyleLoaded,
             sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED => Self::MapLoadingStarted,
             sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED => Self::MapLoadingFinished,
@@ -502,6 +506,32 @@ impl RuntimeEventType {
                 Self::OfflineRegionTileCountLimitExceeded
             }
             sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED => Self::OfflineOperationCompleted,
+            _ => Self::Unknown(raw),
+        }
+    }
+}
+
+/// Camera change kind carried in the `code` of camera will-change and
+/// did-change events.
+///
+/// Decode it with `CameraChangeMode::from_raw(event.code as u32)`. The C API
+/// stores this enum's `uint32_t` value in the event's signed `code` field, so
+/// the cast reinterprets the same bits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CameraChangeMode {
+    /// The camera reached its new value without an animated transition.
+    Immediate,
+    /// The camera moved as part of an animated transition.
+    Animated,
+    Unknown(u32),
+}
+
+impl CameraChangeMode {
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_CAMERA_CHANGE_MODE_IMMEDIATE => Self::Immediate,
+            sys::MLN_CAMERA_CHANGE_MODE_ANIMATED => Self::Animated,
             _ => Self::Unknown(raw),
         }
     }
@@ -1092,10 +1122,24 @@ mod tests {
         );
 
         assert_eq!(
+            RuntimeEventType::from_raw(sys::MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED),
+            RuntimeEventType::MapCameraTransitionFinished
+        );
+
+        assert_eq!(
             RenderMode::from_raw(sys::MLN_RENDER_MODE_FULL),
             RenderMode::Full
         );
         assert_eq!(RenderMode::from_raw(999_021), RenderMode::Unknown(999_021));
+
+        assert_eq!(
+            CameraChangeMode::from_raw(sys::MLN_CAMERA_CHANGE_MODE_ANIMATED),
+            CameraChangeMode::Animated
+        );
+        assert_eq!(
+            CameraChangeMode::from_raw(999_035),
+            CameraChangeMode::Unknown(999_035)
+        );
 
         assert_eq!(
             TileOperation::from_raw(sys::MLN_TILE_OPERATION_CANCELLED),

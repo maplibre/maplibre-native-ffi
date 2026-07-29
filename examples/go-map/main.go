@@ -53,7 +53,7 @@ Modes:
 `)
 }
 
-func run(mode renderTargetMode) error {
+func run(mode renderTargetMode) (result error) {
 	if err := validateNativeRenderBackend(); err != nil {
 		return err
 	}
@@ -104,12 +104,42 @@ func run(mode renderTargetMode) error {
 	}
 	_ = sdl.GL_SetSwapInterval(1)
 
-	state, err := newMapState(graphics, view, mode)
-	if err != nil {
-		return err
+	shared := newSharedState()
+	commands := make(chan cameraCommand, 256)
+	published := make(chan runtimeLoopHandles, 1)
+	runtimeDone := make(chan struct{})
+	go func() {
+		defer close(runtimeDone)
+		runRuntimeLoop(view, commands, published, shared)
+	}()
+	handles, ok := <-published
+	if !ok {
+		<-runtimeDone
+		_ = graphics.Close()
+		if failure := shared.firstFailure(); failure != nil {
+			return fmt.Errorf("runtime loop startup failed: %w", failure)
+		}
+		return errors.New("runtime loop stopped before publishing the map")
 	}
-	defer func() { _ = state.Close() }()
-	defer func() { _ = state.finishFrame() }()
+
+	state, err := newRenderMapState(graphics, handles.mapRef, view, mode)
+	if err != nil {
+		shared.requestShutdown()
+		_ = handles.wake.Signal()
+		<-runtimeDone
+		return errors.Join(
+			fmt.Errorf("render target attach failed: %w", err),
+			shared.firstFailure(),
+			graphics.Close(),
+		)
+	}
+	defer func() {
+		result = errors.Join(result, state.finishFrame(), state.closeTarget())
+		shared.requestShutdown()
+		_ = handles.wake.Signal()
+		<-runtimeDone
+		result = errors.Join(result, shared.firstFailure(), graphics.Close())
+	}()
 
 	fmt.Printf("render target: %s\n", mode)
 	fmt.Printf("render target status: %s\n", mode.statusLine())
@@ -137,15 +167,20 @@ func run(mode renderTargetMode) error {
 			if view.empty() {
 				return nil
 			}
-			changed, err := input.handleEvent(event, state.mapRef, view)
-			if err != nil {
-				return err
+			if input.handleEvent(event, commands, view) {
+				if err := handles.wake.Signal(); err != nil {
+					return fmt.Errorf("wake runtime loop failed: %w", err)
+				}
+				shared.requestRender()
+				renderPending = true
 			}
-			renderPending = renderPending || changed
 		}
 		return nil
 	}
 	for running {
+		if failure := shared.firstFailure(); failure != nil {
+			return fmt.Errorf("runtime loop failed: %w", failure)
+		}
 		didWork := false
 		var event sdl.Event
 		for sdl.PollEvent(&event) {
@@ -155,20 +190,8 @@ func run(mode renderTargetMode) error {
 			}
 		}
 
-		if err := state.runtime.RunOnce(); err != nil {
-			return err
-		}
-		renderUpdateAvailable, err := drainEvents(state.runtime)
-		if err != nil {
-			return err
-		}
-		renderPending = renderPending || renderUpdateAvailable
-		didWork = didWork || renderUpdateAvailable
-
-		if err := state.finishFrame(); err != nil {
-			return err
-		}
-		if renderPending && !view.empty() {
+		renderPending = renderPending || shared.consumeRenderRequest()
+		if renderPending && !view.empty() && running {
 			rendered, err := state.renderUpdate()
 			if err != nil {
 				return err
@@ -176,7 +199,12 @@ func run(mode renderTargetMode) error {
 			if rendered {
 				renderPending = false
 				didWork = true
+			} else {
+				shared.requestRender()
 			}
+		}
+		if err := state.finishFrame(); err != nil {
+			return err
 		}
 
 		if !didWork && running {

@@ -53,6 +53,10 @@ namespace Maplibre.Native.Internal.C
     {
     }
 
+    internal partial struct mln_wake_source
+    {
+    }
+
     internal static partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

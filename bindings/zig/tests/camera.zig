@@ -5,6 +5,43 @@ const maplibre = @import("maplibre_native");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
+const TransitionTally = struct {
+    finished_count: usize = 0,
+    last_transition_id: ?u64 = null,
+    last_change_mode: ?maplibre.CameraChangeMode = null,
+    change_followed_finish: bool = false,
+};
+
+/// Drains the queued runtime events and tallies what the camera events among
+/// them reported.
+fn drainedCameraEvents(runtime: *maplibre.RuntimeHandle) !TransitionTally {
+    var tally = TransitionTally{};
+    while (try runtime.pollEvent(testing.allocator)) |polled| {
+        var event = polled;
+        defer event.deinit();
+        switch (event.event_type) {
+            .map_camera_transition_finished => {
+                try testing.expect(std.meta.eql(
+                    event.payload_type,
+                    maplibre.RuntimeEventPayloadType.camera_transition_finished,
+                ));
+                const payload = switch (event.payload) {
+                    .camera_transition_finished => |value| value,
+                    else => return error.UnexpectedPayload,
+                };
+                tally.finished_count += 1;
+                tally.last_transition_id = payload.transition_id;
+            },
+            .map_camera_did_change => {
+                tally.last_change_mode = maplibre.CameraChangeMode.fromRaw(event.code);
+                if (tally.finished_count > 0) tally.change_followed_finish = true;
+            },
+            else => {},
+        }
+    }
+    return tally;
+}
+
 test "camera jump updates snapshot fields through public binding" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -44,6 +81,57 @@ test "camera commands accept valid public descriptors" {
     try map.easeTo(.{ .center = center, .zoom = 12.0 }, animation);
     try map.flyTo(.{ .center = center, .zoom = 10.0 }, animation);
     try map.cancelTransitions();
+}
+
+test "zero-duration ease reports one transition finish ahead of an immediate camera change" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.easeTo(.{ .center = center, .zoom = 11.0 }, .{ .duration_ms = 0, .transition_id = 7 });
+
+    const tally = try drainedCameraEvents(&runtime);
+    try testing.expectEqual(@as(usize, 1), tally.finished_count);
+    try testing.expectEqual(@as(?u64, 7), tally.last_transition_id);
+    try testing.expect(tally.change_followed_finish);
+    try testing.expect(std.meta.eql(tally.last_change_mode.?, maplibre.CameraChangeMode.immediate));
+}
+
+test "a superseded camera transition reports one transition finish with an animated camera change" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.easeTo(.{ .center = center, .zoom = 12.0 }, .{ .duration_ms = 5000, .transition_id = 11 });
+    try testing.expectEqual(@as(usize, 0), (try drainedCameraEvents(&runtime)).finished_count);
+
+    try map.easeTo(.{ .center = center, .zoom = 13.0 }, .{ .duration_ms = 5000, .transition_id = 12 });
+
+    const tally = try drainedCameraEvents(&runtime);
+    try testing.expectEqual(@as(usize, 1), tally.finished_count);
+    try testing.expectEqual(@as(?u64, 11), tally.last_transition_id);
+    try testing.expect(std.meta.eql(tally.last_change_mode.?, maplibre.CameraChangeMode.animated));
+}
+
+test "cancelling reports one transition finish for the transition that carries an ID" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.easeTo(.{ .center = center, .zoom = 12.0 }, .{ .duration_ms = 5000, .transition_id = 21 });
+    try map.cancelTransitions();
+
+    const cancelled = try drainedCameraEvents(&runtime);
+    try testing.expectEqual(@as(usize, 1), cancelled.finished_count);
+    try testing.expectEqual(@as(?u64, 21), cancelled.last_transition_id);
+
+    try map.easeTo(.{ .center = center, .zoom = 14.0 }, .{ .duration_ms = 5000 });
+    try map.cancelTransitions();
+
+    try testing.expectEqual(@as(usize, 0), (try drainedCameraEvents(&runtime)).finished_count);
 }
 
 test "camera fitting computes camera and visible bounds" {
@@ -89,10 +177,10 @@ test "camera constraints and free camera options round-trip public values" {
     defer map.close() catch @panic("map close failed");
 
     const constraints = maplibre.BoundOptions{
-        .bounds = .{
+        .bounds = .{ .bounded = .{
             .southwest = .{ .latitude = -45.0, .longitude = -120.0 },
             .northeast = .{ .latitude = 45.0, .longitude = 120.0 },
-        },
+        } },
         .min_zoom = 1.0,
         .max_zoom = 12.0,
         .min_pitch = 0.0,
@@ -108,6 +196,42 @@ test "camera constraints and free camera options round-trip public values" {
     try testing.expect(free_camera.position != null);
     try testing.expect(free_camera.orientation != null);
     try map.setFreeCameraOptions(.{ .orientation = free_camera.orientation });
+}
+
+fn jumpedLongitude(map: *maplibre.MapHandle, longitude: f64) !f64 {
+    try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = longitude }, .zoom = 2.0 });
+    const snapshot = try map.getCamera();
+    return (snapshot.center orelse return error.MissingCameraCenter).longitude;
+}
+
+// The unbounded constraint is distinct from world bounds: an unbounded camera center pans across
+// the antimeridian, while world bounds clamp longitude to the -180..180 range.
+test "camera bounds separate the unbounded constraint from world bounds" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const pristine = try map.getBounds();
+    try testing.expectEqual(.unbounded, std.meta.activeTag(pristine.bounds.?));
+    try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
+
+    try map.setBounds(.{ .bounds = .{ .bounded = .{
+        .southwest = .{ .latitude = -90.0, .longitude = -180.0 },
+        .northeast = .{ .latitude = 90.0, .longitude = 180.0 },
+    } } });
+
+    const world = try map.getBounds();
+    switch (world.bounds.?) {
+        .bounded => |bounds| try testing.expectApproxEqAbs(@as(f64, 180.0), bounds.northeast.longitude, 1e-6),
+        .unbounded => return error.TestExpectedBoundedConstraint,
+    }
+    try testing.expectApproxEqAbs(@as(f64, 180.0), try jumpedLongitude(&map, 200.0), 1e-6);
+
+    try map.setBounds(.{ .bounds = .unbounded });
+    const released = try map.getBounds();
+    try testing.expectEqual(.unbounded, std.meta.activeTag(released.bounds.?));
+    try testing.expectApproxEqAbs(@as(f64, -160.0), try jumpedLongitude(&map, 200.0), 1e-6);
 }
 
 test "camera public descriptors report invalid native arguments" {

@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.render
 
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 
 /** Explicit handle for an OpenGL session-owned texture frame. */
 public actual class OpenGLOwnedTextureFrameHandle
@@ -10,11 +11,11 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: OpenGLOwnedTextureFrame,
 ) : AutoCloseable {
-  private val core =
-    OwnedTextureFrameHandleCore(
-      "OpenGLOwnedTextureFrameHandle",
-      "OpenGL owned texture frame handle is closed",
-    )
+  private val core = OwnedTextureFrameHandleCore("OpenGLOwnedTextureFrameHandle")
+
+  init {
+    HandleLeakCleaner.registerFrame(this, core)
+  }
 
   public actual fun frame(): OpenGLOwnedTextureFrame {
     core.ensureOpen()

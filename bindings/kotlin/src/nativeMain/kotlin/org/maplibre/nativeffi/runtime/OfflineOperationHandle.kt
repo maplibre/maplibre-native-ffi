@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.runtime
 
-import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
@@ -19,8 +18,9 @@ internal constructor(
 ) : AutoCloseable {
   /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
   public actual val id: Long = uint64BitsToLong(nativeId)
-  private val runtimeRetention: HandleStateCore.ChildRetention = runtime.retainChild()
-  private val leakReport = LeakReport(id, kind, resultKind)
+  private val runtimeRetention: HandleStateCore.ChildRetention =
+    runtime.retainChild("OfflineOperationHandle")
+  private val leakReport = OfflineOperationLeakReport(id, kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
   private var closed = false
 
@@ -75,25 +75,4 @@ internal constructor(
   }
 
   private fun uint64BitsToLong(value: ULong): Long = value.toLong()
-
-  private class LeakReport(
-    private val id: Long,
-    private val kind: OfflineOperationKind,
-    private val resultKind: OfflineOperationResultKind,
-  ) {
-    private val closed = AtomicInt(0)
-
-    fun markClosed() {
-      closed.store(1)
-    }
-
-    fun report() {
-      if (closed.load() == 0) {
-        println(
-          "Leaked OfflineOperationHandle id=$id kind=$kind resultKind=$resultKind; " +
-            "take or discard operations explicitly on the runtime owner thread."
-        )
-      }
-    }
-  }
 }

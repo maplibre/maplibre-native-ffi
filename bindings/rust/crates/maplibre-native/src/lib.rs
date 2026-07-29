@@ -28,32 +28,36 @@ use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 pub use camera::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
+    FreeCameraOptions, ProjectionMode,
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    MapId, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, MapId, OfflineOperationCompletedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
+    TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
-    LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
-    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, LocationIndicatorImageKind, MapAttachRef, MapHandle, RasterDemEncoding,
+    SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions, TileScheme,
+    TileSourceOptions, VectorTileEncoding,
 };
 pub use maplibre_core::{
-    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
-    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
-    NorthOrientation, OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    OpenGLContextProviderMask, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
-    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
-    ResourceUsage, Result, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,
+    LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, MapOptions, MapTileOptions,
+    MapViewportOptions, NetworkStatus, NorthOrientation, OfflineOperationKind,
+    OfflineOperationResultKind, OfflineRegionDownloadState, OpenGLContextProviderMask,
+    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
+    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
+pub use maplibre_native_core::handle::{NativeHandleLeak, set_leak_reporter};
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, EglContextDescriptor, FeatureExtensionResult,
@@ -74,7 +78,7 @@ pub use resource::{
 };
 pub use runtime::{
     OfflineOperationHandle, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions,
+    RuntimeOptions, WakeSource,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
@@ -272,7 +276,7 @@ fn set_network_status_raw(raw_status: u32) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use static_assertions::assert_not_impl_any;
+    use static_assertions::{assert_impl_all, assert_not_impl_any};
 
     use super::*;
 
@@ -282,6 +286,12 @@ mod tests {
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
+    assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
+    // The one map value that crosses threads. A render session is owned by the
+    // thread that attaches it, so the thread driving a render loop needs a way
+    // to name a map owned elsewhere. It is transferable and not shareable.
+    assert_impl_all!(MapAttachRef: Send);
+    assert_not_impl_any!(MapAttachRef: Sync);
 
     #[test]
     // Spec coverage: BND-103.

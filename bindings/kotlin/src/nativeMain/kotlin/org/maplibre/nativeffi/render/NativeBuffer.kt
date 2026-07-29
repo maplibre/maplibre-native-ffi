@@ -11,6 +11,7 @@ import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.readBytes
 import org.maplibre.nativeffi.internal.lifecycle.BorrowedResourceCore
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Explicit off-heap byte buffer for reusable native readback and upload storage. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
@@ -33,8 +34,12 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
 
   internal fun ensureCapacity(requiredBytes: ULong) {
     withOpenBuffer {
-      require(requiredBytes <= Long.MAX_VALUE.toULong()) { "required byte length is too large" }
-      require(length >= requiredBytes.toLong()) { "buffer is smaller than required byte length" }
+      Status.requireArgument(requiredBytes <= Long.MAX_VALUE.toULong()) {
+        "required byte length is too large"
+      }
+      Status.requireArgument(length >= requiredBytes.toLong()) {
+        "buffer is smaller than required byte length"
+      }
     }
   }
 
@@ -48,8 +53,10 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
 
   public actual companion object {
     public actual fun allocate(byteLength: Long): NativeBuffer {
-      require(byteLength >= 0) { "byteLength must be non-negative" }
-      require(byteLength <= Int.MAX_VALUE) { "byteLength exceeds Kotlin/Native allocation limit" }
+      Status.requireArgument(byteLength >= 0) { "byteLength must be non-negative" }
+      Status.requireArgument(byteLength <= Int.MAX_VALUE) {
+        "byteLength exceeds Kotlin/Native allocation limit"
+      }
       val pointer =
         if (byteLength == 0L) null else nativeHeap.allocArray<ByteVar>(byteLength.toInt())
       return NativeBuffer(pointer, byteLength)
