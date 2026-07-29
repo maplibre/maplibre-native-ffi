@@ -401,19 +401,29 @@ function setLogCallback(callback) {
   const previousGeneration = logCallbackGeneration;
   const generation = previousGeneration + 1;
   logCallbackGeneration = generation;
+  let callbackId = null;
   try {
-    return translateNativeErrors(() =>
+    callbackId = translateNativeErrors(() =>
       native.nativeSetLogCallback((error, record) => {
         if (error || generation !== logCallbackGeneration) {
           return;
         }
+        if (
+          typeof callbackId === "bigint" &&
+          (record.callbackId !== callbackId ||
+            native.nativeCurrentLogCallbackId() !== callbackId)
+        ) {
+          return;
+        }
         try {
-          containCallbackResult(callback(record));
+          const { callbackId: _callbackId, ...publicRecord } = record;
+          containCallbackResult(callback(publicRecord));
         } catch {
           // User logging callbacks must not escape binding-managed callbacks.
         }
       }),
     );
+    return undefined;
   } catch (error) {
     if (logCallbackGeneration === generation) {
       logCallbackGeneration = previousGeneration;
@@ -437,6 +447,12 @@ function setAsyncLogSeverities(severities) {
   }
   return translateNativeErrors(() =>
     native.nativeSetAsyncLogSeverityMask(mask),
+  );
+}
+
+function setAsyncLogSeverityMask(mask) {
+  return translateNativeErrors(() =>
+    native.nativeSetAsyncLogSeverityMask(unsigned32(mask, "mask")),
   );
 }
 
@@ -3376,6 +3392,7 @@ class MapHandle {
 function stringifyJson(value) {
   let json;
   try {
+    validateStructuredJson(value, new Set());
     json = JSON.stringify(value, (_key, item) => {
       if (
         item === undefined ||
@@ -3409,6 +3426,61 @@ function stringifyJson(value) {
     );
   }
   return json;
+}
+
+function validateStructuredJson(value, ancestors) {
+  if (
+    value === undefined ||
+    typeof value === "function" ||
+    typeof value === "symbol" ||
+    typeof value === "bigint"
+  ) {
+    throw new InvalidArgumentError(
+      null,
+      "JSON values must not contain undefined, functions, symbols, or bigints",
+    );
+  }
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    throw new InvalidArgumentError(null, "JSON numbers must be finite");
+  }
+  if (value === null || typeof value !== "object") {
+    return;
+  }
+  if (!Array.isArray(value) && !isPlainObject(value)) {
+    throw new InvalidArgumentError(
+      null,
+      "structured JSON values must contain only arrays and plain or null-prototype objects",
+    );
+  }
+  if (typeof value.toJSON === "function") {
+    throw new InvalidArgumentError(
+      null,
+      "structured JSON values must not define toJSON",
+    );
+  }
+  if (ancestors.has(value)) {
+    throw new InvalidArgumentError(null, "JSON values must not contain cycles");
+  }
+  ancestors.add(value);
+  try {
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.hasOwn(value, index)) {
+          throw new InvalidArgumentError(
+            null,
+            "JSON arrays must not contain empty slots",
+          );
+        }
+        validateStructuredJson(value[index], ancestors);
+      }
+    } else {
+      for (const item of Object.values(value)) {
+        validateStructuredJson(item, ancestors);
+      }
+    }
+  } finally {
+    ancestors.delete(value);
+  }
 }
 
 function transferToken(transfer, kind, label) {
@@ -3635,6 +3707,7 @@ module.exports = {
   setLogCallback,
   clearLogCallback,
   setAsyncLogSeverities,
+  setAsyncLogSeverityMask,
   restoreDefaultAsyncLogSeverities,
 };
 
@@ -3687,5 +3760,6 @@ module.exports.latLngForProjectedMeters = latLngForProjectedMeters;
 module.exports.setLogCallback = setLogCallback;
 module.exports.clearLogCallback = clearLogCallback;
 module.exports.setAsyncLogSeverities = setAsyncLogSeverities;
+module.exports.setAsyncLogSeverityMask = setAsyncLogSeverityMask;
 module.exports.restoreDefaultAsyncLogSeverities =
   restoreDefaultAsyncLogSeverities;

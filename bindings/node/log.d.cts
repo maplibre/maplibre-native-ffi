@@ -2,6 +2,7 @@ export {
   setLogCallback,
   clearLogCallback,
   setAsyncLogSeverities,
+  setAsyncLogSeverityMask,
   restoreDefaultAsyncLogSeverities,
   type LogSeverity,
   type LogRecord,

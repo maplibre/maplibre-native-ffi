@@ -43,6 +43,7 @@ const {
   RuntimeOptions,
   WakeSourceHandle,
   setAsyncLogSeverities,
+  setAsyncLogSeverityMask,
   VulkanOwnedTextureFrame,
   setLogCallback,
   setNetworkStatus,
@@ -461,7 +462,12 @@ test("cleared and replaced log callbacks discard queued records", () => {
   const originalClearLogCallback = nativeAddon.nativeClearLogCallback;
   /** @type {Function[]} */
   const bridges = [];
-  nativeAddon.nativeSetLogCallback = (callback) => bridges.push(callback);
+  nativeAddon.nativeSetLogCallback = /** @type {any} */ (
+    /** @param {any} callback */
+    (callback) => {
+      bridges.push(callback);
+    }
+  );
   nativeAddon.nativeClearLogCallback = () => {};
   let firstRecords = 0;
   let secondRecords = 0;
@@ -487,14 +493,50 @@ test("cleared and replaced log callbacks discard queued records", () => {
   }
 });
 
+test("process-wide log callback ids discard stale queued records", () => {
+  const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
+  const originalClearLogCallback = nativeAddon.nativeClearLogCallback;
+  const originalCurrentLogCallbackId = nativeAddon.nativeCurrentLogCallbackId;
+  /** @type {undefined | ((error: Error | null, record: any) => void)} */
+  let bridge;
+  let currentId = 1n;
+  nativeAddon.nativeSetLogCallback = (callback) => {
+    bridge = callback;
+    return 1n;
+  };
+  nativeAddon.nativeClearLogCallback = () => {};
+  nativeAddon.nativeCurrentLogCallbackId = () => currentId;
+  let deliveries = 0;
+
+  try {
+    setLogCallback(() => {
+      deliveries += 1;
+    });
+    assert.ok(bridge);
+    currentId = 2n;
+    bridge?.(null, { callbackId: 1n, message: "stale" });
+    assert.equal(deliveries, 0);
+    currentId = 1n;
+    bridge?.(null, { callbackId: 1n, message: "current" });
+    assert.equal(deliveries, 1);
+  } finally {
+    nativeAddon.nativeSetLogCallback = originalSetLogCallback;
+    nativeAddon.nativeClearLogCallback = originalClearLogCallback;
+    nativeAddon.nativeCurrentLogCallbackId = originalCurrentLogCallbackId;
+    clearLogCallback();
+  }
+});
+
 test("binding-managed callbacks contain user exceptions", () => {
   const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
-  /** @type {undefined | ((error: Error | null, record: import("..").LogRecord) => void)} */
+  /** @type {undefined | Function} */
   let logBridge;
-  /** @param {(error: Error | null, record: import("..").LogRecord) => void} callback */
-  nativeAddon.nativeSetLogCallback = (callback) => {
-    logBridge = callback;
-  };
+  nativeAddon.nativeSetLogCallback = /** @type {any} */ (
+    /** @param {any} callback */
+    (callback) => {
+      logBridge = callback;
+    }
+  );
 
   try {
     setLogCallback(() => {
@@ -546,12 +588,14 @@ test("binding-managed callbacks contain user exceptions", () => {
 
 test("binding-managed callbacks contain rejected promises", async () => {
   const originalSetLogCallback = nativeAddon.nativeSetLogCallback;
-  /** @type {undefined | ((error: Error | null, record: import("..").LogRecord) => void)} */
+  /** @type {undefined | Function} */
   let logBridge;
-  /** @param {(error: Error | null, record: import("..").LogRecord) => void} callback */
-  nativeAddon.nativeSetLogCallback = (callback) => {
-    logBridge = callback;
-  };
+  nativeAddon.nativeSetLogCallback = /** @type {any} */ (
+    /** @param {any} callback */
+    (callback) => {
+      logBridge = callback;
+    }
+  );
 
   /** @type {{ fetch?: Function | null, cancel?: Function | null }} */
   const callbacks = {};
@@ -985,12 +1029,14 @@ test("runtime construction checks the loaded C ABI version first", () => {
 test("async log severities map string values and reject unknown values", () => {
   setAsyncLogSeverities(["info", "warning"]);
   setAsyncLogSeverities(new Set(["error"]));
+  setAsyncLogSeverityMask(2);
   restoreDefaultAsyncLogSeverities();
 
   assert.throws(
     () => setAsyncLogSeverities([/** @type {any} */ ("debug")]),
     InvalidArgumentError,
   );
+  assert.throws(() => setAsyncLogSeverityMask(-1), InvalidArgumentError);
 });
 
 test("native pointer is a borrowed opaque address value", () => {
@@ -2916,6 +2962,24 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
             /** @type {any} */ ({
               type: "geojson",
               data: { invalid: invalidValue },
+            }),
+          ),
+        InvalidArgumentError,
+      );
+    }
+    for (const invalidValue of [
+      new Date(),
+      new Map(),
+      new Set(),
+      { toJSON: () => ({ accepted: true }) },
+    ]) {
+      assert.throws(
+        () =>
+          map.addStyleSourceJson(
+            "non-plain-json",
+            /** @type {any} */ ({
+              type: "geojson",
+              data: invalidValue,
             }),
           ),
         InvalidArgumentError,

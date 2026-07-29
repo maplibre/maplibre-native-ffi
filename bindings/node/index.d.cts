@@ -1627,6 +1627,7 @@ export declare function clearLogCallback(): void;
 export declare function setAsyncLogSeverities(
   severities: Iterable<LogSeverity>,
 ): void;
+export declare function setAsyncLogSeverityMask(mask: number): void;
 export declare function restoreDefaultAsyncLogSeverities(): void;
 export declare function projectedMetersForLatLng(
   coordinate: LatLng,

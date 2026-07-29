@@ -50,6 +50,7 @@ export const latLngForProjectedMeters = root.latLngForProjectedMeters;
 export const setLogCallback = root.setLogCallback;
 export const clearLogCallback = root.clearLogCallback;
 export const setAsyncLogSeverities = root.setAsyncLogSeverities;
+export const setAsyncLogSeverityMask = root.setAsyncLogSeverityMask;
 export const restoreDefaultAsyncLogSeverities =
   root.restoreDefaultAsyncLogSeverities;
 

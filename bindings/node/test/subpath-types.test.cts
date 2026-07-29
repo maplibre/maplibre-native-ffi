@@ -4,7 +4,11 @@ import {
   projectedMetersForLatLng,
   type LatLng,
 } from "@maplibre/native-ffi-node/geo";
-import { setLogCallback, type LogRecord } from "@maplibre/native-ffi-node/log";
+import {
+  setAsyncLogSeverityMask,
+  setLogCallback,
+  type LogRecord,
+} from "@maplibre/native-ffi-node/log";
 import {
   AnimationOptions,
   BoundOptions,
@@ -70,6 +74,7 @@ projectedMetersForLatLng(coordinate);
 setLogCallback((record: LogRecord) => {
   void record.message;
 });
+setAsyncLogSeverityMask(0x8000_0000);
 networkStatus();
 const leakReports: NativeLeakReport[] = takeNativeLeakReports();
 void leakReports;

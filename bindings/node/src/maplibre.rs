@@ -33,6 +33,7 @@ pub struct NetworkStatusValue {
 
 #[napi(object)]
 pub struct LogRecord {
+    pub callback_id: BigInt,
     pub severity: String,
     pub raw_severity: u32,
     pub event: String,
@@ -138,15 +139,16 @@ pub fn set_network_status(status: Either<String, u32>) -> Result<()> {
 pub fn native_set_log_callback(
     env: Env,
     mut callback: ThreadsafeFunction<LogRecord>,
-) -> Result<()> {
+) -> Result<BigInt> {
     #[allow(deprecated)]
     callback.unref(&env)?;
     let state = Arc::new(LogCallbackState {
         id: next_log_callback_id(),
         callback: Arc::new(callback),
     });
-    env.add_env_cleanup_hook(state.id, clear_log_callback_if_current)?;
-    let user_data = std::ptr::without_provenance_mut::<c_void>(state.id);
+    let id = state.id;
+    env.add_env_cleanup_hook(id, clear_log_callback_if_current)?;
+    let user_data = std::ptr::without_provenance_mut::<c_void>(id);
     let _update = log_callback_update()
         .lock()
         .map_err(|_| error::invalid_argument("log callback update lock is poisoned"))?;
@@ -161,7 +163,7 @@ pub fn native_set_log_callback(
         slot.replace(state)
     };
     drop(previous);
-    Ok(())
+    Ok(BigInt::from(id as u64))
 }
 
 #[napi(js_name = "nativeClearLogCallback")]
@@ -178,6 +180,16 @@ pub fn native_clear_log_callback() -> Result<()> {
     };
     drop(previous);
     Ok(())
+}
+
+#[napi(js_name = "nativeCurrentLogCallbackId")]
+pub fn native_current_log_callback_id() -> BigInt {
+    let id = log_callback_slot()
+        .lock()
+        .ok()
+        .and_then(|slot| slot.as_ref().map(|state| state.id))
+        .unwrap_or(0);
+    BigInt::from(id as u64)
 }
 
 #[napi(js_name = "nativeSetAsyncLogSeverityMask")]
@@ -242,6 +254,7 @@ extern "C" fn log_trampoline(
     let result = catch_unwind(AssertUnwindSafe(|| {
         state.callback.call(
             Ok(LogRecord {
+                callback_id: BigInt::from(state.id as u64),
                 severity: log_severity_name(severity).to_owned(),
                 raw_severity: severity,
                 event: log_event_name(event).to_owned(),
@@ -250,9 +263,9 @@ extern "C" fn log_trampoline(
                 message: copy_log_message(message),
             }),
             ThreadsafeFunctionCallMode::NonBlocking,
-        );
+        )
     }));
-    u32::from(result.is_ok())
+    u32::from(matches!(result, Ok(napi::Status::Ok)))
 }
 
 pub(crate) fn report_native_handle_leak(handle_type: &str, address: usize) {

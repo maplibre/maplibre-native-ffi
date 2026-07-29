@@ -376,6 +376,13 @@ impl NativeWakeSourceHandle {
                 "wake source transfer token is invalid",
             ));
         }
+        crate::transfer::schedule_expiry(wake_source_transfers(), token.clone()).map_err(
+            |spawn_error| {
+                error::invalid_state(format!(
+                    "wake source transfer expiry could not be scheduled: {spawn_error}"
+                ))
+            },
+        )?;
         let source = self
             .source
             .lock()
@@ -383,14 +390,6 @@ impl NativeWakeSourceHandle {
             .take()
             .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))?;
         transfers.insert(token.clone(), source);
-        if let Err(spawn_error) =
-            crate::transfer::schedule_expiry(wake_source_transfers(), token.clone())
-        {
-            transfers.remove(&token);
-            return Err(error::invalid_state(format!(
-                "wake source transfer expiry could not be scheduled: {spawn_error}"
-            )));
-        }
         Ok(())
     }
 }

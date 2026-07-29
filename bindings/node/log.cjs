@@ -5,5 +5,6 @@ const root = require("./index.cjs");
 exports.setLogCallback = root.setLogCallback;
 exports.clearLogCallback = root.clearLogCallback;
 exports.setAsyncLogSeverities = root.setAsyncLogSeverities;
+exports.setAsyncLogSeverityMask = root.setAsyncLogSeverityMask;
 exports.restoreDefaultAsyncLogSeverities =
   root.restoreDefaultAsyncLogSeverities;
