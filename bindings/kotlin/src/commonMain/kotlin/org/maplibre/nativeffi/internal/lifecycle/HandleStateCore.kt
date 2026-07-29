@@ -9,11 +9,11 @@ import org.maplibre.nativeffi.internal.status.Status
 @OptIn(ExperimentalAtomicApi::class)
 internal class HandleStateCore(
   private val typeName: String,
-  private val address: Long,
+  private val handleId: Long,
   vararg parents: Any,
 ) {
   @Suppress("unused") private val parents: Array<out Any> = parents
-  val leakReport: LeakReport = LeakReport(typeName, address)
+  val leakReport: LeakReport = LeakReport(typeName, handleId)
   private val releaseState = AtomicInt(STATE_LIVE)
   private val liveChildren = AtomicReference<List<String>>(emptyList())
 
@@ -27,7 +27,8 @@ internal class HandleStateCore(
 
   fun isReleased(): Boolean = releaseState.load() == STATE_CLOSED
 
-  fun address(): Long = address
+  /** The C API handle id this wrapper owns. */
+  fun handleId(): Long = handleId
 
   /**
    * Retains this handle on behalf of a live child wrapper.
@@ -107,7 +108,7 @@ internal class HandleStateCore(
   @OptIn(ExperimentalAtomicApi::class)
   internal class LeakReport(
     private val typeName: String,
-    private val address: Long,
+    private val handleId: Long,
     private val writeLine: (String) -> Unit = { message -> println(message) },
   ) {
     private val released = AtomicInt(0)
@@ -119,7 +120,7 @@ internal class HandleStateCore(
     fun report() {
       if (released.load() == 0) {
         writeLine(
-          "Leaked $typeName native handle 0x${address.toString(16)}; " +
+          "Leaked $typeName native handle 0x${handleId.toString(16)}; " +
             "close handles explicitly on their owner thread."
         )
       }

@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.internal.struct
 
-import cnames.structs.mln_json_snapshot
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -52,6 +51,8 @@ import org.maplibre.nativeffi.internal.c.mln_json_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_json_value
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_polygon_geometry
+import org.maplibre.nativeffi.internal.lifecycle.NativeJsonSnapshot
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 
@@ -101,23 +102,23 @@ internal object ValueStructs {
     return readJson(value.pointed)
   }
 
-  fun jsonSnapshotHandle(
-    snapshot: CPointer<mln_json_snapshot>?,
-    getter:
-      (CPointer<mln_json_snapshot>, CPointer<CPointerVarOf<CPointer<mln_json_value>>>) -> Int =
+  fun readJsonSnapshot(
+    snapshot: NativeJsonSnapshot,
+    getter: (ULong, CPointer<CPointerVarOf<CPointer<mln_json_value>>>) -> Int =
       ::mln_json_snapshot_get,
-    destroyer: (CPointer<mln_json_snapshot>) -> Unit = ::mln_json_snapshot_destroy,
+    destroyer: (ULong) -> Unit = ::mln_json_snapshot_destroy,
   ): JsonValue? {
-    if (snapshot == null) return null
+    // A null snapshot means the value is absent, which the C API reports as success.
+    if (snapshot.isNull) return null
     return try {
       memScoped {
         val outValue = alloc<CPointerVarOf<CPointer<mln_json_value>>>()
         outValue.value = null
-        Status.check(getter(snapshot, outValue.ptr))
+        Status.check(getter(snapshot.rawHandleValue, outValue.ptr))
         outValue.value?.let(::jsonSnapshot)
       }
     } finally {
-      destroyer(snapshot)
+      destroyer(snapshot.rawHandleValue)
     }
   }
 

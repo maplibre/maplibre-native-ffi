@@ -1,18 +1,18 @@
 package org.maplibre.nativeffi.runtime
 
-import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeWakeSource
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
 /** Wake source backed by the JVM FFM bridge. */
-public actual class WakeSource private constructor(private val source: MemorySegment) :
+public actual class WakeSource private constructor(private val source: NativeWakeSource) :
   AutoCloseable {
   // Held across the native signal and across close, so a close on another
   // thread cannot destroy the source between the live check and the call.
   private val nativeCallGate = Any()
-  private val core = HandleStateCore("WakeSource", source.address())
+  private val core = HandleStateCore("WakeSource", source.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -41,6 +41,6 @@ public actual class WakeSource private constructor(private val source: MemorySeg
   }
 
   internal companion object {
-    fun fromNative(source: MemorySegment): WakeSource = WakeSource(source)
+    fun fromNative(source: NativeWakeSource): WakeSource = WakeSource(source)
   }
 }

@@ -44,6 +44,9 @@ import org.maplibre.nativeffi.internal.c.mln_screen_box
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
+import org.maplibre.nativeffi.internal.lifecycle.NativeFeatureExtensionResult
+import org.maplibre.nativeffi.internal.lifecycle.NativeFeatureQueryResult
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
@@ -56,48 +59,37 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 @OptIn(ExperimentalForeignApi::class)
 internal object QueryStructs {
   fun featureQueryResult(
-    result: CPointer<cnames.structs.mln_feature_query_result>,
-    counter: (CPointer<cnames.structs.mln_feature_query_result>, CPointer<ULongVar>) -> Int =
-      ::mln_feature_query_result_count,
-    getter:
-      (
-        CPointer<cnames.structs.mln_feature_query_result>, ULong, CPointer<mln_queried_feature>,
-      ) -> Int =
-      ::mln_feature_query_result_get,
-    destroyer: (CPointer<cnames.structs.mln_feature_query_result>) -> Unit =
-      ::mln_feature_query_result_destroy,
+    result: NativeFeatureQueryResult,
+    counter: (ULong, CPointer<ULongVar>) -> Int = ::mln_feature_query_result_count,
+    getter: (ULong, ULong, CPointer<mln_queried_feature>) -> Int = ::mln_feature_query_result_get,
+    destroyer: (ULong) -> Unit = ::mln_feature_query_result_destroy,
   ): List<QueriedFeature> =
     try {
       memScoped {
         val outCount = alloc<ULongVar>()
-        Status.check(counter(result, outCount.ptr))
+        Status.check(counter(result.rawHandleValue, outCount.ptr))
         List(checkedInt(outCount.value, "queried feature count")) { index ->
           val outFeature = alloc<mln_queried_feature>()
           outFeature.size = sizeOf<mln_queried_feature>().toUInt()
-          Status.check(getter(result, index.toULong(), outFeature.ptr))
+          Status.check(getter(result.rawHandleValue, index.toULong(), outFeature.ptr))
           queriedFeature(outFeature)
         }
       }
     } finally {
-      destroyer(result)
+      destroyer(result.rawHandleValue)
     }
 
   fun featureExtensionResult(
-    result: CPointer<cnames.structs.mln_feature_extension_result>,
-    getter:
-      (
-        CPointer<cnames.structs.mln_feature_extension_result>,
-        CPointer<mln_feature_extension_result_info>,
-      ) -> Int =
+    result: NativeFeatureExtensionResult,
+    getter: (ULong, CPointer<mln_feature_extension_result_info>) -> Int =
       ::mln_feature_extension_result_get,
-    destroyer: (CPointer<cnames.structs.mln_feature_extension_result>) -> Unit =
-      ::mln_feature_extension_result_destroy,
+    destroyer: (ULong) -> Unit = ::mln_feature_extension_result_destroy,
   ): FeatureExtensionResult =
     try {
       memScoped {
         val info = alloc<mln_feature_extension_result_info>()
         info.size = sizeOf<mln_feature_extension_result_info>().toUInt()
-        Status.check(getter(result, info.ptr))
+        Status.check(getter(result.rawHandleValue, info.ptr))
         when (info.type) {
           MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE ->
             FeatureExtensionResult.Value(ValueStructs.jsonSnapshot(info.data.value))
@@ -109,7 +101,7 @@ internal object QueryStructs {
         }
       }
     } finally {
-      destroyer(result)
+      destroyer(result.rawHandleValue)
     }
 
   fun renderedQueryGeometry(

@@ -1,13 +1,8 @@
 package org.maplibre.nativeffi.map
 
-import cnames.structs.mln_json_snapshot
-import cnames.structs.mln_map
-import cnames.structs.mln_map_projection
-import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
@@ -149,6 +144,13 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeMap
+import org.maplibre.nativeffi.internal.lifecycle.asHandle
+import org.maplibre.nativeffi.internal.lifecycle.jsonSnapshotHandle
+import org.maplibre.nativeffi.internal.lifecycle.mapHandle
+import org.maplibre.nativeffi.internal.lifecycle.mapProjectionHandle
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.lifecycle.styleIdListHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
@@ -181,19 +183,19 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 /** Owned native map handle. Close it on the map owner thread. */
 @OptIn(ExperimentalForeignApi::class)
 public actual class MapHandle
-private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
+private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : AutoCloseable {
   private val runtimeRetention = runtime.retainChild("MapHandle")
   private val state = HandleState("MapHandle", handle, runtime)
   private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public actual fun setStyleUrl(url: String) {
     MemoryUtil.requireValidCString(url)
-    Status.check(mln_map_set_style_url(state.requireLive(), url))
+    Status.check(mln_map_set_style_url(state.requireLive().rawHandleValue, url))
   }
 
   public actual fun setStyleJson(json: String) {
     MemoryUtil.requireValidCString(json)
-    Status.check(mln_map_set_style_json(state.requireLive(), json))
+    Status.check(mln_map_set_style_json(state.requireLive().rawHandleValue, json))
     clearCustomGeometrySources()
   }
 
@@ -201,7 +203,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_style_source_json(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           ValueStructs.jsonValue(sourceJson, this),
         )
@@ -213,7 +215,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_source(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outRemoved.ptr,
       )
@@ -227,7 +229,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_source_exists(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outExists.ptr,
       )
@@ -240,7 +242,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_style_source_type(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outType.ptr,
         outFound.ptr,
@@ -255,7 +257,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_style_source_info(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outInfo.ptr,
         outFound.ptr,
@@ -267,10 +269,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun styleSourceIds(): List<String> = memScoped {
-    val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
-    outList.value = null
-    Status.check(mln_map_list_style_source_ids(state.requireLive(), outList.ptr))
-    StyleStructs.styleIdList(requireNotNull(outList.value))
+    val outList = alloc<ULongVar>()
+    outList.value = 0uL
+    Status.check(mln_map_list_style_source_ids(state.requireLive().rawHandleValue, outList.ptr))
+    StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
   }
 
   public actual fun addGeoJsonSourceUrl(
@@ -281,7 +283,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_geojson_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.geoJsonSourceOptions(options, this),
@@ -298,7 +300,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_geojson_source_data(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           ValueStructs.geoJson(data, this),
           StyleStructs.geoJsonSourceOptions(options, this),
@@ -311,7 +313,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_geojson_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
         )
@@ -323,7 +325,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_geojson_source_data(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           ValueStructs.geoJson(data, this),
         )
@@ -340,7 +342,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       memScoped {
         Status.check(
           mln_map_add_custom_geometry_source(
-            state.requireLive(),
+            state.requireLive().rawHandleValue,
             CoreStructs.stringView(sourceId, this),
             sourceState.descriptor(),
           )
@@ -361,7 +363,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_custom_geometry_source_tile_data(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
           ValueStructs.geoJson(data, this),
@@ -374,7 +376,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_tile(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.canonicalTileId(tileId),
         )
@@ -386,7 +388,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_invalidate_custom_geometry_source_region(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngBounds(bounds),
         )
@@ -414,7 +416,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         val outFound = alloc<BooleanVar>()
         val status =
           mln_map_get_style_source_type(
-            state.requireLive(),
+            state.requireLive().rawHandleValue,
             CoreStructs.stringView(entry.key, this),
             outType.ptr,
             outFound.ptr,
@@ -432,7 +434,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_vector_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
@@ -450,7 +452,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_vector_source_tiles(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
@@ -464,7 +466,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_raster_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
@@ -482,7 +484,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_raster_source_tiles(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
@@ -500,7 +502,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
           StyleStructs.tileSourceOptions(options, this),
@@ -518,7 +520,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_tiles(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.stringViewArray(tileSnapshot, this),
           tileSnapshot.size.toULong(),
@@ -536,7 +538,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_style_image(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(imageId, this),
           StyleStructs.premultipliedRgba8Image(image, this),
           StyleStructs.styleImageOptions(options, this),
@@ -549,7 +551,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_image(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outRemoved.ptr,
       )
@@ -561,7 +563,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_image_exists(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outExists.ptr,
       )
@@ -574,7 +576,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_style_image_info(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outInfo,
         outFound.ptr,
@@ -591,7 +593,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_copy_style_image_premultiplied_rgba8(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(imageId, this),
         outPixels,
         info.byteLength.toULong(),
@@ -619,7 +621,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_image_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
@@ -638,7 +640,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_image_source_image(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
@@ -652,7 +654,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_image_source_url(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(url, this),
         )
@@ -664,7 +666,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_image_source_image(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           StyleStructs.premultipliedRgba8Image(image, this),
         )
@@ -677,7 +679,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_image_source_coordinates(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
@@ -692,7 +694,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_image_source_coordinates(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         outCoordinates,
         4UL,
@@ -718,7 +720,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       val outFound = alloc<BooleanVar>()
       Status.check(
         mln_map_copy_style_source_attribution(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(sourceId, this),
           outAttribution,
           info.attribution_size,
@@ -738,7 +740,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_style_layer_json(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           ValueStructs.jsonValue(layerJson, this),
           CoreStructs.stringView(beforeLayerId, this),
         )
@@ -750,7 +752,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_hillshade_layer(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
@@ -763,7 +765,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_color_relief_layer(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(sourceId, this),
           CoreStructs.stringView(beforeLayerId, this),
@@ -776,7 +778,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_add_location_indicator_layer(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(beforeLayerId, this),
         )
@@ -792,7 +794,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_location_indicator_location(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.latLng(coordinate),
           altitude,
@@ -805,7 +807,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_location_indicator_bearing(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           bearing,
         )
@@ -817,7 +819,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_location_indicator_accuracy_radius(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           radius,
         )
@@ -833,7 +835,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_location_indicator_image_name(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           imageKind.nativeValue.toUInt(),
           CoreStructs.stringView(imageId, this),
@@ -846,7 +848,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outRemoved = alloc<BooleanVar>()
     Status.check(
       mln_map_remove_style_layer(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outRemoved.ptr,
       )
@@ -858,7 +860,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outExists = alloc<BooleanVar>()
     Status.check(
       mln_map_style_layer_exists(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outExists.ptr,
       )
@@ -871,7 +873,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outFound = alloc<BooleanVar>()
     Status.check(
       mln_map_get_style_layer_type(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outType.ptr,
         outFound.ptr,
@@ -881,17 +883,17 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun styleLayerIds(): List<String> = memScoped {
-    val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
-    outList.value = null
-    Status.check(mln_map_list_style_layer_ids(state.requireLive(), outList.ptr))
-    StyleStructs.styleIdList(requireNotNull(outList.value))
+    val outList = alloc<ULongVar>()
+    outList.value = 0uL
+    Status.check(mln_map_list_style_layer_ids(state.requireLive().rawHandleValue, outList.ptr))
+    StyleStructs.styleIdList(outList.value.asHandle("mln_map_list_style_ids", ::styleIdListHandle))
   }
 
   public actual fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_move_style_layer(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(beforeLayerId, this),
         )
@@ -900,24 +902,27 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun styleLayerJson(layerId: String): JsonValue? = memScoped {
-    val outLayer = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
+    val outLayer = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
-    outLayer.value = null
+    outLayer.value = 0uL
     Status.check(
       mln_map_get_style_layer_json(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outLayer.ptr,
         outFound.ptr,
       )
     )
-    if (outFound.value) ValueStructs.jsonSnapshotHandle(outLayer.value) else null
+    if (outFound.value) ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outLayer.value)) else null
   }
 
   public actual fun setStyleLightJson(lightJson: JsonValue) {
     memScoped {
       Status.check(
-        mln_map_set_style_light_json(state.requireLive(), ValueStructs.jsonValue(lightJson, this))
+        mln_map_set_style_light_json(
+          state.requireLive().rawHandleValue,
+          ValueStructs.jsonValue(lightJson, this),
+        )
       )
     }
   }
@@ -926,7 +931,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_set_style_light_property(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(propertyName, this),
           ValueStructs.jsonValue(value, this),
         )
@@ -935,23 +940,23 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun styleLightProperty(propertyName: String): JsonValue? = memScoped {
-    val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
-    outValue.value = null
+    val outValue = alloc<ULongVar>()
+    outValue.value = 0uL
     Status.check(
       mln_map_get_style_light_property(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(propertyName, this),
         outValue.ptr,
       )
     )
-    ValueStructs.jsonSnapshotHandle(outValue.value)
+    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outValue.value))
   }
 
   public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_layer_property(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           CoreStructs.stringView(propertyName, this),
           ValueStructs.jsonValue(value, this),
@@ -961,24 +966,24 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun layerProperty(layerId: String, propertyName: String): JsonValue? = memScoped {
-    val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
-    outValue.value = null
+    val outValue = alloc<ULongVar>()
+    outValue.value = 0uL
     Status.check(
       mln_map_get_layer_property(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         CoreStructs.stringView(propertyName, this),
         outValue.ptr,
       )
     )
-    ValueStructs.jsonSnapshotHandle(outValue.value)
+    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outValue.value))
   }
 
   public actual fun setLayerFilter(layerId: String, filter: JsonValue) {
     memScoped {
       Status.check(
         mln_map_set_layer_filter(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.stringView(layerId, this),
           ValueStructs.jsonValue(filter, this),
         )
@@ -989,64 +994,72 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual fun clearLayerFilter(layerId: String) {
     memScoped {
       Status.check(
-        mln_map_set_layer_filter(state.requireLive(), CoreStructs.stringView(layerId, this), null)
+        mln_map_set_layer_filter(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          null,
+        )
       )
     }
   }
 
   public actual fun layerFilter(layerId: String): JsonValue? = memScoped {
-    val outFilter = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
-    outFilter.value = null
+    val outFilter = alloc<ULongVar>()
+    outFilter.value = 0uL
     Status.check(
       mln_map_get_layer_filter(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(layerId, this),
         outFilter.ptr,
       )
     )
-    ValueStructs.jsonSnapshotHandle(outFilter.value)
+    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outFilter.value))
   }
 
   public actual fun requestRepaint() {
-    Status.check(mln_map_request_repaint(state.requireLive()))
+    Status.check(mln_map_request_repaint(state.requireLive().rawHandleValue))
   }
 
   public actual fun requestStillImage() {
-    Status.check(mln_map_request_still_image(state.requireLive()))
+    Status.check(mln_map_request_still_image(state.requireLive().rawHandleValue))
   }
 
   public actual var debugOptions: Set<DebugOption>
     get() = memScoped {
       val outOptions = alloc<UIntVar>()
-      Status.check(mln_map_get_debug_options(state.requireLive(), outOptions.ptr))
+      Status.check(mln_map_get_debug_options(state.requireLive().rawHandleValue, outOptions.ptr))
       DebugOption.entries.filterTo(mutableSetOf()) {
         (outOptions.value.toInt() and it.nativeMask) != 0
       }
     }
     set(options) {
       val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
-      Status.check(mln_map_set_debug_options(state.requireLive(), mask.toUInt()))
+      Status.check(mln_map_set_debug_options(state.requireLive().rawHandleValue, mask.toUInt()))
     }
 
   public actual var isRenderingStatsViewEnabled: Boolean
     get() = memScoped {
       val outEnabled = alloc<BooleanVar>()
-      Status.check(mln_map_get_rendering_stats_view_enabled(state.requireLive(), outEnabled.ptr))
+      Status.check(
+        mln_map_get_rendering_stats_view_enabled(state.requireLive().rawHandleValue, outEnabled.ptr)
+      )
       outEnabled.value
     }
     set(enabled) {
-      Status.check(mln_map_set_rendering_stats_view_enabled(state.requireLive(), enabled))
+      Status.check(
+        mln_map_set_rendering_stats_view_enabled(state.requireLive().rawHandleValue, enabled)
+      )
     }
 
   public actual val isFullyLoaded: Boolean
     get() = memScoped {
       val outLoaded = alloc<BooleanVar>()
-      Status.check(mln_map_is_fully_loaded(state.requireLive(), outLoaded.ptr))
+      Status.check(mln_map_is_fully_loaded(state.requireLive().rawHandleValue, outLoaded.ptr))
       outLoaded.value
     }
 
   public actual fun dumpDebugLogs() {
-    Status.check(mln_map_dump_debug_logs(state.requireLive()))
+    Status.check(mln_map_dump_debug_logs(state.requireLive().rawHandleValue))
   }
 
   public actual val size: MapSize
@@ -1055,7 +1068,12 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       val outHeight = alloc<UIntVar>()
       val outScaleFactor = alloc<DoubleVar>()
       Status.check(
-        mln_map_get_size(state.requireLive(), outWidth.ptr, outHeight.ptr, outScaleFactor.ptr)
+        mln_map_get_size(
+          state.requireLive().rawHandleValue,
+          outWidth.ptr,
+          outHeight.ptr,
+          outScaleFactor.ptr,
+        )
       )
       MapSize(outWidth.value.toInt(), outHeight.value.toInt(), outScaleFactor.value)
     }
@@ -1063,14 +1081,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual var viewportOptions: ViewportOptions
     get() = memScoped {
       val outOptions = mln_map_viewport_options_default().getPointer(this)
-      Status.check(mln_map_get_viewport_options(state.requireLive(), outOptions))
+      Status.check(mln_map_get_viewport_options(state.requireLive().rawHandleValue, outOptions))
       MapStructs.viewportOptions(outOptions.pointed)
     }
     set(options) {
       memScoped {
         Status.check(
           mln_map_set_viewport_options(
-            state.requireLive(),
+            state.requireLive().rawHandleValue,
             MapStructs.viewportOptions(options, this),
           )
         )
@@ -1080,13 +1098,16 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual var tileOptions: TileOptions
     get() = memScoped {
       val outOptions = mln_map_tile_options_default().getPointer(this)
-      Status.check(mln_map_get_tile_options(state.requireLive(), outOptions))
+      Status.check(mln_map_get_tile_options(state.requireLive().rawHandleValue, outOptions))
       MapStructs.tileOptions(outOptions.pointed)
     }
     set(options) {
       memScoped {
         Status.check(
-          mln_map_set_tile_options(state.requireLive(), MapStructs.tileOptions(options, this))
+          mln_map_set_tile_options(
+            state.requireLive().rawHandleValue,
+            MapStructs.tileOptions(options, this),
+          )
         )
       }
     }
@@ -1094,13 +1115,15 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual val camera: CameraOptions
     get() = memScoped {
       val outCamera = mln_camera_options_default().getPointer(this)
-      Status.check(mln_map_get_camera(state.requireLive(), outCamera))
+      Status.check(mln_map_get_camera(state.requireLive().rawHandleValue, outCamera))
       MapStructs.cameraOptions(outCamera.pointed)
     }
 
   public actual fun jumpTo(camera: CameraOptions) {
     memScoped {
-      Status.check(mln_map_jump_to(state.requireLive(), MapStructs.cameraOptions(camera, this)))
+      Status.check(
+        mln_map_jump_to(state.requireLive().rawHandleValue, MapStructs.cameraOptions(camera, this))
+      )
     }
   }
 
@@ -1108,7 +1131,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_ease_to(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           animation?.let { MapStructs.animationOptions(it, this) },
         )
@@ -1120,7 +1143,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_fly_to(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           animation?.let { MapStructs.animationOptions(it, this) },
         )
@@ -1129,14 +1152,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun moveBy(deltaX: Double, deltaY: Double) {
-    Status.check(mln_map_move_by(state.requireLive(), deltaX, deltaY))
+    Status.check(mln_map_move_by(state.requireLive().rawHandleValue, deltaX, deltaY))
   }
 
   public actual fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_move_by_animated(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           deltaX,
           deltaY,
           animation?.let { MapStructs.animationOptions(it, this) },
@@ -1147,7 +1170,11 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public actual fun scaleBy(scale: Double, anchor: ScreenPoint?) {
     Status.check(
-      mln_map_scale_by(state.requireLive(), scale, anchor?.let { CoreStructs.screenPoint(it) })
+      mln_map_scale_by(
+        state.requireLive().rawHandleValue,
+        scale,
+        anchor?.let { CoreStructs.screenPoint(it) },
+      )
     )
   }
 
@@ -1159,7 +1186,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_scale_by_animated(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           scale,
           anchor?.let { CoreStructs.screenPoint(it) },
           animation?.let { MapStructs.animationOptions(it, this) },
@@ -1171,7 +1198,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual fun rotateBy(first: ScreenPoint, second: ScreenPoint) {
     Status.check(
       mln_map_rotate_by(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(first),
         CoreStructs.screenPoint(second),
       )
@@ -1186,7 +1213,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     memScoped {
       Status.check(
         mln_map_rotate_by_animated(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.screenPoint(first),
           CoreStructs.screenPoint(second),
           animation?.let { MapStructs.animationOptions(it, this) },
@@ -1196,14 +1223,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun pitchBy(pitch: Double) {
-    Status.check(mln_map_pitch_by(state.requireLive(), pitch))
+    Status.check(mln_map_pitch_by(state.requireLive().rawHandleValue, pitch))
   }
 
   public actual fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_pitch_by_animated(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           pitch,
           animation?.let { MapStructs.animationOptions(it, this) },
         )
@@ -1212,7 +1239,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public actual fun cancelTransitions() {
-    Status.check(mln_map_cancel_transitions(state.requireLive()))
+    Status.check(mln_map_cancel_transitions(state.requireLive().rawHandleValue))
   }
 
   public actual fun cameraForLatLngBounds(
@@ -1222,7 +1249,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
       mln_map_camera_for_lat_lng_bounds(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.latLngBounds(bounds),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
@@ -1239,7 +1266,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
       mln_map_camera_for_lat_lngs(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.latLngArray(coordinateSnapshot, this),
         coordinateSnapshot.size.toULong(),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
@@ -1256,7 +1283,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
       mln_map_camera_for_geometry(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         ValueStructs.geometry(geometry, this),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
@@ -1269,7 +1296,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outBounds = alloc<mln_lat_lng_bounds>()
     Status.check(
       mln_map_lat_lng_bounds_for_camera(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         MapStructs.cameraOptions(camera, this),
         outBounds.ptr,
       )
@@ -1282,7 +1309,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       val outBounds = alloc<mln_lat_lng_bounds>()
       Status.check(
         mln_map_lat_lng_bounds_for_camera_unwrapped(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           MapStructs.cameraOptions(camera, this),
           outBounds.ptr,
         )
@@ -1293,13 +1320,16 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual var bounds: BoundOptions
     get() = memScoped {
       val outOptions = mln_bound_options_default().getPointer(this)
-      Status.check(mln_map_get_bounds(state.requireLive(), outOptions))
+      Status.check(mln_map_get_bounds(state.requireLive().rawHandleValue, outOptions))
       MapStructs.boundOptions(outOptions.pointed)
     }
     set(options) {
       memScoped {
         Status.check(
-          mln_map_set_bounds(state.requireLive(), MapStructs.boundOptions(options, this))
+          mln_map_set_bounds(
+            state.requireLive().rawHandleValue,
+            MapStructs.boundOptions(options, this),
+          )
         )
       }
     }
@@ -1307,14 +1337,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual var freeCameraOptions: FreeCameraOptions
     get() = memScoped {
       val outOptions = mln_free_camera_options_default().getPointer(this)
-      Status.check(mln_map_get_free_camera_options(state.requireLive(), outOptions))
+      Status.check(mln_map_get_free_camera_options(state.requireLive().rawHandleValue, outOptions))
       MapStructs.freeCameraOptions(outOptions.pointed)
     }
     set(options) {
       memScoped {
         Status.check(
           mln_map_set_free_camera_options(
-            state.requireLive(),
+            state.requireLive().rawHandleValue,
             MapStructs.freeCameraOptions(options, this),
           )
         )
@@ -1324,14 +1354,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual var projectionMode: ProjectionModeOptions
     get() = memScoped {
       val outMode = mln_projection_mode_default().getPointer(this)
-      Status.check(mln_map_get_projection_mode(state.requireLive(), outMode))
+      Status.check(mln_map_get_projection_mode(state.requireLive().rawHandleValue, outMode))
       MapStructs.projectionModeOptions(outMode.pointed)
     }
     set(mode) {
       memScoped {
         Status.check(
           mln_map_set_projection_mode(
-            state.requireLive(),
+            state.requireLive().rawHandleValue,
             MapStructs.projectionModeOptions(mode, this),
           )
         )
@@ -1341,7 +1371,11 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public actual fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
     val outPoint = alloc<mln_screen_point>()
     Status.check(
-      mln_map_pixel_for_lat_lng(state.requireLive(), CoreStructs.latLng(coordinate), outPoint.ptr)
+      mln_map_pixel_for_lat_lng(
+        state.requireLive().rawHandleValue,
+        CoreStructs.latLng(coordinate),
+        outPoint.ptr,
+      )
     )
     CoreStructs.screenPoint(outPoint)
   }
@@ -1350,7 +1384,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outCoordinate = alloc<mln_lat_lng>()
     Status.check(
       mln_map_lat_lng_for_pixel(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(point),
         outCoordinate.ptr,
       )
@@ -1364,7 +1398,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outPoints = allocArray<mln_screen_point>(coordinateSnapshot.size)
     Status.check(
       mln_map_pixels_for_lat_lngs(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.latLngArray(coordinateSnapshot, this),
         coordinateSnapshot.size.toULong(),
         outPoints,
@@ -1379,7 +1413,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     val outCoordinates = allocArray<mln_lat_lng>(pointSnapshot.size)
     Status.check(
       mln_map_lat_lngs_for_pixels(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.screenPointArray(pointSnapshot, this),
         pointSnapshot.size.toULong(),
         outCoordinates,
@@ -1422,16 +1456,16 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
   public actual fun createProjection(): MapProjectionHandle = memScoped {
-    val outProjection = alloc<CPointerVarOf<CPointer<mln_map_projection>>>()
-    outProjection.value = null
-    Status.check(mln_map_projection_create(state.requireLive(), outProjection.ptr))
+    val outProjection = alloc<ULongVar>()
+    outProjection.value = 0uL
+    Status.check(mln_map_projection_create(state.requireLive().rawHandleValue, outProjection.ptr))
     MapProjectionHandle(
-      requireNotNull(outProjection.value) { "mln_map_projection_create returned null" }
+      outProjection.value.asHandle("mln_map_projection_create", ::mapProjectionHandle)
     )
   }
 
   public actual override fun close() {
-    state.closeOnce(::mln_map_destroy) {
+    state.closeOnce({ handle -> mln_map_destroy(handle.rawHandleValue) }) {
       clearCustomGeometrySources()
       runtime.unregisterMap(this)
       runtimeRetention.close()
@@ -1443,9 +1477,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public actual fun runtime(): RuntimeHandle = runtime
 
-  internal fun nativeHandle(): CPointer<mln_map> = state.requireLive()
+  internal fun nativeHandle(): NativeMap = state.requireLive()
 
-  internal fun nativeAddress(): Long = state.address()
+  internal fun nativeHandleId(): Long = state.handleId()
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     state.retainChild(childTypeName)
@@ -1457,10 +1491,12 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public actual companion object {
     public actual fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
-      val outMap = alloc<CPointerVarOf<CPointer<mln_map>>>()
-      outMap.value = null
-      Status.check(mln_map_create(runtime.nativeHandle(), mapOptions(options, this), outMap.ptr))
-      val map = MapHandle(runtime, requireNotNull(outMap.value) { "mln_map_create returned null" })
+      val outMap = alloc<ULongVar>()
+      outMap.value = 0uL
+      Status.check(
+        mln_map_create(runtime.nativeHandle().rawHandleValue, mapOptions(options, this), outMap.ptr)
+      )
+      val map = MapHandle(runtime, outMap.value.asHandle("mln_map_create", ::mapHandle))
       runtime.registerMap(map)
       map
     }

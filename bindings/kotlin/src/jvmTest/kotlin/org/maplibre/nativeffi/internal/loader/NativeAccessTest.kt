@@ -1,12 +1,12 @@
 package org.maplibre.nativeffi.internal.loader
 
-import java.lang.foreign.MemorySegment
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.resource.ResourceErrorReason
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
@@ -56,7 +56,7 @@ class NativeAccessTest {
 
     val error =
       assertFailsWith<InvalidArgumentException> {
-        NativeAccess.completeResourceRequest(MemorySegment.NULL, response)
+        NativeAccess.completeResourceRequest(SyntheticHandles.resourceRequest(), response)
       }
 
     assertEquals("error message contains embedded NUL", error.diagnostic)
@@ -72,7 +72,7 @@ class NativeAccessTest {
 
     val error =
       assertFailsWith<InvalidArgumentException> {
-        NativeAccess.completeResourceRequest(MemorySegment.NULL, response)
+        NativeAccess.completeResourceRequest(SyntheticHandles.resourceRequest(), response)
       }
 
     assertEquals("Unknown resource error reason cannot be used as input: 999", error.diagnostic)
