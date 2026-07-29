@@ -638,6 +638,7 @@ const ownedTextureFrameFinalizer =
             registration.raw,
           );
           registration.closed = true;
+          registration.validity.active = false;
         } catch (error) {
           process.emitWarning(
             `Leaked ${registration.kind} texture frame could not be released: ${String(error)}`,
@@ -659,6 +660,7 @@ function ownedTextureFrameRegistration(
     releaseMethod,
     kind,
     closed: false,
+    validity: { active: true },
   };
   ownedTextureFrameFinalizer?.register(frame, registration, frame);
   return registration;
@@ -710,18 +712,20 @@ class MetalOwnedTextureFrame {
   }
 
   get texture() {
+    const validity = this.#registration.validity;
     return new NativePointer(
       CONSTRUCTION_TOKEN,
       this.#read("textureAddress"),
-      () => this.#active,
+      () => validity.active,
     );
   }
 
   get device() {
+    const validity = this.#registration.validity;
     return new NativePointer(
       CONSTRUCTION_TOKEN,
       this.#read("deviceAddress"),
-      () => this.#active,
+      () => validity.active,
     );
   }
 
@@ -745,6 +749,7 @@ class MetalOwnedTextureFrame {
     );
     this.#active = false;
     this.#registration.closed = true;
+    this.#registration.validity.active = false;
     ownedTextureFrameFinalizer?.unregister(this);
   }
 
@@ -829,6 +834,7 @@ class OpenGLOwnedTextureFrame {
     );
     this.#active = false;
     this.#registration.closed = true;
+    this.#registration.validity.active = false;
     ownedTextureFrameFinalizer?.unregister(this);
   }
 
@@ -887,26 +893,29 @@ class VulkanOwnedTextureFrame {
   }
 
   get image() {
+    const validity = this.#registration.validity;
     return new NativePointer(
       CONSTRUCTION_TOKEN,
       this.#read("imageAddress"),
-      () => this.#active,
+      () => validity.active,
     );
   }
 
   get imageView() {
+    const validity = this.#registration.validity;
     return new NativePointer(
       CONSTRUCTION_TOKEN,
       this.#read("imageViewAddress"),
-      () => this.#active,
+      () => validity.active,
     );
   }
 
   get device() {
+    const validity = this.#registration.validity;
     return new NativePointer(
       CONSTRUCTION_TOKEN,
       this.#read("deviceAddress"),
-      () => this.#active,
+      () => validity.active,
     );
   }
 
@@ -934,6 +943,7 @@ class VulkanOwnedTextureFrame {
     );
     this.#active = false;
     this.#registration.closed = true;
+    this.#registration.validity.active = false;
     ownedTextureFrameFinalizer?.unregister(this);
   }
 

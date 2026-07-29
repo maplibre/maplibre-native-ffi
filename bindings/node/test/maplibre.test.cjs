@@ -743,6 +743,7 @@ test("finalizers release abandoned request and texture scopes", () => {
 
     async function main() {
       let frameReleases = 0;
+      let borrowedTexture;
       let frame = binding.RenderSessionHandle.prototype
         .acquireMetalOwnedTextureFrame.call({
           native: {
@@ -764,8 +765,11 @@ test("finalizers release abandoned request and texture scopes", () => {
             },
           },
         });
+      borrowedTexture = frame.texture;
+      assert.equal(borrowedTexture.address, 1n);
       frame = undefined;
       await collectUntil(() => frameReleases === 1);
+      assert.throws(() => borrowedTexture.address, binding.InvalidStateError);
 
       let providerBridge;
       let requestCloses = 0;
