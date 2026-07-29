@@ -1219,7 +1219,7 @@ namespace MaplibreNative {
         private Raw.JsonValue[] property_value_natives;
         private Raw.Feature native;
 
-        public Feature (Geometry geometry, JsonMember[] properties, FeatureIdentifier? identifier = null) throws Error {
+        public Feature (Geometry? geometry, JsonMember[] properties, FeatureIdentifier? identifier = null) throws Error {
             if (geometry == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("feature geometry is null");
@@ -1413,7 +1413,7 @@ namespace MaplibreNative {
             native.type = (uint32) GeoJsonType.FEATURE_COLLECTION;
         }
 
-        public static GeoJson geometry (Geometry geometry) throws Error {
+        public static GeoJson geometry (Geometry? geometry) throws Error {
             if (geometry == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("GeoJSON geometry is null");
@@ -1421,7 +1421,7 @@ namespace MaplibreNative {
             return new GeoJson.for_geometry (geometry);
         }
 
-        public static GeoJson feature (Feature feature) throws Error {
+        public static GeoJson feature (Feature? feature) throws Error {
             if (feature == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("GeoJSON feature is null");
@@ -1429,7 +1429,7 @@ namespace MaplibreNative {
             return new GeoJson.for_feature (feature);
         }
 
-        public static GeoJson feature_collection (FeatureCollection feature_collection) throws Error {
+        public static GeoJson feature_collection (FeatureCollection? feature_collection) throws Error {
             if (feature_collection == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("GeoJSON feature collection is null");

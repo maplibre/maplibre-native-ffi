@@ -140,7 +140,7 @@ namespace MaplibreNative {
         public bool? clip { get; set; }
         public bool? wrap { get; set; }
 
-        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback fetch_tile, owned CustomGeometryTileCallback? cancel_tile = null) throws Error {
+        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback? fetch_tile, owned CustomGeometryTileCallback? cancel_tile = null) throws Error {
             if (fetch_tile == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("custom geometry fetch callback is null");

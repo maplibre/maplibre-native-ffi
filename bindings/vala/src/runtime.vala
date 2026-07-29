@@ -928,7 +928,7 @@ namespace MaplibreNative {
             return is_cancelled;
         }
 
-        public void complete (ResourceResponse response) throws Error {
+        public void complete (ResourceResponse? response) throws Error {
             if (response == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("resource response is null");
@@ -949,7 +949,7 @@ namespace MaplibreNative {
             }
         }
 
-        public void complete_and_release (ResourceResponse response) throws Error {
+        public void complete_and_release (ResourceResponse? response) throws Error {
             try {
                 complete (response);
             } catch (Error error) {

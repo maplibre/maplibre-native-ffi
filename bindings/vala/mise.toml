@@ -111,6 +111,9 @@ for argument in "${native_args[@]}"; do
 done
 if [[ "$(uname -s)" == "Linux" ]]; then
   compiler_args+=(-X -lstdc++ -X -lX11)
+  if [[ "$usage_preset" == *-egl ]]; then
+    compiler_args+=(-X -lGLESv2)
+  fi
 fi
 if [[ "$usage_preset" == *-egl ]]; then
   compiler_args+=(-X -DMLN_VALA_TEST_EGL=1)
