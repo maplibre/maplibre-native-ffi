@@ -34,7 +34,7 @@ impl super::MapHandle {
     /// loading-failed event; callers must not treat syntactically valid JSON as
     /// a successful style load until the event stream confirms it.
     pub fn set_style_url(&self, url: &str) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let url = maplibre_core::string::c_string(url)?;
         // SAFETY: map is live and url is a NUL-terminated UTF-8 string valid
         // for the duration of this command. The C API copies/consumes it before
@@ -54,7 +54,7 @@ impl super::MapHandle {
     /// also report a loading-failed event. Callers must not equate syntactically
     /// valid JSON with a supported style document.
     pub fn set_style_json(&self, json: &str) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let json = maplibre_core::string::c_string(json)?;
         // SAFETY: map is live and json is a NUL-terminated UTF-8 string valid
         // for the duration of this command. The C API copies/consumes it before
@@ -78,7 +78,7 @@ impl super::MapHandle {
         source_id: &str,
         options: CustomGeometrySourceOptions,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id_view = maplibre_core::string::string_view(source_id);
         let state = CustomGeometrySourceState::new(options);
         let descriptor = state.descriptor();
@@ -101,7 +101,7 @@ impl super::MapHandle {
         tile_id: CanonicalTileId,
         data: &GeoJson,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = data.try_to_native()?;
         // SAFETY: map is live, source_id is valid for this call, tile_id is
@@ -122,7 +122,7 @@ impl super::MapHandle {
         source_id: &str,
         tile_id: CanonicalTileId,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live, source_id is valid for this call, and tile_id is
         // passed by value.
@@ -141,7 +141,7 @@ impl super::MapHandle {
         source_id: &str,
         bounds: LatLngBounds,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         // SAFETY: map is live, source_id is valid for this call, and bounds is
         // passed by value.
@@ -156,7 +156,7 @@ impl super::MapHandle {
 
     /// Adds one style source from a style-spec source JSON object.
     pub fn add_style_source_json(&self, source_id: &str, source_json: &JsonValue) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let source_json = source_json.try_to_native()?;
         // SAFETY: map is live, source_id is an explicit-length view valid for
@@ -173,7 +173,7 @@ impl super::MapHandle {
         url: &str,
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         let options = options.map(TileSourceOptions::to_native);
@@ -194,7 +194,7 @@ impl super::MapHandle {
         tiles: &[S],
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
         let options = options.map(TileSourceOptions::to_native);
@@ -222,7 +222,7 @@ impl super::MapHandle {
         url: &str,
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         let options = options.map(TileSourceOptions::to_native);
@@ -243,7 +243,7 @@ impl super::MapHandle {
         tiles: &[S],
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
         let options = options.map(TileSourceOptions::to_native);
@@ -271,7 +271,7 @@ impl super::MapHandle {
         url: &str,
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         let options = options.map(TileSourceOptions::to_native);
@@ -292,7 +292,7 @@ impl super::MapHandle {
         tiles: &[S],
         options: Option<&TileSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let raw_tiles = NativeTileUrls::new(tiles);
         let options = options.map(TileSourceOptions::to_native);
@@ -324,7 +324,7 @@ impl super::MapHandle {
         coordinates: &[LatLng; 4],
         url: &str,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
         let url = maplibre_core::string::string_view(url);
@@ -353,7 +353,7 @@ impl super::MapHandle {
         coordinates: &[LatLng; 4],
         image: &PremultipliedRgba8Image,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
@@ -373,7 +373,7 @@ impl super::MapHandle {
 
     /// Updates an image source to load its image from a URL.
     pub fn set_image_source_url(&self, source_id: &str, url: &str) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         // SAFETY: map is live, and source_id and url are explicit-length views
@@ -389,7 +389,7 @@ impl super::MapHandle {
         source_id: &str,
         image: &PremultipliedRgba8Image,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
         // SAFETY: map is live, source_id is an explicit-length view valid for
@@ -409,7 +409,7 @@ impl super::MapHandle {
         source_id: &str,
         coordinates: &[LatLng; 4],
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
         // SAFETY: map is live, source_id is an explicit-length view valid for
@@ -427,7 +427,7 @@ impl super::MapHandle {
 
     /// Copies image source coordinates into owned Rust values.
     pub fn image_source_coordinates(&self, source_id: &str) -> Result<Option<[LatLng; 4]>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let mut coordinates = [sys::mln_lat_lng {
             latitude: 0.0,
@@ -466,7 +466,7 @@ impl super::MapHandle {
     /// Returns whether a source existed and was removed. Native returns an
     /// error when a layer still uses the source.
     pub fn remove_style_source(&self, source_id: &str) -> Result<bool> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id_key = source_id.to_owned();
         let source_id = maplibre_core::string::string_view(source_id);
         let mut removed = false;
@@ -486,7 +486,7 @@ impl super::MapHandle {
 
     /// Reports whether a style source ID exists.
     pub fn style_source_exists(&self, source_id: &str) -> Result<bool> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let mut exists = false;
         // SAFETY: map is live, source_id is an explicit-length view valid for
@@ -504,7 +504,7 @@ impl super::MapHandle {
         image: &PremultipliedRgba8Image,
         options: Option<&StyleImageOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
         let options = options.map(StyleImageOptions::to_native);
@@ -521,7 +521,7 @@ impl super::MapHandle {
     ///
     /// Returns whether an image existed and was removed.
     pub fn remove_style_image(&self, image_id: &str) -> Result<bool> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let mut removed = false;
         // SAFETY: map is live, image_id is an explicit-length view valid for
@@ -534,7 +534,7 @@ impl super::MapHandle {
 
     /// Reports whether a runtime style image ID exists.
     pub fn style_image_exists(&self, image_id: &str) -> Result<bool> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let mut exists = false;
         // SAFETY: map is live, image_id is an explicit-length view valid for
@@ -547,7 +547,7 @@ impl super::MapHandle {
 
     /// Copies fixed metadata for one runtime style image.
     pub fn style_image_info(&self, image_id: &str) -> Result<Option<StyleImageInfo>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let mut info = maplibre_core::style::empty_style_image_info();
         let mut found = false;
@@ -565,7 +565,7 @@ impl super::MapHandle {
         &self,
         image_id: &str,
     ) -> Result<Option<StyleImage>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let image_id = maplibre_core::string::string_view(image_id);
         let mut raw_info = maplibre_core::style::empty_style_image_info();
         let mut info_found = false;
@@ -610,7 +610,7 @@ impl super::MapHandle {
 
     /// Gets one style source type.
     pub fn style_source_type(&self, source_id: &str) -> Result<Option<SourceType>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let mut raw_source_type = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
         let mut found = false;
@@ -629,7 +629,7 @@ impl super::MapHandle {
 
     /// Copies fixed metadata and attribution for one style source.
     pub fn style_source_info(&self, source_id: &str) -> Result<Option<SourceInfo>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let mut info = maplibre_core::style::empty_style_source_info();
         let mut found = false;
@@ -660,7 +660,7 @@ impl super::MapHandle {
 
     fn copy_style_source_attribution(
         &self,
-        map: *mut sys::mln_map,
+        map: sys::mln_map,
         source_id: sys::mln_string_view,
         attribution_size: usize,
     ) -> Result<Option<String>> {
@@ -728,7 +728,7 @@ impl super::MapHandle {
         url: &str,
         options: Option<&GeoJsonSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         let options = options
@@ -756,7 +756,7 @@ impl super::MapHandle {
         data: &GeoJson,
         options: Option<&GeoJsonSourceOptions>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = data.try_to_native()?;
         let options = options
@@ -777,7 +777,7 @@ impl super::MapHandle {
     ///
     /// The source keeps the options it was added with.
     pub fn set_geojson_source_url(&self, source_id: &str, url: &str) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let url = maplibre_core::string::string_view(url);
         // SAFETY: map is live and source_id and url are valid for this call.
@@ -790,7 +790,7 @@ impl super::MapHandle {
     ///
     /// The source keeps the options it was added with.
     pub fn set_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let data = data.try_to_native()?;
         // SAFETY: map is live, source_id is valid for this call, and data owns
@@ -806,7 +806,7 @@ impl super::MapHandle {
         layer_json: &JsonValue,
         before_layer_id: Option<&str>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_json = layer_json.try_to_native()?;
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
         // SAFETY: map is live, layer_json owns the descriptor graph, and
@@ -823,7 +823,7 @@ impl super::MapHandle {
         source_id: &str,
         before_layer_id: Option<&str>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_id = maplibre_core::string::string_view(source_id);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
@@ -845,7 +845,7 @@ impl super::MapHandle {
         source_id: &str,
         before_layer_id: Option<&str>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let source_id = maplibre_core::string::string_view(source_id);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
@@ -866,7 +866,7 @@ impl super::MapHandle {
         layer_id: &str,
         before_layer_id: Option<&str>,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let before_layer_id = maplibre_core::string::string_view(before_layer_id.unwrap_or(""));
         // SAFETY: map is live, and string views are valid for this call.
@@ -882,7 +882,7 @@ impl super::MapHandle {
         coordinate: LatLng,
         altitude: f64,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live, layer_id is valid for this call, and coordinate
         // is passed by value.
@@ -898,7 +898,7 @@ impl super::MapHandle {
 
     /// Sets a location indicator layer bearing in degrees.
     pub fn set_location_indicator_bearing(&self, layer_id: &str, bearing: f64) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id is valid for this call.
         maplibre_core::check(unsafe {
@@ -912,7 +912,7 @@ impl super::MapHandle {
         layer_id: &str,
         radius: f64,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         // SAFETY: map is live and layer_id is valid for this call.
         maplibre_core::check(unsafe {
@@ -927,7 +927,7 @@ impl super::MapHandle {
         image_kind: LocationIndicatorImageKind,
         image_id: &str,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let image_id = maplibre_core::string::string_view(image_id);
         // SAFETY: map is live, string views are valid for this call, and
@@ -944,9 +944,9 @@ impl super::MapHandle {
 
     /// Copies one style layer as a full style-spec JSON object.
     pub fn style_layer_json(&self, layer_id: &str) -> Result<Option<JsonValue>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         let mut found = false;
         // SAFETY: map is live, layer_id is valid for this call, out is a
         // null-initialized out-pointer, and found points to writable storage.
@@ -955,13 +955,13 @@ impl super::MapHandle {
         })?;
         // SAFETY: On success, the C API returns either null or an owned JSON
         // snapshot handle for this call; core copies and releases it.
-        let snapshot = unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }?;
+        let snapshot = unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }?;
         if found { Ok(snapshot) } else { Ok(None) }
     }
 
     /// Sets the style light from a style-spec light JSON object.
     pub fn set_style_light_json(&self, light_json: &JsonValue) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let light_json = light_json.try_to_native()?;
         // SAFETY: map is live and light_json owns the descriptor graph for this call.
         maplibre_core::check(unsafe { sys::mln_map_set_style_light_json(map, light_json.as_ptr()) })
@@ -969,7 +969,7 @@ impl super::MapHandle {
 
     /// Sets one style light property.
     pub fn set_style_light_property(&self, property_name: &str, value: &JsonValue) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
         let value = value.try_to_native()?;
         // SAFETY: map is live, property_name is valid for this call, and value
@@ -981,9 +981,9 @@ impl super::MapHandle {
 
     /// Copies one style light property as a style-spec JSON value.
     pub fn style_light_property(&self, property_name: &str) -> Result<Option<JsonValue>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: map is live, property_name is valid for this call, and out is
         // a null-initialized out-pointer.
         maplibre_core::check(unsafe {
@@ -991,7 +991,7 @@ impl super::MapHandle {
         })?;
         // SAFETY: On success, the C API returns either null or an owned JSON
         // snapshot handle for this call; core copies and releases it.
-        unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }
+        unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
     }
 
     /// Sets one layer style property.
@@ -1001,7 +1001,7 @@ impl super::MapHandle {
         property_name: &str,
         value: &JsonValue,
     ) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let property_name = maplibre_core::string::string_view(property_name);
         let value = value.try_to_native()?;
@@ -1019,10 +1019,10 @@ impl super::MapHandle {
 
     /// Copies one layer style property as a style-spec JSON value.
     pub fn layer_property(&self, layer_id: &str, property_name: &str) -> Result<Option<JsonValue>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let property_name = maplibre_core::string::string_view(property_name);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: map is live, string views are valid for this call, and out is
         // a null-initialized out-pointer.
         maplibre_core::check(unsafe {
@@ -1035,12 +1035,12 @@ impl super::MapHandle {
         })?;
         // SAFETY: On success, the C API returns either null or an owned JSON
         // snapshot handle for this call; core copies and releases it.
-        unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }
+        unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
     }
 
     /// Sets or clears one layer filter.
     pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&JsonValue>) -> Result<()> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
         let native_filter = filter.map(JsonValue::try_to_native).transpose()?;
         // SAFETY: map is live, layer_id is valid for this call, and the
@@ -1058,9 +1058,9 @@ impl super::MapHandle {
 
     /// Copies one layer filter as a style-spec JSON value.
     pub fn layer_filter(&self, layer_id: &str) -> Result<Option<JsonValue>> {
-        let map = self.inner.as_ptr()?;
+        let map = self.inner.native()?;
         let layer_id = maplibre_core::string::string_view(layer_id);
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: map is live, layer_id is valid for this call, and out is a
         // null-initialized out-pointer.
         maplibre_core::check(unsafe {
@@ -1070,7 +1070,7 @@ impl super::MapHandle {
         // snapshot handle for this call; core copies and releases it. Some
         // native backends represent a cleared filter as a JSON null snapshot.
         Ok(
-            match unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }? {
+            match unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }? {
                 Some(JsonValue::Null) => None,
                 filter => filter,
             },
@@ -1079,27 +1079,27 @@ impl super::MapHandle {
 
     /// Copies current style source IDs into owned Rust strings.
     pub fn style_source_ids(&self) -> Result<Vec<String>> {
-        let map = self.inner.as_ptr()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
         // SAFETY: map is live and out is a null-initialized out-pointer owned by
         // this call. On success the returned handle is wrapped and destroyed by
         // the copying helper below.
         maplibre_core::check(unsafe { sys::mln_map_list_style_source_ids(map, out.as_mut_ptr()) })?;
         // SAFETY: On success, the C API returns an owned style ID list handle;
         // core copies and releases it.
-        unsafe { maplibre_core::style::copy_style_id_list(out.into_non_null("mln_style_id_list")?) }
+        unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
     }
 
     /// Copies current style layer IDs into owned Rust strings.
     pub fn style_layer_ids(&self) -> Result<Vec<String>> {
-        let map = self.inner.as_ptr()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        let map = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_style_id_list>::new();
         // SAFETY: map is live and out is a null-initialized out-pointer owned by
         // this call. On success the returned handle is wrapped and destroyed by
         // the copying helper below.
         maplibre_core::check(unsafe { sys::mln_map_list_style_layer_ids(map, out.as_mut_ptr()) })?;
         // SAFETY: On success, the C API returns an owned style ID list handle;
         // core copies and releases it.
-        unsafe { maplibre_core::style::copy_style_id_list(out.into_non_null("mln_style_id_list")?) }
+        unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
     }
 }

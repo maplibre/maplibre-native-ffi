@@ -500,7 +500,7 @@ fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
     let mut event = empty_runtime_event();
     event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
     event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.as_ptr().cast();
+    event.source = map.inner.handle.handle().0;
     runtime.inner.apply_event_side_effects_for_testing(&event);
 
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
@@ -523,7 +523,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     // points to writable storage. This bypasses the binding cleanup path to
     // model native style replacement detaching the source.
     let status = unsafe {
-        sys::mln_map_remove_style_source(map.inner.handle.as_ptr(), source_id.raw(), &mut removed)
+        sys::mln_map_remove_style_source(map.inner.handle.handle(), source_id.raw(), &mut removed)
     };
     assert_eq!(status, sys::MLN_STATUS_OK);
     assert!(removed);
@@ -532,7 +532,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     let mut event = empty_runtime_event();
     event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
     event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.as_ptr().cast();
+    event.source = map.inner.handle.handle().0;
     runtime.inner.apply_event_side_effects_for_testing(&event);
 
     assert_eq!(map.custom_geometry_source_count_for_testing(), 0);

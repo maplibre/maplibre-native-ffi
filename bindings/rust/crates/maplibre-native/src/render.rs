@@ -2,7 +2,6 @@ use std::cell::Cell;
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::NonNull;
 use std::rc::Rc;
 
 pub use maplibre_core::{PremultipliedRgba8Image, TextureImageInfo};
@@ -737,21 +736,21 @@ struct RenderSessionState {
 }
 
 impl RenderSessionState {
-    fn new(ptr: NonNull<sys::mln_render_session>) -> Self {
-        // SAFETY: ptr came from a successful render-session attach call and is
+    fn new(native: sys::mln_render_session) -> Result<Self> {
+        // SAFETY: native came from a successful render-session attach call and is
         // paired with the matching render-session destroy function.
         let handle = unsafe {
-            ThreadAffineNativeHandle::from_raw(
-                ptr,
+            ThreadAffineNativeHandle::from_handle(
+                native,
                 sys::mln_render_session_destroy,
                 "mln_render_session",
             )
-        };
-        Self {
+        }?;
+        Ok(Self {
             handle,
             detached: Cell::new(false),
             frame_acquired: Cell::new(false),
-        }
+        })
     }
 
     fn ensure_no_frame_acquired(&self) -> Result<()> {
@@ -762,13 +761,10 @@ impl RenderSessionState {
         }
     }
 
-    fn as_ptr(&self) -> Result<*mut sys::mln_render_session> {
-        let ptr = self.handle.as_ptr();
-        if ptr.is_null() {
-            Err(closed_handle_error("RenderSessionHandle"))
-        } else {
-            Ok(ptr)
-        }
+    fn native(&self) -> Result<sys::mln_render_session> {
+        self.handle
+            .live_handle()
+            .ok_or_else(|| closed_handle_error("RenderSessionHandle"))
     }
 
     fn close(&self) -> Result<()> {
@@ -990,14 +986,14 @@ impl MetalOwnedTextureFrameHandle {
     fn close_with_release(
         self,
         release: unsafe extern "C" fn(
-            *mut sys::mln_render_session,
+            sys::mln_render_session,
             *const sys::mln_metal_owned_texture_frame,
         ) -> sys::mln_status,
     ) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
         }
-        let session = match self.session.as_ptr() {
+        let session = match self.session.native() {
             Ok(session) => session,
             Err(error) => return Err(HandleOperationError::new(error, self)),
         };
@@ -1017,7 +1013,7 @@ impl Drop for MetalOwnedTextureFrameHandle {
         if self.closed.get() {
             return;
         }
-        if let Ok(session) = self.session.as_ptr() {
+        if let Ok(session) = self.session.native() {
             // SAFETY: Best-effort release of the active frame. Drop cannot
             // report errors and never panics.
             let status = unsafe { sys::mln_metal_owned_texture_release_frame(session, &self.raw) };
@@ -1112,7 +1108,7 @@ impl VulkanOwnedTextureFrameHandle {
         if self.closed.get() {
             return Ok(());
         }
-        let session = match self.session.as_ptr() {
+        let session = match self.session.native() {
             Ok(session) => session,
             Err(error) => return Err(HandleOperationError::new(error, self)),
         };
@@ -1134,7 +1130,7 @@ impl Drop for VulkanOwnedTextureFrameHandle {
         if self.closed.get() {
             return;
         }
-        if let Ok(session) = self.session.as_ptr() {
+        if let Ok(session) = self.session.native() {
             // SAFETY: Best-effort release of the active frame. Drop cannot
             // report errors and never panics.
             let status = unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &self.raw) };
@@ -1190,7 +1186,7 @@ impl OpenGLOwnedTextureFrameHandle {
         if self.closed.get() {
             return Ok(());
         }
-        let session = match self.session.as_ptr() {
+        let session = match self.session.native() {
             Ok(session) => session,
             Err(error) => return Err(HandleOperationError::new(error, self)),
         };
@@ -1212,7 +1208,7 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
         if self.closed.get() {
             return;
         }
-        if let Ok(session) = self.session.as_ptr() {
+        if let Ok(session) = self.session.native() {
             // SAFETY: Best-effort release of the active frame. Drop cannot
             // report errors and never panics.
             let status = unsafe { sys::mln_opengl_owned_texture_release_frame(session, &self.raw) };
@@ -1227,16 +1223,16 @@ impl Drop for OpenGLOwnedTextureFrameHandle {
 impl RenderSessionHandle {
     pub(crate) fn attach<F>(map: &MapAttachRef, attach: F) -> Result<Self>
     where
-        F: FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
+        F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
     {
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_render_session>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
         // The map is held live across the native call, so a concurrent close on
         // its owner thread waits instead of freeing the address underneath it.
         let status = map.with_live(|map| attach(map, out.as_mut_ptr()))?;
         maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {
-            inner: Rc::new(RenderSessionState::new(ptr)),
+            inner: Rc::new(RenderSessionState::new(ptr)?),
         })
     }
 
@@ -1266,7 +1262,7 @@ impl RenderSessionHandle {
     /// sources lives on the map and survives both resize and reattach.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
         maplibre_core::check(unsafe {
             sys::mln_render_session_resize(session, width, height, scale_factor)
@@ -1284,7 +1280,7 @@ impl RenderSessionHandle {
     /// pumping the runtime until an update is reported.
     pub fn render_update(&self) -> Result<bool> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let mut rendered = false;
         // SAFETY: session is a live render session handle owned by this wrapper,
         // and rendered points to caller-owned output storage.
@@ -1309,7 +1305,7 @@ impl RenderSessionHandle {
         if let Err(error) = self.inner.ensure_no_frame_acquired() {
             return Err(HandleOperationError::new(error, self));
         }
-        let session = match self.inner.as_ptr() {
+        let session = match self.inner.native() {
             Ok(session) => session,
             Err(error) => return Err(HandleOperationError::new(error, self)),
         };
@@ -1327,7 +1323,7 @@ impl RenderSessionHandle {
     /// Asks the session renderer to release cached resources where possible.
     pub fn reduce_memory_use(&self) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
         maplibre_core::check(unsafe { sys::mln_render_session_reduce_memory_use(session) })
     }
@@ -1335,7 +1331,7 @@ impl RenderSessionHandle {
     /// Clears renderer data for the session.
     pub fn clear_data(&self) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
         maplibre_core::check(unsafe { sys::mln_render_session_clear_data(session) })
     }
@@ -1343,7 +1339,7 @@ impl RenderSessionHandle {
     /// Dumps renderer debug logs through MapLibre Native logging.
     pub fn dump_debug_logs(&self) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
         maplibre_core::check(unsafe { sys::mln_render_session_dump_debug_logs(session) })
     }
@@ -1351,7 +1347,7 @@ impl RenderSessionHandle {
     /// Returns CPU readback metadata for the most recently rendered texture frame.
     pub fn texture_image_info(&self) -> Result<TextureImageInfo> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         // SAFETY: session is live. Passing a null buffer with zero capacity is
@@ -1371,7 +1367,7 @@ impl RenderSessionHandle {
     /// Reads the most recently rendered texture frame as premultiplied RGBA8.
     pub fn read_premultiplied_rgba8_into(&self, data: &mut [u8]) -> Result<TextureImageInfo> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         let data_ptr = if data.is_empty() {
@@ -1391,7 +1387,7 @@ impl RenderSessionHandle {
     /// Acquires a borrowed Metal frame from a session-owned texture target.
     pub fn acquire_metal_owned_texture_frame(&self) -> Result<MetalOwnedTextureFrameHandle> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let mut raw = empty_metal_owned_texture_frame();
         // SAFETY: session is live and raw points to initialized writable frame storage.
         maplibre_core::check(unsafe {
@@ -1410,7 +1406,7 @@ impl RenderSessionHandle {
     /// Acquires a borrowed Vulkan frame from a session-owned texture target.
     pub fn acquire_vulkan_owned_texture_frame(&self) -> Result<VulkanOwnedTextureFrameHandle> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let mut raw = empty_vulkan_owned_texture_frame();
         // SAFETY: session is live and raw points to initialized writable frame storage.
         maplibre_core::check(unsafe {
@@ -1429,7 +1425,7 @@ impl RenderSessionHandle {
     /// Acquires a borrowed OpenGL frame from a session-owned texture target.
     pub fn acquire_opengl_owned_texture_frame(&self) -> Result<OpenGLOwnedTextureFrameHandle> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let mut raw = empty_opengl_owned_texture_frame();
         // SAFETY: session is live and raw points to initialized writable frame storage.
         maplibre_core::check(unsafe {

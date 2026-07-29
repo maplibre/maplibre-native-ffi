@@ -37,8 +37,58 @@ impl<T> Default for OutPtr<T> {
     }
 }
 
+/// An out-parameter for a handle the C API issues.
+///
+/// The C contract requires `*out_handle` to be the null handle on entry, which
+/// this guarantees, and the value is the handle itself rather than a pointer to
+/// one, so it needs one less level of indirection than [`OutPtr`].
+#[derive(Debug)]
+pub struct OutHandle<T: crate::handle::NativeHandle> {
+    value: T,
+}
+
+impl<T: crate::handle::NativeHandle> OutHandle<T> {
+    pub fn new() -> Self {
+        Self {
+            value: T::from_raw(0),
+        }
+    }
+
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        &raw mut self.value
+    }
+
+    pub fn get(&self) -> T {
+        self.value
+    }
+
+    /// The issued handle, or an error when the C API left it null.
+    pub fn into_live(self, name: &'static str) -> Result<T> {
+        if self.value.to_raw() == 0 {
+            return Err(null_handle_error(name));
+        }
+        Ok(self.value)
+    }
+
+    /// The issued handle, or `None` when the C API left it null.
+    pub fn into_option(self) -> Option<T> {
+        (self.value.to_raw() != 0).then_some(self.value)
+    }
+}
+
+impl<T: crate::handle::NativeHandle> Default for OutHandle<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn non_null_mut<T>(ptr: *mut T, name: &'static str) -> Result<NonNull<T>> {
     NonNull::new(ptr).ok_or_else(|| null_pointer_error(name))
+}
+
+/// Reports a handle that is the null handle where a live one was required.
+pub fn null_handle_error(name: &'static str) -> Error {
+    Error::invalid_argument(format!("{name} must not be the null handle"))
 }
 
 pub fn null_pointer_error(name: &'static str) -> Error {

@@ -2,7 +2,6 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use std::rc::{Rc, Weak};
 use std::time::Duration;
 
@@ -32,37 +31,34 @@ pub(crate) use maplibre_core::runtime::{
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
-    next_map_id: Cell<u64>,
-    map_ids: RefCell<HashMap<usize, MapId>>,
-    map_states: RefCell<HashMap<usize, Weak<MapState>>>,
+    // A map's id is its native handle, which names one map for the life of the
+    // process, so this binding no longer allocates ids of its own. The state
+    // table stays: it drives style-loaded custom geometry cleanup, which the C
+    // API cannot do.
+    map_states: RefCell<HashMap<MapId, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
 }
 
 impl RuntimeState {
-    fn new(ptr: std::ptr::NonNull<sys::mln_runtime>) -> Self {
-        // SAFETY: ptr came from successful mln_runtime_create and is paired
+    fn new(native: sys::mln_runtime) -> Result<Self> {
+        // SAFETY: native came from successful mln_runtime_create and is paired
         // with the matching runtime destroy function.
         let handle = unsafe {
-            ThreadAffineNativeHandle::from_raw(ptr, sys::mln_runtime_destroy, "mln_runtime")
-        };
-        Self {
+            ThreadAffineNativeHandle::from_handle(native, sys::mln_runtime_destroy, "mln_runtime")
+        }?;
+        Ok(Self {
             handle,
-            next_map_id: Cell::new(1),
-            map_ids: RefCell::new(HashMap::new()),
             map_states: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
             resource_provider: RefCell::new(None),
-        }
+        })
     }
 
-    pub(crate) fn as_ptr(&self) -> Result<*mut sys::mln_runtime> {
-        let ptr = self.handle.as_ptr();
-        if ptr.is_null() {
-            Err(closed_handle_error("RuntimeHandle"))
-        } else {
-            Ok(ptr)
-        }
+    pub(crate) fn native(&self) -> Result<sys::mln_runtime> {
+        self.handle
+            .live_handle()
+            .ok_or_else(|| closed_handle_error("RuntimeHandle"))
     }
 
     fn is_closed(&self) -> bool {
@@ -113,7 +109,7 @@ impl RuntimeState {
         replacement: Box<ResourceProviderState>,
         descriptor: sys::mln_resource_provider,
     ) -> Result<()> {
-        let runtime = self.as_ptr()?;
+        let runtime = self.native()?;
 
         // SAFETY: runtime is live. descriptor contains a C trampoline and a
         // user_data pointer to the boxed replacement, which remains alive on
@@ -129,7 +125,7 @@ impl RuntimeState {
     }
 
     fn clear_resource_provider(&self) -> Result<()> {
-        let runtime = self.as_ptr()?;
+        let runtime = self.native()?;
 
         // SAFETY: runtime is live. Native clear waits for in-flight provider
         // callbacks before returning, so dropping Rust callback state below is safe.
@@ -142,7 +138,7 @@ impl RuntimeState {
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
-        let runtime = self.as_ptr()?;
+        let runtime = self.native()?;
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
 
@@ -158,7 +154,7 @@ impl RuntimeState {
     }
 
     fn clear_resource_transform(&self) -> Result<()> {
-        let runtime = self.as_ptr()?;
+        let runtime = self.native()?;
 
         // SAFETY: runtime is live. Native clear waits for in-flight transform
         // callbacks before returning, so dropping Rust callback state below is safe.
@@ -167,23 +163,21 @@ impl RuntimeState {
         Ok(())
     }
 
-    pub(crate) fn register_map(&self, ptr: *mut sys::mln_map) -> MapId {
-        let id = MapId::new(self.next_map_id.get());
-        self.next_map_id.set(id.get().saturating_add(1));
-        self.map_ids.borrow_mut().insert(ptr as usize, id);
-        id
+    pub(crate) fn register_map(&self, native: sys::mln_map) -> MapId {
+        MapId::new(native.0)
     }
 
-    pub(crate) fn register_map_state(&self, ptr: *mut sys::mln_map, state: Weak<MapState>) {
-        if !ptr.is_null() {
-            self.map_states.borrow_mut().insert(ptr as usize, state);
+    pub(crate) fn register_map_state(&self, native: sys::mln_map, state: Weak<MapState>) {
+        if native.0 != 0 {
+            self.map_states
+                .borrow_mut()
+                .insert(MapId::new(native.0), state);
         }
     }
 
-    pub(crate) fn unregister_map(&self, ptr: *mut sys::mln_map) {
-        if !ptr.is_null() {
-            self.map_ids.borrow_mut().remove(&(ptr as usize));
-            self.map_states.borrow_mut().remove(&(ptr as usize));
+    pub(crate) fn unregister_map(&self, native: sys::mln_map) {
+        if native.0 != 0 {
+            self.map_states.borrow_mut().remove(&MapId::new(native.0));
         }
     }
 
@@ -194,7 +188,7 @@ impl RuntimeState {
         let state = self
             .map_states
             .borrow()
-            .get(&(raw.source as usize))
+            .get(&MapId::new(raw.source))
             .and_then(Weak::upgrade);
         let Some(state) = state else {
             return;
@@ -213,10 +207,10 @@ impl RuntimeState {
         match raw.source_type {
             sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME => RuntimeEventSource::Runtime,
             sys::MLN_RUNTIME_EVENT_SOURCE_MAP => self
-                .map_ids
+                .map_states
                 .borrow()
-                .get(&(raw.source as usize))
-                .copied()
+                .get(&MapId::new(raw.source))
+                .map(|_| MapId::new(raw.source))
                 .map(RuntimeEventSource::Map)
                 .unwrap_or(RuntimeEventSource::UnknownMap),
             source_type => RuntimeEventSource::Unknown(source_type),
@@ -282,11 +276,11 @@ impl<T> OfflineOperationHandle<T> {
         })
     }
 
-    fn runtime_ptr(&self) -> Result<*mut sys::mln_runtime> {
+    fn runtime_ptr(&self) -> Result<sys::mln_runtime> {
         if !self.live.get() {
             return Err(closed_handle_error("OfflineOperationHandle"));
         }
-        self.runtime.as_ptr()
+        self.runtime.native()
     }
 
     fn mark_consumed(&self) {
@@ -318,7 +312,7 @@ impl<T> Drop for OfflineOperationHandle<T> {
         if !self.live.get() {
             return;
         }
-        if let Ok(runtime) = self.runtime.as_ptr() {
+        if let Ok(runtime) = self.runtime.native() {
             // SAFETY: Safe Rust keeps this !Send/!Sync handle on the runtime owner thread.
             let status =
                 unsafe { sys::mln_runtime_offline_operation_discard(runtime, self.operation_id) };
@@ -337,7 +331,7 @@ impl OfflineOperationHandle<OfflineRegionInfo> {
             Ok(runtime) => runtime,
             Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         let status = match self.operation_kind {
             maplibre_core::OfflineOperationKind::RegionCreate => unsafe {
                 sys::mln_runtime_offline_region_create_take_result(
@@ -359,7 +353,7 @@ impl OfflineOperationHandle<OfflineRegionInfo> {
             return Err(OfflineOperationTakeError::retryable(error, self));
         }
         self.mark_consumed();
-        let snapshot = match out.into_non_null("mln_offline_region_snapshot") {
+        let snapshot = match out.into_live("mln_offline_region_snapshot") {
             Ok(snapshot) => snapshot,
             Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
@@ -380,7 +374,7 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
             Ok(runtime) => runtime,
             Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
         let status = unsafe {
             sys::mln_runtime_offline_region_get_take_result(
@@ -397,7 +391,7 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
         if !found {
             return Ok(None);
         }
-        let snapshot = match out.into_non_null("mln_offline_region_snapshot") {
+        let snapshot = match out.into_live("mln_offline_region_snapshot") {
             Ok(snapshot) => snapshot,
             Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
@@ -420,7 +414,7 @@ impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
             Ok(runtime) => runtime,
             Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_offline_region_list>::new();
         let status = match self.operation_kind {
             maplibre_core::OfflineOperationKind::RegionsList => unsafe {
                 sys::mln_runtime_offline_regions_list_take_result(
@@ -442,7 +436,7 @@ impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
             return Err(OfflineOperationTakeError::retryable(error, self));
         }
         self.mark_consumed();
-        let list = match out.into_non_null("mln_offline_region_list") {
+        let list = match out.into_live("mln_offline_region_list") {
             Ok(list) => list,
             Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
@@ -500,7 +494,7 @@ impl RuntimeHandle {
     fn create_with_native_options_after_abi_validation(
         options: *const sys::mln_runtime_options,
     ) -> Result<Self> {
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_runtime>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_runtime>::new();
         // SAFETY: options is either null to request native defaults or points to
         // a materialized mln_runtime_options value whose backing strings live
         // for this call. out is a valid null-initialized out-pointer owned by
@@ -509,7 +503,7 @@ impl RuntimeHandle {
         let ptr = out_handle(out, "mln_runtime")?;
 
         Ok(Self {
-            inner: Rc::new(RuntimeState::new(ptr)),
+            inner: Rc::new(RuntimeState::new(ptr)?),
         })
     }
 
@@ -597,7 +591,7 @@ impl RuntimeHandle {
         &self,
         operation: AmbientCacheOperation,
     ) -> Result<OfflineOperationHandle<()>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_run_ambient_cache_operation_start(
@@ -619,7 +613,7 @@ impl RuntimeHandle {
         definition: &OfflineRegionDefinition,
         metadata: &[u8],
     ) -> Result<OfflineOperationHandle<OfflineRegionInfo>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let definition = definition.to_native()?;
         let raw_definition = definition.to_raw();
         let mut operation_id: sys::mln_offline_operation_id = 0;
@@ -646,7 +640,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<OfflineOperationHandle<Option<OfflineRegionInfo>>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
@@ -661,7 +655,7 @@ impl RuntimeHandle {
 
     /// Starts listing offline regions in this runtime's database.
     pub fn start_offline_regions(&self) -> Result<OfflineOperationHandle<Vec<OfflineRegionInfo>>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
@@ -679,7 +673,7 @@ impl RuntimeHandle {
         &self,
         path: &str,
     ) -> Result<OfflineOperationHandle<Vec<OfflineRegionInfo>>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let path = maplibre_core::string::c_string(path)?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live, path is NUL-terminated and valid for this
@@ -704,7 +698,7 @@ impl RuntimeHandle {
         region_id: i64,
         metadata: &[u8],
     ) -> Result<OfflineOperationHandle<OfflineRegionInfo>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live, metadata storage is valid for this call, and
         // operation_id points to writable storage.
@@ -729,7 +723,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<OfflineOperationHandle<OfflineRegionStatus>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
@@ -748,7 +742,7 @@ impl RuntimeHandle {
         region_id: i64,
         observed: bool,
     ) -> Result<OfflineOperationHandle<()>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_set_observed_start(
@@ -771,7 +765,7 @@ impl RuntimeHandle {
         region_id: i64,
         state: OfflineRegionDownloadState,
     ) -> Result<OfflineOperationHandle<()>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let state = state.raw_for_set()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
@@ -794,7 +788,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<OfflineOperationHandle<()>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_invalidate_start(runtime, region_id, &mut operation_id)
@@ -811,7 +805,7 @@ impl RuntimeHandle {
         &self,
         region_id: i64,
     ) -> Result<OfflineOperationHandle<()>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_delete_start(runtime, region_id, &mut operation_id)
@@ -851,7 +845,7 @@ impl RuntimeHandle {
     /// that a thread signalling a [`WakeSource`] takes, and outside native
     /// callbacks.
     pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let timeout_ms = timeout.map_or(-1, |timeout| {
             i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
         });
@@ -862,15 +856,15 @@ impl RuntimeHandle {
     /// Acquires a [`WakeSource`] that releases this runtime's parked owner
     /// thread. The returned source is usable from any thread.
     pub fn wake_source(&self) -> Result<WakeSource> {
-        let runtime = self.inner.as_ptr()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
+        let runtime = self.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_wake_source>::new();
         // SAFETY: runtime is a live runtime handle owned by this wrapper, and
         // out is a valid null-initialized out-pointer owned by this call.
         maplibre_core::check(unsafe {
             sys::mln_runtime_wake_source_acquire(runtime, out.as_mut_ptr())
         })?;
         Ok(WakeSource {
-            ptr: out_handle(out, "mln_wake_source")?,
+            handle: out_handle(out, "mln_wake_source")?,
         })
     }
 
@@ -882,7 +876,7 @@ impl RuntimeHandle {
     /// so keep polling to completion to let that state be reclaimed; a map
     /// whose events go unpolled keeps those sources' callback state alive.
     pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
-        let runtime = self.inner.as_ptr()?;
+        let runtime = self.inner.native()?;
         let mut event = empty_runtime_event();
         let mut has_event = false;
 
@@ -933,19 +927,15 @@ impl RuntimeHandle {
 /// shutdown paths rely on. Each source holds its own reference to the runtime's
 /// wake state, so it stays usable after the runtime closes and signalling it
 /// then does nothing.
+///
+/// This is a copied handle value, so `Send` and `Sync` are derived rather than
+/// asserted: the C API documents signalling and destruction as callable from
+/// any thread, synchronizes concurrent signals itself, and rejects a released
+/// handle instead of reaching freed state.
 #[derive(Debug)]
 pub struct WakeSource {
-    ptr: NonNull<sys::mln_wake_source>,
+    handle: sys::mln_wake_source,
 }
-
-// SAFETY: The C API documents mln_wake_source_signal() and
-// mln_wake_source_destroy() as callable from any thread. The native handle owns
-// a reference-counted wake state whose mutable field is guarded by a native
-// mutex, and it holds only that state.
-unsafe impl Send for WakeSource {}
-// SAFETY: See the Send justification. Signalling takes `&self`, and native
-// synchronizes concurrent signals internally.
-unsafe impl Sync for WakeSource {}
 
 impl WakeSource {
     /// Sets the runtime's wake flag and releases the parked owner thread.
@@ -954,17 +944,17 @@ impl WakeSource {
     /// so the next [`RuntimeHandle::pump`] returns without parking. Signalling
     /// after the runtime closes succeeds and does nothing.
     pub fn signal(&self) -> Result<()> {
-        // SAFETY: ptr is a live wake source owned by this wrapper, and native
-        // accepts signals from any thread.
-        maplibre_core::check(unsafe { sys::mln_wake_source_signal(self.ptr.as_ptr()) })
+        // SAFETY: handle is a live wake source owned by this wrapper, and
+        // native accepts signals from any thread.
+        maplibre_core::check(unsafe { sys::mln_wake_source_signal(self.handle) })
     }
 }
 
 impl Drop for WakeSource {
     fn drop(&mut self) {
-        // SAFETY: ptr is a live wake source this wrapper owns and destroys
+        // SAFETY: handle is a live wake source this wrapper owns and destroys
         // exactly once, and native accepts destruction from any thread.
-        unsafe { sys::mln_wake_source_destroy(self.ptr.as_ptr()) };
+        unsafe { sys::mln_wake_source_destroy(self.handle) };
     }
 }
 
@@ -1531,7 +1521,8 @@ mod tests {
         let mut raw = empty_runtime_event();
         raw.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
         raw.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-        raw.source = 0x1234usize as *mut std::ffi::c_void;
+        // A synthetic map handle that names no live map.
+        raw.source = 0x0200_0000_0000_002a;
 
         let source = runtime.inner.source_for_event(&raw);
         let event = RuntimeEvent::from_native(&raw, source).unwrap();
@@ -1545,15 +1536,12 @@ mod tests {
     // Spec coverage: BND-020, BND-022, BND-190, and BND-191.
     fn runtime_wrong_thread_status_maps_error_and_copies_diagnostic() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
-        let runtime_ptr = runtime.inner.as_ptr().unwrap() as usize;
+        let runtime_handle = runtime.inner.native().unwrap();
 
         let error = std::thread::spawn(move || {
             // SAFETY: This intentionally exercises the C API's owner-thread
             // validation path with a live runtime handle from another thread.
-            maplibre_core::check(unsafe {
-                sys::mln_runtime_pump(runtime_ptr as *mut sys::mln_runtime, 0)
-            })
-            .unwrap_err()
+            maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime_handle, 0) }).unwrap_err()
         })
         .join()
         .unwrap();

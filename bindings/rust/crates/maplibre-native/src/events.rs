@@ -10,7 +10,11 @@ pub use maplibre_core::events::{
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 
-/// Rust-assigned identity for a map owned by a runtime.
+/// Identity for a map owned by a runtime.
+///
+/// The value is the map's native handle, which names one map for the life of
+/// the process, so comparing an id against a released map's id never matches a
+/// later one. It carries no ownership and cannot be used to operate on the map.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapId(u64);
 
@@ -19,7 +23,7 @@ impl MapId {
         Self(value)
     }
 
-    /// Returns the runtime-local numeric map identity.
+    /// Returns the numeric map identity.
     pub const fn get(self) -> u64 {
         self.0
     }
@@ -95,7 +99,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: 999_001,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-            source: ptr::null_mut(),
+            source: 0,
             code: -7,
             payload_type: 999_002,
             payload: bytes.as_ptr().cast(),
@@ -133,7 +137,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-            source: ptr::null_mut(),
+            source: 0,
             code: 0,
             payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
             payload: ptr::addr_of!(status_payload).cast(),
@@ -169,7 +173,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-            source: ptr::null_mut(),
+            source: 0,
             code: -1,
             payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR,
             payload: ptr::addr_of!(error_payload).cast(),

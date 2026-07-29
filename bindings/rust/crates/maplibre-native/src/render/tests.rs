@@ -6,7 +6,6 @@ use std::ffi::c_char;
 use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
@@ -1663,14 +1662,12 @@ fn frame_metadata_copies_values_without_exposing_backend_pointers() {
 static FRAME_RELEASE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
 static FRAME_RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-unsafe extern "C" fn fake_session_destroy(
-    _session: *mut sys::mln_render_session,
-) -> sys::mln_status {
+unsafe extern "C" fn fake_session_destroy(_session: sys::mln_render_session) -> sys::mln_status {
     sys::MLN_STATUS_OK
 }
 
 unsafe extern "C" fn fake_metal_frame_release(
-    _session: *mut sys::mln_render_session,
+    _session: sys::mln_render_session,
     _frame: *const sys::mln_metal_owned_texture_frame,
 ) -> sys::mln_status {
     FRAME_RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -1686,11 +1683,12 @@ fn failed_frame_release_leaves_frame_live_for_later_release() {
         // SAFETY: The fake handle is never dereferenced. The fake destroy
         // function only reports success so RenderSessionState drop is harmless.
         handle: unsafe {
-            ThreadAffineNativeHandle::from_raw(
-                NonNull::dangling(),
+            ThreadAffineNativeHandle::from_handle(
+                sys::mln_render_session(0x0400_0000_0000_002a),
                 fake_session_destroy,
                 "mln_render_session",
             )
+            .unwrap()
         },
         detached: Cell::new(false),
         frame_acquired: Cell::new(true),
@@ -2294,34 +2292,35 @@ fn dropping_a_map_with_an_attached_session_reports_a_leak() {
     let reported = leaks.lock().unwrap().clone();
     assert_eq!(reported.len(), 1, "expected exactly one reported leak");
     assert_eq!(reported[0].type_name, "mln_map");
-    assert_ne!(reported[0].address, 0);
+    assert_ne!(reported[0].id, 0);
 
-    // The reported address is what makes the leak recoverable rather than just
+    // The reported handle is what makes the leak recoverable rather than just
     // observable: closing the session unblocks the destroy this Drop could not
     // complete. Without it the runtime below would stay pinned forever.
     session.close().unwrap();
-    // SAFETY: the address came from a map whose Rust handle was dropped without
+    // SAFETY: the handle came from a map whose Rust wrapper was dropped without
     // destroying it, and its session is now closed, so this is the one
-    // outstanding destroy for that pointer.
-    let status = unsafe { sys::mln_map_destroy(reported[0].address as *mut sys::mln_map) };
+    // outstanding destroy for that map.
+    let status = unsafe { sys::mln_map_destroy(sys::mln_map(reported[0].id)) };
     assert_eq!(status, sys::MLN_STATUS_OK);
 
     runtime.close().unwrap();
 }
 
 #[test]
-// Dropping a map without closing it must retire the shared address too. The
-// destroy happens during the drop, so a reference that only checked the handle
-// before the field destructor ran would keep reporting the map live and hand a
-// freed address to attach.
-fn dropping_a_map_retires_its_attach_refs() {
+// Spec coverage: BND-196. Dropping a map destroys it, so the reference names a
+// released handle. The C API rejects that id rather than binding the session to
+// whatever map is created next.
+fn dropping_a_map_makes_its_attach_refs_stale() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
     let attach_ref = map.attach_ref().unwrap();
-    assert!(!attach_ref.is_map_closed());
 
     drop(map);
-    assert!(attach_ref.is_map_closed());
+
+    // Creating another map reuses the slot the drop freed, which is what makes
+    // this prove the generation rather than the slot merely being empty.
+    let replacement = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
 
     let error = attach_ref
         .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
@@ -2330,19 +2329,17 @@ fn dropping_a_map_retires_its_attach_refs() {
         ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.to_string().contains("MapHandle is closed"));
+    assert!(error.to_string().contains("stale"));
 
+    replacement.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
-// A `MapAttachRef` can outlive the `MapHandle` it came from, and the C API's
-// map registry keys on the pointer value, so an address the allocator reuses
-// for a later map would otherwise attach a session to the wrong map. The
-// reference shares the map's liveness instead of copying its address, so a
-// stale one reports a closed handle. Every other binding already had this
-// property through its own per-map state.
-fn a_stale_attach_ref_reports_a_closed_map() {
+// Spec coverage: BND-196. A `MapAttachRef` can outlive the `MapHandle` it came
+// from. The C API issues each map a generational handle and rejects a released
+// one, so a stale reference cannot attach a session to a later map.
+fn a_stale_attach_ref_reports_a_stale_map() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &static_map_options(64, 64, 1.0)).unwrap();
     let attach_ref = map.attach_ref().unwrap();
@@ -2357,7 +2354,7 @@ fn a_stale_attach_ref_reports_a_closed_map() {
         ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.to_string().contains("MapHandle is closed"));
+    assert!(error.to_string().contains("stale"));
 
     runtime.close().unwrap();
 }
@@ -2432,18 +2429,17 @@ fn session_calls_are_rejected_on_a_foreign_thread() {
     .expect("owned texture test session should attach when supported");
 
     // The handle is `!Send`, so a foreign thread can only reach the session
-    // through the raw pointer the binding wraps. That is the boundary native
+    // through the raw handle the binding wraps. That is the boundary native
     // enforces, and this proves the binding surfaces it as a typed error.
-    let address = session.inner.as_ptr().unwrap() as usize;
+    let native = session.inner.native().unwrap();
     let kind = std::thread::scope(|scope| {
         scope
             .spawn(move || {
-                let session = address as *mut maplibre_native_sys::mln_render_session;
                 let mut rendered = false;
                 // SAFETY: the session is live for the duration of this scope,
                 // and the call is expected to be rejected before it is used.
                 let status = unsafe {
-                    maplibre_native_sys::mln_render_session_render_update(session, &mut rendered)
+                    maplibre_native_sys::mln_render_session_render_update(native, &mut rendered)
                 };
                 maplibre_core::check(status).unwrap_err().kind()
             })
