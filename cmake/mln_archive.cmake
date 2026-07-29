@@ -14,6 +14,7 @@
 #                                   visible; everything else becomes internal
 
 set(MLN_FFI_MAPLIBRE_STATIC_ARCHIVE_DEPENDENCIES
+    fastpfor-lib
     mbgl-core
     mbgl-freetype
     mbgl-harfbuzz

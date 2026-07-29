@@ -39,14 +39,21 @@ vendor_paths=(
   vendor/maplibre-native-base/deps/pixelmatch-cpp # configure-time base dep
   vendor/freetype # text shaping (MLN_TEXT_SHAPING_HARFBUZZ)
   vendor/harfbuzz
+  vendor/metal-cpp # Metal API headers
   vendor/Vulkan-Headers # Vulkan headers + Zig bindgen include path
   vendor/VulkanMemoryAllocator
   vendor/glslang # SPIR-V toolchain (MLN_WITH_VULKAN)
 )
 
+mlt_path="$mln_path/vendor/maplibre-tile-spec"
+mlt_vendor_paths=(
+  cpp/vendor/earcut # MLT polygon triangulation
+  cpp/vendor/fsst # MLT string compression
+)
+
 # Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
 # zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
-# nested .mason / test fixture / glfw submodules under the paths above.
+# other nested .mason / test fixture / glfw submodules under the paths above.
 
 top_status="$(git submodule status "$mln_path" 2>/dev/null || true)"
 if [[ "$top_status" == " "* ]]; then
@@ -54,7 +61,12 @@ if [[ "$top_status" == " "* ]]; then
   nested_count="$(printf '%s\n' "$nested_status" | sed '/^$/d' | wc -l | tr -d ' ')"
   if [[ "$nested_count" == "${#vendor_paths[@]}" ]] &&
     ! grep -qE '^[+-U]' <<<"$nested_status"; then
-    exit 0
+    mlt_status="$(git -C "$mlt_path" submodule status "${mlt_vendor_paths[@]}" 2>/dev/null || true)"
+    mlt_count="$(printf '%s\n' "$mlt_status" | sed '/^$/d' | wc -l | tr -d ' ')"
+    if [[ "$mlt_count" == "${#mlt_vendor_paths[@]}" ]] &&
+      ! grep -qE '^[+-U]' <<<"$mlt_status"; then
+      exit 0
+    fi
   fi
 fi
 
@@ -63,3 +75,6 @@ git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
 
 git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
 git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"
+
+git -C "$mlt_path" -c submodule.recurse=false submodule sync "${mlt_vendor_paths[@]}"
+git -C "$mlt_path" -c submodule.recurse=false submodule update --init --depth 1 "${mlt_vendor_paths[@]}"
