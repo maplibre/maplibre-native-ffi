@@ -276,6 +276,28 @@ void exercise_runtime_wake_source() throws MaplibreNative.Error {
   }
 }
 
+void exercise_runtime_wrong_thread_close() throws MaplibreNative.Error {
+  var runtime = new MaplibreNative.RuntimeHandle();
+  runtime.set_resource_provider(provide_resource);
+  runtime.set_resource_transform(transform_resource);
+  bool wrong_thread = false;
+  var caller = new GLib.Thread<void>("vala-runtime-wrong-thread", () => {
+    try {
+      runtime.close();
+    } catch (MaplibreNative.Error.WRONG_THREAD error) {
+      wrong_thread = true;
+    } catch (MaplibreNative.Error error) {
+      assert_not_reached();
+    }
+  });
+  caller.join();
+  assert(wrong_thread);
+  assert(!runtime.closed);
+  runtime.clear_resource_transform();
+  runtime.clear_resource_provider();
+  runtime.close();
+}
+
 void exercise_render_session_wrong_thread_precedence(MaplibreNative.RenderSessionHandle session) throws MaplibreNative.Error {
   var frame = session.acquire_vulkan_owned_texture_frame();
   bool wrong_thread = false;
@@ -1113,6 +1135,18 @@ void compile_offline_region_wrappers(MaplibreNative.RuntimeHandle runtime, strin
   } catch (MaplibreNative.Error.UNSUPPORTED error) {
     assert(error.message.contains("999"));
   }
+  MaplibreNative.Raw.Geometry geometry_storage = {};
+  MaplibreNative.Geometry? geometry_owner;
+  MaplibreNative.Raw.OfflineRegionInfo malformed_info = {};
+  malformed_info.definition = tile_definition.to_native(ref geometry_storage, out geometry_owner);
+  malformed_info.metadata = null;
+  malformed_info.metadata_size = 1;
+  try {
+    new MaplibreNative.OfflineRegionInfo.from_native(malformed_info);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "offline region metadata data is null");
+  }
   uint8[] metadata = { 1, 2, 3 };
   var create_id = runtime.offline_region_create_start(tile_definition, metadata);
   metadata[0] = 99;
@@ -1377,6 +1411,7 @@ int main() {
     exercise_unknown_feature_identifier_rejection();
     exercise_json_null_rejection();
     exercise_option_value_semantics();
+    exercise_runtime_wrong_thread_close();
     var backends = MaplibreNative.supported_render_backends();
     assert(backends != 0);
     MaplibreNative.opengl_supported_context_providers();

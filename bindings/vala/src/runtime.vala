@@ -148,11 +148,7 @@ namespace MaplibreNative {
             var live = !consumed && !consuming;
             state_mutex.unlock ();
             if (live) {
-                try {
-                    runtime.discard_offline_operation (this);
-                } catch (Error error) {
-                    warning ("OfflineOperationHandle finalized while live and could not be discarded: %s", error.message);
-                }
+                warning ("OfflineOperationHandle finalized while live; call close() on the runtime owner thread");
             }
         }
 
@@ -380,7 +376,7 @@ namespace MaplibreNative {
         internal OfflineRegionInfo.from_native (Raw.OfflineRegionInfo native) throws Error {
             id = OfflineRegionId (native.id);
             definition = OfflineRegionDefinition.from_native (native.definition);
-            metadata_storage = copy_bytes (native.metadata, native.metadata_size) ?? new uint8[0];
+            metadata_storage = copy_sized_bytes (native.metadata, native.metadata_size, "offline region metadata");
         }
 
         private OfflineRegionInfo.from_values (OfflineRegionId id, OfflineRegionDefinition definition, uint8[] metadata) {
@@ -1583,6 +1579,7 @@ namespace MaplibreNative {
         private bool releasing;
         private uint active_native_leases;
         private Mutex registry_mutex;
+        private unowned Thread<void*> owner_thread;
 
         public bool closed {
             get {
@@ -1604,6 +1601,7 @@ namespace MaplibreNative {
             Raw.Runtime created;
             check_status (Raw.runtime_create (&native_options, out created));
             native = (owned) created;
+            owner_thread = Thread.self<void*> ();
         }
 
         ~RuntimeHandle () {
@@ -1650,6 +1648,7 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null) {
                 state_mutex.unlock ();
@@ -1715,6 +1714,13 @@ namespace MaplibreNative {
             resource_transform = null;
             resource_provider = null;
             registry_mutex.unlock ();
+        }
+
+        private void ensure_owner_thread () throws Error {
+            if (Thread.self<void*> () != owner_thread) {
+                clear_unknown_status ();
+                throw new Error.WRONG_THREAD ("runtime called from a thread other than its owner thread");
+            }
         }
 
         public void pump (int64 timeout_ms = 0) throws Error {
