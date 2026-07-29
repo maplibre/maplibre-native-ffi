@@ -228,6 +228,9 @@ static void map_destroy_rejects_a_session_owned_by_another_thread(void) {
 
 typedef struct resize_probe {
   mln_map* map;
+  atomic_bool ready_to_resize;
+  atomic_bool start_resize;
+  atomic_bool immediate_render_checked;
   atomic_bool finished;
   bool attached;
   bool observed_no_update;
@@ -240,8 +243,15 @@ static void attach_resize_render(void* argument) {
   mln_test_render_fixture fixture = {0};
   probe->attached = mln_test_render_fixture_create(probe->map, &fixture);
   if (!probe->attached) {
+    atomic_store(&probe->ready_to_resize, true);
+    atomic_store(&probe->immediate_render_checked, true);
     atomic_store(&probe->finished, true);
     return;
+  }
+
+  atomic_store(&probe->ready_to_resize, true);
+  while (!atomic_load(&probe->start_resize)) {
+    mln_test_sleep_millisecond();
   }
 
   probe->resize_status =
@@ -258,6 +268,7 @@ static void attach_resize_render(void* argument) {
   ) {
     probe->observed_no_update = true;
   }
+  atomic_store(&probe->immediate_render_checked, true);
 
   if (!rendered) {
     (void)render_until_frame(fixture.session, &rendered);
@@ -280,9 +291,24 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
   );
 
   resize_probe probe = {.map = map};
+  atomic_init(&probe.ready_to_resize, false);
+  atomic_init(&probe.start_resize, false);
+  atomic_init(&probe.immediate_render_checked, false);
   atomic_init(&probe.finished, false);
 
   mln_test_thread* thread = mln_test_thread_start(attach_resize_render, &probe);
+  TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.ready_to_resize));
+  atomic_store(&probe.start_resize, true);
+
+  // Keep the map owner thread from processing the queued resize until the
+  // render thread has checked the update for the previous extent.
+  for (unsigned int attempt = 0;
+       attempt < 500 && !atomic_load(&probe.immediate_render_checked);
+       attempt += 1) {
+    mln_test_sleep_millisecond();
+  }
+  TEST_ASSERT_TRUE(atomic_load(&probe.immediate_render_checked));
+
   TEST_ASSERT_TRUE(mln_test_pump_until(runtime, &probe.finished));
   mln_test_thread_join(thread);
 
