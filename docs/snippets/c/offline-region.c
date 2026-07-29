@@ -52,7 +52,7 @@ mln_offline_region_id create_region(
   if (await_operation(runtime, create_id) == MLN_STATUS_OK) {
     mln_runtime_offline_region_create_take_result(runtime, create_id, &region);
   }
-  if (region == NULL) {
+  if (region == MLN_HANDLE_NULL) {
     // An untaken operation stays live until you discard it.
     mln_runtime_offline_operation_discard(runtime, create_id);
     return 0;
