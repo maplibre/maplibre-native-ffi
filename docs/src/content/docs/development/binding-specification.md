@@ -513,6 +513,9 @@ The wake source follows this design:
 2. It is transferable and callable from any thread, and the binding declares
    that where the host language can express it.
 3. Signalling after the runtime is closed succeeds and does nothing.
+4. Where the host language can call signal and release concurrently, the binding
+   orders them against each other, so a signal reports either success or the
+   binding's own closed-handle error.
 
 ### Event polling
 

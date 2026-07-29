@@ -14,6 +14,11 @@ namespace Maplibre.Native.Runtime;
 /// </remarks>
 public sealed unsafe class WakeSource : IDisposable
 {
+    // Signal and close are both any-thread, so the gate orders them against each
+    // other. Without it a signal that passed the live check could reach native
+    // after a concurrent close retired the id, reporting the C API's stale-handle
+    // status where every other binding reports success or its own closed error.
+    private readonly Lock nativeCallGate = new();
     private readonly NativeHandleState<MlnWakeSource> state;
 
     internal WakeSource(MlnWakeSource source)
@@ -40,18 +45,27 @@ public sealed unsafe class WakeSource : IDisposable
     /// </remarks>
     public void Signal()
     {
-        NativeStatus.Check(NativeMethods.mln_wake_source_signal(state.Handle));
+        lock (nativeCallGate)
+        {
+            NativeStatus.Check(NativeMethods.mln_wake_source_signal(state.Handle));
+        }
     }
 
     /// <summary>Releases the wake source.</summary>
     public void Close()
     {
-        state.Close();
+        lock (nativeCallGate)
+        {
+            state.Close();
+        }
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        state.TryClose();
+        lock (nativeCallGate)
+        {
+            state.TryClose();
+        }
     }
 }

@@ -81,6 +81,9 @@ namespace mln::core {
 // Holds its own reference to the wake state, so the state stays readable for a
 // signal that races runtime teardown and hosts destroy the two in either order.
 struct WakeSourceObject {
+  explicit WakeSourceObject(std::shared_ptr<WakeState> state_)
+      : state(std::move(state_)) {}
+
   std::shared_ptr<WakeState> state;
 };
 

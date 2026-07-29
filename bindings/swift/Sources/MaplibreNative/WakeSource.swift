@@ -8,11 +8,15 @@ internal import CMaplibreNativeC
 /// shutdown paths rely on. It stays usable after its runtime closes, and
 /// signalling it then does nothing.
 ///
-/// The unchecked conformance rests on the lock-guarded `NativeHandleState`
-/// being the only stored property, and on the C API documenting
-/// `mln_wake_source_signal` and `mln_wake_source_destroy` as callable from any
-/// thread against wake state that carries its own synchronization.
+/// The unchecked conformance rests on `nativeCallGate` ordering signal against
+/// close, and on the C API documenting signalling and destruction as callable
+/// from any thread against wake state that carries its own synchronization.
 public final class WakeSource: @unchecked Sendable {
+  // Signal and close are both any-thread, so the gate orders them against each
+  // other. Without it a signal that passed the live check could reach native
+  // after a concurrent close retired the id, reporting the C API's stale-handle
+  // status where every other binding reports success or its own closed error.
+  private let nativeCallGate = NSLock()
   private let state: NativeHandleState<NativeWakeSourceHandle>
 
   init(handle: NativeWakeSourceHandle) throws {
@@ -29,16 +33,20 @@ public final class WakeSource: @unchecked Sendable {
   /// the next `RuntimeHandle.pump(timeout:)` returns without parking.
   /// Signalling after the runtime closes succeeds and does nothing.
   public func signal() throws {
-    try mapNativeFailure {
-      try checkStatus(mln_wake_source_signal(state.requireLive().raw))
+    try nativeCallGate.withLock {
+      try mapNativeFailure {
+        try checkStatus(mln_wake_source_signal(state.requireLive().raw))
+      }
     }
   }
 
   /// Releases the wake source.
   public func close() throws {
-    try mapNativeFailure {
-      try state.closeOnce { source in
-        mln_wake_source_destroy(source.raw)
+    try nativeCallGate.withLock {
+      try mapNativeFailure {
+        try state.closeOnce { source in
+          mln_wake_source_destroy(source.raw)
+        }
       }
     }
   }
