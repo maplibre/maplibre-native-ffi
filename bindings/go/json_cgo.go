@@ -240,8 +240,8 @@ func (materializer *cGeoJSONMaterializer) features(features []Feature) (*C.mln_f
 	return rawFeatures, nil
 }
 
-func cJSONSnapshotValue(snapshot *C.mln_json_snapshot) (JSONValue, error) {
-	if snapshot == nil {
+func cJSONSnapshotValue(snapshot C.mln_json_snapshot) (JSONValue, error) {
+	if snapshot == 0 {
 		return JSONNull(), nil
 	}
 	defer C.mln_json_snapshot_destroy(snapshot)

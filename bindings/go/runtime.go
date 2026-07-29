@@ -276,7 +276,7 @@ type RuntimeEvent struct {
 	Message     string
 	Payload     any
 
-	rawSource uintptr
+	rawSource MapID
 }
 
 // CameraChangeMode reports whether a camera change belongs to an animated
@@ -418,16 +418,18 @@ type RuntimeHandle struct {
 	resourceProviderMu  sync.Mutex
 	resourceProvider    *callback.ResourceProviderState
 	mapsMu              sync.Mutex
-	maps                map[uintptr]*MapHandle
-	nextMapID           MapID
+	// Resolves an event's source id to the public wrapper. The C API returns an
+	// id, not a wrapper, so this table stays; the id allocator it used to need
+	// is gone.
+	maps map[MapID]*MapHandle
 }
 
-var destroyRuntimeHandle = func(ptr *nativeRuntime) int32 {
-	return int32(C.mln_runtime_destroy((*C.mln_runtime)(unsafe.Pointer(ptr))))
+var destroyRuntimeHandle = func(native nativeRuntime) int32 {
+	return int32(C.mln_runtime_destroy(C.mln_runtime(native)))
 }
 
-var offlineOperationDiscard = func(ptr *nativeRuntime, id uint64) int32 {
-	return int32(C.mln_runtime_offline_operation_discard((*C.mln_runtime)(unsafe.Pointer(ptr)), C.mln_offline_operation_id(id)))
+var offlineOperationDiscard = func(ptr nativeRuntime, id uint64) int32 {
+	return int32(C.mln_runtime_offline_operation_discard(C.mln_runtime(ptr), C.mln_offline_operation_id(id)))
 }
 
 // String returns a diagnostic name for the status.
@@ -475,11 +477,11 @@ func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
 
 // NewRuntime creates a runtime on the current OS thread using native defaults.
 func NewRuntime() (*RuntimeHandle, error) {
-	return createRuntime(CVersion(), func(out **nativeRuntime) int32 {
-		var raw *C.mln_runtime
+	return createRuntime(CVersion(), func(out *nativeRuntime) int32 {
+		var raw C.mln_runtime
 		status := int32(C.mln_runtime_create(nil, &raw))
 		if status == int32(C.MLN_STATUS_OK) {
-			*out = (*nativeRuntime)(unsafe.Pointer(raw))
+			*out = nativeRuntime(raw)
 		}
 		return status
 	})
@@ -491,7 +493,7 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
-	return createRuntime(CVersion(), func(out **nativeRuntime) int32 {
+	return createRuntime(CVersion(), func(out *nativeRuntime) int32 {
 		rawOptions := C.mln_runtime_options_default()
 		assetPath := C.CString(options.AssetPath)
 		defer C.free(unsafe.Pointer(assetPath))
@@ -504,27 +506,27 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 			rawOptions.maximum_cache_size = C.uint64_t(*options.MaximumCacheSize)
 		}
 
-		var raw *C.mln_runtime
+		var raw C.mln_runtime
 		status := int32(C.mln_runtime_create(&rawOptions, &raw))
 		if status == int32(C.MLN_STATUS_OK) {
-			*out = (*nativeRuntime)(unsafe.Pointer(raw))
+			*out = nativeRuntime(raw)
 		}
 		return status
 	})
 }
 
-type runtimeStateFactory func(*nativeRuntime) (*handle.State[nativeRuntime], error)
+type runtimeStateFactory func(nativeRuntime) (*handle.State[nativeRuntime], error)
 
-func createRuntime(actualCABI uint32, create func(**nativeRuntime) int32) (*RuntimeHandle, error) {
+func createRuntime(actualCABI uint32, create func(*nativeRuntime) int32) (*RuntimeHandle, error) {
 	return createRuntimeWithStateFactory(actualCABI, create, newRuntimeState)
 }
 
-func createRuntimeWithStateFactory(actualCABI uint32, create func(**nativeRuntime) int32, newState runtimeStateFactory) (*RuntimeHandle, error) {
+func createRuntimeWithStateFactory(actualCABI uint32, create func(*nativeRuntime) int32, newState runtimeStateFactory) (*RuntimeHandle, error) {
 	if err := checkCompatibleCABI(actualCABI); err != nil {
 		return nil, err
 	}
 
-	var runtime *nativeRuntime
+	var runtime nativeRuntime
 	if err := checkNative(func() int32 { return create(&runtime) }); err != nil {
 		return nil, err
 	}
@@ -535,19 +537,19 @@ func createRuntimeWithStateFactory(actualCABI uint32, create func(**nativeRuntim
 	return &RuntimeHandle{state: state}, nil
 }
 
-func newRuntimeState(runtime *nativeRuntime) (*handle.State[nativeRuntime], error) {
+func newRuntimeState(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
 	return handle.New(runtime, "RuntimeHandle")
 }
 
-func (runtime *RuntimeHandle) ptr() (*nativeRuntime, func(), error) {
+func (runtime *RuntimeHandle) ptr() (nativeRuntime, func(), error) {
 	if runtime == nil || runtime.state == nil {
-		return nil, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
+		return 0, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
 	borrow, live := runtime.state.Borrow()
 	if !live {
-		return nil, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is closed")
+		return 0, nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is closed")
 	}
-	return borrow.Ptr(), borrow.Release, nil
+	return borrow.Handle(), borrow.Release, nil
 }
 
 // Pump advances this runtime.
@@ -587,7 +589,7 @@ func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
 		timeoutMS = int64(timeout / time.Millisecond)
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_runtime_pump((*C.mln_runtime)(unsafe.Pointer(ptr)), C.int64_t(timeoutMS)))
+		return int32(C.mln_runtime_pump(C.mln_runtime(ptr), C.int64_t(timeoutMS)))
 	})
 }
 
@@ -602,13 +604,13 @@ func (runtime *RuntimeHandle) WakeSource() (*WakeSource, error) {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	var raw *C.mln_wake_source
+	var raw C.mln_wake_source
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_wake_source_acquire((*C.mln_runtime)(unsafe.Pointer(ptr)), &raw))
+		return int32(C.mln_runtime_wake_source_acquire(C.mln_runtime(ptr), &raw))
 	}); err != nil {
 		return nil, err
 	}
-	state, err := handle.New((*nativeWakeSource)(unsafe.Pointer(raw)), "WakeSource")
+	state, err := handle.New(nativeWakeSource(raw), "WakeSource")
 	if err != nil {
 		C.mln_wake_source_destroy(raw)
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
@@ -627,8 +629,8 @@ type WakeSource struct {
 	state *handle.State[nativeWakeSource]
 }
 
-var destroyWakeSource = func(ptr *nativeWakeSource) int32 {
-	C.mln_wake_source_destroy((*C.mln_wake_source)(unsafe.Pointer(ptr)))
+var destroyWakeSource = func(native nativeWakeSource) int32 {
+	C.mln_wake_source_destroy(C.mln_wake_source(native))
 	return int32(C.MLN_STATUS_OK)
 }
 
@@ -646,7 +648,7 @@ func (source *WakeSource) Signal() error {
 	defer borrow.Release()
 	defer source.state.KeepAlive()
 	return checkNative(func() int32 {
-		return int32(C.mln_wake_source_signal((*C.mln_wake_source)(unsafe.Pointer(borrow.Ptr()))))
+		return int32(C.mln_wake_source_signal(C.mln_wake_source(borrow.Handle())))
 	})
 }
 
@@ -676,7 +678,7 @@ func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	rawEvent := C.mln_runtime_event{size: C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{}))}
 	var hasEvent C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_poll_event((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawEvent, &hasEvent))
+		return int32(C.mln_runtime_poll_event(C.mln_runtime(ptr), &rawEvent, &hasEvent))
 	}); err != nil {
 		return nil, err
 	}
@@ -695,7 +697,7 @@ func runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
 func (runtime *RuntimeHandle) runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
 	source := RuntimeEventSource{Type: RuntimeEventSourceType(event.source_type)}
 	if source.Type == RuntimeEventSourceMap {
-		if m := runtime.mapForEventSource(uintptr(event.source)); m != nil {
+		if m := runtime.mapForEventSource(MapID(event.source)); m != nil {
 			source.MapID = m.id
 		}
 	}
@@ -712,7 +714,7 @@ func runtimeEventFromCWithSource(event C.mln_runtime_event, source RuntimeEventS
 		PayloadSize: uintptr(event.payload_size),
 		Message:     goCharBytes(event.message, event.message_size),
 		Payload:     runtimeEventPayloadFromC(event),
-		rawSource:   uintptr(event.source),
+		rawSource:   MapID(event.source),
 	}
 }
 
@@ -732,13 +734,9 @@ func (runtime *RuntimeHandle) registerMap(m *MapHandle) {
 	}
 	runtime.mapsMu.Lock()
 	if runtime.maps == nil {
-		runtime.maps = make(map[uintptr]*MapHandle)
+		runtime.maps = make(map[MapID]*MapHandle)
 	}
-	if m.id == 0 {
-		runtime.nextMapID++
-		m.id = runtime.nextMapID
-	}
-	runtime.maps[m.nativeAddress] = m
+	runtime.maps[m.id] = m
 	runtime.mapsMu.Unlock()
 }
 
@@ -747,11 +745,11 @@ func (runtime *RuntimeHandle) unregisterMap(m *MapHandle) {
 		return
 	}
 	runtime.mapsMu.Lock()
-	delete(runtime.maps, m.nativeAddress)
+	delete(runtime.maps, m.id)
 	runtime.mapsMu.Unlock()
 }
 
-func (runtime *RuntimeHandle) mapForEventSource(source uintptr) *MapHandle {
+func (runtime *RuntimeHandle) mapForEventSource(source MapID) *MapHandle {
 	if runtime == nil || source == 0 {
 		return nil
 	}
@@ -905,7 +903,7 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 
 	var id C.mln_offline_operation_id
 	if err := checkNative(func() int32 {
-		return int32(C.mln_runtime_run_ambient_cache_operation_start((*C.mln_runtime)(unsafe.Pointer(ptr)), C.uint32_t(operation), &id))
+		return int32(C.mln_runtime_run_ambient_cache_operation_start(C.mln_runtime(ptr), C.uint32_t(operation), &id))
 	}); err != nil {
 		return nil, err
 	}
@@ -934,7 +932,7 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 
 	var replacement *callback.ResourceProviderState
 	if err := checkNative(func() int32 {
-		state, status := callback.SetResourceProvider(unsafe.Pointer(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
+		state, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
 			decision := provider(ResourceRequest{
 				URL:                 request.URL,
 				Kind:                ResourceKind(request.Kind),
@@ -982,7 +980,7 @@ func (runtime *RuntimeHandle) ClearResourceProvider() error {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	if err := checkNative(func() int32 { return callback.ClearResourceProvider(unsafe.Pointer(ptr)) }); err != nil {
+	if err := checkNative(func() int32 { return callback.ClearResourceProvider(uint64(ptr)) }); err != nil {
 		return err
 	}
 	runtime.releaseResourceProvider()
@@ -1013,7 +1011,7 @@ func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCa
 
 	var replacement *callback.ResourceTransformState
 	if err := checkNative(func() int32 {
-		state, status := callback.SetResourceTransform(unsafe.Pointer(ptr), func(kind uint32, url string) (string, bool) {
+		state, status := callback.SetResourceTransform(uint64(ptr), func(kind uint32, url string) (string, bool) {
 			return transform(ResourceTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 		})
 		replacement = state
@@ -1039,7 +1037,7 @@ func (runtime *RuntimeHandle) ClearResourceTransform() error {
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	if err := checkNative(func() int32 { return callback.ClearResourceTransform(unsafe.Pointer(ptr)) }); err != nil {
+	if err := checkNative(func() int32 { return callback.ClearResourceTransform(uint64(ptr)) }); err != nil {
 		return err
 	}
 	runtime.releaseResourceTransform()
@@ -1056,11 +1054,11 @@ func (runtime *RuntimeHandle) releaseResourceTransform() {
 
 // NewMap creates a map owned by this runtime with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
-	return runtime.createMap(func(ptr *nativeRuntime, out **nativeMap) int32 {
-		var raw *C.mln_map
-		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), nil, &raw))
+	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
+		var raw C.mln_map
+		status := int32(C.mln_map_create(C.mln_runtime(ptr), nil, &raw))
 		if status == int32(C.MLN_STATUS_OK) {
-			*out = (*nativeMap)(unsafe.Pointer(raw))
+			*out = nativeMap(raw)
 		}
 		return status
 	})
@@ -1068,23 +1066,23 @@ func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 
 // NewMapWithOptions creates a map owned by this runtime with explicit options.
 func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
-	return runtime.createMap(func(ptr *nativeRuntime, out **nativeMap) int32 {
+	return runtime.createMap(func(ptr nativeRuntime, out *nativeMap) int32 {
 		rawOptions := C.mln_map_options_default()
 		rawOptions.width = C.uint32_t(options.Width)
 		rawOptions.height = C.uint32_t(options.Height)
 		rawOptions.scale_factor = C.double(options.ScaleFactor)
 		rawOptions.map_mode = C.uint32_t(options.Mode)
 
-		var raw *C.mln_map
-		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawOptions, &raw))
+		var raw C.mln_map
+		status := int32(C.mln_map_create(C.mln_runtime(ptr), &rawOptions, &raw))
 		if status == int32(C.MLN_STATUS_OK) {
-			*out = (*nativeMap)(unsafe.Pointer(raw))
+			*out = nativeMap(raw)
 		}
 		return status
 	})
 }
 
-func (runtime *RuntimeHandle) createMap(create func(*nativeRuntime, **nativeMap) int32) (*MapHandle, error) {
+func (runtime *RuntimeHandle) createMap(create func(nativeRuntime, *nativeMap) int32) (*MapHandle, error) {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return nil, err
@@ -1092,7 +1090,7 @@ func (runtime *RuntimeHandle) createMap(create func(*nativeRuntime, **nativeMap)
 	defer release()
 	defer runtime.state.KeepAlive()
 
-	var rawMap *nativeMap
+	var rawMap nativeMap
 	if err := checkNative(func() int32 { return create(ptr, &rawMap) }); err != nil {
 		return nil, err
 	}
@@ -1100,7 +1098,7 @@ func (runtime *RuntimeHandle) createMap(create func(*nativeRuntime, **nativeMap)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	m := &MapHandle{state: state, runtime: runtime, runtimeChild: runtime.state.AddChild(), nativeAddress: uintptr(unsafe.Pointer(rawMap))}
+	m := &MapHandle{state: state, runtime: runtime, runtimeChild: runtime.state.AddChild(), id: MapID(rawMap)}
 	runtime.registerMap(m)
 	return m, nil
 }
@@ -1114,8 +1112,8 @@ func (runtime *RuntimeHandle) Close() error {
 	}
 	var bindingErr error
 	if err := checkNative(func() int32 {
-		status, err := runtime.state.CloseChecked(func(ptr *nativeRuntime) int32 {
-			return destroyRuntimeHandle(ptr)
+		status, err := runtime.state.CloseChecked(func(native nativeRuntime) int32 {
+			return destroyRuntimeHandle(native)
 		})
 		if err != nil {
 			if errors.Is(err, handle.ErrLiveChildren) {

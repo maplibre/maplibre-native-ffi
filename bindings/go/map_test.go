@@ -104,7 +104,7 @@ func TestMapIDIdentifiesEachMapUntilClose(t *testing.T) {
 }
 
 func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
-	state, err := handle.New(&nativeMap{}, "MapHandle")
+	state, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
 		destroyMapHandle = oldDestroy
 	}()
 	var calls atomic.Int32
-	destroyMapHandle = func(*nativeMap) int32 {
+	destroyMapHandle = func(nativeMap) int32 {
 		if calls.Add(1) == 1 {
 			return -3
 		}
@@ -129,8 +129,8 @@ func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ptr() after failed Close(): %v", err)
 	}
-	if ptr == nil {
-		t.Fatal("ptr() after failed Close() returned nil")
+	if ptr == 0 {
+		t.Fatal("ptr() after failed Close() returned the null handle")
 	}
 	release()
 	if err := m.Close(); err != nil {
@@ -145,7 +145,7 @@ func TestMapCloseFailedDestroyLeavesHandleRetryable(t *testing.T) {
 }
 
 func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
-	state, err := handle.New(&nativeMap{}, "MapHandle")
+	state, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,8 +155,8 @@ func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ptr(): %v", err)
 	}
-	if ptr == nil {
-		t.Fatal("ptr() returned nil")
+	if ptr == 0 {
+		t.Fatal("ptr() returned the null handle")
 	}
 
 	oldDestroy := destroyMapHandle
@@ -164,7 +164,7 @@ func TestMapCloseWaitsForActiveBorrow(t *testing.T) {
 		destroyMapHandle = oldDestroy
 	}()
 	destroyCalled := make(chan struct{})
-	destroyMapHandle = func(*nativeMap) int32 {
+	destroyMapHandle = func(nativeMap) int32 {
 		close(destroyCalled)
 		return 0
 	}

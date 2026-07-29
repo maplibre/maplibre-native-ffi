@@ -577,7 +577,7 @@ func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string, options *St
 	}
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw(), rawOptions.ptr()))
+		return int32(C.mln_map_add_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptions.ptr()))
 	})
 }
 
@@ -594,7 +594,7 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
 	urlView := newCStringView(url)
 	defer urlView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw()))
+		return int32(C.mln_map_set_geojson_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw()))
 	})
 }
 
@@ -623,7 +623,7 @@ func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON, options 
 	}
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_geojson_source_data((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawData, rawOptions.ptr()))
+		return int32(C.mln_map_add_geojson_source_data(C.mln_map(ptr), sourceView.raw(), &rawData, rawOptions.ptr()))
 	})
 }
 
@@ -645,7 +645,7 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_geojson_source_data((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawData))
+		return int32(C.mln_map_set_geojson_source_data(C.mln_map(ptr), sourceView.raw(), &rawData))
 	})
 }
 
@@ -667,7 +667,7 @@ func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeome
 
 	var replacement *callback.CustomGeometrySourceState
 	if err := checkNative(func() int32 {
-		state, status := callback.AddCustomGeometrySource(unsafe.Pointer(ptr), sourceID, options.toCallback())
+		state, status := callback.AddCustomGeometrySource(uint64(ptr), sourceID, options.toCallback())
 		replacement = state
 		return status
 	}); err != nil {
@@ -703,7 +703,7 @@ func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID Cano
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_custom_geometry_source_tile_data(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			cCanonicalTileID(tileID),
 			&rawData,
@@ -722,7 +722,7 @@ func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID C
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_invalidate_custom_geometry_source_tile((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), cCanonicalTileID(tileID)))
+		return int32(C.mln_map_invalidate_custom_geometry_source_tile(C.mln_map(ptr), sourceView.raw(), cCanonicalTileID(tileID)))
 	})
 }
 
@@ -737,7 +737,7 @@ func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds
 	sourceView := newCStringView(sourceID)
 	defer sourceView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_invalidate_custom_geometry_source_region((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), cLatLngBounds(bounds)))
+		return int32(C.mln_map_invalidate_custom_geometry_source_region(C.mln_map(ptr), sourceView.raw(), cLatLngBounds(bounds)))
 	})
 }
 
@@ -755,7 +755,7 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 	defer rawImage.free()
 	rawOptions := cStyleImageOptions(options)
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_image((*C.mln_map)(unsafe.Pointer(ptr)), imageView.raw(), &rawImage.raw, &rawOptions))
+		return int32(C.mln_map_set_style_image(C.mln_map(ptr), imageView.raw(), &rawImage.raw, &rawOptions))
 	})
 }
 
@@ -771,7 +771,7 @@ func (m *MapHandle) RemoveStyleImage(imageID string) (bool, error) {
 	defer imageView.free()
 	var removed C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_image((*C.mln_map)(unsafe.Pointer(ptr)), imageView.raw(), &removed))
+		return int32(C.mln_map_remove_style_image(C.mln_map(ptr), imageView.raw(), &removed))
 	}); err != nil {
 		return false, err
 	}
@@ -790,7 +790,7 @@ func (m *MapHandle) StyleImageExists(imageID string) (bool, error) {
 	defer imageView.free()
 	var exists C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_style_image_exists((*C.mln_map)(unsafe.Pointer(ptr)), imageView.raw(), &exists))
+		return int32(C.mln_map_style_image_exists(C.mln_map(ptr), imageView.raw(), &exists))
 	}); err != nil {
 		return false, err
 	}
@@ -810,7 +810,7 @@ func (m *MapHandle) StyleImageInfo(imageID string) (StyleImageInfo, bool, error)
 	info := C.mln_style_image_info_default()
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_image_info((*C.mln_map)(unsafe.Pointer(ptr)), imageView.raw(), &info, &found))
+		return int32(C.mln_map_get_style_image_info(C.mln_map(ptr), imageView.raw(), &info, &found))
 	}); err != nil {
 		return StyleImageInfo{}, false, err
 	}
@@ -849,7 +849,7 @@ func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []by
 	var found C.bool
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_copy_style_image_premultiplied_rgba8(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			imageView.raw(),
 			rawBuffer,
 			C.size_t(len(buffer)),
@@ -883,7 +883,7 @@ func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_add_image_source_url(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
@@ -911,7 +911,7 @@ func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, i
 	defer rawImage.free()
 	return checkNative(func() int32 {
 		return int32(C.mln_map_add_image_source_image(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
@@ -933,7 +933,7 @@ func (m *MapHandle) SetImageSourceURL(sourceID string, url string) error {
 	urlView := newCStringView(url)
 	defer urlView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_image_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw()))
+		return int32(C.mln_map_set_image_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw()))
 	})
 }
 
@@ -950,7 +950,7 @@ func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA
 	rawImage := newCPremultipliedRGBA8Image(image)
 	defer rawImage.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_image_source_image((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawImage.raw))
+		return int32(C.mln_map_set_image_source_image(C.mln_map(ptr), sourceView.raw(), &rawImage.raw))
 	})
 }
 
@@ -971,7 +971,7 @@ func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []Lat
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_image_source_coordinates(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
@@ -994,7 +994,7 @@ func (m *MapHandle) ImageSourceCoordinates(sourceID string) ([]LatLng, bool, err
 	var found C.bool
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_get_image_source_coordinates(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			&rawCoordinates[0],
 			C.size_t(len(rawCoordinates)),
@@ -1022,7 +1022,7 @@ func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *Sty
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_vector_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw(), rawOptionsPtr))
+		return int32(C.mln_map_add_vector_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr))
 	})
 }
 
@@ -1041,7 +1041,7 @@ func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, option
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_vector_source_tiles((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
+		return int32(C.mln_map_add_vector_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
 	})
 }
 
@@ -1060,7 +1060,7 @@ func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *Sty
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw(), rawOptionsPtr))
+		return int32(C.mln_map_add_raster_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr))
 	})
 }
 
@@ -1079,7 +1079,7 @@ func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, option
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_source_tiles((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
+		return int32(C.mln_map_add_raster_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
 	})
 }
 
@@ -1098,7 +1098,7 @@ func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_dem_source_url((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), urlView.raw(), rawOptionsPtr))
+		return int32(C.mln_map_add_raster_dem_source_url(C.mln_map(ptr), sourceView.raw(), urlView.raw(), rawOptionsPtr))
 	})
 }
 
@@ -1117,7 +1117,7 @@ func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, opt
 	rawOptions, rawOptionsPtr := cStyleTileSourceOptionsPointer(options)
 	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_raster_dem_source_tiles((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
+		return int32(C.mln_map_add_raster_dem_source_tiles(C.mln_map(ptr), sourceView.raw(), rawTiles.ptr(), rawTiles.count(), rawOptionsPtr))
 	})
 }
 
@@ -1138,7 +1138,7 @@ func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON JSONValue) er
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_style_source_json((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &rawJSON))
+		return int32(C.mln_map_add_style_source_json(C.mln_map(ptr), sourceView.raw(), &rawJSON))
 	})
 }
 
@@ -1155,7 +1155,7 @@ func (m *MapHandle) RemoveStyleSource(sourceID string) (bool, error) {
 	defer sourceView.free()
 	var removed C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_source((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &removed))
+		return int32(C.mln_map_remove_style_source(C.mln_map(ptr), sourceView.raw(), &removed))
 	}); err != nil {
 		return false, err
 	}
@@ -1177,7 +1177,7 @@ func (m *MapHandle) StyleSourceExists(sourceID string) (bool, error) {
 	defer sourceView.free()
 	var exists C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_style_source_exists((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &exists))
+		return int32(C.mln_map_style_source_exists(C.mln_map(ptr), sourceView.raw(), &exists))
 	}); err != nil {
 		return false, err
 	}
@@ -1197,7 +1197,7 @@ func (m *MapHandle) StyleSourceType(sourceID string) (StyleSourceType, bool, err
 	var sourceType C.uint32_t
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_source_type((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &sourceType, &found))
+		return int32(C.mln_map_get_style_source_type(C.mln_map(ptr), sourceView.raw(), &sourceType, &found))
 	}); err != nil {
 		return StyleSourceTypeUnknown, false, err
 	}
@@ -1217,7 +1217,7 @@ func (m *MapHandle) StyleSourceInfo(sourceID string) (StyleSourceInfo, bool, err
 	info := C.mln_style_source_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_source_info{}))}
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_source_info((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &info, &found))
+		return int32(C.mln_map_get_style_source_info(C.mln_map(ptr), sourceView.raw(), &info, &found))
 	}); err != nil {
 		return StyleSourceInfo{}, false, err
 	}
@@ -1244,7 +1244,7 @@ func (m *MapHandle) StyleSourceAttribution(sourceID string) (string, bool, error
 	var rawFound C.bool
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_copy_style_source_attribution(
-			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.mln_map(ptr),
 			sourceView.raw(),
 			(*C.char)(unsafe.Pointer(&buffer[0])),
 			C.size_t(len(buffer)),
@@ -1265,16 +1265,16 @@ func (m *MapHandle) StyleSourceIDs() ([]string, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var list *C.mln_style_id_list
+	var list C.mln_style_id_list
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_list_style_source_ids((*C.mln_map)(unsafe.Pointer(ptr)), &list))
+		return int32(C.mln_map_list_style_source_ids(C.mln_map(ptr), &list))
 	}); err != nil {
 		return nil, err
 	}
 	return styleIDListStrings(list)
 }
 
-func styleIDListStrings(list *C.mln_style_id_list) ([]string, error) {
+func styleIDListStrings(list C.mln_style_id_list) ([]string, error) {
 	defer C.mln_style_id_list_destroy(list)
 	var count C.size_t
 	if err := checkNative(func() int32 { return int32(C.mln_style_id_list_count(list, &count)) }); err != nil {
@@ -1307,7 +1307,7 @@ func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLay
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_hillshade_layer((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), sourceView.raw(), beforeView.raw()))
+		return int32(C.mln_map_add_hillshade_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw()))
 	})
 }
 
@@ -1327,7 +1327,7 @@ func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeL
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_color_relief_layer((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), sourceView.raw(), beforeView.raw()))
+		return int32(C.mln_map_add_color_relief_layer(C.mln_map(ptr), layerView.raw(), sourceView.raw(), beforeView.raw()))
 	})
 }
 
@@ -1345,7 +1345,7 @@ func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID stri
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_location_indicator_layer((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), beforeView.raw()))
+		return int32(C.mln_map_add_location_indicator_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw()))
 	})
 }
 
@@ -1360,7 +1360,7 @@ func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatL
 	layerView := newCStringView(layerID)
 	defer layerView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_location((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), cLatLng(coordinate), C.double(altitude)))
+		return int32(C.mln_map_set_location_indicator_location(C.mln_map(ptr), layerView.raw(), cLatLng(coordinate), C.double(altitude)))
 	})
 }
 
@@ -1375,7 +1375,7 @@ func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64)
 	layerView := newCStringView(layerID)
 	defer layerView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_bearing((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), C.double(bearing)))
+		return int32(C.mln_map_set_location_indicator_bearing(C.mln_map(ptr), layerView.raw(), C.double(bearing)))
 	})
 }
 
@@ -1390,7 +1390,7 @@ func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius fl
 	layerView := newCStringView(layerID)
 	defer layerView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_accuracy_radius((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), C.double(radius)))
+		return int32(C.mln_map_set_location_indicator_accuracy_radius(C.mln_map(ptr), layerView.raw(), C.double(radius)))
 	})
 }
 
@@ -1407,7 +1407,7 @@ func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind Loca
 	imageView := newCStringView(imageID)
 	defer imageView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_location_indicator_image_name((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), C.uint32_t(imageKind), imageView.raw()))
+		return int32(C.mln_map_set_location_indicator_image_name(C.mln_map(ptr), layerView.raw(), C.uint32_t(imageKind), imageView.raw()))
 	})
 }
 
@@ -1429,7 +1429,7 @@ func (m *MapHandle) AddStyleLayerJSON(layerJSON JSONValue, beforeLayerID string)
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_add_style_layer_json((*C.mln_map)(unsafe.Pointer(ptr)), &rawJSON, beforeView.raw()))
+		return int32(C.mln_map_add_style_layer_json(C.mln_map(ptr), &rawJSON, beforeView.raw()))
 	})
 }
 
@@ -1446,7 +1446,7 @@ func (m *MapHandle) RemoveStyleLayer(layerID string) (bool, error) {
 	defer layerView.free()
 	var removed C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_remove_style_layer((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), &removed))
+		return int32(C.mln_map_remove_style_layer(C.mln_map(ptr), layerView.raw(), &removed))
 	}); err != nil {
 		return false, err
 	}
@@ -1465,7 +1465,7 @@ func (m *MapHandle) StyleLayerExists(layerID string) (bool, error) {
 	defer layerView.free()
 	var exists C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_style_layer_exists((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), &exists))
+		return int32(C.mln_map_style_layer_exists(C.mln_map(ptr), layerView.raw(), &exists))
 	}); err != nil {
 		return false, err
 	}
@@ -1485,7 +1485,7 @@ func (m *MapHandle) StyleLayerType(layerID string) (string, bool, error) {
 	var layerType C.mln_string_view
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_layer_type((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), &layerType, &found))
+		return int32(C.mln_map_get_style_layer_type(C.mln_map(ptr), layerView.raw(), &layerType, &found))
 	}); err != nil {
 		return "", false, err
 	}
@@ -1500,9 +1500,9 @@ func (m *MapHandle) StyleLayerIDs() ([]string, error) {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	var list *C.mln_style_id_list
+	var list C.mln_style_id_list
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_list_style_layer_ids((*C.mln_map)(unsafe.Pointer(ptr)), &list))
+		return int32(C.mln_map_list_style_layer_ids(C.mln_map(ptr), &list))
 	}); err != nil {
 		return nil, err
 	}
@@ -1523,7 +1523,7 @@ func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) error {
 	beforeView := newCStringView(beforeLayerID)
 	defer beforeView.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_move_style_layer((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), beforeView.raw()))
+		return int32(C.mln_map_move_style_layer(C.mln_map(ptr), layerView.raw(), beforeView.raw()))
 	})
 }
 
@@ -1538,10 +1538,10 @@ func (m *MapHandle) StyleLayerJSON(layerID string) (JSONValue, bool, error) {
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var snapshot *C.mln_json_snapshot
+	var snapshot C.mln_json_snapshot
 	var found C.bool
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_layer_json((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), &snapshot, &found))
+		return int32(C.mln_map_get_style_layer_json(C.mln_map(ptr), layerView.raw(), &snapshot, &found))
 	}); err != nil {
 		return JSONValue{}, false, err
 	}
@@ -1570,7 +1570,7 @@ func (m *MapHandle) SetStyleLightJSON(lightJSON JSONValue) error {
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_json((*C.mln_map)(unsafe.Pointer(ptr)), &rawJSON))
+		return int32(C.mln_map_set_style_light_json(C.mln_map(ptr), &rawJSON))
 	})
 }
 
@@ -1591,7 +1591,7 @@ func (m *MapHandle) SetStyleLightProperty(propertyName string, value JSONValue) 
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_light_property((*C.mln_map)(unsafe.Pointer(ptr)), propertyView.raw(), &rawValue))
+		return int32(C.mln_map_set_style_light_property(C.mln_map(ptr), propertyView.raw(), &rawValue))
 	})
 }
 
@@ -1606,9 +1606,9 @@ func (m *MapHandle) StyleLightProperty(propertyName string) (JSONValue, error) {
 	defer m.state.KeepAlive()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	var snapshot *C.mln_json_snapshot
+	var snapshot C.mln_json_snapshot
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_style_light_property((*C.mln_map)(unsafe.Pointer(ptr)), propertyView.raw(), &snapshot))
+		return int32(C.mln_map_get_style_light_property(C.mln_map(ptr), propertyView.raw(), &snapshot))
 	}); err != nil {
 		return JSONValue{}, err
 	}
@@ -1634,7 +1634,7 @@ func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value 
 		return newBindingError(ErrInvalidArgument, err.Error())
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_property((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), propertyView.raw(), &rawValue))
+		return int32(C.mln_map_set_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), &rawValue))
 	})
 }
 
@@ -1651,9 +1651,9 @@ func (m *MapHandle) LayerProperty(layerID string, propertyName string) (JSONValu
 	defer layerView.free()
 	propertyView := newCStringView(propertyName)
 	defer propertyView.free()
-	var snapshot *C.mln_json_snapshot
+	var snapshot C.mln_json_snapshot
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_layer_property((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), propertyView.raw(), &snapshot))
+		return int32(C.mln_map_get_layer_property(C.mln_map(ptr), layerView.raw(), propertyView.raw(), &snapshot))
 	}); err != nil {
 		return JSONValue{}, err
 	}
@@ -1683,7 +1683,7 @@ func (m *MapHandle) SetLayerFilter(layerID string, filter *JSONValue) error {
 		rawFilter = &value
 	}
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_layer_filter((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), rawFilter))
+		return int32(C.mln_map_set_layer_filter(C.mln_map(ptr), layerView.raw(), rawFilter))
 	})
 }
 
@@ -1697,9 +1697,9 @@ func (m *MapHandle) LayerFilter(layerID string) (JSONValue, error) {
 	defer m.state.KeepAlive()
 	layerView := newCStringView(layerID)
 	defer layerView.free()
-	var snapshot *C.mln_json_snapshot
+	var snapshot C.mln_json_snapshot
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_get_layer_filter((*C.mln_map)(unsafe.Pointer(ptr)), layerView.raw(), &snapshot))
+		return int32(C.mln_map_get_layer_filter(C.mln_map(ptr), layerView.raw(), &snapshot))
 	}); err != nil {
 		return JSONValue{}, err
 	}
