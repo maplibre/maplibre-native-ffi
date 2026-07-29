@@ -26,6 +26,39 @@ Applications may set `MLN_FFI_NATIVE_LIBRARY` to an absolute library path.
 Otherwise the loader uses the platform library name and the host's normal
 dynamic-library search path.
 
+## Android host integration
+
+The Dart package does not yet publish Android artifacts. An Android application
+that embeds this repository builds the native package and the local Rustls
+platform-verifier helper:
+
+```bash
+mise run //bindings/rustls-platform-verifier-android:build
+```
+
+```kotlin
+// app/build.gradle.kts
+val maplibreNativeFfi = file("../maplibre-native-ffi")
+
+dependencies {
+  implementation(
+    files(
+      maplibreNativeFfi.resolve(
+        "bindings/rustls-platform-verifier-android/build/outputs/aar/" +
+          "rustls-platform-verifier-android-release.aar"
+      )
+    )
+  )
+}
+```
+
+The helper build runs the repository's mise dependency acquisition first. Mise
+pins, acquires, and patches the verifier source used by both Cargo and Gradle.
+The helper uses a MapLibre FFI-private Java package, so it can coexist with
+another library that packages the upstream Rustls helper. The host must also
+call `mln_android_init` with its JNI environment, class, and application context
+before creating a runtime.
+
 ## Ownership and execution
 
 Owned handles have an idempotent `close()` or `discard()` operation. Close child

@@ -37,19 +37,19 @@ val mavenGroup = providers.gradleProperty("maplibre.maven.group").get()
 val mavenVersion = providers.gradleProperty("maplibre.maven.version").get()
 val mavenArtifact = "maplibre-native-ffi"
 val rustlsPlatformVerifierPackage = CargoPackage.directory(project, "rustls-platform-verifier")
-val rustlsPlatformVerifierAndroidPackage =
-  CargoPackage.directory(project, "rustls-platform-verifier-android")
 val rustlsPlatformVerifierAndroidAar =
-  rustlsPlatformVerifierAndroidPackage.map { packageDirectory ->
-    packageDirectory.resolve("maven").walkTopDown().single { it.isFile && it.extension == "aar" }
-  }
+  project(":bindings:rustls-platform-verifier-android")
+    .layout
+    .buildDirectory
+    .file("outputs/aar/rustls-platform-verifier-android-release.aar")
 val rustlsPlatformVerifierAndroidJar =
   layout.buildDirectory.file(
     "generated/dependencies/rustlsPlatformVerifierAndroid/rustls-platform-verifier-android.jar"
   )
 val extractRustlsPlatformVerifierAndroidJar =
   tasks.register<ExtractAarClassesJar>("extractRustlsPlatformVerifierAndroidJar") {
-    aarFile.set(layout.file(rustlsPlatformVerifierAndroidAar))
+    dependsOn(":bindings:rustls-platform-verifier-android:bundleReleaseAar")
+    aarFile.set(rustlsPlatformVerifierAndroidAar)
     outputJar.set(rustlsPlatformVerifierAndroidJar)
   }
 

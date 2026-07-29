@@ -55,6 +55,13 @@ function(mln_link_rust_platform target)
   endif()
   file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
        "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
+  file(
+    GLOB_RECURSE rust_dependency_sources CONFIGURE_DEPENDS
+    "${PROJECT_SOURCE_DIR}/build/dependencies/rustls-platform-verifier/rustls-platform-verifier/src/*.rs"
+    "${PROJECT_SOURCE_DIR}/build/dependencies/rustls-platform-verifier/android-release-support/src/*.rs")
+  set(rust_dependency_manifests
+      "${PROJECT_SOURCE_DIR}/build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml"
+      "${PROJECT_SOURCE_DIR}/build/dependencies/rustls-platform-verifier/android-release-support/Cargo.toml")
 
   string(TOUPPER "${rust_target}" rust_target_env)
   string(REPLACE "-" "_" rust_target_env "${rust_target_env}")
@@ -123,7 +130,8 @@ function(mln_link_rust_platform target)
       "${rust_target}"
       --release
     DEPENDS
-      "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
+      "${rust_manifest}" ${rust_sources} ${rust_dependency_sources}
+      ${rust_dependency_manifests} "${PROJECT_SOURCE_DIR}/Cargo.toml"
       "${PROJECT_SOURCE_DIR}/Cargo.lock"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     VERBATIM)
@@ -152,6 +160,7 @@ function(mln_link_rust_platform target)
       "${PROJECT_SOURCE_DIR}/Cargo.lock"
       "${PROJECT_SOURCE_DIR}/Cargo.toml"
       "${rust_manifest}"
+      ${rust_dependency_manifests}
       "${rust_license_config}"
       "${rust_license_template}")
   execute_process(

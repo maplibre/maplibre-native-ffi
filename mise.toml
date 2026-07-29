@@ -135,6 +135,20 @@ auto = true
 auto = true
 run = ".mise/bin/sync-submodules"
 
+[deps.rustls-platform-verifier]
+auto = true
+description = "Acquire and patch the Android platform certificate verifier"
+sources = [
+  ".mise/bin/sync-rustls-platform-verifier",
+  "patches/rustls-platform-verifier/*.patch",
+]
+outputs = [
+  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
+  "build/dependencies/rustls-platform-verifier/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt",
+]
+run = ".mise/bin/sync-rustls-platform-verifier"
+timeout = "2m"
+
 [hooks]
 postinstall = [
   "hk install --mise --quiet",
@@ -149,14 +163,20 @@ run = 'cmake --preset "$usage_preset"'
 description = "Configure, build, and install a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 sources = [
+  ".mise/bin/sync-rustls-platform-verifier",
   "CMakeLists.txt",
   "CMakePresets.json",
   "Cargo.lock",
   "Cargo.toml",
   "LICENSE",
+  "build/dependencies/rustls-platform-verifier/android-release-support/Cargo.toml",
+  "build/dependencies/rustls-platform-verifier/android-release-support/src/**/*.rs",
+  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/Cargo.toml",
+  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier/src/**/*.rs",
   "build/*/.native-package-install",
   "cmake/**/*",
   "include/**/*",
+  "patches/**/*",
   "src/**/*",
   "third_party/**/*",
 ]
