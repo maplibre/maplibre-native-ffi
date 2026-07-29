@@ -82,6 +82,10 @@ runs:
         restore-keys: |
           mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules') }}-
 
+    - name: Sync MapLibre Native source
+      shell: bash
+      run: .mise/bin/sync-submodules
+
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
