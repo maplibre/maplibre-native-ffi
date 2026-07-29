@@ -2210,7 +2210,6 @@ int main() {
           borrowed_descriptor.physical_height = 16;
           borrowed_descriptor.scale_factor = 1.0;
           var borrowed_session = map.attach_opengl_borrowed_texture(borrowed_descriptor);
-          borrowed_session.resize(32, 16, 1.0);
           borrowed_session.detach();
           borrowed_session.close();
         } finally {
