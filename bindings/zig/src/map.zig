@@ -5,7 +5,6 @@ const diagnostics = @import("diagnostics.zig");
 const native_temp = @import("native_temp.zig");
 const runtime_module = @import("runtime.zig");
 const RuntimeHandle = runtime_module.RuntimeHandle;
-const NativeMap = opaque {};
 const status = @import("status.zig");
 const values = @import("values.zig");
 
@@ -18,7 +17,6 @@ const CustomGeometrySourceState = struct {
 };
 
 const MapState = struct {
-    native: ?*NativeMap,
     runtime_registry: *runtime_module.RuntimeRegistry,
     id_value: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
@@ -28,21 +26,20 @@ const MapState = struct {
 };
 
 pub const RenderSessionRegistration = struct {
-    native: *c.mln_map,
+    native: c.mln_map,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-};
-
-const MapRegistrySlot = struct {
-    state: ?*MapState,
-    generation: u64,
 };
 
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
 
+// The C API issues each map a generational handle and rejects a released one,
+// so this no longer needs its own slot table and generations. It maps a live
+// handle to the state this binding owns on top of it: the diagnostic store,
+// the close-once flag, and the attached-session count. A released handle never
+// collides with a live key, because the C API never reuses a handle value.
 var map_registry_lock = std.atomic.Value(bool).init(false);
-var map_registry: std.ArrayList(MapRegistrySlot) = .empty;
-var map_free_list: std.ArrayList(usize) = .empty;
+var map_registry: std.AutoHashMapUnmanaged(c.mln_map, *MapState) = .empty;
 
 pub const MapMode = enum {
     continuous,
@@ -99,7 +96,7 @@ pub const CustomGeometrySourceOptions = struct {
     wrap: ?bool = null,
 };
 
-pub const MapHandle = enum(u128) {
+pub const MapHandle = enum(c.mln_map) {
     _,
 
     pub fn create(runtime: *RuntimeHandle, options: MapOptions) status.Error!MapHandle {
@@ -112,15 +109,13 @@ pub const MapHandle = enum(u128) {
         const runtime_lease = try runtime_module.lease(runtime);
         defer runtime_lease.release();
 
-        var map: ?*c.mln_map = null;
+        var map: c.mln_map = 0;
         const diagnostic_store = runtime_lease.diagnostic_store;
         try status.checkStatus(
             c.mln_map_create(runtime_lease.native, &native_options, &map),
             diagnostic_store,
         );
-        errdefer {
-            if (map) |handle| _ = c.mln_map_destroy(handle);
-        }
+        errdefer _ = c.mln_map_destroy(map);
 
         const custom_geometry_sources = try std.heap.smp_allocator.create(std.ArrayList(*CustomGeometrySourceState));
         custom_geometry_sources.* = .empty;
@@ -128,15 +123,14 @@ pub const MapHandle = enum(u128) {
 
         const map_registration = try runtime_module.registerMap(
             runtime,
-            map.?,
+            map,
             releaseDetachedCustomGeometrySourceStatesForStyleLoaded,
             custom_geometry_sources,
         );
-        errdefer runtime_module.unregisterMap(map_registration.registry, map.?);
+        errdefer runtime_module.unregisterMap(map_registration.registry, map);
 
         const map_state = try std.heap.smp_allocator.create(MapState);
         map_state.* = .{
-            .native = @ptrCast(map.?),
             .runtime_registry = map_registration.registry,
             .id_value = map_registration.id,
             .diagnostic_store = diagnostic_store,
@@ -146,7 +140,7 @@ pub const MapHandle = enum(u128) {
         };
         errdefer std.heap.smp_allocator.destroy(map_state);
 
-        return try registerMapState(map_state);
+        return try registerMapState(map, map_state);
     }
 
     pub fn id(self: *MapHandle) status.BindingError!values.MapId {
@@ -223,7 +217,7 @@ pub const MapHandle = enum(u128) {
     ) status.Error!?values.OwnedJsonValue {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: ?*c.mln_json_snapshot = null;
+        var snapshot: c.mln_json_snapshot = 0;
         try status.checkStatus(
             c.mln_map_get_layer_property(
                 try native(self),
@@ -233,7 +227,7 @@ pub const MapHandle = enum(u128) {
             ),
             diagnosticStore(self),
         );
-        defer if (snapshot) |handle| c.mln_json_snapshot_destroy(handle);
+        defer c.mln_json_snapshot_destroy(snapshot);
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
@@ -259,27 +253,27 @@ pub const MapHandle = enum(u128) {
     ) status.Error!?values.OwnedJsonValue {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: ?*c.mln_json_snapshot = null;
+        var snapshot: c.mln_json_snapshot = 0;
         try status.checkStatus(
             c.mln_map_get_layer_filter(try native(self), try temp.stringView(layer_id), &snapshot),
             diagnosticStore(self),
         );
-        defer if (snapshot) |handle| c.mln_json_snapshot_destroy(handle);
+        defer c.mln_json_snapshot_destroy(snapshot);
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
     pub fn listStyleSourceIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StringList {
-        var list: ?*c.mln_style_id_list = null;
+        var list: c.mln_style_id_list = 0;
         try status.checkStatus(c.mln_map_list_style_source_ids(try native(self), &list), diagnosticStore(self));
-        defer if (list) |handle| c.mln_style_id_list_destroy(handle);
-        return try copyStyleIdList(allocator, list.?, diagnosticStore(self));
+        defer c.mln_style_id_list_destroy(list);
+        return try copyStyleIdList(allocator, list, diagnosticStore(self));
     }
 
     pub fn listStyleLayerIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StringList {
-        var list: ?*c.mln_style_id_list = null;
+        var list: c.mln_style_id_list = 0;
         try status.checkStatus(c.mln_map_list_style_layer_ids(try native(self), &list), diagnosticStore(self));
-        defer if (list) |handle| c.mln_style_id_list_destroy(handle);
-        return try copyStyleIdList(allocator, list.?, diagnosticStore(self));
+        defer c.mln_style_id_list_destroy(list);
+        return try copyStyleIdList(allocator, list, diagnosticStore(self));
     }
 
     pub fn addStyleSourceJson(
@@ -445,13 +439,13 @@ pub const MapHandle = enum(u128) {
         allocator: std.mem.Allocator,
         layer_id: []const u8,
     ) status.Error!?values.OwnedJsonValue {
-        var snapshot: ?*c.mln_json_snapshot = null;
+        var snapshot: c.mln_json_snapshot = 0;
         var found = false;
         try status.checkStatus(
             c.mln_map_get_style_layer_json(try native(self), stringView(layer_id), &snapshot, &found),
             diagnosticStore(self),
         );
-        defer if (snapshot) |handle| c.mln_json_snapshot_destroy(handle);
+        defer c.mln_json_snapshot_destroy(snapshot);
         if (!found) return null;
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self)) orelse error.NativeError;
     }
@@ -502,12 +496,12 @@ pub const MapHandle = enum(u128) {
     ) status.Error!?values.OwnedJsonValue {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
-        var snapshot: ?*c.mln_json_snapshot = null;
+        var snapshot: c.mln_json_snapshot = 0;
         try status.checkStatus(
             c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &snapshot),
             diagnosticStore(self),
         );
-        defer if (snapshot) |handle| c.mln_json_snapshot_destroy(handle);
+        defer c.mln_json_snapshot_destroy(snapshot);
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
@@ -1611,7 +1605,7 @@ fn releaseCustomGeometrySourceState(map_state: *MapState, source_id: []const u8)
     }
 }
 
-fn releaseDetachedCustomGeometrySourceStatesForStyleLoaded(map: *c.mln_map, context: ?*anyopaque) void {
+fn releaseDetachedCustomGeometrySourceStatesForStyleLoaded(map: c.mln_map, context: ?*anyopaque) void {
     const custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState) = @ptrCast(@alignCast(context orelse return));
     var index: usize = 0;
     while (index < custom_geometry_sources.items.len) {
@@ -1703,35 +1697,12 @@ fn mapIdForHandle(handle: *MapHandle) status.BindingError!values.MapId {
     return map_state.id_value;
 }
 
-fn registerMapState(map_state: *MapState) std.mem.Allocator.Error!MapHandle {
+fn registerMapState(map: c.mln_map, map_state: *MapState) std.mem.Allocator.Error!MapHandle {
     lockMapRegistry();
     defer unlockMapRegistry();
 
-    if (map_free_list.items.len > 0) {
-        const slot_index = map_free_list.pop().?;
-        map_registry.items[slot_index].state = map_state;
-        map_registry.items[slot_index].generation = runtime_module.nextHandleGeneration();
-        return mapHandle(slot_index + 1, map_registry.items[slot_index].generation);
-    }
-
-    const generation = runtime_module.nextHandleGeneration();
-    try map_free_list.ensureTotalCapacity(std.heap.smp_allocator, map_registry.items.len + 1);
-    try map_registry.append(std.heap.smp_allocator, .{ .state = map_state, .generation = generation });
-    return mapHandle(map_registry.items.len, generation);
-}
-
-fn mapHandle(index: usize, generation: u64) MapHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn mapHandleIndex(handle: MapHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn mapHandleGeneration(handle: MapHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try map_registry.put(std.heap.smp_allocator, map, map_state);
+    return @enumFromInt(map);
 }
 
 fn mapState(handle: MapHandle) ?*MapState {
@@ -1741,16 +1712,12 @@ fn mapState(handle: MapHandle) ?*MapState {
 }
 
 fn mapStateLocked(handle: MapHandle) ?*MapState {
-    const index = mapHandleIndex(handle) orelse return null;
-    if (index > map_registry.items.len) return null;
-    const slot = map_registry.items[index - 1];
-    if (slot.generation != mapHandleGeneration(handle)) return null;
-    return slot.state;
+    return map_registry.get(@intFromEnum(handle));
 }
 
 const MapClose = struct {
     state: *MapState,
-    native: *c.mln_map,
+    native: c.mln_map,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     runtime_registry: *runtime_module.RuntimeRegistry,
 };
@@ -1759,19 +1726,13 @@ fn beginMapClose(handle: MapHandle) status.BindingError!?MapClose {
     lockMapRegistry();
     defer unlockMapRegistry();
 
-    const index = mapHandleIndex(handle) orelse return null;
-    if (index > map_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &map_registry.items[slot_index];
-    if (slot.generation != mapHandleGeneration(handle)) return null;
-    const map_state = slot.state orelse return null;
+    const map_state = map_registry.get(@intFromEnum(handle)) orelse return null;
     if (map_state.closing) return error.ActiveBorrow;
     if (map_state.attached_render_sessions.load(.seq_cst) != 0) return error.InvalidState;
-    const map: *c.mln_map = @ptrCast(map_state.native orelse return null);
     map_state.closing = true;
     return .{
         .state = map_state,
-        .native = map,
+        .native = @intFromEnum(handle),
         .diagnostic_store = map_state.diagnostic_store,
         .runtime_registry = map_state.runtime_registry,
     };
@@ -1788,17 +1749,8 @@ fn finishMapClose(handle: MapHandle) ?*MapState {
     lockMapRegistry();
     defer unlockMapRegistry();
 
-    const index = mapHandleIndex(handle) orelse return null;
-    if (index > map_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &map_registry.items[slot_index];
-    if (slot.generation != mapHandleGeneration(handle)) return null;
-    const map_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = runtime_module.nextHandleGeneration();
-    map_state.native = null;
-    map_free_list.appendAssumeCapacity(slot_index);
-    return map_state;
+    const entry = map_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    return entry.value;
 }
 
 fn lockMapRegistry() void {
@@ -1811,10 +1763,10 @@ fn unlockMapRegistry() void {
     map_registry_lock.store(false, .seq_cst);
 }
 
-pub fn native(handle: *MapHandle) status.BindingError!*c.mln_map {
+pub fn native(handle: *MapHandle) status.BindingError!c.mln_map {
     const map_state = mapState(handle.*) orelse return error.ClosedHandle;
     if (map_state.closing) return error.ActiveBorrow;
-    return @ptrCast(map_state.native orelse return error.ClosedHandle);
+    return @intFromEnum(handle.*);
 }
 
 pub fn diagnosticStore(handle: *MapHandle) ?*diagnostics.DiagnosticStore {
@@ -1828,10 +1780,9 @@ pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessi
 
     const map_state = mapStateLocked(handle.*) orelse return error.ClosedHandle;
     if (map_state.closing) return error.ActiveBorrow;
-    const map: *c.mln_map = @ptrCast(map_state.native orelse return error.ClosedHandle);
     _ = map_state.attached_render_sessions.fetchAdd(1, .seq_cst);
     return .{
-        .native = map,
+        .native = @intFromEnum(handle.*),
         .diagnostic_store = map_state.diagnostic_store,
     };
 }
@@ -1847,10 +1798,11 @@ fn customGeometrySourceCountForTesting(handle: *MapHandle) status.BindingError!u
 
 fn copyJsonSnapshot(
     allocator: std.mem.Allocator,
-    snapshot: ?*c.mln_json_snapshot,
+    snapshot: c.mln_json_snapshot,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!?values.OwnedJsonValue {
-    const handle = snapshot orelse return null;
+    if (snapshot == 0) return null;
+    const handle = snapshot;
     var raw: ?*const c.mln_json_value = null;
     try status.checkStatus(c.mln_json_snapshot_get(handle, &raw), diagnostic_store);
     return try values.ownedJsonValueFromNative(allocator, raw.?);
@@ -1858,7 +1810,7 @@ fn copyJsonSnapshot(
 
 fn copyStyleIdList(
     allocator: std.mem.Allocator,
-    list: *c.mln_style_id_list,
+    list: c.mln_style_id_list,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!values.StringList {
     var count: usize = 0;

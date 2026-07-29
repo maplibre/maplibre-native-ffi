@@ -6,12 +6,10 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-const NativeRuntime = opaque {};
-
-pub const MapStyleLoadedHandler = *const fn (map: *c.mln_map, context: ?*anyopaque) void;
+pub const MapStyleLoadedHandler = *const fn (map: c.mln_map, context: ?*anyopaque) void;
 
 const MapRegistration = struct {
-    native: *c.mln_map,
+    native: c.mln_map,
     id: values.MapId,
     style_loaded_handler: MapStyleLoadedHandler,
     style_loaded_context: ?*anyopaque,
@@ -29,7 +27,6 @@ const ResourceProviderState = struct {
 };
 
 const RuntimeState = struct {
-    native: ?*NativeRuntime,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: ?*RuntimeRegistry,
     resource_transform: ?*ResourceTransform,
@@ -40,7 +37,7 @@ const RuntimeState = struct {
 
 pub const RuntimeLease = struct {
     state: *RuntimeState,
-    native: *c.mln_runtime,
+    native: c.mln_runtime,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 
     pub fn release(self: RuntimeLease) void {
@@ -53,30 +50,15 @@ pub const RegisteredMap = struct {
     id: values.MapId,
 };
 
-const RuntimeRegistrySlot = struct {
-    state: ?*RuntimeState,
-    generation: u64,
-};
-
 const ResourceRequestState = struct {
-    native: ?*c.mln_resource_request_handle,
+    native: c.mln_resource_request_handle,
     completed: bool,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
-const ResourceRequestRegistrySlot = struct {
-    state: ?*ResourceRequestState,
-    generation: u64,
-};
-
 const WakeSourceState = struct {
-    native: ?*c.mln_wake_source,
+    native: c.mln_wake_source,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-};
-
-const WakeSourceRegistrySlot = struct {
-    state: ?*WakeSourceState,
-    generation: u64,
 };
 
 const OfflineOperationState = struct {
@@ -96,17 +78,18 @@ const RequiredOfflineOperation = struct {
     operation_kind: OfflineOperationKind,
 };
 
+// The C API issues these three a generational handle and rejects a released
+// one, so each map holds only the state this binding owns on top of it. The
+// offline operation table below keeps its own generations: an operation is a
+// binding concept with no C handle behind it.
 var runtime_registry_lock = std.atomic.Value(bool).init(false);
-var runtime_handle_registry: std.ArrayList(RuntimeRegistrySlot) = .empty;
-var runtime_handle_free_list: std.ArrayList(usize) = .empty;
+var runtime_handle_registry: std.AutoHashMapUnmanaged(c.mln_runtime, *RuntimeState) = .empty;
 
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
-var resource_request_registry: std.ArrayList(ResourceRequestRegistrySlot) = .empty;
-var resource_request_free_list: std.ArrayList(usize) = .empty;
+var resource_request_registry: std.AutoHashMapUnmanaged(c.mln_resource_request_handle, *ResourceRequestState) = .empty;
 
 var wake_source_registry_lock = std.atomic.Value(bool).init(false);
-var wake_source_registry: std.ArrayList(WakeSourceRegistrySlot) = .empty;
-var wake_source_free_list: std.ArrayList(usize) = .empty;
+var wake_source_registry: std.AutoHashMapUnmanaged(c.mln_wake_source, *WakeSourceState) = .empty;
 
 var offline_operation_registry_lock = std.atomic.Value(bool).init(false);
 var offline_operation_registry: std.ArrayList(OfflineOperationRegistrySlot) = .empty;
@@ -115,8 +98,8 @@ var offline_operation_free_list: std.ArrayList(usize) = .empty;
 var handle_generation_counter = std.atomic.Value(u64).init(0);
 var handle_generation_seed = std.atomic.Value(u64).init(0);
 
-const OfflineRegionSnapshotDestroyFn = *const fn (?*c.mln_offline_region_snapshot) callconv(.c) void;
-const OfflineRegionListDestroyFn = *const fn (?*c.mln_offline_region_list) callconv(.c) void;
+const OfflineRegionSnapshotDestroyFn = *const fn (c.mln_offline_region_snapshot) callconv(.c) void;
+const OfflineRegionListDestroyFn = *const fn (c.mln_offline_region_list) callconv(.c) void;
 
 var offline_region_snapshot_destroy_for_testing: OfflineRegionSnapshotDestroyFn = c.mln_offline_region_snapshot_destroy;
 var offline_region_list_destroy_for_testing: OfflineRegionListDestroyFn = c.mln_offline_region_list_destroy;
@@ -516,7 +499,7 @@ pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
 };
 
-pub const ResourceRequestHandle = enum(u128) {
+pub const ResourceRequestHandle = enum(c.mln_resource_request_handle) {
     _,
 
     pub fn complete(self: ResourceRequestHandle, response: ResourceResponse) status.Error!void {
@@ -525,7 +508,8 @@ pub const ResourceRequestHandle = enum(u128) {
 
         const request_state = resourceRequestState(self) orelse return error.ClosedHandle;
         if (request_state.completed) return error.AlreadyCompleted;
-        const native_handle = request_state.native orelse return error.ClosedHandle;
+        if (request_state.native == 0) return error.ClosedHandle;
+        const native_handle = request_state.native;
         var native_response = try resourceResponseToNative(response, request_state.diagnostic_store);
         try status.checkStatus(c.mln_resource_request_complete(native_handle, &native_response), request_state.diagnostic_store);
         request_state.completed = true;
@@ -536,7 +520,8 @@ pub const ResourceRequestHandle = enum(u128) {
         defer unlockResourceRequestRegistry();
 
         const request_state = resourceRequestState(self) orelse return error.ClosedHandle;
-        const native_handle = request_state.native orelse return error.ClosedHandle;
+        if (request_state.native == 0) return error.ClosedHandle;
+        const native_handle = request_state.native;
         var is_cancelled = false;
         try status.checkStatus(c.mln_resource_request_cancelled(native_handle, &is_cancelled), request_state.diagnostic_store);
         return is_cancelled;
@@ -548,9 +533,7 @@ pub const ResourceRequestHandle = enum(u128) {
 
         const request_state = unregisterResourceRequestState(self) orelse return;
         defer std.heap.smp_allocator.destroy(request_state);
-        const native_handle = request_state.native orelse return;
-        c.mln_resource_request_release(native_handle);
-        request_state.native = null;
+        c.mln_resource_request_release(request_state.native);
     }
 };
 
@@ -560,7 +543,7 @@ pub const ResourceRequestHandle = enum(u128) {
 /// shutdown paths rely on. It stays usable after its runtime closes, and
 /// signalling it then does nothing. The diagnostic store the runtime was
 /// created with must outlive the source.
-pub const WakeSourceHandle = enum(u128) {
+pub const WakeSourceHandle = enum(c.mln_wake_source) {
     _,
 
     /// Sets the runtime's wake flag and releases the parked owner thread.
@@ -572,7 +555,8 @@ pub const WakeSourceHandle = enum(u128) {
         defer unlockWakeSourceRegistry();
 
         const source_state = wakeSourceState(self) orelse return error.ClosedHandle;
-        const native_source = source_state.native orelse return error.ClosedHandle;
+        if (source_state.native == 0) return error.ClosedHandle;
+        const native_source = source_state.native;
         try status.checkStatus(c.mln_wake_source_signal(native_source), source_state.diagnostic_store);
     }
 
@@ -583,9 +567,7 @@ pub const WakeSourceHandle = enum(u128) {
 
         const source_state = unregisterWakeSourceState(self) orelse return;
         defer std.heap.smp_allocator.destroy(source_state);
-        const native_source = source_state.native orelse return;
-        c.mln_wake_source_destroy(native_source);
-        source_state.native = null;
+        c.mln_wake_source_destroy(source_state.native);
     }
 };
 
@@ -1079,7 +1061,7 @@ pub const RuntimeEventPayloadType = union(enum) {
     }
 };
 
-pub const RuntimeHandle = enum(u128) {
+pub const RuntimeHandle = enum(c.mln_runtime) {
     _,
 
     pub fn create(
@@ -1154,19 +1136,20 @@ pub const RuntimeHandle = enum(u128) {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
 
-        var native_source: ?*c.mln_wake_source = null;
+        var native_source: c.mln_wake_source = 0;
         try status.checkStatus(
             c.mln_runtime_wake_source_acquire(runtime_lease.native, &native_source),
             runtime_lease.diagnostic_store,
         );
-        const source = native_source orelse return error.NativeError;
+        if (native_source == 0) return error.NativeError;
+        const source = native_source;
 
         const source_state = std.heap.smp_allocator.create(WakeSourceState) catch {
             c.mln_wake_source_destroy(source);
             return error.OutOfMemory;
         };
         source_state.* = .{ .native = source, .diagnostic_store = runtime_lease.diagnostic_store };
-        return registerWakeSourceState(source_state) catch {
+        return registerWakeSourceState(source, source_state) catch {
             std.heap.smp_allocator.destroy(source_state);
             c.mln_wake_source_destroy(source);
             return error.OutOfMemory;
@@ -1209,7 +1192,7 @@ pub const RuntimeHandle = enum(u128) {
 
     fn operationHandleWithRuntime(
         self: *RuntimeHandle,
-        runtime: *c.mln_runtime,
+        runtime: c.mln_runtime,
         operation_id: c.mln_offline_operation_id,
         operation_kind: OfflineOperationKind,
         result_kind: OfflineOperationResultKind,
@@ -1384,7 +1367,7 @@ pub const RuntimeHandle = enum(u128) {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.requireEither(self, .region_create, .region_update_metadata, .region);
-        var snapshot: ?*c.mln_offline_region_snapshot = null;
+        var snapshot: c.mln_offline_region_snapshot = 0;
         const native_status = switch (required.operation_kind) {
             .region_create => c.mln_runtime_offline_region_create_take_result(runtime_lease.native, required.operation_id, &snapshot),
             .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(runtime_lease.native, required.operation_id, &snapshot),
@@ -1392,7 +1375,8 @@ pub const RuntimeHandle = enum(u128) {
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
         operation.consume();
-        const snapshot_handle = snapshot orelse return error.NativeError;
+        if (snapshot == 0) return error.NativeError;
+        const snapshot_handle = snapshot;
         defer destroyOfflineRegionSnapshot(snapshot_handle);
         return copyOfflineRegionSnapshot(allocator, snapshot_handle);
     }
@@ -1405,13 +1389,14 @@ pub const RuntimeHandle = enum(u128) {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.require(self, .region_get, .optional_region);
-        var snapshot: ?*c.mln_offline_region_snapshot = null;
+        var snapshot: c.mln_offline_region_snapshot = 0;
         var found = false;
         const native_status = c.mln_runtime_offline_region_get_take_result(runtime_lease.native, required.operation_id, &snapshot, &found);
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
         operation.consume();
         if (!found) return null;
-        const snapshot_handle = snapshot orelse return error.NativeError;
+        if (snapshot == 0) return error.NativeError;
+        const snapshot_handle = snapshot;
         defer destroyOfflineRegionSnapshot(snapshot_handle);
         return try copyOfflineRegionSnapshot(allocator, snapshot_handle);
     }
@@ -1424,7 +1409,7 @@ pub const RuntimeHandle = enum(u128) {
         const runtime_lease = try lease(self);
         defer runtime_lease.release();
         const required = try operation.requireEither(self, .regions_list, .regions_merge_database, .region_list);
-        var list: ?*c.mln_offline_region_list = null;
+        var list: c.mln_offline_region_list = 0;
         const native_status = switch (required.operation_kind) {
             .regions_list => c.mln_runtime_offline_regions_list_take_result(runtime_lease.native, required.operation_id, &list),
             .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(runtime_lease.native, required.operation_id, &list),
@@ -1432,7 +1417,8 @@ pub const RuntimeHandle = enum(u128) {
         };
         try status.checkStatus(native_status, runtime_lease.diagnostic_store);
         operation.consume();
-        const list_handle = list orelse return error.NativeError;
+        if (list == 0) return error.NativeError;
+        const list_handle = list;
         defer destroyOfflineRegionList(list_handle);
         return copyOfflineRegionList(allocator, list_handle);
     }
@@ -1566,11 +1552,9 @@ fn createNative(
     native_options: *c.mln_runtime_options,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!RuntimeHandle {
-    var runtime: ?*c.mln_runtime = null;
+    var runtime: c.mln_runtime = 0;
     try status.checkStatus(c.mln_runtime_create(native_options, &runtime), diagnostic_store);
-    errdefer {
-        if (runtime) |handle| _ = c.mln_runtime_destroy(handle);
-    }
+    errdefer _ = c.mln_runtime_destroy(runtime);
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
     runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_offline_operations = 0 };
@@ -1578,7 +1562,6 @@ fn createNative(
 
     const runtime_state = try std.heap.smp_allocator.create(RuntimeState);
     runtime_state.* = .{
-        .native = @ptrCast(runtime.?),
         .diagnostic_store = diagnostic_store,
         .registry = runtime_registry,
         .resource_transform = null,
@@ -1588,7 +1571,7 @@ fn createNative(
     };
     errdefer std.heap.smp_allocator.destroy(runtime_state);
 
-    return try registerRuntimeState(runtime_state);
+    return try registerRuntimeState(runtime, runtime_state);
 }
 
 fn copyRuntimeEventOwned(
@@ -1611,11 +1594,11 @@ fn copyRuntimeEventOwned(
     };
 }
 
-fn destroyOfflineRegionSnapshot(snapshot: ?*c.mln_offline_region_snapshot) void {
+fn destroyOfflineRegionSnapshot(snapshot: c.mln_offline_region_snapshot) void {
     offline_region_snapshot_destroy_for_testing(snapshot);
 }
 
-fn destroyOfflineRegionList(list: ?*c.mln_offline_region_list) void {
+fn destroyOfflineRegionList(list: c.mln_offline_region_list) void {
     offline_region_list_destroy_for_testing(list);
 }
 
@@ -1632,33 +1615,36 @@ fn runtimeEventFromNative(handle: *RuntimeHandle, native_event: c.mln_runtime_ev
 fn applyEventSideEffects(handle: *RuntimeHandle, native_event: c.mln_runtime_event) void {
     if (native_event.type != c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) return;
     if (native_event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return;
-    const source_ptr = native_event.source orelse return;
-    const registration = mapRegistrationForNativeSource(handle.*, source_ptr) orelse return;
+    if (native_event.source == 0) return;
+    const registration = mapRegistrationForNativeSource(handle.*, native_event.source) orelse return;
     registration.style_loaded_handler(registration.native, registration.style_loaded_context);
 }
 
-fn mapRegistrationForNativeSource(handle: RuntimeHandle, source_ptr: *anyopaque) ?MapRegistration {
+fn mapRegistrationForNativeSource(handle: RuntimeHandle, source: c.mln_map) ?MapRegistration {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtimeStateLocked(handle) orelse return null;
     const runtime_registry = runtime_state.registry orelse return null;
     for (runtime_registry.maps.items) |registration| {
-        if (@intFromPtr(registration.native) == @intFromPtr(source_ptr)) return registration;
+        if (registration.native == source) return registration;
     }
     return null;
 }
 
-fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: ?*anyopaque) ?values.MapId {
+// The event carries the source map's handle, which names one map for the life
+// of the process, so this is an equality test rather than the address scan it
+// used to be.
+fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: u64) ?values.MapId {
     if (source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return null;
-    const source_ptr = source orelse return null;
+    if (source == 0) return null;
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
     const runtime_state = runtimeStateLocked(handle.*) orelse return null;
     const runtime_registry = runtime_state.registry orelse return null;
     for (runtime_registry.maps.items) |registration| {
-        if (@intFromPtr(registration.native) == @intFromPtr(source_ptr)) return registration.id;
+        if (registration.native == source) return registration.id;
     }
     return null;
 }
@@ -1692,7 +1678,7 @@ fn resourceTransformTrampoline(
 fn resourceProviderTrampoline(
     user_data: ?*anyopaque,
     request: ?*const c.mln_resource_request,
-    native_handle: ?*c.mln_resource_request_handle,
+    native_handle: c.mln_resource_request_handle,
 ) callconv(.c) u32 {
     const provider_state: *ResourceProviderState = @ptrCast(@alignCast(user_data orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH));
     const provider = provider_state.provider;
@@ -1714,14 +1700,15 @@ fn resourceProviderTrampoline(
 }
 
 fn createResourceRequestHandle(
-    native_handle: ?*c.mln_resource_request_handle,
+    native_handle: c.mln_resource_request_handle,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) std.mem.Allocator.Error!?ResourceRequestHandle {
-    const request_handle = native_handle orelse return null;
+    if (native_handle == 0) return null;
+    const request_handle = native_handle;
     const request_state = try std.heap.smp_allocator.create(ResourceRequestState);
     request_state.* = .{ .native = request_handle, .completed = false, .diagnostic_store = diagnostic_store };
     errdefer std.heap.smp_allocator.destroy(request_state);
-    return try registerResourceRequestState(request_state);
+    return try registerResourceRequestState(request_handle, request_state);
 }
 
 fn destroyUnreleasedResourceRequestHandle(handle: ResourceRequestHandle) void {
@@ -1729,39 +1716,15 @@ fn destroyUnreleasedResourceRequestHandle(handle: ResourceRequestHandle) void {
     defer unlockResourceRequestRegistry();
 
     const request_state = unregisterResourceRequestState(handle) orelse return;
-    request_state.native = null;
     std.heap.smp_allocator.destroy(request_state);
 }
 
-fn registerRuntimeState(runtime_state: *RuntimeState) std.mem.Allocator.Error!RuntimeHandle {
+fn registerRuntimeState(native_handle: c.mln_runtime, runtime_state: *RuntimeState) std.mem.Allocator.Error!RuntimeHandle {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
-    if (runtime_handle_free_list.items.len > 0) {
-        const slot_index = runtime_handle_free_list.pop().?;
-        runtime_handle_registry.items[slot_index].state = runtime_state;
-        runtime_handle_registry.items[slot_index].generation = nextHandleGeneration();
-        return runtimeHandle(slot_index + 1, runtime_handle_registry.items[slot_index].generation);
-    }
-
-    const generation = nextHandleGeneration();
-    try runtime_handle_free_list.ensureTotalCapacity(std.heap.smp_allocator, runtime_handle_registry.items.len + 1);
-    try runtime_handle_registry.append(std.heap.smp_allocator, .{ .state = runtime_state, .generation = generation });
-    return runtimeHandle(runtime_handle_registry.items.len, generation);
-}
-
-fn runtimeHandle(index: usize, generation: u64) RuntimeHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn runtimeHandleIndex(handle: RuntimeHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn runtimeHandleGeneration(handle: RuntimeHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try runtime_handle_registry.put(std.heap.smp_allocator, native_handle, runtime_state);
+    return @enumFromInt(native_handle);
 }
 
 fn runtimeState(handle: RuntimeHandle) ?*RuntimeState {
@@ -1771,11 +1734,7 @@ fn runtimeState(handle: RuntimeHandle) ?*RuntimeState {
 }
 
 fn runtimeStateLocked(handle: RuntimeHandle) ?*RuntimeState {
-    const index = runtimeHandleIndex(handle) orelse return null;
-    if (index > runtime_handle_registry.items.len) return null;
-    const slot = runtime_handle_registry.items[index - 1];
-    if (slot.generation != runtimeHandleGeneration(handle)) return null;
-    return slot.state;
+    return runtime_handle_registry.get(@intFromEnum(handle));
 }
 
 pub fn lease(handle: *RuntimeHandle) status.BindingError!RuntimeLease {
@@ -1788,7 +1747,7 @@ fn runtimeLease(handle: RuntimeHandle) status.BindingError!RuntimeLease {
 
     const runtime_state = runtimeStateLocked(handle) orelse return error.ClosedHandle;
     if (runtime_state.closing) return error.ActiveBorrow;
-    const runtime: *c.mln_runtime = @ptrCast(runtime_state.native orelse return error.ClosedHandle);
+    const runtime: c.mln_runtime = @intFromEnum(handle);
     _ = runtime_state.active_leases.fetchAdd(1, .seq_cst);
     return .{
         .state = runtime_state,
@@ -1799,7 +1758,7 @@ fn runtimeLease(handle: RuntimeHandle) status.BindingError!RuntimeLease {
 
 const RuntimeClose = struct {
     state: *RuntimeState,
-    native: *c.mln_runtime,
+    native: c.mln_runtime,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     registry: *RuntimeRegistry,
 };
@@ -1808,11 +1767,7 @@ fn beginRuntimeClose(handle: RuntimeHandle) status.Error!?RuntimeClose {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
-    const index = runtimeHandleIndex(handle) orelse return null;
-    if (index > runtime_handle_registry.items.len) return null;
-    const slot = runtime_handle_registry.items[index - 1];
-    if (slot.generation != runtimeHandleGeneration(handle)) return null;
-    const runtime_state = slot.state orelse return null;
+    const runtime_state = runtime_handle_registry.get(@intFromEnum(handle)) orelse return null;
     if (runtime_state.closing) return error.ActiveBorrow;
     if (runtime_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     const runtime_registry = runtime_state.registry orelse return null;
@@ -1824,7 +1779,7 @@ fn beginRuntimeClose(handle: RuntimeHandle) status.Error!?RuntimeClose {
         try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live offline operations");
         return error.InvalidState;
     }
-    const runtime: *c.mln_runtime = @ptrCast(runtime_state.native orelse return null);
+    const runtime: c.mln_runtime = @intFromEnum(handle);
     runtime_state.closing = true;
     return .{
         .state = runtime_state,
@@ -1845,17 +1800,9 @@ fn finishRuntimeClose(handle: RuntimeHandle) ?*RuntimeState {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
-    const index = runtimeHandleIndex(handle) orelse return null;
-    if (index > runtime_handle_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &runtime_handle_registry.items[slot_index];
-    if (slot.generation != runtimeHandleGeneration(handle)) return null;
-    const runtime_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = nextHandleGeneration();
-    runtime_state.native = null;
+    const entry = runtime_handle_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    const runtime_state = entry.value;
     runtime_state.registry = null;
-    runtime_handle_free_list.appendAssumeCapacity(slot_index);
     return runtime_state;
 }
 
@@ -1888,56 +1835,24 @@ fn unlockRuntimeRegistry() void {
     runtime_registry_lock.store(false, .seq_cst);
 }
 
-fn registerResourceRequestState(request_state: *ResourceRequestState) std.mem.Allocator.Error!ResourceRequestHandle {
+fn registerResourceRequestState(
+    native_handle: c.mln_resource_request_handle,
+    request_state: *ResourceRequestState,
+) std.mem.Allocator.Error!ResourceRequestHandle {
     lockResourceRequestRegistry();
     defer unlockResourceRequestRegistry();
 
-    if (resource_request_free_list.items.len > 0) {
-        const slot_index = resource_request_free_list.pop().?;
-        resource_request_registry.items[slot_index].state = request_state;
-        resource_request_registry.items[slot_index].generation = nextHandleGeneration();
-        return resourceRequestHandle(slot_index + 1, resource_request_registry.items[slot_index].generation);
-    }
-
-    const generation = nextHandleGeneration();
-    try resource_request_free_list.ensureTotalCapacity(std.heap.smp_allocator, resource_request_registry.items.len + 1);
-    try resource_request_registry.append(std.heap.smp_allocator, .{ .state = request_state, .generation = generation });
-    return resourceRequestHandle(resource_request_registry.items.len, generation);
-}
-
-fn resourceRequestHandle(index: usize, generation: u64) ResourceRequestHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn resourceRequestIndex(handle: ResourceRequestHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn resourceRequestGeneration(handle: ResourceRequestHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try resource_request_registry.put(std.heap.smp_allocator, native_handle, request_state);
+    return @enumFromInt(native_handle);
 }
 
 fn resourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    const index = resourceRequestIndex(handle) orelse return null;
-    if (index > resource_request_registry.items.len) return null;
-    const slot = resource_request_registry.items[index - 1];
-    if (slot.generation != resourceRequestGeneration(handle)) return null;
-    return slot.state;
+    return resource_request_registry.get(@intFromEnum(handle));
 }
 
 fn unregisterResourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    const index = resourceRequestIndex(handle) orelse return null;
-    if (index > resource_request_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &resource_request_registry.items[slot_index];
-    if (slot.generation != resourceRequestGeneration(handle)) return null;
-    const request_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = nextHandleGeneration();
-    resource_request_free_list.appendAssumeCapacity(slot_index);
-    return request_state;
+    const entry = resource_request_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    return entry.value;
 }
 
 fn lockResourceRequestRegistry() void {
@@ -1950,56 +1865,24 @@ fn unlockResourceRequestRegistry() void {
     resource_request_registry_lock.store(false, .seq_cst);
 }
 
-fn registerWakeSourceState(source_state: *WakeSourceState) std.mem.Allocator.Error!WakeSourceHandle {
+fn registerWakeSourceState(
+    native_handle: c.mln_wake_source,
+    source_state: *WakeSourceState,
+) std.mem.Allocator.Error!WakeSourceHandle {
     lockWakeSourceRegistry();
     defer unlockWakeSourceRegistry();
 
-    if (wake_source_free_list.items.len > 0) {
-        const slot_index = wake_source_free_list.pop().?;
-        wake_source_registry.items[slot_index].state = source_state;
-        wake_source_registry.items[slot_index].generation = nextHandleGeneration();
-        return wakeSourceHandle(slot_index + 1, wake_source_registry.items[slot_index].generation);
-    }
-
-    const generation = nextHandleGeneration();
-    try wake_source_free_list.ensureTotalCapacity(std.heap.smp_allocator, wake_source_registry.items.len + 1);
-    try wake_source_registry.append(std.heap.smp_allocator, .{ .state = source_state, .generation = generation });
-    return wakeSourceHandle(wake_source_registry.items.len, generation);
-}
-
-fn wakeSourceHandle(index: usize, generation: u64) WakeSourceHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn wakeSourceIndex(handle: WakeSourceHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn wakeSourceGeneration(handle: WakeSourceHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try wake_source_registry.put(std.heap.smp_allocator, native_handle, source_state);
+    return @enumFromInt(native_handle);
 }
 
 fn wakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
-    const index = wakeSourceIndex(handle) orelse return null;
-    if (index > wake_source_registry.items.len) return null;
-    const slot = wake_source_registry.items[index - 1];
-    if (slot.generation != wakeSourceGeneration(handle)) return null;
-    return slot.state;
+    return wake_source_registry.get(@intFromEnum(handle));
 }
 
 fn unregisterWakeSourceState(handle: WakeSourceHandle) ?*WakeSourceState {
-    const index = wakeSourceIndex(handle) orelse return null;
-    if (index > wake_source_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &wake_source_registry.items[slot_index];
-    if (slot.generation != wakeSourceGeneration(handle)) return null;
-    const source_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = nextHandleGeneration();
-    wake_source_free_list.appendAssumeCapacity(slot_index);
-    return source_state;
+    const entry = wake_source_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    return entry.value;
 }
 
 fn lockWakeSourceRegistry() void {
@@ -2288,7 +2171,7 @@ fn offlineStatusFromNative(raw: c.mln_offline_region_status) OfflineRegionStatus
 
 fn copyOfflineRegionSnapshot(
     allocator: std.mem.Allocator,
-    snapshot: *const c.mln_offline_region_snapshot,
+    snapshot: c.mln_offline_region_snapshot,
 ) status.Error!OwnedOfflineRegion {
     var info: c.mln_offline_region_info = undefined;
     info.size = @sizeOf(c.mln_offline_region_info);
@@ -2296,7 +2179,7 @@ fn copyOfflineRegionSnapshot(
     return copyOfflineRegionInfo(allocator, info);
 }
 
-fn copyOfflineRegionList(allocator: std.mem.Allocator, list: *const c.mln_offline_region_list) status.Error!OfflineRegionList {
+fn copyOfflineRegionList(allocator: std.mem.Allocator, list: c.mln_offline_region_list) status.Error!OfflineRegionList {
     var count: usize = 0;
     try status.checkStatus(c.mln_offline_region_list_count(list, &count), null);
     const items = try allocator.alloc(OwnedOfflineRegion, count);
@@ -2361,10 +2244,10 @@ fn copyOfflineRegionDefinition(
     };
 }
 
-pub fn native(handle: *RuntimeHandle) status.BindingError!*c.mln_runtime {
+pub fn native(handle: *RuntimeHandle) status.BindingError!c.mln_runtime {
     const runtime_state = runtimeState(handle.*) orelse return error.ClosedHandle;
     if (runtime_state.closing) return error.ActiveBorrow;
-    return @ptrCast(runtime_state.native orelse return error.ClosedHandle);
+    return (runtime_state.native orelse return error.ClosedHandle);
 }
 
 pub fn diagnosticStore(handle: *RuntimeHandle) ?*diagnostics.DiagnosticStore {
@@ -2374,7 +2257,7 @@ pub fn diagnosticStore(handle: *RuntimeHandle) ?*diagnostics.DiagnosticStore {
 
 pub fn registerMap(
     runtime: *RuntimeHandle,
-    map: *c.mln_map,
+    map: c.mln_map,
     style_loaded_handler: MapStyleLoadedHandler,
     style_loaded_context: ?*anyopaque,
 ) status.Error!RegisteredMap {
@@ -2395,12 +2278,12 @@ pub fn registerMap(
     return .{ .registry = runtime_registry, .id = id };
 }
 
-pub fn unregisterMap(runtime_registry: *RuntimeRegistry, map: *c.mln_map) void {
+pub fn unregisterMap(runtime_registry: *RuntimeRegistry, map: c.mln_map) void {
     lockRuntimeRegistry();
     defer unlockRuntimeRegistry();
 
     for (runtime_registry.maps.items, 0..) |registration, index| {
-        if (@intFromPtr(registration.native) == @intFromPtr(map)) {
+        if (registration.native == map) {
             _ = runtime_registry.maps.orderedRemove(index);
             return;
         }
@@ -2412,7 +2295,7 @@ fn emptyNativeEvent() c.mln_runtime_event {
         .size = @sizeOf(c.mln_runtime_event),
         .type = 0,
         .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        .source = null,
+        .source = 0,
         .code = 0,
         .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
         .payload = null,
@@ -2440,12 +2323,12 @@ const offline_style_url_for_testing = "http://example.com/offline-style.json";
 var snapshot_destroy_count_for_testing: usize = 0;
 var list_destroy_count_for_testing: usize = 0;
 
-fn countingOfflineRegionSnapshotDestroy(snapshot: ?*c.mln_offline_region_snapshot) callconv(.c) void {
+fn countingOfflineRegionSnapshotDestroy(snapshot: c.mln_offline_region_snapshot) callconv(.c) void {
     snapshot_destroy_count_for_testing += 1;
     c.mln_offline_region_snapshot_destroy(snapshot);
 }
 
-fn countingOfflineRegionListDestroy(list: ?*c.mln_offline_region_list) callconv(.c) void {
+fn countingOfflineRegionListDestroy(list: c.mln_offline_region_list) callconv(.c) void {
     list_destroy_count_for_testing += 1;
     c.mln_offline_region_list_destroy(list);
 }
@@ -2512,7 +2395,7 @@ test "runtime event payload copying owns borrowed bytes" {
         .size = @sizeOf(c.mln_runtime_event),
         .type = c.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
         .source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP,
-        .source = null,
+        .source = 0,
         .code = 0,
         .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
         .payload = &native_payload,
@@ -2538,7 +2421,7 @@ test "runtime event unknown payload copies raw bytes" {
         .size = @sizeOf(c.mln_runtime_event),
         .type = 0xffff,
         .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        .source = null,
+        .source = 0,
         .code = 0,
         .payload_type = 0xfeed,
         .payload = &raw,
@@ -2560,7 +2443,7 @@ test "runtime event payload copying rejects malformed borrowed payloads" {
         .size = @sizeOf(c.mln_runtime_event),
         .type = c.MLN_RUNTIME_EVENT_MAP_TILE_ACTION,
         .source_type = c.MLN_RUNTIME_EVENT_SOURCE_MAP,
-        .source = null,
+        .source = 0,
         .code = 0,
         .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
         .payload = null,
