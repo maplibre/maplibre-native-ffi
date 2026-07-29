@@ -9,51 +9,52 @@
 
 static void* const fake_handle = (void*)(uintptr_t)1;
 
-#define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                           \
-  descriptor_type, default_descriptor, attach, clear_required, shrink  \
-)                                                                      \
-  do {                                                                 \
-    mln_render_session* session = NULL;                                \
-    descriptor_type descriptor = default_descriptor();                 \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(NULL, &descriptor, &session) \
-    );                                                                 \
-    TEST_ASSERT_NULL(session);                                         \
-    mln_runtime* runtime = mln_test_create_runtime();                  \
-    mln_map* map = mln_test_create_map(runtime);                       \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, NULL, &session)         \
-    );                                                                 \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, NULL)      \
-    );                                                                 \
-    session = (mln_render_session*)(uintptr_t)1;                       \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, &session)  \
-    );                                                                 \
-    session = NULL;                                                    \
-    descriptor_type invalid = default_descriptor();                    \
-    invalid.size = sizeof(descriptor_type) - 1;                        \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)     \
-    );                                                                 \
-    invalid = default_descriptor();                                    \
-    invalid.extent.size = sizeof(mln_render_target_extent) - 1;        \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)     \
-    );                                                                 \
-    invalid = default_descriptor();                                    \
-    shrink(&invalid);                                                  \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)     \
-    );                                                                 \
-    invalid = default_descriptor();                                    \
-    clear_required(&invalid);                                          \
-    TEST_ASSERT_EQUAL_INT(                                             \
-      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)     \
-    );                                                                 \
-    mln_test_destroy_map(map);                                         \
-    mln_test_destroy_runtime(runtime);                                 \
+#define EXPECT_ATTACH_REJECTS_UNSAFE_INPUTS(                          \
+  descriptor_type, default_descriptor, attach, clear_required, shrink \
+)                                                                     \
+  do {                                                                \
+    mln_render_session session = MLN_HANDLE_NULL;                     \
+    descriptor_type descriptor = default_descriptor();                \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT,                                    \
+      attach(MLN_HANDLE_NULL, &descriptor, &session)                  \
+    );                                                                \
+    TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);               \
+    mln_runtime runtime = mln_test_create_runtime();                  \
+    mln_map map = mln_test_create_map(runtime);                       \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, NULL, &session)        \
+    );                                                                \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, NULL)     \
+    );                                                                \
+    session = 1;                                                      \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &descriptor, &session) \
+    );                                                                \
+    session = MLN_HANDLE_NULL;                                        \
+    descriptor_type invalid = default_descriptor();                   \
+    invalid.size = sizeof(descriptor_type) - 1;                       \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
+    );                                                                \
+    invalid = default_descriptor();                                   \
+    invalid.extent.size = sizeof(mln_render_target_extent) - 1;       \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
+    );                                                                \
+    invalid = default_descriptor();                                   \
+    shrink(&invalid);                                                 \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
+    );                                                                \
+    invalid = default_descriptor();                                   \
+    clear_required(&invalid);                                         \
+    TEST_ASSERT_EQUAL_INT(                                            \
+      MLN_STATUS_INVALID_ARGUMENT, attach(map, &invalid, &session)    \
+    );                                                                \
+    mln_test_destroy_map(map);                                        \
+    mln_test_destroy_runtime(runtime);                                \
   } while (false)
 
 #if defined(MLN_TEST_BACKEND_METAL)
@@ -103,8 +104,8 @@ static void metal_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
 // This verifies nested extent sizing and required borrowed Metal texture
 // handles hidden by binding descriptors.
 static void metal_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_metal_borrowed_texture_descriptor descriptor =
     mln_metal_borrowed_texture_descriptor_default();
   descriptor.extent.width = 128;
@@ -211,8 +212,8 @@ static void opengl_surface_attach_rejects_unsafe_raw_inputs(void) {
 // This verifies nested sizes and required raw texture values that typed OpenGL
 // descriptors prevent.
 static void opengl_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_opengl_borrowed_texture_descriptor descriptor =
     mln_opengl_borrowed_texture_descriptor_default();
   configure_opengl_context(&descriptor.context);
@@ -305,8 +306,8 @@ static void vulkan_owned_texture_attach_rejects_unsafe_raw_inputs(void) {
 // This verifies nested descriptor sizes and required borrowed Vulkan image
 // handles hidden by bindings.
 static void vulkan_borrowed_texture_rejects_unsafe_raw_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_vulkan_borrowed_texture_descriptor descriptor =
     mln_vulkan_borrowed_texture_descriptor_default();
   descriptor.context = fake_vulkan_context();

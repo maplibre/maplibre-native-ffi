@@ -640,7 +640,7 @@ typedef struct mln_offline_region_info {
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_create_start(
-  mln_runtime* runtime, const mln_offline_region_definition* definition,
+  mln_runtime runtime, const mln_offline_region_definition* definition,
   const uint8_t* metadata, size_t metadata_size,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
@@ -661,7 +661,7 @@ MLN_API mln_status mln_runtime_offline_region_create_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_get_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -677,7 +677,7 @@ MLN_API mln_status mln_runtime_offline_region_get_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_regions_list_start(
-  mln_runtime* runtime, mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -695,7 +695,7 @@ MLN_API mln_status mln_runtime_offline_regions_list_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_regions_merge_database_start(
-  mln_runtime* runtime, const char* side_database_path,
+  mln_runtime runtime, const char* side_database_path,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -714,9 +714,8 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_update_metadata_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
+  size_t metadata_size, mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -731,7 +730,7 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_get_status_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -752,7 +751,7 @@ MLN_API mln_status mln_runtime_offline_region_get_status_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_set_observed_start(
-  mln_runtime* runtime, mln_offline_region_id region_id, bool observed,
+  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -774,7 +773,7 @@ MLN_API mln_status mln_runtime_offline_region_set_observed_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_set_download_state_start(
-  mln_runtime* runtime, mln_offline_region_id region_id, uint32_t state,
+  mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -792,7 +791,7 @@ MLN_API mln_status mln_runtime_offline_region_set_download_state_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_invalidate_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -810,7 +809,7 @@ MLN_API mln_status mln_runtime_offline_region_invalidate_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_region_delete_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -835,8 +834,8 @@ MLN_API mln_status mln_runtime_offline_region_delete_start(
  *   is null.
  */
 MLN_API mln_status mln_runtime_offline_region_create_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region
 ) MLN_NOEXCEPT;
 
 /**
@@ -860,8 +859,8 @@ MLN_API mln_status mln_runtime_offline_region_create_take_result(
  *   null, or out_found is null.
  */
 MLN_API mln_status mln_runtime_offline_region_get_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region, bool* out_found
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region, bool* out_found
 ) MLN_NOEXCEPT;
 
 /**
@@ -884,8 +883,8 @@ MLN_API mln_status mln_runtime_offline_region_get_take_result(
  *   out_regions is null.
  */
 MLN_API mln_status mln_runtime_offline_regions_list_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list** out_regions
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list* out_regions
 ) MLN_NOEXCEPT;
 
 /**
@@ -908,8 +907,8 @@ MLN_API mln_status mln_runtime_offline_regions_list_take_result(
  *   out_regions is null.
  */
 MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list** out_regions
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list* out_regions
 ) MLN_NOEXCEPT;
 
 /**
@@ -933,8 +932,8 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
  *   is null.
  */
 MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region
 ) MLN_NOEXCEPT;
 
 /**
@@ -957,7 +956,7 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
  *   is null.
  */
 MLN_API mln_status mln_runtime_offline_region_get_status_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_runtime runtime, mln_offline_operation_id operation_id,
   mln_offline_region_status* out_status
 ) MLN_NOEXCEPT;
 
@@ -974,12 +973,12 @@ MLN_API mln_status mln_runtime_offline_region_get_status_take_result(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_offline_region_snapshot_get(
-  const mln_offline_region_snapshot* snapshot, mln_offline_region_info* out_info
+  mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
 ) MLN_NOEXCEPT;
 
 /** Destroys an offline region snapshot handle. Null is accepted as a no-op. */
 MLN_API void mln_offline_region_snapshot_destroy(
-  mln_offline_region_snapshot* snapshot
+  mln_offline_region_snapshot snapshot
 ) MLN_NOEXCEPT;
 
 /**
@@ -992,7 +991,7 @@ MLN_API void mln_offline_region_snapshot_destroy(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_offline_region_list_count(
-  const mln_offline_region_list* list, size_t* out_count
+  mln_offline_region_list list, size_t* out_count
 ) MLN_NOEXCEPT;
 
 /**
@@ -1008,13 +1007,12 @@ MLN_API mln_status mln_offline_region_list_count(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_offline_region_list_get(
-  const mln_offline_region_list* list, size_t index,
-  mln_offline_region_info* out_info
+  mln_offline_region_list list, size_t index, mln_offline_region_info* out_info
 ) MLN_NOEXCEPT;
 
 /** Destroys an offline region list handle. Null is accepted as a no-op. */
 MLN_API void mln_offline_region_list_destroy(
-  mln_offline_region_list* list
+  mln_offline_region_list list
 ) MLN_NOEXCEPT;
 
 /**
@@ -1093,7 +1091,7 @@ MLN_API mln_map_options mln_map_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_create(
-  mln_runtime* runtime, const mln_map_options* options, mln_map** out_map
+  mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) MLN_NOEXCEPT;
 
 /**
@@ -1116,7 +1114,7 @@ MLN_API mln_status mln_map_create(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_size(
-  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  mln_map map, uint32_t* out_width, uint32_t* out_height,
   double* out_scale_factor
 ) MLN_NOEXCEPT;
 
@@ -1138,7 +1136,7 @@ MLN_API mln_status mln_map_get_size(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_request_repaint(mln_map* map) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_request_repaint(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Requests one still image for a static or tile map.
@@ -1163,7 +1161,7 @@ MLN_API mln_status mln_map_request_repaint(mln_map* map) MLN_NOEXCEPT;
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_request_still_image(mln_map* map) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_request_still_image(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Destroys a map handle on its owner thread.
@@ -1185,7 +1183,7 @@ MLN_API mln_status mln_map_request_still_image(mln_map* map) MLN_NOEXCEPT;
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_destroy(mln_map* map) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_destroy(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Loads a style URL through MapLibre Native style APIs.
@@ -1206,7 +1204,7 @@ MLN_API mln_status mln_map_destroy(mln_map* map) MLN_NOEXCEPT;
  *   internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_set_style_url(mln_map* map, const char* url) MLN_NOEXCEPT;
+mln_map_set_style_url(mln_map map, const char* url) MLN_NOEXCEPT;
 
 /**
  * Loads inline style JSON through MapLibre Native style APIs.
@@ -1225,7 +1223,7 @@ mln_map_set_style_url(mln_map* map, const char* url) MLN_NOEXCEPT;
  *   internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_set_style_json(mln_map* map, const char* json) MLN_NOEXCEPT;
+mln_map_set_style_json(mln_map map, const char* json) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

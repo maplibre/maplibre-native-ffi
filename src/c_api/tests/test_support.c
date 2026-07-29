@@ -44,12 +44,12 @@
 // stack frame, which an aborting assertion unwinds before teardown runs, so a
 // pointer to it would dangle.
 typedef struct tracked_session {
-  mln_render_session* session;
+  mln_render_session session;
   void* backend_state;
 } tracked_session;
 
-static MLN_TEST_THREAD_LOCAL mln_runtime* tracked_runtime;
-static MLN_TEST_THREAD_LOCAL mln_map* tracked_maps[MLN_TEST_TRACKED_CAPACITY];
+static MLN_TEST_THREAD_LOCAL mln_runtime tracked_runtime;
+static MLN_TEST_THREAD_LOCAL mln_map tracked_maps[MLN_TEST_TRACKED_CAPACITY];
 static MLN_TEST_THREAD_LOCAL size_t tracked_map_count;
 static MLN_TEST_THREAD_LOCAL tracked_session
   tracked_sessions[MLN_TEST_TRACKED_CAPACITY];
@@ -67,12 +67,12 @@ static void reserve_map_slot(void) {
   }
 }
 
-static void track_map(mln_map* map) {
+static void track_map(mln_map map) {
   tracked_maps[tracked_map_count] = map;
   tracked_map_count += 1;
 }
 
-static void untrack_map(const mln_map* map) {
+static void untrack_map(const mln_map map) {
   for (size_t index = 0; index < tracked_map_count; index += 1) {
     if (tracked_maps[index] == map) {
       tracked_maps[index] = tracked_maps[tracked_map_count - 1];
@@ -100,7 +100,7 @@ static void track_session(const mln_test_render_fixture* fixture) {
   tracked_session_count += 1;
 }
 
-static void untrack_session(const mln_render_session* session) {
+static void untrack_session(mln_render_session session) {
   for (size_t index = 0; index < tracked_session_count; index += 1) {
     if (tracked_sessions[index].session == session) {
       tracked_sessions[index] = tracked_sessions[tracked_session_count - 1];
@@ -110,8 +110,8 @@ static void untrack_session(const mln_render_session* session) {
   }
 }
 
-mln_runtime* mln_test_create_runtime(void) {
-  mln_runtime* runtime = NULL;
+mln_runtime mln_test_create_runtime(void) {
+  mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
   const mln_status status = mln_runtime_create(&options, &runtime);
   if (status == MLN_STATUS_INVALID_STATE) {
@@ -122,23 +122,23 @@ mln_runtime* mln_test_create_runtime(void) {
     );
   }
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
-  TEST_ASSERT_NOT_NULL(runtime);
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, runtime);
   tracked_runtime = runtime;
   return runtime;
 }
 
-mln_map* mln_test_create_map_with_options(
-  mln_runtime* runtime, const mln_map_options* options
+mln_map mln_test_create_map_with_options(
+  mln_runtime runtime, const mln_map_options* options
 ) {
-  mln_map* map = NULL;
+  mln_map map = MLN_HANDLE_NULL;
   reserve_map_slot();
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_create(runtime, options, &map));
-  TEST_ASSERT_NOT_NULL(map);
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, map);
   track_map(map);
   return map;
 }
 
-mln_map* mln_test_create_map(mln_runtime* runtime) {
+mln_map mln_test_create_map(mln_runtime runtime) {
   mln_map_options options = mln_map_options_default();
   options.width = 512;
   options.height = 512;
@@ -149,14 +149,14 @@ mln_map* mln_test_create_map(mln_runtime* runtime) {
 // temporarily invalid -- destroying a map that still has a render session
 // attached -- longjmps out of the assertion below, and the handle has to stay
 // tracked so teardown can still reclaim it.
-void mln_test_destroy_runtime(mln_runtime* runtime) {
+void mln_test_destroy_runtime(mln_runtime runtime) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
   if (tracked_runtime == runtime) {
-    tracked_runtime = NULL;
+    tracked_runtime = MLN_HANDLE_NULL;
   }
 }
 
-void mln_test_destroy_map(mln_map* map) {
+void mln_test_destroy_map(mln_map map) {
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
   untrack_map(map);
 }
@@ -679,7 +679,7 @@ static void destroy_backend_state(void* opaque_state) {
 #endif
 
 bool mln_test_render_fixture_create(
-  mln_map* map, mln_test_render_fixture* fixture
+  mln_map map, mln_test_render_fixture* fixture
 ) {
   if (map == NULL || fixture == NULL) {
     return false;
@@ -721,7 +721,7 @@ bool mln_test_render_fixture_create(
   const mln_status status =
     mln_vulkan_owned_texture_attach(map, &descriptor, &fixture->session);
 #endif
-  if (status != MLN_STATUS_OK || fixture->session == NULL) {
+  if (status != MLN_STATUS_OK || fixture->session == MLN_HANDLE_NULL) {
     destroy_backend_state(fixture->backend_state);
     *fixture = (mln_test_render_fixture){0};
     return false;
@@ -730,7 +730,7 @@ bool mln_test_render_fixture_create(
   return true;
 }
 
-bool mln_test_pump_until(mln_runtime* runtime, atomic_bool* flag) {
+bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag) {
   for (unsigned int attempt = 0; attempt < 500; attempt += 1) {
     if (atomic_load(flag)) {
       return true;
@@ -763,7 +763,7 @@ void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture) {
   if (fixture == NULL) {
     return;
   }
-  if (fixture->session != NULL) {
+  if (fixture->session != MLN_HANDLE_NULL) {
     TEST_ASSERT_EQUAL_INT(
       MLN_STATUS_OK, mln_render_session_destroy(fixture->session)
     );
@@ -780,7 +780,7 @@ bool mln_test_reclaim_thread_resources(void) {
   while (tracked_session_count > 0) {
     tracked_session_count -= 1;
     const tracked_session entry = tracked_sessions[tracked_session_count];
-    if (entry.session != NULL) {
+    if (entry.session != MLN_HANDLE_NULL) {
       mln_render_session_destroy(entry.session);
     }
     destroy_backend_state(entry.backend_state);
@@ -791,9 +791,9 @@ bool mln_test_reclaim_thread_resources(void) {
     mln_map_destroy(tracked_maps[tracked_map_count]);
     reclaimed = true;
   }
-  if (tracked_runtime != NULL) {
+  if (tracked_runtime != MLN_HANDLE_NULL) {
     mln_runtime_destroy(tracked_runtime);
-    tracked_runtime = NULL;
+    tracked_runtime = MLN_HANDLE_NULL;
     reclaimed = true;
   }
   return reclaimed;

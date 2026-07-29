@@ -18,7 +18,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 
-struct mln_render_session;
+struct mln_render_session_object;
 
 namespace mln::core {
 
@@ -61,21 +61,24 @@ class TextureSessionBackend {
     return headless_backend().getRendererBackend();
   }
   virtual void prepare_render_resources() {}
-  virtual auto after_render(mln_render_session& session, bool& out_rendered)
-    -> mln_status {
+  virtual auto after_render(
+    mln_render_session_object& session, bool& out_rendered
+  ) -> mln_status {
     (void)session;
     out_rendered = true;
     return MLN_STATUS_OK;
   }
   virtual auto acquire_vulkan_owned_frame(
-    const mln_render_session& session, mln_vulkan_owned_texture_frame& out_frame
+    const mln_render_session_object& session,
+    mln_vulkan_owned_texture_frame& out_frame
   ) -> mln_status {
     (void)session;
     (void)out_frame;
     return MLN_STATUS_UNSUPPORTED;
   }
   virtual auto acquire_opengl_owned_frame(
-    const mln_render_session& session, mln_opengl_owned_texture_frame& out_frame
+    const mln_render_session_object& session,
+    mln_opengl_owned_texture_frame& out_frame
   ) -> mln_status {
     (void)session;
     (void)out_frame;
@@ -219,9 +222,9 @@ struct RenderTextureState {
 
 }  // namespace mln::core
 
-struct mln_render_session {
+struct mln_render_session_object {
   mln::core::RenderSessionKind kind = mln::core::RenderSessionKind::Surface;
-  mln_map* map = nullptr;
+  mln_map map = MLN_HANDLE_NULL;
   // The thread that attached the session, fixed for its lifetime. Set before
   // the session is registered, so it is never default-constructed while any
   // entry point can reach it.
@@ -251,24 +254,26 @@ struct RenderSessionAttachMessages {
   const char* non_null_output;
 };
 
-auto register_render_session(
-  mln_render_session* handle, std::unique_ptr<mln_render_session> session
-) -> void;
-auto validate_render_session(mln_render_session* session) -> mln_status;
-auto validate_live_attached_render_session(mln_render_session* session)
-  -> mln_status;
-auto erase_render_session(mln_render_session* session)
-  -> std::unique_ptr<mln_render_session>;
+auto register_render_session(std::shared_ptr<mln_render_session_object> session)
+  -> mln_render_session;
+auto validate_render_session(
+  mln_render_session session, mln_render_session_object*& out_session
+) -> mln_status;
+auto validate_live_attached_render_session(
+  mln_render_session session, mln_render_session_object*& out_session
+) -> mln_status;
+auto erase_render_session(mln_render_session session)
+  -> std::shared_ptr<mln_render_session_object>;
 
 inline auto validate_attach_output(
-  mln_render_session** out_session, const char* null_message,
+  mln_render_session* out_session, const char* null_message,
   const char* not_null_message
 ) -> mln_status {
   if (out_session == nullptr) {
     set_thread_error(null_message);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (*out_session != nullptr) {
+  if (*out_session != MLN_HANDLE_NULL) {
     set_thread_error(not_null_message);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -345,7 +350,7 @@ auto validate_opengl_context(
 ) -> mln_status;
 
 inline auto set_session_extent(
-  mln_render_session& session, const mln_render_target_extent& extent
+  mln_render_session_object& session, const mln_render_target_extent& extent
 ) -> void {
   session.width = extent.width;
   session.height = extent.height;
@@ -360,7 +365,7 @@ inline auto set_session_extent(
 // size instead of deriving it. Physical sizes that no logical extent maps onto,
 // such as an odd width at a scale factor of two, stay expressible this way.
 inline auto set_borrowed_session_extent(
-  mln_render_session& session, const mln_render_target_extent& extent,
+  mln_render_session_object& session, const mln_render_target_extent& extent,
   uint32_t physical_width, uint32_t physical_height
 ) -> void {
   session.width = extent.width;
@@ -397,63 +402,63 @@ inline auto validate_physical_size(
 }
 
 auto attach_render_session(
-  std::unique_ptr<mln_render_session> session, mln_render_session** out_session,
-  RenderSessionKind kind, RenderSessionAttachMessages messages
+  std::shared_ptr<mln_render_session_object> session,
+  mln_render_session* out_session, RenderSessionKind kind,
+  RenderSessionAttachMessages messages
 ) -> mln_status;
 
 auto render_session_resize(
-  mln_render_session* session, uint32_t width, uint32_t height,
+  mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
 ) -> mln_status;
 auto render_session_render_update(
-  mln_render_session* session, bool* out_rendered
+  mln_render_session session, bool* out_rendered
 ) -> mln_status;
-auto render_session_detach(mln_render_session* session) -> mln_status;
-auto render_session_destroy(mln_render_session* session) -> mln_status;
-auto render_session_reduce_memory_use(mln_render_session* session)
-  -> mln_status;
-auto render_session_clear_data(mln_render_session* session) -> mln_status;
-auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status;
+auto render_session_detach(mln_render_session session) -> mln_status;
+auto render_session_destroy(mln_render_session session) -> mln_status;
+auto render_session_reduce_memory_use(mln_render_session session) -> mln_status;
+auto render_session_clear_data(mln_render_session session) -> mln_status;
+auto render_session_dump_debug_logs(mln_render_session session) -> mln_status;
 auto render_session_set_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
+  mln_render_session session, const mln_feature_state_selector* selector,
   const mln_json_value* state
 ) -> mln_status;
 auto render_session_get_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
-  mln_json_snapshot** out_state
+  mln_render_session session, const mln_feature_state_selector* selector,
+  mln_json_snapshot* out_state
 ) -> mln_status;
 auto render_session_remove_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector
+  mln_render_session session, const mln_feature_state_selector* selector
 ) -> mln_status;
 auto render_session_query_rendered_features(
-  mln_render_session* session, const mln_rendered_query_geometry* geometry,
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) -> mln_status;
 auto render_session_query_source_features(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_source_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) -> mln_status;
 auto render_session_query_feature_extensions(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_feature* feature, mln_string_view extension,
   mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result** out_result
+  mln_feature_extension_result* out_result
 ) -> mln_status;
 auto feature_query_result_count(
-  const mln_feature_query_result* result, std::size_t* out_count
+  mln_feature_query_result result, std::size_t* out_count
 ) -> mln_status;
 auto feature_query_result_get(
-  const mln_feature_query_result* result, std::size_t index,
+  mln_feature_query_result result, std::size_t index,
   mln_queried_feature* out_feature
 ) -> mln_status;
-auto feature_query_result_destroy(mln_feature_query_result* result) -> void;
+auto feature_query_result_destroy(mln_feature_query_result result) -> void;
 auto feature_extension_result_get(
-  const mln_feature_extension_result* result,
+  mln_feature_extension_result result,
   mln_feature_extension_result_info* out_info
 ) -> mln_status;
-auto feature_extension_result_destroy(mln_feature_extension_result* result)
+auto feature_extension_result_destroy(mln_feature_extension_result result)
   -> void;
 
 }  // namespace mln::core

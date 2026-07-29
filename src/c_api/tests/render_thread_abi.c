@@ -21,7 +21,7 @@ static const char background_style_json[] =
 // Renders until the map publishes an update for the session's extent, which
 // takes at least one pump on the map owner thread. Returns the last status.
 static mln_status render_until_frame(
-  mln_render_session* session, bool* out_rendered
+  mln_render_session session, bool* out_rendered
 ) {
   mln_status status = MLN_STATUS_OK;
   *out_rendered = false;
@@ -39,7 +39,7 @@ static mln_status render_until_frame(
 }
 
 typedef struct render_probe {
-  mln_map* map;
+  mln_map map;
   atomic_bool finished;
   bool attached;
   bool rendered;
@@ -82,8 +82,8 @@ static void attach_render_readback(void* argument) {
 // observer hop back to the map's run loop, the graphics context priming at
 // attach, and the size gate together.
 static void a_second_thread_attaches_and_renders(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
   );
@@ -113,7 +113,7 @@ static void a_second_thread_attaches_and_renders(void) {
 }
 
 typedef struct foreign_call_probe {
-  mln_render_session* session;
+  mln_render_session session;
   atomic_bool finished;
   mln_status render_status;
   mln_status resize_status;
@@ -145,8 +145,8 @@ static void call_session_from_a_foreign_thread(void* argument) {
 // rejects any other thread. This pins the whole affinity contract in one place,
 // including that destroy cannot be used to escape it.
 static void session_entry_points_reject_a_foreign_thread(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
@@ -173,7 +173,7 @@ static void session_entry_points_reject_a_foreign_thread(void) {
 }
 
 typedef struct hold_session_probe {
-  mln_map* map;
+  mln_map map;
   atomic_bool attached;
   atomic_bool start_destroy;
   atomic_bool destroyed;
@@ -192,7 +192,7 @@ static void attach_hold_destroy(void* argument) {
   }
   if (probe->attach_succeeded) {
     probe->destroy_status = mln_render_session_destroy(probe->fixture.session);
-    probe->fixture.session = NULL;
+    probe->fixture.session = MLN_HANDLE_NULL;
     mln_test_render_fixture_destroy(&probe->fixture);
   }
   atomic_store(&probe->destroyed, true);
@@ -203,8 +203,8 @@ static void attach_hold_destroy(void* argument) {
 // The map registry mutex is what makes the check race-free rather than the
 // owner-thread check that used to imply it.
 static void map_destroy_rejects_a_session_owned_by_another_thread(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
 
   hold_session_probe probe = {.map = map};
   atomic_init(&probe.attached, false);
@@ -227,7 +227,7 @@ static void map_destroy_rejects_a_session_owned_by_another_thread(void) {
 }
 
 typedef struct resize_probe {
-  mln_map* map;
+  mln_map map;
   atomic_bool finished;
   bool attached;
   bool observed_no_update;
@@ -273,8 +273,8 @@ static void attach_resize_render(void* argument) {
 // take its projection from the old logical size and its viewport from the new
 // physical one.
 static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
   );
@@ -305,7 +305,7 @@ static void resize_from_the_render_thread_lands_on_the_map_thread(void) {
 }
 
 typedef struct runtime_after_render_probe {
-  mln_map* map;
+  mln_map map;
   atomic_bool finished;
   mln_status create_status;
 } runtime_after_render_probe;
@@ -322,7 +322,7 @@ static void render_then_create_runtime(void* argument) {
   // Rendering installs a scheduler as this thread's current one. If it were
   // left installed, or if looking it up had lazily created a run loop, the
   // thread could never host a runtime.
-  mln_runtime* runtime = NULL;
+  mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
   probe->create_status = mln_runtime_create(&options, &runtime);
   if (probe->create_status == MLN_STATUS_OK) {
@@ -335,8 +335,8 @@ static void render_then_create_runtime(void* argument) {
 // exactly as they found it. Creating a runtime is the cheapest observable
 // proof, because runtime creation refuses a thread that already has one.
 static void render_thread_is_not_poisoned_for_runtime_creation(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_json(map, background_style_json)
   );

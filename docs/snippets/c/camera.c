@@ -3,7 +3,7 @@
 
 #include <maplibre_native_c.h>
 
-void move_camera(mln_map* map) {
+void move_camera(mln_map map) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   camera.latitude = 37.7749;
@@ -24,7 +24,7 @@ void move_camera(mln_map* map) {
   mln_map_fly_to(map, &camera, NULL);
 }
 
-void fit_bounds(mln_map* map, mln_lat_lng_bounds bounds) {
+void fit_bounds(mln_map map, mln_lat_lng_bounds bounds) {
   mln_camera_fit_options fit = mln_camera_fit_options_default();
   fit.fields = MLN_CAMERA_FIT_OPTION_PADDING;
   fit.padding =

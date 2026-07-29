@@ -35,7 +35,7 @@ extern "C" {
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_create(
-  mln_map* map, mln_map_projection** out_projection
+  mln_map map, mln_map_projection* out_projection
 ) MLN_NOEXCEPT;
 
 /**
@@ -49,7 +49,7 @@ MLN_API mln_status mln_map_projection_create(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_projection_destroy(mln_map_projection* projection) MLN_NOEXCEPT;
+mln_map_projection_destroy(mln_map_projection projection) MLN_NOEXCEPT;
 
 /**
  * Copies the current camera snapshot from a standalone projection helper.
@@ -67,7 +67,7 @@ mln_map_projection_destroy(mln_map_projection* projection) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_get_camera(
-  mln_map_projection* projection, mln_camera_options* out_camera
+  mln_map_projection projection, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
 /**
@@ -84,7 +84,7 @@ MLN_API mln_status mln_map_projection_get_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_camera(
-  mln_map_projection* projection, const mln_camera_options* camera
+  mln_map_projection projection, const mln_camera_options* camera
 ) MLN_NOEXCEPT;
 
 /**
@@ -105,7 +105,7 @@ MLN_API mln_status mln_map_projection_set_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_visible_coordinates(
-  mln_map_projection* projection, const mln_lat_lng* coordinates,
+  mln_map_projection projection, const mln_lat_lng* coordinates,
   size_t coordinate_count, mln_edge_insets padding
 ) MLN_NOEXCEPT;
 
@@ -128,7 +128,7 @@ MLN_API mln_status mln_map_projection_set_visible_coordinates(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_set_visible_geometry(
-  mln_map_projection* projection, const mln_geometry* geometry,
+  mln_map_projection projection, const mln_geometry* geometry,
   mln_edge_insets padding
 ) MLN_NOEXCEPT;
 
@@ -147,7 +147,7 @@ MLN_API mln_status mln_map_projection_set_visible_geometry(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
-  mln_map_projection* projection, mln_lat_lng coordinate,
+  mln_map_projection projection, mln_lat_lng coordinate,
   mln_screen_point* out_point
 ) MLN_NOEXCEPT;
 
@@ -166,7 +166,7 @@ MLN_API mln_status mln_map_projection_pixel_for_lat_lng(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_projection_lat_lng_for_pixel(
-  mln_map_projection* projection, mln_screen_point point,
+  mln_map_projection projection, mln_screen_point point,
   mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;
 

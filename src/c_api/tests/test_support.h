@@ -9,7 +9,7 @@
 #include "maplibre_native_c.h"
 
 typedef struct mln_test_render_fixture {
-  mln_render_session* session;
+  mln_render_session session;
   void* backend_state;
 } mln_test_render_fixture;
 
@@ -25,23 +25,23 @@ uint64_t mln_test_monotonic_milliseconds(void);
 
 // These helpers track what they create per calling thread so the suite can
 // reclaim handles a test left behind. The matching destroy helpers untrack.
-mln_runtime* mln_test_create_runtime(void);
-mln_map* mln_test_create_map(mln_runtime* runtime);
-mln_map* mln_test_create_map_with_options(
-  mln_runtime* runtime, const mln_map_options* options
+mln_runtime mln_test_create_runtime(void);
+mln_map mln_test_create_map(mln_runtime runtime);
+mln_map mln_test_create_map_with_options(
+  mln_runtime runtime, const mln_map_options* options
 );
-void mln_test_destroy_runtime(mln_runtime* runtime);
-void mln_test_destroy_map(mln_map* map);
+void mln_test_destroy_runtime(mln_runtime runtime);
+void mln_test_destroy_map(mln_map map);
 void mln_test_sleep_millisecond(void);
 
 bool mln_test_render_fixture_create(
-  mln_map* map, mln_test_render_fixture* fixture
+  mln_map map, mln_test_render_fixture* fixture
 );
 void mln_test_render_fixture_destroy(mln_test_render_fixture* fixture);
 
 // Pumps the runtime until `flag` is set or the deadline passes. Returns whether
 // the flag was observed. Use for waiting on work another thread reports.
-bool mln_test_pump_until(mln_runtime* runtime, atomic_bool* flag);
+bool mln_test_pump_until(mln_runtime runtime, atomic_bool* flag);
 
 // Destroys everything this thread still has tracked, render session first, then
 // map, then runtime, and reports whether it reclaimed anything. Safe to call

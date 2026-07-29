@@ -10,7 +10,7 @@ int main(void) {
   mln_runtime_options runtime_options = mln_runtime_options_default();
   runtime_options.cache_path = ":memory:";
 
-  mln_runtime* runtime = NULL;
+  mln_runtime runtime = MLN_HANDLE_NULL;
   if (mln_runtime_create(&runtime_options, &runtime) != MLN_STATUS_OK) {
     return 1;
   }
@@ -20,7 +20,7 @@ int main(void) {
   map_options.height = 512;
   map_options.scale_factor = 1.0;
 
-  mln_map* map = NULL;
+  mln_map map = MLN_HANDLE_NULL;
   if (mln_map_create(runtime, &map_options, &map) != MLN_STATUS_OK) {
     mln_runtime_destroy(runtime);
     return 1;

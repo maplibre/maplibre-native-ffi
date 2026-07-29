@@ -62,7 +62,7 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_set_debug_options(mln_map* map, uint32_t options) MLN_NOEXCEPT;
+mln_map_set_debug_options(mln_map map, uint32_t options) MLN_NOEXCEPT;
 
 /**
  * Copies the current MapLibre debug overlay mask bits.
@@ -76,7 +76,7 @@ mln_map_set_debug_options(mln_map* map, uint32_t options) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_get_debug_options(mln_map* map, uint32_t* out_options) MLN_NOEXCEPT;
+mln_map_get_debug_options(mln_map map, uint32_t* out_options) MLN_NOEXCEPT;
 
 /**
  * Enables or disables MapLibre's rendering stats overlay view.
@@ -89,7 +89,7 @@ mln_map_get_debug_options(mln_map* map, uint32_t* out_options) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
-  mln_map* map, bool enabled
+  mln_map map, bool enabled
 ) MLN_NOEXCEPT;
 
 /**
@@ -104,7 +104,7 @@ MLN_API mln_status mln_map_set_rendering_stats_view_enabled(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_rendering_stats_view_enabled(
-  mln_map* map, bool* out_enabled
+  mln_map map, bool* out_enabled
 ) MLN_NOEXCEPT;
 
 /**
@@ -119,7 +119,7 @@ MLN_API mln_status mln_map_get_rendering_stats_view_enabled(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_is_fully_loaded(mln_map* map, bool* out_loaded) MLN_NOEXCEPT;
+mln_map_is_fully_loaded(mln_map map, bool* out_loaded) MLN_NOEXCEPT;
 
 /**
  * Dumps map debug logs through MapLibre Native logging.
@@ -131,7 +131,7 @@ mln_map_is_fully_loaded(mln_map* map, bool* out_loaded) MLN_NOEXCEPT;
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_dump_debug_logs(mln_map* map) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_dump_debug_logs(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Copies live map viewport and render-transform controls.
@@ -147,7 +147,7 @@ MLN_API mln_status mln_map_dump_debug_logs(mln_map* map) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_viewport_options(
-  mln_map* map, mln_map_viewport_options* out_options
+  mln_map map, mln_map_viewport_options* out_options
 ) MLN_NOEXCEPT;
 
 /**
@@ -165,7 +165,7 @@ MLN_API mln_status mln_map_get_viewport_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_viewport_options(
-  mln_map* map, const mln_map_viewport_options* options
+  mln_map map, const mln_map_viewport_options* options
 ) MLN_NOEXCEPT;
 
 /**
@@ -182,7 +182,7 @@ MLN_API mln_status mln_map_set_viewport_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_tile_options(
-  mln_map* map, mln_map_tile_options* out_options
+  mln_map map, mln_map_tile_options* out_options
 ) MLN_NOEXCEPT;
 
 /**
@@ -201,7 +201,7 @@ MLN_API mln_status mln_map_get_tile_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_tile_options(
-  mln_map* map, const mln_map_tile_options* options
+  mln_map map, const mln_map_tile_options* options
 ) MLN_NOEXCEPT;
 
 /**
@@ -220,7 +220,7 @@ MLN_API mln_status mln_map_set_tile_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_get_camera(mln_map* map, mln_camera_options* out_camera) MLN_NOEXCEPT;
+mln_map_get_camera(mln_map map, mln_camera_options* out_camera) MLN_NOEXCEPT;
 
 /**
  * Applies a camera jump command.
@@ -237,7 +237,7 @@ mln_map_get_camera(mln_map* map, mln_camera_options* out_camera) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_jump_to(mln_map* map, const mln_camera_options* camera) MLN_NOEXCEPT;
+mln_map_jump_to(mln_map map, const mln_camera_options* camera) MLN_NOEXCEPT;
 
 /**
  * Applies a camera ease transition command.
@@ -265,7 +265,7 @@ mln_map_jump_to(mln_map* map, const mln_camera_options* camera) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_ease_to(
-  mln_map* map, const mln_camera_options* camera,
+  mln_map map, const mln_camera_options* camera,
   const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
@@ -295,7 +295,7 @@ MLN_API mln_status mln_map_ease_to(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_fly_to(
-  mln_map* map, const mln_camera_options* camera,
+  mln_map map, const mln_camera_options* camera,
   const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
@@ -311,7 +311,7 @@ MLN_API mln_status mln_map_fly_to(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
+mln_map_move_by(mln_map map, double delta_x, double delta_y) MLN_NOEXCEPT;
 
 /**
  * Applies an animated screen-space pan command.
@@ -333,7 +333,7 @@ mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_move_by_animated(
-  mln_map* map, double delta_x, double delta_y,
+  mln_map map, double delta_x, double delta_y,
   const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
@@ -351,7 +351,7 @@ MLN_API mln_status mln_map_move_by_animated(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_scale_by(
-  mln_map* map, double scale, const mln_screen_point* anchor
+  mln_map map, double scale, const mln_screen_point* anchor
 ) MLN_NOEXCEPT;
 
 /**
@@ -376,7 +376,7 @@ MLN_API mln_status mln_map_scale_by(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_scale_by_animated(
-  mln_map* map, double scale, const mln_screen_point* anchor,
+  mln_map map, double scale, const mln_screen_point* anchor,
   const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
@@ -392,7 +392,7 @@ MLN_API mln_status mln_map_scale_by_animated(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_rotate_by(
-  mln_map* map, mln_screen_point first, mln_screen_point second
+  mln_map map, mln_screen_point first, mln_screen_point second
 ) MLN_NOEXCEPT;
 
 /**
@@ -415,7 +415,7 @@ MLN_API mln_status mln_map_rotate_by(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_rotate_by_animated(
-  mln_map* map, mln_screen_point first, mln_screen_point second,
+  mln_map map, mln_screen_point first, mln_screen_point second,
   const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
@@ -430,7 +430,7 @@ MLN_API mln_status mln_map_rotate_by_animated(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_pitch_by(mln_map* map, double pitch) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_pitch_by(mln_map map, double pitch) MLN_NOEXCEPT;
 
 /**
  * Applies an animated pitch delta command.
@@ -452,7 +452,7 @@ MLN_API mln_status mln_map_pitch_by(mln_map* map, double pitch) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_pitch_by_animated(
-  mln_map* map, double pitch, const mln_animation_options* animation
+  mln_map map, double pitch, const mln_animation_options* animation
 ) MLN_NOEXCEPT;
 
 /**
@@ -469,7 +469,7 @@ MLN_API mln_status mln_map_pitch_by_animated(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_cancel_transitions(mln_map* map) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_cancel_transitions(mln_map map) MLN_NOEXCEPT;
 
 /**
  * Computes a camera that fits geographic bounds in the current viewport.
@@ -487,7 +487,7 @@ MLN_API mln_status mln_map_cancel_transitions(mln_map* map) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
-  mln_map* map, mln_lat_lng_bounds bounds,
+  mln_map map, mln_lat_lng_bounds bounds,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
@@ -508,7 +508,7 @@ MLN_API mln_status mln_map_camera_for_lat_lng_bounds(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_camera_for_lat_lngs(
-  mln_map* map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
@@ -531,7 +531,7 @@ MLN_API mln_status mln_map_camera_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_camera_for_geometry(
-  mln_map* map, const mln_geometry* geometry,
+  mln_map map, const mln_geometry* geometry,
   const mln_camera_fit_options* fit_options, mln_camera_options* out_camera
 ) MLN_NOEXCEPT;
 
@@ -547,7 +547,7 @@ MLN_API mln_status mln_map_camera_for_geometry(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
-  mln_map* map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
 ) MLN_NOEXCEPT;
 
 /**
@@ -562,7 +562,7 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
-  mln_map* map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
+  mln_map map, const mln_camera_options* camera, mln_lat_lng_bounds* out_bounds
 ) MLN_NOEXCEPT;
 
 /**
@@ -582,7 +582,7 @@ MLN_API mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_get_bounds(mln_map* map, mln_bound_options* out_options) MLN_NOEXCEPT;
+mln_map_get_bounds(mln_map map, mln_bound_options* out_options) MLN_NOEXCEPT;
 
 /**
  * Applies selected map camera constraint options.
@@ -603,7 +603,7 @@ mln_map_get_bounds(mln_map* map, mln_bound_options* out_options) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_map_set_bounds(mln_map* map, const mln_bound_options* options) MLN_NOEXCEPT;
+mln_map_set_bounds(mln_map map, const mln_bound_options* options) MLN_NOEXCEPT;
 
 /**
  * Copies the current free camera position and orientation.
@@ -619,7 +619,7 @@ mln_map_set_bounds(mln_map* map, const mln_bound_options* options) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_free_camera_options(
-  mln_map* map, mln_free_camera_options* out_options
+  mln_map map, mln_free_camera_options* out_options
 ) MLN_NOEXCEPT;
 
 /**
@@ -640,7 +640,7 @@ MLN_API mln_status mln_map_get_free_camera_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_free_camera_options(
-  mln_map* map, const mln_free_camera_options* options
+  mln_map map, const mln_free_camera_options* options
 ) MLN_NOEXCEPT;
 
 /**
@@ -657,7 +657,7 @@ MLN_API mln_status mln_map_set_free_camera_options(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_get_projection_mode(
-  mln_map* map, mln_projection_mode* out_mode
+  mln_map map, mln_projection_mode* out_mode
 ) MLN_NOEXCEPT;
 
 /**
@@ -677,7 +677,7 @@ MLN_API mln_status mln_map_get_projection_mode(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_set_projection_mode(
-  mln_map* map, const mln_projection_mode* mode
+  mln_map map, const mln_projection_mode* mode
 ) MLN_NOEXCEPT;
 
 /**
@@ -695,7 +695,7 @@ MLN_API mln_status mln_map_set_projection_mode(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_pixel_for_lat_lng(
-  mln_map* map, mln_lat_lng coordinate, mln_screen_point* out_point
+  mln_map map, mln_lat_lng coordinate, mln_screen_point* out_point
 ) MLN_NOEXCEPT;
 
 /**
@@ -713,7 +713,7 @@ MLN_API mln_status mln_map_pixel_for_lat_lng(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lng_for_pixel(
-  mln_map* map, mln_screen_point point, mln_lat_lng* out_coordinate
+  mln_map map, mln_screen_point point, mln_lat_lng* out_coordinate
 ) MLN_NOEXCEPT;
 
 /**
@@ -732,7 +732,7 @@ MLN_API mln_status mln_map_lat_lng_for_pixel(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_pixels_for_lat_lngs(
-  mln_map* map, const mln_lat_lng* coordinates, size_t coordinate_count,
+  mln_map map, const mln_lat_lng* coordinates, size_t coordinate_count,
   mln_screen_point* out_points
 ) MLN_NOEXCEPT;
 
@@ -751,7 +751,7 @@ MLN_API mln_status mln_map_pixels_for_lat_lngs(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_map_lat_lngs_for_pixels(
-  mln_map* map, const mln_screen_point* points, size_t point_count,
+  mln_map map, const mln_screen_point* points, size_t point_count,
   mln_lat_lng* out_coordinates
 ) MLN_NOEXCEPT;
 

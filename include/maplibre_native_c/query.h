@@ -16,8 +16,8 @@
 extern "C" {
 #endif
 
-typedef struct mln_feature_query_result mln_feature_query_result;
-typedef struct mln_feature_extension_result mln_feature_extension_result;
+typedef uint64_t mln_feature_query_result;
+typedef uint64_t mln_feature_extension_result;
 
 /** Rendered feature query geometry variants. */
 typedef enum mln_rendered_query_geometry_type : uint32_t {
@@ -179,9 +179,9 @@ MLN_API mln_rendered_query_geometry mln_rendered_query_geometry_line_string(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_rendered_features(
-  mln_render_session* session, const mln_rendered_query_geometry* geometry,
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) MLN_NOEXCEPT;
 
 /**
@@ -205,9 +205,9 @@ MLN_API mln_status mln_render_session_query_rendered_features(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_source_features(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_source_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) MLN_NOEXCEPT;
 
 /**
@@ -255,10 +255,10 @@ MLN_API mln_status mln_render_session_query_source_features(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_query_feature_extensions(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_feature* feature, mln_string_view extension,
   mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result** out_result
+  mln_feature_extension_result* out_result
 ) MLN_NOEXCEPT;
 
 /**
@@ -271,7 +271,7 @@ MLN_API mln_status mln_render_session_query_feature_extensions(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_feature_query_result_count(
-  const mln_feature_query_result* result, size_t* out_count
+  mln_feature_query_result result, size_t* out_count
 ) MLN_NOEXCEPT;
 
 /**
@@ -287,13 +287,13 @@ MLN_API mln_status mln_feature_query_result_count(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_feature_query_result_get(
-  const mln_feature_query_result* result, size_t index,
+  mln_feature_query_result result, size_t index,
   mln_queried_feature* out_feature
 ) MLN_NOEXCEPT;
 
 /** Destroys a feature query result handle. Null is accepted as a no-op. */
 MLN_API void mln_feature_query_result_destroy(
-  mln_feature_query_result* result
+  mln_feature_query_result result
 ) MLN_NOEXCEPT;
 
 /**
@@ -309,13 +309,13 @@ MLN_API void mln_feature_query_result_destroy(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_feature_extension_result_get(
-  const mln_feature_extension_result* result,
+  mln_feature_extension_result result,
   mln_feature_extension_result_info* out_info
 ) MLN_NOEXCEPT;
 
 /** Destroys a feature extension result handle. Null is accepted as a no-op. */
 MLN_API void mln_feature_extension_result_destroy(
-  mln_feature_extension_result* result
+  mln_feature_extension_result result
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

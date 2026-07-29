@@ -33,7 +33,7 @@ static mln_status add_api_key(
   );
 }
 
-void install_transform(mln_runtime* runtime, char* api_key) {
+void install_transform(mln_runtime runtime, char* api_key) {
   // MapLibre calls this on its network threads, and both the callback and
   // user_data have to outlive the transform.
   mln_resource_transform transform = {

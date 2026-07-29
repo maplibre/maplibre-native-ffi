@@ -17,12 +17,14 @@ auto request_custom_resource(
 ) -> std::unique_ptr<mbgl::AsyncRequest>;
 
 auto complete_resource_request(
-  mln_resource_request_handle* handle, const mln_resource_response* response
+  mln_resource_request_handle handle, const mln_resource_response* response
 ) -> mln_status;
 
 auto resource_request_cancelled(
-  const mln_resource_request_handle* handle, bool* out_cancelled
+  mln_resource_request_handle handle, bool* out_cancelled
 ) -> mln_status;
-void release_resource_request(mln_resource_request_handle* handle) noexcept;
+void release_resource_request(mln_resource_request_handle handle) noexcept;
+auto wait_for_resource_request_retired(mln_resource_request_handle handle)
+  -> mln_status;
 
 }  // namespace mln::core

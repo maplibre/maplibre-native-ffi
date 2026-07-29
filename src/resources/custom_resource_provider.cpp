@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -20,24 +21,34 @@
 #include "resources/custom_resource_provider.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
-struct mln_resource_request_handle {
-  explicit mln_resource_request_handle(
-    mbgl::ActorRef<mbgl::FileSourceRequest> actor_
-  )
+namespace mln::core {
+
+struct ResourceRequestObject {
+  explicit ResourceRequestObject(mbgl::ActorRef<mbgl::FileSourceRequest> actor_)
       : actor(std::move(actor_)) {}
 
-  std::atomic_size_t refs{2};
   mutable std::mutex mutex;
+  std::condition_variable retired_changed;
   bool cancelled = false;
   bool completed = false;
-  bool provider_callback_in_flight = true;
-  bool provider_release_deferred = false;
+  bool retired = false;
   mbgl::ActorRef<mbgl::FileSourceRequest> actor;
 };
 
-namespace mln::core {
+// A request reaches host code that may complete it from any MapLibre thread,
+// and mbgl's cancel path runs on its own. Each of those holds a strong
+// reference, so the object outlives a release that races them. That is what
+// replaces the hand-rolled reference count this type used to carry, along with
+// the in-flight and deferred-release bookkeeping that count needed.
+template <>
+struct HandleTraits<ResourceRequestObject> {
+  static constexpr auto kind = HandleKind::ResourceRequest;
+  static constexpr auto leasable = true;
+};
+
 namespace {
 
 auto error_response(std::string message, mbgl::Response::Error::Reason reason)
@@ -193,14 +204,19 @@ auto response_from_abi(const mln_resource_response& provider_response)
   return response;
 }
 
-void release(mln_resource_request_handle* handle) noexcept {
-  if (handle == nullptr) {
+// Retires the id so no later call can reach this request. Idempotent, because
+// a provider that releases inline and a provider that passes through both end
+// up here.
+void retire_request(mln_resource_request_handle handle) noexcept {
+  auto object = handle_table<ResourceRequestObject>().remove(handle);
+  if (object == nullptr) {
     return;
   }
-  if (handle->refs.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-    // C handle uses manual intrusive refs.
-    delete handle;  // NOLINT(cppcoreguidelines-owning-memory)
+  {
+    const std::scoped_lock lock(object->mutex);
+    object->retired = true;
   }
+  object->retired_changed.notify_all();
 }
 
 auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
@@ -247,7 +263,10 @@ auto make_request_view(const mbgl::Resource& resource) -> mln_resource_request {
 }
 
 struct CustomProviderInvocation {
-  mln_resource_request_handle* handle = nullptr;
+  mln_resource_request_handle handle = MLN_HANDLE_NULL;
+  // Held for the whole invocation, so a host that releases inline cannot free
+  // the object out from under the code that runs after the callback returns.
+  std::shared_ptr<ResourceRequestObject> object;
   mbgl::Resource resource;
   mln_resource_provider_callback callback = nullptr;
   void* user_data = nullptr;
@@ -258,27 +277,20 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
   try {
     auto was_cancelled = false;
     {
-      const std::scoped_lock lock(invocation.handle->mutex);
-      if (invocation.handle->cancelled) {
+      const std::scoped_lock lock(invocation.object->mutex);
+      if (invocation.object->cancelled) {
         was_cancelled = true;
       }
     }
     if (was_cancelled) {
-      release(invocation.handle);
+      retire_request(invocation.handle);
       return true;
     }
     const auto request = make_request_view(invocation.resource);
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
-    auto provider_release_deferred = false;
-    {
-      const std::scoped_lock lock(invocation.handle->mutex);
-      invocation.handle->provider_callback_in_flight = false;
-      provider_release_deferred = invocation.handle->provider_release_deferred;
-      invocation.handle->provider_release_deferred = false;
-    }
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
-      release(invocation.handle);
+      retire_request(invocation.handle);
       return false;
     }
     if (decision != MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
@@ -301,12 +313,10 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       static_cast<void>(
         complete_resource_request(invocation.handle, &response)
       );
-      release(invocation.handle);
+      retire_request(invocation.handle);
       return true;
     }
-    if (provider_release_deferred) {
-      release(invocation.handle);
-    }
+    // A handled request stays reachable by id until the host releases it.
     return true;
   } catch (...) {
     auto response = mln_resource_response{
@@ -332,7 +342,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     } catch (...) {
       static_cast<void>(response);
     }
-    release(invocation.handle);
+    retire_request(invocation.handle);
     return true;
   }
 }
@@ -346,18 +356,20 @@ auto request_custom_resource(
 ) -> std::unique_ptr<mbgl::AsyncRequest> {
   auto request =
     std::make_unique<mbgl::FileSourceRequest>(std::move(file_source_callback));
-  auto* handle = new mln_resource_request_handle{request->actor()};
-  request->onCancel([handle]() noexcept -> void {
-    {
-      const std::scoped_lock lock(handle->mutex);
-      handle->cancelled = true;
-    }
-    release(handle);
+  auto object = std::make_shared<ResourceRequestObject>(request->actor());
+  const auto handle = handle_table<ResourceRequestObject>().insert(object);
+  // Capturing the object rather than the id keeps the cancel path off the
+  // handle table, so it adds no lock-ordering edge against mbgl's own locks on
+  // the thread that cancels.
+  request->onCancel([object]() noexcept -> void {
+    const std::scoped_lock lock(object->mutex);
+    object->cancelled = true;
   });
   try {
     const auto handled = invoke_custom_provider(
       CustomProviderInvocation{
         .handle = handle,
+        .object = object,
         .resource = resource,
         .callback = provider_callback,
         .user_data = user_data,
@@ -382,32 +394,36 @@ auto request_custom_resource(
       .retry_after_unix_ms = 0,
     };
     static_cast<void>(complete_resource_request(handle, &response));
-    release(handle);
+    retire_request(handle);
     return request;
   }
 }
 
 auto complete_resource_request(
-  mln_resource_request_handle* handle, const mln_resource_response* response
+  mln_resource_request_handle handle, const mln_resource_response* response
 ) -> mln_status {
-  if (handle == nullptr || response == nullptr) {
-    set_thread_error("resource request handle and response must not be null");
+  if (response == nullptr) {
+    set_thread_error("response must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto live = handle_table<ResourceRequestObject>().lease(handle);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto native_response = response_from_abi(*response);
   {
-    const std::scoped_lock lock(handle->mutex);
-    if (handle->cancelled) {
+    const std::scoped_lock lock(live->mutex);
+    if (live->cancelled) {
       set_thread_error("resource request is cancelled");
       return MLN_STATUS_INVALID_STATE;
     }
-    if (handle->completed) {
+    if (live->completed) {
       set_thread_error("resource request is already completed");
       return MLN_STATUS_INVALID_STATE;
     }
-    handle->completed = true;
+    live->completed = true;
     try {
-      handle->actor.invoke(
+      live->actor.invoke(
         &mbgl::FileSourceRequest::setResponse, std::move(native_response)
       );
     } catch (...) {
@@ -419,31 +435,44 @@ auto complete_resource_request(
 }
 
 auto resource_request_cancelled(
-  const mln_resource_request_handle* handle, bool* out_cancelled
+  mln_resource_request_handle handle, bool* out_cancelled
 ) -> mln_status {
-  if (handle == nullptr || out_cancelled == nullptr) {
-    set_thread_error(
-      "resource request handle and out_cancelled must not be null"
-    );
+  if (out_cancelled == nullptr) {
+    set_thread_error("out_cancelled must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const std::scoped_lock lock(handle->mutex);
-  *out_cancelled = handle->cancelled;
+  const auto live = handle_table<ResourceRequestObject>().lease(handle);
+  if (live == nullptr) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const std::scoped_lock lock(live->mutex);
+  *out_cancelled = live->cancelled;
   return MLN_STATUS_OK;
 }
 
-void release_resource_request(mln_resource_request_handle* handle) noexcept {
-  if (handle == nullptr) {
-    return;
+auto wait_for_resource_request_retired(mln_resource_request_handle handle)
+  -> mln_status {
+  if (handle == MLN_HANDLE_NULL) {
+    set_thread_error("resource request handle must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
   }
-  {
-    const std::scoped_lock lock(handle->mutex);
-    if (handle->provider_callback_in_flight) {
-      handle->provider_release_deferred = true;
-      return;
-    }
+  // A handle that no longer resolves has already been retired, so there is
+  // nothing to wait for. try_lease keeps this off the thread-local diagnostic,
+  // because that is a success here rather than a fault.
+  const auto live = handle_table<ResourceRequestObject>().try_lease(handle);
+  if (live == nullptr) {
+    return MLN_STATUS_OK;
   }
-  release(handle);
+  auto lock = std::unique_lock{live->mutex};
+  live->retired_changed.wait(lock, [&live] { return live->retired; });
+  return MLN_STATUS_OK;
+}
+
+void release_resource_request(mln_resource_request_handle handle) noexcept {
+  // A release that lands while the provider callback is still on the stack no
+  // longer needs deferring: the invocation holds its own reference, so
+  // retiring the id here only makes it unreachable.
+  retire_request(handle);
 }
 
 }  // namespace mln::core

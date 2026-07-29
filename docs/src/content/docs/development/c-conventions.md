@@ -49,7 +49,34 @@ handles in public structs—these are friendly to binding generators. Expose
 borrowed ABI-owned text with a length or provide an explicit copy or drain API.
 Backend-native handles are opaque `void*`; document the backend type and
 field-level requirements on the struct field, and ownership and lifetime on the
-function that accepts or returns the struct.
+function that accepts or returns the struct. A backend-native handle is an
+address the host already owns, so it stays a `void*` and never becomes a
+MapLibre handle id.
+
+## Handles
+
+Every MapLibre handle type is `typedef uint64_t`, an opaque generational id
+rather than an address. Each id packs its handle type, a slot index, and a reuse
+generation, so an id names one object for the life of the process and a released
+id stays distinguishable from every later one.
+
+`MLN_HANDLE_NULL` is the null handle for every type. A live id always carries a
+nonzero type tag, so this value names no object of any type.
+
+Handle entry points report `MLN_STATUS_INVALID_ARGUMENT` and leave the call
+without effect for an id that names a released object, an id of the wrong handle
+type, and a value this library never issued. `mln_thread_last_error_message()`
+distinguishes those cases. Because every handle shares one C type, the type tag
+is what rejects a mismatched handle, so document the handle type each parameter
+expects.
+
+Handle values are safe to copy, compare, hash, and move between threads, and
+carry no ownership on their own. Owner-thread rules govern which thread may call
+with a handle, not which thread may hold one.
+
+The bit layout is internal. Hosts pass handles back as issued rather than
+decoding or synthesizing them, and a synthesized value is rejected rather than
+dereferenced.
 
 ## Ownership And Execution
 
@@ -67,13 +94,14 @@ they must remain valid on the registering function. Document the invalidation
 point for returned borrowed pointers.
 
 Give owned handles and scoped resources explicit destroy or release functions.
-Status-returning functions reject null handles. Void release functions accept
-null as a no-op.
+Status-returning functions reject `MLN_HANDLE_NULL`. Void release functions
+accept `MLN_HANDLE_NULL` as a no-op, and accept an already-released id as a
+no-op, so a host cleanup hook that runs twice stays safe.
 
-Output handle parameters that create or acquire ownership reject non-null
-`*out_handle` values and preserve live host-owned handles on failure. Document
-when scoped resource ownership begins, when it ends, and whether completion may
-happen inline or later.
+Output handle parameters that create or acquire ownership require `*out_handle`
+to equal `MLN_HANDLE_NULL` on entry and preserve live host-owned handles on
+failure. Document when scoped resource ownership begins, when it ends, and
+whether completion may happen inline or later.
 
 The runtime and map use a host-pumped, owner-thread model. Runtime creation
 records the owner thread. Runtime, map, map-projection, and render session calls
@@ -83,9 +111,10 @@ A map shares its runtime's owner thread. A render session records its own: the
 thread that attached it, fixed for the session's lifetime. Attach validates that
 the map is live rather than that the caller owns it, so a session may be
 attached, driven, and destroyed on a thread that never touches the map. Session
-calls from any other thread report the owner-thread status. The host publishes
-the map pointer to the attaching thread with a happens-before edge; the C API
-does not synchronize that handoff.
+calls from any other thread report the owner-thread status. The host may hand
+the map handle to the attaching thread by any means, because a handle is a plain
+value and attach resolves it under the C API's own lock; an id that names a
+released map is rejected rather than bound to a later map.
 
 Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build
@@ -126,7 +155,7 @@ own work. Park-and-wake follows these rules:
 - Wake signals set a flag that the pump clears before it returns. Document a
   pump as advancing the runtime, and require the event drain after every return.
 - Any-thread wake entry points take a handle that carries its own reference to
-  the wake state, never the thread-affine runtime pointer.
+  the wake state, never the thread-affine runtime handle.
 - Document each blocking entry point's deadlock risk, naming the host locks a
   caller must not hold across it.
 - Queue one event per host-visible outcome. An event whose handling acts on the
@@ -140,8 +169,9 @@ comment lists its status values and meanings.
 Use these categories consistently:
 
 - `MLN_STATUS_INVALID_ARGUMENT` for null pointers, unknown enum values, unknown
-  flag bits, undersized structs, invalid dimensions, invalid handles, or
-  incorrectly initialized output handles;
+  flag bits, undersized structs, invalid dimensions, handles that are null,
+  released, of the wrong handle type, or never issued, or incorrectly
+  initialized output handles;
 - `MLN_STATUS_INVALID_STATE` for otherwise valid objects in the wrong lifecycle
   state;
 - `MLN_STATUS_WRONG_THREAD` for thread-affine handles called from the wrong
@@ -201,10 +231,12 @@ panics, and errors inside the callback and convert them to the callback's
 documented return behavior.
 
 Render session APIs document owner thread, render target backend handle
-ownership, synchronization, borrowed pointer lifetimes, generation or
-stale-frame behavior, and teardown rules. Attach entry points also document that
-the calling thread becomes the session's owner thread and what the calling
-thread's graphics context must provide.
+ownership, synchronization, borrowed pointer lifetimes, frame generation or
+stale-frame behavior, and teardown rules. Frame generations are session-scoped
+counters in frame structs and are unrelated to the generation inside a handle
+id. Attach entry points also document that the calling thread becomes the
+session's owner thread and what the calling thread's graphics context must
+provide.
 
 ## Callback Adapter
 

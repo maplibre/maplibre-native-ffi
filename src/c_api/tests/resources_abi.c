@@ -32,7 +32,7 @@ static mln_runtime_event empty_event(void) {
 }
 
 static bool wait_for_offline_completion(
-  mln_runtime* runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
     if (mln_runtime_pump(runtime, 0) != MLN_STATUS_OK) {
@@ -71,7 +71,7 @@ static bool wait_for_offline_completion(
 }
 
 static bool wait_for_map_loading_failure(
-  mln_runtime* runtime, const mln_map* map, char* out_message,
+  mln_runtime runtime, const mln_map map, char* out_message,
   size_t out_message_capacity
 ) {
   for (size_t attempt = 0; attempt < 5000; attempt += 1) {
@@ -163,7 +163,7 @@ static mln_resource_response style_response(void) {
 
 static uint32_t resource_provider_stub(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   (void)user_data;
   (void)request;
@@ -178,7 +178,7 @@ typedef struct inline_release_provider_state {
 
 static uint32_t inline_release_resource_provider(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   inline_release_provider_state* state = user_data;
   const mln_resource_response response = {
@@ -214,15 +214,16 @@ static mln_status resource_transform_stub(
 // This verifies null request-handle behavior for release, cancellation, and
 // completion below binding wrappers.
 static void custom_provider_request_handles_reject_raw_null_handles(void) {
-  mln_resource_request_release(NULL);
+  mln_resource_request_release(MLN_HANDLE_NULL);
   bool cancelled = true;
   const mln_resource_response response = style_response();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_resource_request_cancelled(NULL, &cancelled)
+    mln_resource_request_cancelled(MLN_HANDLE_NULL, &cancelled)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_resource_request_complete(NULL, &response)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_resource_request_complete(MLN_HANDLE_NULL, &response)
   );
 }
 
@@ -237,7 +238,7 @@ static void network_status_get_rejects_raw_null_output(void) {
 // This verifies unknown raw operation discriminants and failure-time output
 // initialization.
 static void ambient_cache_operations_validate_raw_operation_values(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_offline_operation_id operation_id = 123;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -252,7 +253,7 @@ static void ambient_cache_operations_validate_raw_operation_values(void) {
 // This verifies raw union discriminants, required nested pointers, and
 // failure-time output initialization.
 static void offline_regions_reject_raw_invalid_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_offline_region_definition definition = offline_tile_definition();
   const uint8_t metadata[] = {1, 2, 3};
   mln_offline_operation_id operation_id = 123;
@@ -326,7 +327,7 @@ static void offline_regions_reject_raw_invalid_descriptors(void) {
 // This verifies a null borrowed database path is rejected before any
 // asynchronous operation is created.
 static void offline_database_merge_rejects_raw_null_path(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_offline_operation_id operation_id = 123;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -341,7 +342,7 @@ static void offline_database_merge_rejects_raw_null_path(void) {
 // This verifies wrong-result-kind rejection because typed binding operation
 // variants prevent requesting a mismatched result.
 static void offline_take_rejects_mismatched_result_kind(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const uint8_t metadata[] = {1, 2, 3};
   const mln_offline_region_definition definition = offline_tile_definition();
   mln_offline_operation_id operation_id = 0;
@@ -353,13 +354,13 @@ static void offline_take_rejects_mismatched_result_kind(void) {
   );
   TEST_ASSERT_NOT_EQUAL(0, operation_id);
   TEST_ASSERT_TRUE(wait_for_offline_completion(runtime, operation_id));
-  mln_offline_region_list* wrong_list = NULL;
+  mln_offline_region_list wrong_list = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_STATE, mln_runtime_offline_regions_list_take_result(
                                 runtime, operation_id, &wrong_list
                               )
   );
-  TEST_ASSERT_NULL(wrong_list);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, wrong_list);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_offline_operation_discard(runtime, operation_id)
   );
@@ -369,9 +370,10 @@ static void offline_take_rejects_mismatched_result_kind(void) {
 // This verifies null, undersized, and missing-callback descriptors that binding
 // constructors cannot produce.
 static void resource_transform_rejects_raw_invalid_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_clear_resource_transform(NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_clear_resource_transform(MLN_HANDLE_NULL)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -466,7 +468,7 @@ static mln_status blocking_resource_transform(
 // inside teardown.
 static void other_runtime_entry(void* argument) {
   teardown_probe* probe = argument;
-  mln_runtime* runtime = NULL;
+  mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
   const mln_status create_status = mln_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
@@ -488,7 +490,7 @@ static void other_runtime_entry(void* argument) {
 // requests the style from a MapLibre file source thread, which is where the
 // resource provider and resource transform callbacks run.
 static bool activate_style_download(
-  mln_runtime* runtime, const char* style_url
+  mln_runtime runtime, const char* style_url
 ) {
   const mln_offline_region_definition definition =
     offline_tile_definition_for_style(style_url);
@@ -503,7 +505,7 @@ static bool activate_style_download(
     return false;
   }
 
-  mln_offline_region_snapshot* snapshot = NULL;
+  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_create_take_result(
       runtime, operation_id, &snapshot
@@ -533,7 +535,7 @@ static bool activate_style_download(
 }
 
 // Pumps the owner thread's run loop until `flag` is set by a MapLibre thread.
-static bool pump_until_flag(mln_runtime* runtime, atomic_bool* flag) {
+static bool pump_until_flag(mln_runtime runtime, atomic_bool* flag) {
   for (size_t attempt = 0; attempt < teardown_probe_wait_attempts;
        attempt += 1) {
     if (atomic_load(flag)) {
@@ -548,7 +550,7 @@ static bool pump_until_flag(mln_runtime* runtime, atomic_bool* flag) {
 }
 
 static bool start_offline_region_download(
-  mln_runtime* runtime, teardown_probe* probe
+  mln_runtime runtime, teardown_probe* probe
 ) {
   return activate_style_download(runtime, offline_style_url) &&
          pump_until_flag(runtime, &probe->transform_entered);
@@ -562,7 +564,7 @@ static bool start_offline_region_download(
 static void runtime_teardown_leaves_other_runtimes_responsive(void) {
   teardown_probe probe = {0};
   atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_test_thread* other_thread =
     mln_test_thread_start(other_runtime_entry, &probe);
   TEST_ASSERT_TRUE(wait_for_flag(&probe.other_runtime_ready));
@@ -642,7 +644,7 @@ static mln_status lookup_blocking_transform(
 // sends the thread into the lookup under test.
 static uint32_t lookup_probe_resource_provider(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   (void)handle;
   lookup_probe* probe = user_data;
@@ -672,7 +674,7 @@ static uint32_t lookup_probe_resource_provider(
 // the resource transform lookup for the first runtime.
 static void lookup_other_runtime_entry(void* argument) {
   lookup_probe* probe = argument;
-  mln_runtime* runtime = NULL;
+  mln_runtime runtime = MLN_HANDLE_NULL;
   const mln_runtime_options options = mln_runtime_options_default();
   const mln_status create_status = mln_runtime_create(&options, &runtime);
   if (create_status != MLN_STATUS_OK) {
@@ -701,7 +703,7 @@ static void lookup_other_runtime_entry(void* argument) {
 static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
   lookup_probe probe = {0};
   atomic_store(&probe.other_runtime_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_test_thread* other_thread =
     mln_test_thread_start(lookup_other_runtime_entry, &probe);
   TEST_ASSERT_TRUE(wait_for_flag(&probe.other_runtime_ready));
@@ -757,7 +759,7 @@ static void resource_transform_lookup_leaves_other_runtimes_responsive(void) {
 // This verifies null, undersized, and missing-callback provider descriptors
 // below binding-owned validation.
 static void resource_provider_rejects_raw_invalid_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_runtime_set_resource_provider(runtime, NULL)
@@ -776,7 +778,8 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
     mln_runtime_set_resource_provider(runtime, &provider)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_clear_resource_provider(NULL)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_clear_resource_provider(MLN_HANDLE_NULL)
   );
   mln_test_destroy_runtime(runtime);
 }
@@ -786,7 +789,7 @@ static void resource_provider_rejects_raw_invalid_descriptors(void) {
 // while blocked.
 static uint32_t blocking_resource_provider_for_clear(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   (void)request;
   (void)handle;
@@ -810,7 +813,7 @@ static uint32_t blocking_resource_provider_for_clear(
 // downloads request the region style from a MapLibre file source thread, which
 // is where the provider callback runs, and they need no live map.
 static bool wait_for_clear_provider_callback(
-  mln_runtime* runtime, provider_quiescence_probe* probe
+  mln_runtime runtime, provider_quiescence_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
   const uint8_t metadata[] = {1, 2, 3};
@@ -824,7 +827,7 @@ static bool wait_for_clear_provider_callback(
     return false;
   }
 
-  mln_offline_region_snapshot* snapshot = NULL;
+  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_create_take_result(
       runtime, operation_id, &snapshot
@@ -869,7 +872,7 @@ static bool wait_for_clear_provider_callback(
 // the callback and its user data are unreferenced once the clear returns.
 static void clearing_resource_provider_waits_for_in_flight_callback(void) {
   provider_quiescence_probe probe = {0};
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = blocking_resource_provider_for_clear,
@@ -898,8 +901,8 @@ static void clearing_resource_provider_waits_for_in_flight_callback(void) {
 // style URL whose scheme no file source serves reports the scheme, the URL,
 // and the resource provider remedy instead of an HTTP client parse error.
 static void unsupported_style_url_scheme_names_scheme_and_url(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
   );
@@ -915,8 +918,8 @@ static void unsupported_style_url_scheme_names_scheme_and_url(void) {
 }
 
 static void unsupported_style_url_diagnostic_redacts_credentials(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK,
     mln_map_set_style_url(map, credentialed_unsupported_scheme_style_url)
@@ -935,7 +938,7 @@ static void unsupported_style_url_diagnostic_redacts_credentials(void) {
 }
 
 static void unsupported_style_url_names_declining_provider(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = resource_provider_stub,
@@ -943,7 +946,7 @@ static void unsupported_style_url_names_declining_provider(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
   );
-  mln_map* map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_url(map, unsupported_scheme_style_url)
   );
@@ -966,7 +969,7 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   inline_release_provider_state state;
   atomic_init(&state.callback_finished, false);
   atomic_init(&state.completion_status, MLN_STATUS_NATIVE_ERROR);
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = inline_release_resource_provider,
@@ -975,7 +978,7 @@ static void resource_provider_defers_inline_release_until_callback_returns(
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_set_resource_provider(runtime, &provider)
   );
-  mln_map* map = mln_test_create_map(runtime);
+  mln_map map = mln_test_create_map(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_url(map, "custom://inline-style.json")
   );
@@ -1005,7 +1008,7 @@ enum {
 // for this invocation from teardown returning while callback state is live.
 static uint32_t blocking_resource_provider(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   (void)request;
   (void)handle;
@@ -1032,7 +1035,7 @@ static uint32_t blocking_resource_provider(
 // Starts an offline download because its network request runs on a MapLibre
 // file-source thread and does not require a live map during runtime teardown.
 static bool wait_for_provider_callback(
-  mln_runtime* runtime, provider_teardown_probe* probe
+  mln_runtime runtime, provider_teardown_probe* probe
 ) {
   const mln_offline_region_definition definition = offline_tile_definition();
   const uint8_t metadata[] = {1, 2, 3};
@@ -1046,7 +1049,7 @@ static bool wait_for_provider_callback(
     return false;
   }
 
-  mln_offline_region_snapshot* snapshot = NULL;
+  mln_offline_region_snapshot snapshot = MLN_HANDLE_NULL;
   if (
     mln_runtime_offline_region_create_take_result(
       runtime, operation_id, &snapshot
@@ -1090,7 +1093,7 @@ static bool wait_for_provider_callback(
 // destruction returns, including callbacks already running on worker threads.
 static void runtime_teardown_waits_for_in_flight_provider_callback(void) {
   provider_teardown_probe probe = {0};
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = blocking_resource_provider,

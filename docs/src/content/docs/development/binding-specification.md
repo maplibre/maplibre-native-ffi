@@ -127,16 +127,17 @@ snapshot, result, and list handles remain internal implementation details.
 
 Every public wrapper that owns or controls native state across calls MUST store:
 
-- private native identity;
+- the private native handle id;
 - live/releasing/closed state;
 - the native destroy function or bridge release path;
 - parent references or lifetime evidence required for native validity;
 - callback state owned by that handle's native scope;
 - leak-reporting context when the binding has non-deterministic cleanup hooks.
 
-Native identity MUST NOT be public. The implementation can represent it with a
-native pointer, bridge-owned handle, or private table ID, but every public
-operation uses the same ownership rules.
+The native handle id stays private. A binding publishes native identity only as
+a copied identity value that supports equality and hashing and carries no
+operations. Public code MUST NOT be able to obtain an operable handle from an
+identity value, a raw integer, a public field, or an ordinary constructor.
 
 Public release follows this operation:
 
@@ -161,6 +162,23 @@ MUST NOT destroy runtime, map, projection, or render-session handles from
 cleanup hooks. Infallible language destructors that attempt best-effort release
 MUST preserve the explicit release contract and MUST NOT mask native errors from
 the explicit release path.
+
+### Stale and mismatched handles
+
+The C API validates every handle id it receives. It reports
+`MLN_STATUS_INVALID_ARGUMENT` with a distinguishing diagnostic for an id that
+names a released handle, an id whose handle type does not match the operation,
+and a value it never issued.
+
+Bindings surface that status through their ordinary invalid-argument error with
+the native diagnostic attached, and keep binding-owned close-once state so a
+released wrapper reports its own closed-handle error before crossing into C.
+Bindings rely on the C API for id validity, generation, and handle-type
+checking.
+
+A binding whose public handle values can be copied or moved between threads or
+host isolates documents that a copy of a released handle reports invalid
+argument rather than reaching a later native handle.
 
 ### Parent validity
 
@@ -433,6 +451,12 @@ non-OK. Release runs once, waits for in-flight completion or cancellation
 checks, and makes later completion or cancellation checks fail before crossing
 into C. Stale public request handles cannot affect later native requests.
 
+A binding whose host runtime moves a handled request between execution contexts
+passes the request handle id itself, and exposes the C API's wait-until-retired
+operation for teardown. A released or completed request id reports invalid
+argument, so bindings expose one request handle type rather than a separate
+transferable request token.
+
 ---
 
 ## Threading
@@ -508,10 +532,10 @@ Event polling follows this operation:
 5. Decode known typed payloads only after validating their native size. Preserve
    unknown event and payload domains with their raw values and copied payload
    bytes.
-6. Resolve event source identity through binding-owned runtime state. A
-   map-originated event may reference an existing public map wrapper or copied
-   map identity only when the binding can prove that identity. It never creates
-   a public handle from the native source pointer.
+6. Copy the event's source id, resolve any public map wrapper for that id
+   through binding-owned runtime state, and expose the copied id as the event's
+   source identity. Constructing a public handle from the source id stays
+   outside the safe public API.
 7. Apply binding-owned state updates triggered by the event before returning the
    copied event.
 
@@ -692,12 +716,15 @@ that a real native failure would expose.
 
 ### Handle lifetime
 
-| ID      | Test                                                                                                                                                           |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; every public alias observes release state, and a second release no-ops. |
-| BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                         |
-| BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                              |
-| BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                               |
+| ID      | Test                                                                                                                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; every public alias observes release state, and a second release no-ops.                                            |
+| BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                                                                    |
+| BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                                                                         |
+| BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                                                                          |
+| BND-045 | A released handle's id, replayed through an internal seam after a new handle of the same kind is created, reports the binding's invalid-argument error naming it stale, and the new handle keeps working. |
+| BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
+| BND-049 | A handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                                               |
 
 ### Input Structs, Values, and Copied Data
 
