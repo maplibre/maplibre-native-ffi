@@ -1229,7 +1229,11 @@ test("handles stay local while workers create their own runtime", async () => {
 test("wake sources move to workers and release an unbounded pump", async () => {
   const runtime = new RuntimeHandle();
   const wakeSource = runtime.acquireWakeSource();
-  const transfer = structuredClone(wakeSource.transfer());
+  const ownedTransfer = wakeSource.transfer();
+  assert.match(ownedTransfer.token, /^[^:]+:[0-9a-f-]{36}:[0-9a-f-]{36}$/);
+  assert.equal(typeof ownedTransfer.cancel, "function");
+  const transfer = structuredClone(ownedTransfer);
+  assert.equal(transfer.cancel, undefined);
   assert.equal(wakeSource.closed, true);
   const worker = new Worker(
     `
@@ -1319,6 +1323,28 @@ test("map attach references move between N-API environments exactly once", async
   } finally {
     await worker.terminate();
     if (!map.closed) map.close();
+    runtime.close();
+  }
+});
+
+test("abandoned cross-thread transfers can be cancelled", () => {
+  const runtime = new RuntimeHandle();
+  const wakeTransfer = runtime.acquireWakeSource().transfer();
+  const map = runtime.createMap();
+  const mapTransfer = map.attachReference().transfer();
+  try {
+    wakeTransfer.cancel?.();
+    mapTransfer.cancel?.();
+    assert.throws(
+      () => WakeSourceHandle.fromTransfer(wakeTransfer),
+      InvalidStateError,
+    );
+    assert.throws(
+      () => MapAttachReference.fromTransfer(mapTransfer),
+      InvalidStateError,
+    );
+  } finally {
+    map.close();
     runtime.close();
   }
 });
@@ -1678,6 +1704,13 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.equal(received.completionToken, undefined);
     assert.equal(received.handle instanceof ResourceRequestHandle, true);
     assert.equal(received.handle.closed, false);
+    for (const errorReason of [1.5, -1, 2 ** 32]) {
+      assert.throws(
+        () => received.handle.complete({ errorReason }),
+        InvalidArgumentError,
+      );
+      assert.equal(received.handle.closed, false);
+    }
     received.handle.close();
     assert.deepEqual(closes, ["resource-request:1"]);
     assert.throws(() => received.handle.cancelled(), InvalidStateError);

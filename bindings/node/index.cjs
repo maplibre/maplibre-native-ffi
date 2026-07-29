@@ -1,5 +1,6 @@
 "use strict";
 
+const { randomUUID } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
 const native = require("./index.js");
 
@@ -1271,8 +1272,15 @@ class ResourceRequestHandle {
     }
     let consumed = false;
     try {
+      const normalized = { ...response };
+      if (typeof normalized.errorReason === "number") {
+        normalized.errorReason = unsigned32(
+          normalized.errorReason,
+          "errorReason",
+        );
+      }
       const result = translateNativeErrors(() =>
-        native.nativeResourceRequestComplete(this.#completionToken, response),
+        native.nativeResourceRequestComplete(this.#completionToken, normalized),
       );
       consumed = true;
       return result;
@@ -1469,10 +1477,11 @@ class WakeSourceHandle {
   }
 
   transfer() {
-    return Object.freeze({
-      kind: "wakeSource",
-      token: translateNativeErrors(() => liveNativeOf(this).transferToken()),
-    });
+    return createExpiringTransfer(
+      "wakeSource",
+      (token) => liveNativeOf(this).transferToken(token),
+      native.nativeWakeSourceTransferCancel,
+    );
   }
 
   static fromTransfer(transfer) {
@@ -2368,10 +2377,11 @@ class MapAttachReference {
   }
 
   transfer() {
-    return Object.freeze({
-      kind: "mapAttachReference",
-      token: translateNativeErrors(() => liveNativeOf(this).transferToken()),
-    });
+    return createExpiringTransfer(
+      "mapAttachReference",
+      (token) => liveNativeOf(this).transferToken(token),
+      native.nativeMapAttachTransferCancel,
+    );
   }
 
   attachMetalOwnedTexture(descriptor) {
@@ -3378,6 +3388,30 @@ function transferToken(transfer, kind, label) {
     throw new InvalidArgumentError(null, `${label} transfer is invalid`);
   }
   return transfer.token;
+}
+
+const TRANSFER_EXPIRY_MS = 5 * 60 * 1000;
+
+function createExpiringTransfer(kind, register, cancelNative) {
+  const token = `${kind}:${randomUUID()}:${randomUUID()}`;
+  translateNativeErrors(() => register(token));
+  let active = true;
+  const cancel = () => {
+    if (!active) return;
+    active = false;
+    translateNativeErrors(() => cancelNative(token));
+  };
+  const expiry = setTimeout(cancel, TRANSFER_EXPIRY_MS);
+  expiry.unref?.();
+  const transfer = { kind, token };
+  Object.defineProperty(transfer, "cancel", {
+    enumerable: false,
+    value() {
+      clearTimeout(expiry);
+      cancel();
+    },
+  });
+  return Object.freeze(transfer);
 }
 
 function geoJsonSourceOptionsToNative(options) {

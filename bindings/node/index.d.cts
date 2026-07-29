@@ -741,6 +741,7 @@ export declare class WakeSourceHandle {
 export interface WakeSourceTransfer {
   readonly kind: "wakeSource";
   readonly token: string;
+  cancel?(): void;
 }
 
 export interface OfflineTilePyramidRegionDefinition {
@@ -1080,6 +1081,7 @@ export type FeatureExtensionResult =
 export interface MapAttachReferenceTransfer {
   readonly kind: "mapAttachReference";
   readonly token: string;
+  cancel?(): void;
 }
 
 export declare class MapAttachReference {

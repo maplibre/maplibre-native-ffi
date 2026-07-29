@@ -250,7 +250,6 @@ pub struct ResourceResponseInput {
 static RESOURCE_REQUEST_TOKEN_IDS: AtomicU64 = AtomicU64::new(1);
 static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<String, ResourceRequestRegistration>>> =
     OnceLock::new();
-static WAKE_SOURCE_TRANSFER_IDS: AtomicU64 = AtomicU64::new(1);
 static WAKE_SOURCE_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<SharedWakeSource>>>> =
     OnceLock::new();
 
@@ -368,22 +367,30 @@ impl NativeWakeSourceHandle {
     }
 
     #[napi(js_name = "transferToken")]
-    pub fn transfer_token(&self) -> Result<String> {
+    pub fn transfer_token(&self, token: String) -> Result<()> {
+        let mut transfers = wake_source_transfers()
+            .lock()
+            .map_err(|_| error::invalid_state("wake source transfer registry lock is poisoned"))?;
+        if token.len() < 32 || transfers.contains_key(&token) {
+            return Err(error::invalid_argument(
+                "wake source transfer token is invalid",
+            ));
+        }
         let source = self
             .source
             .lock()
             .map_err(|_| error::invalid_state("wake source handle lock is poisoned"))?
             .take()
             .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))?;
-        let token = format!(
-            "wake-source-transfer:{}",
-            WAKE_SOURCE_TRANSFER_IDS.fetch_add(1, Ordering::Relaxed)
-        );
-        let mut transfers = wake_source_transfers()
-            .lock()
-            .map_err(|_| error::invalid_state("wake source transfer registry lock is poisoned"))?;
-        transfers.insert(token.clone(), source);
-        Ok(token)
+        transfers.insert(token, source);
+        Ok(())
+    }
+}
+
+#[napi(js_name = "nativeWakeSourceTransferCancel")]
+pub fn native_wake_source_transfer_cancel(token: String) {
+    if let Ok(mut transfers) = wake_source_transfers().lock() {
+        transfers.remove(&token);
     }
 }
 

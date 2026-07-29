@@ -5,7 +5,7 @@ use std::{
     ptr::NonNull,
     sync::{
         Arc, Condvar, Mutex, OnceLock, RwLock,
-        atomic::{AtomicU64, AtomicUsize, Ordering},
+        atomic::{AtomicUsize, Ordering},
     },
 };
 
@@ -297,7 +297,6 @@ impl MapAddress {
     }
 }
 
-static MAP_ATTACH_TRANSFER_IDS: AtomicU64 = AtomicU64::new(1);
 static MAP_ATTACH_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<MapAddress>>>> = OnceLock::new();
 
 #[napi(js_name = "NativeMapAttachReference")]
@@ -316,22 +315,23 @@ impl NativeMapAttachReference {
     }
 
     #[napi(js_name = "transferToken")]
-    pub fn transfer_token(&self) -> Result<String> {
+    pub fn transfer_token(&self, token: String) -> Result<()> {
+        let mut transfers = map_attach_transfers()
+            .lock()
+            .map_err(|_| error::invalid_state("map attach transfer registry lock is poisoned"))?;
+        if token.len() < 32 || transfers.contains_key(&token) {
+            return Err(error::invalid_argument(
+                "map attach transfer token is invalid",
+            ));
+        }
         let address = self
             .address
             .lock()
             .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
             .take()
             .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
-        let token = format!(
-            "map-attach-transfer:{}",
-            MAP_ATTACH_TRANSFER_IDS.fetch_add(1, Ordering::Relaxed)
-        );
-        map_attach_transfers()
-            .lock()
-            .map_err(|_| error::invalid_state("map attach transfer registry lock is poisoned"))?
-            .insert(token.clone(), address);
-        Ok(token)
+        transfers.insert(token, address);
+        Ok(())
     }
 }
 
@@ -361,6 +361,13 @@ pub fn native_map_attach_reference_from_transfer(
     Ok(NativeMapAttachReference {
         address: Mutex::new(Some(address)),
     })
+}
+
+#[napi(js_name = "nativeMapAttachTransferCancel")]
+pub fn native_map_attach_transfer_cancel(token: String) {
+    if let Ok(mut transfers) = map_attach_transfers().lock() {
+        transfers.remove(&token);
+    }
 }
 
 fn map_attach_transfers() -> &'static Mutex<HashMap<String, Arc<MapAddress>>> {
