@@ -3,12 +3,6 @@
 # Not supported by Dependabot:
 # - mise tool versions: https://github.com/dependabot/dependabot-core/issues/12320
 # - Zig `build.zig.zon` dependencies
-#
-# Supported, but deliberately left out:
-# - the MapLibre Native submodule pin, because `gitsubmodule` tracks the
-#   upstream default branch and would open a pull request per upstream commit
-# - `gomod` and `swift`, because `bindings/go` and both `Package.swift` files
-#   declare no external dependencies yet
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -30,6 +24,28 @@ updates:
     labels: [dependencies, rust]
     groups:
       cargo:
+        patterns: ["*"]
+  # Tracks the tip of MapLibre Native's default branch, so the weekly run keeps
+  # one rolling pull request rather than one per upstream commit.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, infra]
+    groups:
+      gitsubmodule:
+        patterns: ["*"]
+  - package-ecosystem: gomod
+    directory: /bindings/go
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, go]
+    groups:
+      gomod:
         patterns: ["*"]
   - package-ecosystem: gradle
     directory: /
@@ -73,6 +89,16 @@ updates:
     labels: [dependencies, dart]
     groups:
       pub:
+        patterns: ["*"]
+  - package-ecosystem: swift
+    directories: ["/bindings/swift", "/examples/swift-map"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, swift]
+    groups:
+      swift:
         patterns: ["*"]
   - package-ecosystem: uv
     directory: /
