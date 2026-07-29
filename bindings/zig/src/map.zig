@@ -2003,3 +2003,87 @@ test "custom geometry source states are released after style URL load detaches t
     try std.testing.expect(try waitForRuntimeEventForTesting(&runtime, .map_style_loaded));
     try std.testing.expectEqual(@as(usize, 0), try customGeometrySourceCountForTesting(&map));
 }
+
+test "a released map id replayed after a new map is reported stale" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var first = try MapHandle.create(&runtime, .{});
+    const released = @intFromEnum(first);
+    try first.close();
+
+    // The released slot is the one the next map takes, so this is the case a
+    // pointer handle could not tell apart from a live map.
+    var second = try MapHandle.create(&runtime, .{});
+    defer second.close() catch @panic("map close failed");
+
+    var width: u32 = 0;
+    var height: u32 = 0;
+    var scale_factor: f64 = 0;
+    try std.testing.expectError(
+        error.InvalidArgument,
+        status.checkStatus(
+            c.mln_map_get_size(released, &width, &height, &scale_factor),
+            null,
+        ),
+    );
+    try std.testing.expect(
+        std.mem.indexOf(u8, std.mem.span(c.mln_thread_last_error_message()), "stale") != null,
+    );
+
+    // The live map is unaffected by the replay.
+    _ = try second.getSize();
+}
+
+test "a map id passed to a runtime operation is rejected on its kind" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    // MapHandle and RuntimeHandle are distinct enums, so this call has no
+    // expression in the safe API and needs the raw id.
+    try std.testing.expectError(
+        error.InvalidArgument,
+        status.checkStatus(c.mln_runtime_pump(@intFromEnum(map), 0), null),
+    );
+    const message = std.mem.span(c.mln_thread_last_error_message());
+    try std.testing.expect(std.mem.indexOf(u8, message, "map") != null);
+    try std.testing.expect(std.mem.indexOf(u8, message, "runtime") != null);
+}
+
+test "a live map id called from another thread reports wrong thread" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const CrossThread = struct {
+        live: c.mln_map,
+        result: status.Error!void = {},
+        stale: bool = false,
+
+        fn run(self: *@This()) void {
+            var width: u32 = 0;
+            var height: u32 = 0;
+            var scale_factor: f64 = 0;
+            self.result = status.checkStatus(
+                c.mln_map_get_size(self.live, &width, &height, &scale_factor),
+                null,
+            );
+            self.stale = std.mem.indexOf(
+                u8,
+                std.mem.span(c.mln_thread_last_error_message()),
+                "stale",
+            ) != null;
+        }
+    };
+
+    var context = CrossThread{ .live = @intFromEnum(map) };
+    const thread = try std.Thread.spawn(.{}, CrossThread.run, .{&context});
+    thread.join();
+
+    // The id is live, so the owner-thread rule decides rather than identity.
+    try std.testing.expectError(error.WrongThread, context.result);
+    try std.testing.expect(!context.stale);
+}

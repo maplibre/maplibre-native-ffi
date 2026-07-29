@@ -1027,3 +1027,28 @@ func (m *MapHandle) Close() error {
 	m.releaseCustomGeometrySources()
 	return nil
 }
+
+// mapSizeByIDForTest calls the C size accessor with a raw map id, so a test can
+// replay a released id or use one from another thread. The safe API has no way
+// to express either. The result is the binding's own error, so a test asserts
+// on the same value a caller would see.
+func mapSizeByIDForTest(id nativeMap) error {
+	var width, height C.uint32_t
+	var scale C.double
+	return checkNative(func() int32 {
+		return int32(C.mln_map_get_size(C.mln_map(id), &width, &height, &scale))
+	})
+}
+
+// pumpRuntimeWithMapIDForTest passes a map id where a runtime id belongs. The
+// two are distinct Go types, so this call has no expression in the safe API.
+func pumpRuntimeWithMapIDForTest(id nativeMap) error {
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_pump(C.mln_runtime(id), 0))
+	})
+}
+
+// nativeMapIDForTest exposes a live map's id for the identity tests.
+func (m *MapHandle) nativeMapIDForTest() (nativeMap, func(), error) {
+	return m.ptr()
+}

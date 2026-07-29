@@ -6862,6 +6862,49 @@ fn set_network_status_raw(raw_status: u32) -> PyResult<()> {
     maplibre_core::set_network_status(NetworkStatus::from_raw(raw_status)).map_err(map_error)
 }
 
+/// Test helper that calls the C size accessor with a raw map id, so a test can
+/// replay a released id or use one from another thread. The safe API has no way
+/// to express either.
+#[pyfunction]
+fn map_size_by_id_for_test(py: Python<'_>, id: u64) -> PyResult<(u32, u32, f64)> {
+    py.detach(|| {
+        let mut width = 0u32;
+        let mut height = 0u32;
+        let mut scale_factor = 0.0f64;
+        // SAFETY: the id is well-formed and the out-pointers are live locals;
+        // the C API resolves the id rather than dereferencing it.
+        let status = unsafe {
+            sys::mln_map_get_size(sys::mln_map(id), &mut width, &mut height, &mut scale_factor)
+        };
+        if status == sys::MLN_STATUS_OK {
+            Ok((width, height, scale_factor))
+        } else {
+            Err(map_error(Error::from_status_and_diagnostic(
+                status,
+                maplibre_native_core::error::capture_thread_diagnostic(),
+            )))
+        }
+    })
+}
+
+/// Test helper that passes a map id where a runtime id belongs. The two are
+/// distinct newtypes, so this call has no expression in the safe API.
+#[pyfunction]
+fn pump_runtime_with_map_id_for_test(py: Python<'_>, id: u64) -> PyResult<()> {
+    py.detach(|| {
+        // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
+        let status = unsafe { sys::mln_runtime_pump(sys::mln_runtime(id), 0) };
+        if status == sys::MLN_STATUS_OK {
+            Ok(())
+        } else {
+            Err(map_error(Error::from_status_and_diagnostic(
+                status,
+                maplibre_native_core::error::capture_thread_diagnostic(),
+            )))
+        }
+    })
+}
+
 /// Test helper that lets native status conversion see C validation failures.
 #[pyfunction]
 fn set_network_status_raw_unchecked_for_test(raw_status: u32) -> PyResult<()> {
@@ -7560,6 +7603,8 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
         set_network_status_raw_unchecked_for_test,
         module
     )?)?;
+    module.add_function(wrap_pyfunction!(map_size_by_id_for_test, module)?)?;
+    module.add_function(wrap_pyfunction!(pump_runtime_with_map_id_for_test, module)?)?;
     module.add_function(wrap_pyfunction!(status_error_for_test, module)?)?;
     module.add_function(wrap_pyfunction!(
         status_error_after_support_call_for_test,
