@@ -414,7 +414,8 @@ def generate(source_path: Path, output_path: Path) -> None:
         raise SystemExit("raw VAPI annotated source is empty")
     lines[0] = GENERATED_HEADER
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    with output_path.open("w", encoding="utf-8", newline="\n") as output:
+        output.write("\n".join(lines) + "\n")
 
 
 def main() -> None:

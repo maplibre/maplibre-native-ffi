@@ -55,17 +55,22 @@ export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_
 export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
 
 binding_cc="${CC:-cc}"
-valac_cc_args=()
+valac_args=(
+  --vapidir vapi
+  --pkg maplibre-native-c
+  --pkg glib-2.0
+  --pkg gmodule-2.0
+  -X -Wno-unused-value
+)
 if [[ "$usage_preset" == windows-*-wgl ]]; then
   binding_cc="${vala_msys2_root:?}/ucrt64/bin/gcc.exe"
-  valac_cc_args=(--cc "$binding_cc")
+  valac_args+=(--cc "$binding_cc")
 fi
 
 metal_support_object="build/metal_support.o"
-metal_framework_args=()
 if [[ "$(uname -s)" == "Darwin" ]]; then
   clang -fobjc-exceptions -c tests/compile/metal_support_macos.m -o "$metal_support_object"
-  metal_framework_args=(
+  valac_args+=(
     -X -framework
     -X AppKit
     -X -framework
@@ -130,14 +135,8 @@ elif [[ "$usage_preset" == windows-*-wgl ]]; then
 fi
 
 valac \
-  "${valac_cc_args[@]}" \
-  --vapidir vapi \
-  --pkg maplibre-native-c \
-  --pkg glib-2.0 \
-  --pkg gmodule-2.0 \
-  -X -Wno-unused-value \
+  "${valac_args[@]}" \
   "${compiler_args[@]}" \
-  "${metal_framework_args[@]}" \
   -X "$metal_support_object" \
   src/*.vala \
   tests/compile/minimal.vala \
