@@ -417,9 +417,32 @@ runs:
     # every `[monorepo].config_roots` entry, which is what the jobs run against.
     # Installing them here rather than lazily keeps the cache saved below
     # identical no matter which job writes it.
-    - name: Install project toolchains
+    - name: Install project toolchains (Unix)
+      if: runner.os != 'Windows'
       shell: bash
       run: MISE_NO_HOOKS=1 mise install --monorepo
+
+    # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
+    # with a native exception while spawning processes. Keep the retry supervisor
+    # in native PowerShell so it survives that failure:
+    # https://github.com/actions/runner-images/issues/14052
+    # https://github.com/git-for-windows/git/issues/6287
+    - name: Install project toolchains (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $env:MISE_NO_HOOKS = "1"
+        foreach ($attempt in 1..2) {
+          mise install --monorepo
+          if ($LASTEXITCODE -eq 0) {
+            exit 0
+          }
+          Write-Output "::warning::mise install --monorepo failed (attempt $attempt/2)"
+          if ($attempt -lt 2) {
+            Start-Sleep -Seconds 5
+          }
+        }
+        exit 1
 
     # Every job restores; one job per runner label saves. Otherwise a miss has
     # every job archive the toolchain tree for one of them to win the key, and
@@ -438,7 +461,8 @@ runs:
     # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
     # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
     # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>
-    - name: Wire sccache into CMake
+    - name: Wire sccache into CMake (Unix)
+      if: runner.os != 'Windows'
       shell: bash
       env:
         SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
@@ -481,3 +505,57 @@ runs:
           } >> "$GITHUB_ENV"
           echo "Configured sccache R2 backend (public read-only)"
         fi
+
+    # This step is another Git Bash startup boundary exposed to the same
+    # Windows ARM64 emulation failure as the toolchain install above. Keep the
+    # orchestration native even though it only writes environment variables:
+    # https://github.com/actions/runner-images/issues/14052
+    # https://github.com/git-for-windows/git/issues/6287
+    - name: Wire sccache into CMake (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
+      run: |
+        $bucket = "maplibre-native-ffi-sccache"
+        $accountId = "6cda5be3bf367f2885f3696d3c9b2653"
+        $publicEndpoint = "https://sccache.sargunv.dev"
+        $writeEndpoint = "https://${accountId}.r2.cloudflarestorage.com"
+
+        @(
+          "SCCACHE_BUCKET=$bucket"
+          "SCCACHE_REGION=auto"
+          "SCCACHE_S3_USE_SSL=true"
+          "SCCACHE_BASEDIRS=$env:GITHUB_WORKSPACE"
+          "SCCACHE_IDLE_TIMEOUT=0"
+          "CMAKE_C_COMPILER_LAUNCHER=sccache"
+          "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+          "RUSTC_WRAPPER=sccache"
+          # sccache declines to cache incrementally compiled crates, which is
+          # the cargo default for the dev profile that `cargo test` uses.
+          "CARGO_INCREMENTAL=0"
+        ) >> $env:GITHUB_ENV
+
+        if (
+          $env:GITHUB_EVENT_NAME -ne "pull_request" -and
+          $env:SCCACHE_ACCESS_KEY_ID -and
+          $env:SCCACHE_SECRET_ACCESS_KEY
+        ) {
+          @(
+            "SCCACHE_ENDPOINT=$writeEndpoint"
+            "SCCACHE_S3_KEY_PREFIX=$bucket/"
+            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
+            # clear it so authenticated writes are not rejected by sccache.
+            "SCCACHE_S3_NO_CREDENTIALS=0"
+            "AWS_ACCESS_KEY_ID=$env:SCCACHE_ACCESS_KEY_ID"
+            "AWS_SECRET_ACCESS_KEY=$env:SCCACHE_SECRET_ACCESS_KEY"
+          ) >> $env:GITHUB_ENV
+          Write-Output "Configured sccache R2 backend (read-write)"
+        } else {
+          @(
+            "SCCACHE_ENDPOINT=$publicEndpoint"
+            "SCCACHE_S3_NO_CREDENTIALS=1"
+          ) >> $env:GITHUB_ENV
+          Write-Output "Configured sccache R2 backend (public read-only)"
+        }
