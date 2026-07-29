@@ -673,7 +673,6 @@ const PmtilesRangeProviderState = struct {
     saw_style_absent_range: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     recorded_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_source_kind: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
-    saw_all_loading: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     range_start: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
     range_end: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
 
@@ -683,7 +682,6 @@ const PmtilesRangeProviderState = struct {
 
     fn markPmtilesRequest(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
         self.saw_source_kind.store(std.meta.eql(request.kind, maplibre.ResourceKind.source), .seq_cst);
-        self.saw_all_loading.store(std.meta.eql(request.loading_method, maplibre.ResourceLoadingMethod.all), .seq_cst);
         if (request.range) |range| {
             self.range_start.store(range.start, .seq_cst);
             self.range_end.store(range.end, .seq_cst);
@@ -697,7 +695,6 @@ const PmtilesRangeProviderState = struct {
         try testing.expect(self.saw_style_absent_range.load(.seq_cst));
         try testing.expect(self.recorded_pmtiles_request.load(.seq_cst));
         try testing.expect(self.saw_source_kind.load(.seq_cst));
-        try testing.expect(self.saw_all_loading.load(.seq_cst));
         try testing.expectEqual(@as(u64, 0), start);
         try testing.expect(end >= start);
         try testing.expect(end - start + 1 > 0);
