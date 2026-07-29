@@ -841,26 +841,27 @@ test("finalizers release abandoned request and texture scopes", () => {
 test("runtime event lookup does not retain abandoned map wrappers", () => {
   const packageRoot = path.join(__dirname, "..");
   // A deliberately abandoned native map can keep backend work alive on Windows.
-  // Exit after the leak report proves the JavaScript wrapper was collected.
+  // Exit after the weak reference proves the JavaScript wrapper was collected;
+  // native finalizer scheduling is deliberately outside this lookup test.
   const script = `
     process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
     const assert = require("node:assert/strict");
     const binding = require(${JSON.stringify(packageRoot)});
 
     async function main() {
-      binding.takeNativeLeakReports();
       const runtime = new binding.RuntimeHandle();
       let map = runtime.createMap({ width: 16, height: 16 });
+      const reference = new WeakRef(map);
       map = undefined;
-      let reports = [];
-      for (let attempt = 0; attempt < 100 && reports.length === 0; attempt += 1) {
+      let collected = false;
+      for (let attempt = 0; attempt < 100 && !collected; attempt += 1) {
         global.gc();
         await new Promise((resolve) => setImmediate(resolve));
-        reports = binding.takeNativeLeakReports().filter(
-          (report) => report.handleType === "MapHandle"
-        );
+        collected = reference.deref() === undefined;
+        // WeakRef.deref() keeps a live target alive through the current job.
+        await new Promise((resolve) => setImmediate(resolve));
       }
-      assert.equal(reports.length, 1);
+      assert.equal(collected, true);
     }
 
     main().then(

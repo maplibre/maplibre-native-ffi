@@ -47,8 +47,12 @@ usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":build-test", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
-export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+lib_dirs="$native_install_dir/lib"
+if [[ -n "${MLN_FFI_VULKAN_LOADER_DIR:-}" ]]; then
+  lib_dirs="$lib_dirs:$MLN_FFI_VULKAN_LOADER_DIR"
+fi
+export LD_LIBRARY_PATH="$lib_dirs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export DYLD_LIBRARY_PATH="$lib_dirs${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
 export MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir"
 case "$usage_preset" in
   linux-*-egl|macos-*-egl) export MAPLIBRE_NATIVE_NODE_TEST_BACKENDS=egl ;;
