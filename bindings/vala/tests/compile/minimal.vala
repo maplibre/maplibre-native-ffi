@@ -81,6 +81,7 @@ struct OpenGLTestContext {
   public void* context;
   public void* surface;
   public void* get_proc_address;
+  public void* window;
 }
 
 [CCode(cname = "mln_vala_opengl_test_context_supported")]

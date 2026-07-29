@@ -9,6 +9,7 @@ typedef struct MlnValaOpenGLTestContext {
   void* context;
   void* surface;
   void* get_proc_address;
+  void* window;
 } MlnValaOpenGLTestContext;
 
 #if defined(MLN_VALA_TEST_EGL)
@@ -219,16 +220,17 @@ bool mln_vala_opengl_test_context_create(
   out_context->platform = 1;
   out_context->display = device_context;
   out_context->context = context;
-  out_context->surface = window;
+  out_context->surface = device_context;
   out_context->get_proc_address = (void*)wglGetProcAddress;
+  out_context->window = window;
   return true;
 }
 
 void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
-  if (context == NULL || context->surface == NULL) {
+  if (context == NULL || context->window == NULL) {
     return;
   }
-  HWND window = (HWND)context->surface;
+  HWND window = (HWND)context->window;
   wglMakeCurrent(NULL, NULL);
   if (context->context != NULL) {
     wglDeleteContext((HGLRC)context->context);
