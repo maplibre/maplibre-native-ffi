@@ -22,6 +22,7 @@ namespace MaplibreNative {
         private Cond idle;
         private bool releasing;
         private uint active_native_leases;
+        private unowned Thread<void*> owner_thread;
 
         public bool closed {
             get {
@@ -43,6 +44,7 @@ namespace MaplibreNative {
         internal RenderSessionHandle (MapHandle map, owned Raw.RenderSession native) {
             this.map = map;
             this.native = (owned) native;
+            owner_thread = Thread.self<void*> ();
         }
 
         ~RenderSessionHandle () {
@@ -55,6 +57,7 @@ namespace MaplibreNative {
         }
 
         internal RenderSessionNativeLease require_live () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
@@ -77,6 +80,7 @@ namespace MaplibreNative {
         }
 
         internal void begin_frame_borrow () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
@@ -99,6 +103,7 @@ namespace MaplibreNative {
         }
 
         private RenderSessionNativeLease require_available () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null || releasing) {
                 state_mutex.unlock ();
@@ -117,6 +122,7 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null) {
                 state_mutex.unlock ();
@@ -149,6 +155,13 @@ namespace MaplibreNative {
             idle.broadcast ();
             state_mutex.unlock ();
             check_status (status);
+        }
+
+        private void ensure_owner_thread () throws Error {
+            if (Thread.self<void*> () != owner_thread) {
+                clear_unknown_status ();
+                throw new Error.WRONG_THREAD ("render session called from a thread other than its owner thread");
+            }
         }
 
         public void resize (uint32 width, uint32 height, double scale_factor) throws Error {

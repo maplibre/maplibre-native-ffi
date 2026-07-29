@@ -452,6 +452,14 @@ namespace MaplibreNative {
                 total_draw_call_count = native.total_draw_call_count
             };
         }
+
+        public bool equal (RenderingStats other) {
+            return encoding_time == other.encoding_time
+                && rendering_time == other.rendering_time
+                && frame_count == other.frame_count
+                && draw_call_count == other.draw_call_count
+                && total_draw_call_count == other.total_draw_call_count;
+        }
     }
 
     public struct TileId {
@@ -469,6 +477,14 @@ namespace MaplibreNative {
                 canonical_x = native.canonical_x,
                 canonical_y = native.canonical_y
             };
+        }
+
+        public bool equal (TileId other) {
+            return overscaled_z == other.overscaled_z
+                && wrap == other.wrap
+                && canonical_z == other.canonical_z
+                && canonical_x == other.canonical_x
+                && canonical_y == other.canonical_y;
         }
     }
 
@@ -496,6 +512,18 @@ namespace MaplibreNative {
                 complete = native.complete
             };
         }
+
+        public bool equal (OfflineRegionStatus other) {
+            return download_state == other.download_state
+                && completed_resource_count == other.completed_resource_count
+                && completed_resource_size == other.completed_resource_size
+                && completed_tile_count == other.completed_tile_count
+                && required_tile_count == other.required_tile_count
+                && completed_tile_size == other.completed_tile_size
+                && required_resource_count == other.required_resource_count
+                && required_resource_count_is_precise == other.required_resource_count_is_precise
+                && complete == other.complete;
+        }
     }
 
     public class RuntimeEventRenderFrame {
@@ -510,6 +538,22 @@ namespace MaplibreNative {
             placement_changed = native.placement_changed;
             stats = RenderingStats.from_native (native.stats);
         }
+
+        private RuntimeEventRenderFrame.from_copy (RuntimeEventRenderFrame source) {
+            mode = source.mode;
+            needs_repaint = source.needs_repaint;
+            placement_changed = source.placement_changed;
+            stats = source.stats;
+        }
+
+        public RuntimeEventRenderFrame copy () { return new RuntimeEventRenderFrame.from_copy (this); }
+
+        public bool equal (RuntimeEventRenderFrame other) {
+            return mode == other.mode
+                && needs_repaint == other.needs_repaint
+                && placement_changed == other.placement_changed
+                && stats.equal (other.stats);
+        }
     }
 
     public class RuntimeEventRenderMap {
@@ -518,6 +562,10 @@ namespace MaplibreNative {
         internal RuntimeEventRenderMap.from_native (Raw.RuntimeEventRenderMap native) {
             mode = render_mode_from_raw (native.mode);
         }
+
+        private RuntimeEventRenderMap.from_copy (RuntimeEventRenderMap source) { mode = source.mode; }
+        public RuntimeEventRenderMap copy () { return new RuntimeEventRenderMap.from_copy (this); }
+        public bool equal (RuntimeEventRenderMap other) { return mode == other.mode; }
     }
 
     public class RuntimeEventStyleImageMissing {
@@ -534,6 +582,12 @@ namespace MaplibreNative {
         public Utf8String get_image_id_utf8 () {
             return image_id_storage.copy ();
         }
+
+        private RuntimeEventStyleImageMissing.from_copy (RuntimeEventStyleImageMissing source) {
+            image_id_storage = source.image_id_storage.copy ();
+        }
+        public RuntimeEventStyleImageMissing copy () { return new RuntimeEventStyleImageMissing.from_copy (this); }
+        public bool equal (RuntimeEventStyleImageMissing other) { return image_id_storage.equal (other.image_id_storage); }
     }
 
     public class RuntimeEventTileAction {
@@ -554,6 +608,18 @@ namespace MaplibreNative {
         public Utf8String get_source_id_utf8 () {
             return source_id_storage.copy ();
         }
+
+        private RuntimeEventTileAction.from_copy (RuntimeEventTileAction source) {
+            operation = source.operation;
+            tile_id = source.tile_id;
+            source_id_storage = source.source_id_storage.copy ();
+        }
+        public RuntimeEventTileAction copy () { return new RuntimeEventTileAction.from_copy (this); }
+        public bool equal (RuntimeEventTileAction other) {
+            return operation == other.operation
+                && tile_id.equal (other.tile_id)
+                && source_id_storage.equal (other.source_id_storage);
+        }
     }
 
     public class RuntimeEventOfflineRegionStatus {
@@ -563,6 +629,14 @@ namespace MaplibreNative {
         internal RuntimeEventOfflineRegionStatus.from_native (Raw.RuntimeEventOfflineRegionStatus native) {
             region_id = OfflineRegionId (native.region_id);
             status = OfflineRegionStatus.from_native (native.status);
+        }
+        private RuntimeEventOfflineRegionStatus.from_copy (RuntimeEventOfflineRegionStatus source) {
+            region_id = source.region_id;
+            status = source.status;
+        }
+        public RuntimeEventOfflineRegionStatus copy () { return new RuntimeEventOfflineRegionStatus.from_copy (this); }
+        public bool equal (RuntimeEventOfflineRegionStatus other) {
+            return region_id.value == other.region_id.value && status.equal (other.status);
         }
     }
 
@@ -574,6 +648,14 @@ namespace MaplibreNative {
             region_id = OfflineRegionId (native.region_id);
             reason = resource_error_reason_from_raw (native.reason);
         }
+        private RuntimeEventOfflineRegionResponseError.from_copy (RuntimeEventOfflineRegionResponseError source) {
+            region_id = source.region_id;
+            reason = source.reason;
+        }
+        public RuntimeEventOfflineRegionResponseError copy () { return new RuntimeEventOfflineRegionResponseError.from_copy (this); }
+        public bool equal (RuntimeEventOfflineRegionResponseError other) {
+            return region_id.value == other.region_id.value && reason == other.reason;
+        }
     }
 
     public class RuntimeEventOfflineRegionTileCountLimit {
@@ -583,6 +665,14 @@ namespace MaplibreNative {
         internal RuntimeEventOfflineRegionTileCountLimit.from_native (Raw.RuntimeEventOfflineRegionTileCountLimit native) {
             region_id = OfflineRegionId (native.region_id);
             limit = native.limit;
+        }
+        private RuntimeEventOfflineRegionTileCountLimit.from_copy (RuntimeEventOfflineRegionTileCountLimit source) {
+            region_id = source.region_id;
+            limit = source.limit;
+        }
+        public RuntimeEventOfflineRegionTileCountLimit copy () { return new RuntimeEventOfflineRegionTileCountLimit.from_copy (this); }
+        public bool equal (RuntimeEventOfflineRegionTileCountLimit other) {
+            return region_id.value == other.region_id.value && limit == other.limit;
         }
     }
 
@@ -600,6 +690,21 @@ namespace MaplibreNative {
             result_status = native.result_status;
             found = native.found;
         }
+        private RuntimeEventOfflineOperationCompleted.from_copy (RuntimeEventOfflineOperationCompleted source) {
+            operation = source.operation;
+            operation_kind = source.operation_kind;
+            result_kind = source.result_kind;
+            result_status = source.result_status;
+            found = source.found;
+        }
+        public RuntimeEventOfflineOperationCompleted copy () { return new RuntimeEventOfflineOperationCompleted.from_copy (this); }
+        public bool equal (RuntimeEventOfflineOperationCompleted other) {
+            return operation == other.operation
+                && operation_kind == other.operation_kind
+                && result_kind == other.result_kind
+                && result_status == other.result_status
+                && found == other.found;
+        }
     }
 
     public class RuntimeEventCameraTransitionFinished {
@@ -608,6 +713,11 @@ namespace MaplibreNative {
         internal RuntimeEventCameraTransitionFinished.from_native (Raw.RuntimeEventCameraTransitionFinished native) {
             transition_id = native.transition_id;
         }
+        private RuntimeEventCameraTransitionFinished.from_copy (RuntimeEventCameraTransitionFinished source) {
+            transition_id = source.transition_id;
+        }
+        public RuntimeEventCameraTransitionFinished copy () { return new RuntimeEventCameraTransitionFinished.from_copy (this); }
+        public bool equal (RuntimeEventCameraTransitionFinished other) { return transition_id == other.transition_id; }
     }
 
     /**
@@ -1022,6 +1132,69 @@ namespace MaplibreNative {
                 default:
                     break;
             }
+        }
+
+        private RuntimeEvent.from_copy (RuntimeEvent source) {
+            event_type = source.event_type;
+            source_type = source.source_type;
+            code = source.code;
+            camera_change_mode = source.camera_change_mode;
+            payload_type = source.payload_type;
+            message_storage = source.message_storage.copy ();
+            payload_storage = copy_byte_array (source.payload_storage);
+            source_map = source.source_map;
+            render_frame = source.render_frame == null ? null : source.render_frame.copy ();
+            render_map = source.render_map == null ? null : source.render_map.copy ();
+            style_image_missing = source.style_image_missing == null ? null : source.style_image_missing.copy ();
+            tile_action = source.tile_action == null ? null : source.tile_action.copy ();
+            offline_region_status = source.offline_region_status == null ? null : source.offline_region_status.copy ();
+            offline_region_response_error = source.offline_region_response_error == null ? null : source.offline_region_response_error.copy ();
+            offline_region_tile_count_limit = source.offline_region_tile_count_limit == null ? null : source.offline_region_tile_count_limit.copy ();
+            offline_operation_completed = source.offline_operation_completed == null ? null : source.offline_operation_completed.copy ();
+            camera_transition_finished = source.camera_transition_finished == null ? null : source.camera_transition_finished.copy ();
+        }
+
+        public RuntimeEvent copy () {
+            return new RuntimeEvent.from_copy (this);
+        }
+
+        public bool equal (RuntimeEvent other) {
+            if (event_type != other.event_type
+                || source_type != other.source_type
+                || source_map != other.source_map
+                || code != other.code
+                || camera_change_mode != other.camera_change_mode
+                || payload_type != other.payload_type
+                || !message_storage.equal (other.message_storage)
+                || payload_storage.length != other.payload_storage.length) {
+                return false;
+            }
+            for (var index = 0; index < payload_storage.length; index++) {
+                if (payload_storage[index] != other.payload_storage[index]) {
+                    return false;
+                }
+            }
+            if ((render_frame == null) != (other.render_frame == null)
+                || (render_frame != null && !render_frame.equal (other.render_frame))
+                || (render_map == null) != (other.render_map == null)
+                || (render_map != null && !render_map.equal (other.render_map))
+                || (style_image_missing == null) != (other.style_image_missing == null)
+                || (style_image_missing != null && !style_image_missing.equal (other.style_image_missing))
+                || (tile_action == null) != (other.tile_action == null)
+                || (tile_action != null && !tile_action.equal (other.tile_action))
+                || (offline_region_status == null) != (other.offline_region_status == null)
+                || (offline_region_status != null && !offline_region_status.equal (other.offline_region_status))
+                || (offline_region_response_error == null) != (other.offline_region_response_error == null)
+                || (offline_region_response_error != null && !offline_region_response_error.equal (other.offline_region_response_error))
+                || (offline_region_tile_count_limit == null) != (other.offline_region_tile_count_limit == null)
+                || (offline_region_tile_count_limit != null && !offline_region_tile_count_limit.equal (other.offline_region_tile_count_limit))
+                || (offline_operation_completed == null) != (other.offline_operation_completed == null)
+                || (offline_operation_completed != null && !offline_operation_completed.equal (other.offline_operation_completed))
+                || (camera_transition_finished == null) != (other.camera_transition_finished == null)
+                || (camera_transition_finished != null && !camera_transition_finished.equal (other.camera_transition_finished))) {
+                return false;
+            }
+            return true;
         }
 
         public Utf8String get_message_utf8 () {

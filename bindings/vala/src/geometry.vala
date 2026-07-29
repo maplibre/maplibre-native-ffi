@@ -512,7 +512,7 @@ namespace MaplibreNative {
                 return Geometry.geometry_collection (geometries);
             default:
                 clear_unknown_status ();
-                throw new Error.INVALID_ARGUMENT ("unknown geometry type");
+                throw new Error.UNSUPPORTED ("unknown geometry type %u", native.type);
             }
         }
     }

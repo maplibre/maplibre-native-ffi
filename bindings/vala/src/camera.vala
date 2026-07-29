@@ -116,7 +116,7 @@ namespace MaplibreNative {
             }
             if (has_transition_id) {
                 options.transition_id = transition_id_value;
-                options.fields |= 1U << 4;
+                options.fields |= (uint32) Raw.AnimationOptionField.TRANSITION_ID;
             }
             return options;
         }
@@ -224,7 +224,7 @@ namespace MaplibreNative {
         internal BoundOptions.from_native (Raw.BoundOptions native) {
             if ((native.fields & (1U << 0)) != 0) {
                 set_bounds (LatLngBounds.from_native (native.bounds));
-            } else if ((native.fields & (1U << 5)) != 0) {
+            } else if ((native.fields & (uint32) Raw.BoundOptionField.UNBOUNDED) != 0) {
                 set_unbounded ();
             }
             if ((native.fields & (1U << 1)) != 0) {
@@ -341,7 +341,7 @@ namespace MaplibreNative {
                 options.bounds = bounds_value.to_native ();
                 options.fields |= 1U << 0;
             } else if (unbounded) {
-                options.fields |= 1U << 5;
+                options.fields |= (uint32) Raw.BoundOptionField.UNBOUNDED;
             }
             if (has_min_zoom) {
                 options.min_zoom = min_zoom_value;

@@ -83,6 +83,7 @@ else
 #include <stdbool.h>
 #include <stdint.h>
 typedef struct MlnValaMetalWindowLayer { void* window; void* layer; } MlnValaMetalWindowLayer;
+void* mln_vala_metal_test_default_device(void) { return 0; }
 bool mln_vala_metal_test_window_layer_create(uint32_t width, uint32_t height, MlnValaMetalWindowLayer* out_layer) { (void)width; (void)height; if (out_layer != 0) { out_layer->window = 0; out_layer->layer = 0; } return false; }
 void mln_vala_metal_test_window_layer_destroy(MlnValaMetalWindowLayer* window_layer) { (void)window_layer; }
 void* mln_vala_metal_test_texture_create(void* device, uint32_t width, uint32_t height) { (void)device; (void)width; (void)height; return 0; }

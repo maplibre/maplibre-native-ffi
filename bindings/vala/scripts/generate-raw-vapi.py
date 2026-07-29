@@ -49,6 +49,11 @@ STRUCT_FIELD = re.compile(
     r'(?:\[CCode \([^\]]*?cname = "([^"]+)"[^\]]*?\)\]\s*)?'
     r"public\s+(.+?)\s+(\w+)\s*;"
 )
+ENUM_DECLARATION = re.compile(
+    r"((?:\s*\[[^\]]+\]\s*)+)"
+    r"public enum\s+\w+\s*\{(.*?)\n    \}",
+    re.DOTALL,
+)
 PRIMITIVE_C_TYPES = {
     "bool": "bool",
     "char": "char",
@@ -221,6 +226,24 @@ def vapi_struct_layouts(
     return layouts
 
 
+def vapi_enum_constants(source: str) -> dict[str, set[str]]:
+    constants: dict[str, set[str]] = {}
+    for attributes, body in ENUM_DECLARATION.findall(source):
+        enum_name = c_name(attributes)
+        prefix_match = re.search(r'cprefix = "([^"]+)"', attributes)
+        if enum_name is None or prefix_match is None:
+            continue
+        members = {
+            prefix_match.group(1) + member
+            for member in re.findall(
+                r"^\s*([A-Z][A-Z0-9_]*)\s*,?\s*$", body, re.MULTILINE
+            )
+        }
+        if members:
+            constants[enum_name] = members
+    return constants
+
+
 def run_clang_ast() -> dict[str, Any]:
     path_entries = [
         entry
@@ -320,11 +343,29 @@ def clang_struct_layouts(
     }
 
 
+def clang_enum_constants(
+    ast: dict[str, Any], expected_names: set[str]
+) -> dict[str, set[str]]:
+    constants: dict[str, set[str]] = {}
+    for node in walk_ast(ast):
+        if node.get("kind") != "EnumDecl" or node.get("name") not in expected_names:
+            continue
+        members = {
+            child["name"]
+            for child in node.get("inner", [])
+            if child.get("kind") == "EnumConstantDecl"
+        }
+        if members:
+            constants[node["name"]] = members
+    return constants
+
+
 def compare_declarations(source: str) -> None:
     types = named_c_types(source)
     expected_functions = vapi_function_signatures(source, types)
     expected_delegates = vapi_delegate_signatures(source, types)
     expected_structs = vapi_struct_layouts(source, types)
+    expected_enums = vapi_enum_constants(source)
     ast = run_clang_ast()
     actual_functions = clang_function_signatures(ast)
     actual_delegates = {
@@ -335,6 +376,7 @@ def compare_declarations(source: str) -> None:
         if node.get("kind") == "TypedefDecl" and node.get("name") in expected_delegates
     }
     actual_structs = clang_struct_layouts(ast, set(expected_structs))
+    actual_enums = clang_enum_constants(ast, set(expected_enums))
 
     differences: list[str] = []
     for name, signature in sorted(expected_functions.items()):
@@ -350,6 +392,13 @@ def compare_declarations(source: str) -> None:
         if actual != layout:
             differences.append(
                 f"{name}: VAPI fields {layout!r}, C header fields {actual!r}"
+            )
+    for name, constants in sorted(expected_enums.items()):
+        actual = actual_enums.get(name)
+        if actual != constants:
+            differences.append(
+                f"{name}: VAPI constants {sorted(constants)!r}, "
+                f"C header constants {sorted(actual) if actual is not None else None!r}"
             )
     if differences:
         raise SystemExit(

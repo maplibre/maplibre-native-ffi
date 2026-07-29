@@ -101,7 +101,8 @@ namespace MaplibreNative.Raw {
         DURATION,
         VELOCITY,
         MIN_ZOOM,
-        EASING
+        EASING,
+        TRANSITION_ID
     }
 
     [CCode (cname = "mln_camera_fit_option_field", cprefix = "MLN_CAMERA_FIT_OPTION_", has_type_id = false)]
@@ -119,7 +120,8 @@ namespace MaplibreNative.Raw {
         MIN_ZOOM,
         MAX_ZOOM,
         MIN_PITCH,
-        MAX_PITCH
+        MAX_PITCH,
+        UNBOUNDED
     }
 
     [CCode (cname = "mln_free_camera_option_field", cprefix = "MLN_FREE_CAMERA_OPTION_", has_type_id = false)]

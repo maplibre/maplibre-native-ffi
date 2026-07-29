@@ -1,6 +1,3 @@
-[CCode(has_target = false)]
-delegate void* MetalCreateSystemDefaultDeviceFunc();
-
 [SimpleType]
 [CCode(cname = "MlnValaMetalWindowLayer")]
 struct MetalWindowLayer {
@@ -10,6 +7,9 @@ struct MetalWindowLayer {
 
 [CCode(cname = "mln_vala_metal_test_window_layer_create")]
 extern bool metal_test_window_layer_create(uint32 width, uint32 height, out MetalWindowLayer layer);
+
+[CCode(cname = "mln_vala_metal_test_default_device")]
+extern void* metal_test_default_device();
 
 [CCode(cname = "mln_vala_metal_test_window_layer_destroy")]
 extern void metal_test_window_layer_destroy(ref MetalWindowLayer layer);
@@ -112,19 +112,6 @@ int read_callback_count(ref int count) {
   var value = count;
   callback_count_mutex.unlock();
   return value;
-}
-
-void* create_system_default_metal_device() {
-  var module = GLib.Module.open("/System/Library/Frameworks/Metal.framework/Metal", GLib.ModuleFlags.LAZY);
-  if (module == null) {
-    return null;
-  }
-  void* symbol;
-  if (!module.symbol("MTLCreateSystemDefaultDevice", out symbol)) {
-    return null;
-  }
-  var create_device = (MetalCreateSystemDefaultDeviceFunc) symbol;
-  return create_device();
 }
 
 void inspect_runtime_event_payload(MaplibreNative.RuntimeEvent event) {
@@ -282,66 +269,22 @@ void exercise_runtime_wake_source() throws MaplibreNative.Error {
   }
 }
 
-void exercise_render_session_close_race(MaplibreNative.RenderSessionHandle session) throws MaplibreNative.Error {
-  Mutex state_mutex = Mutex();
-  Cond state_changed = Cond();
-  bool lease_acquired = false;
-  bool release_lease = false;
-  bool close_rejected_new_call = false;
-  bool holder_failed = false;
-
-  var holder = new GLib.Thread<void>("vala-render-session-lease-holder", () => {
+void exercise_render_session_wrong_thread_precedence(MaplibreNative.RenderSessionHandle session) throws MaplibreNative.Error {
+  var frame = session.acquire_vulkan_owned_texture_frame();
+  bool wrong_thread = false;
+  var caller = new GLib.Thread<void>("vala-render-session-wrong-thread", () => {
     try {
-      var lease = session.require_live();
-      state_mutex.lock();
-      lease_acquired = true;
-      state_changed.broadcast();
-      while (!release_lease) {
-        state_changed.wait(state_mutex);
-      }
-      state_mutex.unlock();
-      assert(lease.native != null);
+      session.close();
+    } catch (MaplibreNative.Error.WRONG_THREAD error) {
+      wrong_thread = true;
     } catch (MaplibreNative.Error error) {
-      holder_failed = true;
+      assert_not_reached();
     }
   });
-
-  state_mutex.lock();
-  while (!lease_acquired) {
-    state_changed.wait(state_mutex);
-  }
-  state_mutex.unlock();
-
-  var coordinator = new GLib.Thread<void>("vala-render-session-close-coordinator", () => {
-    while (true) {
-      try {
-        var lease = session.require_live();
-        assert(lease.native != null);
-      } catch (MaplibreNative.Error.INVALID_STATE error) {
-        state_mutex.lock();
-        close_rejected_new_call = true;
-        release_lease = true;
-        state_changed.broadcast();
-        state_mutex.unlock();
-        return;
-      } catch (MaplibreNative.Error error) {
-        state_mutex.lock();
-        holder_failed = true;
-        release_lease = true;
-        state_changed.broadcast();
-        state_mutex.unlock();
-        return;
-      }
-      GLib.Thread.usleep(100);
-    }
-  });
-
-  session.close();
-  holder.join();
-  coordinator.join();
-  assert(!holder_failed);
-  assert(close_rejected_new_call);
-  assert(session.closed);
+  caller.join();
+  assert(wrong_thread);
+  assert(!session.closed);
+  frame.close();
 }
 
 void exercise_projection_close_race(MaplibreNative.MapProjectionHandle projection) throws MaplibreNative.Error {
@@ -598,9 +541,12 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   native_event.payload = payload;
   native_event.payload_size = payload.length;
   var event = new MaplibreNative.RuntimeEvent(runtime, native_event);
+  var event_copy = event.copy();
+  assert(event.equal(event_copy));
   var event_data = event.payload_bytes;
   event_data[0] = 9;
   assert(event.payload_bytes[0] == 4);
+  assert(event.equal(event_copy));
 
   MaplibreNative.Raw.RuntimeEventCameraTransitionFinished transition = {};
   transition.size = (uint32) sizeof(MaplibreNative.Raw.RuntimeEventCameraTransitionFinished);
@@ -612,6 +558,8 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   var transition_event = new MaplibreNative.RuntimeEvent(runtime, native_event);
   assert(transition_event.camera_transition_finished != null);
   assert(transition_event.camera_transition_finished.transition_id == 42);
+  assert(transition_event.equal(transition_event.copy()));
+  assert(!transition_event.equal(event));
 
   native_event.type = (uint32) MaplibreNative.RuntimeEventType.MAP_CAMERA_WILL_CHANGE;
   native_event.code = (int32) MaplibreNative.CameraChangeMode.ANIMATED;
@@ -628,6 +576,15 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
     assert_not_reached();
   } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
     assert(error.message == "runtime event payload data is null");
+  }
+
+  MaplibreNative.Raw.Geometry unknown_geometry = {};
+  unknown_geometry.type = 999;
+  try {
+    MaplibreNative.Geometry.from_native(unknown_geometry);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.UNSUPPORTED error) {
+    assert(error.message.contains("999"));
   }
 }
 
@@ -2058,8 +2015,9 @@ int main() {
           closed_vulkan_frame_image_failed = true;
         }
         assert(closed_vulkan_frame_image_failed);
+        exercise_render_session_wrong_thread_precedence(vulkan_session);
         vulkan_session.detach();
-        exercise_render_session_close_race(vulkan_session);
+        vulkan_session.close();
 
         VulkanBorrowedImage vulkan_borrowed_storage;
         assert(vulkan_test_borrowed_image_create(ref vulkan_context_storage, 32, 16, out vulkan_borrowed_storage));
@@ -2195,7 +2153,7 @@ int main() {
     }
 
     if ((backends & MaplibreNative.RenderBackendFlags.METAL) != 0) {
-      void* device = create_system_default_metal_device();
+      void* device = metal_test_default_device();
       assert(device != null);
       if (device != null) {
         var texture = new MaplibreNative.MetalOwnedTextureDescriptor(MaplibreNative.NativePointer.borrowed((size_t) device));
@@ -2362,6 +2320,7 @@ int main() {
         } finally {
           metal_test_window_layer_destroy(ref metal_surface_layer);
         }
+        metal_test_object_release(device);
       }
     }
 

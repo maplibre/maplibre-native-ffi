@@ -14,6 +14,10 @@ typedef struct MlnValaMetalWindowLayer {
   void* layer;
 } MlnValaMetalWindowLayer;
 
+void* mln_vala_metal_test_default_device(void) {
+  return [MTLCreateSystemDefaultDevice() retain];
+}
+
 bool mln_vala_metal_test_window_layer_create(
   uint32_t width, uint32_t height, MlnValaMetalWindowLayer* out_layer
 ) {
