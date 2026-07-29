@@ -8,6 +8,7 @@ internal static class NativeLibraryResolver
     private const string LibraryDirsSwitch = "Maplibre.Native.LibraryDirs";
     private static readonly object RegistrationLock = new();
     private static bool registered;
+    private static bool preloadedGlfw;
 
     public static void Register()
     {
@@ -23,6 +24,25 @@ internal static class NativeLibraryResolver
                 ResolveNativeLibrary
             );
             registered = true;
+        }
+    }
+
+    // Silk.NET asks the OS loader for its native libraries by name, so it never searches the app's
+    // runtimes/<rid>/native directory where the NuGet package puts GLFW. Load GLFW through this
+    // resolver first; Silk.NET then finds the image already loaded under the same soname. Call this
+    // before touching any Silk.NET GLFW API.
+    public static void PreloadGlfw()
+    {
+        Register();
+        lock (RegistrationLock)
+        {
+            if (preloadedGlfw)
+            {
+                return;
+            }
+
+            preloadedGlfw = true;
+            ResolveNativeLibrary("glfw", typeof(NativeLibraryResolver).Assembly, null);
         }
     }
 
@@ -88,6 +108,14 @@ internal static class NativeLibraryResolver
         {
             yield return directory;
         }
+
+        // Where NuGet packages stage their native assets for a portable build.
+        yield return Path.Combine(
+            AppContext.BaseDirectory,
+            "runtimes",
+            RuntimeInformation.RuntimeIdentifier,
+            "native"
+        );
     }
 
     private static IEnumerable<string> PathList(string? value)
