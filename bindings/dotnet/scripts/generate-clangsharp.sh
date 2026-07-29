@@ -21,7 +21,7 @@ case "$(uname -s)-$(uname -m)" in
     ;;
 esac
 
-clangsharp_version="21.1.8.3" # Keep in sync with dotnet-tools.json.
+clangsharp_version="21.1.8.3" # Keep in sync with .config/dotnet-tools.json.
 nuget_packages="${NUGET_PACKAGES:-$HOME/.nuget/packages}"
 clangsharp_native_dir="$nuget_packages/clangsharppinvokegenerator.$rid/$clangsharp_version/tools/any/$rid"
 

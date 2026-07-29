@@ -151,7 +151,7 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.ci-package-cache
-        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', 'dotnet-tools.json', 'bindings/dotnet/dotnet-tools.json') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', '.config/dotnet-tools.json', 'bindings/dotnet/.config/dotnet-tools.json') }}
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-pkg-v2-
 
