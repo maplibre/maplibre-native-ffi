@@ -287,7 +287,7 @@ private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseabl
   private fun createInstance() {
     ensureVulkanFunctionProvider()
     MemoryStack.stackPush().use { stack ->
-      val available = stack.vulkanInstanceExtensions()
+      val available = vulkanInstanceExtensions()
       val extensions = LinkedHashSet<String>()
       val enablePortability = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME in available
       if (enablePortability) {
@@ -331,13 +331,13 @@ private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseabl
       )
       for (index in 0..<devices.capacity()) {
         val candidate = VkPhysicalDevice(devices[index], instance())
-        if (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME !in stack.vulkanDeviceExtensions(candidate)) {
+        if (VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME !in vulkanDeviceExtensions(candidate)) {
           continue
         }
         if (requiredDeviceUuids.isNotEmpty() && deviceUuid(candidate) !in requiredDeviceUuids) {
           continue
         }
-        val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
+        val queueFamily = findVulkanGraphicsQueueFamily(candidate)
         if (queueFamily >= 0) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
@@ -368,7 +368,7 @@ private constructor(private val requiredDeviceUuids: Set<String>) : AutoCloseabl
 
   private fun createDevice() {
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = stack.vulkanDeviceExtensions(physicalDevice())
+      val deviceExtensions = vulkanDeviceExtensions(physicalDevice())
       check(VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME in deviceExtensions) {
         "Selected Vulkan device does not support $VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME"
       }
