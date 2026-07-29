@@ -1,5 +1,4 @@
 import 'dart:ffi';
-import 'dart:isolate';
 
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
@@ -79,30 +78,4 @@ void main() {
       ),
     );
   });
-
-  test(
-    'a live map id used from another isolate reports wrong thread',
-    () async {
-      final runtime = RuntimeHandle.create();
-      final map = runtime.createMap();
-      final live = map.attachRef().mapIdForTesting;
-
-      // The id crosses isolates because it is a plain integer; the owner-thread
-      // rule is what rejects the call, not identity.
-      final diagnostic = await Isolate.run(() {
-        try {
-          _mapSizeById(NativeMap(live));
-          return 'succeeded';
-        } on MaplibreException catch (error) {
-          return '${error.runtimeType}: ${error.diagnostic}';
-        }
-      });
-
-      expect(diagnostic, startsWith('WrongThreadException'));
-      expect(diagnostic, isNot(contains('stale')));
-
-      map.close();
-      runtime.close();
-    },
-  );
 }

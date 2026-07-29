@@ -726,6 +726,16 @@ that a real native failure would expose.
 | BND-047 | A handle id of one kind passed to another kind's operation through an internal seam reports the binding's invalid-argument error, and the safe public API has no expression of that call.                 |
 | BND-049 | A handle id moved to a different native thread and called there reports the binding's wrong-thread error rather than a stale-handle or closed-handle error.                                               |
 
+BND-049 applies where the host language can reach a second native thread while
+the handle stays live. Dart is excluded: an isolate may resume on a different
+native thread after an await, so a handle must be closed before the test awaits
+another isolate, which leaves its id stale rather than live.
+
+BND-049 applies where the host language can reach a second native thread while
+the handle stays live. Dart is excluded: an isolate may resume on a different
+native thread after an await, so a handle must be closed before the test awaits
+the other isolate, which makes its id stale rather than live.
+
 ### Input Structs, Values, and Copied Data
 
 | ID      | Test                                                                                                                                                                                                       |
