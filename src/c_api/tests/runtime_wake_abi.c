@@ -123,7 +123,7 @@ static void a_wake_source_releases_a_parked_owner_thread(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_runtime_wake_source_acquire(runtime, &source)
   );
-  TEST_ASSERT_NOT_NULL(source);
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, source);
   quiesce(runtime);
 
   signal_probe probe = {.source = source};
@@ -320,10 +320,8 @@ static void signal_stale_wake_source_entry(void* argument) {
 }
 
 // Signalling is documented as any-thread, so a released wake source can reach
-// mln_wake_source_signal() from a thread that never saw the release. A
-// generational handle makes that a rejection; a raw pointer made it a
-// dereference of freed memory, and a later wake source could take the same
-// address and be signalled by mistake.
+// mln_wake_source_signal() from a thread that never saw the release. The
+// signal is rejected, and no later wake source can be signalled in its place.
 static void a_released_wake_source_rejects_a_foreign_thread_signal(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_wake_source source = MLN_HANDLE_NULL;

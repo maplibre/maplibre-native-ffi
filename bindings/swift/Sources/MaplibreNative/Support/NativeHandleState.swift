@@ -36,31 +36,6 @@ final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
     }
   }
 
-  /// Runs `use` with the handle held live for the duration of the call.
-  ///
-  /// `closeOnce` takes the same lock to move the handle out of `.live`, so a
-  /// close waits rather than destroying the handle midway through `use`. Do
-  /// not
-  /// re-enter this handle from `use`; the lock is not recursive.
-  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
-    try lock.withLock {
-      switch state {
-      case let .live(handle):
-        return try use(handle)
-      case .closing:
-        throw NativeStatusFailure(
-          rawStatus: 0,
-          diagnostic: "\(typeName) is closing"
-        )
-      case .closed:
-        throw NativeStatusFailure(
-          rawStatus: 0,
-          diagnostic: "\(typeName) is closed"
-        )
-      }
-    }
-  }
-
   func requireLive() throws -> Handle {
     try lock.withLock {
       switch state {

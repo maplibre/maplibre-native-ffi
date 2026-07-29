@@ -724,7 +724,7 @@ static void destroy_backend_state(void* opaque_state) {
 bool mln_test_render_fixture_create(
   mln_map map, mln_test_render_fixture* fixture
 ) {
-  if (map == NULL || fixture == NULL) {
+  if (map == MLN_HANDLE_NULL || fixture == NULL) {
     return false;
   }
   reserve_session_slot();

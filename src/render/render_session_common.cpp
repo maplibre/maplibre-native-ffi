@@ -917,8 +917,8 @@ auto RenderSessionScheduler::discard() -> void {
   batch.swap(queue_);
 }
 
-// Only the attaching thread destroys a session, so borrowing the object past
-// the table lock is safe for the same reason dereferencing the old pointer was.
+// Only the attaching thread destroys a session, so the borrowed object stays
+// alive for as long as the calling thread can use it.
 auto validate_render_session(
   mln_render_session session, mln_render_session_object*& out_session
 ) -> mln_status {

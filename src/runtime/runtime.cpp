@@ -977,8 +977,8 @@ auto patch_polled_payload_strings(RuntimeObject* runtime, uint32_t payload_type)
 
 }  // namespace
 
-// Only the owner thread destroys a runtime, so borrowing the object past the
-// table lock is safe for exactly the reason dereferencing the old pointer was.
+// Only the owner thread destroys a runtime, so the borrowed object stays alive
+// for as long as the calling thread can use it.
 auto validate_runtime(mln_runtime runtime, RuntimeObject*& out_runtime)
   -> mln_status {
   out_runtime = handle_table<RuntimeObject>().resolve(runtime);

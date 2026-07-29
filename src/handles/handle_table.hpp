@@ -9,12 +9,10 @@
 
 namespace mln::core {
 
-// Public handles are 64-bit generational ids rather than object addresses.
-// Keying a registry on a pointer cannot prove identity: the allocator may hand
-// a later object the address a retired handle still names, so a stale handle
-// either misses the registry or binds the wrong object. Packing a per-slot
-// generation into the handle makes that second outcome impossible, because a
-// retired handle's generation never matches the slot again.
+// Public handles are 64-bit generational ids. Each id carries the generation of
+// the slot it came from, so a retired handle's generation never matches that
+// slot again and a stale handle resolves to nothing instead of to whichever
+// object holds the slot now.
 //
 // Layout, most significant bit first:
 //
@@ -137,10 +135,6 @@ class HandleTable {
 
   auto insert(std::shared_ptr<Object> object) -> std::uint64_t {
     const std::scoped_lock lock(mutex_);
-    return insert_locked(std::move(object));
-  }
-
-  auto insert_locked(std::shared_ptr<Object> object) -> std::uint64_t {
     if (!free_indices_.empty()) {
       const auto index = free_indices_.back();
       free_indices_.pop_back();
@@ -240,11 +234,6 @@ class HandleTable {
     // A slot whose generation is exhausted is retired instead of recycled, so
     // a handle value is never reused even in the limit.
     return object;
-  }
-
-  [[nodiscard]] auto contains(std::uint64_t handle) const noexcept -> bool {
-    const std::scoped_lock lock(mutex_);
-    return find_slot(handle) != nullptr;
   }
 
  private:

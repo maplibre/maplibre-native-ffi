@@ -84,7 +84,7 @@ type MapHandle struct {
 	runtime      *RuntimeHandle
 	runtimeChild *handle.Child
 	// The map's native handle, which is also its public identity. It names one
-	// map for the life of the process, so the binding no longer allocates ids.
+	// map for the life of the process.
 	id MapID
 
 	customGeometryMu      sync.Mutex

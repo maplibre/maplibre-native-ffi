@@ -31,10 +31,8 @@ pub(crate) use maplibre_core::runtime::{
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
-    // A map's id is its native handle, which names one map for the life of the
-    // process, so this binding no longer allocates ids of its own. The state
-    // table stays: it drives style-loaded custom geometry cleanup, which the C
-    // API cannot do.
+    // Resolves a map id to the state this binding owns on top of it, which
+    // drives style-loaded custom geometry cleanup.
     map_states: RefCell<HashMap<MapId, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,

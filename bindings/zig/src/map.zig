@@ -33,11 +33,9 @@ pub const RenderSessionRegistration = struct {
 var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
 
-// The C API issues each map a generational handle and rejects a released one,
-// so this no longer needs its own slot table and generations. It maps a live
-// handle to the state this binding owns on top of it: the diagnostic store,
-// the close-once flag, and the attached-session count. A released handle never
-// collides with a live key, because the C API never reuses a handle value.
+// Maps a map handle to the state this binding owns on top of it: the diagnostic
+// store, the close-once flag, and the attached-session count. A released handle
+// never collides with a live key, because the C API never reuses a handle value.
 var map_registry_lock = std.atomic.Value(bool).init(false);
 var map_registry: std.AutoHashMapUnmanaged(c.mln_map, *MapState) = .empty;
 
@@ -2023,8 +2021,8 @@ test "a released map id replayed after a new map is reported stale" {
     const released = @intFromEnum(first);
     try first.close();
 
-    // The released slot is the one the next map takes, so this is the case a
-    // pointer handle could not tell apart from a live map.
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
     var second = try MapHandle.create(&runtime, .{});
     defer second.close() catch @panic("map close failed");
 

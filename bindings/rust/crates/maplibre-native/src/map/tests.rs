@@ -923,8 +923,8 @@ fn a_released_map_id_replayed_after_a_new_map_reports_it_stale() {
     let released = first.inner.native().unwrap();
     first.close().unwrap();
 
-    // The released slot is the one the next map takes, so this is the case a
-    // pointer handle could not tell apart from a live map.
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
     let second = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     let mut width = 0;

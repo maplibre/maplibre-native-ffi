@@ -534,10 +534,10 @@ final class RuntimeHandle {
         raw.mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED.value) {
       return;
     }
-    final reference = _maps[event._sourceAddress];
+    final reference = _maps[event._sourceId];
     final map = reference?.target;
     if (map == null) {
-      _maps.remove(event._sourceAddress);
+      _maps.remove(event._sourceId);
       return;
     }
     map._clearCustomGeometryCallbacksAfterUrlStyleLoad();
@@ -634,13 +634,13 @@ final class RuntimeEvent {
     required this.eventType,
     required this.sourceType,
     required this.source,
-    required int sourceAddress,
+    required int sourceId,
     required this.code,
     required this.payloadType,
     required this.payload,
     required this.payloadSize,
     required this.message,
-  }) : _sourceAddress = sourceAddress;
+  }) : _sourceId = sourceId;
 
   factory RuntimeEvent._fromNative(
     raw.mln_runtime_event event,
@@ -651,7 +651,7 @@ final class RuntimeEvent {
       eventType: RuntimeEventType.fromRawValue(event.type),
       sourceType: event.source_type,
       source: RuntimeEventSource._fromNative(event, runtime),
-      sourceAddress: event.source,
+      sourceId: event.source,
       code: event.code,
       payloadType: event.payload_type,
       payload: RuntimeEventPayload._fromNative(event, runtime),
@@ -672,7 +672,7 @@ final class RuntimeEvent {
   /// Typed event source, preserving unknown raw values.
   final RuntimeEventSource source;
 
-  final int _sourceAddress;
+  final int _sourceId;
 
   /// Native event code.
   final int code;
@@ -872,12 +872,12 @@ sealed class RuntimeEventSource {
     RuntimeHandle runtime,
   ) {
     final sourceType = RuntimeEventSourceType.fromRawValue(event.source_type);
-    final address = event.source;
+    final sourceId = event.source;
     if (sourceType == RuntimeEventSourceType.runtime) {
       return RuntimeRuntimeEventSource(runtime);
     }
     if (sourceType == RuntimeEventSourceType.map) {
-      final map = runtime._maps[address]?.target;
+      final map = runtime._maps[sourceId]?.target;
       return MapRuntimeEventSource(map);
     }
     return UnknownRuntimeEventSource(sourceType);
@@ -1665,12 +1665,11 @@ final class MapHandle {
   ///
   /// A render session belongs to the isolate that attached it, which need not be
   /// the map's, and attaching only requires the map to be live. A [MapHandle]
-  /// cannot cross isolates, so this carries the native address instead. Every
+  /// cannot cross isolates, so this carries the map's handle id instead. Every
   /// other map call stays on the map's own isolate.
   ///
   /// The reference does not keep the map alive. Attaching after the map closes
-  /// fails rather than dangling, because the C API resolves the address under
-  /// its own registry lock.
+  /// reports invalid argument, because the id is stale from the close onward.
   MapAttachRef attachRef() => MapAttachRef._(_handle.raw);
 
   /// Copies the current camera snapshot.

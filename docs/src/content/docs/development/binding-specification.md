@@ -454,8 +454,7 @@ into C. Stale public request handles cannot affect later native requests.
 A binding whose host runtime moves a handled request between execution contexts
 passes the request handle id itself, and exposes the C API's wait-until-retired
 operation for teardown. A released or completed request id reports invalid
-argument, so bindings expose one request handle type rather than a separate
-transferable request token.
+argument, so one request handle type covers both the owning and the moved use.
 
 ---
 
@@ -571,8 +570,8 @@ synchronization. Two handles are the second kind. A map attach reference reaches
 no thread-affine map state: attach claims the map's render-session slot under
 the C API's map registry lock and posts the new size to the map's own owner
 thread. A wake source handle reaches native wake state that carries its own
-synchronization and holds no owner-thread pointer. Both are transferable and
-MUST NOT be shareable. Copied immutable values can be transferable when their
+synchronization and holds no owner-thread state. Both are transferable and MUST
+NOT be shareable. Copied immutable values can be transferable when their
 contents are independent of native owner-thread state. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
@@ -763,7 +762,7 @@ the other isolate, which makes its id stale rather than live.
 | BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |
 | BND-084 | Offline operation completion returns copied result data. Native take-result status failures before result ownership transfers leave the operation handle retryable. |
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
-| BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle.                                                                               |
 | BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
 | BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
 | BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |

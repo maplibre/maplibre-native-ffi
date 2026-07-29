@@ -14,7 +14,8 @@ pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 ///
 /// The value is the map's native handle, which names one map for the life of
 /// the process, so comparing an id against a released map's id never matches a
-/// later one. It carries no ownership and cannot be used to operate on the map.
+/// later one. It carries no ownership; map operations go through
+/// [`MapHandle`](crate::MapHandle).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct MapId(u64);
 

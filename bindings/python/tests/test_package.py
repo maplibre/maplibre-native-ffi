@@ -3540,8 +3540,8 @@ def test_released_map_id_replayed_after_a_new_map_reports_it_stale() -> None:
         released = first._native.id()
         first.close()
 
-        # The released slot is the one the next map takes, so this is the case a
-        # pointer handle could not tell apart from a live map.
+        # The released slot is the one the next map takes, so the replayed id
+        # names a retired generation of a slot that is live again.
         second = runtime.create_map()
 
         with pytest.raises(mln.InvalidArgumentError) as excinfo:

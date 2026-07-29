@@ -40,8 +40,8 @@ impl<T> Default for OutPtr<T> {
 /// An out-parameter for a handle the C API issues.
 ///
 /// The C contract requires `*out_handle` to be the null handle on entry, which
-/// this guarantees, and the value is the handle itself rather than a pointer to
-/// one, so it needs one less level of indirection than [`OutPtr`].
+/// this guarantees. The slot holds the handle value directly, so it takes one
+/// level of indirection where [`OutPtr`] takes two.
 #[derive(Debug)]
 pub struct OutHandle<T: crate::handle::NativeHandle> {
     value: T,

@@ -51,8 +51,8 @@ private func mapSize(_ map: NativeMapHandle) throws {
   let released = try first.requireLiveHandle()
   try first.close()
 
-  // The released slot is the one the next map takes, so this is the case a
-  // pointer handle could not tell apart from a live map.
+  // The released slot is the one the next map takes, so the replayed id
+  // names a retired generation of a slot that is live again.
   let second = try makeMap(runtime)
   defer { try? second.close() }
 

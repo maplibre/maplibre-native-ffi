@@ -30,8 +30,8 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 		t.Fatalf("first.Close(): %v", err)
 	}
 
-	// The released slot is the one the next map takes, so this is the case a
-	// pointer handle could not tell apart from a live map.
+	// The released slot is the one the next map takes, so the replayed id
+	// names a retired generation of a slot that is live again.
 	second, err := runtime.NewMap()
 	if err != nil {
 		t.Fatalf("second NewMap(): %v", err)

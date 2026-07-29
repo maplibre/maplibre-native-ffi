@@ -40,9 +40,7 @@ struct ResourceRequestObject {
 
 // A request reaches host code that may complete it from any MapLibre thread,
 // and mbgl's cancel path runs on its own. Each of those holds a strong
-// reference, so the object outlives a release that races them. That is what
-// replaces the hand-rolled reference count this type used to carry, along with
-// the in-flight and deferred-release bookkeeping that count needed.
+// reference, so the object outlives a release that races them.
 template <>
 struct HandleTraits<ResourceRequestObject> {
   static constexpr auto kind = HandleKind::ResourceRequest;

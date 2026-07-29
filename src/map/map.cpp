@@ -2934,8 +2934,8 @@ struct MapObject {
   std::optional<mbgl::ActorRef<MapCommands>> command_ref;
   // Guarded by the map handle table's mutex; a render session on another thread
   // clears it from map_detach_render_target_session(). This stays an internal
-  // object address rather than a handle, because it is only ever compared
-  // against the session the caller is currently inside.
+  // object address, because it is only ever compared against the session the
+  // caller is currently inside.
   void* render_target_session = nullptr;
 };
 
@@ -3230,16 +3230,16 @@ auto validate_map_live(mln_map map, MapObject*& out_map) -> mln_status {
   return validate_map_live_locked(map, out_map);
 }
 
-// Only the owner thread destroys a map, so borrowing the object past the table
-// lock is safe for exactly the reason dereferencing the old pointer was.
+// Only the owner thread destroys a map, so the borrowed object stays alive for
+// as long as the calling thread can use it.
 auto validate_map(mln_map map, MapObject*& out_map) -> mln_status {
   const std::scoped_lock lock(handle_table<MapObject>().mutex());
   return validate_map_locked(map, out_map);
 }
 
 // Resolves a projection handle and checks its owner thread. Only the owner
-// thread destroys a projection, so borrowing the object past the table lock is
-// safe for exactly the reason it was safe to dereference the old pointer.
+// thread destroys a projection, so the borrowed object stays alive for as long
+// as the calling thread can use it.
 auto validate_map_projection(
   mln_map_projection handle, MapProjectionObject*& out_projection
 ) -> mln_status {

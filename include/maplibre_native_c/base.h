@@ -69,7 +69,7 @@ typedef enum mln_render_backend_flag : uint32_t {
 #define MLN_HANDLE_NULL ((uint64_t)0)
 
 /**
- * Handles are opaque 64-bit generational ids, not addresses.
+ * Handles are opaque 64-bit generational ids.
  *
  * Each id packs the handle's type, a slot index, and a reuse generation, so a
  * released handle stays distinguishable from every later handle. Passing a

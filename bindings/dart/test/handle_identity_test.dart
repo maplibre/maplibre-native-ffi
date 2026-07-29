@@ -35,8 +35,8 @@ void main() {
     final released = NativeMap(mapAttachRefIdForTesting(first.attachRef()));
     first.close();
 
-    // The released slot is the one the next map takes, so this is the case a
-    // pointer handle could not tell apart from a live map.
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
     final second = runtime.createMap();
     addTearDown(() {
       second.close();

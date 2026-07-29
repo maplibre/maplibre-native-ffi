@@ -91,7 +91,7 @@ static bool wait_for_map_loading_failure(
       }
       if (
         event.type != MLN_RUNTIME_EVENT_MAP_LOADING_FAILED ||
-        event.source != (const void*)map || event.message == NULL ||
+        event.source != map || event.message == NULL ||
         event.message_size >= out_message_capacity
       ) {
         continue;

@@ -817,17 +817,9 @@ impl fmt::Debug for MapAttachRef {
 }
 
 impl MapAttachRef {
-    /// Whether the map this reference names has been closed.
-    ///
-    /// A reference can outlive its [`MapHandle`], so a host that keeps one
-    /// across a map's lifetime can check here instead of relying on the error
-    /// from a failed attach.
-    /// Runs `attach` against the map this reference names.
-    ///
-    /// A released map reports invalid argument from the C API rather than
-    /// binding the session to a later map, so this needs no liveness guard.
-    pub(crate) fn with_live<T>(&self, attach: impl FnOnce(sys::mln_map) -> T) -> Result<T> {
-        Ok(attach(self.map))
+    /// The handle of the map this reference names.
+    pub(crate) fn map(&self) -> sys::mln_map {
+        self.map
     }
 
     /// Attaches a Metal native surface render target to the map.

@@ -14,10 +14,8 @@ static bool last_error_mentions(const char* fragment) {
   return message != NULL && strstr(message, fragment) != NULL;
 }
 
-// The regression test for the reused-address bug. With pointer handles this
-// case was not expressible: the allocator may or may not hand the second map
-// the first map's address, and when it did, the call bound to the wrong map and
-// succeeded. A generational handle makes the outcome the same every run.
+// A released handle stays distinguishable from every later map, so replaying
+// one after another map exists gives the same outcome every run.
 static void a_released_map_handle_never_names_a_later_map(void) {
   mln_runtime runtime = mln_test_create_runtime();
 
@@ -70,8 +68,8 @@ static void a_handle_of_another_kind_is_rejected_by_kind(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// A value this library never issued is rejected rather than dereferenced. With
-// pointer handles this was a registry miss at best and a wild read at worst.
+// A value this library never issued is rejected, whether it is the null handle
+// or an arbitrary integer.
 static void a_handle_this_process_never_issued_is_rejected(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_request_repaint(MLN_HANDLE_NULL)
@@ -93,8 +91,8 @@ static void a_handle_this_process_never_issued_is_rejected(void) {
   );
 }
 
-// Releasing a scoped handle twice is a defined no-op rather than a double free,
-// which is what makes non-deterministic host cleanup hooks safe.
+// Releasing a scoped handle twice is a defined no-op, which is what makes
+// non-deterministic host cleanup hooks safe.
 static void releasing_a_scoped_handle_twice_is_a_no_op(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);

@@ -24,8 +24,8 @@ public sealed unsafe class NativeHandleIdentityTests
         var releasedId = first.Handle;
         first.Close();
 
-        // The released slot is the one the next map takes, so this is the case
-        // a pointer handle could not distinguish from a live map.
+        // The released slot is the one the next map takes, so the replayed id
+        // names a retired generation of a slot that is live again.
         using var second = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
         var error = Assert.Throws<InvalidArgumentException>(() => GetSize(releasedId));

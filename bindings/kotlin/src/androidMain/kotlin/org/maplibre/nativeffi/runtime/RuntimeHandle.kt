@@ -55,10 +55,10 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
 
   public actual fun acquireWakeSource(): WakeSource {
     NativeAccess.ensureLoaded()
-    val address = requireLiveHandle()
+    val runtime = requireLiveHandle()
     LongPointer(1).use { outSource ->
       outSource.put(0, 0L)
-      Status.check(MaplibreNativeC.mln_runtime_wake_source_acquire(address, outSource))
+      Status.check(MaplibreNativeC.mln_runtime_wake_source_acquire(runtime, outSource))
       val sourceId = outSource.get()
       require(sourceId != 0L) { "mln_runtime_wake_source_acquire returned a null wake source" }
       return WakeSource(sourceId)
@@ -440,9 +440,9 @@ public actual class RuntimeHandle private constructor(private val handleId: Long
         val outRuntime = LongPointer(1)
         outRuntime.put(0, 0L)
         Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options, outRuntime))
-        val address = outRuntime.get()
-        require(address != 0L) { "mln_runtime_create returned a null runtime" }
-        return RuntimeHandle(address)
+        val runtime = outRuntime.get()
+        require(runtime != 0L) { "mln_runtime_create returned a null runtime" }
+        return RuntimeHandle(runtime)
       }
     }
   }

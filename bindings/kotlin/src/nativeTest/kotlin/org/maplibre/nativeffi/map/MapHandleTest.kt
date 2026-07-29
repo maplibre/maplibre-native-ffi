@@ -253,8 +253,8 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     val released = first.nativeHandle()
     first.close()
 
-    // The released slot is the one the next map takes, so this is the case a
-    // pointer handle could not tell apart from a live map.
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
     val second =
       MapHandle.create(
         runtime,

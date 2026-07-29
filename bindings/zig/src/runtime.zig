@@ -1633,8 +1633,7 @@ fn mapRegistrationForNativeSource(handle: RuntimeHandle, source: c.mln_map) ?Map
 }
 
 // The event carries the source map's handle, which names one map for the life
-// of the process, so this is an equality test rather than the address scan it
-// used to be.
+// of the process, so a registration matches on handle equality.
 fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: u64) ?values.MapId {
     if (source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return null;
     if (source == 0) return null;

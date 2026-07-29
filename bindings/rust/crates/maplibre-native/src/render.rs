@@ -1226,9 +1226,9 @@ impl RenderSessionHandle {
         F: FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
     {
         let mut out = maplibre_core::ptr::OutHandle::<sys::mln_render_session>::new();
-        // The map is held live across the native call, so a concurrent close on
-        // its owner thread waits instead of freeing the address underneath it.
-        let status = map.with_live(|map| attach(map, out.as_mut_ptr()))?;
+        // A close racing this attach on the map's owner thread makes the handle
+        // stale, which the C API rejects.
+        let status = attach(map.map(), out.as_mut_ptr());
         maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {

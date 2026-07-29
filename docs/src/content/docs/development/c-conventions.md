@@ -55,10 +55,10 @@ MapLibre handle id.
 
 ## Handles
 
-Every MapLibre handle type is `typedef uint64_t`, an opaque generational id
-rather than an address. Each id packs its handle type, a slot index, and a reuse
-generation, so an id names one object for the life of the process and a released
-id stays distinguishable from every later one.
+Every MapLibre handle type is `typedef uint64_t`, an opaque id. Each id packs
+its handle type, a slot index, and a reuse generation, so an id names one object
+for the life of the process and a released id stays distinguishable from every
+later one.
 
 `MLN_HANDLE_NULL` is the null handle for every type. A live id always carries a
 nonzero type tag, so this value names no object of any type.
@@ -74,9 +74,8 @@ Handle values are safe to copy, compare, hash, and move between threads, and
 carry no ownership on their own. Owner-thread rules govern which thread may call
 with a handle, not which thread may hold one.
 
-The bit layout is internal. Hosts pass handles back as issued rather than
-decoding or synthesizing them, and a synthesized value is rejected rather than
-dereferenced.
+The bit layout is internal. Hosts pass handles back as issued, and decoding or
+synthesizing an id is unsupported.
 
 ## Ownership And Execution
 
@@ -113,8 +112,8 @@ the map is live rather than that the caller owns it, so a session may be
 attached, driven, and destroyed on a thread that never touches the map. Session
 calls from any other thread report the owner-thread status. The host may hand
 the map handle to the attaching thread by any means, because a handle is a plain
-value and attach resolves it under the C API's own lock; an id that names a
-released map is rejected rather than bound to a later map.
+value and attach resolves it under the C API's own lock, rejecting an id that
+names a released map.
 
 Cross-thread dispatch belongs in public functions designed as enqueueing
 commands. Document that behavior on the function. Higher-level adapters build

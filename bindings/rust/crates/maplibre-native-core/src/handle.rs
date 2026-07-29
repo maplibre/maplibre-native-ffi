@@ -62,7 +62,7 @@ pub struct NativeHandleLeak {
     pub type_name: &'static str,
     /// The handle id that was not destroyed. An id names one object for the
     /// life of the process, so it is greppable against the log line that
-    /// created it in a way an address never was.
+    /// created it.
     pub id: u64,
 }
 

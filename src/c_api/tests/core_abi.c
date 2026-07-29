@@ -26,7 +26,7 @@ static mln_runtime_event empty_event(void) {
 // null destroy calls hidden by safe bindings.
 static void runtime_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(MLN_HANDLE_NULL, NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_create(NULL, NULL)
   );
 
   mln_runtime_options small_options = mln_runtime_options_default();

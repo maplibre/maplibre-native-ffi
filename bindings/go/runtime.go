@@ -418,9 +418,8 @@ type RuntimeHandle struct {
 	resourceProviderMu  sync.Mutex
 	resourceProvider    *callback.ResourceProviderState
 	mapsMu              sync.Mutex
-	// Resolves an event's source id to the public wrapper. The C API returns an
-	// id, not a wrapper, so this table stays; the id allocator it used to need
-	// is gone.
+	// Resolves an event's source id to the public wrapper, which the C API has
+	// no way to hand back.
 	maps map[MapID]*MapHandle
 }
 

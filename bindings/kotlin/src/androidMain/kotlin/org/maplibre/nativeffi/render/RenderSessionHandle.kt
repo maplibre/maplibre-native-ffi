@@ -473,9 +473,9 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
       LongPointer(1).use { outSession ->
         outSession.put(0, 0L)
         Status.check(block(outSession))
-        val address = outSession.get()
-        require(address != 0L) { "render session attach returned a null session" }
-        return RenderSessionHandle(map, address)
+        val session = outSession.get()
+        require(session != 0L) { "render session attach returned a null session" }
+        return RenderSessionHandle(map, session)
       }
     }
   }
