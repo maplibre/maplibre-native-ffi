@@ -20,6 +20,7 @@ let testSourceFiles = [
   "MaplibreNativeTests/RuntimeTests.swift",
   "MaplibreNativeTests/StyleTests.swift",
   "MaplibreNativeTests/SupportHelperTests.swift",
+  "MaplibreNativeTests/SyntheticHandles.swift",
   "MaplibreNativeTests/ValueTests.swift",
   "MaplibreNativeTests/WakeSourceTests.swift",
 ]

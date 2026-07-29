@@ -1,9 +1,9 @@
 import Foundation
 
-final class NativeHandleState: @unchecked Sendable {
+final class NativeHandleState<Handle: NativeHandle>: @unchecked Sendable {
   private enum State {
-    case live(OpaquePointer)
-    case closing(OpaquePointer)
+    case live(Handle)
+    case closing(Handle)
     case closed
   }
 
@@ -11,21 +11,21 @@ final class NativeHandleState: @unchecked Sendable {
   private let lock = NSLock()
   private var state: State
 
-  init(typeName: String, pointer: OpaquePointer?) throws {
-    guard let pointer else {
+  init(typeName: String, handle: Handle) throws {
+    guard !handle.isNull else {
       throw NativeStatusFailure(
         rawStatus: 0,
-        diagnostic: "\(typeName) native handle is null"
+        diagnostic: "\(typeName) native handle is the null handle"
       )
     }
     self.typeName = typeName
-    state = .live(pointer)
+    state = .live(handle)
   }
 
   deinit {
-    if let pointer = lock.withLock({ leakPointer }) {
+    if let handle = lock.withLock({ leakedHandle }) {
       NativeHandleLeakReporter.report(
-        NativeHandleLeak(typeName: typeName, address: UInt(bitPattern: pointer))
+        NativeHandleLeak(typeName: typeName, handle: handle.raw)
       )
     }
   }
@@ -39,14 +39,14 @@ final class NativeHandleState: @unchecked Sendable {
   /// Runs `use` with the handle held live for the duration of the call.
   ///
   /// `closeOnce` takes the same lock to move the handle out of `.live`, so a
-  /// close waits rather than destroying the pointer midway through `use`. Do
+  /// close waits rather than destroying the handle midway through `use`. Do
   /// not
   /// re-enter this handle from `use`; the lock is not recursive.
-  func withLive<T>(_ use: (OpaquePointer) throws -> T) throws -> T {
+  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
     try lock.withLock {
       switch state {
-      case let .live(pointer):
-        return try use(pointer)
+      case let .live(handle):
+        return try use(handle)
       case .closing:
         throw NativeStatusFailure(
           rawStatus: 0,
@@ -61,11 +61,11 @@ final class NativeHandleState: @unchecked Sendable {
     }
   }
 
-  func requireLive() throws -> OpaquePointer {
+  func requireLive() throws -> Handle {
     try lock.withLock {
       switch state {
-      case let .live(pointer):
-        return pointer
+      case let .live(handle):
+        return handle
       case .closing:
         throw NativeStatusFailure(
           rawStatus: 0,
@@ -80,12 +80,12 @@ final class NativeHandleState: @unchecked Sendable {
     }
   }
 
-  func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
-    let livePointer: OpaquePointer? = try lock.withLock {
+  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
+    let liveHandle: Handle? = try lock.withLock {
       switch state {
-      case let .live(pointer):
-        state = .closing(pointer)
-        return pointer
+      case let .live(handle):
+        state = .closing(handle)
+        return handle
       case .closing:
         throw NativeStatusFailure(
           rawStatus: 0,
@@ -95,25 +95,25 @@ final class NativeHandleState: @unchecked Sendable {
         return nil
       }
     }
-    guard let livePointer else { return }
+    guard let liveHandle else { return }
 
     do {
-      try destroy(livePointer)
+      try destroy(liveHandle)
       lock.withLock {
         state = .closed
       }
     } catch {
       lock.withLock {
-        state = .live(livePointer)
+        state = .live(liveHandle)
       }
       throw error
     }
   }
 
-  private var leakPointer: OpaquePointer? {
+  private var leakedHandle: Handle? {
     switch state {
-    case let .live(pointer), let .closing(pointer):
-      pointer
+    case let .live(handle), let .closing(handle):
+      handle
     case .closed:
       nil
     }

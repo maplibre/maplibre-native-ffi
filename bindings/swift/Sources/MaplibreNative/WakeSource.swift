@@ -15,10 +15,10 @@ internal import CMaplibreNativeC
 /// that carries its own synchronization.
 public final class WakeSource: @unchecked Sendable {
   private let nativeCallGate = NSLock()
-  private let state: NativeHandleState
+  private let state: NativeHandleState<NativeWakeSourceHandle>
 
-  init(pointer: OpaquePointer?) throws {
-    state = try NativeHandleState(typeName: "WakeSource", pointer: pointer)
+  init(handle: NativeWakeSourceHandle) throws {
+    state = try NativeHandleState(typeName: "WakeSource", handle: handle)
   }
 
   public var isClosed: Bool {
@@ -33,7 +33,7 @@ public final class WakeSource: @unchecked Sendable {
   public func signal() throws {
     try nativeCallGate.withLock {
       try mapNativeFailure {
-        try checkStatus(mln_wake_source_signal(state.requireLive()))
+        try checkStatus(mln_wake_source_signal(state.requireLive().raw))
       }
     }
   }
@@ -42,8 +42,8 @@ public final class WakeSource: @unchecked Sendable {
   public func close() throws {
     try nativeCallGate.withLock {
       try mapNativeFailure {
-        try state.closeOnce { pointer in
-          mln_wake_source_destroy(pointer)
+        try state.closeOnce { source in
+          mln_wake_source_destroy(source.raw)
         }
       }
     }

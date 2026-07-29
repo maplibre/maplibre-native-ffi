@@ -3,12 +3,12 @@
 /// itself is safe to share. This is what lets `MapAttachRef` be plainly
 /// `Sendable` rather than `@unchecked`. The public handles that hold a box stay
 /// non-`Sendable`, so this does not make any of them crossable.
-class NativeHandleBox: @unchecked Sendable {
-  private let state: NativeHandleState
+class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
+  private let state: NativeHandleState<Handle>
 
-  init(typeName: String, pointer: OpaquePointer?) throws {
+  init(typeName: String, handle: Handle) throws {
     do {
-      state = try NativeHandleState(typeName: typeName, pointer: pointer)
+      state = try NativeHandleState(typeName: typeName, handle: handle)
     } catch let failure as NativeStatusFailure {
       throw MaplibreError.invalidArgument(failure.diagnostic)
     }
@@ -18,7 +18,7 @@ class NativeHandleBox: @unchecked Sendable {
     state.isClosed
   }
 
-  func withLive<T>(_ use: (OpaquePointer) throws -> T) throws -> T {
+  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
     do {
       return try state.withLive(use)
     } catch let failure as NativeStatusFailure {
@@ -30,7 +30,7 @@ class NativeHandleBox: @unchecked Sendable {
     }
   }
 
-  func requireLive() throws -> OpaquePointer {
+  func requireLive() throws -> Handle {
     do {
       return try state.requireLive()
     } catch let failure as NativeStatusFailure {
@@ -42,7 +42,7 @@ class NativeHandleBox: @unchecked Sendable {
     }
   }
 
-  func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
+  func closeOnce(_ destroy: (Handle) throws -> Void) throws {
     do {
       try state.closeOnce(destroy)
     } catch let failure as NativeStatusFailure {

@@ -429,12 +429,12 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
 /// Native keeps the map alive instead: destroying a map fails while a session
 /// is attached to it.
 public final class RenderSessionHandle {
-  private let handle: NativeHandleBox
+  private let handle: NativeHandleBox<NativeRenderSessionHandle>
 
-  init(pointer: OpaquePointer) throws {
+  init(handle session: NativeRenderSessionHandle) throws {
     handle = try NativeHandleBox(
       typeName: "RenderSessionHandle",
-      pointer: pointer
+      handle: session
     )
   }
 
@@ -442,13 +442,13 @@ public final class RenderSessionHandle {
     handle.isClosed
   }
 
-  func requireLivePointer() throws -> OpaquePointer {
+  func requireLiveHandle() throws -> NativeRenderSessionHandle {
     try handle.requireLive()
   }
 
   public func close() throws {
-    try handle.closeOnce { pointer in
-      try checkStatus(mln_render_session_destroy(pointer))
+    try handle.closeOnce { session in
+      try checkStatus(mln_render_session_destroy(session.raw))
     }
   }
 
@@ -468,7 +468,7 @@ public final class RenderSessionHandle {
   {
     try mapNativeFailure {
       try checkStatus(mln_render_session_resize(
-        handle.requireLive(),
+        handle.requireLive().raw,
         width,
         height,
         scaleFactor
@@ -490,7 +490,7 @@ public final class RenderSessionHandle {
     try mapNativeFailure {
       var rendered = false
       try checkStatus(mln_render_session_render_update(
-        handle.requireLive(),
+        handle.requireLive().raw,
         &rendered
       ))
       return rendered
@@ -499,27 +499,27 @@ public final class RenderSessionHandle {
 
   public func detach() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_detach(handle.requireLive()))
+      try checkStatus(mln_render_session_detach(handle.requireLive().raw))
     }
   }
 
   public func reduceMemoryUse() throws {
     try mapNativeFailure {
       try checkStatus(mln_render_session_reduce_memory_use(handle
-          .requireLive()))
+          .requireLive().raw))
     }
   }
 
   public func clearData() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_clear_data(handle.requireLive()))
+      try checkStatus(mln_render_session_clear_data(handle.requireLive().raw))
     }
   }
 
   public func dumpDebugLogs() throws {
     try mapNativeFailure {
       try checkStatus(mln_render_session_dump_debug_logs(handle
-          .requireLive()))
+          .requireLive().raw))
     }
   }
 
@@ -661,7 +661,7 @@ public final class MetalOwnedTextureFrameHandle {
     releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
         try checkStatus(mln_metal_owned_texture_release_frame(
-          session.requireLivePointer(),
+          session.requireLiveHandle().raw,
           rawFrame
         ))
       }
@@ -682,7 +682,8 @@ public final class MetalOwnedTextureFrameHandle {
       NativeHandleLeakReporter.report(
         NativeHandleLeak(
           typeName: "MetalOwnedTextureFrameHandle",
-          address: UInt(bitPattern: frame.raw.texture)
+          handle: 0,
+          detail: "texture 0x\(String(UInt(bitPattern: frame.raw.texture), radix: 16))"
         )
       )
     }
@@ -738,7 +739,7 @@ public final class VulkanOwnedTextureFrameHandle {
     releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
         try checkStatus(mln_vulkan_owned_texture_release_frame(
-          session.requireLivePointer(),
+          session.requireLiveHandle().raw,
           rawFrame
         ))
       }
@@ -759,7 +760,8 @@ public final class VulkanOwnedTextureFrameHandle {
       NativeHandleLeakReporter.report(
         NativeHandleLeak(
           typeName: "VulkanOwnedTextureFrameHandle",
-          address: UInt(bitPattern: frame.raw.image)
+          handle: 0,
+          detail: "image 0x\(String(UInt(bitPattern: frame.raw.image), radix: 16))"
         )
       )
     }
@@ -815,7 +817,7 @@ public final class OpenGLOwnedTextureFrameHandle {
     releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
         try checkStatus(mln_opengl_owned_texture_release_frame(
-          session.requireLivePointer(),
+          session.requireLiveHandle().raw,
           rawFrame
         ))
       }
@@ -836,7 +838,8 @@ public final class OpenGLOwnedTextureFrameHandle {
       NativeHandleLeakReporter.report(
         NativeHandleLeak(
           typeName: "OpenGLOwnedTextureFrameHandle",
-          address: UInt(frame.raw.texture)
+          handle: 0,
+          detail: "texture 0x\(String(UInt(frame.raw.texture), radix: 16))"
         )
       )
     }
@@ -896,15 +899,14 @@ public final class OpenGLOwnedTextureFrameHandle {
 /// destroy fails and `deinit` can only report it. Close the session first, then
 /// the map.
 ///
-/// This is plainly `Sendable`: it shares the map's lock-guarded handle state
-/// rather than a bare pointer, and the attach it performs reaches no
-/// thread-affine map state — the C API claims the map's render-session slot
-/// under its registry lock and posts the new size to the map's own owner
-/// thread.
+/// This is plainly `Sendable`: it carries a copied handle id rather than a
+/// pointer, and the attach it performs reaches no thread-affine map state — the
+/// C API claims the map's render-session slot under its registry lock and posts
+/// the new size to the map's own owner thread.
 public struct MapAttachRef: Sendable {
-  private let handle: NativeHandleBox
+  private let handle: NativeHandleBox<NativeMapHandle>
 
-  init(handle: NativeHandleBox) {
+  init(handle: NativeHandleBox<NativeMapHandle>) {
     self.handle = handle
   }
 
@@ -917,11 +919,12 @@ public struct MapAttachRef: Sendable {
     handle.isClosed
   }
 
-  /// Runs `attach` with the map held live for the duration of the call, so a
-  /// concurrent `MapHandle.close()` waits instead of freeing the address
-  /// underneath it.
-  func withLiveMap<T>(_ attach: (OpaquePointer) throws -> T) throws -> T {
-    try handle.withLive(attach)
+  /// The map's handle id, which the C API validates on every attach.
+  ///
+  /// A released id is rejected rather than binding the session to a later map,
+  /// so no lock is held across the attach.
+  func mapHandle() throws -> NativeMapHandle {
+    try handle.requireLive()
   }
 }
 
@@ -929,65 +932,65 @@ public extension MapAttachRef {
   func attachMetalSurface(_ descriptor: MetalSurfaceDescriptor) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.metalSurfaceAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachVulkanSurface(_ descriptor: VulkanSurfaceDescriptor) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.vulkanSurfaceAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachOpenGLSurface(_ descriptor: OpenGLSurfaceDescriptor) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.openGLSurfaceAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachMetalOwnedTexture(_ descriptor: MetalOwnedTextureDescriptor) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.metalOwnedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachMetalBorrowedTexture(
@@ -995,17 +998,17 @@ public extension MapAttachRef {
   ) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.metalBorrowedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachVulkanOwnedTexture(
@@ -1013,17 +1016,17 @@ public extension MapAttachRef {
   ) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.vulkanOwnedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachVulkanBorrowedTexture(
@@ -1031,17 +1034,17 @@ public extension MapAttachRef {
   ) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.vulkanBorrowedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachOpenGLOwnedTexture(
@@ -1049,17 +1052,17 @@ public extension MapAttachRef {
   ) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.openGLOwnedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 
   func attachOpenGLBorrowedTexture(
@@ -1067,16 +1070,16 @@ public extension MapAttachRef {
   ) throws
     -> RenderSessionHandle
   {
-    let pointer = try mapNativeFailure {
-      try withLiveMap { map in
-        try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
+    let session = try mapNativeFailure {
+      let map = try mapHandle()
+      return try descriptor.nativeInput
+        .withNativeDescriptor { nativeDescriptor in
           try NativeRender.openGLBorrowedTextureAttach(
             map: map,
             descriptor: nativeDescriptor
           )
         }
-      }
     }
-    return try RenderSessionHandle(pointer: pointer)
+    return try RenderSessionHandle(handle: session)
   }
 }

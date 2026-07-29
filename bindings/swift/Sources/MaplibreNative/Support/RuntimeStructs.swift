@@ -197,7 +197,7 @@ enum NativeRuntimeEventPayload: Equatable {
 struct NativeRuntimeEvent: Equatable {
   let type: UInt32
   let sourceType: UInt32
-  let sourceAddress: UInt
+  let sourceId: UInt64
   let code: Int32
   let message: String
   let payload: NativeRuntimeEventPayload
@@ -205,7 +205,7 @@ struct NativeRuntimeEvent: Equatable {
   init(_ raw: mln_runtime_event) throws {
     type = raw.type
     sourceType = raw.source_type
-    sourceAddress = UInt(bitPattern: raw.source)
+    sourceId = raw.source
     code = raw.code
     message = try NativeString.copyUTF8(
       data: raw.message,
