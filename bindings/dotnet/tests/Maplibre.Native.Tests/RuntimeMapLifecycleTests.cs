@@ -17,6 +17,24 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(map.IsClosed);
     }
 
+    [BindingSpecTest("BND-100")]
+    [Fact]
+    public void MapOptionsMaterializeFastPforDecoding()
+    {
+        Assert.Equal(0, new MapOptions().ToNative().fast_pfor_enabled);
+        Assert.Equal(
+            1,
+            new MapOptions { FastPforEnabled = true }
+                .ToNative()
+                .fast_pfor_enabled
+        );
+
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { FastPforEnabled = true });
+
+        Assert.False(map.IsClosed);
+    }
+
     [BindingSpecTest("BND-040", "BND-100")]
     [Fact]
     public void RuntimeAndMapCloseDeterministically()

@@ -87,6 +87,7 @@ struct NativeMapOptionsInput: Equatable {
   let height: UInt32
   let scaleFactor: Double
   let mapMode: UInt32
+  let fastPFOREnabled: Bool
 
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_map_options>) throws -> Result
@@ -96,6 +97,7 @@ struct NativeMapOptionsInput: Equatable {
     options.height = height
     options.scale_factor = scaleFactor
     options.map_mode = mapMode
+    options.fast_pfor_enabled = fastPFOREnabled
     return try withUnsafePointer(to: &options, body)
   }
 }

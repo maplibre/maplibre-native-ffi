@@ -30,17 +30,27 @@ public struct MapOptions: Equatable, Sendable {
   /// imagery chosen for this density.
   public var scaleFactor: Double
   public var mode: MapMode
+  /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+  /// encodings, fixed for the lifetime of the map.
+  ///
+  /// Enable this on maps that read vector sources created with
+  /// ``VectorTileEncoding/mlt`` from a tile set that uses FastPFOR. A map
+  /// created with this `false` decodes every other MLT encoding and logs a tile
+  /// parse warning for the FastPFOR ones.
+  public var fastPFOREnabled: Bool
 
   public init(
     width: UInt32,
     height: UInt32,
     scaleFactor: Double = 1.0,
-    mode: MapMode = .continuous
+    mode: MapMode = .continuous,
+    fastPFOREnabled: Bool = false
   ) {
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
     self.mode = mode
+    self.fastPFOREnabled = fastPFOREnabled
   }
 
   var nativeInput: NativeMapOptionsInput {
@@ -48,7 +58,8 @@ public struct MapOptions: Equatable, Sendable {
       width: width,
       height: height,
       scaleFactor: scaleFactor,
-      mapMode: mode.rawValue
+      mapMode: mode.rawValue,
+      fastPFOREnabled: fastPFOREnabled
     )
   }
 }

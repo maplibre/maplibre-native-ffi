@@ -1074,6 +1074,7 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle,
 		rawOptions.height = C.uint32_t(options.Height)
 		rawOptions.scale_factor = C.double(options.ScaleFactor)
 		rawOptions.map_mode = C.uint32_t(options.Mode)
+		rawOptions.fast_pfor_enabled = C.bool(options.FastPFOREnabled)
 
 		var raw *C.mln_map
 		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawOptions, &raw))

@@ -40,6 +40,17 @@ public class MapOptions {
 
   public var mapMode: MapMode? = null
 
+  /**
+   * Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings, fixed for the
+   * lifetime of the map.
+   *
+   * Enable this on maps that read vector sources created with
+   * [org.maplibre.nativeffi.style.VectorTileEncoding.MLT] from a tile set that uses FastPFOR. A map
+   * created with this `false` decodes every other MLT encoding and logs a tile parse warning for
+   * the FastPFOR ones.
+   */
+  public var fastPforEnabled: Boolean? = null
+
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */
   public fun copy(block: MapOptions.() -> Unit = {}): MapOptions =
     MapOptions()
@@ -48,11 +59,12 @@ public class MapOptions {
         it.height = height
         it.scaleFactor = scaleFactor
         it.mapMode = mapMode
+        it.fastPforEnabled = fastPforEnabled
       }
       .apply(block)
 
   private val fields: List<Any?>
-    get() = listOf(width, height, scaleFactor, mapMode)
+    get() = listOf(width, height, scaleFactor, mapMode, fastPforEnabled)
 
   override fun equals(other: Any?): Boolean = other is MapOptions && fields == other.fields
 

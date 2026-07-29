@@ -2864,6 +2864,7 @@ private class MapOptionsScope(value: MapOptions) : AutoCloseable {
       }
       options.map_mode(it.nativeValue)
     }
+    value.fastPforEnabled?.let { options.fast_pfor_enabled(it) }
   }
 
   override fun close() {
