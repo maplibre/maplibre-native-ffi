@@ -36,13 +36,20 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         height = 240
         scaleFactor = 2.0
         mapMode = MapMode.STATIC
+        fastPforEnabled = true
       }
     ) { native ->
       assertEquals(320U, native.width)
       assertEquals(240U, native.height)
       assertEquals(2.0, native.scale_factor)
       assertEquals(MapMode.STATIC.nativeValue.toUInt(), native.map_mode)
+      assertTrue(native.fast_pfor_enabled)
     }
+  }
+
+  @Test
+  fun mapCreationLeavesFastPforDecodingOffByDefault() {
+    MapHandle.mapOptionsForTesting(MapOptions()) { native -> assertFalse(native.fast_pfor_enabled) }
   }
 
   @Test

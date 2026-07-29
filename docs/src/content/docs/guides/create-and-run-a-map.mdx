@@ -60,6 +60,12 @@ for every frame, so set it to the density you intend to render at.
 `map_mode` selects `CONTINUOUS` for a live map, `STATIC` for one-off stills of
 an arbitrary viewport, or `TILE` for one-off stills of a single tile.
 
+`fast_pfor_enabled` decodes MapLibre Tile (MLT) tiles whose integer streams use
+FastPFOR encodings. Set it when the map reads vector sources created with
+`MLN_STYLE_VECTOR_TILE_ENCODING_MLT` from a tile set that uses FastPFOR. It is
+fixed for the life of the map, and a map created without it decodes every other
+MLT encoding and logs a tile parse warning for the FastPFOR ones.
+
 A map works without a render target. You can load a style, move the camera,
 add sources, and read events on one that has yet to draw a frame.
 

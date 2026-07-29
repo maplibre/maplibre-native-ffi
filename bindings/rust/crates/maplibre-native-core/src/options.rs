@@ -22,6 +22,15 @@ pub struct MapOptions {
     /// styled imagery chosen for this density.
     pub scale_factor: f64,
     pub mode: MapMode,
+    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+    /// encodings, fixed for the lifetime of the map.
+    ///
+    /// Enable this on maps that read vector sources created with
+    /// [`VectorTileEncoding::Mlt`](crate::enums::VectorTileEncoding::Mlt) from a
+    /// tile set that uses FastPFOR. A map created with this `false` decodes
+    /// every other MLT encoding and logs a tile parse warning for the FastPFOR
+    /// ones.
+    pub fast_pfor_enabled: bool,
 }
 
 impl MapOptions {
@@ -42,6 +51,7 @@ impl MapOptions {
         raw.height = self.height;
         raw.scale_factor = self.scale_factor;
         raw.map_mode = self.mode.raw_for_set()?;
+        raw.fast_pfor_enabled = self.fast_pfor_enabled;
         Ok(raw)
     }
 }
@@ -56,6 +66,7 @@ impl Default for MapOptions {
             height: raw.height,
             scale_factor: raw.scale_factor,
             mode: MapMode::from_raw(raw.map_mode),
+            fast_pfor_enabled: raw.fast_pfor_enabled,
         }
     }
 }
@@ -265,6 +276,7 @@ mod tests {
     fn map_options_materializes_defaults_and_fields() {
         let mut options = MapOptions::new(800, 600, 2.0);
         options.mode = MapMode::Static;
+        options.fast_pfor_enabled = true;
         let raw = map_options_to_native(&options).unwrap();
 
         assert_eq!(raw.size, std::mem::size_of::<sys::mln_map_options>() as u32);
@@ -272,6 +284,14 @@ mod tests {
         assert_eq!(raw.height, 600);
         assert_eq!(raw.scale_factor, 2.0);
         assert_eq!(raw.map_mode, sys::MLN_MAP_MODE_STATIC);
+        assert!(raw.fast_pfor_enabled);
+    }
+
+    #[test]
+    fn map_options_leave_fast_pfor_decoding_off_by_default() {
+        let options = MapOptions::default();
+        assert!(!options.fast_pfor_enabled);
+        assert!(!map_options_to_native(&options).unwrap().fast_pfor_enabled);
     }
 
     #[test]

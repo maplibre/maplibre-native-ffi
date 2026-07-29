@@ -4644,6 +4644,7 @@ internal object NativeAccess {
       }
       mln_map_options.map_mode(segment, it.nativeValue)
     }
+    options.fastPforEnabled?.let { mln_map_options.fast_pfor_enabled(segment, it) }
     return segment
   }
 

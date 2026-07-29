@@ -217,11 +217,13 @@ public sealed class OptionsValueSemanticsTests
                     Height = 200,
                     ScaleFactor = 2,
                     MapMode = MapMode.Continuous,
+                    FastPforEnabled = false,
                 },
             options => options.Width = 300,
             options => options.Height = 400,
             options => options.ScaleFactor = 3,
-            options => options.MapMode = MapMode.Static
+            options => options.MapMode = MapMode.Static,
+            options => options.FastPforEnabled = true
         );
     }
 
