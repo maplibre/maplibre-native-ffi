@@ -112,7 +112,7 @@ public sealed unsafe class ResourceProviderTests
     [Fact]
     public void PassThroughFinalizationClosesRequestHandleBeforeNativeRelease()
     {
-        var handle = new ResourceRequestHandle((mln_resource_request_handle*)1234);
+        var handle = new ResourceRequestHandle(SyntheticHandles.ResourceRequest(1234));
 
         var decision = handle.FinishProviderDecision(ResourceProviderDecision.PassThrough);
 
@@ -131,7 +131,7 @@ public sealed unsafe class ResourceProviderTests
     [Fact]
     public void UnknownProviderDecisionReturnsErrorDecisionPath()
     {
-        var handle = new ResourceRequestHandle((mln_resource_request_handle*)1234);
+        var handle = new ResourceRequestHandle(SyntheticHandles.ResourceRequest(1234));
 
         var decision = handle.FinishProviderDecision((ResourceProviderDecision)999);
 
@@ -146,7 +146,7 @@ public sealed unsafe class ResourceProviderTests
         var completeCalls = 0;
         var releaseCalls = 0;
         var handle = new ResourceRequestHandle(
-            (mln_resource_request_handle*)1234,
+            SyntheticHandles.ResourceRequest(1234),
             (_, _) =>
             {
                 completeCalls++;
@@ -189,7 +189,7 @@ public sealed unsafe class ResourceProviderTests
         var completeCalls = 0;
         var releaseCalls = 0;
         var handle = new ResourceRequestHandle(
-            (mln_resource_request_handle*)1234,
+            SyntheticHandles.ResourceRequest(1234),
             (_, _) =>
             {
                 completeCalls++;
@@ -236,7 +236,7 @@ public sealed unsafe class ResourceProviderTests
         var cancelCalls = 0;
         var releaseCalls = 0;
         var handle = new ResourceRequestHandle(
-            (mln_resource_request_handle*)1234,
+            SyntheticHandles.ResourceRequest(1234),
             (_, _) => mln_status.MLN_STATUS_OK,
             (_, cancelled) =>
             {

@@ -430,7 +430,8 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint source_type;
 
-        public void* source;
+        [NativeTypeName("uint64_t")]
+        public ulong source;
 
         [NativeTypeName("int32_t")]
         public int code;
@@ -578,7 +579,7 @@ namespace Maplibre.Native.Internal.C
         public uint size;
 
         [NativeTypeName("mln_resource_provider_callback")]
-        public delegate* unmanaged[Cdecl]<void*, mln_resource_request*, mln_resource_request_handle*, uint> callback;
+        public delegate* unmanaged[Cdecl]<void*, mln_resource_request*, MlnResourceRequest, uint> callback;
 
         public void* user_data;
     }
@@ -598,51 +599,54 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_runtime_options mln_runtime_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_create([NativeTypeName("const mln_runtime_options *")] mln_runtime_options* options, mln_runtime** out_runtime);
+        public static extern mln_status mln_runtime_create([NativeTypeName("const mln_runtime_options *")] mln_runtime_options* options, [NativeTypeName("mln_runtime *")] MlnRuntime* out_runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_set_resource_provider(mln_runtime* runtime, [NativeTypeName("const mln_resource_provider *")] mln_resource_provider* provider);
+        public static extern mln_status mln_runtime_set_resource_provider([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_resource_provider *")] mln_resource_provider* provider);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_clear_resource_provider(mln_runtime* runtime);
+        public static extern mln_status mln_runtime_clear_resource_provider([NativeTypeName("mln_runtime")] MlnRuntime runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_resource_request_complete(mln_resource_request_handle* handle, [NativeTypeName("const mln_resource_response *")] mln_resource_response* response);
+        public static extern mln_status mln_resource_request_complete([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle, [NativeTypeName("const mln_resource_response *")] mln_resource_response* response);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_resource_request_cancelled([NativeTypeName("const mln_resource_request_handle *")] mln_resource_request_handle* handle, bool* out_cancelled);
+        public static extern mln_status mln_resource_request_cancelled([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle, bool* out_cancelled);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_resource_request_release(mln_resource_request_handle* handle);
+        public static extern void mln_resource_request_release([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_set_resource_transform(mln_runtime* runtime, [NativeTypeName("const mln_resource_transform *")] mln_resource_transform* transform);
+        public static extern mln_status mln_resource_request_wait_until_retired([NativeTypeName("mln_resource_request_handle")] MlnResourceRequest handle);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_clear_resource_transform(mln_runtime* runtime);
+        public static extern mln_status mln_runtime_set_resource_transform([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("const mln_resource_transform *")] mln_resource_transform* transform);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_run_ambient_cache_operation_start(mln_runtime* runtime, [NativeTypeName("uint32_t")] uint operation, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
+        public static extern mln_status mln_runtime_clear_resource_transform([NativeTypeName("mln_runtime")] MlnRuntime runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_offline_operation_discard(mln_runtime* runtime, [NativeTypeName("mln_offline_operation_id")] ulong operation_id);
+        public static extern mln_status mln_runtime_run_ambient_cache_operation_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint32_t")] uint operation, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_destroy(mln_runtime* runtime);
+        public static extern mln_status mln_runtime_offline_operation_discard([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_operation_id")] ulong operation_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_pump(mln_runtime* runtime, [NativeTypeName("int64_t")] long timeout_ms);
+        public static extern mln_status mln_runtime_destroy([NativeTypeName("mln_runtime")] MlnRuntime runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_wake_source_acquire(mln_runtime* runtime, mln_wake_source** out_source);
+        public static extern mln_status mln_runtime_pump([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("int64_t")] long timeout_ms);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_wake_source_signal(mln_wake_source* source);
+        public static extern mln_status mln_runtime_wake_source_acquire([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_wake_source *")] MlnWakeSource* out_source);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_wake_source_destroy(mln_wake_source* source);
+        public static extern mln_status mln_wake_source_signal([NativeTypeName("mln_wake_source")] MlnWakeSource source);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_poll_event(mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event);
+        public static extern void mln_wake_source_destroy([NativeTypeName("mln_wake_source")] MlnWakeSource source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_poll_event([NativeTypeName("mln_runtime")] MlnRuntime runtime, mln_runtime_event* out_event, bool* out_has_event);
     }
 }

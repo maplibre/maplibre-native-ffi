@@ -9,11 +9,11 @@ using Maplibre.Native.Json;
 namespace Maplibre.Native.Internal.Struct;
 
 internal unsafe delegate mln_status JsonSnapshotGet(
-    mln_json_snapshot* snapshot,
+    MlnJsonSnapshot snapshot,
     mln_json_value** outValue
 );
 
-internal unsafe delegate void JsonSnapshotDestroy(mln_json_snapshot* snapshot);
+internal delegate void JsonSnapshotDestroy(MlnJsonSnapshot snapshot);
 
 internal static unsafe class ValueStructs
 {
@@ -28,9 +28,9 @@ internal static unsafe class ValueStructs
     [ThreadStatic]
     private static JsonSnapshotDestroy? jsonSnapshotDestroyForTest;
 
-    internal static JsonValue? ReadJsonSnapshot(mln_json_snapshot* snapshot)
+    internal static JsonValue? ReadJsonSnapshot(MlnJsonSnapshot snapshot)
     {
-        if (snapshot is null)
+        if (snapshot.IsNull)
         {
             return null;
         }

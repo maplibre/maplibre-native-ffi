@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# With --check the generated sources are compared against the committed ones
+# instead of replacing them, so drift fails a build rather than appearing as an
+# unexplained diff later.
+check_only=false
+if [[ "${1:-}" == "--check" ]]; then
+  check_only=true
+fi
+
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binding_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$binding_dir/../.." && pwd)"
@@ -117,6 +125,26 @@ for header in "${headers[@]}"; do
     exit 1
   fi
 done
+
+if [[ "$check_only" == true ]]; then
+  # Report the drift rather than just the exit code. ClangSharp parses with
+  # whatever libclang the host provides, so a mismatch needs to name what
+  # actually differs before anyone can act on it.
+  # The output directory also holds hand-maintained files, so compare only the
+  # generated ones.
+  drifted=false
+  for header in "${headers[@]}"; do
+    if ! diff -u "$output_dir/$header.g.cs" "$tmp_output_dir/$header.g.cs"; then
+      drifted=true
+    fi
+  done
+  if [[ "$drifted" == true ]]; then
+    echo "error: the committed ClangSharp bindings differ from a fresh generation" >&2
+    echo "Regenerate with 'mise run //bindings/dotnet:generate' and commit the result." >&2
+    exit 1
+  fi
+  exit 0
+fi
 
 rm -f "$output_dir"/*.g.cs
 mv "$tmp_output_dir"/*.g.cs "$output_dir"/

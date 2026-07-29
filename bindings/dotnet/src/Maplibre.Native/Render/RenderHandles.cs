@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
-using Maplibre.Native.Internal.Handle;
+using Maplibre.Native.Internal.Pointer;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Json;
@@ -12,42 +12,42 @@ using Maplibre.Native.Query;
 namespace Maplibre.Native.Render;
 
 internal unsafe delegate mln_status OpenGLSurfaceAttach(
-    mln_map* map,
+    MlnMap map,
     mln_opengl_surface_descriptor* descriptor,
-    mln_render_session** outSession
+    MlnRenderSession* outSession
 );
 
 internal unsafe delegate mln_status OpenGLOwnedTextureAttach(
-    mln_map* map,
+    MlnMap map,
     mln_opengl_owned_texture_descriptor* descriptor,
-    mln_render_session** outSession
+    MlnRenderSession* outSession
 );
 
 internal unsafe delegate mln_status OpenGLBorrowedTextureAttach(
-    mln_map* map,
+    MlnMap map,
     mln_opengl_borrowed_texture_descriptor* descriptor,
-    mln_render_session** outSession
+    MlnRenderSession* outSession
 );
 
 internal unsafe delegate mln_status RenderSessionResize(
-    mln_render_session* session,
+    MlnRenderSession session,
     uint width,
     uint height,
     double scaleFactor
 );
 
 internal unsafe delegate mln_status RenderSessionRenderUpdate(
-    mln_render_session* session,
+    MlnRenderSession session,
     bool* out_rendered
 );
 
 internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
-    mln_render_session* session,
+    MlnRenderSession session,
     mln_metal_owned_texture_frame* frame
 );
 
 internal unsafe delegate mln_status MetalOwnedTextureReleaseFrame(
-    mln_render_session* session,
+    MlnRenderSession session,
     mln_metal_owned_texture_frame* frame
 );
 
@@ -79,7 +79,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     ) => NativeMethods.mln_render_session_render_update(session, outRendered);
     private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
         NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
-    private static readonly StatusDestroy<mln_render_session> DefaultDestroy = static session =>
+    private static readonly StatusDestroy<MlnRenderSession> DefaultDestroy = static session =>
         NativeMethods.mln_render_session_destroy(session);
     private static readonly MetalOwnedTextureAcquireFrame DefaultAcquireMetalFrame = static (
         session,
@@ -117,7 +117,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     private static TextureRead? textureReadForTest;
 
     [ThreadStatic]
-    private static StatusDestroy<mln_render_session>? destroyForTest;
+    private static StatusDestroy<MlnRenderSession>? destroyForTest;
 
     [ThreadStatic]
     private static MetalOwnedTextureAcquireFrame? acquireMetalFrameForTest;
@@ -140,27 +140,27 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     private readonly object frameGate = new();
     private readonly MapHandle? map;
-    private readonly NativeHandleState<mln_render_session> state;
+    private readonly NativeHandleState<MlnRenderSession> state;
     private bool hasActiveTextureFrame;
 
-    private RenderSessionHandle(MapHandle? map, mln_render_session* handle)
+    private RenderSessionHandle(MapHandle? map, MlnRenderSession handle)
         : this(map, handle, DestroyNative) { }
 
     private RenderSessionHandle(
         MapHandle? map,
-        mln_render_session* handle,
-        StatusDestroy<mln_render_session> destroy
+        MlnRenderSession handle,
+        StatusDestroy<MlnRenderSession> destroy
     )
     {
         this.map = map;
-        state = new NativeHandleState<mln_render_session>(
+        state = new NativeHandleState<MlnRenderSession>(
             handle,
             destroy,
             nameof(RenderSessionHandle)
         );
     }
 
-    internal static RenderSessionHandle CreateForTest(mln_render_session* handle) =>
+    internal static RenderSessionHandle CreateForTest(MlnRenderSession handle) =>
         new(null, handle, static _ => mln_status.MLN_STATUS_OK);
 
     internal static IDisposable UseOpenGLAttachMethodsForTest(
@@ -186,7 +186,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         RenderSessionResize resize,
         RenderSessionRenderUpdate renderUpdate,
         TextureRead textureRead,
-        StatusDestroy<mln_render_session> destroy
+        StatusDestroy<MlnRenderSession> destroy
     )
     {
         var previousResize = resizeForTest;
@@ -239,8 +239,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
-        NativeStatus.Check(NativeMethods.mln_metal_surface_attach(map.Pointer, &native, &session));
+        MlnRenderSession session = default;
+        NativeStatus.Check(NativeMethods.mln_metal_surface_attach(map.Handle, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
@@ -251,8 +251,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
-        NativeStatus.Check(NativeMethods.mln_vulkan_surface_attach(map.Pointer, &native, &session));
+        MlnRenderSession session = default;
+        NativeStatus.Check(NativeMethods.mln_vulkan_surface_attach(map.Handle, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
@@ -263,8 +263,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
-        NativeStatus.Check(OpenGLSurfaceAttachNative(map.Pointer, &native, &session));
+        MlnRenderSession session = default;
+        NativeStatus.Check(OpenGLSurfaceAttachNative(map.Handle, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
@@ -275,9 +275,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
+        MlnRenderSession session = default;
         NativeStatus.Check(
-            NativeMethods.mln_metal_owned_texture_attach(map.Pointer, &native, &session)
+            NativeMethods.mln_metal_owned_texture_attach(map.Handle, &native, &session)
         );
         return new RenderSessionHandle(map, session);
     }
@@ -289,9 +289,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
+        MlnRenderSession session = default;
         NativeStatus.Check(
-            NativeMethods.mln_metal_borrowed_texture_attach(map.Pointer, &native, &session)
+            NativeMethods.mln_metal_borrowed_texture_attach(map.Handle, &native, &session)
         );
         return new RenderSessionHandle(map, session);
     }
@@ -303,9 +303,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
+        MlnRenderSession session = default;
         NativeStatus.Check(
-            NativeMethods.mln_vulkan_owned_texture_attach(map.Pointer, &native, &session)
+            NativeMethods.mln_vulkan_owned_texture_attach(map.Handle, &native, &session)
         );
         return new RenderSessionHandle(map, session);
     }
@@ -317,9 +317,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
+        MlnRenderSession session = default;
         NativeStatus.Check(
-            NativeMethods.mln_vulkan_borrowed_texture_attach(map.Pointer, &native, &session)
+            NativeMethods.mln_vulkan_borrowed_texture_attach(map.Handle, &native, &session)
         );
         return new RenderSessionHandle(map, session);
     }
@@ -331,8 +331,8 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
-        NativeStatus.Check(OpenGLOwnedTextureAttachNative(map.Pointer, &native, &session));
+        MlnRenderSession session = default;
+        NativeStatus.Check(OpenGLOwnedTextureAttachNative(map.Handle, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
@@ -343,12 +343,12 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
-        mln_render_session* session = null;
-        NativeStatus.Check(OpenGLBorrowedTextureAttachNative(map.Pointer, &native, &session));
+        MlnRenderSession session = default;
+        NativeStatus.Check(OpenGLBorrowedTextureAttachNative(map.Handle, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
-    internal mln_render_session* Pointer => state.Pointer;
+    internal MlnRenderSession Handle => state.Handle;
 
     public bool IsClosed => state.IsClosed;
 
@@ -363,7 +363,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public void Resize(uint width, uint height, double scaleFactor)
     {
         ThrowIfTextureFrameActive(nameof(Resize));
-        NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
+        NativeStatus.Check(ResizeNative(Handle, width, height, scaleFactor));
     }
 
     /// <summary>
@@ -380,29 +380,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ThrowIfTextureFrameActive(nameof(RenderUpdate));
         var rendered = false;
-        NativeStatus.Check(RenderUpdateNative(Pointer, &rendered));
+        NativeStatus.Check(RenderUpdateNative(Handle, &rendered));
         return rendered;
     }
 
     public void Detach()
     {
         ThrowIfTextureFrameActive(nameof(Detach));
-        NativeStatus.Check(NativeMethods.mln_render_session_detach(Pointer));
+        NativeStatus.Check(NativeMethods.mln_render_session_detach(Handle));
     }
 
     public void ReduceMemoryUse()
     {
-        NativeStatus.Check(NativeMethods.mln_render_session_reduce_memory_use(Pointer));
+        NativeStatus.Check(NativeMethods.mln_render_session_reduce_memory_use(Handle));
     }
 
     public void ClearData()
     {
-        NativeStatus.Check(NativeMethods.mln_render_session_clear_data(Pointer));
+        NativeStatus.Check(NativeMethods.mln_render_session_clear_data(Handle));
     }
 
     public void DumpDebugLogs()
     {
-        NativeStatus.Check(NativeMethods.mln_render_session_dump_debug_logs(Pointer));
+        NativeStatus.Check(NativeMethods.mln_render_session_dump_debug_logs(Handle));
     }
 
     public void SetFeatureState(FeatureStateSelector selector, JsonValue value)
@@ -412,7 +412,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         var selectorValue = nativeSelector.Value;
         NativeStatus.Check(
             NativeMethods.mln_render_session_set_feature_state(
-                Pointer,
+                Handle,
                 &selectorValue,
                 nativeValue.Pointer
             )
@@ -423,9 +423,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         using var nativeSelector = NativeFeatureStateSelector.From(selector);
         var selectorValue = nativeSelector.Value;
-        mln_json_snapshot* snapshot = null;
+        MlnJsonSnapshot snapshot = default;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_get_feature_state(Pointer, &selectorValue, &snapshot)
+            NativeMethods.mln_render_session_get_feature_state(Handle, &selectorValue, &snapshot)
         );
         return ValueStructs.ReadJsonSnapshot(snapshot) ?? new JsonValue.Object([]);
     }
@@ -435,7 +435,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeSelector = NativeFeatureStateSelector.From(selector);
         var selectorValue = nativeSelector.Value;
         NativeStatus.Check(
-            NativeMethods.mln_render_session_remove_feature_state(Pointer, &selectorValue)
+            NativeMethods.mln_render_session_remove_feature_state(Handle, &selectorValue)
         );
     }
 
@@ -481,10 +481,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
         using var nativeArguments = arguments is null ? null : NativeJsonValue.From(arguments);
         var featureValue = nativeFeature.Value;
-        mln_feature_extension_result* result = null;
+        MlnFeatureExtensionResult result = default;
         NativeStatus.Check(
             NativeMethods.mln_render_session_query_feature_extensions(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 &featureValue,
                 nativeExtension.Value,
@@ -500,7 +500,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     {
         ThrowIfTextureFrameActive(nameof(TextureImageInfo));
         var info = new mln_texture_image_info { size = (uint)sizeof(mln_texture_image_info) };
-        var status = TextureReadNative(Pointer, null, 0, &info);
+        var status = TextureReadNative(Handle, null, 0, &info);
         var copied = RenderStructs.FromNative(info);
         if (
             status == mln_status.MLN_STATUS_OK
@@ -523,7 +523,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         {
             NativeStatus.Check(
                 TextureReadNative(
-                    Pointer,
+                    Handle,
                     buffer.ByteLength == 0 ? null : data,
                     (nuint)buffer.ByteLength,
                     &info
@@ -545,7 +545,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             pointer = (mln_metal_owned_texture_frame*)
                 NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
             pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
-            NativeStatus.Check(AcquireMetalFrameNative(Pointer, pointer));
+            NativeStatus.Check(AcquireMetalFrameNative(Handle, pointer));
             acquired = true;
             scope = new FrameScope(nameof(MetalOwnedTextureFrame));
             var frame = ReadMetalFrame(*pointer, scope);
@@ -588,7 +588,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             pointer = (mln_vulkan_owned_texture_frame*)
                 NativeMemory.AllocZeroed((nuint)sizeof(mln_vulkan_owned_texture_frame));
             pointer->size = (uint)sizeof(mln_vulkan_owned_texture_frame);
-            NativeStatus.Check(AcquireVulkanFrameNative(Pointer, pointer));
+            NativeStatus.Check(AcquireVulkanFrameNative(Handle, pointer));
             acquired = true;
             scope = new FrameScope(nameof(VulkanOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
@@ -631,7 +631,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             pointer = (mln_opengl_owned_texture_frame*)
                 NativeMemory.AllocZeroed((nuint)sizeof(mln_opengl_owned_texture_frame));
             pointer->size = (uint)sizeof(mln_opengl_owned_texture_frame);
-            NativeStatus.Check(AcquireOpenGLFrameNative(Pointer, pointer));
+            NativeStatus.Check(AcquireOpenGLFrameNative(Handle, pointer));
             acquired = true;
             scope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
@@ -663,13 +663,13 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 
     internal mln_status ReleaseMetalFrame(mln_metal_owned_texture_frame* frame) =>
-        ReleaseMetalFrameNative(Pointer, frame);
+        ReleaseMetalFrameNative(Handle, frame);
 
     internal mln_status ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame) =>
-        NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame);
+        NativeMethods.mln_vulkan_owned_texture_release_frame(Handle, frame);
 
     internal mln_status ReleaseOpenGLFrame(mln_opengl_owned_texture_frame* frame) =>
-        NativeMethods.mln_opengl_owned_texture_release_frame(Pointer, frame);
+        NativeMethods.mln_opengl_owned_texture_release_frame(Handle, frame);
 
     private void ReleaseAcquiredFrameAfterConstructionFailure<T>(
         T* pointer,
@@ -690,7 +690,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 new NativeLeakReport(
                     NativeLeakReportKind.DisposeFailed,
                     typeName,
-                    (nint)pointer,
+                    0,
                     status,
                     $"Construction failed after acquiring {typeName} frame 0x{(nint)pointer:x}; cleanup returned {status}."
                 )
@@ -702,7 +702,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 new NativeLeakReport(
                     NativeLeakReportKind.DisposeFailed,
                     typeName,
-                    (nint)pointer,
+                    0,
                     null,
                     $"Construction failed after acquiring {typeName} frame 0x{(nint)pointer:x}; cleanup threw {error.GetType().Name}: {error.Message}"
                 )
@@ -726,7 +726,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     private static TextureRead TextureReadNative => textureReadForTest ?? DefaultTextureRead;
 
-    private static mln_status DestroyNative(mln_render_session* session) =>
+    private static mln_status DestroyNative(MlnRenderSession session) =>
         (destroyForTest ?? DefaultDestroy)(session);
 
     private static MetalOwnedTextureAcquireFrame AcquireMetalFrameNative =>
@@ -767,7 +767,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         RenderSessionResize? previousResize,
         RenderSessionRenderUpdate? previousRenderUpdate,
         TextureRead? previousTextureRead,
-        StatusDestroy<mln_render_session>? previousDestroy
+        StatusDestroy<MlnRenderSession>? previousDestroy
     ) : IDisposable
     {
         public void Dispose()
@@ -815,12 +815,12 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             ? null
             : NativeRenderedFeatureQueryOptions.From(options);
         var geometryValue = nativeGeometry.Value;
-        mln_feature_query_result* result = null;
+        MlnFeatureQueryResult result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
                 NativeMethods.mln_render_session_query_rendered_features(
-                    Pointer,
+                    Handle,
                     &geometryValue,
                     null,
                     &result
@@ -832,7 +832,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             var optionsValue = nativeOptions.Value;
             NativeStatus.Check(
                 NativeMethods.mln_render_session_query_rendered_features(
-                    Pointer,
+                    Handle,
                     &geometryValue,
                     &optionsValue,
                     &result
@@ -851,12 +851,12 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var nativeOptions = options is null
             ? null
             : NativeSourceFeatureQueryOptions.From(options);
-        mln_feature_query_result* result = null;
+        MlnFeatureQueryResult result = default;
         if (nativeOptions is null)
         {
             NativeStatus.Check(
                 NativeMethods.mln_render_session_query_source_features(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     null,
                     &result
@@ -868,7 +868,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             var optionsValue = nativeOptions.Value;
             NativeStatus.Check(
                 NativeMethods.mln_render_session_query_source_features(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     &optionsValue,
                     &result
@@ -928,7 +928,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
             new NativeLeakReport(
                 NativeLeakReportKind.DisposeFailed,
                 nameof(RenderSessionHandle),
-                (nint)Pointer,
+                Handle.Value,
                 null,
                 "Dispose could not close RenderSessionHandle while a texture frame is active. Release the frame on the owner thread, then call Close() to observe errors and retry."
             )
@@ -965,17 +965,17 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 internal unsafe delegate mln_status FrameRelease<T>(RenderSessionHandle session, T* frame)
     where T : unmanaged;
 internal unsafe delegate mln_status TextureRead(
-    mln_render_session* session,
+    MlnRenderSession session,
     byte* data,
     nuint length,
     mln_texture_image_info* info
 );
 internal unsafe delegate mln_status VulkanOwnedTextureAcquireFrame(
-    mln_render_session* session,
+    MlnRenderSession session,
     mln_vulkan_owned_texture_frame* frame
 );
 internal unsafe delegate mln_status OpenGLOwnedTextureAcquireFrame(
-    mln_render_session* session,
+    MlnRenderSession session,
     mln_opengl_owned_texture_frame* frame
 );
 
@@ -1053,7 +1053,7 @@ internal sealed unsafe class TextureFrameState<T>
                 new NativeLeakReport(
                     NativeLeakReportKind.DisposeFailed,
                     typeName,
-                    (nint)pointer,
+                    0,
                     status,
                     $"Dispose could not release {typeName} frame 0x{(nint)pointer:x}; native release returned {status}. Call Close() on the owner thread to observe the error and retry."
                 )
@@ -1070,7 +1070,7 @@ internal sealed unsafe class TextureFrameState<T>
             new NativeLeakReport(
                 NativeLeakReportKind.DisposeFailed,
                 typeName,
-                (nint)pointer,
+                0,
                 null,
                 $"Dispose could not release {typeName} frame 0x{(nint)pointer:x}; the parent RenderSessionHandle is already closed."
             )

@@ -184,7 +184,7 @@ public sealed unsafe class OfflineStructTests
         );
 
         Assert.Throws<InvalidOperationException>(() =>
-            OfflineStructs.ReadList((mln_offline_region_list*)1234)
+            OfflineStructs.ReadList(SyntheticHandles.OfflineRegionList(1234))
         );
 
         Assert.Equal(1, destroyCalls);
