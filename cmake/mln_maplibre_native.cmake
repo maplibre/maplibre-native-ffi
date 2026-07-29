@@ -27,7 +27,9 @@ function(mln_add_maplibre_native)
     # The vendored tile-spec library's Unix -Wall flag means -Weverything to
     # clang-cl. Neutralize it to match the dependency's MSVC warning behavior.
     foreach(MLN_FFI_MLT_TARGET mlt-cpp mlt-cpp-encoder)
-      target_compile_options(${MLN_FFI_MLT_TARGET} PRIVATE -Wno-everything)
+      if(TARGET ${MLN_FFI_MLT_TARGET})
+        target_compile_options(${MLN_FFI_MLT_TARGET} PRIVATE -Wno-everything)
+      endif()
     endforeach()
   endif()
 
@@ -38,10 +40,12 @@ function(mln_add_maplibre_native)
       PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
 
     foreach(MLN_FFI_MLT_TARGET mlt-cpp mlt-cpp-encoder)
-      target_include_directories(
-        ${MLN_FFI_MLT_TARGET}
-        BEFORE
-        PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+      if(TARGET ${MLN_FFI_MLT_TARGET})
+        target_include_directories(
+          ${MLN_FFI_MLT_TARGET}
+          BEFORE
+          PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+      endif()
     endforeach()
   endif()
 
