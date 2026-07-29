@@ -330,7 +330,15 @@ impl NativeMapAttachReference {
             .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
             .take()
             .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
-        transfers.insert(token, address);
+        transfers.insert(token.clone(), address);
+        if let Err(spawn_error) =
+            crate::transfer::schedule_expiry(map_attach_transfers(), token.clone())
+        {
+            transfers.remove(&token);
+            return Err(error::invalid_state(format!(
+                "map attach transfer expiry could not be scheduled: {spawn_error}"
+            )));
+        }
         Ok(())
     }
 }

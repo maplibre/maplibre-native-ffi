@@ -1206,6 +1206,7 @@ export declare class MapHandle {
   getDebugOptions(): MapDebugOption[];
   getDebugOptionsRawMask(): number;
   setDebugOptions(options: Iterable<MapDebugOption>): void;
+  setDebugOptionsRawMask(mask: number): void;
   getViewportOptions(): MapViewportOptions;
   setViewportOptions(
     options: MapViewportOptionsInput | MapViewportOptions,

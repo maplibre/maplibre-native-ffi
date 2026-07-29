@@ -1708,6 +1708,13 @@ test("resource provider routes validate Node handoff shape", async () => {
     assert.equal(received.completionToken, undefined);
     assert.equal(received.handle instanceof ResourceRequestHandle, true);
     assert.equal(received.handle.closed, false);
+    for (const invalidResponse of [null, "ok", 1, [], new Date(0)]) {
+      assert.throws(
+        () => received.handle.complete(/** @type {any} */ (invalidResponse)),
+        InvalidArgumentError,
+      );
+      assert.equal(received.handle.closed, false);
+    }
     for (const errorReason of [1.5, -1, 2 ** 32]) {
       assert.throws(
         () => received.handle.complete({ errorReason }),
@@ -2901,6 +2908,19 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
         }),
       /JSON numbers must be finite/,
     );
+    for (const invalidValue of [undefined, () => {}, Symbol("invalid"), 1n]) {
+      assert.throws(
+        () =>
+          map.addStyleSourceJson(
+            "non-json",
+            /** @type {any} */ ({
+              type: "geojson",
+              data: { invalid: invalidValue },
+            }),
+          ),
+        InvalidArgumentError,
+      );
+    }
     map.addCustomGeometrySource("custom-geometry", {
       fetchTile() {},
       cancelTile() {},
@@ -3204,6 +3224,7 @@ test("map debug options map stable strings to native bitmasks", () => {
     map.setDebugOptions(["tileBorders", "collision"]);
     assert.deepEqual(map.getDebugOptions(), ["tileBorders", "collision"]);
     assert.equal(typeof map.getDebugOptionsRawMask(), "number");
+    map.setDebugOptionsRawMask(map.getDebugOptionsRawMask());
     map.setDebugOptions([]);
     assert.deepEqual(map.getDebugOptions(), []);
     assert.throws(
@@ -3221,6 +3242,21 @@ test("map debug options map stable strings to native bitmasks", () => {
       }),
       0x40000000,
     );
+    let restoredMask = 0;
+    MapHandle.prototype.setDebugOptionsRawMask.call(
+      {
+        native: {
+          closed: false,
+          /** @param {number} mask */
+          setDebugOptionsRaw(mask) {
+            restoredMask = mask;
+          },
+        },
+      },
+      0x80000000,
+    );
+    assert.equal(restoredMask, 0x80000000);
+    assert.throws(() => map.setDebugOptionsRawMask(-1), InvalidArgumentError);
   } finally {
     map.close();
     runtime.close();

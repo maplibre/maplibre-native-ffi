@@ -309,7 +309,7 @@ function resourceKindInput(kind) {
 
 function resourceMatcherInputs(matchers) {
   return matchers.map((matcher) => {
-    if (!isResourceMatcherRecord(matcher)) {
+    if (!isPlainObject(matcher)) {
       throw new InvalidArgumentError(
         null,
         "resource matcher entries must be plain or null-prototype objects",
@@ -321,7 +321,7 @@ function resourceMatcherInputs(matchers) {
   });
 }
 
-function isResourceMatcherRecord(value) {
+function isPlainObject(value) {
   if (value == null || typeof value !== "object" || Array.isArray(value)) {
     return false;
   }
@@ -1279,6 +1279,12 @@ class ResourceRequestHandle {
     assertHandleEnvironment(this);
     if (this.#closed) {
       throw new InvalidStateError(null, "ResourceRequestHandle is closed");
+    }
+    if (!isPlainObject(response)) {
+      throw new InvalidArgumentError(
+        null,
+        "resource response must be a plain object",
+      );
     }
     let consumed = false;
     try {
@@ -2647,8 +2653,14 @@ class MapHandle {
     for (const option of options) {
       mask |= mapDebugOptionMaskBit(option);
     }
+    return this.setDebugOptionsRawMask(mask);
+  }
+
+  setDebugOptionsRawMask(mask) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).setDebugOptionsRaw(mask),
+      liveNativeOf(this).setDebugOptionsRaw(
+        unsigned32(mask, "debug options raw mask"),
+      ),
     );
   }
 
@@ -3365,6 +3377,17 @@ function stringifyJson(value) {
   let json;
   try {
     json = JSON.stringify(value, (_key, item) => {
+      if (
+        item === undefined ||
+        typeof item === "function" ||
+        typeof item === "symbol" ||
+        typeof item === "bigint"
+      ) {
+        throw new InvalidArgumentError(
+          null,
+          "JSON values must not contain undefined, functions, symbols, or bigints",
+        );
+      }
       if (typeof item === "number" && !Number.isFinite(item)) {
         throw new InvalidArgumentError(null, "JSON numbers must be finite");
       }
