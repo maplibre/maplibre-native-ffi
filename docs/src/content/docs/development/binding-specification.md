@@ -850,11 +850,12 @@ thread or race release on the same owner-thread handle, include:
 When the binding's test suite attaches a render session on a configured render
 backend and the host language can start a native thread, include:
 
-| ID      | Test                                                                                                                                                 |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-193 | A native thread that does not own the map attaches its own render session against it and renders while the map is pumped on its own owner thread.    |
-| BND-194 | Every render-session operation reports the binding's wrong-thread error on a thread other than the one that attached the session, leaving it usable. |
-| BND-195 | A session attached and closed on a second native thread destroys the native handle exactly once, after which the map closes successfully.            |
+| ID      | Test                                                                                                                                                  |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-193 | A native thread that does not own the map attaches its own render session against it and renders while the map is pumped on its own owner thread.     |
+| BND-194 | Every render-session operation reports the binding's wrong-thread error on a thread other than the one that attached the session, leaving it usable.  |
+| BND-195 | A session attached and closed on a second native thread destroys the native handle exactly once, after which the map closes successfully.             |
+| BND-196 | Attaching through a reference to a released map reports the binding's invalid-argument error naming the map stale, including once a later map exists. |
 
 #### Live render session queries
 
