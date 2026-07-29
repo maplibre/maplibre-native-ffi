@@ -382,7 +382,11 @@ namespace MaplibreNative {
             if ((native.fields & (uint32) Raw.QueriedFeatureField.SOURCE_LAYER_ID) != 0) {
                 source_layer_id = new Utf8String.from_bytes (copy_string_view_bytes (native.source_layer_id));
             }
-            if ((native.fields & (uint32) Raw.QueriedFeatureField.STATE) != 0 && native.state != null) {
+            if ((native.fields & (uint32) Raw.QueriedFeatureField.STATE) != 0) {
+                if (native.state == null) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("queried feature state is null");
+                }
                 state = JsonValue.from_native (native.state[0]);
             }
             return new QueriedFeature (Feature.from_native (native.feature), source_id, source_layer_id, state);

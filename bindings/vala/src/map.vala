@@ -1028,7 +1028,8 @@ namespace MaplibreNative {
         }
 
         public void add_vector_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
+            Utf8String[] tile_storage;
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles, out tile_storage);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             StyleTileSourceOptions? options_storage = null;
@@ -1069,7 +1070,8 @@ namespace MaplibreNative {
         }
 
         public void add_raster_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
+            Utf8String[] tile_storage;
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles, out tile_storage);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             StyleTileSourceOptions? options_storage = null;
@@ -1110,7 +1112,8 @@ namespace MaplibreNative {
         }
 
         public void add_raster_dem_source_tiles_utf8 (Utf8String source_id, Utf8String[] tiles, StyleTileSourceOptions? options = null) throws Error {
-            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles);
+            Utf8String[] tile_storage;
+            Raw.StringView[] tile_views = string_views_for_tiles_utf8 (tiles, out tile_storage);
             Raw.StyleTileSourceOptions native_options = {};
             Raw.StyleTileSourceOptions* options_ptr = null;
             StyleTileSourceOptions? options_storage = null;

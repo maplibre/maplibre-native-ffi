@@ -873,6 +873,7 @@ namespace MaplibreNative {
         private Mutex mutex;
         private bool completed;
         private bool provider_decision_pending = true;
+        private bool release_pending;
 
         public bool released {
             get {
@@ -928,6 +929,10 @@ namespace MaplibreNative {
         }
 
         public void complete (ResourceResponse response) throws Error {
+            if (response == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("resource response is null");
+            }
             var response_storage = response.copy ();
             var native_response = response_storage.to_native ();
             mutex.lock ();
@@ -968,9 +973,9 @@ namespace MaplibreNative {
         public void release () throws Error {
             mutex.lock ();
             if (provider_decision_pending) {
+                release_pending = true;
                 mutex.unlock ();
-                clear_unknown_status ();
-                throw new Error.INVALID_STATE ("resource request handle ownership transfers only after the provider callback returns HANDLE");
+                return;
             }
             unowned Raw.ResourceRequestHandle? live = native;
             native = null;
@@ -990,6 +995,10 @@ namespace MaplibreNative {
             if (native == null) {
                 native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
             } else if (completed) {
+                release_after_unlock = native;
+                native = null;
+                native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
+            } else if (decision == ResourceProviderDecision.HANDLE && release_pending) {
                 release_after_unlock = native;
                 native = null;
                 native_decision = (uint32) Raw.ResourceProviderDecision.HANDLE;
@@ -1090,6 +1099,10 @@ namespace MaplibreNative {
             message_storage = copy_sized_utf8 (native.message, native.message_size, "runtime event message");
             payload_storage = copy_sized_bytes ((uint8*) native.payload, native.payload_size, "runtime event payload");
             if (native.payload == null) {
+                if (payload_type != RuntimeEventPayloadType.NONE) {
+                    clear_unknown_status ();
+                    throw new Error.INVALID_ARGUMENT ("runtime event payload is null for payload type %u", native.payload_type);
+                }
                 return;
             }
             switch (payload_type) {

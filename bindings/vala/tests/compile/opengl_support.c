@@ -15,6 +15,7 @@ typedef struct MlnValaOpenGLTestContext {
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+#include <GLES3/gl3.h>
 
 bool mln_vala_opengl_test_context_supported(void) { return true; }
 
@@ -137,8 +138,26 @@ void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
   *context = (MlnValaOpenGLTestContext){0};
 }
 
+uint32_t mln_vala_opengl_test_texture_create(uint32_t width, uint32_t height) {
+  GLuint texture = 0;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexImage2D(
+    GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)width, (GLsizei)height, 0, GL_RGBA,
+    GL_UNSIGNED_BYTE, NULL
+  );
+  glBindTexture(GL_TEXTURE_2D, 0);
+  return texture;
+}
+
+void mln_vala_opengl_test_texture_destroy(uint32_t texture) {
+  GLuint value = texture;
+  glDeleteTextures(1, &value);
+}
+
 #elif defined(MLN_VALA_TEST_WGL)
 
+#include <GL/gl.h>
 #include <windows.h>
 
 bool mln_vala_opengl_test_context_supported(void) { return true; }
@@ -221,6 +240,23 @@ void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
   *context = (MlnValaOpenGLTestContext){0};
 }
 
+uint32_t mln_vala_opengl_test_texture_create(uint32_t width, uint32_t height) {
+  GLuint texture = 0;
+  glGenTextures(1, &texture);
+  glBindTexture(GL_TEXTURE_2D, texture);
+  glTexImage2D(
+    GL_TEXTURE_2D, 0, GL_RGBA, (GLsizei)width, (GLsizei)height, 0, GL_RGBA,
+    GL_UNSIGNED_BYTE, NULL
+  );
+  glBindTexture(GL_TEXTURE_2D, 0);
+  return texture;
+}
+
+void mln_vala_opengl_test_texture_destroy(uint32_t texture) {
+  GLuint value = texture;
+  glDeleteTextures(1, &value);
+}
+
 #else
 
 bool mln_vala_opengl_test_context_supported(void) { return false; }
@@ -239,5 +275,13 @@ bool mln_vala_opengl_test_context_create(
 void mln_vala_opengl_test_context_destroy(MlnValaOpenGLTestContext* context) {
   (void)context;
 }
+
+uint32_t mln_vala_opengl_test_texture_create(uint32_t width, uint32_t height) {
+  (void)width;
+  (void)height;
+  return 0;
+}
+
+void mln_vala_opengl_test_texture_destroy(uint32_t texture) { (void)texture; }
 
 #endif

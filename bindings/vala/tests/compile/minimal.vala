@@ -92,6 +92,12 @@ extern bool opengl_test_context_create(uint32 width, uint32 height, out OpenGLTe
 [CCode(cname = "mln_vala_opengl_test_context_destroy")]
 extern void opengl_test_context_destroy(ref OpenGLTestContext context);
 
+[CCode(cname = "mln_vala_opengl_test_texture_create")]
+extern uint32 opengl_test_texture_create(uint32 width, uint32 height);
+
+[CCode(cname = "mln_vala_opengl_test_texture_destroy")]
+extern void opengl_test_texture_destroy(uint32 texture);
+
 int log_count = 0;
 int resource_transform_count = 0;
 int resource_provider_request_count = 0;
@@ -409,6 +415,25 @@ void exercise_json_null_rejection() throws MaplibreNative.Error {
   }
 
   MaplibreNative.JsonMember[] null_members = new MaplibreNative.JsonMember[1];
+  MaplibreNative.Geometry[] null_geometry = new MaplibreNative.Geometry[1];
+  try {
+    new MaplibreNative.Feature(null_geometry[0], {});
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "feature geometry is null");
+  }
+  try {
+    MaplibreNative.GeoJson.geometry(null_geometry[0]);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "GeoJSON geometry is null");
+  }
+  try {
+    new MaplibreNative.CustomGeometrySourceOptions(null);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "custom geometry fetch callback is null");
+  }
   try {
     MaplibreNative.JsonValue.object_value(null_members);
     assert_not_reached();
@@ -560,6 +585,27 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   assert(transition_event.camera_transition_finished.transition_id == 42);
   assert(transition_event.equal(transition_event.copy()));
   assert(!transition_event.equal(event));
+
+  native_event.payload = null;
+  native_event.payload_size = 0;
+  try {
+    new MaplibreNative.RuntimeEvent(runtime, native_event);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message.has_prefix("runtime event payload is null"));
+  }
+
+  var queried_geometry = MaplibreNative.Geometry.point(MaplibreNative.LatLng(0.0, 0.0));
+  var queried_feature_value = new MaplibreNative.Feature(queried_geometry, {});
+  MaplibreNative.Raw.QueriedFeature queried_feature = {};
+  queried_feature.feature = queried_feature_value.to_native();
+  queried_feature.fields = (uint32) MaplibreNative.Raw.QueriedFeatureField.STATE;
+  try {
+    MaplibreNative.QueriedFeature.from_native(queried_feature);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+    assert(error.message == "queried feature state is null");
+  }
 
   native_event.type = (uint32) MaplibreNative.RuntimeEventType.MAP_CAMERA_WILL_CHANGE;
   native_event.code = (int32) MaplibreNative.CameraChangeMode.ANIMATED;
@@ -994,6 +1040,12 @@ MaplibreNative.ResourceProviderDecision provide_resource(MaplibreNative.Resource
   }
   try {
     var response = MaplibreNative.ResourceResponse.data(bytes_from_string("{\"version\":8,\"sources\":{},\"layers\":[]}"));
+    MaplibreNative.ResourceResponse[] null_responses = new MaplibreNative.ResourceResponse[1];
+    try {
+      handle.complete(null_responses[0]);
+    } catch (MaplibreNative.Error.INVALID_ARGUMENT error) {
+      increment_callback_count(ref resource_provider_one_shot_error_count);
+    }
     try {
       handle.release();
     } catch (MaplibreNative.Error error) {
@@ -2147,6 +2199,34 @@ int main() {
         opengl_frame.close();
         opengl_session.detach();
         opengl_session.close();
+
+        var borrowed_texture = opengl_test_texture_create(32, 16);
+        assert(borrowed_texture != 0);
+        try {
+          var borrowed_descriptor = new MaplibreNative.OpenGLBorrowedTextureDescriptor(opengl_context, borrowed_texture, 0x0DE1);
+          borrowed_descriptor.width = 32;
+          borrowed_descriptor.height = 16;
+          borrowed_descriptor.physical_width = 32;
+          borrowed_descriptor.physical_height = 16;
+          borrowed_descriptor.scale_factor = 1.0;
+          var borrowed_session = map.attach_opengl_borrowed_texture(borrowed_descriptor);
+          borrowed_session.resize(32, 16, 1.0);
+          borrowed_session.detach();
+          borrowed_session.close();
+        } finally {
+          opengl_test_texture_destroy(borrowed_texture);
+        }
+
+        var surface_descriptor = new MaplibreNative.OpenGLSurfaceDescriptor(
+          opengl_context,
+          MaplibreNative.NativePointer.borrowed((size_t) opengl_context_storage.surface));
+        surface_descriptor.width = 32;
+        surface_descriptor.height = 16;
+        surface_descriptor.scale_factor = 1.0;
+        var surface_session = map.attach_opengl_surface(surface_descriptor);
+        surface_session.resize(32, 16, 1.0);
+        surface_session.detach();
+        surface_session.close();
       } finally {
         opengl_test_context_destroy(ref opengl_context_storage);
       }

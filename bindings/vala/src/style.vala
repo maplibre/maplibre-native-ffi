@@ -140,7 +140,11 @@ namespace MaplibreNative {
         public bool? clip { get; set; }
         public bool? wrap { get; set; }
 
-        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback fetch_tile, owned CustomGeometryTileCallback? cancel_tile = null) {
+        public CustomGeometrySourceOptions (owned CustomGeometryTileCallback fetch_tile, owned CustomGeometryTileCallback? cancel_tile = null) throws Error {
+            if (fetch_tile == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("custom geometry fetch callback is null");
+            }
             this.fetch_tile = (owned) fetch_tile;
             this.cancel_tile = (owned) cancel_tile;
         }
@@ -558,18 +562,20 @@ namespace MaplibreNative {
         }
     }
 
-    internal Raw.StringView[] string_views_for_tiles_utf8 (Utf8String[] tiles) throws Error {
+    internal Raw.StringView[] string_views_for_tiles_utf8 (Utf8String[] tiles, out Utf8String[] storage) throws Error {
         if (tiles.length == 0) {
             clear_unknown_status ();
             throw new Error.INVALID_ARGUMENT ("tile URL list is empty");
         }
+        storage = new Utf8String[tiles.length];
         Raw.StringView[] views = new Raw.StringView[tiles.length];
         for (var index = 0; index < tiles.length; index++) {
             if (tiles[index] == null) {
                 clear_unknown_status ();
                 throw new Error.INVALID_ARGUMENT ("tile URL is null");
             }
-            views[index] = tiles[index].to_native ();
+            storage[index] = tiles[index].copy ();
+            views[index] = storage[index].to_native ();
         }
         return views;
     }
