@@ -21,9 +21,9 @@ func TestReleasedMapIDReplayedAfterANewMapReportsItStale(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewMap(): %v", err)
 	}
-	released, release, err := first.nativeMapIDForTest()
+	released, release, err := first.ptr()
 	if err != nil {
-		t.Fatalf("nativeMapIDForTest(): %v", err)
+		t.Fatalf("ptr(): %v", err)
 	}
 	release()
 	if err := first.Close(); err != nil {
@@ -68,9 +68,9 @@ func TestMapIDPassedToARuntimeOperationReportsInvalidArgument(t *testing.T) {
 	}
 	defer m.Close()
 
-	mapID, release, err := m.nativeMapIDForTest()
+	mapID, release, err := m.ptr()
 	if err != nil {
-		t.Fatalf("nativeMapIDForTest(): %v", err)
+		t.Fatalf("ptr(): %v", err)
 	}
 	defer release()
 
@@ -101,9 +101,9 @@ func TestLiveMapIDCalledFromAnotherThreadReportsWrongThread(t *testing.T) {
 	}
 	defer m.Close()
 
-	live, release, err := m.nativeMapIDForTest()
+	live, release, err := m.ptr()
 	if err != nil {
-		t.Fatalf("nativeMapIDForTest(): %v", err)
+		t.Fatalf("ptr(): %v", err)
 	}
 	defer release()
 

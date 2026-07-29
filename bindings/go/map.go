@@ -1047,8 +1047,3 @@ func pumpRuntimeWithMapIDForTest(id nativeMap) error {
 		return int32(C.mln_runtime_pump(C.mln_runtime(id), 0))
 	})
 }
-
-// nativeMapIDForTest exposes a live map's id for the identity tests.
-func (m *MapHandle) nativeMapIDForTest() (nativeMap, func(), error) {
-	return m.ptr()
-}

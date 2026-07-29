@@ -2,6 +2,8 @@ import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
 import 'package:maplibre_native_ffi/maplibre_native_ffi.dart';
+import 'package:maplibre_native_ffi/src/runtime/runtime.dart'
+    show mapAttachRefIdForTesting;
 import 'package:maplibre_native_ffi/src/internal/c/maplibre_native_c.dart';
 import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 import 'package:maplibre_native_ffi/src/internal/status/status.dart';
@@ -30,7 +32,7 @@ void main() {
   test('a released map id replayed after a new map is reported stale', () {
     final runtime = RuntimeHandle.create();
     final first = runtime.createMap();
-    final released = NativeMap(first.attachRef().mapIdForTesting);
+    final released = NativeMap(mapAttachRefIdForTesting(first.attachRef()));
     first.close();
 
     // The released slot is the one the next map takes, so this is the case a
@@ -53,7 +55,7 @@ void main() {
     );
 
     // The live map is unaffected by the replay.
-    _mapSizeById(NativeMap(second.attachRef().mapIdForTesting));
+    _mapSizeById(NativeMap(mapAttachRefIdForTesting(second.attachRef())));
   });
 
   test('a map id passed to a runtime operation is rejected on its kind', () {
@@ -68,7 +70,9 @@ void main() {
     // id; the C API rejects it on its kind tag.
     expect(
       () => checkNativeStatus(
-        _c.raw.mln_runtime_pump(map.attachRef().mapIdForTesting, 0).value,
+        _c.raw
+            .mln_runtime_pump(mapAttachRefIdForTesting(map.attachRef()), 0)
+            .value,
         _c.threadLastErrorMessage,
       ),
       throwsA(

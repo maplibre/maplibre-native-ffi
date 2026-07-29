@@ -561,6 +561,10 @@ extension type const ResourceRequestHandle._(NativeResourceRequest _handle) {
   }
 }
 
+/// Exposes an attach reference's map id for tests that must reach the C API
+/// with a raw id. The safe API has no way to express those calls.
+int mapAttachRefIdForTesting(MapAttachRef ref) => ref._mapId;
+
 /// CPU image readback metadata for a texture session frame.
 final class TextureImageInfo {
   const TextureImageInfo._({
@@ -1017,9 +1021,6 @@ final class MapAttachRef {
   final int _mapId;
 
   NativeMap get _mapHandle => NativeMap(_mapId);
-
-  /// The map's handle id, for tests that must reach the C API with a raw id.
-  int get mapIdForTesting => _mapId;
 
   /// Attaches a Metal native surface render target to the map.
   RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
