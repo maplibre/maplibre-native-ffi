@@ -1239,6 +1239,23 @@ namespace MaplibreNative {
      */
     public delegate bool LogCallback (LogSeverity severity, LogEvent event, int64 code, string? message);
 
+    private static Private? active_log_callback_data;
+    private static Mutex active_log_callback_init_mutex;
+
+    private static unowned Private active_log_callback_store () {
+        active_log_callback_init_mutex.lock ();
+        if (active_log_callback_data == null) {
+            active_log_callback_data = new Private (null);
+        }
+        unowned Private store = active_log_callback_data;
+        active_log_callback_init_mutex.unlock ();
+        return store;
+    }
+
+    private static bool log_callback_active_on_current_thread () {
+        return active_log_callback_store ().get () != null;
+    }
+
     /**
      * Rewrites a copied resource URL on an arbitrary worker or network thread.
      * Implementations stay thread-safe, return promptly, and call no MapLibre
@@ -1267,9 +1284,12 @@ namespace MaplibreNative {
             }
             active_callbacks++;
             mutex.unlock ();
+            void* previous_active_callback = active_log_callback_store ().get ();
+            active_log_callback_store ().set ((void*) 1);
             try {
                 return callback (log_severity_from_raw (severity), log_event_from_raw (event), code, message) ? 1U : 0U;
             } finally {
+                active_log_callback_store ().set (previous_active_callback);
                 mutex.lock ();
                 active_callbacks--;
                 if (closing && active_callbacks == 0) {
@@ -1446,6 +1466,10 @@ namespace MaplibreNative {
     }
 
     public void set_log_callback (owned LogCallback callback) throws Error {
+        if (log_callback_active_on_current_thread ()) {
+            clear_unknown_status ();
+            throw new Error.INVALID_STATE ("log callback registration cannot change from inside a log callback");
+        }
         var registration = new LogRegistration ((owned) callback);
         LogRegistration? previous = null;
         log_registration_mutex.lock ();
@@ -1462,6 +1486,10 @@ namespace MaplibreNative {
     }
 
     public void clear_log_callback () throws Error {
+        if (log_callback_active_on_current_thread ()) {
+            clear_unknown_status ();
+            throw new Error.INVALID_STATE ("log callback registration cannot change from inside a log callback");
+        }
         LogRegistration? previous = null;
         log_registration_mutex.lock ();
         try {

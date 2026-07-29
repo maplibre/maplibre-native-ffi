@@ -100,6 +100,7 @@ extern uint32 opengl_test_texture_create(uint32 width, uint32 height);
 extern void opengl_test_texture_destroy(uint32 texture);
 
 int log_count = 0;
+int reentrant_log_change_status = 0;
 int resource_transform_count = 0;
 int resource_provider_request_count = 0;
 int resource_provider_async_complete_count = 0;
@@ -119,6 +120,12 @@ int read_callback_count(ref int count) {
   var value = count;
   callback_count_mutex.unlock();
   return value;
+}
+
+void set_callback_status(ref int status, int value) {
+  callback_count_mutex.lock();
+  status = value;
+  callback_count_mutex.unlock();
 }
 
 void inspect_runtime_event_payload(MaplibreNative.RuntimeEvent event) {
@@ -1072,6 +1079,18 @@ bool handle_log(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent eve
   return false;
 }
 
+bool handle_reentrant_log_change(MaplibreNative.LogSeverity severity, MaplibreNative.LogEvent event, int64 code, string? message) {
+  try {
+    MaplibreNative.clear_log_callback();
+    set_callback_status(ref reentrant_log_change_status, 2);
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    set_callback_status(ref reentrant_log_change_status, 1);
+  } catch (MaplibreNative.Error error) {
+    set_callback_status(ref reentrant_log_change_status, -1);
+  }
+  return false;
+}
+
 uint8[] bytes_from_string(string value) {
   uint8[] bytes = new uint8[value.length];
   for (var index = 0; index < value.length; index++) {
@@ -1629,6 +1648,13 @@ int main() {
     assert(parse_error_mapped);
     assert(read_callback_count(ref log_count) > 0);
     MaplibreNative.clear_log_callback();
+    MaplibreNative.set_log_callback(handle_reentrant_log_change);
+    try {
+      map.set_style_json("{");
+    } catch (MaplibreNative.Error error) {
+    }
+    assert(read_callback_count(ref reentrant_log_change_status) == 1);
+    MaplibreNative.clear_log_callback();
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
 
     bool invalid_argument_mapped = false;
@@ -2044,6 +2070,7 @@ int main() {
     assert(map.get_style_layer_type("state-circle") == "circle");
     var copied_layer_json = map.get_style_layer_json("state-circle");
     assert(copied_layer_json != null && copied_layer_json.value_type == MaplibreNative.JsonValueType.OBJECT);
+    assert(map.get_style_layer_json("missing-layer") == null);
     map.set_layer_property("state-circle", "circle-radius", MaplibreNative.JsonValue.double_value(6.0));
     var copied_layer_property = map.get_layer_property("state-circle", "circle-radius");
     assert(copied_layer_property != null);
@@ -2054,7 +2081,7 @@ int main() {
     var copied_layer_filter = map.get_layer_filter("state-circle");
     assert(copied_layer_filter != null && copied_layer_filter.value_type == MaplibreNative.JsonValueType.ARRAY);
     map.set_layer_filter("state-circle");
-    map.get_layer_filter("state-circle");
+    assert(map.get_layer_filter("state-circle") == null);
     map.move_style_layer("state-circle");
     assert(map.remove_style_layer("state-circle"));
     if (GLib.Environment.get_variable("MLN_VALA_RUN_STYLE_LIGHT_SMOKE") == "1") {

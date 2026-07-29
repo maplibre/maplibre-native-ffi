@@ -1377,7 +1377,14 @@ namespace MaplibreNative {
             bool found;
             check_status (Raw.map_get_style_layer_json (require_live ().native, layer_id.to_native (), out snapshot, out found));
             if (!found) {
-                return copy_json_snapshot ((owned) snapshot);
+                if (snapshot != null) {
+                    Raw.json_snapshot_destroy ((owned) snapshot);
+                }
+                return null;
+            }
+            if (snapshot == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_STATE ("style layer JSON getter returned no snapshot for a found layer");
             }
             return copy_json_snapshot ((owned) snapshot);
         }
@@ -1451,7 +1458,8 @@ namespace MaplibreNative {
         public JsonValue? get_layer_filter_utf8 (Utf8String layer_id) throws Error {
             Raw.JsonSnapshot? snapshot;
             check_status (Raw.map_get_layer_filter (require_live ().native, layer_id.to_native (), out snapshot));
-            return copy_json_snapshot ((owned) snapshot);
+            var filter = copy_json_snapshot ((owned) snapshot);
+            return filter != null && filter.value_type == JsonValueType.NULL ? null : filter;
         }
 
         public void set_style_image (string image_id, PremultipliedRgba8Image image, StyleImageOptions? options = null) throws Error {
@@ -1567,6 +1575,10 @@ namespace MaplibreNative {
             check_status (Raw.map_get_image_source_coordinates (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, out coordinate_count, out found));
             if (!found) {
                 return null;
+            }
+            if (coordinate_count != (size_t) native_coordinates.length) {
+                clear_unknown_status ();
+                throw new Error.INVALID_STATE ("image source coordinate getter returned an invalid coordinate count");
             }
             LatLng[] coordinates = new LatLng[coordinate_count];
             for (size_t index = 0; index < coordinate_count; index++) {
