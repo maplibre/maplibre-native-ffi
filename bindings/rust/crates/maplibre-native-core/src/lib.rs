@@ -33,12 +33,12 @@ pub mod values;
 
 pub use abi::{EXPECTED_C_ABI_VERSION, validate_abi_version, validate_abi_version_value};
 pub use camera::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
-    ProjectionMode,
+    AnimationOptions, BoundOptions, BoundsConstraint, CameraFitOptions, CameraOptions,
+    FreeCameraOptions, ProjectionMode,
 };
 pub use enums::{
-    AmbientCacheOperation, ConstrainMode, LocationIndicatorImageKind, LogEvent, LogSeverity,
-    LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
+    AmbientCacheOperation, CameraChangeMode, ConstrainMode, LocationIndicatorImageKind, LogEvent,
+    LogSeverity, LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
     OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
     OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode,
     ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
@@ -47,10 +47,11 @@ pub use enums::{
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
-    CopiedRuntimeEvent, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent,
-    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
-    RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload,
-    StyleImageMissingEvent, TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, CopiedRuntimeEvent, OfflineOperationCompletedEvent,
+    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent,
+    RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
+    UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
@@ -69,7 +70,9 @@ pub use runtime::{
     OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions, network_status, set_network_status,
     set_network_status_raw,
 };
-pub use style::{SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions};
+pub use style::{
+    GeoJsonSourceOptions, SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions,
+};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,
     ScreenBox, ScreenPoint, StyleImageInfo, TextureImageInfo, UnitBezier, Vec3,

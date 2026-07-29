@@ -122,6 +122,7 @@ namespace Maplibre.Native.Internal.C
         MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
         MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
         MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
+        MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED = 23,
     }
 
     [NativeTypeName("uint32_t")]
@@ -143,6 +144,14 @@ namespace Maplibre.Native.Internal.C
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
         MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED = 9,
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_camera_change_mode : uint
+    {
+        MLN_CAMERA_CHANGE_MODE_IMMEDIATE = 0,
+        MLN_CAMERA_CHANGE_MODE_ANIMATED = 1,
     }
 
     [NativeTypeName("uint32_t")]
@@ -343,6 +352,15 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("size_t")]
         public nuint source_id_size;
+    }
+
+    internal partial struct mln_runtime_event_camera_transition_finished
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint64_t")]
+        public ulong transition_id;
     }
 
     internal partial struct mln_runtime_event_offline_region_status
@@ -586,6 +604,9 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_runtime_set_resource_provider(mln_runtime* runtime, [NativeTypeName("const mln_resource_provider *")] mln_resource_provider* provider);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_clear_resource_provider(mln_runtime* runtime);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_resource_request_complete(mln_resource_request_handle* handle, [NativeTypeName("const mln_resource_response *")] mln_resource_response* response);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -610,7 +631,16 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_runtime_destroy(mln_runtime* runtime);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_runtime_run_once(mln_runtime* runtime);
+        public static extern mln_status mln_runtime_pump(mln_runtime* runtime, [NativeTypeName("int64_t")] long timeout_ms);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_wake_source_acquire(mln_runtime* runtime, mln_wake_source** out_source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_wake_source_signal(mln_wake_source* source);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern void mln_wake_source_destroy(mln_wake_source* source);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_poll_event(mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event);

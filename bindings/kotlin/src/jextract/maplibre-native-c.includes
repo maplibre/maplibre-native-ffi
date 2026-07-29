@@ -36,6 +36,7 @@
 --include-function mln_map_get_free_camera_options
 --include-function mln_map_get_projection_mode
 --include-function mln_map_get_rendering_stats_view_enabled
+--include-function mln_map_get_size
 --include-function mln_map_get_tile_options
 --include-function mln_map_get_viewport_options
 --include-function mln_map_is_fully_loaded
@@ -103,12 +104,14 @@
 --include-constant MLN_ANIMATION_OPTION_DURATION
 --include-constant MLN_ANIMATION_OPTION_EASING
 --include-constant MLN_ANIMATION_OPTION_MIN_ZOOM
+--include-constant MLN_ANIMATION_OPTION_TRANSITION_ID
 --include-constant MLN_ANIMATION_OPTION_VELOCITY
 --include-constant MLN_BOUND_OPTION_BOUNDS
 --include-constant MLN_BOUND_OPTION_MAX_PITCH
 --include-constant MLN_BOUND_OPTION_MAX_ZOOM
 --include-constant MLN_BOUND_OPTION_MIN_PITCH
 --include-constant MLN_BOUND_OPTION_MIN_ZOOM
+--include-constant MLN_BOUND_OPTION_UNBOUNDED
 --include-constant MLN_CAMERA_FIT_OPTION_BEARING
 --include-constant MLN_CAMERA_FIT_OPTION_PADDING
 --include-constant MLN_CAMERA_FIT_OPTION_PITCH
@@ -430,6 +433,7 @@
 --include-function mln_resource_request_complete
 --include-function mln_resource_request_release
 --include-function mln_resource_transform_response_set_url
+--include-function mln_runtime_clear_resource_provider
 --include-function mln_runtime_clear_resource_transform
 --include-function mln_runtime_create
 --include-function mln_runtime_destroy
@@ -437,9 +441,12 @@
 --include-function mln_runtime_options_default
 --include-function mln_runtime_poll_event
 --include-function mln_runtime_run_ambient_cache_operation_start
---include-function mln_runtime_run_once
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
+--include-function mln_runtime_pump
+--include-function mln_runtime_wake_source_acquire
+--include-function mln_wake_source_destroy
+--include-function mln_wake_source_signal
 --include-struct mln_offline_region_status
 --include-struct mln_rendering_stats
 --include-struct mln_resource_provider
@@ -448,6 +455,7 @@
 --include-struct mln_resource_transform
 --include-struct mln_resource_transform_response
 --include-struct mln_runtime_event
+--include-struct mln_runtime_event_camera_transition_finished
 --include-struct mln_runtime_event_offline_operation_completed
 --include-struct mln_runtime_event_offline_region_response_error
 --include-struct mln_runtime_event_offline_region_status
@@ -471,6 +479,17 @@
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+--include-constant MLN_GEOJSON_SOURCE_OPTION_BUFFER
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+--include-constant MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
+--include-constant MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+--include-constant MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
+--include-constant MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW
 --include-constant MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP
@@ -500,6 +519,7 @@
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MLT
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-function mln_custom_geometry_source_options_default
+--include-function mln_geojson_source_options_default
 --include-function mln_map_add_color_relief_layer
 --include-function mln_map_add_custom_geometry_source
 --include-function mln_map_add_geojson_source_data
@@ -562,6 +582,7 @@
 --include-function mln_style_tile_source_options_default
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
+--include-struct mln_geojson_source_options
 --include-struct mln_premultiplied_rgba8_image
 --include-struct mln_style_image_info
 --include-struct mln_style_image_options

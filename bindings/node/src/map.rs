@@ -28,6 +28,7 @@ pub struct MapOptions {
     pub height: Option<u32>,
     pub scale_factor: Option<f64>,
     pub map_mode: Option<String>,
+    pub fast_pfor_enabled: Option<bool>,
 }
 
 #[napi(object)]
@@ -57,6 +58,7 @@ pub struct AnimationOptions {
     pub velocity: Option<f64>,
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
+    pub transition_id: Option<BigInt>,
 }
 
 #[napi(object)]
@@ -120,6 +122,7 @@ pub struct MapTileOptions {
 #[napi(object)]
 pub struct BoundOptions {
     pub bounds: Option<LatLngBounds>,
+    pub unbounded: Option<bool>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub min_pitch: Option<f64>,
@@ -160,6 +163,29 @@ pub struct TileSourceOptions {
     pub tile_size: Option<u32>,
     pub vector_encoding: Option<String>,
     pub raster_dem_encoding: Option<String>,
+}
+
+#[napi(object)]
+#[derive(Default)]
+pub struct GeoJsonSourceOptions {
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub tolerance: Option<f64>,
+    pub cluster_max_zoom: Option<f64>,
+    pub cluster_properties: Option<String>,
+    pub tile_size: Option<u32>,
+    pub buffer: Option<u32>,
+    pub cluster_radius: Option<u32>,
+    pub cluster_min_points: Option<u32>,
+    pub line_metrics: Option<bool>,
+    pub cluster: Option<bool>,
+}
+
+#[napi(object)]
+pub struct MapSize {
+    pub width: u32,
+    pub height: u32,
+    pub pixel_ratio: f64,
 }
 
 #[napi(object)]
@@ -235,7 +261,6 @@ pub fn create_native_map_handle(
 
     core::check(unsafe { sys::mln_map_create(runtime.as_ptr(), &native_options, &mut map) })
         .map_err(error::from_core)?;
-    runtime.mark_map_created();
     let state =
         unsafe { NativeHandleState::from_raw_ptr(map, "MapHandle") }.map_err(error::from_core)?;
     Ok(NativeMapHandle {
@@ -352,8 +377,7 @@ impl NativeMapHandle {
         delta_y: f64,
         animation: Option<AnimationOptions>,
     ) -> Result<()> {
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -374,8 +398,7 @@ impl NativeMapHandle {
         let anchor_ptr = anchor.as_ref().map_or(std::ptr::null(), |anchor| {
             anchor as *const sys::mln_screen_point
         });
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -392,8 +415,7 @@ impl NativeMapHandle {
         second: ScreenPoint,
         animation: Option<AnimationOptions>,
     ) -> Result<()> {
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -410,8 +432,7 @@ impl NativeMapHandle {
 
     #[napi(js_name = "pitchByAnimated")]
     pub fn pitch_by_animated(&self, pitch: f64, animation: Option<AnimationOptions>) -> Result<()> {
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -473,9 +494,30 @@ impl NativeMapHandle {
 
     #[napi(js_name = "setBounds")]
     pub fn set_bounds(&self, options: BoundOptions) -> Result<()> {
-        let options = core::camera::bound_options_to_native(&options.into_core());
+        let options = core::camera::bound_options_to_native(&options.into_core()?);
         core::check(unsafe { sys::mln_map_set_bounds(self.state.as_ptr(), &options) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "getSize")]
+    pub fn get_size(&self) -> Result<MapSize> {
+        let mut width = 0;
+        let mut height = 0;
+        let mut pixel_ratio = 0.0;
+        core::check(unsafe {
+            sys::mln_map_get_size(
+                self.state.as_ptr(),
+                &mut width,
+                &mut height,
+                &mut pixel_ratio,
+            )
+        })
+        .map_err(error::from_core)?;
+        Ok(MapSize {
+            width,
+            height,
+            pixel_ratio,
+        })
     }
 
     #[napi(js_name = "getFreeCameraOptions")]
@@ -536,8 +578,7 @@ impl NativeMapHandle {
         animation: Option<AnimationOptions>,
     ) -> Result<()> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -548,8 +589,7 @@ impl NativeMapHandle {
     #[napi(js_name = "flyTo")]
     pub fn fly_to(&self, camera: CameraOptions, animation: Option<AnimationOptions>) -> Result<()> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
-        let animation = animation
-            .map(|animation| core::camera::animation_options_to_native(&animation.into_core()));
+        let animation = animation_options_to_native(animation)?;
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
@@ -891,25 +931,59 @@ impl NativeMapHandle {
     }
 
     #[napi(js_name = "addGeoJsonSourceUrl")]
-    pub fn add_geo_json_source_url(&self, source_id: String, url: String) -> Result<()> {
+    pub fn add_geo_json_source_url(
+        &self,
+        source_id: String,
+        url: String,
+        options: Option<GeoJsonSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
+        let options = options.map(GeoJsonSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::geojson_source_options_to_native)
+            .transpose()
+            .map_err(error::from_core)?;
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
-            sys::mln_map_add_geojson_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_add_geojson_source_url(
+                self.state.as_ptr(),
+                source_id.raw(),
+                url.raw(),
+                options_ptr,
+            )
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "addGeoJsonSourceData")]
-    pub fn add_geo_json_source_data(&self, source_id: String, data: String) -> Result<()> {
+    pub fn add_geo_json_source_data(
+        &self,
+        source_id: String,
+        data: String,
+        options: Option<GeoJsonSourceOptions>,
+    ) -> Result<()> {
         let source_id = core::string::string_view(&source_id);
         let data = parse_geojson(data)?;
         let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
+        let options = options.map(GeoJsonSourceOptions::into_core).transpose()?;
+        let native_options = options
+            .as_ref()
+            .map(core::style::geojson_source_options_to_native)
+            .transpose()
+            .map_err(error::from_core)?;
+        let options_ptr = native_options
+            .as_ref()
+            .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_geojson_source_data(
                 self.state.as_ptr(),
                 source_id.raw(),
                 native_data.as_ptr(),
+                options_ptr,
             )
         })
         .map_err(error::from_core)
@@ -2068,10 +2142,17 @@ impl MapTileOptions {
 }
 
 impl BoundOptions {
-    fn into_core(self) -> core::BoundOptions {
+    fn into_core(self) -> Result<core::BoundOptions> {
         let mut options = core::BoundOptions::default();
+        if self.bounds.is_some() && self.unbounded == Some(true) {
+            return Err(error::invalid_argument(
+                "bounds and unbounded cannot both be set",
+            ));
+        }
         if let Some(value) = self.bounds {
-            options.bounds = Some(value.into_core());
+            options.bounds = Some(core::BoundsConstraint::Bounded(value.into_core()));
+        } else if self.unbounded == Some(true) {
+            options.bounds = Some(core::BoundsConstraint::Unbounded);
         }
         if let Some(value) = self.min_zoom {
             options.min_zoom = Some(value);
@@ -2085,12 +2166,19 @@ impl BoundOptions {
         if let Some(value) = self.max_pitch {
             options.max_pitch = Some(value);
         }
-        options
+        Ok(options)
     }
 
     fn from_core(options: core::BoundOptions) -> Self {
         Self {
-            bounds: options.bounds.map(LatLngBounds::from_core),
+            bounds: options.bounds.and_then(|constraint| match constraint {
+                core::BoundsConstraint::Bounded(bounds) => Some(LatLngBounds::from_core(bounds)),
+                core::BoundsConstraint::Unbounded => None,
+            }),
+            unbounded: Some(matches!(
+                options.bounds,
+                Some(core::BoundsConstraint::Unbounded)
+            )),
             min_zoom: options.min_zoom,
             max_zoom: options.max_zoom,
             min_pitch: options.min_pitch,
@@ -2178,7 +2266,7 @@ impl UnitBezier {
 }
 
 impl AnimationOptions {
-    fn into_core(self) -> core::AnimationOptions {
+    fn into_core(self) -> Result<core::AnimationOptions> {
         let mut animation = core::AnimationOptions::default();
         if let Some(duration_ms) = self.duration_ms {
             animation.duration_ms = Some(duration_ms);
@@ -2192,8 +2280,32 @@ impl AnimationOptions {
         if let Some(easing) = self.easing {
             animation.easing = Some(easing.into_core());
         }
-        animation
+        if let Some(transition_id) = self.transition_id {
+            animation.transition_id = Some(bigint_to_u64(transition_id, "transitionId")?);
+        }
+        Ok(animation)
     }
+}
+
+fn animation_options_to_native(
+    animation: Option<AnimationOptions>,
+) -> Result<Option<sys::mln_animation_options>> {
+    animation
+        .map(AnimationOptions::into_core)
+        .transpose()
+        .map(|animation| {
+            animation.map(|animation| core::camera::animation_options_to_native(&animation))
+        })
+}
+
+fn bigint_to_u64(value: BigInt, field_name: &str) -> Result<u64> {
+    let (signed, value, lossless) = value.get_u64();
+    if signed || !lossless {
+        return Err(error::invalid_argument(format!(
+            "{field_name} must be a non-negative 64-bit bigint"
+        )));
+    }
+    Ok(value)
 }
 
 impl Vec3 {
@@ -2274,6 +2386,27 @@ impl MapOptions {
         if let Some(map_mode) = self.map_mode {
             options.mode = map_mode_from_string(&map_mode)?;
         }
+        if let Some(fast_pfor_enabled) = self.fast_pfor_enabled {
+            options.fast_pfor_enabled = fast_pfor_enabled;
+        }
+        Ok(options)
+    }
+}
+
+impl GeoJsonSourceOptions {
+    fn into_core(self) -> Result<core::GeoJsonSourceOptions> {
+        let mut options = core::GeoJsonSourceOptions::default();
+        options.min_zoom = self.min_zoom;
+        options.max_zoom = self.max_zoom;
+        options.tolerance = self.tolerance;
+        options.cluster_max_zoom = self.cluster_max_zoom;
+        options.cluster_properties = self.cluster_properties.map(parse_json_value).transpose()?;
+        options.tile_size = self.tile_size;
+        options.buffer = self.buffer;
+        options.cluster_radius = self.cluster_radius;
+        options.cluster_min_points = self.cluster_min_points;
+        options.line_metrics = self.line_metrics;
+        options.cluster = self.cluster;
         Ok(options)
     }
 }

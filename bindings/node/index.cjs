@@ -154,6 +154,7 @@ class AnimationOptions extends optionClass([
   "velocity",
   "minZoom",
   "easing",
+  "transitionId",
 ]) {}
 
 class FreeCameraOptions extends optionClass(["position", "orientation"]) {}
@@ -182,6 +183,7 @@ class MapTileOptions extends optionClass([
 
 class BoundOptions extends optionClass([
   "bounds",
+  "unbounded",
   "minZoom",
   "maxZoom",
   "minPitch",
@@ -195,6 +197,7 @@ class MapOptions extends optionClass([
   "height",
   "scaleFactor",
   "mapMode",
+  "fastPforEnabled",
 ]) {}
 
 class RenderedFeatureQueryOptions extends optionClass(["layerIds", "filter"]) {}
@@ -216,6 +219,20 @@ class TileSourceOptions extends optionClass([
 ]) {}
 
 class StyleImageOptions extends optionClass(["pixelRatio", "sdf"]) {}
+
+class GeoJsonSourceOptions extends optionClass([
+  "minZoom",
+  "maxZoom",
+  "tolerance",
+  "clusterMaxZoom",
+  "clusterProperties",
+  "tileSize",
+  "buffer",
+  "clusterRadius",
+  "clusterMinPoints",
+  "lineMetrics",
+  "cluster",
+]) {}
 
 function cVersion() {
   return native.cVersion();
@@ -1435,6 +1452,35 @@ class OfflineOperationHandle {
   }
 }
 
+class WakeSourceHandle {
+  constructor(token, nativeHandle) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "wake sources are created by RuntimeHandle.acquireWakeSource()",
+      );
+    }
+    recordHandleEnvironment(this);
+    defineCheckedNative(this, nativeHandle);
+  }
+
+  signal() {
+    return translateNativeErrors(() => liveNativeOf(this).signal());
+  }
+
+  close() {
+    return translateNativeErrors(() => nativeOf(this).close());
+  }
+
+  get closed() {
+    return nativeOf(this).closed;
+  }
+
+  [Symbol.dispose]() {
+    this.close();
+  }
+}
+
 class RuntimeHandle {
   #mapsByAddress = new Map();
   #offlineOperations = new Set();
@@ -1504,8 +1550,26 @@ class RuntimeHandle {
     return nativeOf(this).closed;
   }
 
-  runOnce() {
-    return translateNativeErrors(() => liveNativeOf(this).runOnce());
+  pump(timeoutMs = 0) {
+    if (
+      timeoutMs !== null &&
+      (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0)
+    ) {
+      throw new InvalidArgumentError(
+        null,
+        "timeoutMs must be null or a non-negative safe integer",
+      );
+    }
+    return translateNativeErrors(() =>
+      liveNativeOf(this).pump(timeoutMs === null ? -1 : timeoutMs),
+    );
+  }
+
+  acquireWakeSource() {
+    return new WakeSourceHandle(
+      CONSTRUCTION_TOKEN,
+      translateNativeErrors(() => liveNativeOf(this).acquireWakeSource()),
+    );
   }
 
   setResourceTransformRules(rules) {
@@ -1555,6 +1619,18 @@ class RuntimeHandle {
       registration.active = false;
       throw error;
     }
+  }
+
+  clearResourceProvider() {
+    const result = translateNativeErrors(() =>
+      liveNativeOf(this).clearResourceProvider(),
+    );
+    const registration = runtimeResourceProviderRegistrations.get(this);
+    if (registration != null) {
+      registration.active = false;
+      runtimeResourceProviderRegistrations.delete(this);
+    }
+    return result;
   }
 
   clearResourceTransform() {
@@ -2274,6 +2350,10 @@ class MapHandle {
     return new MapProjectionHandle(CONSTRUCTION_TOKEN, this);
   }
 
+  getSize() {
+    return translateNativeErrors(() => liveNativeOf(this).getSize());
+  }
+
   attachMetalOwnedTexture(descriptor) {
     return attachRenderSession(this, () =>
       native.createMetalOwnedTextureRenderSession(
@@ -2660,15 +2740,23 @@ class MapHandle {
     );
   }
 
-  addGeoJsonSourceUrl(sourceId, url) {
+  addGeoJsonSourceUrl(sourceId, url, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addGeoJsonSourceUrl(sourceId, url),
+      liveNativeOf(this).addGeoJsonSourceUrl(
+        sourceId,
+        url,
+        geoJsonSourceOptionsToNative(options),
+      ),
     );
   }
 
-  addGeoJsonSourceData(sourceId, data) {
+  addGeoJsonSourceData(sourceId, data, options) {
     return translateNativeErrors(() =>
-      liveNativeOf(this).addGeoJsonSourceData(sourceId, stringifyJson(data)),
+      liveNativeOf(this).addGeoJsonSourceData(
+        sourceId,
+        stringifyJson(data),
+        geoJsonSourceOptionsToNative(options),
+      ),
     );
   }
 
@@ -3122,6 +3210,19 @@ function stringifyJson(value) {
   return json;
 }
 
+function geoJsonSourceOptionsToNative(options) {
+  if (options == null) {
+    return undefined;
+  }
+  const value = new GeoJsonSourceOptions(options);
+  const nativeOptions = Object.assign({}, value);
+  nativeOptions.clusterProperties =
+    value.clusterProperties === undefined
+      ? undefined
+      : stringifyJson(value.clusterProperties);
+  return nativeOptions;
+}
+
 function assertNativeAbiVersion() {
   const actual = native.cVersion();
   if (actual !== EXPECTED_C_ABI_VERSION) {
@@ -3247,6 +3348,7 @@ module.exports = {
   NativeError,
   MaplibreStatus,
   RuntimeHandle,
+  WakeSourceHandle,
   ResourceRequestHandle,
   OfflineOperationHandle,
   MapHandle,
@@ -3271,6 +3373,7 @@ module.exports = {
   SourceFeatureQueryOptions,
   TileSourceOptions,
   StyleImageOptions,
+  GeoJsonSourceOptions,
   cVersion,
   supportedRenderBackends,
   supportedOpenGLContextProviders,
@@ -3295,6 +3398,7 @@ module.exports.UnsupportedFeatureError = UnsupportedFeatureError;
 module.exports.NativeError = NativeError;
 module.exports.MaplibreStatus = MaplibreStatus;
 module.exports.RuntimeHandle = RuntimeHandle;
+module.exports.WakeSourceHandle = WakeSourceHandle;
 module.exports.ResourceRequestHandle = ResourceRequestHandle;
 module.exports.OfflineOperationHandle = OfflineOperationHandle;
 module.exports.MapHandle = MapHandle;
@@ -3319,6 +3423,7 @@ module.exports.RenderedFeatureQueryOptions = RenderedFeatureQueryOptions;
 module.exports.SourceFeatureQueryOptions = SourceFeatureQueryOptions;
 module.exports.TileSourceOptions = TileSourceOptions;
 module.exports.StyleImageOptions = StyleImageOptions;
+module.exports.GeoJsonSourceOptions = GeoJsonSourceOptions;
 module.exports.cVersion = cVersion;
 module.exports.supportedRenderBackends = supportedRenderBackends;
 module.exports.supportedOpenGLContextProviders =

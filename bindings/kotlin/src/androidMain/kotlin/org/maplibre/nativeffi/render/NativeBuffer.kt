@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.render
 
 import java.nio.ByteBuffer
 import org.maplibre.nativeffi.internal.lifecycle.BorrowedResourceCore
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Explicit direct byte buffer for reusable Android JNI readback and upload storage. */
 public actual class NativeBuffer
@@ -26,7 +27,9 @@ private constructor(private val buffer: ByteBuffer, private val length: Long) : 
 
   internal fun ensureCapacity(requiredBytes: Long) {
     withOpenBuffer {
-      require(length >= requiredBytes) { "buffer is smaller than required byte length" }
+      Status.requireArgument(length >= requiredBytes) {
+        "buffer is smaller than required byte length"
+      }
     }
   }
 
@@ -36,8 +39,10 @@ private constructor(private val buffer: ByteBuffer, private val length: Long) : 
 
   public actual companion object {
     public actual fun allocate(byteLength: Long): NativeBuffer {
-      require(byteLength >= 0) { "byteLength must be non-negative" }
-      require(byteLength <= Int.MAX_VALUE) { "byteLength must be at most Integer.MAX_VALUE" }
+      Status.requireArgument(byteLength >= 0) { "byteLength must be non-negative" }
+      Status.requireArgument(byteLength <= Int.MAX_VALUE) {
+        "byteLength must be at most Integer.MAX_VALUE"
+      }
       return NativeBuffer(ByteBuffer.allocateDirect(byteLength.toInt()), byteLength)
     }
   }

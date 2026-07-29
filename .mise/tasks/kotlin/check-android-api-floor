@@ -1,0 +1,492 @@
+#!/usr/bin/env python3
+# [MISE] description="Verify compiled androidMain bytecode stays on the android-minSdk floor."
+# [MISE] shell="python3"
+
+"""Reject Android platform APIs introduced above the ``android-minSdk`` floor.
+
+AGP's ``com.android.kotlin.multiplatform.library`` plugin accepts a ``lint {}``
+block but registers no lint variant, so ``NewApi`` never runs for this module.
+This check reproduces the part of ``NewApi`` that matters here: it reads the
+platform API database the SDK ships (``platforms/android-<sdk>/data/
+api-versions.xml``), walks the constant pool of every compiled ``androidMain``
+class, and reports each platform class, method, or field whose ``since`` level
+is above the floor.
+
+References the database does not describe -- Kotlin stdlib, JavaCPP, project
+code -- are left alone, so only the Android platform surface is judged.
+"""
+
+import os
+import pathlib
+import re
+import struct
+import sys
+import xml.etree.ElementTree as element_tree
+
+# Constant pool tags that carry a type or member reference, mapped to the
+# number of bytes their payload occupies after the tag.
+TAG_UTF8 = 1
+TAG_INTEGER = 3
+TAG_FLOAT = 4
+TAG_LONG = 5
+TAG_DOUBLE = 6
+TAG_CLASS = 7
+TAG_STRING = 8
+TAG_FIELDREF = 9
+TAG_METHODREF = 10
+TAG_INTERFACE_METHODREF = 11
+TAG_NAME_AND_TYPE = 12
+TAG_METHOD_HANDLE = 15
+TAG_METHOD_TYPE = 16
+TAG_DYNAMIC = 17
+TAG_INVOKE_DYNAMIC = 18
+TAG_MODULE = 19
+TAG_PACKAGE = 20
+
+FIXED_WIDTH_TAGS = {
+    TAG_INTEGER: 4,
+    TAG_FLOAT: 4,
+    TAG_LONG: 8,
+    TAG_DOUBLE: 8,
+    TAG_CLASS: 2,
+    TAG_STRING: 2,
+    TAG_FIELDREF: 4,
+    TAG_METHODREF: 4,
+    TAG_INTERFACE_METHODREF: 4,
+    TAG_NAME_AND_TYPE: 4,
+    TAG_METHOD_HANDLE: 3,
+    TAG_METHOD_TYPE: 2,
+    TAG_DYNAMIC: 4,
+    TAG_INVOKE_DYNAMIC: 4,
+    TAG_MODULE: 2,
+    TAG_PACKAGE: 2,
+}
+
+WIDE_TAGS = {TAG_LONG, TAG_DOUBLE}
+
+# Object types inside a JVM descriptor or generic signature: `Lpkg/Name;`.
+DESCRIPTOR_TYPE = re.compile(r"L([a-zA-Z_$][\w$]*(?:/[a-zA-Z_$][\w$]*)+);")
+
+# D8 desugars every `invokedynamic` -- Kotlin lambdas, SAM conversions, and
+# string concatenation -- into anonymous classes below API 26, so the bootstrap
+# types these call sites name in the class file never reach the dex. Verified by
+# dexing `androidMain` at `--min-api 24`: the class files reference
+# `java/lang/invoke/{CallSite,MethodHandle,MethodHandles$Lookup,MethodType}`
+# while the resulting dex contains no `java/lang/invoke` reference at all.
+DESUGARED_TYPE_PREFIXES = ("java/lang/invoke/",)
+
+# D8 rewrites these JDK helpers into inline code or synthetic methods at every
+# min-api level, so calling them stays safe below their documented `since`.
+# Keyed by `owner#descriptor` rather than by owner, so an unrelated post-floor
+# method on the same class is still reported.
+#
+# Each entry is verified by dexing `androidMain` at `--min-api 24` and
+# confirming the reference is absent from the resulting dex while present in the
+# class files. The list stays narrow -- anything absent from it is reported,
+# which keeps the default answer safe. Re-verify when adding an entry.
+BACKPORTED_MEMBERS = frozenset(
+    {
+        # Kotlin emits this for `UInt.toLong()`.
+        "java/lang/Integer#toUnsignedLong(I)J",
+    }
+)
+
+# Symbols this project has deliberately accepted above the floor, keyed the same
+# way as BACKPORTED_MEMBERS (a bare `owner` entry exempts the type itself).
+# The scanner reads the constant pool and does not follow control flow, so a
+# call genuinely guarded by `Build.VERSION.SDK_INT` is recorded here with the
+# reasoning rather than being silently tolerated.
+ALLOWED_ABOVE_FLOOR = frozenset()
+
+
+class ApiClass:
+    """One ``<class>`` entry from the platform API database."""
+
+    __slots__ = ("name", "since", "supers", "methods", "fields")
+
+    def __init__(self, name, since):
+        self.name = name
+        self.since = since
+        self.supers = []
+        self.methods = {}
+        self.fields = {}
+
+
+def fail(message):
+    print(f"error: {message}", file=sys.stderr)
+    raise SystemExit(1)
+
+
+def repository_root():
+    root = os.environ.get("MISE_MONOREPO_ROOT")
+    if root:
+        return pathlib.Path(root)
+    # This file lives at <root>/.mise/tasks/kotlin/check-android-api-floor.
+    return pathlib.Path(__file__).resolve().parents[3]
+
+
+def catalog_version(root, key):
+    """Read a single ``[versions]`` entry from the Gradle version catalog."""
+    catalog = root / "gradle" / "libs.versions.toml"
+    pattern = re.compile(rf'^\s*{re.escape(key)}\s*=\s*"([^"]+)"', re.MULTILINE)
+    match = pattern.search(catalog.read_text(encoding="utf-8"))
+    if match is None:
+        fail(f"{key} not found in {catalog}")
+    return match.group(1)
+
+
+def unescape_properties_value(value):
+    """Decode a java.util.Properties value.
+
+    Gradle writes ``local.properties`` with properties escaping, so a Windows
+    SDK path arrives as ``C\\:\\\\Users\\\\name\\\\Android\\\\Sdk``. A backslash
+    escapes the character after it, and ``\\t``/``\\n``/``\\r``/``\\f`` carry
+    their usual meaning.
+    """
+    specials = {"t": "\t", "n": "\n", "r": "\r", "f": "\f"}
+    out = []
+    index = 0
+    while index < len(value):
+        character = value[index]
+        if character != "\\" or index + 1 >= len(value):
+            out.append(character)
+            index += 1
+            continue
+        following = value[index + 1]
+        if following == "u" and index + 5 < len(value):
+            try:
+                out.append(chr(int(value[index + 2 : index + 6], 16)))
+                index += 6
+                continue
+            except ValueError:
+                pass
+        out.append(specials.get(following, following))
+        index += 2
+    return "".join(out)
+
+
+def android_sdk_directory(root):
+    """Resolve the SDK the same way settings.gradle.kts does."""
+    local_properties = root / "local.properties"
+    if local_properties.is_file():
+        match = re.search(
+            r"^\s*sdk\.dir\s*=\s*(.+)$",
+            local_properties.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+        if match:
+            candidate = pathlib.Path(unescape_properties_value(match.group(1).strip()))
+            if candidate.is_dir():
+                return candidate
+    for variable in ("ANDROID_HOME", "ANDROID_SDK_ROOT"):
+        value = os.environ.get(variable)
+        if value and pathlib.Path(value).is_dir():
+            return pathlib.Path(value)
+    fail(
+        "Android SDK not found; set ANDROID_HOME or sdk.dir in local.properties "
+        "so the platform API database can be read"
+    )
+
+
+def platform_api_level(path):
+    """Return the numeric API level of a ``platforms/android-<level>`` path."""
+    name = path.parts[-3].removeprefix("android-")
+    try:
+        # Preview and extension platforms use names like `android-37.0`.
+        return int(name.split(".", 1)[0])
+    except ValueError:
+        return None
+
+
+def api_database_path(sdk_directory, compile_sdk):
+    """Resolve the compileSdk platform database, or a newer one.
+
+    An older database omits every API introduced since, which would silently
+    accept calls above the floor, so this fails rather than falling back to one.
+    """
+    preferred = sdk_directory / "platforms" / f"android-{compile_sdk}" / "data" / "api-versions.xml"
+    if preferred.is_file():
+        return preferred
+    wanted = int(compile_sdk.split(".", 1)[0])
+    candidates = [
+        (level, path)
+        for path in (sdk_directory / "platforms").glob("android-*/data/api-versions.xml")
+        for level in [platform_api_level(path)]
+        if level is not None and level >= wanted
+    ]
+    if candidates:
+        return min(candidates)[1]
+    fail(
+        f"no api-versions.xml for android-{compile_sdk} or newer under "
+        f"{sdk_directory / 'platforms'}; install the android-{compile_sdk} platform"
+    )
+
+
+def load_api_database(path):
+    """Parse api-versions.xml into a name -> ApiClass mapping."""
+    root = element_tree.parse(path).getroot()
+    baseline = int(root.get("min", "1"))
+    classes = {}
+    for node in root.findall("class"):
+        name = node.get("name")
+        if name is None:
+            continue
+        entry = ApiClass(name, int(node.get("since", baseline)))
+        for relation in node:
+            if relation.tag in ("extends", "implements"):
+                target = relation.get("name")
+                if target:
+                    # A relationship carries its own `since` when the type
+                    # gained the supertype after being introduced, so an
+                    # inherited member is only reachable from that level up.
+                    entry.supers.append((target, int(relation.get("since", entry.since))))
+            elif relation.tag in ("method", "field"):
+                member = relation.get("name")
+                if member is None:
+                    continue
+                since = int(relation.get("since", entry.since))
+                if relation.tag == "field":
+                    keys, table = [member], entry.fields
+                else:
+                    # The database keys methods by their full descriptor. Index the
+                    # argument list too, so a covariant return still resolves.
+                    keys, table = [member], entry.methods
+                    cut = member.rfind(")")
+                    if cut != -1:
+                        keys.append(member[: cut + 1])
+                for key in keys:
+                    # Keep the lowest level when a key repeats across overloads.
+                    if key not in table or since < table[key]:
+                        table[key] = since
+        classes[name] = entry
+    return classes
+
+
+def resolve_member(classes, owner, member, kind):
+    """Walk the type hierarchy for a member, returning its ``since`` level.
+
+    Returns ``(since, declaring_class)`` or ``None`` when the database does not
+    describe the member -- which means it belongs to project or library code.
+    """
+    candidates = [member]
+    if kind == "method":
+        cut = member.rfind(")")
+        if cut != -1:
+            candidates.append(member[: cut + 1])
+    # Each entry carries the level at which this owner can reach that class, so
+    # a member inherited through a late `implements` is judged at that level.
+    seen = {}
+    pending = [(owner, 0)]
+    best = None
+    while pending:
+        name, reachable_since = pending.pop(0)
+        if seen.get(name, sys.maxsize) <= reachable_since:
+            continue
+        seen[name] = reachable_since
+        entry = classes.get(name)
+        if entry is None:
+            continue
+        table = entry.methods if kind == "method" else entry.fields
+        for candidate in candidates:
+            if candidate in table:
+                since = max(table[candidate], reachable_since)
+                if best is None or since < best[0]:
+                    best = (since, name)
+                break
+        for super_name, super_since in entry.supers:
+            pending.append((super_name, max(reachable_since, super_since)))
+    return best
+
+
+def read_constant_pool(data):
+    """Extract class and member references from a class file's constant pool."""
+    if len(data) < 10 or struct.unpack_from(">I", data, 0)[0] != 0xCAFEBABE:
+        return None
+    count = struct.unpack_from(">H", data, 8)[0]
+    offset = 10
+    entries = {}
+    index = 1
+    while index < count:
+        tag = data[offset]
+        offset += 1
+        if tag == TAG_UTF8:
+            length = struct.unpack_from(">H", data, offset)[0]
+            offset += 2
+            entries[index] = data[offset : offset + length].decode("utf-8", "replace")
+            offset += length
+        else:
+            width = FIXED_WIDTH_TAGS.get(tag)
+            if width is None:
+                # An unknown tag makes every later offset meaningless.
+                return None
+            entries[index] = struct.unpack_from(f">{width}B", data, offset)
+            offset += width
+        index += 2 if tag in WIDE_TAGS else 1
+    return entries, data
+
+
+def parse_references(data):
+    """Yield ``("class", name)`` and ``("method"|"field", owner, member)`` tuples."""
+    parsed = read_constant_pool(data)
+    if parsed is None:
+        return []
+    entries, raw = parsed
+
+    # Re-walk the pool to read the structured entries with correct field widths.
+    count = struct.unpack_from(">H", raw, 8)[0]
+    offset = 10
+    index = 1
+    classes = {}
+    name_and_types = {}
+    members = []
+    while index < count:
+        tag = raw[offset]
+        offset += 1
+        if tag == TAG_UTF8:
+            length = struct.unpack_from(">H", raw, offset)[0]
+            offset += 2 + length
+        elif tag == TAG_CLASS:
+            classes[index] = struct.unpack_from(">H", raw, offset)[0]
+            offset += 2
+        elif tag == TAG_NAME_AND_TYPE:
+            name_and_types[index] = struct.unpack_from(">HH", raw, offset)
+            offset += 4
+        elif tag in (TAG_FIELDREF, TAG_METHODREF, TAG_INTERFACE_METHODREF):
+            class_index, name_and_type_index = struct.unpack_from(">HH", raw, offset)
+            members.append((tag, class_index, name_and_type_index))
+            offset += 4
+        else:
+            offset += FIXED_WIDTH_TAGS[tag]
+        index += 2 if tag in WIDE_TAGS else 1
+
+    references = []
+    for class_index, name_index in classes.items():
+        name = entries.get(name_index)
+        if isinstance(name, str) and not name.startswith("["):
+            references.append(("class", name))
+    # A platform type named only in a field or method signature never reaches
+    # the pool as a CONSTANT_Class entry, so mine the descriptors too. Every
+    # descriptor lives in the pool as a UTF-8 entry, which also covers the
+    # signature attributes and the field/method tables without parsing them.
+    for value in entries.values():
+        if isinstance(value, str):
+            for name in DESCRIPTOR_TYPE.findall(value):
+                references.append(("class", name))
+    for tag, class_index, name_and_type_index in members:
+        owner = entries.get(classes.get(class_index, -1))
+        pair = name_and_types.get(name_and_type_index)
+        if not isinstance(owner, str) or pair is None or owner.startswith("["):
+            continue
+        member_name = entries.get(pair[0])
+        descriptor = entries.get(pair[1])
+        if not isinstance(member_name, str) or not isinstance(descriptor, str):
+            continue
+        if tag == TAG_FIELDREF:
+            references.append(("field", owner, member_name))
+        else:
+            references.append(("method", owner, f"{member_name}{descriptor}"))
+    return references
+
+
+def describe_key(reference):
+    """Exemption key: `owner/Name` for a type, `owner#descriptor` for a member."""
+    if reference[0] == "class":
+        return reference[1]
+    return f"{reference[1]}#{reference[2]}"
+
+
+def describe(reference):
+    if reference[0] == "class":
+        return reference[1].replace("/", ".")
+    return f"{reference[1].replace('/', '.')}#{reference[2]}"
+
+
+def main(argv):
+    root = repository_root()
+    floor = int(catalog_version(root, "android-minSdk"))
+    compile_sdk = catalog_version(root, "android-compileSdk")
+
+    roots = [pathlib.Path(path) for path in argv[1:]]
+    if not roots:
+        roots = [
+            root / "bindings/kotlin/build/classes/kotlin/android/main",
+            root
+            / "bindings/kotlin/build/intermediates/javac/androidMain"
+            / "compileAndroidMainJavaWithJavac/classes",
+        ]
+        # Both halves of androidMain must be present. Scanning only the Kotlin
+        # output would report success while the Java sources went unchecked.
+        missing = [path for path in roots if not path.is_dir()]
+        if missing:
+            fail(
+                "no compiled androidMain classes at "
+                + ", ".join(str(path) for path in missing)
+                + "; run ./gradlew :bindings:kotlin:compileAndroidMain "
+                ":bindings:kotlin:compileAndroidMainJavaWithJavac first"
+            )
+    roots = [path for path in roots if path.is_dir()]
+    if not roots:
+        fail("no compiled androidMain classes found in the requested directories")
+
+    database = load_api_database(api_database_path(android_sdk_directory(root), compile_sdk))
+
+    violations = {}
+    scanned = 0
+    for class_root in roots:
+        for class_file in sorted(class_root.rglob("*.class")):
+            scanned += 1
+            data = class_file.read_bytes()
+            for reference in parse_references(data):
+                # Only the bootstrap *types* an invokedynamic names are
+                # exempt. A direct call such as MethodHandle.invokeExact() is a
+                # method reference D8 does not rewrite, so it stays in scope.
+                if reference[0] == "class" and reference[1].startswith(
+                    DESUGARED_TYPE_PREFIXES
+                ):
+                    continue
+                key = describe_key(reference)
+                if key in BACKPORTED_MEMBERS or key in ALLOWED_ABOVE_FLOOR:
+                    continue
+                if reference[0] == "class":
+                    entry = database.get(reference[1])
+                    if entry is None or entry.since <= floor:
+                        continue
+                    since = entry.since
+                else:
+                    if reference[1] in ALLOWED_ABOVE_FLOOR:
+                        continue
+                    resolved = resolve_member(database, reference[1], reference[2], reference[0])
+                    if resolved is None or resolved[0] <= floor:
+                        continue
+                    since = resolved[0]
+                violations.setdefault((since, describe(reference)), set()).add(
+                    str(class_file.relative_to(class_root))
+                )
+
+    if violations:
+        print(
+            f"error: androidMain calls {len(violations)} platform API(s) above "
+            f"the android-minSdk {floor} floor:",
+            file=sys.stderr,
+        )
+        for (since, name), sources in sorted(violations.items()):
+            origin = ", ".join(sorted(sources)[:3])
+            print(f"  API {since} (floor {floor}): {name}  [{origin}]", file=sys.stderr)
+        print(
+            f"\nUse an API {floor}-compatible equivalent, or raise "
+            "android-minSdk in gradle/libs.versions.toml.\n\n"
+            "This scanner reads the constant pool and does not follow control "
+            "flow, so a Build.VERSION.SDK_INT guard around the call does not "
+            "clear the report on its own. When a reference really is guarded "
+            "(or is rewritten by D8), add its `owner#descriptor` to "
+            "ALLOWED_ABOVE_FLOOR in this file with the reason.",
+            file=sys.stderr,
+        )
+        return 1
+
+    print(f"androidMain stays on the API {floor} floor ({scanned} classes scanned)")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv))

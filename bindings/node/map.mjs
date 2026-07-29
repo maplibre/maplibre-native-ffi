@@ -11,5 +11,6 @@ export {
   MapViewportOptions,
   ProjectionMode,
   StyleImageOptions,
+  GeoJsonSourceOptions,
   TileSourceOptions,
 } from "./index.mjs";

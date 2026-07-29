@@ -1,3 +1,4 @@
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Struct;
@@ -45,7 +46,7 @@ public sealed unsafe class GeoJsonSourceTests
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
 
-        map.AddGeoJsonSourceData("geo-data", EmptyFeatureCollection());
+        map.AddGeoJsonSourceData("geo-data", EmptyFeatureCollection(), null);
         map.SetGeoJsonSourceData(
             "geo-data",
             new GeoJson.GeometryValue(new Geometry.Point(new LatLng(1, 2)))
@@ -54,6 +55,69 @@ public sealed unsafe class GeoJsonSourceTests
         Assert.True(map.StyleSourceExists("geo-data"));
         Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo-data"));
     }
+
+    [BindingSpecTest("BND-060", "BND-105")]
+    [Fact]
+    public void ClusteredGeoJsonSourceOptionsParseThroughNativeMap()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
+        map.AddGeoJsonSourceData("clustered", NearbyPoints(), ClusterOptions());
+
+        Assert.True(map.StyleSourceExists("clustered"));
+        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("clustered"));
+
+        // The cluster aggregation graph is borrowed for the call and parsed by
+        // MapLibre Native, so an unparseable expression fails the add.
+        var options = ClusterOptions();
+        options.ClusterProperties = new JsonValue.Object([
+            new JsonMember("weight_sum", new JsonValue.String("not-an-expression")),
+        ]);
+
+        var error = Assert.Throws<InvalidArgumentException>(() =>
+            map.AddGeoJsonSourceData("clustered-invalid", NearbyPoints(), options)
+        );
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
+        Assert.False(map.StyleSourceExists("clustered-invalid"));
+    }
+
+    private static GeoJsonSourceOptions ClusterOptions() =>
+        new()
+        {
+            Cluster = true,
+            ClusterRadius = 60,
+            ClusterMinimumPoints = 2,
+            ClusterMaximumZoom = 17,
+            ClusterProperties = new JsonValue.Object([
+                new JsonMember(
+                    "weight_sum",
+                    new JsonValue.Array([
+                        new JsonValue.String("+"),
+                        new JsonValue.Array([
+                            new JsonValue.String("get"),
+                            new JsonValue.String("weight"),
+                        ]),
+                    ])
+                ),
+            ]),
+        };
+
+    private static GeoJson NearbyPoints() =>
+        new GeoJson.FeatureCollection([
+            NearbyPoint(0.000, 1),
+            NearbyPoint(0.001, 2),
+            NearbyPoint(0.002, 3),
+        ]);
+
+    private static Feature NearbyPoint(double offset, ulong weight) =>
+        new(
+            new Geometry.Point(new LatLng(offset, offset)),
+            [new JsonMember("weight", new JsonValue.UInt(weight))],
+            FeatureIdentifier.Null.Instance
+        );
 
     private static GeoJson EmptyFeatureCollection() => new GeoJson.FeatureCollection([]);
 }

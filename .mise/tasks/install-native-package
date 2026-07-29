@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Replace a native build tree with its packaged install."
+#MISE shell="bash"
 #USAGE arg "<preset>" help="Native CMake preset"
 #USAGE arg "<archive>" help="Native package archive"
 
@@ -33,6 +34,16 @@ mkdir -p "$staging_dir"
 descriptor="$package_root/share/maplibre-native-c/artifact.json"
 if [[ ! -f "$descriptor" ]]; then
   echo "Native package is missing its artifact descriptor: $descriptor" >&2
+  exit 1
+fi
+license_dir="$package_root/share/maplibre-native-c/licenses"
+# Expand the glob directly rather than shelling out. An unmatched pattern stays
+# literal, so the -e test below fails on an empty or absent directory. This uses
+# only core bash, avoiding both the GNU/BSD find differences on the macOS
+# runners and compgen, which the Windows runners' bash does not provide.
+license_entries=("$license_dir"/*)
+if [[ ! -d "$license_dir" ]] || [[ ! -e "${license_entries[0]}" ]]; then
+  echo "Native package is missing its third-party license bundle: $license_dir" >&2
   exit 1
 fi
 

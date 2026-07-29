@@ -48,5 +48,35 @@ abstract class VerifyMaplibreRuntimeInstall : DefaultTask() {
       "Native runtime install ${installDirectory.absolutePath} targets " +
         "'$actualTargetPlatform'; expected '${expectedTargetPlatform.get()}'"
     }
+
+    val requiredLicenses = buildSet {
+      addAll(listOf("icu.txt", "maplibre-native.md", "nunicode.txt", "pmtiles.txt"))
+      if (
+        expectedTargetPlatform.get().startsWith("android-") ||
+          expectedTargetPlatform.get().startsWith("linux-") ||
+          expectedTargetPlatform.get().startsWith("windows-")
+      ) {
+        add("rust.md")
+      }
+      if (
+        expectedTargetPlatform.get().startsWith("linux-") ||
+          expectedTargetPlatform.get().startsWith("windows-")
+      ) {
+        addAll(listOf("libuv-extra.txt", "libuv.txt", "zlib.txt"))
+      }
+      if (expectedBackend.get() == "vulkan") {
+        addAll(listOf("glslang.txt", "vulkan-headers.md", "vulkan-memory-allocator.txt"))
+      }
+      if (expectedBackend.get() == "opengl" && expectedTargetPlatform.get().startsWith("macos-")) {
+        add("angle.txt")
+      }
+    }
+    val licenseDirectory = installDirectory.resolve("share/maplibre-native-c/licenses")
+    val actualLicenses =
+      licenseDirectory.listFiles()?.filter(File::isFile)?.map(File::getName)?.toSet().orEmpty()
+    require(actualLicenses.containsAll(requiredLicenses)) {
+      "Native runtime install ${installDirectory.absolutePath} is missing licenses: " +
+        (requiredLicenses - actualLicenses).sorted().joinToString()
+    }
   }
 }

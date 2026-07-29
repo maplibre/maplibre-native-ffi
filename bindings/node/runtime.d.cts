@@ -1,5 +1,6 @@
 export {
   RuntimeHandle,
+  WakeSourceHandle,
   RuntimeOptions,
   cVersion,
   supportedRenderBackends,
@@ -20,6 +21,7 @@ export {
   type RuntimeEventPayloadOfflineRegionResponseError,
   type RuntimeEventPayloadOfflineRegionTileCountLimit,
   type RuntimeEventPayloadOfflineOperationCompleted,
+  type RuntimeEventPayloadCameraTransitionFinished,
   type RuntimeEventPayloadUnknown,
   type RenderingStats,
   type RenderMode,

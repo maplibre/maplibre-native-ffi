@@ -36,6 +36,7 @@ func runtimeEventKnownPayloadSizesForTest() map[RuntimeEventPayloadType]uintptr 
 		RuntimeEventPayloadOfflineRegionResponseError:  unsafe.Sizeof(C.mln_runtime_event_offline_region_response_error{}),
 		RuntimeEventPayloadOfflineRegionTileCountLimit: unsafe.Sizeof(C.mln_runtime_event_offline_region_tile_count_limit{}),
 		RuntimeEventPayloadOfflineOperationCompleted:   unsafe.Sizeof(C.mln_runtime_event_offline_operation_completed{}),
+		RuntimeEventPayloadCameraTransitionFinished:    unsafe.Sizeof(C.mln_runtime_event_camera_transition_finished{}),
 	}
 }
 

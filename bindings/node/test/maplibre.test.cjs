@@ -14,6 +14,7 @@ const {
   clearLogCallback,
   cVersion,
   FreeCameraOptions,
+  GeoJsonSourceOptions,
   InvalidArgumentError,
   InvalidStateError,
   MaplibreError,
@@ -39,6 +40,7 @@ const {
   RenderSessionHandle,
   RuntimeHandle,
   RuntimeOptions,
+  WakeSourceHandle,
   setAsyncLogSeverities,
   VulkanOwnedTextureFrame,
   setLogCallback,
@@ -102,6 +104,7 @@ test("concept subpath modules expose curated public API groups", () => {
   const resourceModule = require("@maplibre/native-ffi-node/resource");
 
   assert.equal(runtimeModule.RuntimeHandle, RuntimeHandle);
+  assert.equal(runtimeModule.WakeSourceHandle, WakeSourceHandle);
   assert.equal(runtimeModule.RuntimeOptions, RuntimeOptions);
   assert.equal(runtimeModule.networkStatus, networkStatus);
   assert.equal(
@@ -119,6 +122,7 @@ test("concept subpath modules expose curated public API groups", () => {
   assert.equal(logModule.setLogCallback, setLogCallback);
   assert.equal(mapModule.MapHandle, MapHandle);
   assert.equal(mapModule.MapOptions, MapOptions);
+  assert.equal(mapModule.GeoJsonSourceOptions, GeoJsonSourceOptions);
   assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
   assert.equal(resourceModule.ResourceRequestHandle, ResourceRequestHandle);
 });
@@ -138,8 +142,20 @@ test("option values compare and copy every semantic field", () => {
     ],
     [
       MapOptions,
-      { width: 16, height: 8, scaleFactor: 1, mapMode: "static" },
-      { width: 32, height: 4, scaleFactor: 2, mapMode: "tile" },
+      {
+        width: 16,
+        height: 8,
+        scaleFactor: 1,
+        mapMode: "static",
+        fastPforEnabled: true,
+      },
+      {
+        width: 32,
+        height: 4,
+        scaleFactor: 2,
+        mapMode: "tile",
+        fastPforEnabled: false,
+      },
     ],
     [
       CameraOptions,
@@ -173,12 +189,14 @@ test("option values compare and copy every semantic field", () => {
         velocity: 2,
         minZoom: 3,
         easing: { x1: 0, y1: 0, x2: 1, y2: 1 },
+        transitionId: 7n,
       },
       {
         durationMs: 4,
         velocity: 5,
         minZoom: 6,
         easing: { x1: 0.1, y1: 0.2, x2: 0.8, y2: 0.9 },
+        transitionId: 8n,
       },
     ],
     [
@@ -199,14 +217,26 @@ test("option values compare and copy every semantic field", () => {
     ],
     [
       BoundOptions,
-      { bounds, minZoom: 5, maxZoom: 6, minPitch: 7, maxPitch: 8 },
       {
-        bounds: { ...bounds, northeast: { latitude: 30, longitude: 40 } },
+        bounds,
+        unbounded: false,
+        minZoom: 5,
+        maxZoom: 6,
+        minPitch: 7,
+        maxPitch: 8,
+      },
+      {
+        unbounded: true,
         minZoom: 9,
         maxZoom: 10,
         minPitch: 11,
         maxPitch: 12,
       },
+    ],
+    [
+      GeoJsonSourceOptions,
+      { minZoom: 1, cluster: true, clusterRadius: 40 },
+      { maxZoom: 12, lineMetrics: true, buffer: 64 },
     ],
     [
       MapViewportOptions,
@@ -1318,16 +1348,14 @@ test("offline take errors preserve whether native ownership transferred", () => 
   }
 });
 
-test("resource providers must be configured before map creation", () => {
+test("resource providers can be replaced and cleared while maps are live", () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
 
   try {
-    map.close();
-    assert.throws(
-      () => runtime.setResourceProviderRoutes([], () => {}),
-      InvalidStateError,
-    );
+    runtime.setResourceProviderRoutes([], () => {});
+    runtime.setResourceProviderRoutes([], () => {});
+    runtime.clearResourceProvider();
   } finally {
     map.close();
     runtime.close();
@@ -1340,7 +1368,7 @@ test("offline operation events expose copied typed payloads", async () => {
   try {
     operation = runtime.runAmbientCacheOperation("clear");
     const event = await eventually(() => {
-      runtime.runOnce();
+      runtime.pump();
       const event = runtime.pollEvent();
       return event?.payload.kind === "offline-operation-completed"
         ? event
@@ -1374,7 +1402,7 @@ test("map events expose proven public map identity without native addresses", as
   try {
     map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
     const event = await eventually(() => {
-      runtime.runOnce();
+      runtime.pump();
       const event = runtime.pollEvent();
       return event?.eventType === "map-style-loaded" ? event : null;
     });
@@ -1928,7 +1956,15 @@ test("runtime handle supports options, resource transform, explicit close, and i
     false,
   );
   assert.equal("native" in runtime, false);
-  runtime.runOnce();
+  runtime.pump();
+  assert.throws(() => runtime.pump(-2), InvalidArgumentError);
+  assert.throws(() => runtime.pump(0.5), InvalidArgumentError);
+  const wakeSource = runtime.acquireWakeSource();
+  assert.equal(wakeSource.closed, false);
+  wakeSource.signal();
+  runtime.pump(null);
+  wakeSource.close();
+  assert.equal(wakeSource.closed, true);
   assert.equal(runtime.pollEvent(), null);
   runtime.setResourceTransformRules([
     {
@@ -1973,7 +2009,7 @@ test("runtime handle supports options, resource transform, explicit close, and i
   );
   runtime.close();
   assert.equal(runtime.closed, true);
-  assert.throws(() => runtime.runOnce(), /handle is closed/);
+  assert.throws(() => runtime.pump(), /handle is closed/);
   runtime.close();
   runtime[Symbol.dispose]();
 });
@@ -1984,6 +2020,7 @@ test("map handle retains runtime parent and closes before runtime", () => {
 
   assert.equal(map instanceof MapHandle, true);
   assert.equal(map.closed, false);
+  assert.deepEqual(map.getSize(), { width: 32, height: 32, pixelRatio: 1 });
   const projection = map.createProjection();
   projection.close();
   assert.throws(
@@ -2240,6 +2277,14 @@ test("map bounds options copy constraints", () => {
     assert.equal(copied.maxZoom, 10);
     assert.equal(copied.minPitch, 0);
     assert.equal(copied.maxPitch, 45);
+    map.setBounds({ unbounded: true });
+    const unbounded = map.getBounds();
+    assert.equal(unbounded.unbounded, true);
+    assert.equal(unbounded.bounds, undefined);
+    assert.throws(
+      () => map.setBounds({ bounds, unbounded: true }),
+      InvalidArgumentError,
+    );
   } finally {
     map.close();
     runtime.close();
@@ -2325,7 +2370,38 @@ test("map camera commands copy descriptor values", () => {
     assert.equal(camera.pitch, 20);
     map.easeTo(
       { center: { latitude: 13, longitude: 35 }, zoom: 4 },
-      { durationMs: 0, easing: { x1: 0, y1: 0, x2: 1, y2: 1 } },
+      {
+        durationMs: 0,
+        easing: { x1: 0, y1: 0, x2: 1, y2: 1 },
+        transitionId: 77n,
+      },
+    );
+    runtime.pump();
+    const cameraEvents = [];
+    for (
+      let event = runtime.pollEvent();
+      event != null;
+      event = runtime.pollEvent()
+    ) {
+      if (event.eventType.startsWith("map-camera-")) {
+        cameraEvents.push(event);
+      }
+    }
+    assert.ok(
+      cameraEvents.some(
+        (event) =>
+          event.eventType === "map-camera-will-change" &&
+          typeof event.cameraChangeMode === "string" &&
+          ["immediate", "animated"].includes(event.cameraChangeMode) &&
+          Number.isInteger(event.rawCameraChangeMode),
+      ),
+    );
+    assert.ok(
+      cameraEvents.some(
+        (event) =>
+          event.payload.kind === "camera-transition-finished" &&
+          event.payload.cameraTransitionFinished.transitionId === 77n,
+      ),
     );
     map.flyTo({ center: { latitude: 14, longitude: 36 }, zoom: 5 }, null);
     map.setFreeCameraOptions({ orientation: { x: 0, y: 0, z: 0, w: 1 } });
@@ -2431,7 +2507,7 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
 
   try {
     map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
-    runtime.runOnce();
+    runtime.pump();
     map.addStyleSourceJson("empty-geojson", {
       type: "geojson",
       data: { type: "FeatureCollection", features: [] },
@@ -2516,7 +2592,19 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
       "https://example.test/updated.geojson",
     );
     map.setGeoJsonSourceData("geojson-url", geojsonData);
-    map.addGeoJsonSourceData("geojson-data", geojsonData);
+    map.addGeoJsonSourceData("geojson-data", geojsonData, {
+      minZoom: 0,
+      maxZoom: 14,
+      tolerance: 0.375,
+      clusterMaxZoom: 12,
+      clusterProperties: {},
+      tileSize: 512,
+      buffer: 128,
+      clusterRadius: 50,
+      clusterMinPoints: 2,
+      lineMetrics: true,
+      cluster: true,
+    });
     assert.deepEqual(map.getStyleSourceType("geojson-data"), {
       kind: "geojson",
       rawType: 4,
@@ -2858,13 +2946,13 @@ test("custom geometry callback retention follows current style ownership", async
       1,
     );
     for (let i = 0; i < 5; i += 1) {
-      runtime.runOnce();
+      runtime.pump();
       while (runtime.pollEvent() != null) {}
     }
 
     map.setStyleUrl("custom://empty-style.json");
     await eventually(() => {
-      runtime.runOnce();
+      runtime.pump();
       let event;
       while ((event = runtime.pollEvent()) != null) {
         if (event.eventType === "map-style-loaded") {
@@ -2889,7 +2977,7 @@ test("style existence and removal probes return copied booleans", () => {
 
   try {
     map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
-    runtime.runOnce();
+    runtime.pump();
     assert.equal(map.styleSourceExists("missing-source"), false);
     assert.equal(map.removeStyleSource("missing-source"), false);
     assert.equal(map.styleLayerExists("missing-layer"), false);

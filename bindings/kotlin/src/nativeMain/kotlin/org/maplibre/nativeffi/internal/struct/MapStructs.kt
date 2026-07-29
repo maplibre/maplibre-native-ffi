@@ -7,18 +7,21 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.BoundsConstraint
 import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_EASING
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_TRANSITION_ID
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_VELOCITY
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_BOUNDS
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_UNBOUNDED
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_BEARING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_PADDING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_PITCH
@@ -96,6 +99,10 @@ internal object MapStructs {
       native.easing.x2 = it.x2
       native.easing.y2 = it.y2
     }
+    value.transitionId?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_TRANSITION_ID
+      native.transition_id = it.toULong()
+    }
     return native.ptr
   }
 
@@ -170,12 +177,18 @@ internal object MapStructs {
   fun boundOptions(value: BoundOptions, scope: MemScope): CPointer<mln_bound_options> {
     val native = scope.alloc<mln_bound_options>()
     mln_bound_options_default().place(native.ptr)
-    value.bounds?.let {
-      native.fields = native.fields or MLN_BOUND_OPTION_BOUNDS
-      native.bounds.southwest.latitude = it.southwest.latitude
-      native.bounds.southwest.longitude = it.southwest.longitude
-      native.bounds.northeast.latitude = it.northeast.latitude
-      native.bounds.northeast.longitude = it.northeast.longitude
+    when (val constraint = value.bounds) {
+      is BoundsConstraint.Bounded -> {
+        native.fields = native.fields or MLN_BOUND_OPTION_BOUNDS
+        native.bounds.southwest.latitude = constraint.bounds.southwest.latitude
+        native.bounds.southwest.longitude = constraint.bounds.southwest.longitude
+        native.bounds.northeast.latitude = constraint.bounds.northeast.latitude
+        native.bounds.northeast.longitude = constraint.bounds.northeast.longitude
+      }
+      BoundsConstraint.Unbounded -> {
+        native.fields = native.fields or MLN_BOUND_OPTION_UNBOUNDED
+      }
+      null -> {}
     }
     value.minZoom?.let {
       native.fields = native.fields or MLN_BOUND_OPTION_MIN_ZOOM
@@ -199,7 +212,9 @@ internal object MapStructs {
   fun boundOptions(value: mln_bound_options): BoundOptions {
     val options = BoundOptions()
     if ((value.fields and MLN_BOUND_OPTION_BOUNDS) != 0U)
-      options.bounds = CoreStructs.latLngBounds(value.bounds)
+      options.bounds = BoundsConstraint.Bounded(CoreStructs.latLngBounds(value.bounds))
+    else if ((value.fields and MLN_BOUND_OPTION_UNBOUNDED) != 0U)
+      options.bounds = BoundsConstraint.Unbounded
     if ((value.fields and MLN_BOUND_OPTION_MIN_ZOOM) != 0U) options.minZoom = value.min_zoom
     if ((value.fields and MLN_BOUND_OPTION_MAX_ZOOM) != 0U) options.maxZoom = value.max_zoom
     if ((value.fields and MLN_BOUND_OPTION_MIN_PITCH) != 0U) options.minPitch = value.min_pitch

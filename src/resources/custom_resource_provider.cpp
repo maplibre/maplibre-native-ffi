@@ -32,6 +32,8 @@ struct mln_resource_request_handle {
   mutable std::mutex mutex;
   bool cancelled = false;
   bool completed = false;
+  bool provider_callback_in_flight = true;
+  bool provider_release_deferred = false;
   mbgl::ActorRef<mbgl::FileSourceRequest> actor;
 };
 
@@ -268,6 +270,13 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
     const auto request = make_request_view(invocation.resource);
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
+    auto provider_release_deferred = false;
+    {
+      const std::scoped_lock lock(invocation.handle->mutex);
+      invocation.handle->provider_callback_in_flight = false;
+      provider_release_deferred = invocation.handle->provider_release_deferred;
+      invocation.handle->provider_release_deferred = false;
+    }
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
       release(invocation.handle);
       return false;
@@ -292,6 +301,10 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       static_cast<void>(
         complete_resource_request(invocation.handle, &response)
       );
+      release(invocation.handle);
+      return true;
+    }
+    if (provider_release_deferred) {
       release(invocation.handle);
     }
     return true;
@@ -420,6 +433,16 @@ auto resource_request_cancelled(
 }
 
 void release_resource_request(mln_resource_request_handle* handle) noexcept {
+  if (handle == nullptr) {
+    return;
+  }
+  {
+    const std::scoped_lock lock(handle->mutex);
+    if (handle->provider_callback_in_flight) {
+      handle->provider_release_deferred = true;
+      return;
+    }
+  }
   release(handle);
 }
 

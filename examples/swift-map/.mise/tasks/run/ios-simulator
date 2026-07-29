@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Install and launch the Swift map iOS simulator app."
+#MISE shell="bash"
 set -euo pipefail
 
 mise run package:ios-simulator

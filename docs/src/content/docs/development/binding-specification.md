@@ -434,8 +434,13 @@ Resource provider invocation follows this operation:
    or release.
 4. Treat inline completion during the provider callback as handled ownership,
    even if the callback return path would otherwise pass through.
-5. Allow deferred or cross-thread completion when the C API allows it, without
+5. Defer inline request release until the callback returns handled ownership.
+6. Allow deferred or cross-thread completion when the C API allows it, without
    changing one-shot or release behavior.
+
+Provider registration is replaceable for a runtime's whole life. A binding keeps
+the registered callback state reachable until the C call that replaces or clears
+the provider returns, and releases it after that call returns.
 
 Handled request completion is terminal. A request can complete once; a
 completion that reaches C consumes the completion path even when native returns
@@ -475,6 +480,34 @@ The helper follows this design:
    thread, and leaves later submissions in the binding's closed-state error
    shape.
 
+A helper that parks its owner thread between iterations acquires a wake source
+and signals it from submission and close, so a submitted operation runs at
+submission time.
+
+### Parking and wake
+
+The pump is one method taking a timeout. Bindings expose it alongside a wake
+source handle.
+
+The pump wrapper follows this design:
+
+1. It takes the host language's duration or timeout type, maps zero to a
+   non-blocking drain, and maps the language's "no timeout" spelling to an
+   unbounded park.
+2. It releases the host runtime's blocking-call machinery for the duration of
+   the call, including any interpreter lock, so other host threads run while the
+   owner thread parks.
+3. Its documentation states that a wake signal sets a flag the pump clears, and
+   that callers drain events after every return.
+
+The wake source follows this design:
+
+1. It is a distinct owned handle that the host releases explicitly, and
+   releasing it is independent of the runtime's lifetime in both orders.
+2. It is transferable and callable from any thread, and the binding declares
+   that where the host language can express it.
+3. Signalling after the runtime is closed succeeds and does nothing.
+
 ### Event polling
 
 The public event API is explicit: host code pumps native runtime work, then
@@ -499,13 +532,41 @@ Event polling follows this operation:
 7. Apply binding-owned state updates triggered by the event before returning the
    copied event.
 
+### Attaching a render session
+
+A render session's owner thread is the thread that attached it, fixed for the
+session's lifetime, and it need not be the map's owner thread.
+
+1. Attach requires the map to be live, not to be owned by the calling thread.
+2. The session a binding returns is affine to the attaching thread. Every
+   session operation from another thread reports the binding's wrong-thread
+   error, including close.
+3. A binding MUST NOT retain the map in binding-owned state that cannot reach
+   the attaching thread. Where a binding drops that retention, it documents that
+   the C API keeps the map alive instead, by rejecting map destroy while a
+   session is attached, and that releasing a map before its session reports
+   through the binding's leak channel rather than destroying the map.
+4. A binding whose map handle cannot cross threads MUST expose the map to the
+   attaching thread through a transferable attach reference whose only operation
+   is attach. Bindings whose map handle is already safe to use from another
+   thread expose attach on the map handle directly and MUST NOT add a redundant
+   reference type. A binding whose owner identity is a host construct rather
+   than the native thread, such as a Dart isolate, states that the two must
+   coincide for its handles to stay usable.
+
 ### Transferability
 
 When the language can declare or enforce cross-thread transferability, ordinary
 owner-thread handles MUST be non-transferable. A transferable owner-thread
-helper handle is allowed only when every operation is submitted back to the
-bound native owner thread. Copied immutable values can be transferable when
-their contents are independent of native owner-thread state. Unchecked or unsafe
+helper handle is allowed only when every operation either is submitted back to
+the bound native owner thread or is serviced entirely under native
+synchronization. Two handles are the second kind. A map attach reference reaches
+no thread-affine map state: attach claims the map's render-session slot under
+the C API's map registry lock and posts the new size to the map's own owner
+thread. A wake source handle reaches native wake state that carries its own
+synchronization and holds no owner-thread pointer. Both are transferable and
+MUST NOT be shareable. Copied immutable values can be transferable when their
+contents are independent of native owner-thread state. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
 sound.
 
@@ -524,6 +585,10 @@ helper that preserves the one-shot completion and stale-handle rules.
 Rendering bindings expose render sessions, frame lifetimes, and readback without
 taking ownership of caller-owned backend resources.
 
+Render session calls may run on a thread other than the one that pumps the
+runtime. Events produced by rendering are still delivered by runtime event
+polling on the runtime owner thread.
+
 ### Render sessions
 
 Render-session attach APIs cover the C API session families:
@@ -538,12 +603,13 @@ Attach follows this operation:
 1. Materialize the backend-specific public descriptor into the matching C
    descriptor.
 2. Pass backend-native host resources as `NativePointer` values.
-3. Call the matching C attach function on the map owner thread.
-4. Return a distinct `RenderSessionHandle` for the map's one live render
-   session.
+3. Call the matching C attach function on the thread that will drive the
+   session, which for a host graphics API with a thread-current context is the
+   thread where that context is current.
+4. Return a distinct `RenderSessionHandle`, bound to the calling thread, for the
+   map's one live render session.
 5. Surface unsupported backend, unsupported render-target mode,
-   existing-session, wrong-thread, and native errors through the binding's
-   status mapping.
+   existing-session, and native errors through the binding's status mapping.
 
 For host-owned backend resources, the binding does not release or synchronize
 those resources. The caller keeps them valid for the C API's documented borrow
@@ -555,7 +621,8 @@ The public handle exposes:
 - `render_update` for the latest available map render update, reporting whether
   an update was rendered;
 - `detach`, which keeps the public handle live after backend resources detach;
-- `close` or `destroy`, using the owned-handle release operation.
+- `close` or `destroy`, using the owned-handle release operation, on the thread
+  that attached the session.
 
 ### Texture frames
 
@@ -678,7 +745,7 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                |
 | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                        |
+| BND-080 | `pump` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                            |
 | BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.                                             |
 | BND-082 | Event message and payload data remain valid after the next event poll.                                                                                              |
 | BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |
@@ -686,6 +753,8 @@ that a real native failure would expose.
 | BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
 | BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
 | BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
+| BND-088 | A parked owner thread is released by native work and by a wake source signalled from another thread, and reports a wake rather than a timeout.                      |
+| BND-089 | A pump clears the wake flag it returned on, and a wake source stays signalable and releasable after its runtime closes.                                             |
 
 ### Map, camera, projection, style, and query
 
@@ -727,6 +796,7 @@ that a real native failure would expose.
 | BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                    |
 | BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
 | BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
+| BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
 
 ### Rendering
 
@@ -746,6 +816,7 @@ that a real native failure would expose.
 | BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
 | BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
 | BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
+| BND-174 | Closing a map whose render session was attached on another thread reports the C API's invalid-state error and leaves both handles live.                   |
 
 ### Conditional tests
 
@@ -771,6 +842,17 @@ thread or race release on the same owner-thread handle, include:
 | BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
 | BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
 | BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+
+#### Render sessions on a second thread
+
+When the binding's test suite attaches a render session on a configured render
+backend and the host language can start a native thread, include:
+
+| ID      | Test                                                                                                                                                 |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-193 | A native thread that does not own the map attaches its own render session against it and renders while the map is pumped on its own owner thread.    |
+| BND-194 | Every render-session operation reports the binding's wrong-thread error on a thread other than the one that attached the session, leaving it usable. |
+| BND-195 | A session attached and closed on a second native thread destroys the native handle exactly once, after which the map closes successfully.            |
 
 #### Live render session queries
 

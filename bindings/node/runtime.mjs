@@ -1,5 +1,6 @@
 export {
   RuntimeHandle,
+  WakeSourceHandle,
   RuntimeOptions,
   cVersion,
   networkStatus,

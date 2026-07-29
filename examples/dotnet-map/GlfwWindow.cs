@@ -11,6 +11,11 @@ internal sealed unsafe class GlfwWindow : IDisposable
     private float contentScaleY;
     private bool closed;
 
+    static GlfwWindow()
+    {
+        NativeLibraryResolver.PreloadGlfw();
+    }
+
     private GlfwWindow(Glfw glfw, WindowHandle* handle)
     {
         Glfw = glfw;

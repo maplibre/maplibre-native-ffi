@@ -135,7 +135,7 @@ async function renderStillImage(runtime, map, session) {
   let finished = false;
   const deadline = Date.now() + 30_000;
   while (!finished && Date.now() < deadline) {
-    runtime.runOnce();
+    runtime.pump();
     let event;
     while ((event = runtime.pollEvent()) != null) {
       if (event.sourceMap !== map) {

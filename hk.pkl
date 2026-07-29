@@ -49,6 +49,12 @@ local lintSteps = new Mapping<String, Step> {
     check = "pnpm exec vp check --no-fmt {{files}}"
     fix = "pnpm exec vp check --no-fmt --fix {{files}}"
   }
+  // The guides embed these snippets verbatim. Header changes are in the glob so
+  // an API change that invalidates a documented snippet fails here first.
+  ["docs-snippets"] {
+    glob = List("docs/snippets/c/**/*.c", "include/**/*.h")
+    check = "mise run //docs:check-snippets"
+  }
   ["ruff"] {
     glob = List("**/*.py")
     exclude = List("third_party/**")
@@ -63,6 +69,12 @@ local lintSteps = new Mapping<String, Step> {
     glob = List("bindings/go/**/*.go")
     check = "unformatted=\"$(mise run --quiet //bindings/go:_gofumpt-check {{files}})\"; test -z \"$unformatted\" || { echo \"$unformatted\" >&2; exit 1; }"
     fix = "mise run --quiet //bindings/go:_gofumpt-fix {{files}}"
+  }
+  ["dart-format"] {
+    glob = List("bindings/dart/**/*.dart")
+    exclude = List("bindings/dart/**/*.g.dart")
+    check = "mise run --quiet //bindings/dart:_format-check {{files}}"
+    fix = "mise run --quiet //bindings/dart:_format-fix {{files}}"
   }
 }
 

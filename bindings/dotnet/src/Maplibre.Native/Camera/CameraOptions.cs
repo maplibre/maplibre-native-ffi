@@ -2,6 +2,20 @@ using Maplibre.Native.Geo;
 
 namespace Maplibre.Native.Camera;
 
+/// <summary>Camera change kinds reported by camera will-change and did-change events.</summary>
+/// <remarks>
+/// A camera will-change or did-change runtime event carries this value in its raw
+/// <c>Code</c> field.
+/// </remarks>
+public enum CameraChangeMode : uint
+{
+    /// <summary>The camera reached its new value without an animated transition.</summary>
+    Immediate = 0,
+
+    /// <summary>The camera moved as part of an animated transition.</summary>
+    Animated = 1,
+}
+
 /// <summary>Mutable camera descriptor used for camera snapshots and commands.</summary>
 /// <remarks>
 /// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
@@ -37,6 +51,29 @@ public sealed record AnimationOptions
     public UnitBezier? Easing { get; set; }
     public double? MinimumZoom { get; set; }
     public double? Velocity { get; set; }
+
+    /// <summary>Caller-chosen identity for the transition these options start.</summary>
+    /// <remarks>
+    /// <para>
+    /// When set, the transition emits one map camera transition-finished runtime event carrying
+    /// this value in its <c>RuntimeEventPayload.CameraTransitionFinished</c> payload. The value
+    /// passes through to MapLibre Native uninterpreted, so callers pick their own scheme, such as
+    /// a monotonically increasing counter.
+    /// </para>
+    /// <para>
+    /// Each transition emits that event exactly once, whichever way it ends: running to
+    /// completion, being superseded by a later camera command, being cancelled by
+    /// <c>MapHandle.CancelTransitions</c>, or completing instantly as a zero-duration jump. A
+    /// command this API rejects, such as one carrying a non-finite enabled camera field, starts no
+    /// transition and emits no such event. MapLibre Native reports the
+    /// moment a transition releases the camera and does not report which of those outcomes
+    /// occurred, so the event establishes transition identity rather than a completion reason. A
+    /// host that needs to tell completion from cancellation compares the resulting camera against
+    /// the requested one, or tracks which transition ID is current.
+    /// </para>
+    /// <para>Leaving this property null emits no such event.</para>
+    /// </remarks>
+    public ulong? TransitionId { get; set; }
 }
 
 /// <summary>Camera fitting descriptor.</summary>
@@ -51,6 +88,26 @@ public sealed record CameraFitOptions
     public double? Pitch { get; set; }
 }
 
+/// <summary>Geographic constraint applied to the map camera center.</summary>
+public abstract record BoundsConstraint
+{
+    private BoundsConstraint() { }
+
+    /// <summary>Keeps the camera center inside the given bounds.</summary>
+    public sealed record Bounded(LatLngBounds Bounds) : BoundsConstraint;
+
+    /// <summary>
+    /// Leaves the camera center unconstrained, so the map pans freely across the antimeridian.
+    /// This differs from world bounds of -90/-180 to 90/180, which clamp longitude to that range.
+    /// </summary>
+    public sealed record Unbounded : BoundsConstraint
+    {
+        public static Unbounded Instance { get; } = new();
+
+        private Unbounded() { }
+    }
+}
+
 /// <summary>Camera bound constraint descriptor.</summary>
 /// <remarks>
 /// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
@@ -58,7 +115,7 @@ public sealed record CameraFitOptions
 /// </remarks>
 public sealed record BoundOptions
 {
-    public LatLngBounds? Bounds { get; set; }
+    public BoundsConstraint? Bounds { get; set; }
     public double? MinimumZoom { get; set; }
     public double? MaximumZoom { get; set; }
     public double? MinimumPitch { get; set; }

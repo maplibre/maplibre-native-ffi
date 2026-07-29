@@ -109,6 +109,8 @@ export interface RuntimeEvent {
   rawSourceType: number;
   sourceMap: MapHandle | null;
   code: number;
+  cameraChangeMode?: "immediate" | "animated" | "unknown" | null;
+  rawCameraChangeMode?: number | null;
   message?: string | null;
   payloadKind: RuntimeEventPayload["kind"];
   payload: RuntimeEventPayload;
@@ -124,6 +126,7 @@ export type RuntimeEventPayload =
   | RuntimeEventPayloadOfflineRegionResponseError
   | RuntimeEventPayloadOfflineRegionTileCountLimit
   | RuntimeEventPayloadOfflineOperationCompleted
+  | RuntimeEventPayloadCameraTransitionFinished
   | RuntimeEventPayloadUnknown;
 
 export interface RuntimeEventPayloadBase {
@@ -268,6 +271,13 @@ export interface RuntimeEventPayloadOfflineOperationCompleted extends RuntimeEve
   };
 }
 
+export interface RuntimeEventPayloadCameraTransitionFinished extends RuntimeEventPayloadBase {
+  kind: "camera-transition-finished";
+  cameraTransitionFinished: {
+    transitionId: bigint;
+  };
+}
+
 export interface RuntimeEventPayloadUnknown extends RuntimeEventPayloadBase {
   kind: "unknown";
   unknown: {
@@ -324,6 +334,7 @@ export interface AnimationOptionsInput {
   velocity?: number | null;
   minZoom?: number | null;
   easing?: UnitBezier | null;
+  transitionId?: bigint | null;
 }
 
 export declare class AnimationOptions implements AnimationOptionsInput {
@@ -332,6 +343,7 @@ export declare class AnimationOptions implements AnimationOptionsInput {
   readonly velocity?: number | null;
   readonly minZoom?: number | null;
   readonly easing?: UnitBezier | null;
+  readonly transitionId?: bigint | null;
   equals(other: unknown): boolean;
   copy(changes?: AnimationOptionsInput | null): AnimationOptions;
 }
@@ -481,6 +493,7 @@ export declare class MapTileOptions {
 
 export interface BoundOptionsInput {
   bounds?: LatLngBounds | null;
+  unbounded?: boolean | null;
   minZoom?: number | null;
   maxZoom?: number | null;
   minPitch?: number | null;
@@ -490,6 +503,7 @@ export interface BoundOptionsInput {
 export declare class BoundOptions implements BoundOptionsInput {
   constructor(input?: BoundOptionsInput | null);
   readonly bounds?: LatLngBounds | null;
+  readonly unbounded?: boolean | null;
   readonly minZoom?: number | null;
   readonly maxZoom?: number | null;
   readonly minPitch?: number | null;
@@ -518,6 +532,7 @@ export interface MapOptionsInput {
   height?: number | null;
   scaleFactor?: number | null;
   mapMode?: "continuous" | "static" | "tile" | null;
+  fastPforEnabled?: boolean | null;
 }
 
 export declare class MapOptions implements MapOptionsInput {
@@ -526,6 +541,7 @@ export declare class MapOptions implements MapOptionsInput {
   readonly height?: number | null;
   readonly scaleFactor?: number | null;
   readonly mapMode?: "continuous" | "static" | "tile" | null;
+  readonly fastPforEnabled?: boolean | null;
   equals(other: unknown): boolean;
   copy(changes?: MapOptionsInput | null): MapOptions;
 }
@@ -655,13 +671,15 @@ export declare class RuntimeHandle {
   readonly closed: boolean;
   createMap(options?: MapOptionsInput | MapOptions | null): MapHandle;
   close(): void;
-  runOnce(): void;
+  pump(timeoutMs?: number | null): void;
+  acquireWakeSource(): WakeSourceHandle;
   setResourceTransformRules(rules: readonly ResourceTransformRule[]): void;
   clearResourceTransform(): void;
   setResourceProviderRoutes(
     routes: readonly ResourceRoute[],
     callback: ResourceProviderCallback,
   ): void;
+  clearResourceProvider(): void;
   runAmbientCacheOperation(
     operation: AmbientCacheOperation,
   ): OfflineOperationHandle;
@@ -706,6 +724,14 @@ export declare class RuntimeHandle {
     operation: OfflineOperationRef,
   ): OfflineRegionStatus;
   pollEvent(): RuntimeEvent | null;
+  [Symbol.dispose](): void;
+}
+
+export declare class WakeSourceHandle {
+  private constructor(nativeHandle: unknown);
+  readonly closed: boolean;
+  signal(): void;
+  close(): void;
   [Symbol.dispose](): void;
 }
 
@@ -1104,6 +1130,7 @@ export declare class MapHandle {
   renderingStatsViewEnabled: boolean;
   close(): void;
   createProjection(): MapProjectionHandle;
+  getSize(): MapSize;
   attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle;
@@ -1208,8 +1235,16 @@ export declare class MapHandle {
   listStyleSourceIds(): string[];
   getStyleSourceType(sourceId: string): StyleSourceTypeValue | null;
   getStyleSourceInfo(sourceId: string): StyleSourceInfo | null;
-  addGeoJsonSourceUrl(sourceId: string, url: string): void;
-  addGeoJsonSourceData(sourceId: string, data: JsonValue): void;
+  addGeoJsonSourceUrl(
+    sourceId: string,
+    url: string,
+    options?: GeoJsonSourceOptionsInput | GeoJsonSourceOptions | null,
+  ): void;
+  addGeoJsonSourceData(
+    sourceId: string,
+    data: JsonValue,
+    options?: GeoJsonSourceOptionsInput | GeoJsonSourceOptions | null,
+  ): void;
   setGeoJsonSourceUrl(sourceId: string, url: string): void;
   setGeoJsonSourceData(sourceId: string, data: JsonValue): void;
   addVectorSourceUrl(
@@ -1455,6 +1490,43 @@ export interface PremultipliedRgba8ImageInput {
 export interface StyleImageOptionsInput {
   pixelRatio?: number | null;
   sdf?: boolean | null;
+}
+
+export interface MapSize {
+  width: number;
+  height: number;
+  pixelRatio: number;
+}
+
+export interface GeoJsonSourceOptionsInput {
+  minZoom?: number | null;
+  maxZoom?: number | null;
+  tolerance?: number | null;
+  clusterMaxZoom?: number | null;
+  clusterProperties?: JsonValue | null;
+  tileSize?: number | null;
+  buffer?: number | null;
+  clusterRadius?: number | null;
+  clusterMinPoints?: number | null;
+  lineMetrics?: boolean | null;
+  cluster?: boolean | null;
+}
+
+export declare class GeoJsonSourceOptions implements GeoJsonSourceOptionsInput {
+  constructor(input?: GeoJsonSourceOptionsInput | null);
+  readonly minZoom?: number | null;
+  readonly maxZoom?: number | null;
+  readonly tolerance?: number | null;
+  readonly clusterMaxZoom?: number | null;
+  readonly clusterProperties?: JsonValue | null;
+  readonly tileSize?: number | null;
+  readonly buffer?: number | null;
+  readonly clusterRadius?: number | null;
+  readonly clusterMinPoints?: number | null;
+  readonly lineMetrics?: boolean | null;
+  readonly cluster?: boolean | null;
+  equals(other: unknown): boolean;
+  copy(changes?: GeoJsonSourceOptionsInput | null): GeoJsonSourceOptions;
 }
 
 export declare class StyleImageOptions implements StyleImageOptionsInput {

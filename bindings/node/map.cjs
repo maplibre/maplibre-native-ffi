@@ -15,3 +15,4 @@ exports.BoundOptions = root.BoundOptions;
 exports.ProjectionMode = root.ProjectionMode;
 exports.TileSourceOptions = root.TileSourceOptions;
 exports.StyleImageOptions = root.StyleImageOptions;
+exports.GeoJsonSourceOptions = root.GeoJsonSourceOptions;

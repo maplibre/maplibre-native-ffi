@@ -17,6 +17,7 @@ import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_NONE
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
@@ -35,6 +36,7 @@ import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_destroy
 import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_camera_transition_finished
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status
@@ -107,6 +109,12 @@ internal object RuntimeStructs {
         if (hasPayloadSize<mln_runtime_event_offline_operation_completed>(event)) {
           offlineOperationCompleted(
             payload.reinterpret<mln_runtime_event_offline_operation_completed>()
+          )
+        } else unknownPayload(event)
+      MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED ->
+        if (hasPayloadSize<mln_runtime_event_camera_transition_finished>(event)) {
+          cameraTransitionFinished(
+            payload.reinterpret<mln_runtime_event_camera_transition_finished>()
           )
         } else unknownPayload(event)
       else -> unknownPayload(event)
@@ -221,6 +229,11 @@ internal object RuntimeStructs {
       value.found,
     )
   }
+
+  private fun cameraTransitionFinished(
+    payload: CPointer<mln_runtime_event_camera_transition_finished>
+  ): RuntimeEventPayload.CameraTransitionFinished =
+    RuntimeEventPayload.CameraTransitionFinished(uint64BitsToLong(payload.pointed.transition_id))
 
   private fun checkedInt(value: ULong, name: String): Int {
     require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }

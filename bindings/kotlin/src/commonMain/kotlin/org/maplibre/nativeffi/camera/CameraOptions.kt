@@ -16,6 +16,13 @@ public class CameraOptions {
 
   public var padding: EdgeInsets? = null
 
+  /**
+   * The screen point that stays fixed while a camera command applies.
+   *
+   * This field is input-only. MapLibre Native honours it on camera commands and never reports it in
+   * a camera snapshot, so a value read back from [org.maplibre.nativeffi.map.MapHandle.camera] is
+   * always null and code branching on it there never runs.
+   */
   public var anchor: ScreenPoint? = null
 
   public var zoom: Double? = null

@@ -8,7 +8,9 @@ import "C"
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"sync"
+	"time"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
@@ -216,6 +218,7 @@ const (
 	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
 	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED)
+	RuntimeEventMapCameraTransitionFinished         RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED)
 )
 
 // RuntimeEventSourceType identifies the native handle kind that emitted an event.
@@ -239,6 +242,7 @@ const (
 	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
+	RuntimeEventPayloadCameraTransitionFinished    RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED)
 )
 
 // MapID identifies a map within one RuntimeHandle.
@@ -254,9 +258,18 @@ type RuntimeEventSource struct {
 // RuntimeEvent is a copied runtime event. Unknown payloads preserve raw
 // metadata and bytes.
 type RuntimeEvent struct {
-	Type        RuntimeEventType
-	SourceType  RuntimeEventSourceType
-	Source      RuntimeEventSource
+	Type       RuntimeEventType
+	SourceType RuntimeEventSourceType
+	Source     RuntimeEventSource
+	// Code is a secondary event detail whose meaning Type selects.
+	//
+	// For RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange it
+	// is a CameraChangeMode. For RuntimeEventMapLoadingFailed it is the ordinal
+	// of MapLibre Native's internal map load error kind, which this binding does
+	// not name as a type; Message carries the failure text. For
+	// RuntimeEventOfflineOperationCompleted it is the operation result as a
+	// native status value, the same value the payload reports in ResultStatus.
+	// Every other event type reports 0.
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	PayloadSize uintptr
@@ -265,6 +278,22 @@ type RuntimeEvent struct {
 
 	rawSource uintptr
 }
+
+// CameraChangeMode reports whether a camera change belongs to an animated
+// transition. It is the meaning of RuntimeEvent.Code for
+// RuntimeEventMapCameraWillChange and RuntimeEventMapCameraDidChange, so a host
+// reads it as CameraChangeMode(event.Code). Values outside the named constants
+// stay readable as the raw code.
+type CameraChangeMode uint32
+
+const (
+	// CameraChangeModeImmediate marks a camera that reached its new value
+	// without an animated transition.
+	CameraChangeModeImmediate CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_IMMEDIATE)
+	// CameraChangeModeAnimated marks a camera that moved as part of an animated
+	// transition.
+	CameraChangeModeAnimated CameraChangeMode = CameraChangeMode(C.MLN_CAMERA_CHANGE_MODE_ANIMATED)
+)
 
 // RenderMode identifies a render observer mode.
 type RenderMode uint32
@@ -333,6 +362,14 @@ type RuntimeEventTileActionPayload struct {
 	RawOperation uint32
 	TileID       TileID
 	SourceID     string
+}
+
+// RuntimeEventCameraTransitionFinishedPayload is a copied camera
+// transition-finished event payload. It carries the identity the caller stamped
+// on the transition through AnimationOptions.TransitionID, which also documents
+// the terminal outcomes this event covers.
+type RuntimeEventCameraTransitionFinishedPayload struct {
+	TransitionID uint64
 }
 
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
@@ -513,24 +550,112 @@ func (runtime *RuntimeHandle) ptr() (*nativeRuntime, func(), error) {
 	return borrow.Ptr(), borrow.Release, nil
 }
 
-// RunOnce runs one iteration of this runtime's owner-thread run loop. The
-// iteration drains the high-priority task queue and then the default queue
-// until both are empty, including tasks enqueued during the drain, and also
-// dispatches expired timers and ready I/O.
+// Pump advances this runtime.
 //
-// RunOnce returns without blocking on new work, but its duration is unbounded:
-// a single iteration can span a style parse. Treat it as "make progress now"
-// rather than as a fixed per-frame time slice.
-func (runtime *RuntimeHandle) RunOnce() error {
+// The call parks the owner thread when timeout allows it, then drains the
+// owner-thread task queues. Drain the queued runtime events with PollEvent
+// afterwards.
+//
+// timeout sets the park bound. Zero drains and returns; hosts pumping from a
+// frame callback pass it. A positive value parks for up to that long; hosts that
+// own their pump goroutine pass one and take their cadence from the runtime's
+// own work. A negative value parks until a wake arrives.
+//
+// The drain runs every task queued when it begins plus every task those
+// enqueue, so a single call can span a full style parse.
+//
+// The runtime holds a wake flag. Style, tile, offline, and resource responses
+// set it, as do queued runtime events and WakeSource.Signal. A parking call
+// returns as soon as the flag is set and clears it before returning, and work
+// arriving during the drain sets it again. A call also returns without parking
+// while unread runtime events are queued. Timers and ready file descriptors set
+// the flag only when they queue owner-thread work, so pass a bounded timeout to
+// cap how long a call waits.
+//
+// A non-zero timeout blocks the calling goroutine and its OS thread. Call it
+// outside any lock that a goroutine signalling a WakeSource takes.
+func (runtime *RuntimeHandle) Pump(timeout time.Duration) error {
 	ptr, release, err := runtime.ptr()
 	if err != nil {
 		return err
 	}
 	defer release()
 	defer runtime.state.KeepAlive()
+
+	timeoutMS := int64(-1)
+	if timeout >= 0 {
+		timeoutMS = int64(timeout / time.Millisecond)
+	}
 	return checkNative(func() int32 {
-		return int32(C.mln_runtime_run_once((*C.mln_runtime)(unsafe.Pointer(ptr))))
+		return int32(C.mln_runtime_pump((*C.mln_runtime)(unsafe.Pointer(ptr)), C.int64_t(timeoutMS)))
 	})
+}
+
+// WakeSource acquires a wake source that releases this runtime's parked owner
+// thread. The returned source is usable from any goroutine, and the caller
+// closes it.
+func (runtime *RuntimeHandle) WakeSource() (*WakeSource, error) {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	var raw *C.mln_wake_source
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_wake_source_acquire((*C.mln_runtime)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
+		return nil, err
+	}
+	state, err := handle.New((*nativeWakeSource)(unsafe.Pointer(raw)), "WakeSource")
+	if err != nil {
+		C.mln_wake_source_destroy(raw)
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	source := &WakeSource{state: state}
+	stdruntime.SetFinalizer(source, func(source *WakeSource) { source.Close() })
+	return source, nil
+}
+
+// WakeSource releases a runtime owner thread parked in RuntimeHandle.Pump.
+//
+// A wake source is usable from any goroutine, which a host's task submission
+// and shutdown paths rely on. It stays usable after its runtime closes, and
+// signalling it then does nothing.
+type WakeSource struct {
+	state *handle.State[nativeWakeSource]
+}
+
+var destroyWakeSource = func(ptr *nativeWakeSource) int32 {
+	C.mln_wake_source_destroy((*C.mln_wake_source)(unsafe.Pointer(ptr)))
+	return int32(C.MLN_STATUS_OK)
+}
+
+// Signal sets the runtime's wake flag and releases the parked owner thread. A
+// signal raised while the owner thread is running leaves the flag set, so the
+// next Pump returns without parking.
+func (source *WakeSource) Signal() error {
+	if source == nil || source.state == nil {
+		return newBindingError(ErrInvalidArgument, "WakeSource is nil")
+	}
+	borrow, live := source.state.Borrow()
+	if !live {
+		return newBindingError(ErrInvalidArgument, "WakeSource is closed")
+	}
+	defer borrow.Release()
+	defer source.state.KeepAlive()
+	return checkNative(func() int32 {
+		return int32(C.mln_wake_source_signal((*C.mln_wake_source)(unsafe.Pointer(borrow.Ptr()))))
+	})
+}
+
+// Close releases the wake source. Later signals report a closed handle.
+func (source *WakeSource) Close() {
+	if source == nil || source.state == nil {
+		return
+	}
+	source.state.Close(destroyWakeSource)
 }
 
 // PollEvent polls one queued runtime event and copies it into a Go value. It
@@ -679,6 +804,12 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			TileID:       tileIDFromC(payload.tile_id),
 			SourceID:     goCharBytes(payload.source_id, payload.source_id_size),
 		}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED):
+		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_camera_transition_finished{})) {
+			return runtimeEventUnknownPayloadFromC(event)
+		}
+		payload := (*C.mln_runtime_event_camera_transition_finished)(event.payload)
+		return RuntimeEventCameraTransitionFinishedPayload{TransitionID: uint64(payload.transition_id)}
 	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS):
 		if !runtimeEventPayloadHasSize(event, unsafe.Sizeof(C.mln_runtime_event_offline_region_status{})) {
 			return runtimeEventUnknownPayloadFromC(event)
@@ -785,9 +916,11 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
-// provider. Configure it before creating maps from this runtime. Native code may
-// invoke the provider on worker or network threads, so callbacks must be
-// thread-safe and must not call MapLibre map/runtime APIs.
+// provider. It may be called while maps are live. Native code may invoke the
+// provider on worker or network threads, so callbacks must be thread-safe and
+// must not call MapLibre map/runtime APIs. Once this call returns, a replaced
+// provider is no longer invoked; requests it already took a handle for keep that
+// handle, so complete or close each one as usual.
 func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
 	if provider == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
@@ -833,6 +966,26 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	runtime.resourceProvider = replacement
 	runtime.resourceProviderMu.Unlock()
 	previous.Release()
+	return nil
+}
+
+// ClearResourceProvider clears the runtime-scoped network resource provider.
+// Requests that reach the C API network file source then go to MapLibre's online
+// file source. Once this call returns, the cleared provider is no longer invoked;
+// requests it already took a handle for keep that handle, so complete or close
+// each one as usual.
+func (runtime *RuntimeHandle) ClearResourceProvider() error {
+	ptr, release, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer runtime.state.KeepAlive()
+
+	if err := checkNative(func() int32 { return callback.ClearResourceProvider(unsafe.Pointer(ptr)) }); err != nil {
+		return err
+	}
+	runtime.releaseResourceProvider()
 	return nil
 }
 
@@ -921,6 +1074,7 @@ func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle,
 		rawOptions.height = C.uint32_t(options.Height)
 		rawOptions.scale_factor = C.double(options.ScaleFactor)
 		rawOptions.map_mode = C.uint32_t(options.Mode)
+		rawOptions.fast_pfor_enabled = C.bool(options.FastPFOREnabled)
 
 		var raw *C.mln_map
 		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawOptions, &raw))

@@ -131,8 +131,8 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
 	t.Helper()
 	for range make([]struct{}, 5000) {
-		if err := runtime.RunOnce(); err != nil {
-			t.Fatalf("RunOnce(): %v", err)
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
 		}
 		result, err := operation.Take()
 		if err == nil {
@@ -214,8 +214,8 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 		t.Fatalf("StartOfflineRegions(): %v", err)
 	}
 	for range make([]struct{}, 5000) {
-		if err := runtime.RunOnce(); err != nil {
-			t.Fatalf("RunOnce(): %v", err)
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
 		}
 		event, err := runtime.PollEvent()
 		if err != nil {

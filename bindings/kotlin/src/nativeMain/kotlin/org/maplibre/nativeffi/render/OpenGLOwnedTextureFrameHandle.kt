@@ -18,11 +18,7 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: OpenGLOwnedTextureFrame,
 ) : AutoCloseable {
-  private val core =
-    OwnedTextureFrameHandleCore(
-      "OpenGLOwnedTextureFrameHandle",
-      "OpenGL owned texture frame handle is closed",
-    )
+  private val core = OwnedTextureFrameHandleCore("OpenGLOwnedTextureFrameHandle")
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.reportLeak() }
 
   public actual fun frame(): OpenGLOwnedTextureFrame {

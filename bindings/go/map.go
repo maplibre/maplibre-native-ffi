@@ -59,6 +59,12 @@ type MapOptions struct {
 	// imagery chosen for this density.
 	ScaleFactor float64
 	Mode        MapMode
+	// FastPFOREnabled decodes MapLibre Tile (MLT) tiles whose integer streams use
+	// FastPFOR encodings, fixed for the lifetime of the map. Enable it on maps
+	// that read vector sources created with StyleVectorTileEncodingMLT from a
+	// tile set that uses FastPFOR. A map created with this false decodes every
+	// other MLT encoding and logs a tile parse warning for the FastPFOR ones.
+	FastPFOREnabled bool
 }
 
 // Equal reports whether two descriptors hold the same field values, matching the Equal methods on
@@ -107,6 +113,18 @@ func validateCStringArgument(name string, value string) error {
 		return err
 	}
 	return nil
+}
+
+// ID returns this map's runtime-local event source identity. It matches
+// RuntimeEventSource.MapID on runtime events this map raises, so a host holding
+// several maps can route an event to the map that produced it.
+func (m *MapHandle) ID() (MapID, error) {
+	_, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	return m.id, nil
 }
 
 // RequestRepaint requests a repaint for a continuous map.
@@ -259,6 +277,29 @@ func (m *MapHandle) IsFullyLoaded() (bool, error) {
 		return false, err
 	}
 	return bool(loaded), nil
+}
+
+// Size returns the map's logical viewport size in UI pixels and its pixel
+// ratio.
+//
+// The size starts at the creation width and height, and follows the attach and
+// resize rules documented on MapOptions. The scale factor is fixed for the
+// lifetime of the map and is independent of any render target's scale factor.
+func (m *MapHandle) Size() (width uint32, height uint32, scaleFactor float64, err error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var rawWidth, rawHeight C.uint32_t
+	var rawScaleFactor C.double
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_size((*C.mln_map)(unsafe.Pointer(ptr)), &rawWidth, &rawHeight, &rawScaleFactor))
+	}); err != nil {
+		return 0, 0, 0, err
+	}
+	return uint32(rawWidth), uint32(rawHeight), float64(rawScaleFactor), nil
 }
 
 // DumpDebugLogs dumps map debug logs through MapLibre Native logging.
@@ -652,7 +693,10 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 	}
 	defer release()
 	defer m.state.KeepAlive()
-	rawOptions := cBoundOptions(options)
+	rawOptions, err := cBoundOptions(options)
+	if err != nil {
+		return err
+	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
 	})

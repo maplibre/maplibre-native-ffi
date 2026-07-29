@@ -1,6 +1,7 @@
 // Raw C ABI coverage: null and stale render-session handles are hidden by
 // binding-owned handle state.
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 

@@ -17,6 +17,24 @@ public sealed class RuntimeMapLifecycleTests
         Assert.False(map.IsClosed);
     }
 
+    [BindingSpecTest("BND-100")]
+    [Fact]
+    public void MapOptionsMaterializeFastPforDecoding()
+    {
+        Assert.Equal(0, new MapOptions().ToNative().fast_pfor_enabled);
+        Assert.Equal(
+            1,
+            new MapOptions { FastPforEnabled = true }
+                .ToNative()
+                .fast_pfor_enabled
+        );
+
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { FastPforEnabled = true });
+
+        Assert.False(map.IsClosed);
+    }
+
     [BindingSpecTest("BND-040", "BND-100")]
     [Fact]
     public void RuntimeAndMapCloseDeterministically()
@@ -71,6 +89,23 @@ public sealed class RuntimeMapLifecycleTests
         map.DumpDebugLogs();
     }
 
+    [Fact]
+    public void MapSizeReportsCreationExtentAndPixelRatio()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(
+            runtime,
+            new MapOptions
+            {
+                Width = 512,
+                Height = 256,
+                ScaleFactor = 2,
+            }
+        );
+
+        Assert.Equal((512u, 256u, 2d), map.GetSize());
+    }
+
     [BindingSpecTest("BND-190", "BND-191")]
     [Fact]
     public void OwnerThreadViolationMapsToWrongThreadException()
@@ -118,7 +153,7 @@ public sealed class RuntimeMapLifecycleTests
             {
                 Assert.Equal(createThreadId, Environment.CurrentManagedThreadId);
                 map!.RequestRepaint();
-                runtime!.RunOnce();
+                runtime!.Pump(TimeSpan.Zero);
                 _ = runtime.PollEvent();
                 return Environment.CurrentManagedThreadId;
             })

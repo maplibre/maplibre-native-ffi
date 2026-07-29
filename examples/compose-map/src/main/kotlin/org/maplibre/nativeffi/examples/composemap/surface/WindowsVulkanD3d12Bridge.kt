@@ -253,7 +253,7 @@ private class WindowsVulkanContext private constructor(private val sharedHandle:
   private fun createInstance() {
     ensureVulkanFunctionProvider()
     MemoryStack.stackPush().use { stack ->
-      val available = stack.vulkanInstanceExtensions()
+      val available = vulkanInstanceExtensions()
       val extensions = LinkedHashSet<String>()
       val enablePortability = VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME in available
       if (enablePortability) {
@@ -297,12 +297,10 @@ private class WindowsVulkanContext private constructor(private val sharedHandle:
       )
       for (index in 0..<devices.capacity()) {
         val candidate = VkPhysicalDevice(devices[index], instance())
-        if (
-          VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME !in stack.vulkanDeviceExtensions(candidate)
-        ) {
+        if (VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME !in vulkanDeviceExtensions(candidate)) {
           continue
         }
-        val queueFamily = stack.findVulkanGraphicsQueueFamily(candidate)
+        val queueFamily = findVulkanGraphicsQueueFamily(candidate)
         if (queueFamily >= 0 && canImportD3D12Handle(candidate, queueFamily)) {
           physicalDevice = candidate
           graphicsQueueFamilyIndex = queueFamily
@@ -315,7 +313,7 @@ private class WindowsVulkanContext private constructor(private val sharedHandle:
 
   private fun canImportD3D12Handle(candidate: VkPhysicalDevice, queueFamily: Int): Boolean {
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = stack.vulkanDeviceExtensions(candidate)
+      val deviceExtensions = vulkanDeviceExtensions(candidate)
       val extensions = LinkedHashSet<String>()
       extensions.add(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME)
       if (VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME in deviceExtensions) {
@@ -355,7 +353,7 @@ private class WindowsVulkanContext private constructor(private val sharedHandle:
 
   private fun createDevice() {
     MemoryStack.stackPush().use { stack ->
-      val deviceExtensions = stack.vulkanDeviceExtensions(physicalDevice())
+      val deviceExtensions = vulkanDeviceExtensions(physicalDevice())
       check(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME in deviceExtensions) {
         "Selected Vulkan device does not support $VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME"
       }

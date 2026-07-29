@@ -1,5 +1,10 @@
 function(mln_configure_platform_dependencies target)
   include(FetchContent)
+  # The Windows presets set CMAKE_TRY_COMPILE_TARGET_TYPE to STATIC_LIBRARY so
+  # compiler-flag probes skip the link step. zlib's fseeko probe is the one here
+  # that answers from linking, so the preset pins HAVE_FSEEKO to what the
+  # linking probe reports on clang-cl. A dependency bump that adds a link-based
+  # check needs the same treatment.
   set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
   set(LIBUV_BUILD_SHARED OFF CACHE BOOL "" FORCE)
   set(LIBUV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -18,6 +23,12 @@ function(mln_configure_platform_dependencies target)
       "SHA256=7f1db8ac368d89d1baf163bac1ea5fe5120697a73910c8ae6b2fffb3551d59fb"
     EXCLUDE_FROM_ALL)
   fetchcontent_makeavailable(mln_ffi_zlib_source mln_ffi_libuv_source)
+  mln_add_license(${target} "${mln_ffi_zlib_source_SOURCE_DIR}/LICENSE"
+                  "zlib.txt")
+  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE"
+                  "libuv.txt")
+  mln_add_license(${target} "${mln_ffi_libuv_source_SOURCE_DIR}/LICENSE-extra"
+                  "libuv-extra.txt")
 
   target_link_libraries(${target} INTERFACE zlibstatic uv_a ntdll ws2_32)
   set_target_properties(
@@ -90,11 +101,6 @@ function(mln_configure_platform target)
     SYSTEM
     BEFORE
     PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
-
-  target_include_directories(
-    ${target}
-    BEFORE
-    PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/windows/shims)
 
   target_include_directories(
     ${target}

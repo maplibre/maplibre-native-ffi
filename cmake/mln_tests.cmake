@@ -8,11 +8,18 @@ function(mln_add_c_api_test)
                       MLN_FFI_RUNTIME_DIRS)
   get_target_property(dependency_include_dirs mln_ffi_render_dependencies
                       MLN_FFI_INCLUDE_DIRS)
+  # Libraries the harness links for the graphics API it drives itself, which the
+  # C API resolves at runtime rather than linking.
+  get_target_property(dependency_test_libraries mln_ffi_render_dependencies
+                      MLN_FFI_TEST_LINK_LIBRARIES)
   if("${dependency_runtime_dirs}" MATCHES "-NOTFOUND$")
     set(dependency_runtime_dirs "")
   endif()
   if("${dependency_include_dirs}" MATCHES "-NOTFOUND$")
     set(dependency_include_dirs "")
+  endif()
+  if("${dependency_test_libraries}" MATCHES "-NOTFOUND$")
+    set(dependency_test_libraries "")
   endif()
 
   include(FetchContent)
@@ -29,32 +36,84 @@ function(mln_add_c_api_test)
   # flush calls live in Unity's own translation unit, so the definition belongs
   # on that target rather than on the tests that link it.
   target_compile_definitions(unity PRIVATE UNITY_USE_FLUSH_STDOUT=1)
+  # Unity 2.6 makes double support opt-in: without this define TEST_ASSERT_*
+  # DOUBLE macros expand to an unconditional "Double Support Disabled" failure.
+  # Unity's own translation unit and every test that includes unity.h have to
+  # agree on it, so unlike UNITY_USE_FLUSH_STDOUT (which only affects calls
+  # inside Unity's sources) this one is PUBLIC.
+  target_compile_definitions(unity PUBLIC UNITY_INCLUDE_DOUBLE)
   if(MSVC AND CMAKE_C_COMPILER_ID MATCHES "Clang")
     # Unity's Unix -Wall flag means -Weverything to clang-cl. Neutralize it to
     # match the framework's MSVC warning behavior.
     target_compile_options(unity PRIVATE -Wno-everything)
   endif()
 
-  set(test_sources
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/core_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/map_options_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/render_backend_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/owned_texture_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/query_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/resources_abi.c
-      ${PROJECT_SOURCE_DIR}/src/c_api/tests/style_values_abi.c)
+  # Globbing keeps a newly added *_abi.c in the build without a second edit
+  # here; CONFIGURE_DEPENDS reruns the glob when the directory changes.
+  file(GLOB test_abi_sources CONFIGURE_DEPENDS
+       ${PROJECT_SOURCE_DIR}/src/c_api/tests/*_abi.c)
+  set(test_sources ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c
+      ${PROJECT_SOURCE_DIR}/src/c_api/tests/test_support.c ${test_abi_sources})
+
+  # Each *_abi.c reaches the runner through one run_<file>_tests() call in
+  # main.c. main.c carries no preprocessor guards, so a plain text match is
+  # exact here once comments are stripped -- otherwise a commented-out call
+  # would satisfy the guard while its tests never run. See
+  # src/c_api/tests/README.md for the full contract.
+  file(READ ${PROJECT_SOURCE_DIR}/src/c_api/tests/main.c test_main_contents)
+  string(REGEX REPLACE "/\\*([^*]|\\*+[^*/])*\\*+/" "" test_main_contents
+         "${test_main_contents}")
+  string(REGEX REPLACE "//[^\n]*" "" test_main_contents "${test_main_contents}")
+  # String literals too, so a runner named only inside a diagnostic message
+  # cannot stand in for the call that runs it.
+  string(REGEX REPLACE "\"([^\"\\\\]|\\\\.)*\"" "" test_main_contents
+         "${test_main_contents}")
+  foreach(test_abi_source IN LISTS test_abi_sources)
+    get_filename_component(test_abi_name ${test_abi_source} NAME_WE)
+    if(NOT test_main_contents MATCHES "run_${test_abi_name}_tests\\(\\)")
+      message(
+        FATAL_ERROR
+          "src/c_api/tests/${test_abi_name}.c defines tests that never run: "
+          "declare run_${test_abi_name}_tests(void) in "
+          "src/c_api/tests/abi_tests.h and call it from "
+          "src/c_api/tests/main.c.")
+    endif()
+  endforeach()
+
   add_executable(mln_c_api_tests ${test_sources})
   set_target_properties(
     mln_c_api_tests
     PROPERTIES C_STANDARD 23 C_STANDARD_REQUIRED YES C_EXTENSIONS OFF)
   target_link_libraries(
     mln_c_api_tests
-    PRIVATE maplibre_native_c unity::framework MLN_FFI::RenderDependencies)
+    PRIVATE
+      maplibre_native_c unity::framework MLN_FFI::RenderDependencies
+      ${dependency_test_libraries})
   target_include_directories(
     mln_c_api_tests
     PRIVATE ${PROJECT_SOURCE_DIR}/src/c_api/tests ${dependency_include_dirs})
+
+  # Enforce the registration contract at compile time. A test that no RUN_TEST
+  # references is an unused static function, and dropping `static` to dodge that
+  # trips the missing-prototype error instead, because abi_tests.h and
+  # test_support.h declare every function this suite legitimately exports.
+  # These stay off the vendored unity target.
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(
+      mln_c_api_tests
+      PRIVATE -Werror=unused-function -Werror=missing-prototypes)
+  elseif(MSVC)
+    # C4505: unreferenced function with internal linkage has been removed.
+    target_compile_options(mln_c_api_tests PRIVATE /we4505)
+  endif()
+
+  # Tile fixtures the suite feeds through a resource provider come from the
+  # MapLibre Native submodule rather than being duplicated here, so a submodule
+  # bump that moves one surfaces as a test failure instead of silent drift.
+  target_compile_definitions(
+    mln_c_api_tests
+    PRIVATE
+      "MLN_TEST_FIXTURE_DIR=\"${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures\"")
 
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_BACKEND_METAL=1)
@@ -76,6 +135,12 @@ function(mln_add_c_api_test)
   if(NOT WIN32)
     find_package(Threads REQUIRED)
     target_link_libraries(mln_c_api_tests PRIVATE Threads::Threads)
+  endif()
+
+  get_target_property(test_link_options mln_ffi_platform_dependencies
+                      MLN_FFI_TEST_LINK_OPTIONS)
+  if(test_link_options)
+    target_link_options(mln_c_api_tests PRIVATE ${test_link_options})
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")

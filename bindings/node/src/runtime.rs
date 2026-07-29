@@ -3,7 +3,7 @@ use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
 use maplibre_native_core::{self as core, handle::NativeHandleState};
@@ -81,6 +81,8 @@ pub struct RuntimeEvent {
     pub raw_source_type: u32,
     pub source_address: BigInt,
     pub code: i32,
+    pub camera_change_mode: Option<String>,
+    pub raw_camera_change_mode: Option<u32>,
     pub message: Option<String>,
     pub payload_kind: String,
     pub payload: RuntimeEventPayloadValue,
@@ -98,6 +100,7 @@ pub struct RuntimeEventPayloadValue {
     pub offline_region_response_error: Option<OfflineRegionResponseErrorEventValue>,
     pub offline_region_tile_count_limit: Option<OfflineRegionTileCountLimitEventValue>,
     pub offline_operation_completed: Option<OfflineOperationCompletedEventValue>,
+    pub camera_transition_finished: Option<CameraTransitionFinishedEventValue>,
     pub unknown: Option<UnknownRuntimeEventPayloadValue>,
 }
 
@@ -175,6 +178,11 @@ pub struct OfflineOperationCompletedEventValue {
     pub raw_result_kind: u32,
     pub result_status: i32,
     pub found: bool,
+}
+
+#[napi(object)]
+pub struct CameraTransitionFinishedEventValue {
+    pub transition_id: BigInt,
 }
 
 #[napi(object)]
@@ -274,10 +282,39 @@ struct ResourceProviderState {
 #[napi(js_name = "NativeRuntimeHandle")]
 pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
-    has_created_map: AtomicBool,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
     retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
+}
+
+#[napi(js_name = "NativeWakeSourceHandle")]
+pub struct NativeWakeSourceHandle {
+    state: NativeHandleState<sys::mln_wake_source>,
+}
+
+#[napi]
+impl NativeWakeSourceHandle {
+    #[napi]
+    pub fn signal(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_wake_source_signal(self.state.as_ptr()) })
+            .map_err(error::from_core)
+    }
+
+    #[napi]
+    pub fn close(&self) {
+        unsafe { self.state.close_infallible(sys::mln_wake_source_destroy) };
+    }
+
+    #[napi(getter)]
+    pub fn closed(&self) -> bool {
+        self.state.is_closed()
+    }
+}
+
+impl Drop for NativeWakeSourceHandle {
+    fn drop(&mut self) {
+        unsafe { self.state.close_infallible(sys::mln_wake_source_destroy) };
+    }
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -295,7 +332,6 @@ pub fn create_native_runtime_handle(
         .map_err(error::from_core)?;
     Ok(NativeRuntimeHandle {
         state,
-        has_created_map: AtomicBool::new(false),
         resource_transform: Mutex::new(None),
         resource_provider: Mutex::new(None),
         retired_resource_providers: Mutex::new(Vec::new()),
@@ -360,10 +396,27 @@ impl NativeRuntimeHandle {
         self.state.is_closed()
     }
 
-    #[napi(js_name = "runOnce")]
-    pub fn run_once(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_runtime_run_once(self.state.as_ptr()) })
+    #[napi]
+    pub fn pump(&self, timeout_ms: i64) -> Result<()> {
+        if timeout_ms < -1 {
+            return Err(error::invalid_argument(
+                "timeoutMs must be -1 for an unbounded park or a non-negative integer",
+            ));
+        }
+        core::check(unsafe { sys::mln_runtime_pump(self.state.as_ptr(), timeout_ms) })
             .map_err(error::from_core)
+    }
+
+    #[napi(js_name = "acquireWakeSource")]
+    pub fn acquire_wake_source(&self) -> Result<NativeWakeSourceHandle> {
+        let mut source = std::ptr::null_mut();
+        core::check(unsafe {
+            sys::mln_runtime_wake_source_acquire(self.state.as_ptr(), &mut source)
+        })
+        .map_err(error::from_core)?;
+        let state = unsafe { NativeHandleState::from_raw_ptr(source, "WakeSource") }
+            .map_err(error::from_core)?;
+        Ok(NativeWakeSourceHandle { state })
     }
 
     #[napi(js_name = "setResourceProviderRoutes")]
@@ -373,11 +426,6 @@ impl NativeRuntimeHandle {
         routes: Vec<ResourceRouteInput>,
         mut callback: ThreadsafeFunction<ResourceProviderRequest>,
     ) -> Result<()> {
-        if self.has_created_map.load(Ordering::Acquire) {
-            return Err(error::invalid_state(
-                "resource provider routes must be configured before creating maps from the runtime",
-            ));
-        }
         #[allow(deprecated)]
         callback.unref(&env)?;
         let provider = Arc::new(ResourceProviderState {
@@ -401,6 +449,24 @@ impl NativeRuntimeHandle {
         })
         .map_err(error::from_core)?;
         if let Some(replaced) = provider_slot.replace(provider) {
+            match self.retired_resource_providers.lock() {
+                Ok(mut retired) => retired.push(replaced),
+                Err(_) => std::mem::forget(replaced),
+            }
+        }
+        Ok(())
+    }
+
+    #[napi(js_name = "clearResourceProvider")]
+    pub fn clear_resource_provider(&self) -> Result<()> {
+        core::check(unsafe { sys::mln_runtime_clear_resource_provider(self.state.as_ptr()) })
+            .map_err(error::from_core)?;
+        let replaced = self
+            .resource_provider
+            .lock()
+            .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?
+            .take();
+        if let Some(replaced) = replaced {
             match self.retired_resource_providers.lock() {
                 Ok(mut retired) => retired.push(replaced),
                 Err(_) => std::mem::forget(replaced),
@@ -917,6 +983,7 @@ unsafe fn resource_transform_trampoline_inner(
 impl RuntimeEvent {
     fn from_copied(event: core::CopiedRuntimeEvent, raw_event_type: u32) -> Self {
         let payload_kind = runtime_event_payload_kind(&event.payload).to_owned();
+        let camera_change_mode = camera_change_mode(event.event_type, event.code);
         Self {
             event_type: runtime_event_type_name(event.event_type).to_owned(),
             raw_event_type,
@@ -924,6 +991,9 @@ impl RuntimeEvent {
             raw_source_type: event.source.source_type,
             source_address: BigInt::from(event.source.source_address as u64),
             code: event.code,
+            camera_change_mode: camera_change_mode
+                .map(|mode| camera_change_mode_name(mode).to_owned()),
+            raw_camera_change_mode: camera_change_mode.map(|_| event.code as u32),
             message: event.message,
             payload_kind,
             payload: runtime_event_payload_to_value(event.payload),
@@ -1244,6 +1314,7 @@ fn runtime_event_payload_kind(payload: &core::RuntimeEventPayload) -> &'static s
             "offline-region-tile-count-limit"
         }
         core::RuntimeEventPayload::OfflineOperationCompleted(_) => "offline-operation-completed",
+        core::RuntimeEventPayload::CameraTransitionFinished(_) => "camera-transition-finished",
         core::RuntimeEventPayload::Unknown(_) => "unknown",
         _ => "unknown",
     }
@@ -1336,6 +1407,14 @@ fn runtime_event_payload_to_value(payload: core::RuntimeEventPayload) -> Runtime
             }),
             ..empty_runtime_event_payload_fields()
         },
+        core::RuntimeEventPayload::CameraTransitionFinished(event) => RuntimeEventPayloadValue {
+            kind: "camera-transition-finished".to_owned(),
+            raw_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+            camera_transition_finished: Some(CameraTransitionFinishedEventValue {
+                transition_id: BigInt::from(event.transition_id),
+            }),
+            ..empty_runtime_event_payload_fields()
+        },
         core::RuntimeEventPayload::Unknown(payload) => RuntimeEventPayloadValue {
             kind: "unknown".to_owned(),
             raw_type: payload.raw_type,
@@ -1369,6 +1448,7 @@ fn empty_runtime_event_payload_fields() -> RuntimeEventPayloadValue {
         offline_region_response_error: None,
         offline_region_tile_count_limit: None,
         offline_operation_completed: None,
+        camera_transition_finished: None,
         unknown: None,
     }
 }
@@ -1486,11 +1566,32 @@ fn offline_operation_result_kind_name(kind: core::OfflineOperationResultKind) ->
     }
 }
 
+fn camera_change_mode(
+    event_type: core::RuntimeEventType,
+    code: i32,
+) -> Option<core::CameraChangeMode> {
+    matches!(
+        event_type,
+        core::RuntimeEventType::MapCameraWillChange | core::RuntimeEventType::MapCameraDidChange
+    )
+    .then(|| core::CameraChangeMode::from_raw(code as u32))
+}
+
+fn camera_change_mode_name(mode: core::CameraChangeMode) -> &'static str {
+    match mode {
+        core::CameraChangeMode::Immediate => "immediate",
+        core::CameraChangeMode::Animated => "animated",
+        core::CameraChangeMode::Unknown(_) => "unknown",
+        _ => "unknown",
+    }
+}
+
 fn runtime_event_type_name(event_type: core::RuntimeEventType) -> &'static str {
     match event_type {
         core::RuntimeEventType::MapCameraWillChange => "map-camera-will-change",
         core::RuntimeEventType::MapCameraIsChanging => "map-camera-is-changing",
         core::RuntimeEventType::MapCameraDidChange => "map-camera-did-change",
+        core::RuntimeEventType::MapCameraTransitionFinished => "map-camera-transition-finished",
         core::RuntimeEventType::MapStyleLoaded => "map-style-loaded",
         core::RuntimeEventType::MapLoadingStarted => "map-loading-started",
         core::RuntimeEventType::MapLoadingFinished => "map-loading-finished",
@@ -1520,10 +1621,6 @@ fn runtime_event_type_name(event_type: core::RuntimeEventType) -> &'static str {
 impl NativeRuntimeHandle {
     pub(crate) fn as_ptr(&self) -> *mut sys::mln_runtime {
         self.state.as_ptr()
-    }
-
-    pub(crate) fn mark_map_created(&self) {
-        self.has_created_map.store(true, Ordering::Release);
     }
 
     fn release_resource_callback_state(&self) {

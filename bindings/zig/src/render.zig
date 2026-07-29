@@ -30,6 +30,12 @@ const RenderSessionState = struct {
     /// The map this session is registered against, cleared once the
     /// registration is released by a successful detach or close.
     map_handle: ?map_module.MapHandle,
+    /// The session's own store, not the map's.
+    ///
+    /// A session is owned by the thread that attached it, which need not be the
+    /// map's, so sharing the map's store would let both threads write it at
+    /// once. `DiagnosticStore` is unsynchronized and frees the previous message
+    /// on every set, so that would race the allocator, not just the message.
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: ?*RenderSessionFrameState,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -768,6 +774,10 @@ pub const RenderSessionHandle = enum(u128) {
         }
         std.heap.smp_allocator.destroy(session_close.frame_state);
         const session_state = finishRenderSessionClose(self.*) orelse session_close.state;
+        if (session_state.diagnostic_store) |store| {
+            store.deinit();
+            std.heap.smp_allocator.destroy(store);
+        }
         std.heap.smp_allocator.destroy(session_state);
     }
 };
@@ -1020,11 +1030,23 @@ fn newRenderSession(
     session_frame_state.* = .{};
     errdefer std.heap.smp_allocator.destroy(session_frame_state);
 
+    // Its own store, allocated from the same allocator the map's uses so the
+    // host's memory still accounts for it.
+    const session_store: ?*diagnostics.DiagnosticStore = if (diagnostic_store) |map_store| store: {
+        const store = try std.heap.smp_allocator.create(diagnostics.DiagnosticStore);
+        store.* = diagnostics.DiagnosticStore.init(map_store.allocator);
+        break :store store;
+    } else null;
+    errdefer if (session_store) |store| {
+        store.deinit();
+        std.heap.smp_allocator.destroy(store);
+    };
+
     const session_state = try std.heap.smp_allocator.create(RenderSessionState);
     session_state.* = .{
         .native = @ptrCast(session),
         .map_handle = map_handle,
-        .diagnostic_store = diagnostic_store,
+        .diagnostic_store = session_store,
         .frame_state = session_frame_state,
     };
     errdefer std.heap.smp_allocator.destroy(session_state);
