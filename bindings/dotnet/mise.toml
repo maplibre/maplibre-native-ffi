@@ -4,10 +4,13 @@
 [deps.dotnet-tools]
 auto = true
 dir = "../.."
-sources = ["dotnet-tools.json", "bindings/dotnet/dotnet-tools.json"]
+sources = [
+  ".config/dotnet-tools.json",
+  "bindings/dotnet/.config/dotnet-tools.json",
+]
 # Dependency providers run through the platform shell, so both manifests restore
 # from one `&&` line that `sh` and `cmd` each understand.
-run = "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet"
+run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity quiet && dotnet tool restore --tool-manifest bindings/dotnet/.config/dotnet-tools.json --verbosity quiet"
 
 [tasks.generate]
 run = "scripts/generate-clangsharp.sh"

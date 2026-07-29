@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://json.schemastore.org/dependabot-2.0.json
 #
-# Not yet supported:
+# Not supported by Dependabot:
 # - mise tool versions: https://github.com/dependabot/dependabot-core/issues/12320
-# - the MapLibre Native submodule pin (manual bumps)
+# - Zig `build.zig.zon` dependencies
 version: 2
 updates:
   - package-ecosystem: github-actions
@@ -11,8 +11,74 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
+    labels: [dependencies, github_actions]
     groups:
       github-actions:
+        patterns: ["*"]
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, rust]
+    groups:
+      cargo:
+        patterns: ["*"]
+  # Tracks the tip of MapLibre Native's default branch, so the weekly run keeps
+  # one rolling pull request rather than one per upstream commit.
+  - package-ecosystem: gitsubmodule
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, infra]
+    groups:
+      gitsubmodule:
+        patterns: ["*"]
+  - package-ecosystem: gomod
+    directory: /bindings/go
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, go]
+    groups:
+      gomod:
+        patterns: ["*"]
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, kotlin]
+    groups:
+      gradle:
+        patterns: ["*"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, typescript]
+    groups:
+      npm:
+        patterns: ["*"]
+  # The root covers the solution and `Directory.Packages.props`; the binding
+  # directory is listed for its own `.config/dotnet-tools.json`, which is only
+  # discovered from the directory that holds it.
+  - package-ecosystem: nuget
+    directories: ["/", "/bindings/dotnet"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, dotnet]
+    groups:
+      nuget:
         patterns: ["*"]
   - package-ecosystem: pub
     directory: /bindings/dart
@@ -20,6 +86,27 @@ updates:
       interval: weekly
     cooldown:
       default-days: 3
+    labels: [dependencies, dart]
     groups:
       pub:
+        patterns: ["*"]
+  - package-ecosystem: swift
+    directories: ["/bindings/swift", "/examples/swift-map"]
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, swift]
+    groups:
+      swift:
+        patterns: ["*"]
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    labels: [dependencies, python]
+    groups:
+      uv:
         patterns: ["*"]
