@@ -220,7 +220,7 @@ void main() {
     final runtime = RuntimeHandle.create();
     final requests = <ResourceRequest>[];
     late Future<bool> completion;
-    late ResourceRequestToken ownerToken;
+    late ResourceRequestHandle ownerToken;
 
     runtime.setResourceProvider(
       ResourceProvider(
@@ -241,11 +241,8 @@ void main() {
             ),
             throwsA(isA<InvalidArgumentException>()),
           );
-          expect(handle.isReleased, isFalse);
-          final token = handle.transfer();
-          expect(handle.isReleased, isTrue);
-          ownerToken = token;
-          completion = _completeTransferredRequest(token);
+          ownerToken = handle;
+          completion = _completeTransferredRequest(handle);
         },
       ),
     );
@@ -254,8 +251,7 @@ void main() {
     map.setStyleUrl(styleUrl);
     await _pumpUntil(runtime, () => requests.isNotEmpty);
 
-    ownerToken.waitUntilReleased();
-    expect(ownerToken.isReleased, isTrue);
+    ownerToken.waitUntilRetired();
     expect(
       () => ownerToken.cancelled(),
       throwsA(isA<InvalidArgumentException>()),
@@ -269,7 +265,7 @@ void main() {
   test('cancelled transferred requests complete terminally', () async {
     const styleUrl = 'custom://dart-provider-cancelled.json';
     final runtime = RuntimeHandle.create();
-    ResourceRequestToken? token;
+    ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
       ResourceProvider(
@@ -277,7 +273,7 @@ void main() {
           ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
-          token = handle.transfer();
+          token = handle;
         },
       ),
     );
@@ -287,8 +283,8 @@ void main() {
     await _pumpUntil(runtime, () => token != null);
     final liveToken = token!;
     final waiter = Isolate.run(() {
-      liveToken.waitUntilReleased();
-      return liveToken.isReleased;
+      liveToken.waitUntilRetired();
+      return true;
     });
 
     map.close();
@@ -300,14 +296,13 @@ void main() {
       ),
       throwsA(isA<InvalidStateException>()),
     );
-    expect(liveToken.isReleased, isTrue);
     expect(await waiter, isTrue);
   });
 
   test('transferred response validation preserves the live token', () async {
     const styleUrl = 'custom://dart-provider-token-validation.json';
     final runtime = RuntimeHandle.create();
-    ResourceRequestToken? token;
+    ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
       ResourceProvider(
@@ -315,7 +310,7 @@ void main() {
           ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
-          token = handle.transfer();
+          token = handle;
         },
       ),
     );
@@ -333,14 +328,19 @@ void main() {
       ),
       throwsA(isA<InvalidArgumentException>()),
     );
-    expect(liveToken.isReleased, isFalse);
     liveToken.complete(
       ResourceResponse(
         status: ResourceResponseStatus.ok,
         bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
       ),
     );
-    expect(liveToken.isReleased, isTrue);
+    // A released id is rejected rather than naming a later request.
+    expect(
+      () => liveToken.complete(
+        ResourceResponse(status: ResourceResponseStatus.noContent),
+      ),
+      throwsA(isA<InvalidArgumentException>()),
+    );
 
     map.close();
     runtime.close();
@@ -349,7 +349,7 @@ void main() {
   test('transferred token aliases have one terminal winner', () async {
     const styleUrl = 'custom://dart-provider-token-race.json';
     final runtime = RuntimeHandle.create();
-    ResourceRequestToken? token;
+    ResourceRequestHandle? token;
 
     runtime.setResourceProvider(
       ResourceProvider(
@@ -357,7 +357,7 @@ void main() {
           ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
-          token = handle.transfer();
+          token = handle;
         },
       ),
     );
@@ -367,19 +367,27 @@ void main() {
 
     final liveToken = token!;
     final waiter = Isolate.run(() {
-      liveToken.waitUntilReleased();
-      return liveToken.isReleased;
+      liveToken.waitUntilRetired();
+      return true;
     });
+    // Completion is the one-shot operation; release is idempotent by design,
+    // so racing two completions is what can have a single winner. Teardown
+    // starts first because closing a map or runtime must not follow an await
+    // on this isolate: the Dart VM may resume it on another native thread and
+    // the owner-thread check would reject the close.
     final race = Future.wait([
       Isolate.run(() => _completeTokenAlias(liveToken)),
-      Isolate.run(() => _closeTokenAlias(liveToken)),
+      Isolate.run(() => _completeTokenAlias(liveToken)),
     ]);
     map.close();
     runtime.close();
     final results = await race;
 
-    expect(results.where((result) => result).length, 1);
+    // Teardown may retire the request before either alias reaches it, so the
+    // guarantee is that completion never succeeds twice.
+    expect(results.where((result) => result).length, lessThanOrEqualTo(1));
     expect(await waiter, isTrue);
+    // The id is retired either way, so every later use is rejected.
     expect(
       () => liveToken.cancelled(),
       throwsA(isA<InvalidArgumentException>()),
@@ -1459,7 +1467,9 @@ void main() {
         return error.diagnostic;
       }
     });
-    expect(diagnostic, contains('map is not a live handle'));
+    // BND-196: the C API rejects the released id as stale rather than binding
+    // the session to whatever map is created next.
+    expect(diagnostic, contains('stale'));
   });
 }
 
@@ -1498,7 +1508,7 @@ Future<void> _signalWakeSource(List<SendPort> ports) async {
   inbox.close();
 }
 
-Future<bool> _completeTransferredRequest(ResourceRequestToken token) {
+Future<bool> _completeTransferredRequest(ResourceRequestHandle token) {
   return Isolate.run(() {
     token.cancelled();
     token.complete(
@@ -1518,7 +1528,12 @@ Future<bool> _completeTransferredRequest(ResourceRequestToken token) {
   });
 }
 
-bool _completeTokenAlias(ResourceRequestToken token) {
+/// Whether this alias was the one that completed the request.
+///
+/// The loser sees invalid-state when the request is still live and already
+/// completed, and invalid-argument once the winner's release has retired the
+/// id; both mean it lost.
+bool _completeTokenAlias(ResourceRequestHandle token) {
   try {
     token.complete(
       ResourceResponse(
@@ -1528,16 +1543,7 @@ bool _completeTokenAlias(ResourceRequestToken token) {
     );
     return true;
   } on InvalidStateException {
-    return true;
-  } on InvalidArgumentException {
     return false;
-  }
-}
-
-bool _closeTokenAlias(ResourceRequestToken token) {
-  try {
-    token.close();
-    return true;
   } on InvalidArgumentException {
     return false;
   }

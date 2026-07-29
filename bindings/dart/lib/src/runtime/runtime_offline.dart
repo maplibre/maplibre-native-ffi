@@ -11,7 +11,7 @@ final class OfflineOperationHandle implements Finalizable {
     _leakReporter = NativeLeakReporter(
       this,
       'OfflineOperationHandle',
-      Pointer<Void>.fromAddress(_id == 0 ? 1 : _id),
+      NativeHandle(_id == 0 ? 1 : _id),
     );
   }
 
@@ -35,17 +35,19 @@ final class OfflineOperationHandle implements Finalizable {
       'takeCreatedRegion',
     );
     return withNativeArena((arena) {
-      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
-      outRegion.value = nullptr;
+      final outRegion = arena<Uint64>();
+      outRegion.value = 0;
       _check(
         _c.raw.mln_runtime_offline_region_create_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outRegion,
         ),
       );
       _markDiscarded();
-      return _copyOfflineRegionSnapshot(outRegion.value);
+      return _copyOfflineRegionSnapshot(
+        NativeOfflineRegionSnapshot(outRegion.value),
+      );
     });
   }
 
@@ -57,12 +59,12 @@ final class OfflineOperationHandle implements Finalizable {
       'takeOptionalRegion',
     );
     return withNativeArena((arena) {
-      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
-      outRegion.value = nullptr;
+      final outRegion = arena<Uint64>();
+      outRegion.value = 0;
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_runtime_offline_region_get_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outRegion,
           outFound,
@@ -70,7 +72,9 @@ final class OfflineOperationHandle implements Finalizable {
       );
       _markDiscarded();
       return outFound.value
-          ? _copyOfflineRegionSnapshot(outRegion.value)
+          ? _copyOfflineRegionSnapshot(
+              NativeOfflineRegionSnapshot(outRegion.value),
+            )
           : null;
     });
   }
@@ -83,17 +87,17 @@ final class OfflineOperationHandle implements Finalizable {
       'takeRegionList',
     );
     return withNativeArena((arena) {
-      final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
-      outRegions.value = nullptr;
+      final outRegions = arena<Uint64>();
+      outRegions.value = 0;
       _check(
         _c.raw.mln_runtime_offline_regions_list_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outRegions,
         ),
       );
       _markDiscarded();
-      return _copyOfflineRegionList(outRegions.value);
+      return _copyOfflineRegionList(NativeOfflineRegionList(outRegions.value));
     });
   }
 
@@ -105,17 +109,17 @@ final class OfflineOperationHandle implements Finalizable {
       'takeMergedRegionList',
     );
     return withNativeArena((arena) {
-      final outRegions = arena<Pointer<raw.mln_offline_region_list>>();
-      outRegions.value = nullptr;
+      final outRegions = arena<Uint64>();
+      outRegions.value = 0;
       _check(
         _c.raw.mln_runtime_offline_regions_merge_database_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outRegions,
         ),
       );
       _markDiscarded();
-      return _copyOfflineRegionList(outRegions.value);
+      return _copyOfflineRegionList(NativeOfflineRegionList(outRegions.value));
     });
   }
 
@@ -127,17 +131,19 @@ final class OfflineOperationHandle implements Finalizable {
       'takeUpdatedRegionMetadata',
     );
     return withNativeArena((arena) {
-      final outRegion = arena<Pointer<raw.mln_offline_region_snapshot>>();
-      outRegion.value = nullptr;
+      final outRegion = arena<Uint64>();
+      outRegion.value = 0;
       _check(
         _c.raw.mln_runtime_offline_region_update_metadata_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outRegion,
         ),
       );
       _markDiscarded();
-      return _copyOfflineRegionSnapshot(outRegion.value);
+      return _copyOfflineRegionSnapshot(
+        NativeOfflineRegionSnapshot(outRegion.value),
+      );
     });
   }
 
@@ -153,7 +159,7 @@ final class OfflineOperationHandle implements Finalizable {
       outStatus.ref.size = sizeOf<raw.mln_offline_region_status>();
       _check(
         _c.raw.mln_runtime_offline_region_get_status_take_result(
-          _runtime._pointer,
+          _runtime._handle.raw,
           _id,
           outStatus,
         ),
@@ -169,7 +175,7 @@ final class OfflineOperationHandle implements Finalizable {
       return;
     }
     _check(
-      _c.raw.mln_runtime_offline_operation_discard(_runtime._pointer, _id),
+      _c.raw.mln_runtime_offline_operation_discard(_runtime._handle.raw, _id),
     );
     _markDiscarded();
   }
@@ -395,45 +401,43 @@ Pointer<Uint8> _nativeBytes(Uint8List? bytes, Allocator allocator) {
 }
 
 OfflineRegionInfo _copyOfflineRegionSnapshot(
-  Pointer<raw.mln_offline_region_snapshot> snapshot,
+  NativeOfflineRegionSnapshot snapshot,
 ) {
   try {
     return withNativeArena((arena) {
       final outInfo = arena<raw.mln_offline_region_info>();
       outInfo.ref.size = sizeOf<raw.mln_offline_region_info>();
-      _check(_c.raw.mln_offline_region_snapshot_get(snapshot, outInfo));
+      _check(_c.raw.mln_offline_region_snapshot_get(snapshot.raw, outInfo));
       return _offlineRegionInfoFromNative(outInfo.ref);
     });
   } finally {
-    _c.raw.mln_offline_region_snapshot_destroy(snapshot);
+    _c.raw.mln_offline_region_snapshot_destroy(snapshot.raw);
   }
 }
 
-List<OfflineRegionInfo> _copyOfflineRegionList(
-  Pointer<raw.mln_offline_region_list> list,
-) {
+List<OfflineRegionInfo> _copyOfflineRegionList(NativeOfflineRegionList list) {
   try {
     return withNativeArena((arena) {
       final outCount = arena<Size>();
-      _check(_c.raw.mln_offline_region_list_count(list, outCount));
+      _check(_c.raw.mln_offline_region_list_count(list.raw, outCount));
       return [
         for (var index = 0; index < outCount.value; index += 1)
           _copyOfflineRegionListEntry(list, index, arena),
       ];
     });
   } finally {
-    _c.raw.mln_offline_region_list_destroy(list);
+    _c.raw.mln_offline_region_list_destroy(list.raw);
   }
 }
 
 OfflineRegionInfo _copyOfflineRegionListEntry(
-  Pointer<raw.mln_offline_region_list> list,
+  NativeOfflineRegionList list,
   int index,
   Allocator allocator,
 ) {
   final outInfo = allocator<raw.mln_offline_region_info>();
   outInfo.ref.size = sizeOf<raw.mln_offline_region_info>();
-  _check(_c.raw.mln_offline_region_list_get(list, index, outInfo));
+  _check(_c.raw.mln_offline_region_list_get(list.raw, index, outInfo));
   return _offlineRegionInfoFromNative(outInfo.ref);
 }
 

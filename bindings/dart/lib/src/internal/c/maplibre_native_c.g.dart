@@ -136,7 +136,7 @@ class MaplibreNativeC {
 
   mln_status mln_runtime_create(
     ffi.Pointer<mln_runtime_options> options,
-    ffi.Pointer<ffi.Pointer<mln_runtime>> out_runtime,
+    ffi.Pointer<mln_runtime> out_runtime,
   ) {
     return mln_status.fromValue(_mln_runtime_create(options, out_runtime));
   }
@@ -146,20 +146,17 @@ class MaplibreNativeC {
         ffi.NativeFunction<
           ffi.Int32 Function(
             ffi.Pointer<mln_runtime_options>,
-            ffi.Pointer<ffi.Pointer<mln_runtime>>,
+            ffi.Pointer<mln_runtime>,
           )
         >
       >('mln_runtime_create');
   late final _mln_runtime_create = _mln_runtime_createPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_runtime_options>,
-          ffi.Pointer<ffi.Pointer<mln_runtime>>,
-        )
+        int Function(ffi.Pointer<mln_runtime_options>, ffi.Pointer<mln_runtime>)
       >();
 
   mln_status mln_runtime_set_resource_provider(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_resource_provider> provider,
   ) {
     return mln_status.fromValue(
@@ -170,37 +167,26 @@ class MaplibreNativeC {
   late final _mln_runtime_set_resource_providerPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
-            ffi.Pointer<mln_resource_provider>,
-          )
+          ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_resource_provider>)
         >
       >('mln_runtime_set_resource_provider');
   late final _mln_runtime_set_resource_provider =
       _mln_runtime_set_resource_providerPtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              ffi.Pointer<mln_resource_provider>,
-            )
-          >();
+          .asFunction<int Function(int, ffi.Pointer<mln_resource_provider>)>();
 
-  mln_status mln_runtime_clear_resource_provider(
-    ffi.Pointer<mln_runtime> runtime,
-  ) {
+  mln_status mln_runtime_clear_resource_provider(Dartmln_runtime runtime) {
     return mln_status.fromValue(_mln_runtime_clear_resource_provider(runtime));
   }
 
   late final _mln_runtime_clear_resource_providerPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_runtime>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_runtime)>>(
         'mln_runtime_clear_resource_provider',
       );
   late final _mln_runtime_clear_resource_provider =
-      _mln_runtime_clear_resource_providerPtr
-          .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
+      _mln_runtime_clear_resource_providerPtr.asFunction<int Function(int)>();
 
   mln_status mln_resource_request_complete(
-    ffi.Pointer<mln_resource_request_handle> handle,
+    Dartmln_resource_request_handle handle,
     ffi.Pointer<mln_resource_response> response,
   ) {
     return mln_status.fromValue(
@@ -212,21 +198,16 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_resource_request_handle>,
+            mln_resource_request_handle,
             ffi.Pointer<mln_resource_response>,
           )
         >
       >('mln_resource_request_complete');
   late final _mln_resource_request_complete = _mln_resource_request_completePtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_resource_request_handle>,
-          ffi.Pointer<mln_resource_response>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_resource_response>)>();
 
   mln_status mln_resource_request_cancelled(
-    ffi.Pointer<mln_resource_request_handle> handle,
+    Dartmln_resource_request_handle handle,
     ffi.Pointer<ffi.Bool> out_cancelled,
   ) {
     return mln_status.fromValue(
@@ -237,38 +218,42 @@ class MaplibreNativeC {
   late final _mln_resource_request_cancelledPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_resource_request_handle>,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_resource_request_handle, ffi.Pointer<ffi.Bool>)
         >
       >('mln_resource_request_cancelled');
   late final _mln_resource_request_cancelled =
       _mln_resource_request_cancelledPtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_resource_request_handle>,
-              ffi.Pointer<ffi.Bool>,
-            )
-          >();
+          .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
 
-  void mln_resource_request_release(
-    ffi.Pointer<mln_resource_request_handle> handle,
-  ) {
+  void mln_resource_request_release(int handle) {
     return _mln_resource_request_release(handle);
   }
 
   late final _mln_resource_request_releasePtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_resource_request_handle>)
-        >
+        ffi.NativeFunction<ffi.Void Function(mln_resource_request_handle)>
       >('mln_resource_request_release');
   late final _mln_resource_request_release = _mln_resource_request_releasePtr
-      .asFunction<void Function(ffi.Pointer<mln_resource_request_handle>)>();
+      .asFunction<void Function(int)>();
+
+  mln_status mln_resource_request_wait_until_retired(
+    Dartmln_resource_request_handle handle,
+  ) {
+    return mln_status.fromValue(
+      _mln_resource_request_wait_until_retired(handle),
+    );
+  }
+
+  late final _mln_resource_request_wait_until_retiredPtr =
+      _lookup<
+        ffi.NativeFunction<ffi.Int32 Function(mln_resource_request_handle)>
+      >('mln_resource_request_wait_until_retired');
+  late final _mln_resource_request_wait_until_retired =
+      _mln_resource_request_wait_until_retiredPtr
+          .asFunction<int Function(int)>();
 
   mln_status mln_runtime_set_resource_transform(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_resource_transform> transform,
   ) {
     return mln_status.fromValue(
@@ -279,37 +264,26 @@ class MaplibreNativeC {
   late final _mln_runtime_set_resource_transformPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
-            ffi.Pointer<mln_resource_transform>,
-          )
+          ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_resource_transform>)
         >
       >('mln_runtime_set_resource_transform');
   late final _mln_runtime_set_resource_transform =
       _mln_runtime_set_resource_transformPtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              ffi.Pointer<mln_resource_transform>,
-            )
-          >();
+          .asFunction<int Function(int, ffi.Pointer<mln_resource_transform>)>();
 
-  mln_status mln_runtime_clear_resource_transform(
-    ffi.Pointer<mln_runtime> runtime,
-  ) {
+  mln_status mln_runtime_clear_resource_transform(Dartmln_runtime runtime) {
     return mln_status.fromValue(_mln_runtime_clear_resource_transform(runtime));
   }
 
   late final _mln_runtime_clear_resource_transformPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_runtime>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_runtime)>>(
         'mln_runtime_clear_resource_transform',
       );
   late final _mln_runtime_clear_resource_transform =
-      _mln_runtime_clear_resource_transformPtr
-          .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
+      _mln_runtime_clear_resource_transformPtr.asFunction<int Function(int)>();
 
   mln_status mln_runtime_run_ambient_cache_operation_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     int operation,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -326,7 +300,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             ffi.Uint32,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -335,15 +309,11 @@ class MaplibreNativeC {
   late final _mln_runtime_run_ambient_cache_operation_start =
       _mln_runtime_run_ambient_cache_operation_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_operation_discard(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
   ) {
     return mln_status.fromValue(
@@ -354,43 +324,38 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_operation_discardPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_runtime>, mln_offline_operation_id)
+          ffi.Int32 Function(mln_runtime, mln_offline_operation_id)
         >
       >('mln_runtime_offline_operation_discard');
   late final _mln_runtime_offline_operation_discard =
       _mln_runtime_offline_operation_discardPtr
-          .asFunction<int Function(ffi.Pointer<mln_runtime>, int)>();
+          .asFunction<int Function(int, int)>();
 
-  mln_status mln_runtime_destroy(ffi.Pointer<mln_runtime> runtime) {
+  mln_status mln_runtime_destroy(Dartmln_runtime runtime) {
     return mln_status.fromValue(_mln_runtime_destroy(runtime));
   }
 
   late final _mln_runtime_destroyPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_runtime>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_runtime)>>(
         'mln_runtime_destroy',
       );
   late final _mln_runtime_destroy = _mln_runtime_destroyPtr
-      .asFunction<int Function(ffi.Pointer<mln_runtime>)>();
+      .asFunction<int Function(int)>();
 
-  mln_status mln_runtime_pump(
-    ffi.Pointer<mln_runtime> runtime,
-    int timeout_ms,
-  ) {
+  mln_status mln_runtime_pump(Dartmln_runtime runtime, int timeout_ms) {
     return mln_status.fromValue(_mln_runtime_pump(runtime, timeout_ms));
   }
 
   late final _mln_runtime_pumpPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_runtime>, ffi.Int64)
-        >
-      >('mln_runtime_pump');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_runtime, ffi.Int64)>>(
+        'mln_runtime_pump',
+      );
   late final _mln_runtime_pump = _mln_runtime_pumpPtr
-      .asFunction<int Function(ffi.Pointer<mln_runtime>, int)>();
+      .asFunction<int Function(int, int)>();
 
   mln_status mln_runtime_wake_source_acquire(
-    ffi.Pointer<mln_runtime> runtime,
-    ffi.Pointer<ffi.Pointer<mln_wake_source>> out_source,
+    Dartmln_runtime runtime,
+    ffi.Pointer<mln_wake_source> out_source,
   ) {
     return mln_status.fromValue(
       _mln_runtime_wake_source_acquire(runtime, out_source),
@@ -400,45 +365,37 @@ class MaplibreNativeC {
   late final _mln_runtime_wake_source_acquirePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
-            ffi.Pointer<ffi.Pointer<mln_wake_source>>,
-          )
+          ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_wake_source>)
         >
       >('mln_runtime_wake_source_acquire');
   late final _mln_runtime_wake_source_acquire =
       _mln_runtime_wake_source_acquirePtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              ffi.Pointer<ffi.Pointer<mln_wake_source>>,
-            )
-          >();
+          .asFunction<int Function(int, ffi.Pointer<mln_wake_source>)>();
 
-  mln_status mln_wake_source_signal(ffi.Pointer<mln_wake_source> source) {
+  mln_status mln_wake_source_signal(Dartmln_wake_source source) {
     return mln_status.fromValue(_mln_wake_source_signal(source));
   }
 
   late final _mln_wake_source_signalPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_wake_source>)>
-      >('mln_wake_source_signal');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_wake_source)>>(
+        'mln_wake_source_signal',
+      );
   late final _mln_wake_source_signal = _mln_wake_source_signalPtr
-      .asFunction<int Function(ffi.Pointer<mln_wake_source>)>();
+      .asFunction<int Function(int)>();
 
-  void mln_wake_source_destroy(ffi.Pointer<mln_wake_source> source) {
+  void mln_wake_source_destroy(int source) {
     return _mln_wake_source_destroy(source);
   }
 
   late final _mln_wake_source_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<mln_wake_source>)>
-      >('mln_wake_source_destroy');
+      _lookup<ffi.NativeFunction<ffi.Void Function(mln_wake_source)>>(
+        'mln_wake_source_destroy',
+      );
   late final _mln_wake_source_destroy = _mln_wake_source_destroyPtr
-      .asFunction<void Function(ffi.Pointer<mln_wake_source>)>();
+      .asFunction<void Function(int)>();
 
   mln_status mln_runtime_poll_event(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_runtime_event> out_event,
     ffi.Pointer<ffi.Bool> out_has_event,
   ) {
@@ -451,7 +408,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             ffi.Pointer<mln_runtime_event>,
             ffi.Pointer<ffi.Bool>,
           )
@@ -459,15 +416,11 @@ class MaplibreNativeC {
       >('mln_runtime_poll_event');
   late final _mln_runtime_poll_event = _mln_runtime_poll_eventPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_runtime>,
-          ffi.Pointer<mln_runtime_event>,
-          ffi.Pointer<ffi.Bool>,
-        )
+        int Function(int, ffi.Pointer<mln_runtime_event>, ffi.Pointer<ffi.Bool>)
       >();
 
   mln_status mln_runtime_offline_region_create_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_offline_region_definition> definition,
     ffi.Pointer<ffi.Uint8> metadata,
     int metadata_size,
@@ -488,7 +441,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             ffi.Pointer<mln_offline_region_definition>,
             ffi.Pointer<ffi.Uint8>,
             ffi.Size,
@@ -500,7 +453,7 @@ class MaplibreNativeC {
       _mln_runtime_offline_region_create_startPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_runtime>,
+              int,
               ffi.Pointer<mln_offline_region_definition>,
               ffi.Pointer<ffi.Uint8>,
               int,
@@ -509,7 +462,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_runtime_offline_region_get_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -526,7 +479,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -535,15 +488,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_get_start =
       _mln_runtime_offline_region_get_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_regions_list_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
     return mln_status.fromValue(
@@ -554,23 +503,17 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_regions_list_startPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
-            ffi.Pointer<mln_offline_operation_id>,
-          )
+          ffi.Int32 Function(mln_runtime, ffi.Pointer<mln_offline_operation_id>)
         >
       >('mln_runtime_offline_regions_list_start');
   late final _mln_runtime_offline_regions_list_start =
       _mln_runtime_offline_regions_list_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_regions_merge_database_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<ffi.Char> side_database_path,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -587,7 +530,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             ffi.Pointer<ffi.Char>,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -597,14 +540,14 @@ class MaplibreNativeC {
       _mln_runtime_offline_regions_merge_database_startPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_runtime>,
+              int,
               ffi.Pointer<ffi.Char>,
               ffi.Pointer<mln_offline_operation_id>,
             )
           >();
 
   mln_status mln_runtime_offline_region_update_metadata_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     ffi.Pointer<ffi.Uint8> metadata,
     int metadata_size,
@@ -625,7 +568,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Pointer<ffi.Uint8>,
             ffi.Size,
@@ -637,7 +580,7 @@ class MaplibreNativeC {
       _mln_runtime_offline_region_update_metadata_startPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_runtime>,
+              int,
               int,
               ffi.Pointer<ffi.Uint8>,
               int,
@@ -646,7 +589,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_runtime_offline_region_get_status_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -663,7 +606,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -672,15 +615,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_get_status_start =
       _mln_runtime_offline_region_get_status_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_region_set_observed_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     bool observed,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
@@ -699,7 +638,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Bool,
             ffi.Pointer<mln_offline_operation_id>,
@@ -709,16 +648,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_set_observed_start =
       _mln_runtime_offline_region_set_observed_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              bool,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, bool, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_region_set_download_state_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     int state,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
@@ -737,7 +671,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Uint32,
             ffi.Pointer<mln_offline_operation_id>,
@@ -747,16 +681,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_set_download_state_start =
       _mln_runtime_offline_region_set_download_state_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_region_invalidate_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -773,7 +702,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -782,15 +711,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_invalidate_start =
       _mln_runtime_offline_region_invalidate_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_region_delete_start(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_region_id region_id,
     ffi.Pointer<mln_offline_operation_id> out_operation_id,
   ) {
@@ -807,7 +732,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_region_id,
             ffi.Pointer<mln_offline_operation_id>,
           )
@@ -816,17 +741,13 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_delete_start =
       _mln_runtime_offline_region_delete_startPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_operation_id>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
   mln_status mln_runtime_offline_region_create_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
-    ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>> out_region,
+    ffi.Pointer<mln_offline_region_snapshot> out_region,
   ) {
     return mln_status.fromValue(
       _mln_runtime_offline_region_create_take_result(
@@ -841,26 +762,22 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
-            ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
+            ffi.Pointer<mln_offline_region_snapshot>,
           )
         >
       >('mln_runtime_offline_region_create_take_result');
   late final _mln_runtime_offline_region_create_take_result =
       _mln_runtime_offline_region_create_take_resultPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_region_snapshot>)
           >();
 
   mln_status mln_runtime_offline_region_get_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
-    ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>> out_region,
+    ffi.Pointer<mln_offline_region_snapshot> out_region,
     ffi.Pointer<ffi.Bool> out_found,
   ) {
     return mln_status.fromValue(
@@ -877,9 +794,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
-            ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
+            ffi.Pointer<mln_offline_region_snapshot>,
             ffi.Pointer<ffi.Bool>,
           )
         >
@@ -888,17 +805,17 @@ class MaplibreNativeC {
       _mln_runtime_offline_region_get_take_resultPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_runtime>,
               int,
-              ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
+              int,
+              ffi.Pointer<mln_offline_region_snapshot>,
               ffi.Pointer<ffi.Bool>,
             )
           >();
 
   mln_status mln_runtime_offline_regions_list_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
-    ffi.Pointer<ffi.Pointer<mln_offline_region_list>> out_regions,
+    ffi.Pointer<mln_offline_region_list> out_regions,
   ) {
     return mln_status.fromValue(
       _mln_runtime_offline_regions_list_take_result(
@@ -913,26 +830,22 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
-            ffi.Pointer<ffi.Pointer<mln_offline_region_list>>,
+            ffi.Pointer<mln_offline_region_list>,
           )
         >
       >('mln_runtime_offline_regions_list_take_result');
   late final _mln_runtime_offline_regions_list_take_result =
       _mln_runtime_offline_regions_list_take_resultPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<ffi.Pointer<mln_offline_region_list>>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_region_list>)
           >();
 
   mln_status mln_runtime_offline_regions_merge_database_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
-    ffi.Pointer<ffi.Pointer<mln_offline_region_list>> out_regions,
+    ffi.Pointer<mln_offline_region_list> out_regions,
   ) {
     return mln_status.fromValue(
       _mln_runtime_offline_regions_merge_database_take_result(
@@ -947,26 +860,22 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
-            ffi.Pointer<ffi.Pointer<mln_offline_region_list>>,
+            ffi.Pointer<mln_offline_region_list>,
           )
         >
       >('mln_runtime_offline_regions_merge_database_take_result');
   late final _mln_runtime_offline_regions_merge_database_take_result =
       _mln_runtime_offline_regions_merge_database_take_resultPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<ffi.Pointer<mln_offline_region_list>>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_region_list>)
           >();
 
   mln_status mln_runtime_offline_region_update_metadata_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
-    ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>> out_region,
+    ffi.Pointer<mln_offline_region_snapshot> out_region,
   ) {
     return mln_status.fromValue(
       _mln_runtime_offline_region_update_metadata_take_result(
@@ -981,24 +890,20 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
-            ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
+            ffi.Pointer<mln_offline_region_snapshot>,
           )
         >
       >('mln_runtime_offline_region_update_metadata_take_result');
   late final _mln_runtime_offline_region_update_metadata_take_result =
       _mln_runtime_offline_region_update_metadata_take_resultPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<ffi.Pointer<mln_offline_region_snapshot>>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_region_snapshot>)
           >();
 
   mln_status mln_runtime_offline_region_get_status_take_result(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
     ffi.Pointer<mln_offline_region_status> out_status,
   ) {
@@ -1015,7 +920,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             mln_offline_operation_id,
             ffi.Pointer<mln_offline_region_status>,
           )
@@ -1024,15 +929,11 @@ class MaplibreNativeC {
   late final _mln_runtime_offline_region_get_status_take_result =
       _mln_runtime_offline_region_get_status_take_resultPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_runtime>,
-              int,
-              ffi.Pointer<mln_offline_region_status>,
-            )
+            int Function(int, int, ffi.Pointer<mln_offline_region_status>)
           >();
 
   mln_status mln_offline_region_snapshot_get(
-    ffi.Pointer<mln_offline_region_snapshot> snapshot,
+    Dartmln_offline_region_snapshot snapshot,
     ffi.Pointer<mln_offline_region_info> out_info,
   ) {
     return mln_status.fromValue(
@@ -1044,7 +945,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_offline_region_snapshot>,
+            mln_offline_region_snapshot,
             ffi.Pointer<mln_offline_region_info>,
           )
         >
@@ -1052,32 +953,22 @@ class MaplibreNativeC {
   late final _mln_offline_region_snapshot_get =
       _mln_offline_region_snapshot_getPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_offline_region_snapshot>,
-              ffi.Pointer<mln_offline_region_info>,
-            )
+            int Function(int, ffi.Pointer<mln_offline_region_info>)
           >();
 
-  void mln_offline_region_snapshot_destroy(
-    ffi.Pointer<mln_offline_region_snapshot> snapshot,
-  ) {
+  void mln_offline_region_snapshot_destroy(int snapshot) {
     return _mln_offline_region_snapshot_destroy(snapshot);
   }
 
   late final _mln_offline_region_snapshot_destroyPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_offline_region_snapshot>)
-        >
+        ffi.NativeFunction<ffi.Void Function(mln_offline_region_snapshot)>
       >('mln_offline_region_snapshot_destroy');
   late final _mln_offline_region_snapshot_destroy =
-      _mln_offline_region_snapshot_destroyPtr
-          .asFunction<
-            void Function(ffi.Pointer<mln_offline_region_snapshot>)
-          >();
+      _mln_offline_region_snapshot_destroyPtr.asFunction<void Function(int)>();
 
   mln_status mln_offline_region_list_count(
-    ffi.Pointer<mln_offline_region_list> list,
+    Dartmln_offline_region_list list,
     ffi.Pointer<ffi.Size> out_count,
   ) {
     return mln_status.fromValue(
@@ -1088,22 +979,14 @@ class MaplibreNativeC {
   late final _mln_offline_region_list_countPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_offline_region_list>,
-            ffi.Pointer<ffi.Size>,
-          )
+          ffi.Int32 Function(mln_offline_region_list, ffi.Pointer<ffi.Size>)
         >
       >('mln_offline_region_list_count');
   late final _mln_offline_region_list_count = _mln_offline_region_list_countPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_offline_region_list>,
-          ffi.Pointer<ffi.Size>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Size>)>();
 
   mln_status mln_offline_region_list_get(
-    ffi.Pointer<mln_offline_region_list> list,
+    Dartmln_offline_region_list list,
     int index,
     ffi.Pointer<mln_offline_region_info> out_info,
   ) {
@@ -1116,7 +999,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_offline_region_list>,
+            mln_offline_region_list,
             ffi.Size,
             ffi.Pointer<mln_offline_region_info>,
           )
@@ -1124,28 +1007,19 @@ class MaplibreNativeC {
       >('mln_offline_region_list_get');
   late final _mln_offline_region_list_get = _mln_offline_region_list_getPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_offline_region_list>,
-          int,
-          ffi.Pointer<mln_offline_region_info>,
-        )
+        int Function(int, int, ffi.Pointer<mln_offline_region_info>)
       >();
 
-  void mln_offline_region_list_destroy(
-    ffi.Pointer<mln_offline_region_list> list,
-  ) {
+  void mln_offline_region_list_destroy(int list) {
     return _mln_offline_region_list_destroy(list);
   }
 
   late final _mln_offline_region_list_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_offline_region_list>)
-        >
-      >('mln_offline_region_list_destroy');
+      _lookup<ffi.NativeFunction<ffi.Void Function(mln_offline_region_list)>>(
+        'mln_offline_region_list_destroy',
+      );
   late final _mln_offline_region_list_destroy =
-      _mln_offline_region_list_destroyPtr
-          .asFunction<void Function(ffi.Pointer<mln_offline_region_list>)>();
+      _mln_offline_region_list_destroyPtr.asFunction<void Function(int)>();
 
   mln_map_options mln_map_options_default() {
     return _mln_map_options_default();
@@ -1159,9 +1033,9 @@ class MaplibreNativeC {
       .asFunction<mln_map_options Function()>();
 
   mln_status mln_map_create(
-    ffi.Pointer<mln_runtime> runtime,
+    Dartmln_runtime runtime,
     ffi.Pointer<mln_map_options> options,
-    ffi.Pointer<ffi.Pointer<mln_map>> out_map,
+    ffi.Pointer<mln_map> out_map,
   ) {
     return mln_status.fromValue(_mln_map_create(runtime, options, out_map));
   }
@@ -1170,23 +1044,19 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_runtime>,
+            mln_runtime,
             ffi.Pointer<mln_map_options>,
-            ffi.Pointer<ffi.Pointer<mln_map>>,
+            ffi.Pointer<mln_map>,
           )
         >
       >('mln_map_create');
   late final _mln_map_create = _mln_map_createPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_runtime>,
-          ffi.Pointer<mln_map_options>,
-          ffi.Pointer<ffi.Pointer<mln_map>>,
-        )
+        int Function(int, ffi.Pointer<mln_map_options>, ffi.Pointer<mln_map>)
       >();
 
   mln_status mln_map_get_size(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<ffi.Uint32> out_width,
     ffi.Pointer<ffi.Uint32> out_height,
     ffi.Pointer<ffi.Double> out_scale_factor,
@@ -1200,7 +1070,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<ffi.Uint32>,
             ffi.Pointer<ffi.Uint32>,
             ffi.Pointer<ffi.Double>,
@@ -1210,64 +1080,59 @@ class MaplibreNativeC {
   late final _mln_map_get_size = _mln_map_get_sizePtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<ffi.Uint32>,
           ffi.Pointer<ffi.Uint32>,
           ffi.Pointer<ffi.Double>,
         )
       >();
 
-  mln_status mln_map_request_repaint(ffi.Pointer<mln_map> map) {
+  mln_status mln_map_request_repaint(Dartmln_map map) {
     return mln_status.fromValue(_mln_map_request_repaint(map));
   }
 
   late final _mln_map_request_repaintPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map)>>(
         'mln_map_request_repaint',
       );
   late final _mln_map_request_repaint = _mln_map_request_repaintPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>)>();
+      .asFunction<int Function(int)>();
 
-  mln_status mln_map_request_still_image(ffi.Pointer<mln_map> map) {
+  mln_status mln_map_request_still_image(Dartmln_map map) {
     return mln_status.fromValue(_mln_map_request_still_image(map));
   }
 
   late final _mln_map_request_still_imagePtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map)>>(
         'mln_map_request_still_image',
       );
   late final _mln_map_request_still_image = _mln_map_request_still_imagePtr
-      .asFunction<int Function(ffi.Pointer<mln_map>)>();
+      .asFunction<int Function(int)>();
 
-  mln_status mln_map_destroy(ffi.Pointer<mln_map> map) {
+  mln_status mln_map_destroy(Dartmln_map map) {
     return mln_status.fromValue(_mln_map_destroy(map));
   }
 
   late final _mln_map_destroyPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map)>>(
         'mln_map_destroy',
       );
   late final _mln_map_destroy = _mln_map_destroyPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>)>();
+      .asFunction<int Function(int)>();
 
-  mln_status mln_map_set_style_url(
-    ffi.Pointer<mln_map> map,
-    ffi.Pointer<ffi.Char> url,
-  ) {
+  mln_status mln_map_set_style_url(Dartmln_map map, ffi.Pointer<ffi.Char> url) {
     return mln_status.fromValue(_mln_map_set_style_url(map, url));
   }
 
   late final _mln_map_set_style_urlPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Char>)>
       >('mln_map_set_style_url');
   late final _mln_map_set_style_url = _mln_map_set_style_urlPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)>();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Char>)>();
 
   mln_status mln_map_set_style_json(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<ffi.Char> json,
   ) {
     return mln_status.fromValue(_mln_map_set_style_json(map, json));
@@ -1275,12 +1140,10 @@ class MaplibreNativeC {
 
   late final _mln_map_set_style_jsonPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Char>)>
       >('mln_map_set_style_json');
   late final _mln_map_set_style_json = _mln_map_set_style_jsonPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Char>)>();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Char>)>();
 
   mln_camera_options mln_camera_options_default() {
     return _mln_camera_options_default();
@@ -1373,19 +1236,19 @@ class MaplibreNativeC {
   late final _mln_map_tile_options_default = _mln_map_tile_options_defaultPtr
       .asFunction<mln_map_tile_options Function()>();
 
-  mln_status mln_map_set_debug_options(ffi.Pointer<mln_map> map, int options) {
+  mln_status mln_map_set_debug_options(Dartmln_map map, int options) {
     return mln_status.fromValue(_mln_map_set_debug_options(map, options));
   }
 
   late final _mln_map_set_debug_optionsPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Uint32)>
-      >('mln_map_set_debug_options');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Uint32)>>(
+        'mln_map_set_debug_options',
+      );
   late final _mln_map_set_debug_options = _mln_map_set_debug_optionsPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, int)>();
+      .asFunction<int Function(int, int)>();
 
   mln_status mln_map_get_debug_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<ffi.Uint32> out_options,
   ) {
     return mln_status.fromValue(_mln_map_get_debug_options(map, out_options));
@@ -1393,17 +1256,13 @@ class MaplibreNativeC {
 
   late final _mln_map_get_debug_optionsPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Uint32>)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Uint32>)>
       >('mln_map_get_debug_options');
   late final _mln_map_get_debug_options = _mln_map_get_debug_optionsPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Uint32>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Uint32>)>();
 
   mln_status mln_map_set_rendering_stats_view_enabled(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     bool enabled,
   ) {
     return mln_status.fromValue(
@@ -1412,15 +1271,15 @@ class MaplibreNativeC {
   }
 
   late final _mln_map_set_rendering_stats_view_enabledPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Bool)>
-      >('mln_map_set_rendering_stats_view_enabled');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Bool)>>(
+        'mln_map_set_rendering_stats_view_enabled',
+      );
   late final _mln_map_set_rendering_stats_view_enabled =
       _mln_map_set_rendering_stats_view_enabledPtr
-          .asFunction<int Function(ffi.Pointer<mln_map>, bool)>();
+          .asFunction<int Function(int, bool)>();
 
   mln_status mln_map_get_rendering_stats_view_enabled(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<ffi.Bool> out_enabled,
   ) {
     return mln_status.fromValue(
@@ -1430,18 +1289,14 @@ class MaplibreNativeC {
 
   late final _mln_map_get_rendering_stats_view_enabledPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>
       >('mln_map_get_rendering_stats_view_enabled');
   late final _mln_map_get_rendering_stats_view_enabled =
       _mln_map_get_rendering_stats_view_enabledPtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)
-          >();
+          .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_is_fully_loaded(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<ffi.Bool> out_loaded,
   ) {
     return mln_status.fromValue(_mln_map_is_fully_loaded(map, out_loaded));
@@ -1449,26 +1304,24 @@ class MaplibreNativeC {
 
   late final _mln_map_is_fully_loadedPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Pointer<ffi.Bool>)>
       >('mln_map_is_fully_loaded');
   late final _mln_map_is_fully_loaded = _mln_map_is_fully_loadedPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, ffi.Pointer<ffi.Bool>)>();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
 
-  mln_status mln_map_dump_debug_logs(ffi.Pointer<mln_map> map) {
+  mln_status mln_map_dump_debug_logs(Dartmln_map map) {
     return mln_status.fromValue(_mln_map_dump_debug_logs(map));
   }
 
   late final _mln_map_dump_debug_logsPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map)>>(
         'mln_map_dump_debug_logs',
       );
   late final _mln_map_dump_debug_logs = _mln_map_dump_debug_logsPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>)>();
+      .asFunction<int Function(int)>();
 
   mln_status mln_map_get_viewport_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_map_viewport_options> out_options,
   ) {
     return mln_status.fromValue(
@@ -1479,22 +1332,14 @@ class MaplibreNativeC {
   late final _mln_map_get_viewport_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_map_viewport_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_viewport_options>)
         >
       >('mln_map_get_viewport_options');
   late final _mln_map_get_viewport_options = _mln_map_get_viewport_optionsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<mln_map_viewport_options>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_map_viewport_options>)>();
 
   mln_status mln_map_set_viewport_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_map_viewport_options> options,
   ) {
     return mln_status.fromValue(_mln_map_set_viewport_options(map, options));
@@ -1503,22 +1348,14 @@ class MaplibreNativeC {
   late final _mln_map_set_viewport_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_map_viewport_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_viewport_options>)
         >
       >('mln_map_set_viewport_options');
   late final _mln_map_set_viewport_options = _mln_map_set_viewport_optionsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<mln_map_viewport_options>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_map_viewport_options>)>();
 
   mln_status mln_map_get_tile_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_map_tile_options> out_options,
   ) {
     return mln_status.fromValue(_mln_map_get_tile_options(map, out_options));
@@ -1527,19 +1364,14 @@ class MaplibreNativeC {
   late final _mln_map_get_tile_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_map_tile_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_tile_options>)
         >
       >('mln_map_get_tile_options');
   late final _mln_map_get_tile_options = _mln_map_get_tile_optionsPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_map_tile_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_map_tile_options>)>();
 
   mln_status mln_map_set_tile_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_map_tile_options> options,
   ) {
     return mln_status.fromValue(_mln_map_set_tile_options(map, options));
@@ -1548,19 +1380,14 @@ class MaplibreNativeC {
   late final _mln_map_set_tile_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_map_tile_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_tile_options>)
         >
       >('mln_map_set_tile_options');
   late final _mln_map_set_tile_options = _mln_map_set_tile_optionsPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_map_tile_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_map_tile_options>)>();
 
   mln_status mln_map_get_camera(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> out_camera,
   ) {
     return mln_status.fromValue(_mln_map_get_camera(map, out_camera));
@@ -1569,19 +1396,14 @@ class MaplibreNativeC {
   late final _mln_map_get_cameraPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_camera_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_camera_options>)
         >
       >('mln_map_get_camera');
   late final _mln_map_get_camera = _mln_map_get_cameraPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_camera_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_camera_options>)>();
 
   mln_status mln_map_jump_to(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> camera,
   ) {
     return mln_status.fromValue(_mln_map_jump_to(map, camera));
@@ -1590,19 +1412,14 @@ class MaplibreNativeC {
   late final _mln_map_jump_toPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_camera_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_camera_options>)
         >
       >('mln_map_jump_to');
   late final _mln_map_jump_to = _mln_map_jump_toPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_camera_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_camera_options>)>();
 
   mln_status mln_map_ease_to(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> camera,
     ffi.Pointer<mln_animation_options> animation,
   ) {
@@ -1613,7 +1430,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_camera_options>,
             ffi.Pointer<mln_animation_options>,
           )
@@ -1622,14 +1439,14 @@ class MaplibreNativeC {
   late final _mln_map_ease_to = _mln_map_ease_toPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_camera_options>,
           ffi.Pointer<mln_animation_options>,
         )
       >();
 
   mln_status mln_map_fly_to(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> camera,
     ffi.Pointer<mln_animation_options> animation,
   ) {
@@ -1640,7 +1457,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_camera_options>,
             ffi.Pointer<mln_animation_options>,
           )
@@ -1649,31 +1466,25 @@ class MaplibreNativeC {
   late final _mln_map_fly_to = _mln_map_fly_toPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_camera_options>,
           ffi.Pointer<mln_animation_options>,
         )
       >();
 
-  mln_status mln_map_move_by(
-    ffi.Pointer<mln_map> map,
-    double delta_x,
-    double delta_y,
-  ) {
+  mln_status mln_map_move_by(Dartmln_map map, double delta_x, double delta_y) {
     return mln_status.fromValue(_mln_map_move_by(map, delta_x, delta_y));
   }
 
   late final _mln_map_move_byPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Double, ffi.Double)
-        >
+        ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Double, ffi.Double)>
       >('mln_map_move_by');
   late final _mln_map_move_by = _mln_map_move_byPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, double, double)>();
+      .asFunction<int Function(int, double, double)>();
 
   mln_status mln_map_move_by_animated(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     double delta_x,
     double delta_y,
     ffi.Pointer<mln_animation_options> animation,
@@ -1687,7 +1498,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Double,
             ffi.Double,
             ffi.Pointer<mln_animation_options>,
@@ -1696,16 +1507,11 @@ class MaplibreNativeC {
       >('mln_map_move_by_animated');
   late final _mln_map_move_by_animated = _mln_map_move_by_animatedPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          double,
-          double,
-          ffi.Pointer<mln_animation_options>,
-        )
+        int Function(int, double, double, ffi.Pointer<mln_animation_options>)
       >();
 
   mln_status mln_map_scale_by(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     double scale,
     ffi.Pointer<mln_screen_point> anchor,
   ) {
@@ -1715,24 +1521,14 @@ class MaplibreNativeC {
   late final _mln_map_scale_byPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Double,
-            ffi.Pointer<mln_screen_point>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Double, ffi.Pointer<mln_screen_point>)
         >
       >('mln_map_scale_by');
   late final _mln_map_scale_by = _mln_map_scale_byPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          double,
-          ffi.Pointer<mln_screen_point>,
-        )
-      >();
+      .asFunction<int Function(int, double, ffi.Pointer<mln_screen_point>)>();
 
   mln_status mln_map_scale_by_animated(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     double scale,
     ffi.Pointer<mln_screen_point> anchor,
     ffi.Pointer<mln_animation_options> animation,
@@ -1746,7 +1542,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Double,
             ffi.Pointer<mln_screen_point>,
             ffi.Pointer<mln_animation_options>,
@@ -1756,7 +1552,7 @@ class MaplibreNativeC {
   late final _mln_map_scale_by_animated = _mln_map_scale_by_animatedPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           double,
           ffi.Pointer<mln_screen_point>,
           ffi.Pointer<mln_animation_options>,
@@ -1764,7 +1560,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_rotate_by(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_screen_point first,
     mln_screen_point second,
   ) {
@@ -1774,20 +1570,14 @@ class MaplibreNativeC {
   late final _mln_map_rotate_byPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_screen_point,
-            mln_screen_point,
-          )
+          ffi.Int32 Function(mln_map, mln_screen_point, mln_screen_point)
         >
       >('mln_map_rotate_by');
   late final _mln_map_rotate_by = _mln_map_rotate_byPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, mln_screen_point, mln_screen_point)
-      >();
+      .asFunction<int Function(int, mln_screen_point, mln_screen_point)>();
 
   mln_status mln_map_rotate_by_animated(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_screen_point first,
     mln_screen_point second,
     ffi.Pointer<mln_animation_options> animation,
@@ -1801,7 +1591,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_screen_point,
             mln_screen_point,
             ffi.Pointer<mln_animation_options>,
@@ -1811,26 +1601,26 @@ class MaplibreNativeC {
   late final _mln_map_rotate_by_animated = _mln_map_rotate_by_animatedPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_screen_point,
           mln_screen_point,
           ffi.Pointer<mln_animation_options>,
         )
       >();
 
-  mln_status mln_map_pitch_by(ffi.Pointer<mln_map> map, double pitch) {
+  mln_status mln_map_pitch_by(Dartmln_map map, double pitch) {
     return mln_status.fromValue(_mln_map_pitch_by(map, pitch));
   }
 
   late final _mln_map_pitch_byPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Double)>
-      >('mln_map_pitch_by');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map, ffi.Double)>>(
+        'mln_map_pitch_by',
+      );
   late final _mln_map_pitch_by = _mln_map_pitch_byPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>, double)>();
+      .asFunction<int Function(int, double)>();
 
   mln_status mln_map_pitch_by_animated(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     double pitch,
     ffi.Pointer<mln_animation_options> animation,
   ) {
@@ -1843,7 +1633,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Double,
             ffi.Pointer<mln_animation_options>,
           )
@@ -1851,26 +1641,22 @@ class MaplibreNativeC {
       >('mln_map_pitch_by_animated');
   late final _mln_map_pitch_by_animated = _mln_map_pitch_by_animatedPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          double,
-          ffi.Pointer<mln_animation_options>,
-        )
+        int Function(int, double, ffi.Pointer<mln_animation_options>)
       >();
 
-  mln_status mln_map_cancel_transitions(ffi.Pointer<mln_map> map) {
+  mln_status mln_map_cancel_transitions(Dartmln_map map) {
     return mln_status.fromValue(_mln_map_cancel_transitions(map));
   }
 
   late final _mln_map_cancel_transitionsPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map>)>>(
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map)>>(
         'mln_map_cancel_transitions',
       );
   late final _mln_map_cancel_transitions = _mln_map_cancel_transitionsPtr
-      .asFunction<int Function(ffi.Pointer<mln_map>)>();
+      .asFunction<int Function(int)>();
 
   mln_status mln_map_camera_for_lat_lng_bounds(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_lat_lng_bounds bounds,
     ffi.Pointer<mln_camera_fit_options> fit_options,
     ffi.Pointer<mln_camera_options> out_camera,
@@ -1884,7 +1670,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_lat_lng_bounds,
             ffi.Pointer<mln_camera_fit_options>,
             ffi.Pointer<mln_camera_options>,
@@ -1895,7 +1681,7 @@ class MaplibreNativeC {
       _mln_map_camera_for_lat_lng_boundsPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_lat_lng_bounds,
               ffi.Pointer<mln_camera_fit_options>,
               ffi.Pointer<mln_camera_options>,
@@ -1903,7 +1689,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_camera_for_lat_lngs(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
     ffi.Pointer<mln_camera_fit_options> fit_options,
@@ -1924,7 +1710,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
             ffi.Pointer<mln_camera_fit_options>,
@@ -1935,7 +1721,7 @@ class MaplibreNativeC {
   late final _mln_map_camera_for_lat_lngs = _mln_map_camera_for_lat_lngsPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_lat_lng>,
           int,
           ffi.Pointer<mln_camera_fit_options>,
@@ -1944,7 +1730,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_camera_for_geometry(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_geometry> geometry,
     ffi.Pointer<mln_camera_fit_options> fit_options,
     ffi.Pointer<mln_camera_options> out_camera,
@@ -1958,7 +1744,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_geometry>,
             ffi.Pointer<mln_camera_fit_options>,
             ffi.Pointer<mln_camera_options>,
@@ -1968,7 +1754,7 @@ class MaplibreNativeC {
   late final _mln_map_camera_for_geometry = _mln_map_camera_for_geometryPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_geometry>,
           ffi.Pointer<mln_camera_fit_options>,
           ffi.Pointer<mln_camera_options>,
@@ -1976,7 +1762,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_lat_lng_bounds_for_camera(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> camera,
     ffi.Pointer<mln_lat_lng_bounds> out_bounds,
   ) {
@@ -1989,7 +1775,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_camera_options>,
             ffi.Pointer<mln_lat_lng_bounds>,
           )
@@ -1999,14 +1785,14 @@ class MaplibreNativeC {
       _mln_map_lat_lng_bounds_for_cameraPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_camera_options>,
               ffi.Pointer<mln_lat_lng_bounds>,
             )
           >();
 
   mln_status mln_map_lat_lng_bounds_for_camera_unwrapped(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_camera_options> camera,
     ffi.Pointer<mln_lat_lng_bounds> out_bounds,
   ) {
@@ -2019,7 +1805,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_camera_options>,
             ffi.Pointer<mln_lat_lng_bounds>,
           )
@@ -2029,14 +1815,14 @@ class MaplibreNativeC {
       _mln_map_lat_lng_bounds_for_camera_unwrappedPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_camera_options>,
               ffi.Pointer<mln_lat_lng_bounds>,
             )
           >();
 
   mln_status mln_map_get_bounds(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_bound_options> out_options,
   ) {
     return mln_status.fromValue(_mln_map_get_bounds(map, out_options));
@@ -2045,19 +1831,14 @@ class MaplibreNativeC {
   late final _mln_map_get_boundsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_bound_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_bound_options>)
         >
       >('mln_map_get_bounds');
   late final _mln_map_get_bounds = _mln_map_get_boundsPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_bound_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_bound_options>)>();
 
   mln_status mln_map_set_bounds(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_bound_options> options,
   ) {
     return mln_status.fromValue(_mln_map_set_bounds(map, options));
@@ -2066,19 +1847,14 @@ class MaplibreNativeC {
   late final _mln_map_set_boundsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_bound_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_bound_options>)
         >
       >('mln_map_set_bounds');
   late final _mln_map_set_bounds = _mln_map_set_boundsPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_bound_options>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_bound_options>)>();
 
   mln_status mln_map_get_free_camera_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_free_camera_options> out_options,
   ) {
     return mln_status.fromValue(
@@ -2089,23 +1865,17 @@ class MaplibreNativeC {
   late final _mln_map_get_free_camera_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_free_camera_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)
         >
       >('mln_map_get_free_camera_options');
   late final _mln_map_get_free_camera_options =
       _mln_map_get_free_camera_optionsPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              ffi.Pointer<mln_free_camera_options>,
-            )
+            int Function(int, ffi.Pointer<mln_free_camera_options>)
           >();
 
   mln_status mln_map_set_free_camera_options(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_free_camera_options> options,
   ) {
     return mln_status.fromValue(_mln_map_set_free_camera_options(map, options));
@@ -2114,23 +1884,17 @@ class MaplibreNativeC {
   late final _mln_map_set_free_camera_optionsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_free_camera_options>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_free_camera_options>)
         >
       >('mln_map_set_free_camera_options');
   late final _mln_map_set_free_camera_options =
       _mln_map_set_free_camera_optionsPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              ffi.Pointer<mln_free_camera_options>,
-            )
+            int Function(int, ffi.Pointer<mln_free_camera_options>)
           >();
 
   mln_status mln_map_get_projection_mode(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_projection_mode> out_mode,
   ) {
     return mln_status.fromValue(_mln_map_get_projection_mode(map, out_mode));
@@ -2139,19 +1903,14 @@ class MaplibreNativeC {
   late final _mln_map_get_projection_modePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_projection_mode>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_projection_mode>)
         >
       >('mln_map_get_projection_mode');
   late final _mln_map_get_projection_mode = _mln_map_get_projection_modePtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_projection_mode>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_projection_mode>)>();
 
   mln_status mln_map_set_projection_mode(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_projection_mode> mode,
   ) {
     return mln_status.fromValue(_mln_map_set_projection_mode(map, mode));
@@ -2160,19 +1919,14 @@ class MaplibreNativeC {
   late final _mln_map_set_projection_modePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<mln_projection_mode>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_projection_mode>)
         >
       >('mln_map_set_projection_mode');
   late final _mln_map_set_projection_mode = _mln_map_set_projection_modePtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_projection_mode>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_projection_mode>)>();
 
   mln_status mln_map_pixel_for_lat_lng(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_lat_lng coordinate,
     ffi.Pointer<mln_screen_point> out_point,
   ) {
@@ -2185,7 +1939,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_lat_lng,
             ffi.Pointer<mln_screen_point>,
           )
@@ -2193,15 +1947,11 @@ class MaplibreNativeC {
       >('mln_map_pixel_for_lat_lng');
   late final _mln_map_pixel_for_lat_lng = _mln_map_pixel_for_lat_lngPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_lat_lng,
-          ffi.Pointer<mln_screen_point>,
-        )
+        int Function(int, mln_lat_lng, ffi.Pointer<mln_screen_point>)
       >();
 
   mln_status mln_map_lat_lng_for_pixel(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_screen_point point,
     ffi.Pointer<mln_lat_lng> out_coordinate,
   ) {
@@ -2214,7 +1964,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_screen_point,
             ffi.Pointer<mln_lat_lng>,
           )
@@ -2222,15 +1972,11 @@ class MaplibreNativeC {
       >('mln_map_lat_lng_for_pixel');
   late final _mln_map_lat_lng_for_pixel = _mln_map_lat_lng_for_pixelPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_screen_point,
-          ffi.Pointer<mln_lat_lng>,
-        )
+        int Function(int, mln_screen_point, ffi.Pointer<mln_lat_lng>)
       >();
 
   mln_status mln_map_pixels_for_lat_lngs(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
     ffi.Pointer<mln_screen_point> out_points,
@@ -2249,7 +1995,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
             ffi.Pointer<mln_screen_point>,
@@ -2259,7 +2005,7 @@ class MaplibreNativeC {
   late final _mln_map_pixels_for_lat_lngs = _mln_map_pixels_for_lat_lngsPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_lat_lng>,
           int,
           ffi.Pointer<mln_screen_point>,
@@ -2267,7 +2013,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_lat_lngs_for_pixels(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_screen_point> points,
     int point_count,
     ffi.Pointer<mln_lat_lng> out_coordinates,
@@ -2281,7 +2027,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_screen_point>,
             ffi.Size,
             ffi.Pointer<mln_lat_lng>,
@@ -2291,7 +2037,7 @@ class MaplibreNativeC {
   late final _mln_map_lat_lngs_for_pixels = _mln_map_lat_lngs_for_pixelsPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_screen_point>,
           int,
           ffi.Pointer<mln_lat_lng>,
@@ -2357,8 +2103,8 @@ class MaplibreNativeC {
       _mln_log_set_async_severity_maskPtr.asFunction<int Function(int)>();
 
   mln_status mln_map_projection_create(
-    ffi.Pointer<mln_map> map,
-    ffi.Pointer<ffi.Pointer<mln_map_projection>> out_projection,
+    Dartmln_map map,
+    ffi.Pointer<mln_map_projection> out_projection,
   ) {
     return mln_status.fromValue(
       _mln_map_projection_create(map, out_projection),
@@ -2368,35 +2114,25 @@ class MaplibreNativeC {
   late final _mln_map_projection_createPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<ffi.Pointer<mln_map_projection>>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_map_projection>)
         >
       >('mln_map_projection_create');
   late final _mln_map_projection_create = _mln_map_projection_createPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<ffi.Pointer<mln_map_projection>>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_map_projection>)>();
 
-  mln_status mln_map_projection_destroy(
-    ffi.Pointer<mln_map_projection> projection,
-  ) {
+  mln_status mln_map_projection_destroy(Dartmln_map_projection projection) {
     return mln_status.fromValue(_mln_map_projection_destroy(projection));
   }
 
   late final _mln_map_projection_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_map_projection>)>
-      >('mln_map_projection_destroy');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_map_projection)>>(
+        'mln_map_projection_destroy',
+      );
   late final _mln_map_projection_destroy = _mln_map_projection_destroyPtr
-      .asFunction<int Function(ffi.Pointer<mln_map_projection>)>();
+      .asFunction<int Function(int)>();
 
   mln_status mln_map_projection_get_camera(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     ffi.Pointer<mln_camera_options> out_camera,
   ) {
     return mln_status.fromValue(
@@ -2408,21 +2144,16 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             ffi.Pointer<mln_camera_options>,
           )
         >
       >('mln_map_projection_get_camera');
   late final _mln_map_projection_get_camera = _mln_map_projection_get_cameraPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map_projection>,
-          ffi.Pointer<mln_camera_options>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_camera_options>)>();
 
   mln_status mln_map_projection_set_camera(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     ffi.Pointer<mln_camera_options> camera,
   ) {
     return mln_status.fromValue(
@@ -2434,21 +2165,16 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             ffi.Pointer<mln_camera_options>,
           )
         >
       >('mln_map_projection_set_camera');
   late final _mln_map_projection_set_camera = _mln_map_projection_set_cameraPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map_projection>,
-          ffi.Pointer<mln_camera_options>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_camera_options>)>();
 
   mln_status mln_map_projection_set_visible_coordinates(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
     mln_edge_insets padding,
@@ -2467,7 +2193,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
             mln_edge_insets,
@@ -2477,16 +2203,11 @@ class MaplibreNativeC {
   late final _mln_map_projection_set_visible_coordinates =
       _mln_map_projection_set_visible_coordinatesPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map_projection>,
-              ffi.Pointer<mln_lat_lng>,
-              int,
-              mln_edge_insets,
-            )
+            int Function(int, ffi.Pointer<mln_lat_lng>, int, mln_edge_insets)
           >();
 
   mln_status mln_map_projection_set_visible_geometry(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     ffi.Pointer<mln_geometry> geometry,
     mln_edge_insets padding,
   ) {
@@ -2499,7 +2220,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             ffi.Pointer<mln_geometry>,
             mln_edge_insets,
           )
@@ -2508,15 +2229,11 @@ class MaplibreNativeC {
   late final _mln_map_projection_set_visible_geometry =
       _mln_map_projection_set_visible_geometryPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map_projection>,
-              ffi.Pointer<mln_geometry>,
-              mln_edge_insets,
-            )
+            int Function(int, ffi.Pointer<mln_geometry>, mln_edge_insets)
           >();
 
   mln_status mln_map_projection_pixel_for_lat_lng(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     mln_lat_lng coordinate,
     ffi.Pointer<mln_screen_point> out_point,
   ) {
@@ -2529,7 +2246,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             mln_lat_lng,
             ffi.Pointer<mln_screen_point>,
           )
@@ -2538,15 +2255,11 @@ class MaplibreNativeC {
   late final _mln_map_projection_pixel_for_lat_lng =
       _mln_map_projection_pixel_for_lat_lngPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map_projection>,
-              mln_lat_lng,
-              ffi.Pointer<mln_screen_point>,
-            )
+            int Function(int, mln_lat_lng, ffi.Pointer<mln_screen_point>)
           >();
 
   mln_status mln_map_projection_lat_lng_for_pixel(
-    ffi.Pointer<mln_map_projection> projection,
+    Dartmln_map_projection projection,
     mln_screen_point point,
     ffi.Pointer<mln_lat_lng> out_coordinate,
   ) {
@@ -2559,7 +2272,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map_projection>,
+            mln_map_projection,
             mln_screen_point,
             ffi.Pointer<mln_lat_lng>,
           )
@@ -2568,11 +2281,7 @@ class MaplibreNativeC {
   late final _mln_map_projection_lat_lng_for_pixel =
       _mln_map_projection_lat_lng_for_pixelPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map_projection>,
-              mln_screen_point,
-              ffi.Pointer<mln_lat_lng>,
-            )
+            int Function(int, mln_screen_point, ffi.Pointer<mln_lat_lng>)
           >();
 
   mln_status mln_projected_meters_for_lat_lng(
@@ -2698,10 +2407,10 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_render_session_query_rendered_features(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_rendered_query_geometry> geometry,
     ffi.Pointer<mln_rendered_feature_query_options> options,
-    ffi.Pointer<ffi.Pointer<mln_feature_query_result>> out_result,
+    ffi.Pointer<mln_feature_query_result> out_result,
   ) {
     return mln_status.fromValue(
       _mln_render_session_query_rendered_features(
@@ -2717,10 +2426,10 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_rendered_query_geometry>,
             ffi.Pointer<mln_rendered_feature_query_options>,
-            ffi.Pointer<ffi.Pointer<mln_feature_query_result>>,
+            ffi.Pointer<mln_feature_query_result>,
           )
         >
       >('mln_render_session_query_rendered_features');
@@ -2728,18 +2437,18 @@ class MaplibreNativeC {
       _mln_render_session_query_rendered_featuresPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               ffi.Pointer<mln_rendered_query_geometry>,
               ffi.Pointer<mln_rendered_feature_query_options>,
-              ffi.Pointer<ffi.Pointer<mln_feature_query_result>>,
+              ffi.Pointer<mln_feature_query_result>,
             )
           >();
 
   mln_status mln_render_session_query_source_features(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     mln_string_view source_id,
     ffi.Pointer<mln_source_feature_query_options> options,
-    ffi.Pointer<ffi.Pointer<mln_feature_query_result>> out_result,
+    ffi.Pointer<mln_feature_query_result> out_result,
   ) {
     return mln_status.fromValue(
       _mln_render_session_query_source_features(
@@ -2755,10 +2464,10 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             mln_string_view,
             ffi.Pointer<mln_source_feature_query_options>,
-            ffi.Pointer<ffi.Pointer<mln_feature_query_result>>,
+            ffi.Pointer<mln_feature_query_result>,
           )
         >
       >('mln_render_session_query_source_features');
@@ -2766,21 +2475,21 @@ class MaplibreNativeC {
       _mln_render_session_query_source_featuresPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_source_feature_query_options>,
-              ffi.Pointer<ffi.Pointer<mln_feature_query_result>>,
+              ffi.Pointer<mln_feature_query_result>,
             )
           >();
 
   mln_status mln_render_session_query_feature_extensions(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     mln_string_view source_id,
     ffi.Pointer<mln_feature> feature,
     mln_string_view extension,
     mln_string_view extension_field,
     ffi.Pointer<mln_json_value> arguments,
-    ffi.Pointer<ffi.Pointer<mln_feature_extension_result>> out_result,
+    ffi.Pointer<mln_feature_extension_result> out_result,
   ) {
     return mln_status.fromValue(
       _mln_render_session_query_feature_extensions(
@@ -2799,13 +2508,13 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             mln_string_view,
             ffi.Pointer<mln_feature>,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_json_value>,
-            ffi.Pointer<ffi.Pointer<mln_feature_extension_result>>,
+            ffi.Pointer<mln_feature_extension_result>,
           )
         >
       >('mln_render_session_query_feature_extensions');
@@ -2813,18 +2522,18 @@ class MaplibreNativeC {
       _mln_render_session_query_feature_extensionsPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_feature>,
               mln_string_view,
               mln_string_view,
               ffi.Pointer<mln_json_value>,
-              ffi.Pointer<ffi.Pointer<mln_feature_extension_result>>,
+              ffi.Pointer<mln_feature_extension_result>,
             )
           >();
 
   mln_status mln_feature_query_result_count(
-    ffi.Pointer<mln_feature_query_result> result,
+    Dartmln_feature_query_result result,
     ffi.Pointer<ffi.Size> out_count,
   ) {
     return mln_status.fromValue(
@@ -2835,23 +2544,15 @@ class MaplibreNativeC {
   late final _mln_feature_query_result_countPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_feature_query_result>,
-            ffi.Pointer<ffi.Size>,
-          )
+          ffi.Int32 Function(mln_feature_query_result, ffi.Pointer<ffi.Size>)
         >
       >('mln_feature_query_result_count');
   late final _mln_feature_query_result_count =
       _mln_feature_query_result_countPtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_feature_query_result>,
-              ffi.Pointer<ffi.Size>,
-            )
-          >();
+          .asFunction<int Function(int, ffi.Pointer<ffi.Size>)>();
 
   mln_status mln_feature_query_result_get(
-    ffi.Pointer<mln_feature_query_result> result,
+    Dartmln_feature_query_result result,
     int index,
     ffi.Pointer<mln_queried_feature> out_feature,
   ) {
@@ -2864,39 +2565,28 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_feature_query_result>,
+            mln_feature_query_result,
             ffi.Size,
             ffi.Pointer<mln_queried_feature>,
           )
         >
       >('mln_feature_query_result_get');
   late final _mln_feature_query_result_get = _mln_feature_query_result_getPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_feature_query_result>,
-          int,
-          ffi.Pointer<mln_queried_feature>,
-        )
-      >();
+      .asFunction<int Function(int, int, ffi.Pointer<mln_queried_feature>)>();
 
-  void mln_feature_query_result_destroy(
-    ffi.Pointer<mln_feature_query_result> result,
-  ) {
+  void mln_feature_query_result_destroy(int result) {
     return _mln_feature_query_result_destroy(result);
   }
 
   late final _mln_feature_query_result_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_feature_query_result>)
-        >
-      >('mln_feature_query_result_destroy');
+      _lookup<ffi.NativeFunction<ffi.Void Function(mln_feature_query_result)>>(
+        'mln_feature_query_result_destroy',
+      );
   late final _mln_feature_query_result_destroy =
-      _mln_feature_query_result_destroyPtr
-          .asFunction<void Function(ffi.Pointer<mln_feature_query_result>)>();
+      _mln_feature_query_result_destroyPtr.asFunction<void Function(int)>();
 
   mln_status mln_feature_extension_result_get(
-    ffi.Pointer<mln_feature_extension_result> result,
+    Dartmln_feature_extension_result result,
     ffi.Pointer<mln_feature_extension_result_info> out_info,
   ) {
     return mln_status.fromValue(
@@ -2908,7 +2598,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_feature_extension_result>,
+            mln_feature_extension_result,
             ffi.Pointer<mln_feature_extension_result_info>,
           )
         >
@@ -2916,32 +2606,22 @@ class MaplibreNativeC {
   late final _mln_feature_extension_result_get =
       _mln_feature_extension_result_getPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_feature_extension_result>,
-              ffi.Pointer<mln_feature_extension_result_info>,
-            )
+            int Function(int, ffi.Pointer<mln_feature_extension_result_info>)
           >();
 
-  void mln_feature_extension_result_destroy(
-    ffi.Pointer<mln_feature_extension_result> result,
-  ) {
+  void mln_feature_extension_result_destroy(int result) {
     return _mln_feature_extension_result_destroy(result);
   }
 
   late final _mln_feature_extension_result_destroyPtr =
       _lookup<
-        ffi.NativeFunction<
-          ffi.Void Function(ffi.Pointer<mln_feature_extension_result>)
-        >
+        ffi.NativeFunction<ffi.Void Function(mln_feature_extension_result)>
       >('mln_feature_extension_result_destroy');
   late final _mln_feature_extension_result_destroy =
-      _mln_feature_extension_result_destroyPtr
-          .asFunction<
-            void Function(ffi.Pointer<mln_feature_extension_result>)
-          >();
+      _mln_feature_extension_result_destroyPtr.asFunction<void Function(int)>();
 
   mln_status mln_render_session_resize(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     int width,
     int height,
     double scale_factor,
@@ -2955,7 +2635,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Uint32,
             ffi.Uint32,
             ffi.Double,
@@ -2963,12 +2643,10 @@ class MaplibreNativeC {
         >
       >('mln_render_session_resize');
   late final _mln_render_session_resize = _mln_render_session_resizePtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_render_session>, int, int, double)
-      >();
+      .asFunction<int Function(int, int, int, double)>();
 
   mln_status mln_render_session_render_update(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<ffi.Bool> out_rendered,
   ) {
     return mln_status.fromValue(
@@ -2979,87 +2657,74 @@ class MaplibreNativeC {
   late final _mln_render_session_render_updatePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_render_session, ffi.Pointer<ffi.Bool>)
         >
       >('mln_render_session_render_update');
   late final _mln_render_session_render_update =
       _mln_render_session_render_updatePtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_render_session>, ffi.Pointer<ffi.Bool>)
-          >();
+          .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
 
-  mln_status mln_render_session_detach(
-    ffi.Pointer<mln_render_session> session,
-  ) {
+  mln_status mln_render_session_detach(Dartmln_render_session session) {
     return mln_status.fromValue(_mln_render_session_detach(session));
   }
 
   late final _mln_render_session_detachPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_render_session>)>
-      >('mln_render_session_detach');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_render_session)>>(
+        'mln_render_session_detach',
+      );
   late final _mln_render_session_detach = _mln_render_session_detachPtr
-      .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
+      .asFunction<int Function(int)>();
 
-  mln_status mln_render_session_destroy(
-    ffi.Pointer<mln_render_session> session,
-  ) {
+  mln_status mln_render_session_destroy(Dartmln_render_session session) {
     return mln_status.fromValue(_mln_render_session_destroy(session));
   }
 
   late final _mln_render_session_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_render_session>)>
-      >('mln_render_session_destroy');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_render_session)>>(
+        'mln_render_session_destroy',
+      );
   late final _mln_render_session_destroy = _mln_render_session_destroyPtr
-      .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
+      .asFunction<int Function(int)>();
 
   mln_status mln_render_session_reduce_memory_use(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
   ) {
     return mln_status.fromValue(_mln_render_session_reduce_memory_use(session));
   }
 
   late final _mln_render_session_reduce_memory_usePtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_render_session>)>
-      >('mln_render_session_reduce_memory_use');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_render_session)>>(
+        'mln_render_session_reduce_memory_use',
+      );
   late final _mln_render_session_reduce_memory_use =
-      _mln_render_session_reduce_memory_usePtr
-          .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
+      _mln_render_session_reduce_memory_usePtr.asFunction<int Function(int)>();
 
-  mln_status mln_render_session_clear_data(
-    ffi.Pointer<mln_render_session> session,
-  ) {
+  mln_status mln_render_session_clear_data(Dartmln_render_session session) {
     return mln_status.fromValue(_mln_render_session_clear_data(session));
   }
 
   late final _mln_render_session_clear_dataPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_render_session>)>
-      >('mln_render_session_clear_data');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_render_session)>>(
+        'mln_render_session_clear_data',
+      );
   late final _mln_render_session_clear_data = _mln_render_session_clear_dataPtr
-      .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
+      .asFunction<int Function(int)>();
 
   mln_status mln_render_session_dump_debug_logs(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
   ) {
     return mln_status.fromValue(_mln_render_session_dump_debug_logs(session));
   }
 
   late final _mln_render_session_dump_debug_logsPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<mln_render_session>)>
-      >('mln_render_session_dump_debug_logs');
+      _lookup<ffi.NativeFunction<ffi.Int32 Function(mln_render_session)>>(
+        'mln_render_session_dump_debug_logs',
+      );
   late final _mln_render_session_dump_debug_logs =
-      _mln_render_session_dump_debug_logsPtr
-          .asFunction<int Function(ffi.Pointer<mln_render_session>)>();
+      _mln_render_session_dump_debug_logsPtr.asFunction<int Function(int)>();
 
   mln_status mln_render_session_set_feature_state(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_feature_state_selector> selector,
     ffi.Pointer<mln_json_value> state,
   ) {
@@ -3072,7 +2737,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_feature_state_selector>,
             ffi.Pointer<mln_json_value>,
           )
@@ -3082,16 +2747,16 @@ class MaplibreNativeC {
       _mln_render_session_set_feature_statePtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               ffi.Pointer<mln_feature_state_selector>,
               ffi.Pointer<mln_json_value>,
             )
           >();
 
   mln_status mln_render_session_get_feature_state(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_feature_state_selector> selector,
-    ffi.Pointer<ffi.Pointer<mln_json_snapshot>> out_state,
+    ffi.Pointer<mln_json_snapshot> out_state,
   ) {
     return mln_status.fromValue(
       _mln_render_session_get_feature_state(session, selector, out_state),
@@ -3102,9 +2767,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_feature_state_selector>,
-            ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+            ffi.Pointer<mln_json_snapshot>,
           )
         >
       >('mln_render_session_get_feature_state');
@@ -3112,14 +2777,14 @@ class MaplibreNativeC {
       _mln_render_session_get_feature_statePtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               ffi.Pointer<mln_feature_state_selector>,
-              ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+              ffi.Pointer<mln_json_snapshot>,
             )
           >();
 
   mln_status mln_render_session_remove_feature_state(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_feature_state_selector> selector,
   ) {
     return mln_status.fromValue(
@@ -3131,7 +2796,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_feature_state_selector>,
           )
         >
@@ -3139,14 +2804,11 @@ class MaplibreNativeC {
   late final _mln_render_session_remove_feature_state =
       _mln_render_session_remove_feature_statePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_feature_state_selector>,
-            )
+            int Function(int, ffi.Pointer<mln_feature_state_selector>)
           >();
 
   mln_status mln_json_snapshot_get(
-    ffi.Pointer<mln_json_snapshot> snapshot,
+    Dartmln_json_snapshot snapshot,
     ffi.Pointer<ffi.Pointer<mln_json_value>> out_value,
   ) {
     return mln_status.fromValue(_mln_json_snapshot_get(snapshot, out_value));
@@ -3156,29 +2818,26 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_json_snapshot>,
+            mln_json_snapshot,
             ffi.Pointer<ffi.Pointer<mln_json_value>>,
           )
         >
       >('mln_json_snapshot_get');
   late final _mln_json_snapshot_get = _mln_json_snapshot_getPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_json_snapshot>,
-          ffi.Pointer<ffi.Pointer<mln_json_value>>,
-        )
+        int Function(int, ffi.Pointer<ffi.Pointer<mln_json_value>>)
       >();
 
-  void mln_json_snapshot_destroy(ffi.Pointer<mln_json_snapshot> snapshot) {
+  void mln_json_snapshot_destroy(int snapshot) {
     return _mln_json_snapshot_destroy(snapshot);
   }
 
   late final _mln_json_snapshot_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<mln_json_snapshot>)>
-      >('mln_json_snapshot_destroy');
+      _lookup<ffi.NativeFunction<ffi.Void Function(mln_json_snapshot)>>(
+        'mln_json_snapshot_destroy',
+      );
   late final _mln_json_snapshot_destroy = _mln_json_snapshot_destroyPtr
-      .asFunction<void Function(ffi.Pointer<mln_json_snapshot>)>();
+      .asFunction<void Function(int)>();
 
   mln_status mln_render_target_extent_physical_size(
     ffi.Pointer<mln_render_target_extent> extent,
@@ -3295,7 +2954,7 @@ class MaplibreNativeC {
       .asFunction<mln_style_image_info Function()>();
 
   mln_status mln_style_id_list_count(
-    ffi.Pointer<mln_style_id_list> list,
+    Dartmln_style_id_list list,
     ffi.Pointer<ffi.Size> out_count,
   ) {
     return mln_status.fromValue(_mln_style_id_list_count(list, out_count));
@@ -3304,19 +2963,14 @@ class MaplibreNativeC {
   late final _mln_style_id_list_countPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_style_id_list>,
-            ffi.Pointer<ffi.Size>,
-          )
+          ffi.Int32 Function(mln_style_id_list, ffi.Pointer<ffi.Size>)
         >
       >('mln_style_id_list_count');
   late final _mln_style_id_list_count = _mln_style_id_list_countPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_style_id_list>, ffi.Pointer<ffi.Size>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<ffi.Size>)>();
 
   mln_status mln_style_id_list_get(
-    ffi.Pointer<mln_style_id_list> list,
+    Dartmln_style_id_list list,
     int index,
     ffi.Pointer<mln_string_view> out_id,
   ) {
@@ -3327,34 +2981,28 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_style_id_list>,
+            mln_style_id_list,
             ffi.Size,
             ffi.Pointer<mln_string_view>,
           )
         >
       >('mln_style_id_list_get');
   late final _mln_style_id_list_get = _mln_style_id_list_getPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_style_id_list>,
-          int,
-          ffi.Pointer<mln_string_view>,
-        )
-      >();
+      .asFunction<int Function(int, int, ffi.Pointer<mln_string_view>)>();
 
-  void mln_style_id_list_destroy(ffi.Pointer<mln_style_id_list> list) {
+  void mln_style_id_list_destroy(int list) {
     return _mln_style_id_list_destroy(list);
   }
 
   late final _mln_style_id_list_destroyPtr =
-      _lookup<
-        ffi.NativeFunction<ffi.Void Function(ffi.Pointer<mln_style_id_list>)>
-      >('mln_style_id_list_destroy');
+      _lookup<ffi.NativeFunction<ffi.Void Function(mln_style_id_list)>>(
+        'mln_style_id_list_destroy',
+      );
   late final _mln_style_id_list_destroy = _mln_style_id_list_destroyPtr
-      .asFunction<void Function(ffi.Pointer<mln_style_id_list>)>();
+      .asFunction<void Function(int)>();
 
   mln_status mln_map_add_style_source_json(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_json_value> source_json,
   ) {
@@ -3367,7 +3015,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_json_value>,
           )
@@ -3375,15 +3023,11 @@ class MaplibreNativeC {
       >('mln_map_add_style_source_json');
   late final _mln_map_add_style_source_json = _mln_map_add_style_source_jsonPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<mln_json_value>,
-        )
+        int Function(int, mln_string_view, ffi.Pointer<mln_json_value>)
       >();
 
   mln_status mln_map_remove_style_source(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<ffi.Bool> out_removed,
   ) {
@@ -3395,24 +3039,14 @@ class MaplibreNativeC {
   late final _mln_map_remove_style_sourcePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_remove_style_source');
   late final _mln_map_remove_style_source = _mln_map_remove_style_sourcePtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_style_source_exists(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<ffi.Bool> out_exists,
   ) {
@@ -3424,24 +3058,14 @@ class MaplibreNativeC {
   late final _mln_map_style_source_existsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_style_source_exists');
   late final _mln_map_style_source_exists = _mln_map_style_source_existsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_get_style_source_type(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<ffi.Uint32> out_source_type,
     ffi.Pointer<ffi.Bool> out_found,
@@ -3460,7 +3084,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<ffi.Uint32>,
             ffi.Pointer<ffi.Bool>,
@@ -3470,7 +3094,7 @@ class MaplibreNativeC {
   late final _mln_map_get_style_source_type = _mln_map_get_style_source_typePtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<ffi.Uint32>,
           ffi.Pointer<ffi.Bool>,
@@ -3478,7 +3102,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_get_style_source_info(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_style_source_info> out_info,
     ffi.Pointer<ffi.Bool> out_found,
@@ -3492,7 +3116,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_style_source_info>,
             ffi.Pointer<ffi.Bool>,
@@ -3502,7 +3126,7 @@ class MaplibreNativeC {
   late final _mln_map_get_style_source_info = _mln_map_get_style_source_infoPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<mln_style_source_info>,
           ffi.Pointer<ffi.Bool>,
@@ -3510,7 +3134,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_copy_style_source_attribution(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<ffi.Char> out_attribution,
     int attribution_capacity,
@@ -3533,7 +3157,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<ffi.Char>,
             ffi.Size,
@@ -3546,7 +3170,7 @@ class MaplibreNativeC {
       _mln_map_copy_style_source_attributionPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<ffi.Char>,
               int,
@@ -3556,8 +3180,8 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_list_style_source_ids(
-    ffi.Pointer<mln_map> map,
-    ffi.Pointer<ffi.Pointer<mln_style_id_list>> out_source_ids,
+    Dartmln_map map,
+    ffi.Pointer<mln_style_id_list> out_source_ids,
   ) {
     return mln_status.fromValue(
       _mln_map_list_style_source_ids(map, out_source_ids),
@@ -3567,22 +3191,14 @@ class MaplibreNativeC {
   late final _mln_map_list_style_source_idsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<ffi.Pointer<mln_style_id_list>>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_id_list>)
         >
       >('mln_map_list_style_source_ids');
   late final _mln_map_list_style_source_ids = _mln_map_list_style_source_idsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<ffi.Pointer<mln_style_id_list>>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_style_id_list>)>();
 
   mln_status mln_map_add_geojson_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
     ffi.Pointer<mln_geojson_source_options> options,
@@ -3596,7 +3212,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_geojson_source_options>,
@@ -3607,7 +3223,7 @@ class MaplibreNativeC {
       _mln_map_add_geojson_source_urlPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               mln_string_view,
               ffi.Pointer<mln_geojson_source_options>,
@@ -3615,7 +3231,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_geojson_source_data(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_geojson> data,
     ffi.Pointer<mln_geojson_source_options> options,
@@ -3629,7 +3245,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_geojson>,
             ffi.Pointer<mln_geojson_source_options>,
@@ -3640,7 +3256,7 @@ class MaplibreNativeC {
       _mln_map_add_geojson_source_dataPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_geojson>,
               ffi.Pointer<mln_geojson_source_options>,
@@ -3648,7 +3264,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_set_geojson_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
   ) {
@@ -3660,21 +3276,15 @@ class MaplibreNativeC {
   late final _mln_map_set_geojson_source_urlPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_string_view,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
         >
       >('mln_map_set_geojson_source_url');
   late final _mln_map_set_geojson_source_url =
       _mln_map_set_geojson_source_urlPtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
-          >();
+          .asFunction<int Function(int, mln_string_view, mln_string_view)>();
 
   mln_status mln_map_set_geojson_source_data(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_geojson> data,
   ) {
@@ -3686,25 +3296,17 @@ class MaplibreNativeC {
   late final _mln_map_set_geojson_source_dataPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<mln_geojson>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<mln_geojson>)
         >
       >('mln_map_set_geojson_source_data');
   late final _mln_map_set_geojson_source_data =
       _mln_map_set_geojson_source_dataPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              ffi.Pointer<mln_geojson>,
-            )
+            int Function(int, mln_string_view, ffi.Pointer<mln_geojson>)
           >();
 
   mln_status mln_map_add_vector_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
     ffi.Pointer<mln_style_tile_source_options> options,
@@ -3718,7 +3320,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_style_tile_source_options>,
@@ -3728,7 +3330,7 @@ class MaplibreNativeC {
   late final _mln_map_add_vector_source_url = _mln_map_add_vector_source_urlPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           mln_string_view,
           ffi.Pointer<mln_style_tile_source_options>,
@@ -3736,7 +3338,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_add_vector_source_tiles(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_string_view> tiles,
     int tile_count,
@@ -3757,7 +3359,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_string_view>,
             ffi.Size,
@@ -3769,7 +3371,7 @@ class MaplibreNativeC {
       _mln_map_add_vector_source_tilesPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_string_view>,
               int,
@@ -3778,7 +3380,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_raster_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
     ffi.Pointer<mln_style_tile_source_options> options,
@@ -3792,7 +3394,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_style_tile_source_options>,
@@ -3802,7 +3404,7 @@ class MaplibreNativeC {
   late final _mln_map_add_raster_source_url = _mln_map_add_raster_source_urlPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           mln_string_view,
           ffi.Pointer<mln_style_tile_source_options>,
@@ -3810,7 +3412,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_add_raster_source_tiles(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_string_view> tiles,
     int tile_count,
@@ -3831,7 +3433,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_string_view>,
             ffi.Size,
@@ -3843,7 +3445,7 @@ class MaplibreNativeC {
       _mln_map_add_raster_source_tilesPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_string_view>,
               int,
@@ -3852,7 +3454,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_raster_dem_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
     ffi.Pointer<mln_style_tile_source_options> options,
@@ -3866,7 +3468,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_style_tile_source_options>,
@@ -3877,7 +3479,7 @@ class MaplibreNativeC {
       _mln_map_add_raster_dem_source_urlPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               mln_string_view,
               ffi.Pointer<mln_style_tile_source_options>,
@@ -3885,7 +3487,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_raster_dem_source_tiles(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_string_view> tiles,
     int tile_count,
@@ -3906,7 +3508,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_string_view>,
             ffi.Size,
@@ -3918,7 +3520,7 @@ class MaplibreNativeC {
       _mln_map_add_raster_dem_source_tilesPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_string_view>,
               int,
@@ -3927,7 +3529,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_custom_geometry_source(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_custom_geometry_source_options> options,
   ) {
@@ -3940,7 +3542,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_custom_geometry_source_options>,
           )
@@ -3950,14 +3552,14 @@ class MaplibreNativeC {
       _mln_map_add_custom_geometry_sourcePtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_custom_geometry_source_options>,
             )
           >();
 
   mln_status mln_map_set_custom_geometry_source_tile_data(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_canonical_tile_id tile_id,
     ffi.Pointer<mln_geojson> data,
@@ -3976,7 +3578,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_canonical_tile_id,
             ffi.Pointer<mln_geojson>,
@@ -3987,7 +3589,7 @@ class MaplibreNativeC {
       _mln_map_set_custom_geometry_source_tile_dataPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               mln_canonical_tile_id,
               ffi.Pointer<mln_geojson>,
@@ -3995,7 +3597,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_invalidate_custom_geometry_source_tile(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_canonical_tile_id tile_id,
   ) {
@@ -4007,25 +3609,17 @@ class MaplibreNativeC {
   late final _mln_map_invalidate_custom_geometry_source_tilePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_canonical_tile_id,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_canonical_tile_id)
         >
       >('mln_map_invalidate_custom_geometry_source_tile');
   late final _mln_map_invalidate_custom_geometry_source_tile =
       _mln_map_invalidate_custom_geometry_source_tilePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              mln_canonical_tile_id,
-            )
+            int Function(int, mln_string_view, mln_canonical_tile_id)
           >();
 
   mln_status mln_map_invalidate_custom_geometry_source_region(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_lat_lng_bounds bounds,
   ) {
@@ -4037,25 +3631,15 @@ class MaplibreNativeC {
   late final _mln_map_invalidate_custom_geometry_source_regionPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_lat_lng_bounds,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_lat_lng_bounds)
         >
       >('mln_map_invalidate_custom_geometry_source_region');
   late final _mln_map_invalidate_custom_geometry_source_region =
       _mln_map_invalidate_custom_geometry_source_regionPtr
-          .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              mln_lat_lng_bounds,
-            )
-          >();
+          .asFunction<int Function(int, mln_string_view, mln_lat_lng_bounds)>();
 
   mln_status mln_map_set_style_image(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view image_id,
     ffi.Pointer<mln_premultiplied_rgba8_image> image,
     ffi.Pointer<mln_style_image_options> options,
@@ -4069,7 +3653,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_premultiplied_rgba8_image>,
             ffi.Pointer<mln_style_image_options>,
@@ -4079,7 +3663,7 @@ class MaplibreNativeC {
   late final _mln_map_set_style_image = _mln_map_set_style_imagePtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<mln_premultiplied_rgba8_image>,
           ffi.Pointer<mln_style_image_options>,
@@ -4087,7 +3671,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_remove_style_image(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view image_id,
     ffi.Pointer<ffi.Bool> out_removed,
   ) {
@@ -4099,24 +3683,14 @@ class MaplibreNativeC {
   late final _mln_map_remove_style_imagePtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_remove_style_image');
   late final _mln_map_remove_style_image = _mln_map_remove_style_imagePtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_style_image_exists(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view image_id,
     ffi.Pointer<ffi.Bool> out_exists,
   ) {
@@ -4128,24 +3702,14 @@ class MaplibreNativeC {
   late final _mln_map_style_image_existsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_style_image_exists');
   late final _mln_map_style_image_exists = _mln_map_style_image_existsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_get_style_image_info(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view image_id,
     ffi.Pointer<mln_style_image_info> out_info,
     ffi.Pointer<ffi.Bool> out_found,
@@ -4159,7 +3723,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_style_image_info>,
             ffi.Pointer<ffi.Bool>,
@@ -4169,7 +3733,7 @@ class MaplibreNativeC {
   late final _mln_map_get_style_image_info = _mln_map_get_style_image_infoPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<mln_style_image_info>,
           ffi.Pointer<ffi.Bool>,
@@ -4177,7 +3741,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_copy_style_image_premultiplied_rgba8(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view image_id,
     ffi.Pointer<ffi.Uint8> out_pixels,
     int pixel_capacity,
@@ -4200,7 +3764,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<ffi.Uint8>,
             ffi.Size,
@@ -4213,7 +3777,7 @@ class MaplibreNativeC {
       _mln_map_copy_style_image_premultiplied_rgba8Ptr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<ffi.Uint8>,
               int,
@@ -4223,7 +3787,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_image_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
@@ -4244,7 +3808,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
@@ -4255,7 +3819,7 @@ class MaplibreNativeC {
   late final _mln_map_add_image_source_url = _mln_map_add_image_source_urlPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<mln_lat_lng>,
           int,
@@ -4264,7 +3828,7 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_add_image_source_image(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
@@ -4285,7 +3849,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
@@ -4297,7 +3861,7 @@ class MaplibreNativeC {
       _mln_map_add_image_source_imagePtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_lat_lng>,
               int,
@@ -4306,7 +3870,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_set_image_source_url(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     mln_string_view url,
   ) {
@@ -4318,20 +3882,14 @@ class MaplibreNativeC {
   late final _mln_map_set_image_source_urlPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_string_view,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
         >
       >('mln_map_set_image_source_url');
   late final _mln_map_set_image_source_url = _mln_map_set_image_source_urlPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
-      >();
+      .asFunction<int Function(int, mln_string_view, mln_string_view)>();
 
   mln_status mln_map_set_image_source_image(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_premultiplied_rgba8_image> image,
   ) {
@@ -4344,7 +3902,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_premultiplied_rgba8_image>,
           )
@@ -4354,14 +3912,14 @@ class MaplibreNativeC {
       _mln_map_set_image_source_imagePtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_premultiplied_rgba8_image>,
             )
           >();
 
   mln_status mln_map_set_image_source_coordinates(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_lat_lng> coordinates,
     int coordinate_count,
@@ -4380,7 +3938,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
@@ -4390,16 +3948,11 @@ class MaplibreNativeC {
   late final _mln_map_set_image_source_coordinates =
       _mln_map_set_image_source_coordinatesPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              ffi.Pointer<mln_lat_lng>,
-              int,
-            )
+            int Function(int, mln_string_view, ffi.Pointer<mln_lat_lng>, int)
           >();
 
   mln_status mln_map_get_image_source_coordinates(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view source_id,
     ffi.Pointer<mln_lat_lng> out_coordinates,
     int coordinate_capacity,
@@ -4422,7 +3975,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_lat_lng>,
             ffi.Size,
@@ -4435,7 +3988,7 @@ class MaplibreNativeC {
       _mln_map_get_image_source_coordinatesPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               mln_string_view,
               ffi.Pointer<mln_lat_lng>,
               int,
@@ -4445,7 +3998,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_map_add_hillshade_layer(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view source_id,
     mln_string_view before_layer_id,
@@ -4459,7 +4012,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             mln_string_view,
@@ -4468,16 +4021,11 @@ class MaplibreNativeC {
       >('mln_map_add_hillshade_layer');
   late final _mln_map_add_hillshade_layer = _mln_map_add_hillshade_layerPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          mln_string_view,
-          mln_string_view,
-        )
+        int Function(int, mln_string_view, mln_string_view, mln_string_view)
       >();
 
   mln_status mln_map_add_color_relief_layer(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view source_id,
     mln_string_view before_layer_id,
@@ -4496,7 +4044,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             mln_string_view,
@@ -4506,16 +4054,11 @@ class MaplibreNativeC {
   late final _mln_map_add_color_relief_layer =
       _mln_map_add_color_relief_layerPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              mln_string_view,
-              mln_string_view,
-            )
+            int Function(int, mln_string_view, mln_string_view, mln_string_view)
           >();
 
   mln_status mln_map_add_location_indicator_layer(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view before_layer_id,
   ) {
@@ -4527,21 +4070,15 @@ class MaplibreNativeC {
   late final _mln_map_add_location_indicator_layerPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_string_view,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
         >
       >('mln_map_add_location_indicator_layer');
   late final _mln_map_add_location_indicator_layer =
       _mln_map_add_location_indicator_layerPtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
-          >();
+          .asFunction<int Function(int, mln_string_view, mln_string_view)>();
 
   mln_status mln_map_set_location_indicator_location(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_lat_lng coordinate,
     double altitude,
@@ -4559,27 +4096,17 @@ class MaplibreNativeC {
   late final _mln_map_set_location_indicator_locationPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_lat_lng,
-            ffi.Double,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_lat_lng, ffi.Double)
         >
       >('mln_map_set_location_indicator_location');
   late final _mln_map_set_location_indicator_location =
       _mln_map_set_location_indicator_locationPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              mln_lat_lng,
-              double,
-            )
+            int Function(int, mln_string_view, mln_lat_lng, double)
           >();
 
   mln_status mln_map_set_location_indicator_bearing(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     double bearing,
   ) {
@@ -4591,17 +4118,15 @@ class MaplibreNativeC {
   late final _mln_map_set_location_indicator_bearingPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, mln_string_view, ffi.Double)
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)
         >
       >('mln_map_set_location_indicator_bearing');
   late final _mln_map_set_location_indicator_bearing =
       _mln_map_set_location_indicator_bearingPtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_map>, mln_string_view, double)
-          >();
+          .asFunction<int Function(int, mln_string_view, double)>();
 
   mln_status mln_map_set_location_indicator_accuracy_radius(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     double radius,
   ) {
@@ -4613,17 +4138,15 @@ class MaplibreNativeC {
   late final _mln_map_set_location_indicator_accuracy_radiusPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, mln_string_view, ffi.Double)
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)
         >
       >('mln_map_set_location_indicator_accuracy_radius');
   late final _mln_map_set_location_indicator_accuracy_radius =
       _mln_map_set_location_indicator_accuracy_radiusPtr
-          .asFunction<
-            int Function(ffi.Pointer<mln_map>, mln_string_view, double)
-          >();
+          .asFunction<int Function(int, mln_string_view, double)>();
 
   mln_status mln_map_set_location_indicator_image_name(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     int image_kind,
     mln_string_view image_id,
@@ -4642,7 +4165,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Uint32,
             mln_string_view,
@@ -4652,16 +4175,11 @@ class MaplibreNativeC {
   late final _mln_map_set_location_indicator_image_name =
       _mln_map_set_location_indicator_image_namePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              int,
-              mln_string_view,
-            )
+            int Function(int, mln_string_view, int, mln_string_view)
           >();
 
   mln_status mln_map_add_style_layer_json(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_json_value> layer_json,
     mln_string_view before_layer_id,
   ) {
@@ -4674,7 +4192,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_json_value>,
             mln_string_view,
           )
@@ -4682,15 +4200,11 @@ class MaplibreNativeC {
       >('mln_map_add_style_layer_json');
   late final _mln_map_add_style_layer_json = _mln_map_add_style_layer_jsonPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<mln_json_value>,
-          mln_string_view,
-        )
+        int Function(int, ffi.Pointer<mln_json_value>, mln_string_view)
       >();
 
   mln_status mln_map_remove_style_layer(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     ffi.Pointer<ffi.Bool> out_removed,
   ) {
@@ -4702,24 +4216,14 @@ class MaplibreNativeC {
   late final _mln_map_remove_style_layerPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_remove_style_layer');
   late final _mln_map_remove_style_layer = _mln_map_remove_style_layerPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_style_layer_exists(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     ffi.Pointer<ffi.Bool> out_exists,
   ) {
@@ -4731,24 +4235,14 @@ class MaplibreNativeC {
   late final _mln_map_style_layer_existsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            ffi.Pointer<ffi.Bool>,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Bool>)
         >
       >('mln_map_style_layer_exists');
   late final _mln_map_style_layer_exists = _mln_map_style_layer_existsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Bool>,
-        )
-      >();
+      .asFunction<int Function(int, mln_string_view, ffi.Pointer<ffi.Bool>)>();
 
   mln_status mln_map_get_style_layer_type(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     ffi.Pointer<mln_string_view> out_layer_type,
     ffi.Pointer<ffi.Bool> out_found,
@@ -4762,7 +4256,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_string_view>,
             ffi.Pointer<ffi.Bool>,
@@ -4772,7 +4266,7 @@ class MaplibreNativeC {
   late final _mln_map_get_style_layer_type = _mln_map_get_style_layer_typePtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           ffi.Pointer<mln_string_view>,
           ffi.Pointer<ffi.Bool>,
@@ -4780,8 +4274,8 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_list_style_layer_ids(
-    ffi.Pointer<mln_map> map,
-    ffi.Pointer<ffi.Pointer<mln_style_id_list>> out_layer_ids,
+    Dartmln_map map,
+    ffi.Pointer<mln_style_id_list> out_layer_ids,
   ) {
     return mln_status.fromValue(
       _mln_map_list_style_layer_ids(map, out_layer_ids),
@@ -4791,22 +4285,14 @@ class MaplibreNativeC {
   late final _mln_map_list_style_layer_idsPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            ffi.Pointer<ffi.Pointer<mln_style_id_list>>,
-          )
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_id_list>)
         >
       >('mln_map_list_style_layer_ids');
   late final _mln_map_list_style_layer_ids = _mln_map_list_style_layer_idsPtr
-      .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          ffi.Pointer<ffi.Pointer<mln_style_id_list>>,
-        )
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_style_id_list>)>();
 
   mln_status mln_map_move_style_layer(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view before_layer_id,
   ) {
@@ -4818,22 +4304,16 @@ class MaplibreNativeC {
   late final _mln_map_move_style_layerPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
-            mln_string_view,
-            mln_string_view,
-          )
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
         >
       >('mln_map_move_style_layer');
   late final _mln_map_move_style_layer = _mln_map_move_style_layerPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, mln_string_view, mln_string_view)
-      >();
+      .asFunction<int Function(int, mln_string_view, mln_string_view)>();
 
   mln_status mln_map_get_style_layer_json(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
-    ffi.Pointer<ffi.Pointer<mln_json_snapshot>> out_layer,
+    ffi.Pointer<mln_json_snapshot> out_layer,
     ffi.Pointer<ffi.Bool> out_found,
   ) {
     return mln_status.fromValue(
@@ -4845,9 +4325,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
-            ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+            ffi.Pointer<mln_json_snapshot>,
             ffi.Pointer<ffi.Bool>,
           )
         >
@@ -4855,15 +4335,15 @@ class MaplibreNativeC {
   late final _mln_map_get_style_layer_json = _mln_map_get_style_layer_jsonPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
-          ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+          ffi.Pointer<mln_json_snapshot>,
           ffi.Pointer<ffi.Bool>,
         )
       >();
 
   mln_status mln_map_set_style_light_json(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_json_value> light_json,
   ) {
     return mln_status.fromValue(_mln_map_set_style_light_json(map, light_json));
@@ -4872,16 +4352,14 @@ class MaplibreNativeC {
   late final _mln_map_set_style_light_jsonPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_json_value>)
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_json_value>)
         >
       >('mln_map_set_style_light_json');
   late final _mln_map_set_style_light_json = _mln_map_set_style_light_jsonPtr
-      .asFunction<
-        int Function(ffi.Pointer<mln_map>, ffi.Pointer<mln_json_value>)
-      >();
+      .asFunction<int Function(int, ffi.Pointer<mln_json_value>)>();
 
   mln_status mln_map_set_style_light_property(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view property_name,
     ffi.Pointer<mln_json_value> value,
   ) {
@@ -4894,7 +4372,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_json_value>,
           )
@@ -4903,17 +4381,13 @@ class MaplibreNativeC {
   late final _mln_map_set_style_light_property =
       _mln_map_set_style_light_propertyPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              ffi.Pointer<mln_json_value>,
-            )
+            int Function(int, mln_string_view, ffi.Pointer<mln_json_value>)
           >();
 
   mln_status mln_map_get_style_light_property(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view property_name,
-    ffi.Pointer<ffi.Pointer<mln_json_snapshot>> out_value,
+    ffi.Pointer<mln_json_snapshot> out_value,
   ) {
     return mln_status.fromValue(
       _mln_map_get_style_light_property(map, property_name, out_value),
@@ -4924,24 +4398,20 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
-            ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+            ffi.Pointer<mln_json_snapshot>,
           )
         >
       >('mln_map_get_style_light_property');
   late final _mln_map_get_style_light_property =
       _mln_map_get_style_light_propertyPtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_map>,
-              mln_string_view,
-              ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
-            )
+            int Function(int, mln_string_view, ffi.Pointer<mln_json_snapshot>)
           >();
 
   mln_status mln_map_set_layer_property(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view property_name,
     ffi.Pointer<mln_json_value> value,
@@ -4955,7 +4425,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
             ffi.Pointer<mln_json_value>,
@@ -4965,7 +4435,7 @@ class MaplibreNativeC {
   late final _mln_map_set_layer_property = _mln_map_set_layer_propertyPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           mln_string_view,
           ffi.Pointer<mln_json_value>,
@@ -4973,10 +4443,10 @@ class MaplibreNativeC {
       >();
 
   mln_status mln_map_get_layer_property(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     mln_string_view property_name,
-    ffi.Pointer<ffi.Pointer<mln_json_snapshot>> out_value,
+    ffi.Pointer<mln_json_snapshot> out_value,
   ) {
     return mln_status.fromValue(
       _mln_map_get_layer_property(map, layer_id, property_name, out_value),
@@ -4987,25 +4457,25 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             mln_string_view,
-            ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+            ffi.Pointer<mln_json_snapshot>,
           )
         >
       >('mln_map_get_layer_property');
   late final _mln_map_get_layer_property = _mln_map_get_layer_propertyPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           mln_string_view,
           mln_string_view,
-          ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+          ffi.Pointer<mln_json_snapshot>,
         )
       >();
 
   mln_status mln_map_set_layer_filter(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
     ffi.Pointer<mln_json_value> filter,
   ) {
@@ -5018,7 +4488,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
             ffi.Pointer<mln_json_value>,
           )
@@ -5026,17 +4496,13 @@ class MaplibreNativeC {
       >('mln_map_set_layer_filter');
   late final _mln_map_set_layer_filter = _mln_map_set_layer_filterPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<mln_json_value>,
-        )
+        int Function(int, mln_string_view, ffi.Pointer<mln_json_value>)
       >();
 
   mln_status mln_map_get_layer_filter(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     mln_string_view layer_id,
-    ffi.Pointer<ffi.Pointer<mln_json_snapshot>> out_filter,
+    ffi.Pointer<mln_json_snapshot> out_filter,
   ) {
     return mln_status.fromValue(
       _mln_map_get_layer_filter(map, layer_id, out_filter),
@@ -5047,19 +4513,15 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             mln_string_view,
-            ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
+            ffi.Pointer<mln_json_snapshot>,
           )
         >
       >('mln_map_get_layer_filter');
   late final _mln_map_get_layer_filter = _mln_map_get_layer_filterPtr
       .asFunction<
-        int Function(
-          ffi.Pointer<mln_map>,
-          mln_string_view,
-          ffi.Pointer<ffi.Pointer<mln_json_snapshot>>,
-        )
+        int Function(int, mln_string_view, ffi.Pointer<mln_json_snapshot>)
       >();
 
   mln_metal_surface_descriptor mln_metal_surface_descriptor_default() {
@@ -5099,9 +4561,9 @@ class MaplibreNativeC {
           .asFunction<mln_opengl_surface_descriptor Function()>();
 
   mln_status mln_metal_surface_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_metal_surface_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_metal_surface_attach(map, descriptor, out_session),
@@ -5112,25 +4574,25 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_metal_surface_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_metal_surface_attach');
   late final _mln_metal_surface_attach = _mln_metal_surface_attachPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_metal_surface_descriptor>,
-          ffi.Pointer<ffi.Pointer<mln_render_session>>,
+          ffi.Pointer<mln_render_session>,
         )
       >();
 
   mln_status mln_vulkan_surface_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_vulkan_surface_attach(map, descriptor, out_session),
@@ -5141,25 +4603,25 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_vulkan_surface_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_vulkan_surface_attach');
   late final _mln_vulkan_surface_attach = _mln_vulkan_surface_attachPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_vulkan_surface_descriptor>,
-          ffi.Pointer<ffi.Pointer<mln_render_session>>,
+          ffi.Pointer<mln_render_session>,
         )
       >();
 
   mln_status mln_opengl_surface_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_opengl_surface_attach(map, descriptor, out_session),
@@ -5170,18 +4632,18 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_opengl_surface_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_opengl_surface_attach');
   late final _mln_opengl_surface_attach = _mln_opengl_surface_attachPtr
       .asFunction<
         int Function(
-          ffi.Pointer<mln_map>,
+          int,
           ffi.Pointer<mln_opengl_surface_descriptor>,
-          ffi.Pointer<ffi.Pointer<mln_render_session>>,
+          ffi.Pointer<mln_render_session>,
         )
       >();
 
@@ -5276,9 +4738,9 @@ class MaplibreNativeC {
           .asFunction<mln_texture_image_info Function()>();
 
   mln_status mln_metal_owned_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_metal_owned_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_metal_owned_texture_attach(map, descriptor, out_session),
@@ -5289,9 +4751,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_metal_owned_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_metal_owned_texture_attach');
@@ -5299,16 +4761,16 @@ class MaplibreNativeC {
       _mln_metal_owned_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_metal_owned_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_metal_borrowed_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_metal_borrowed_texture_attach(map, descriptor, out_session),
@@ -5319,9 +4781,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_metal_borrowed_texture_attach');
@@ -5329,16 +4791,16 @@ class MaplibreNativeC {
       _mln_metal_borrowed_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_vulkan_owned_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_vulkan_owned_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_vulkan_owned_texture_attach(map, descriptor, out_session),
@@ -5349,9 +4811,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_vulkan_owned_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_vulkan_owned_texture_attach');
@@ -5359,16 +4821,16 @@ class MaplibreNativeC {
       _mln_vulkan_owned_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_vulkan_owned_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_vulkan_borrowed_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_vulkan_borrowed_texture_attach(map, descriptor, out_session),
@@ -5379,9 +4841,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_vulkan_borrowed_texture_attach');
@@ -5389,16 +4851,16 @@ class MaplibreNativeC {
       _mln_vulkan_borrowed_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_opengl_owned_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_opengl_owned_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_opengl_owned_texture_attach(map, descriptor, out_session),
@@ -5409,9 +4871,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_opengl_owned_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_opengl_owned_texture_attach');
@@ -5419,16 +4881,16 @@ class MaplibreNativeC {
       _mln_opengl_owned_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_opengl_owned_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_opengl_borrowed_texture_attach(
-    ffi.Pointer<mln_map> map,
+    Dartmln_map map,
     ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
-    ffi.Pointer<ffi.Pointer<mln_render_session>> out_session,
+    ffi.Pointer<mln_render_session> out_session,
   ) {
     return mln_status.fromValue(
       _mln_opengl_borrowed_texture_attach(map, descriptor, out_session),
@@ -5439,9 +4901,9 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_map>,
+            mln_map,
             ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
-            ffi.Pointer<ffi.Pointer<mln_render_session>>,
+            ffi.Pointer<mln_render_session>,
           )
         >
       >('mln_opengl_borrowed_texture_attach');
@@ -5449,14 +4911,14 @@ class MaplibreNativeC {
       _mln_opengl_borrowed_texture_attachPtr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_map>,
+              int,
               ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
-              ffi.Pointer<ffi.Pointer<mln_render_session>>,
+              ffi.Pointer<mln_render_session>,
             )
           >();
 
   mln_status mln_texture_read_premultiplied_rgba8(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<ffi.Uint8> out_data,
     int out_data_capacity,
     ffi.Pointer<mln_texture_image_info> out_info,
@@ -5475,7 +4937,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<ffi.Uint8>,
             ffi.Size,
             ffi.Pointer<mln_texture_image_info>,
@@ -5486,7 +4948,7 @@ class MaplibreNativeC {
       _mln_texture_read_premultiplied_rgba8Ptr
           .asFunction<
             int Function(
-              ffi.Pointer<mln_render_session>,
+              int,
               ffi.Pointer<ffi.Uint8>,
               int,
               ffi.Pointer<mln_texture_image_info>,
@@ -5494,7 +4956,7 @@ class MaplibreNativeC {
           >();
 
   mln_status mln_metal_owned_texture_acquire_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_metal_owned_texture_frame> out_frame,
   ) {
     return mln_status.fromValue(
@@ -5506,7 +4968,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_metal_owned_texture_frame>,
           )
         >
@@ -5514,14 +4976,11 @@ class MaplibreNativeC {
   late final _mln_metal_owned_texture_acquire_frame =
       _mln_metal_owned_texture_acquire_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_metal_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_metal_owned_texture_frame>)
           >();
 
   mln_status mln_metal_owned_texture_release_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_metal_owned_texture_frame> frame,
   ) {
     return mln_status.fromValue(
@@ -5533,7 +4992,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_metal_owned_texture_frame>,
           )
         >
@@ -5541,14 +5000,11 @@ class MaplibreNativeC {
   late final _mln_metal_owned_texture_release_frame =
       _mln_metal_owned_texture_release_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_metal_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_metal_owned_texture_frame>)
           >();
 
   mln_status mln_vulkan_owned_texture_acquire_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_vulkan_owned_texture_frame> out_frame,
   ) {
     return mln_status.fromValue(
@@ -5560,7 +5016,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_vulkan_owned_texture_frame>,
           )
         >
@@ -5568,14 +5024,11 @@ class MaplibreNativeC {
   late final _mln_vulkan_owned_texture_acquire_frame =
       _mln_vulkan_owned_texture_acquire_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_vulkan_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_vulkan_owned_texture_frame>)
           >();
 
   mln_status mln_vulkan_owned_texture_release_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_vulkan_owned_texture_frame> frame,
   ) {
     return mln_status.fromValue(
@@ -5587,7 +5040,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_vulkan_owned_texture_frame>,
           )
         >
@@ -5595,14 +5048,11 @@ class MaplibreNativeC {
   late final _mln_vulkan_owned_texture_release_frame =
       _mln_vulkan_owned_texture_release_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_vulkan_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_vulkan_owned_texture_frame>)
           >();
 
   mln_status mln_opengl_owned_texture_acquire_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_opengl_owned_texture_frame> out_frame,
   ) {
     return mln_status.fromValue(
@@ -5614,7 +5064,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_opengl_owned_texture_frame>,
           )
         >
@@ -5622,14 +5072,11 @@ class MaplibreNativeC {
   late final _mln_opengl_owned_texture_acquire_frame =
       _mln_opengl_owned_texture_acquire_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_opengl_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_opengl_owned_texture_frame>)
           >();
 
   mln_status mln_opengl_owned_texture_release_frame(
-    ffi.Pointer<mln_render_session> session,
+    Dartmln_render_session session,
     ffi.Pointer<mln_opengl_owned_texture_frame> frame,
   ) {
     return mln_status.fromValue(
@@ -5641,7 +5088,7 @@ class MaplibreNativeC {
       _lookup<
         ffi.NativeFunction<
           ffi.Int32 Function(
-            ffi.Pointer<mln_render_session>,
+            mln_render_session,
             ffi.Pointer<mln_opengl_owned_texture_frame>,
           )
         >
@@ -5649,15 +5096,12 @@ class MaplibreNativeC {
   late final _mln_opengl_owned_texture_release_frame =
       _mln_opengl_owned_texture_release_framePtr
           .asFunction<
-            int Function(
-              ffi.Pointer<mln_render_session>,
-              ffi.Pointer<mln_opengl_owned_texture_frame>,
-            )
+            int Function(int, ffi.Pointer<mln_opengl_owned_texture_frame>)
           >();
 
   ffi.Pointer<ffi.Void> mln_adapter_handle_leak_token_create(
     ffi.Pointer<ffi.Char> type_name,
-    ffi.Pointer<ffi.Void> handle,
+    int handle,
   ) {
     return _mln_adapter_handle_leak_token_create(type_name, handle);
   }
@@ -5665,19 +5109,13 @@ class MaplibreNativeC {
   late final _mln_adapter_handle_leak_token_createPtr =
       _lookup<
         ffi.NativeFunction<
-          ffi.Pointer<ffi.Void> Function(
-            ffi.Pointer<ffi.Char>,
-            ffi.Pointer<ffi.Void>,
-          )
+          ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Char>, ffi.Uint64)
         >
       >('mln_adapter_handle_leak_token_create');
   late final _mln_adapter_handle_leak_token_create =
       _mln_adapter_handle_leak_token_createPtr
           .asFunction<
-            ffi.Pointer<ffi.Void> Function(
-              ffi.Pointer<ffi.Char>,
-              ffi.Pointer<ffi.Void>,
-            )
+            ffi.Pointer<ffi.Void> Function(ffi.Pointer<ffi.Char>, int)
           >();
 
   void mln_adapter_handle_leak_token_destroy(ffi.Pointer<ffi.Void> token) {
@@ -5805,7 +5243,7 @@ class MaplibreNativeC {
   int mln_adapter_resource_provider_rules_callback(
     ffi.Pointer<ffi.Void> user_data,
     ffi.Pointer<mln_resource_request> request,
-    ffi.Pointer<mln_resource_request_handle> handle,
+    int handle,
   ) {
     return _mln_adapter_resource_provider_rules_callback(
       user_data,
@@ -5820,7 +5258,7 @@ class MaplibreNativeC {
           ffi.Uint32 Function(
             ffi.Pointer<ffi.Void>,
             ffi.Pointer<mln_resource_request>,
-            ffi.Pointer<mln_resource_request_handle>,
+            mln_resource_request_handle,
           )
         >
       >('mln_adapter_resource_provider_rules_callback');
@@ -5830,14 +5268,14 @@ class MaplibreNativeC {
             int Function(
               ffi.Pointer<ffi.Void>,
               ffi.Pointer<mln_resource_request>,
-              ffi.Pointer<mln_resource_request_handle>,
+              int,
             )
           >();
 
   int mln_adapter_queued_resource_provider_callback(
     ffi.Pointer<ffi.Void> user_data,
     ffi.Pointer<mln_resource_request> request,
-    ffi.Pointer<mln_resource_request_handle> handle,
+    int handle,
   ) {
     return _mln_adapter_queued_resource_provider_callback(
       user_data,
@@ -5852,7 +5290,7 @@ class MaplibreNativeC {
           ffi.Uint32 Function(
             ffi.Pointer<ffi.Void>,
             ffi.Pointer<mln_resource_request>,
-            ffi.Pointer<mln_resource_request_handle>,
+            mln_resource_request_handle,
           )
         >
       >('mln_adapter_queued_resource_provider_callback');
@@ -5862,7 +5300,7 @@ class MaplibreNativeC {
             int Function(
               ffi.Pointer<ffi.Void>,
               ffi.Pointer<mln_resource_request>,
-              ffi.Pointer<mln_resource_request_handle>,
+              int,
             )
           >();
 
@@ -5929,88 +5367,6 @@ class MaplibreNativeC {
               ffi.Pointer<ffi.Void>,
             )
           >();
-
-  int mln_adapter_resource_request_token_create(
-    ffi.Pointer<mln_resource_request_handle> handle,
-  ) {
-    return _mln_adapter_resource_request_token_create(handle);
-  }
-
-  late final _mln_adapter_resource_request_token_createPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Uint64 Function(ffi.Pointer<mln_resource_request_handle>)
-        >
-      >('mln_adapter_resource_request_token_create');
-  late final _mln_adapter_resource_request_token_create =
-      _mln_adapter_resource_request_token_createPtr
-          .asFunction<int Function(ffi.Pointer<mln_resource_request_handle>)>();
-
-  mln_status mln_adapter_resource_request_token_cancelled(
-    int token,
-    ffi.Pointer<ffi.Bool> out_cancelled,
-  ) {
-    return mln_status.fromValue(
-      _mln_adapter_resource_request_token_cancelled(token, out_cancelled),
-    );
-  }
-
-  late final _mln_adapter_resource_request_token_cancelledPtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Uint64, ffi.Pointer<ffi.Bool>)
-        >
-      >('mln_adapter_resource_request_token_cancelled');
-  late final _mln_adapter_resource_request_token_cancelled =
-      _mln_adapter_resource_request_token_cancelledPtr
-          .asFunction<int Function(int, ffi.Pointer<ffi.Bool>)>();
-
-  mln_status mln_adapter_resource_request_token_complete(
-    int token,
-    ffi.Pointer<mln_resource_response> response,
-  ) {
-    return mln_status.fromValue(
-      _mln_adapter_resource_request_token_complete(token, response),
-    );
-  }
-
-  late final _mln_adapter_resource_request_token_completePtr =
-      _lookup<
-        ffi.NativeFunction<
-          ffi.Int32 Function(ffi.Uint64, ffi.Pointer<mln_resource_response>)
-        >
-      >('mln_adapter_resource_request_token_complete');
-  late final _mln_adapter_resource_request_token_complete =
-      _mln_adapter_resource_request_token_completePtr
-          .asFunction<int Function(int, ffi.Pointer<mln_resource_response>)>();
-
-  mln_status mln_adapter_resource_request_token_release(int token) {
-    return mln_status.fromValue(
-      _mln_adapter_resource_request_token_release(token),
-    );
-  }
-
-  late final _mln_adapter_resource_request_token_releasePtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Uint64)>>(
-        'mln_adapter_resource_request_token_release',
-      );
-  late final _mln_adapter_resource_request_token_release =
-      _mln_adapter_resource_request_token_releasePtr
-          .asFunction<int Function(int)>();
-
-  mln_status mln_adapter_resource_request_token_wait(int token) {
-    return mln_status.fromValue(
-      _mln_adapter_resource_request_token_wait(token),
-    );
-  }
-
-  late final _mln_adapter_resource_request_token_waitPtr =
-      _lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Uint64)>>(
-        'mln_adapter_resource_request_token_wait',
-      );
-  late final _mln_adapter_resource_request_token_wait =
-      _mln_adapter_resource_request_token_waitPtr
-          .asFunction<int Function(int)>();
 }
 
 enum mln_status {
@@ -6053,23 +5409,24 @@ enum mln_render_backend_flag {
   };
 }
 
-final class mln_runtime extends ffi.Opaque {}
-
-final class mln_map extends ffi.Opaque {}
-
-final class mln_map_projection extends ffi.Opaque {}
-
-final class mln_offline_region_snapshot extends ffi.Opaque {}
-
-final class mln_offline_region_list extends ffi.Opaque {}
-
-final class mln_json_snapshot extends ffi.Opaque {}
-
-final class mln_resource_request_handle extends ffi.Opaque {}
-
-final class mln_render_session extends ffi.Opaque {}
-
-final class mln_wake_source extends ffi.Opaque {}
+typedef mln_runtime = ffi.Uint64;
+typedef Dartmln_runtime = int;
+typedef mln_map = ffi.Uint64;
+typedef Dartmln_map = int;
+typedef mln_map_projection = ffi.Uint64;
+typedef Dartmln_map_projection = int;
+typedef mln_offline_region_snapshot = ffi.Uint64;
+typedef Dartmln_offline_region_snapshot = int;
+typedef mln_offline_region_list = ffi.Uint64;
+typedef Dartmln_offline_region_list = int;
+typedef mln_json_snapshot = ffi.Uint64;
+typedef Dartmln_json_snapshot = int;
+typedef mln_resource_request_handle = ffi.Uint64;
+typedef Dartmln_resource_request_handle = int;
+typedef mln_render_session = ffi.Uint64;
+typedef Dartmln_render_session = int;
+typedef mln_wake_source = ffi.Uint64;
+typedef Dartmln_wake_source = int;
 
 enum mln_network_status {
   MLN_NETWORK_STATUS_ONLINE(1),
@@ -6732,7 +6089,8 @@ final class mln_runtime_event extends ffi.Struct {
   @ffi.Uint32()
   external int source_type;
 
-  external ffi.Pointer<ffi.Void> source;
+  @ffi.Uint64()
+  external int source;
 
   @ffi.Int32()
   external int code;
@@ -6881,13 +6239,13 @@ typedef mln_resource_provider_callbackFunction =
     ffi.Uint32 Function(
       ffi.Pointer<ffi.Void> user_data,
       ffi.Pointer<mln_resource_request> request,
-      ffi.Pointer<mln_resource_request_handle> handle,
+      mln_resource_request_handle handle,
     );
 typedef Dartmln_resource_provider_callbackFunction =
     int Function(
       ffi.Pointer<ffi.Void> user_data,
       ffi.Pointer<mln_resource_request> request,
-      ffi.Pointer<mln_resource_request_handle> handle,
+      Dartmln_resource_request_handle handle,
     );
 typedef mln_resource_provider_callback =
     ffi.Pointer<ffi.NativeFunction<mln_resource_provider_callbackFunction>>;
@@ -7916,10 +7274,10 @@ typedef Dartmln_log_callbackFunction =
     );
 typedef mln_log_callback =
     ffi.Pointer<ffi.NativeFunction<mln_log_callbackFunction>>;
-
-final class mln_feature_query_result extends ffi.Opaque {}
-
-final class mln_feature_extension_result extends ffi.Opaque {}
+typedef mln_feature_query_result = ffi.Uint64;
+typedef Dartmln_feature_query_result = int;
+typedef mln_feature_extension_result = ffi.Uint64;
+typedef Dartmln_feature_extension_result = int;
 
 enum mln_rendered_query_geometry_type {
   MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT(1),
@@ -8217,7 +7575,8 @@ final class mln_opengl_context_descriptor extends ffi.Struct {
   external UnnamedUnion$6 data;
 }
 
-final class mln_style_id_list extends ffi.Opaque {}
+typedef mln_style_id_list = ffi.Uint64;
+typedef Dartmln_style_id_list = int;
 
 enum mln_style_source_type {
   MLN_STYLE_SOURCE_TYPE_UNKNOWN(0),
@@ -8921,7 +8280,8 @@ final class mln_adapter_queued_resource_provider extends ffi.Struct {
 final class mln_adapter_queued_resource_request extends ffi.Struct {
   external ffi.Pointer<ffi.Void> owner;
 
-  external ffi.Pointer<mln_resource_request_handle> handle;
+  @mln_resource_request_handle()
+  external int handle;
 
   external ffi.Pointer<ffi.Char> url;
 
@@ -9000,5 +8360,7 @@ final class mln_adapter_log_record extends ffi.Struct {
 
   external ffi.Pointer<ffi.Char> message;
 }
+
+const int MLN_HANDLE_NULL = 0;
 
 const int MLN_ADAPTER_RESOURCE_KIND_ANY = 4294967295;

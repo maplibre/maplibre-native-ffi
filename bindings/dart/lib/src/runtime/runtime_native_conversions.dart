@@ -616,31 +616,29 @@ Pointer<raw.mln_string_view> _stringViewArray(
   return views;
 }
 
-List<QueriedFeature> _copyFeatureQueryResult(
-  Pointer<raw.mln_feature_query_result> result,
-) {
+List<QueriedFeature> _copyFeatureQueryResult(NativeFeatureQueryResult result) {
   try {
     return withNativeArena((arena) {
       final outCount = arena<Size>();
-      _check(_c.raw.mln_feature_query_result_count(result, outCount));
+      _check(_c.raw.mln_feature_query_result_count(result.raw, outCount));
       return [
         for (var index = 0; index < outCount.value; index += 1)
           _copyQueriedFeature(result, index, arena),
       ];
     });
   } finally {
-    _c.raw.mln_feature_query_result_destroy(result);
+    _c.raw.mln_feature_query_result_destroy(result.raw);
   }
 }
 
 QueriedFeature _copyQueriedFeature(
-  Pointer<raw.mln_feature_query_result> result,
+  NativeFeatureQueryResult result,
   int index,
   Allocator allocator,
 ) {
   final outFeature = allocator<raw.mln_queried_feature>();
   outFeature.ref.size = sizeOf<raw.mln_queried_feature>();
-  _check(_c.raw.mln_feature_query_result_get(result, index, outFeature));
+  _check(_c.raw.mln_feature_query_result_get(result.raw, index, outFeature));
   final feature = outFeature.ref;
   final state =
       (feature.fields &
@@ -677,13 +675,13 @@ QueriedFeature _copyQueriedFeature(
 }
 
 FeatureExtensionResult _copyFeatureExtensionResult(
-  Pointer<raw.mln_feature_extension_result> result,
+  NativeFeatureExtensionResult result,
 ) {
   try {
     return withNativeArena((arena) {
       final outInfo = arena<raw.mln_feature_extension_result_info>();
       outInfo.ref.size = sizeOf<raw.mln_feature_extension_result_info>();
-      _check(_c.raw.mln_feature_extension_result_get(result, outInfo));
+      _check(_c.raw.mln_feature_extension_result_get(result.raw, outInfo));
       final info = outInfo.ref;
       return switch (info.type) {
         1 => FeatureExtensionValue(
@@ -698,7 +696,7 @@ FeatureExtensionResult _copyFeatureExtensionResult(
       };
     });
   } finally {
-    _c.raw.mln_feature_extension_result_destroy(result);
+    _c.raw.mln_feature_extension_result_destroy(result.raw);
   }
 }
 
@@ -938,7 +936,7 @@ Pointer<raw.mln_screen_point> _nativeScreenPoint(
 }
 
 String? _copyStyleSourceAttribution(
-  Pointer<raw.mln_map> map,
+  NativeMap map,
   raw.mln_string_view sourceId,
   bool hasAttribution,
   int attributionSize,
@@ -954,7 +952,7 @@ String? _copyStyleSourceAttribution(
   final outFound = allocator<Bool>();
   _check(
     _c.raw.mln_map_copy_style_source_attribution(
-      map,
+      map.raw,
       sourceId,
       buffer,
       attributionSize,
@@ -971,40 +969,42 @@ String? _copyStyleSourceAttribution(
   return buffer.cast<Utf8>().toDartString(length: outSize.value);
 }
 
-JsonValue? _copyJsonSnapshot(Pointer<raw.mln_json_snapshot> snapshot) {
-  if (snapshot == nullptr) {
+JsonValue? _copyJsonSnapshot(NativeJsonSnapshot snapshot) {
+  // A null snapshot means the value is absent, which the C API reports as
+  // success.
+  if (snapshot.isNull) {
     return null;
   }
   try {
     return withNativeArena((arena) {
       final outValue = arena<Pointer<raw.mln_json_value>>();
       outValue.value = nullptr;
-      _check(_c.raw.mln_json_snapshot_get(snapshot, outValue));
+      _check(_c.raw.mln_json_snapshot_get(snapshot.raw, outValue));
       if (outValue.value == nullptr) {
         return null;
       }
       return native_json.jsonValueFromNative(outValue.value.ref);
     });
   } finally {
-    _c.raw.mln_json_snapshot_destroy(snapshot);
+    _c.raw.mln_json_snapshot_destroy(snapshot.raw);
   }
 }
 
-List<String> _copyStyleIdList(Pointer<raw.mln_style_id_list> list) {
+List<String> _copyStyleIdList(NativeStyleIdList list) {
   try {
     return withNativeArena((arena) {
       final outCount = arena<Size>();
-      _check(_c.raw.mln_style_id_list_count(list, outCount));
+      _check(_c.raw.mln_style_id_list_count(list.raw, outCount));
       final ids = <String>[];
       for (var index = 0; index < outCount.value; index += 1) {
         final outId = arena<raw.mln_string_view>();
-        _check(_c.raw.mln_style_id_list_get(list, index, outId));
+        _check(_c.raw.mln_style_id_list_get(list.raw, index, outId));
         ids.add(_copyStringView(outId.ref) ?? '');
       }
       return ids;
     });
   } finally {
-    _c.raw.mln_style_id_list_destroy(list);
+    _c.raw.mln_style_id_list_destroy(list.raw);
   }
 }
 

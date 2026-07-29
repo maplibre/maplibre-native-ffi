@@ -1,5 +1,4 @@
 import 'dart:ffi';
-import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
@@ -11,6 +10,7 @@ import '../internal/callback/callback_state.dart';
 import '../internal/c/maplibre_native_c.dart';
 import '../internal/c/maplibre_native_c.g.dart' as raw;
 import '../internal/lifecycle/lifecycle.dart';
+import '../internal/lifecycle/native_handles.dart';
 import '../internal/lifecycle/frame_construction.dart';
 import '../internal/memory/memory.dart';
 import '../internal/status/status.dart';
@@ -90,10 +90,10 @@ final class RuntimeOptions {
 
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
 final class RuntimeHandle {
-  RuntimeHandle._(Pointer<raw.mln_runtime> pointer)
-    : _state = NativeHandleState(pointer, 'RuntimeHandle');
+  RuntimeHandle._(NativeRuntime handle)
+    : _state = NativeHandleState(handle, 'RuntimeHandle');
 
-  final NativeHandleState<raw.mln_runtime> _state;
+  final NativeHandleState<NativeRuntime> _state;
   final _maps = <int, WeakReference<MapHandle>>{};
   final _offlineOperations = <int, WeakReference<OfflineOperationHandle>>{};
   _ResourceTransformState? _resourceTransformState;
@@ -115,14 +115,14 @@ final class RuntimeHandle {
     return withNativeArena((arena) {
       final nativeOptions = arena<raw.mln_runtime_options>();
       nativeOptions.ref = _runtimeOptionsToNative(options, arena);
-      final outRuntime = arena<Pointer<raw.mln_runtime>>();
-      outRuntime.value = nullptr;
+      final outRuntime = arena<Uint64>();
+      outRuntime.value = 0;
       _check(_c.raw.mln_runtime_create(nativeOptions, outRuntime));
-      return RuntimeHandle._(outRuntime.value);
+      return RuntimeHandle._(NativeRuntime(outRuntime.value));
     });
   }
 
-  Pointer<raw.mln_runtime> get _pointer => _state.pointer;
+  NativeRuntime get _handle => _state.handle;
 
   /// Whether this runtime has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
@@ -145,7 +145,7 @@ final class RuntimeHandle {
   /// one for host-driven work such as submitted tasks or shutdown.
   void pump({Duration? timeout = Duration.zero}) {
     _check(
-      _c.raw.mln_runtime_pump(_pointer, _pumpTimeoutMilliseconds(timeout)),
+      _c.raw.mln_runtime_pump(_handle.raw, _pumpTimeoutMilliseconds(timeout)),
     );
   }
 
@@ -155,10 +155,10 @@ final class RuntimeHandle {
   /// to the runtime's wake state, so the two close in either order.
   WakeSource acquireWakeSource() {
     return withNativeArena((arena) {
-      final outSource = arena<Pointer<raw.mln_wake_source>>();
-      outSource.value = nullptr;
-      _check(_c.raw.mln_runtime_wake_source_acquire(_pointer, outSource));
-      return WakeSource._(outSource.value);
+      final outSource = arena<Uint64>();
+      outSource.value = 0;
+      _check(_c.raw.mln_runtime_wake_source_acquire(_handle.raw, outSource));
+      return WakeSource._(NativeWakeSource(outSource.value));
     });
   }
 
@@ -170,7 +170,7 @@ final class RuntimeHandle {
       final hasEvent = arena<Bool>();
       hasEvent.value = false;
 
-      _check(_c.raw.mln_runtime_poll_event(_pointer, event, hasEvent));
+      _check(_c.raw.mln_runtime_poll_event(_handle.raw, event, hasEvent));
       if (!hasEvent.value) {
         return null;
       }
@@ -199,7 +199,9 @@ final class RuntimeHandle {
         transform.ref.size = sizeOf<raw.mln_resource_transform>();
         transform.ref.callback = _c.adapterResourceTransformRewriteCallback();
         transform.ref.user_data = state.pointer.cast<Void>();
-        _check(_c.raw.mln_runtime_set_resource_transform(_pointer, transform));
+        _check(
+          _c.raw.mln_runtime_set_resource_transform(_handle.raw, transform),
+        );
       });
       _resourceTransformState?.close();
       _resourceTransformState = state;
@@ -211,7 +213,7 @@ final class RuntimeHandle {
 
   /// Clears runtime-scoped URL rewrite rules.
   void clearResourceTransform() {
-    _check(_c.raw.mln_runtime_clear_resource_transform(_pointer));
+    _check(_c.raw.mln_runtime_clear_resource_transform(_handle.raw));
     _resourceTransformState?.close();
     _resourceTransformState = null;
   }
@@ -225,7 +227,7 @@ final class RuntimeHandle {
         provider.ref.size = sizeOf<raw.mln_resource_provider>();
         provider.ref.callback = _c.adapterResourceProviderRulesCallback();
         provider.ref.user_data = state.pointer.cast<Void>();
-        _check(_c.raw.mln_runtime_set_resource_provider(_pointer, provider));
+        _check(_c.raw.mln_runtime_set_resource_provider(_handle.raw, provider));
       });
       _resourceProviderRulesState?.close();
       _resourceProviderRulesState = state;
@@ -248,7 +250,7 @@ final class RuntimeHandle {
             .adapterQueuedResourceProviderCallback();
         nativeProvider.ref.user_data = state.pointer.cast<Void>();
         _check(
-          _c.raw.mln_runtime_set_resource_provider(_pointer, nativeProvider),
+          _c.raw.mln_runtime_set_resource_provider(_handle.raw, nativeProvider),
         );
       });
       _resourceProviderCallbackState?.retire();
@@ -263,7 +265,7 @@ final class RuntimeHandle {
 
   /// Clears the runtime-scoped network resource provider.
   void clearResourceProvider() {
-    _check(_c.raw.mln_runtime_clear_resource_provider(_pointer));
+    _check(_c.raw.mln_runtime_clear_resource_provider(_handle.raw));
     _resourceProviderRulesState?.close();
     _resourceProviderRulesState = null;
     _resourceProviderCallbackState?.retire();
@@ -278,7 +280,7 @@ final class RuntimeHandle {
       final outOperationId = arena<Uint64>();
       _check(
         _c.raw.mln_runtime_run_ambient_cache_operation_start(
-          _pointer,
+          _handle.raw,
           operation.rawValue,
           outOperationId,
         ),
@@ -307,7 +309,7 @@ final class RuntimeHandle {
       final outOperationId = arena<Uint64>();
       _check(
         _c.raw.mln_runtime_offline_region_create_start(
-          _pointer,
+          _handle.raw,
           nativeDefinition,
           nativeMetadata,
           metadata?.length ?? 0,
@@ -331,7 +333,7 @@ final class RuntimeHandle {
         (outOperationId) {
           _check(
             _c.raw.mln_runtime_offline_region_get_start(
-              _pointer,
+              _handle.raw,
               regionId,
               outOperationId,
             ),
@@ -345,7 +347,10 @@ final class RuntimeHandle {
     _OfflineOperationResultKind.regionList,
     (outOperationId) {
       _check(
-        _c.raw.mln_runtime_offline_regions_list_start(_pointer, outOperationId),
+        _c.raw.mln_runtime_offline_regions_list_start(
+          _handle.raw,
+          outOperationId,
+        ),
       );
     },
   );
@@ -357,7 +362,7 @@ final class RuntimeHandle {
       final outOperationId = arena<Uint64>();
       _check(
         _c.raw.mln_runtime_offline_regions_merge_database_start(
-          _pointer,
+          _handle.raw,
           nativePath.pointer.cast<Char>(),
           outOperationId,
         ),
@@ -381,7 +386,7 @@ final class RuntimeHandle {
       final outOperationId = arena<Uint64>();
       _check(
         _c.raw.mln_runtime_offline_region_update_metadata_start(
-          _pointer,
+          _handle.raw,
           regionId,
           nativeMetadata,
           metadata.length,
@@ -405,7 +410,7 @@ final class RuntimeHandle {
         (outOperationId) {
           _check(
             _c.raw.mln_runtime_offline_region_get_status_start(
-              _pointer,
+              _handle.raw,
               regionId,
               outOperationId,
             ),
@@ -423,7 +428,7 @@ final class RuntimeHandle {
     (outOperationId) {
       _check(
         _c.raw.mln_runtime_offline_region_set_observed_start(
-          _pointer,
+          _handle.raw,
           regionId,
           observed,
           outOperationId,
@@ -442,7 +447,7 @@ final class RuntimeHandle {
     (outOperationId) {
       _check(
         _c.raw.mln_runtime_offline_region_set_download_state_start(
-          _pointer,
+          _handle.raw,
           regionId,
           state.rawValue,
           outOperationId,
@@ -459,7 +464,7 @@ final class RuntimeHandle {
         (outOperationId) {
           _check(
             _c.raw.mln_runtime_offline_region_invalidate_start(
-              _pointer,
+              _handle.raw,
               regionId,
               outOperationId,
             ),
@@ -475,7 +480,7 @@ final class RuntimeHandle {
         (outOperationId) {
           _check(
             _c.raw.mln_runtime_offline_region_delete_start(
-              _pointer,
+              _handle.raw,
               regionId,
               outOperationId,
             ),
@@ -505,13 +510,11 @@ final class RuntimeHandle {
       MapHandle.create(this, options: options);
 
   void _registerMap(MapHandle map) {
-    _maps[map._pointer.address] = WeakReference(map);
+    _maps[map._handle.raw] = WeakReference(map);
   }
 
-  void _unregisterMapAddress(int? address) {
-    if (address != null) {
-      _maps.remove(address);
-    }
+  void _unregisterMapId(int id) {
+    _maps.remove(id);
   }
 
   void _registerOfflineOperation(OfflineOperationHandle operation) {
@@ -548,7 +551,7 @@ final class RuntimeHandle {
         .toList(growable: false);
     for (final operationId in collectedOperationIds) {
       _check(
-        _c.raw.mln_runtime_offline_operation_discard(_pointer, operationId),
+        _c.raw.mln_runtime_offline_operation_discard(_handle.raw, operationId),
       );
       _offlineOperations.remove(operationId);
     }
@@ -559,7 +562,7 @@ final class RuntimeHandle {
       );
     }
     _state.close(
-      (pointer) => _c.raw.mln_runtime_destroy(pointer).value,
+      (handle) => _c.raw.mln_runtime_destroy(handle.raw).value,
       _c.threadLastErrorMessage,
     );
     _resourceTransformState?.close();
@@ -595,33 +598,33 @@ int _pumpTimeoutMilliseconds(Duration? timeout) {
 /// and cross-isolate signalling is the reason this handle exists. An unclosed
 /// wake source therefore leaks silently rather than reporting itself.
 final class WakeSource {
-  WakeSource._(this._pointer);
+  WakeSource._(this._handle);
 
-  Pointer<raw.mln_wake_source> _pointer;
+  NativeWakeSource? _handle;
 
   /// Whether this wake source has released its native handle.
-  bool get isClosed => _pointer == nullptr;
+  bool get isClosed => _handle == null;
 
   /// Sets the runtime's wake flag and releases the parked owner isolate.
   ///
   /// A signal raised while the owner isolate is running sets the flag, so the
   /// next [RuntimeHandle.pump] returns without parking.
   void signal() {
-    final pointer = _pointer;
-    if (pointer == nullptr) {
+    final handle = _handle;
+    if (handle == null) {
       throwInvalidArgument('WakeSource is closed');
     }
-    _check(_c.raw.mln_wake_source_signal(pointer));
+    _check(_c.raw.mln_wake_source_signal(handle.raw));
   }
 
   /// Releases the wake source.
   void close() {
-    final pointer = _pointer;
-    if (pointer == nullptr) {
+    final handle = _handle;
+    if (handle == null) {
       return;
     }
-    _pointer = nullptr;
-    _c.raw.mln_wake_source_destroy(pointer);
+    _handle = null;
+    _c.raw.mln_wake_source_destroy(handle.raw);
   }
 }
 
@@ -648,7 +651,7 @@ final class RuntimeEvent {
       eventType: RuntimeEventType.fromRawValue(event.type),
       sourceType: event.source_type,
       source: RuntimeEventSource._fromNative(event, runtime),
-      sourceAddress: event.source.address,
+      sourceAddress: event.source,
       code: event.code,
       payloadType: event.payload_type,
       payload: RuntimeEventPayload._fromNative(event, runtime),
@@ -869,7 +872,7 @@ sealed class RuntimeEventSource {
     RuntimeHandle runtime,
   ) {
     final sourceType = RuntimeEventSourceType.fromRawValue(event.source_type);
-    final address = event.source.address;
+    final address = event.source;
     if (sourceType == RuntimeEventSourceType.runtime) {
       return RuntimeRuntimeEventSource(runtime);
     }
@@ -1537,8 +1540,8 @@ final class MapSize {
 
 /// Owner-thread map handle bound to a retained runtime.
 final class MapHandle {
-  MapHandle._(this._runtime, Pointer<raw.mln_map> pointer)
-    : _state = NativeHandleState(pointer, 'MapHandle');
+  MapHandle._(this._runtime, NativeMap handle)
+    : _state = NativeHandleState(handle, 'MapHandle');
 
   /// Creates a map owned by [runtime].
   factory MapHandle.create(
@@ -1552,27 +1555,28 @@ final class MapHandle {
       nativeOptions.ref.height = _positiveUint32(options.height, 'map height');
       nativeOptions.ref.scale_factor = options.scaleFactor;
       nativeOptions.ref.map_mode = options.mapMode.rawValue;
-      final outMap = arena<Pointer<raw.mln_map>>();
-      outMap.value = nullptr;
+      final outMap = arena<Uint64>();
+      outMap.value = 0;
 
-      _check(_c.raw.mln_map_create(runtime._pointer, nativeOptions, outMap));
-      final map = MapHandle._(runtime, outMap.value);
+      _check(_c.raw.mln_map_create(runtime._handle.raw, nativeOptions, outMap));
+      final map = MapHandle._(runtime, NativeMap(outMap.value));
       runtime._registerMap(map);
       return map;
     });
   }
 
   final RuntimeHandle _runtime;
-  final NativeHandleState<raw.mln_map> _state;
+  final NativeHandleState<NativeMap> _state;
   final _customGeometryCallbacks = <String, _CustomGeometryCallbackState>{};
   final _pendingUrlStyleCallbacks = <Set<_CustomGeometryCallbackState>>[];
 
   /// Whether this map has been closed by the Dart binding.
   bool get isClosed => _state.isClosed;
 
-  Pointer<raw.mln_map> get _pointer {
-    final _ = _runtime._pointer;
-    return _state.pointer;
+  NativeMap get _handle {
+    // Touching the runtime's handle keeps its owner-isolate check on this path.
+    final _ = _runtime._handle;
+    return _state.handle;
   }
 
   /// Loads a style URL through MapLibre Native style APIs.
@@ -1580,7 +1584,10 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeUrl = nativeUtf8CString(url, arena);
       _check(
-        _c.raw.mln_map_set_style_url(_pointer, nativeUrl.pointer.cast<Char>()),
+        _c.raw.mln_map_set_style_url(
+          _handle.raw,
+          nativeUrl.pointer.cast<Char>(),
+        ),
       );
     });
     _pendingUrlStyleCallbacks.add(_customGeometryCallbacks.values.toSet());
@@ -1592,7 +1599,7 @@ final class MapHandle {
       final nativeJson = nativeUtf8CString(json, arena);
       _check(
         _c.raw.mln_map_set_style_json(
-          _pointer,
+          _handle.raw,
           nativeJson.pointer.cast<Char>(),
         ),
       );
@@ -1602,31 +1609,31 @@ final class MapHandle {
 
   /// Requests a repaint for a continuous map.
   void requestRepaint() {
-    _check(_c.raw.mln_map_request_repaint(_pointer));
+    _check(_c.raw.mln_map_request_repaint(_handle.raw));
   }
 
   /// Requests one still image for a static or tile map.
   void requestStillImage() {
-    _check(_c.raw.mln_map_request_still_image(_pointer));
+    _check(_c.raw.mln_map_request_still_image(_handle.raw));
   }
 
   /// Applies MapLibre debug overlay options.
   void setDebugOptions(MapDebugOptions options) {
-    _check(_c.raw.mln_map_set_debug_options(_pointer, options.bits));
+    _check(_c.raw.mln_map_set_debug_options(_handle.raw, options.bits));
   }
 
   /// Copies current MapLibre debug overlay options.
   MapDebugOptions debugOptions() {
     return withNativeArena((arena) {
       final outOptions = arena<Uint32>();
-      _check(_c.raw.mln_map_get_debug_options(_pointer, outOptions));
+      _check(_c.raw.mln_map_get_debug_options(_handle.raw, outOptions));
       return MapDebugOptions(outOptions.value);
     });
   }
 
   /// Dumps map debug logs through MapLibre Native logging.
   void dumpDebugLogs() {
-    _check(_c.raw.mln_map_dump_debug_logs(_pointer));
+    _check(_c.raw.mln_map_dump_debug_logs(_handle.raw));
   }
 
   /// A reference to this map for attaching a render session, safe to send to
@@ -1640,14 +1647,14 @@ final class MapHandle {
   /// The reference does not keep the map alive. Attaching after the map closes
   /// fails rather than dangling, because the C API resolves the address under
   /// its own registry lock.
-  MapAttachRef attachRef() => MapAttachRef._(_pointer.address);
+  MapAttachRef attachRef() => MapAttachRef._(_handle.raw);
 
   /// Copies the current camera snapshot.
   CameraOptions camera() {
     return withNativeArena((arena) {
       final outCamera = arena<raw.mln_camera_options>();
       outCamera.ref.size = sizeOf<raw.mln_camera_options>();
-      _check(_c.raw.mln_map_get_camera(_pointer, outCamera));
+      _check(_c.raw.mln_map_get_camera(_handle.raw, outCamera));
       return native_struct.cameraOptionsFromNative(outCamera.ref);
     });
   }
@@ -1656,7 +1663,7 @@ final class MapHandle {
   void jumpTo(CameraOptions camera) {
     withNativeArena((arena) {
       final nativeCamera = _nativeCamera(camera, arena);
-      _check(_c.raw.mln_map_jump_to(_pointer, nativeCamera));
+      _check(_c.raw.mln_map_jump_to(_handle.raw, nativeCamera));
     });
   }
 
@@ -1665,7 +1672,9 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeCamera = _nativeCamera(camera, arena);
       final nativeAnimation = _nativeAnimation(animation, arena);
-      _check(_c.raw.mln_map_ease_to(_pointer, nativeCamera, nativeAnimation));
+      _check(
+        _c.raw.mln_map_ease_to(_handle.raw, nativeCamera, nativeAnimation),
+      );
     });
   }
 
@@ -1674,7 +1683,7 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeCamera = _nativeCamera(camera, arena);
       final nativeAnimation = _nativeAnimation(animation, arena);
-      _check(_c.raw.mln_map_fly_to(_pointer, nativeCamera, nativeAnimation));
+      _check(_c.raw.mln_map_fly_to(_handle.raw, nativeCamera, nativeAnimation));
     });
   }
 
@@ -1684,9 +1693,9 @@ final class MapHandle {
       final nativeAnimation = _nativeAnimation(animation, arena);
       _check(
         animation == null
-            ? _c.raw.mln_map_move_by(_pointer, deltaX, deltaY)
+            ? _c.raw.mln_map_move_by(_handle.raw, deltaX, deltaY)
             : _c.raw.mln_map_move_by_animated(
-                _pointer,
+                _handle.raw,
                 deltaX,
                 deltaY,
                 nativeAnimation,
@@ -1706,9 +1715,9 @@ final class MapHandle {
       final nativeAnimation = _nativeAnimation(animation, arena);
       _check(
         animation == null
-            ? _c.raw.mln_map_scale_by(_pointer, scale, nativeAnchor)
+            ? _c.raw.mln_map_scale_by(_handle.raw, scale, nativeAnchor)
             : _c.raw.mln_map_scale_by_animated(
-                _pointer,
+                _handle.raw,
                 scale,
                 nativeAnchor,
                 nativeAnimation,
@@ -1729,9 +1738,9 @@ final class MapHandle {
       final nativeAnimation = _nativeAnimation(animation, arena);
       _check(
         animation == null
-            ? _c.raw.mln_map_rotate_by(_pointer, nativeFirst, nativeSecond)
+            ? _c.raw.mln_map_rotate_by(_handle.raw, nativeFirst, nativeSecond)
             : _c.raw.mln_map_rotate_by_animated(
-                _pointer,
+                _handle.raw,
                 nativeFirst,
                 nativeSecond,
                 nativeAnimation,
@@ -1746,9 +1755,9 @@ final class MapHandle {
       final nativeAnimation = _nativeAnimation(animation, arena);
       _check(
         animation == null
-            ? _c.raw.mln_map_pitch_by(_pointer, pitch)
+            ? _c.raw.mln_map_pitch_by(_handle.raw, pitch)
             : _c.raw.mln_map_pitch_by_animated(
-                _pointer,
+                _handle.raw,
                 pitch,
                 nativeAnimation,
               ),
@@ -1758,12 +1767,14 @@ final class MapHandle {
 
   /// Cancels active camera transitions.
   void cancelTransitions() {
-    _check(_c.raw.mln_map_cancel_transitions(_pointer));
+    _check(_c.raw.mln_map_cancel_transitions(_handle.raw));
   }
 
   /// Enables or disables the rendering stats overlay.
   void setRenderingStatsViewEnabled(bool enabled) {
-    _check(_c.raw.mln_map_set_rendering_stats_view_enabled(_pointer, enabled));
+    _check(
+      _c.raw.mln_map_set_rendering_stats_view_enabled(_handle.raw, enabled),
+    );
   }
 
   /// Copies whether the rendering stats overlay is enabled.
@@ -1771,7 +1782,10 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outEnabled = arena<Bool>();
       _check(
-        _c.raw.mln_map_get_rendering_stats_view_enabled(_pointer, outEnabled),
+        _c.raw.mln_map_get_rendering_stats_view_enabled(
+          _handle.raw,
+          outEnabled,
+        ),
       );
       return outEnabled.value;
     });
@@ -1781,7 +1795,7 @@ final class MapHandle {
   bool isFullyLoaded() {
     return withNativeArena((arena) {
       final outLoaded = arena<Bool>();
-      _check(_c.raw.mln_map_is_fully_loaded(_pointer, outLoaded));
+      _check(_c.raw.mln_map_is_fully_loaded(_handle.raw, outLoaded));
       return outLoaded.value;
     });
   }
@@ -1793,7 +1807,12 @@ final class MapHandle {
       final outHeight = arena<Uint32>();
       final outScaleFactor = arena<Double>();
       _check(
-        _c.raw.mln_map_get_size(_pointer, outWidth, outHeight, outScaleFactor),
+        _c.raw.mln_map_get_size(
+          _handle.raw,
+          outWidth,
+          outHeight,
+          outScaleFactor,
+        ),
       );
       return MapSize(
         width: outWidth.value,
@@ -1808,7 +1827,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outOptions = arena<raw.mln_map_viewport_options>();
       outOptions.ref.size = sizeOf<raw.mln_map_viewport_options>();
-      _check(_c.raw.mln_map_get_viewport_options(_pointer, outOptions));
+      _check(_c.raw.mln_map_get_viewport_options(_handle.raw, outOptions));
       return native_struct.mapViewportOptionsFromNative(outOptions.ref);
     });
   }
@@ -1821,7 +1840,7 @@ final class MapHandle {
         options,
         _c.raw.mln_map_viewport_options_default(),
       );
-      _check(_c.raw.mln_map_set_viewport_options(_pointer, nativeOptions));
+      _check(_c.raw.mln_map_set_viewport_options(_handle.raw, nativeOptions));
     });
   }
 
@@ -1830,7 +1849,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outOptions = arena<raw.mln_map_tile_options>();
       outOptions.ref.size = sizeOf<raw.mln_map_tile_options>();
-      _check(_c.raw.mln_map_get_tile_options(_pointer, outOptions));
+      _check(_c.raw.mln_map_get_tile_options(_handle.raw, outOptions));
       return native_struct.mapTileOptionsFromNative(outOptions.ref);
     });
   }
@@ -1843,7 +1862,7 @@ final class MapHandle {
         options,
         _c.raw.mln_map_tile_options_default(),
       );
-      _check(_c.raw.mln_map_set_tile_options(_pointer, nativeOptions));
+      _check(_c.raw.mln_map_set_tile_options(_handle.raw, nativeOptions));
     });
   }
 
@@ -1852,7 +1871,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outOptions = arena<raw.mln_bound_options>();
       outOptions.ref.size = sizeOf<raw.mln_bound_options>();
-      _check(_c.raw.mln_map_get_bounds(_pointer, outOptions));
+      _check(_c.raw.mln_map_get_bounds(_handle.raw, outOptions));
       return native_struct.boundOptionsFromNative(outOptions.ref);
     });
   }
@@ -1865,7 +1884,7 @@ final class MapHandle {
         options,
         _c.raw.mln_bound_options_default(),
       );
-      _check(_c.raw.mln_map_set_bounds(_pointer, nativeOptions));
+      _check(_c.raw.mln_map_set_bounds(_handle.raw, nativeOptions));
     });
   }
 
@@ -1874,7 +1893,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outOptions = arena<raw.mln_free_camera_options>();
       outOptions.ref.size = sizeOf<raw.mln_free_camera_options>();
-      _check(_c.raw.mln_map_get_free_camera_options(_pointer, outOptions));
+      _check(_c.raw.mln_map_get_free_camera_options(_handle.raw, outOptions));
       return native_struct.freeCameraOptionsFromNative(outOptions.ref);
     });
   }
@@ -1887,7 +1906,9 @@ final class MapHandle {
         options,
         _c.raw.mln_free_camera_options_default(),
       );
-      _check(_c.raw.mln_map_set_free_camera_options(_pointer, nativeOptions));
+      _check(
+        _c.raw.mln_map_set_free_camera_options(_handle.raw, nativeOptions),
+      );
     });
   }
 
@@ -1896,7 +1917,7 @@ final class MapHandle {
     return withNativeArena((arena) {
       final outMode = arena<raw.mln_projection_mode>();
       outMode.ref.size = sizeOf<raw.mln_projection_mode>();
-      _check(_c.raw.mln_map_get_projection_mode(_pointer, outMode));
+      _check(_c.raw.mln_map_get_projection_mode(_handle.raw, outMode));
       return native_struct.projectionModeOptionsFromNative(outMode.ref);
     });
   }
@@ -1909,7 +1930,7 @@ final class MapHandle {
         mode,
         _c.raw.mln_projection_mode_default(),
       );
-      _check(_c.raw.mln_map_set_projection_mode(_pointer, nativeMode));
+      _check(_c.raw.mln_map_set_projection_mode(_handle.raw, nativeMode));
     });
   }
 
@@ -1928,7 +1949,7 @@ final class MapHandle {
       );
       _check(
         _c.raw.mln_map_camera_for_lat_lng_bounds(
-          _pointer,
+          _handle.raw,
           native_struct.latLngBoundsToNative(bounds),
           nativeFitOptions,
           outCamera,
@@ -1953,7 +1974,7 @@ final class MapHandle {
       );
       _check(
         _c.raw.mln_map_camera_for_lat_lngs(
-          _pointer,
+          _handle.raw,
           _latLngArray(coordinates, arena),
           coordinates.length,
           nativeFitOptions,
@@ -1980,7 +2001,7 @@ final class MapHandle {
       final nativeGeometry = native_geometry.nativeGeometry(geometry, arena);
       _check(
         _c.raw.mln_map_camera_for_geometry(
-          _pointer,
+          _handle.raw,
           nativeGeometry.pointer,
           nativeFitOptions,
           outCamera,
@@ -2008,12 +2029,12 @@ final class MapHandle {
       _check(
         unwrapped
             ? _c.raw.mln_map_lat_lng_bounds_for_camera_unwrapped(
-                _pointer,
+                _handle.raw,
                 nativeCamera,
                 outBounds,
               )
             : _c.raw.mln_map_lat_lng_bounds_for_camera(
-                _pointer,
+                _handle.raw,
                 nativeCamera,
                 outBounds,
               ),
@@ -2028,7 +2049,7 @@ final class MapHandle {
       final outPoint = arena<raw.mln_screen_point>();
       _check(
         _c.raw.mln_map_pixel_for_lat_lng(
-          _pointer,
+          _handle.raw,
           native_struct.latLngToNative(coordinate),
           outPoint,
         ),
@@ -2043,7 +2064,7 @@ final class MapHandle {
       final outCoordinate = arena<raw.mln_lat_lng>();
       _check(
         _c.raw.mln_map_lat_lng_for_pixel(
-          _pointer,
+          _handle.raw,
           native_struct.screenPointToNative(point),
           outCoordinate,
         ),
@@ -2060,7 +2081,7 @@ final class MapHandle {
           : arena<raw.mln_screen_point>(coordinates.length);
       _check(
         _c.raw.mln_map_pixels_for_lat_lngs(
-          _pointer,
+          _handle.raw,
           _latLngArray(coordinates, arena),
           coordinates.length,
           outPoints,
@@ -2087,7 +2108,7 @@ final class MapHandle {
           : arena<raw.mln_lat_lng>(points.length);
       _check(
         _c.raw.mln_map_lat_lngs_for_pixels(
-          _pointer,
+          _handle.raw,
           nativePoints,
           points.length,
           outCoordinates,
@@ -2103,10 +2124,10 @@ final class MapHandle {
   /// Creates a standalone projection helper from the current map transform.
   MapProjectionHandle createProjection() {
     return withNativeArena((arena) {
-      final outProjection = arena<Pointer<raw.mln_map_projection>>();
-      outProjection.value = nullptr;
-      _check(_c.raw.mln_map_projection_create(_pointer, outProjection));
-      return MapProjectionHandle._(outProjection.value);
+      final outProjection = arena<Uint64>();
+      outProjection.value = 0;
+      _check(_c.raw.mln_map_projection_create(_handle.raw, outProjection));
+      return MapProjectionHandle._(NativeMapProjection(outProjection.value));
     });
   }
 
@@ -2124,7 +2145,7 @@ final class MapHandle {
       nativeOptions.ref = _styleImageOptionsToNative(options);
       _check(
         _c.raw.mln_map_set_style_image(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeImage,
           nativeOptions,
@@ -2139,7 +2160,11 @@ final class MapHandle {
       final nativeId = nativeStringView(imageId, arena);
       final outRemoved = arena<Bool>();
       _check(
-        _c.raw.mln_map_remove_style_image(_pointer, nativeId.value, outRemoved),
+        _c.raw.mln_map_remove_style_image(
+          _handle.raw,
+          nativeId.value,
+          outRemoved,
+        ),
       );
       return outRemoved.value;
     });
@@ -2151,7 +2176,11 @@ final class MapHandle {
       final nativeId = nativeStringView(imageId, arena);
       final outExists = arena<Bool>();
       _check(
-        _c.raw.mln_map_style_image_exists(_pointer, nativeId.value, outExists),
+        _c.raw.mln_map_style_image_exists(
+          _handle.raw,
+          nativeId.value,
+          outExists,
+        ),
       );
       return outExists.value;
     });
@@ -2166,7 +2195,7 @@ final class MapHandle {
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_get_style_image_info(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outInfo,
           outFound,
@@ -2191,7 +2220,7 @@ final class MapHandle {
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_copy_style_image_premultiplied_rgba8(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           pixels,
           info.byteLength,
@@ -2216,7 +2245,7 @@ final class MapHandle {
       final nativeSourceJson = native_json.nativeJsonValue(sourceJson, arena);
       _check(
         _c.raw.mln_map_add_style_source_json(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeSourceJson.pointer,
         ),
@@ -2236,7 +2265,7 @@ final class MapHandle {
       final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
       _check(
         _c.raw.mln_map_add_geojson_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
           nativeOptions,
@@ -2257,7 +2286,7 @@ final class MapHandle {
       final nativeOptions = _nativeGeoJsonSourceOptions(options, arena);
       _check(
         _c.raw.mln_map_add_geojson_source_data(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeData.pointer,
           nativeOptions,
@@ -2273,7 +2302,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_set_geojson_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
         ),
@@ -2288,7 +2317,7 @@ final class MapHandle {
       final nativeData = native_geometry.nativeGeoJson(data, arena);
       _check(
         _c.raw.mln_map_set_geojson_source_data(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeData.pointer,
         ),
@@ -2307,7 +2336,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_add_vector_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
@@ -2326,7 +2355,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_add_vector_source_tiles(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _stringViewArray(tiles, arena),
           tiles.length,
@@ -2347,7 +2376,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_add_raster_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
@@ -2366,7 +2395,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_add_raster_source_tiles(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _stringViewArray(tiles, arena),
           tiles.length,
@@ -2387,7 +2416,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_add_raster_dem_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
           _nativeTileSourceOptions(options, arena),
@@ -2406,7 +2435,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_add_raster_dem_source_tiles(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _stringViewArray(tiles, arena),
           tiles.length,
@@ -2427,7 +2456,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_add_image_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _latLngArray(coordinates, arena),
           coordinates.length,
@@ -2449,7 +2478,7 @@ final class MapHandle {
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
       _check(
         _c.raw.mln_map_add_image_source_image(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _latLngArray(coordinates, arena),
           coordinates.length,
@@ -2466,7 +2495,7 @@ final class MapHandle {
       final nativeUrl = nativeStringView(url, arena);
       _check(
         _c.raw.mln_map_set_image_source_url(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeUrl.value,
         ),
@@ -2482,7 +2511,7 @@ final class MapHandle {
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
       _check(
         _c.raw.mln_map_set_image_source_image(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           nativeImage,
         ),
@@ -2496,7 +2525,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_set_image_source_coordinates(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _latLngArray(coordinates, arena),
           coordinates.length,
@@ -2514,7 +2543,7 @@ final class MapHandle {
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_get_image_source_coordinates(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outCoordinates,
           4,
@@ -2547,7 +2576,7 @@ final class MapHandle {
         );
         _check(
           _c.raw.mln_map_add_custom_geometry_source(
-            _pointer,
+            _handle.raw,
             nativeId.value,
             nativeOptions,
           ),
@@ -2572,7 +2601,7 @@ final class MapHandle {
       final nativeData = native_geometry.nativeGeoJson(data, arena);
       _check(
         _c.raw.mln_map_set_custom_geometry_source_tile_data(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
           nativeData.pointer,
@@ -2590,7 +2619,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_invalidate_custom_geometry_source_tile(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           _canonicalTileIdToNative(tileId),
         ),
@@ -2607,7 +2636,7 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       _check(
         _c.raw.mln_map_invalidate_custom_geometry_source_region(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           native_struct.latLngBoundsToNative(bounds),
         ),
@@ -2621,7 +2650,11 @@ final class MapHandle {
       final nativeId = nativeStringView(sourceId, arena);
       final outExists = arena<Bool>();
       _check(
-        _c.raw.mln_map_style_source_exists(_pointer, nativeId.value, outExists),
+        _c.raw.mln_map_style_source_exists(
+          _handle.raw,
+          nativeId.value,
+          outExists,
+        ),
       );
       return outExists.value;
     });
@@ -2634,7 +2667,7 @@ final class MapHandle {
       final outRemoved = arena<Bool>();
       _check(
         _c.raw.mln_map_remove_style_source(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outRemoved,
         ),
@@ -2656,7 +2689,7 @@ final class MapHandle {
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_get_style_source_info(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outInfo,
           outFound,
@@ -2671,7 +2704,7 @@ final class MapHandle {
         id: sourceId,
         isVolatile: info.is_volatile,
         attribution: _copyStyleSourceAttribution(
-          _pointer,
+          _handle,
           nativeId.value,
           info.has_attribution,
           info.attribution_size,
@@ -2684,10 +2717,10 @@ final class MapHandle {
   /// Copies style source IDs in style order.
   List<String> listStyleSourceIds() {
     return withNativeArena((arena) {
-      final outList = arena<Pointer<raw.mln_style_id_list>>();
-      outList.value = nullptr;
-      _check(_c.raw.mln_map_list_style_source_ids(_pointer, outList));
-      return _copyStyleIdList(outList.value);
+      final outList = arena<Uint64>();
+      outList.value = 0;
+      _check(_c.raw.mln_map_list_style_source_ids(_handle.raw, outList));
+      return _copyStyleIdList(NativeStyleIdList(outList.value));
     });
   }
 
@@ -2703,7 +2736,7 @@ final class MapHandle {
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         _c.raw.mln_map_add_hillshade_layer(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativeSourceId.value,
           nativeBeforeLayerId.value,
@@ -2724,7 +2757,7 @@ final class MapHandle {
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         _c.raw.mln_map_add_color_relief_layer(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativeSourceId.value,
           nativeBeforeLayerId.value,
@@ -2740,7 +2773,7 @@ final class MapHandle {
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         _c.raw.mln_map_add_location_indicator_layer(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativeBeforeLayerId.value,
         ),
@@ -2758,7 +2791,7 @@ final class MapHandle {
       final nativeLayerId = nativeStringView(layerId, arena);
       _check(
         _c.raw.mln_map_set_location_indicator_location(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           native_struct.latLngToNative(coordinate),
           altitude,
@@ -2773,7 +2806,7 @@ final class MapHandle {
       final nativeLayerId = nativeStringView(layerId, arena);
       _check(
         _c.raw.mln_map_set_location_indicator_bearing(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           bearing,
         ),
@@ -2787,7 +2820,7 @@ final class MapHandle {
       final nativeLayerId = nativeStringView(layerId, arena);
       _check(
         _c.raw.mln_map_set_location_indicator_accuracy_radius(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           radius,
         ),
@@ -2806,7 +2839,7 @@ final class MapHandle {
       final nativeImageId = nativeStringView(imageId, arena);
       _check(
         _c.raw.mln_map_set_location_indicator_image_name(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           imageKind.rawValue,
           nativeImageId.value,
@@ -2822,7 +2855,7 @@ final class MapHandle {
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         _c.raw.mln_map_add_style_layer_json(
-          _pointer,
+          _handle.raw,
           nativeLayerJson.pointer,
           nativeBeforeLayerId.value,
         ),
@@ -2834,12 +2867,12 @@ final class MapHandle {
   JsonValue? getStyleLayerJson(String layerId) {
     return withNativeArena((arena) {
       final nativeId = nativeStringView(layerId, arena);
-      final outLayer = arena<Pointer<raw.mln_json_snapshot>>();
-      outLayer.value = nullptr;
+      final outLayer = arena<Uint64>();
+      outLayer.value = 0;
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_get_style_layer_json(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outLayer,
           outFound,
@@ -2848,7 +2881,7 @@ final class MapHandle {
       if (!outFound.value) {
         return null;
       }
-      return _copyJsonSnapshot(outLayer.value);
+      return _copyJsonSnapshot(NativeJsonSnapshot(outLayer.value));
     });
   }
 
@@ -2857,7 +2890,10 @@ final class MapHandle {
     withNativeArena((arena) {
       final nativeLightJson = native_json.nativeJsonValue(lightJson, arena);
       _check(
-        _c.raw.mln_map_set_style_light_json(_pointer, nativeLightJson.pointer),
+        _c.raw.mln_map_set_style_light_json(
+          _handle.raw,
+          nativeLightJson.pointer,
+        ),
       );
     });
   }
@@ -2869,7 +2905,7 @@ final class MapHandle {
       final nativeValue = native_json.nativeJsonValue(value, arena);
       _check(
         _c.raw.mln_map_set_style_light_property(
-          _pointer,
+          _handle.raw,
           nativePropertyName.value,
           nativeValue.pointer,
         ),
@@ -2881,16 +2917,16 @@ final class MapHandle {
   JsonValue? getStyleLightProperty(String propertyName) {
     return withNativeArena((arena) {
       final nativePropertyName = nativeStringView(propertyName, arena);
-      final outValue = arena<Pointer<raw.mln_json_snapshot>>();
-      outValue.value = nullptr;
+      final outValue = arena<Uint64>();
+      outValue.value = 0;
       _check(
         _c.raw.mln_map_get_style_light_property(
-          _pointer,
+          _handle.raw,
           nativePropertyName.value,
           outValue,
         ),
       );
-      return _copyJsonSnapshot(outValue.value);
+      return _copyJsonSnapshot(NativeJsonSnapshot(outValue.value));
     });
   }
 
@@ -2902,7 +2938,7 @@ final class MapHandle {
       final nativeValue = native_json.nativeJsonValue(value, arena);
       _check(
         _c.raw.mln_map_set_layer_property(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativePropertyName.value,
           nativeValue.pointer,
@@ -2916,17 +2952,17 @@ final class MapHandle {
     return withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
       final nativePropertyName = nativeStringView(propertyName, arena);
-      final outValue = arena<Pointer<raw.mln_json_snapshot>>();
-      outValue.value = nullptr;
+      final outValue = arena<Uint64>();
+      outValue.value = 0;
       _check(
         _c.raw.mln_map_get_layer_property(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativePropertyName.value,
           outValue,
         ),
       );
-      return _copyJsonSnapshot(outValue.value);
+      return _copyJsonSnapshot(NativeJsonSnapshot(outValue.value));
     });
   }
 
@@ -2939,7 +2975,7 @@ final class MapHandle {
           : native_json.nativeJsonValue(filter, arena).pointer;
       _check(
         _c.raw.mln_map_set_layer_filter(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativeFilter,
         ),
@@ -2951,16 +2987,16 @@ final class MapHandle {
   JsonValue? getLayerFilter(String layerId) {
     return withNativeArena((arena) {
       final nativeLayerId = nativeStringView(layerId, arena);
-      final outFilter = arena<Pointer<raw.mln_json_snapshot>>();
-      outFilter.value = nullptr;
+      final outFilter = arena<Uint64>();
+      outFilter.value = 0;
       _check(
         _c.raw.mln_map_get_layer_filter(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           outFilter,
         ),
       );
-      return _copyJsonSnapshot(outFilter.value);
+      return _copyJsonSnapshot(NativeJsonSnapshot(outFilter.value));
     });
   }
 
@@ -2970,7 +3006,11 @@ final class MapHandle {
       final nativeId = nativeStringView(layerId, arena);
       final outExists = arena<Bool>();
       _check(
-        _c.raw.mln_map_style_layer_exists(_pointer, nativeId.value, outExists),
+        _c.raw.mln_map_style_layer_exists(
+          _handle.raw,
+          nativeId.value,
+          outExists,
+        ),
       );
       return outExists.value;
     });
@@ -2984,7 +3024,7 @@ final class MapHandle {
       final outFound = arena<Bool>();
       _check(
         _c.raw.mln_map_get_style_layer_type(
-          _pointer,
+          _handle.raw,
           nativeId.value,
           outLayerType,
           outFound,
@@ -3004,7 +3044,7 @@ final class MapHandle {
       final nativeBeforeLayerId = nativeStringView(beforeLayerId ?? '', arena);
       _check(
         _c.raw.mln_map_move_style_layer(
-          _pointer,
+          _handle.raw,
           nativeLayerId.value,
           nativeBeforeLayerId.value,
         ),
@@ -3018,7 +3058,11 @@ final class MapHandle {
       final nativeId = nativeStringView(layerId, arena);
       final outRemoved = arena<Bool>();
       _check(
-        _c.raw.mln_map_remove_style_layer(_pointer, nativeId.value, outRemoved),
+        _c.raw.mln_map_remove_style_layer(
+          _handle.raw,
+          nativeId.value,
+          outRemoved,
+        ),
       );
       return outRemoved.value;
     });
@@ -3027,21 +3071,21 @@ final class MapHandle {
   /// Copies style layer IDs in style order.
   List<String> listStyleLayerIds() {
     return withNativeArena((arena) {
-      final outList = arena<Pointer<raw.mln_style_id_list>>();
-      outList.value = nullptr;
-      _check(_c.raw.mln_map_list_style_layer_ids(_pointer, outList));
-      return _copyStyleIdList(outList.value);
+      final outList = arena<Uint64>();
+      outList.value = 0;
+      _check(_c.raw.mln_map_list_style_layer_ids(_handle.raw, outList));
+      return _copyStyleIdList(NativeStyleIdList(outList.value));
     });
   }
 
   /// Explicitly destroys this map.
   void close() {
-    final address = _state.pointerAddress;
+    final id = _state.handleId;
     _state.close(
-      (pointer) => _c.raw.mln_map_destroy(pointer).value,
+      (handle) => _c.raw.mln_map_destroy(handle.raw).value,
       _c.threadLastErrorMessage,
     );
-    _runtime._unregisterMapAddress(address);
+    _runtime._unregisterMapId(id);
     _clearCustomGeometryCallbacks();
   }
 
