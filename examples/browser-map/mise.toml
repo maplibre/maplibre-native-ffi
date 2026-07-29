@@ -1,9 +1,7 @@
-[tools]
-emsdk = "4.0.10"
-
 [tasks.build]
 description = "Build the browser WebGPU map example."
 dir = "{{config_root}}/../.."
+tools = { emsdk = "4.0.10" }
 run = '''
 set -euo pipefail
 
