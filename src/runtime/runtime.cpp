@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -57,6 +58,12 @@ struct mln_offline_region_list {
   std::vector<OfflineRegionData> regions;
 };
 
+// Holds its own reference to the wake state, so the state stays readable for a
+// signal that races runtime teardown and hosts destroy the two in either order.
+struct mln_wake_source {
+  std::shared_ptr<mln::core::WakeState> state;
+};
+
 namespace mln::core {
 
 using OfflineOperationResult = std::variant<
@@ -96,6 +103,44 @@ auto runtime_registry_mutex() -> std::mutex& {
 auto runtime_registry() -> RuntimeRegistry& {
   static RuntimeRegistry value;
   return value;
+}
+
+// Leases the resource transform registration for a MapLibre-owned thread.
+//
+// The registry lock proves the platform context is a live runtime, and the
+// work done under it is a reference count increment that completes without
+// waiting on any per-runtime lock. Callers take the returned state's lock
+// afterwards, so a writer waiting on that lock delays this runtime alone
+// rather than every `mln_*` call in the process.
+auto lease_resource_transform_state(void* platform_context) noexcept
+  -> std::shared_ptr<mln::core::ResourceTransformState> {
+  if (platform_context == nullptr) {
+    return nullptr;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    return nullptr;
+  }
+  return runtime->resource_transform_state;
+}
+
+// Leases the resource provider registration, matching the transform lookup:
+// the registry lock covers only a reference count increment, and the caller
+// takes the state's lock after it is released.
+auto lease_resource_provider_state(void* platform_context) noexcept
+  -> std::shared_ptr<mln::core::ResourceProviderState> {
+  if (platform_context == nullptr) {
+    return nullptr;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  const std::scoped_lock registry_lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    return nullptr;
+  }
+  return runtime->resource_provider_state;
 }
 
 using OfflineRegionSnapshotRegistry = std::unordered_map<
@@ -475,11 +520,16 @@ auto push_offline_region_event(
     .offline_region_id = region_id
   };
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  if (!runtime->observed_offline_regions.contains(region_id)) {
-    return;
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    if (!runtime->observed_offline_regions.contains(region_id)) {
+      return;
+    }
+    runtime->events.push_back(std::move(event));
   }
-  runtime->events.push_back(std::move(event));
+  // The offline region observer runs off the owner-thread run loop, so this
+  // signal is what tells a parked owner thread the event arrived.
+  mln::core::signal_wake(runtime->wake_state);
 }
 
 class OfflineRegionRuntimeObserver final : public mbgl::OfflineRegionObserver {
@@ -770,8 +820,11 @@ auto complete_offline_operation(
     .offline_operation_id = operation_id
   };
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  runtime->events.push_back(std::move(event));
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    runtime->events.push_back(std::move(event));
+  }
+  mln::core::signal_wake(runtime->wake_state);
 }
 
 auto complete_offline_operation_error(
@@ -987,8 +1040,15 @@ auto create_runtime(
 
   auto owned_runtime = std::make_unique<mln_runtime>();
   owned_runtime->owner_thread = owner_thread;
+  owned_runtime->wake_state = std::make_shared<WakeState>();
   owned_runtime->run_loop =
     std::make_unique<mbgl::util::RunLoop>(mbgl::util::RunLoop::Type::New);
+  // `setPlatformCallback` is an unlocked assignment, so it is set here while
+  // the run loop is reachable only from this thread. MapLibre calls it from
+  // every thread that queues owner-thread work.
+  owned_runtime->run_loop->setPlatformCallback(
+    [state = owned_runtime->wake_state]() -> void { signal_wake(state); }
+  );
   owned_runtime->asset_path =
     options == nullptr || options->asset_path == nullptr
       ? std::string{}
@@ -1010,6 +1070,10 @@ auto create_runtime(
     std::make_shared<OfflineOperationEventState>();
   owned_runtime->offline_operation_state->runtime = owned_runtime.get();
   owned_runtime->offline_operation_state->alive = true;
+  owned_runtime->resource_transform_state =
+    std::make_shared<ResourceTransformState>();
+  owned_runtime->resource_provider_state =
+    std::make_shared<ResourceProviderState>();
   auto* runtime = owned_runtime.get();
   {
     const std::scoped_lock lock(runtime_registry_mutex());
@@ -1040,9 +1104,10 @@ auto set_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::unique_lock lock(runtime->resource_transform_mutex);
-  runtime->resource_transform_callback = transform->callback;
-  runtime->resource_transform_user_data = transform->user_data;
+  auto& state = *runtime->resource_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = transform->callback;
+  state.user_data = transform->user_data;
   return MLN_STATUS_OK;
 }
 
@@ -1090,9 +1155,10 @@ auto clear_resource_transform(mln_runtime* runtime) -> mln_status {
     return status;
   }
 
-  const std::unique_lock lock(runtime->resource_transform_mutex);
-  runtime->resource_transform_callback = nullptr;
-  runtime->resource_transform_user_data = nullptr;
+  auto& state = *runtime->resource_transform_state;
+  const std::unique_lock lock(state.mutex);
+  state.callback = nullptr;
+  state.user_data = nullptr;
   return MLN_STATUS_OK;
 }
 
@@ -2308,88 +2374,215 @@ auto set_resource_provider(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::scoped_lock lock(runtime_registry_mutex());
-  if (runtime->live_maps != 0) {
-    set_thread_error("resource provider must be set before map creation");
-    return MLN_STATUS_INVALID_STATE;
-  }
-  runtime->has_resource_provider = true;
-  runtime->resource_provider = ResourceProvider{
+  // Waiting for the exclusive provider lock waits for every provider callback
+  // that already leased the previous provider, so the previous callback and its
+  // `user_data` are unreferenced once this returns. The registry lock is not
+  // held across that wait, so one runtime's callback cannot stall others.
+  auto& state = *runtime->resource_provider_state;
+  const std::unique_lock lock(state.mutex);
+  state.registered = true;
+  state.provider = ResourceProvider{
     .callback = provider->callback,
     .user_data = provider->user_data,
   };
   return MLN_STATUS_OK;
 }
 
+auto clear_resource_provider(mln_runtime* runtime) -> mln_status {
+  const auto status = validate_runtime(runtime);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  auto& state = *runtime->resource_provider_state;
+  const std::unique_lock lock(state.mutex);
+  state.registered = false;
+  state.provider = ResourceProvider{};
+  return MLN_STATUS_OK;
+}
+
 auto destroy_runtime(mln_runtime* runtime) -> mln_status {
-  const std::scoped_lock lock(runtime_registry_mutex());
   if (runtime == nullptr) {
     set_thread_error("runtime must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto found = runtime_registry().find(runtime);
-  if (found == runtime_registry().end()) {
-    set_thread_error("runtime is not a live handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
-  if (found->second->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("runtime must be destroyed on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
-  }
-
-  if (found->second->live_maps != 0) {
-    set_thread_error("runtime still owns live maps");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
+  // Take ownership of the runtime out of the registry, then release the
+  // process-global registry lock before any teardown step that can block on a
+  // native callback. Removing the entry under the registry lock makes the
+  // handle unreachable to every later registry lookup, so the waits below stall
+  // this runtime alone while calls on unrelated runtimes keep running.
+  std::unique_ptr<mln_runtime> owned_runtime;
   {
-    const std::unique_lock transform_lock(
-      found->second->resource_transform_mutex
-    );
-    found->second->resource_transform_callback = nullptr;
-    found->second->resource_transform_user_data = nullptr;
+    const std::scoped_lock lock(runtime_registry_mutex());
+    const auto found = runtime_registry().find(runtime);
+    if (found == runtime_registry().end()) {
+      set_thread_error("runtime is not a live handle");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+
+    if (found->second->owner_thread != std::this_thread::get_id()) {
+      set_thread_error("runtime must be destroyed on its owner thread");
+      return MLN_STATUS_WRONG_THREAD;
+    }
+
+    if (found->second->live_maps != 0) {
+      set_thread_error("runtime still owns live maps");
+      return MLN_STATUS_INVALID_STATE;
+    }
+
+    owned_runtime = std::move(found->second);
+    runtime_registry().erase(found);
+  }
+
+  // A resource transform callback that entered `invoke_resource_transform()`
+  // before the erase above holds a shared transform lock, so this wait covers
+  // every callback that can still observe the runtime. A lookup that leased
+  // the state before the erase and reaches the shared lock after this block
+  // reads the cleared registration and calls nothing. The lease keeps the
+  // state object alive on its own, so it stays readable past the runtime.
+  {
+    auto& transform_state = *owned_runtime->resource_transform_state;
+    const std::unique_lock transform_lock(transform_state.mutex);
+    transform_state.callback = nullptr;
+    transform_state.user_data = nullptr;
+  }
+
+  // A resource provider callback that leased the provider before the erase
+  // above holds a shared provider lock, so this wait covers every callback that
+  // can still observe the runtime.
+  {
+    auto& provider_state = *owned_runtime->resource_provider_state;
+    const std::unique_lock provider_lock(provider_state.mutex);
+    provider_state.registered = false;
+    provider_state.provider = ResourceProvider{};
   }
 
   {
     const std::scoped_lock state_lock(
-      found->second->offline_event_state->mutex
+      owned_runtime->offline_event_state->mutex
     );
-    found->second->offline_event_state->alive = false;
-    found->second->offline_event_state->runtime = nullptr;
-    const std::scoped_lock event_lock(found->second->event_mutex);
-    found->second->observed_offline_regions.clear();
-    std::erase_if(found->second->events, [](const auto& event) -> bool {
+    owned_runtime->offline_event_state->alive = false;
+    owned_runtime->offline_event_state->runtime = nullptr;
+    const std::scoped_lock event_lock(owned_runtime->event_mutex);
+    owned_runtime->observed_offline_regions.clear();
+    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
       return event.has_offline_region;
     });
   }
 
   {
     const std::scoped_lock state_lock(
-      found->second->offline_operation_state->mutex
+      owned_runtime->offline_operation_state->mutex
     );
-    found->second->offline_operation_state->alive = false;
-    found->second->offline_operation_state->runtime = nullptr;
-    found->second->offline_operation_state->operations.clear();
-    const std::scoped_lock event_lock(found->second->event_mutex);
-    std::erase_if(found->second->events, [](const auto& event) -> bool {
+    owned_runtime->offline_operation_state->alive = false;
+    owned_runtime->offline_operation_state->runtime = nullptr;
+    owned_runtime->offline_operation_state->operations.clear();
+    const std::scoped_lock event_lock(owned_runtime->event_mutex);
+    std::erase_if(owned_runtime->events, [](const auto& event) -> bool {
       return event.has_offline_operation;
     });
   }
 
-  runtime_registry().erase(runtime);
+  // Retiring the wake state before the run loop is released covers a late
+  // `mln_wake_source_signal()` and the run loop teardown's final iteration.
+  // Wake sources the host still holds keep the state readable.
+  {
+    const std::scoped_lock wake_lock(owned_runtime->wake_state->mutex);
+    owned_runtime->wake_state->alive = false;
+    owned_runtime->wake_state->signaled = false;
+  }
+
+  // Releasing the run loop and the database file source can join native
+  // threads, and that happens here with the registry lock released.
+  owned_runtime.reset();
   return MLN_STATUS_OK;
 }
 
-auto run_runtime_once(mln_runtime* runtime) -> mln_status {
+auto signal_wake(const std::shared_ptr<WakeState>& state) noexcept -> void {
+  if (!state) {
+    return;
+  }
+  {
+    const std::scoped_lock lock(state->mutex);
+    if (!state->alive) {
+      return;
+    }
+    state->signaled = true;
+  }
+  // MapLibre calls this while it holds the `RunLoop` mutex, which every thread
+  // that queues owner-thread work needs, so the notify happens outside the wake
+  // lock to keep the path short.
+  state->condition.notify_all();
+}
+
+auto pump_runtime(mln_runtime* runtime, int64_t timeout_ms) -> mln_status {
   const auto status = validate_runtime(runtime);
   if (status != MLN_STATUS_OK) {
     return status;
   }
 
+  // Queued unread events return the call without parking, so a host that
+  // stopped polling before the queue emptied keeps making progress.
+  auto queued_events = false;
+  {
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    queued_events = !runtime->events.empty();
+  }
+
+  {
+    auto& wake = *runtime->wake_state;
+    std::unique_lock lock(wake.mutex);
+    if (!queued_events && timeout_ms != 0 && !wake.signaled) {
+      if (timeout_ms < 0) {
+        wake.condition.wait(lock, [&wake]() -> bool { return wake.signaled; });
+      } else {
+        wake.condition.wait_for(
+          lock, std::chrono::milliseconds{timeout_ms},
+          [&wake]() -> bool { return wake.signaled; }
+        );
+      }
+    }
+    // The flag is cleared before the drain, so work arriving during the drain
+    // leaves it set for the next pump.
+    wake.signaled = false;
+  }
+
   runtime->run_loop->runOnce();
   return MLN_STATUS_OK;
+}
+
+auto acquire_wake_source(mln_runtime* runtime, mln_wake_source** out_source)
+  -> mln_status {
+  const auto status = validate_runtime(runtime);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (out_source == nullptr) {
+    set_thread_error("out_source must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (*out_source != nullptr) {
+    set_thread_error("out_source must point to a null handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_source = new mln_wake_source{.state = runtime->wake_state};
+  return MLN_STATUS_OK;
+}
+
+auto signal_wake_source(mln_wake_source* source) -> mln_status {
+  if (source == nullptr) {
+    set_thread_error("wake source must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  signal_wake(source->state);
+  return MLN_STATUS_OK;
+}
+
+auto destroy_wake_source(mln_wake_source* source) noexcept -> void {
+  delete source;
 }
 
 auto poll_runtime_event(
@@ -2461,6 +2654,10 @@ auto retain_runtime_map(mln_runtime* runtime) -> mln_status {
   }
 
   const std::scoped_lock lock(runtime_registry_mutex());
+  if (!runtime_registry().contains(runtime)) {
+    set_thread_error("runtime is not a live handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   ++runtime->live_maps;
   return MLN_STATUS_OK;
 }
@@ -2474,6 +2671,10 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void {
   if (runtime_registry().contains(runtime) && runtime->live_maps != 0) {
     --runtime->live_maps;
   }
+}
+
+auto runtime_run_loop(mln_runtime* runtime) -> mbgl::util::RunLoop& {
+  return *runtime->run_loop;
 }
 
 auto resource_options_for_runtime(mln_runtime* runtime)
@@ -2492,36 +2693,73 @@ auto resource_options_for_runtime(mln_runtime* runtime)
   return options;
 }
 
-auto find_runtime_for_platform_context(void* platform_context) noexcept
-  -> mln_runtime* {
+auto acquire_resource_provider_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<ResourceProviderLease> {
+  const auto state = lease_resource_provider_state(platform_context);
+  if (state == nullptr) {
+    return std::nullopt;
+  }
+
+  // The lease keeps this state readable on its own, so the shared lock is
+  // taken with the registry lock released. `destroy_runtime()` erases the
+  // registry entry and then clears the registration under the exclusive lock,
+  // so a callback that reaches the shared lock first holds teardown until it
+  // returns, and one that arrives later finds an empty registration.
+  std::shared_lock provider_lock(state->mutex);
+  if (!state->registered) {
+    return std::nullopt;
+  }
+  return ResourceProviderLease{
+    state, std::move(provider_lock), state->provider
+  };
+}
+
+auto find_maximum_cache_size_for_platform_context(
+  void* platform_context
+) noexcept -> std::optional<std::uint64_t> {
   if (platform_context == nullptr) {
-    return nullptr;
+    return std::nullopt;
   }
 
   const std::scoped_lock lock(runtime_registry_mutex());
   auto* runtime = static_cast<mln_runtime*>(platform_context);
-  return runtime_registry().contains(runtime) ? runtime : nullptr;
+  if (
+    !runtime_registry().contains(runtime) || !runtime->has_maximum_cache_size
+  ) {
+    return std::nullopt;
+  }
+  return runtime->maximum_cache_size;
+}
+
+auto has_resource_transform_for_platform_context(
+  void* platform_context
+) noexcept -> bool {
+  const auto state = lease_resource_transform_state(platform_context);
+  if (state == nullptr) {
+    return false;
+  }
+
+  const std::shared_lock transform_lock(state->mutex);
+  return state->callback != nullptr;
 }
 
 auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,
   std::string& out_replacement_url
 ) noexcept -> mln_status {
-  if (platform_context == nullptr) {
+  const auto state = lease_resource_transform_state(platform_context);
+  if (state == nullptr) {
     return MLN_STATUS_OK;
   }
 
-  auto* runtime = static_cast<mln_runtime*>(platform_context);
-  std::shared_lock<std::shared_mutex> transform_lock;
-  {
-    const std::scoped_lock registry_lock(runtime_registry_mutex());
-    if (!runtime_registry().contains(runtime)) {
-      return MLN_STATUS_OK;
-    }
-    transform_lock = std::shared_lock{runtime->resource_transform_mutex};
-  }
-
-  const auto callback = runtime->resource_transform_callback;
+  // The lease keeps this state readable on its own, so the shared lock is
+  // taken with the registry lock released. `destroy_runtime()` erases the
+  // registry entry and then clears the registration under the exclusive lock,
+  // so a callback that reaches the shared lock first holds teardown until it
+  // returns, and one that arrives later finds an empty registration.
+  const std::shared_lock transform_lock(state->mutex);
+  const auto callback = state->callback;
   if (callback == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -2532,8 +2770,7 @@ auto invoke_resource_transform(
     .context = &out_replacement_url,
   };
   try {
-    const auto status =
-      callback(runtime->resource_transform_user_data, kind, url, &response);
+    const auto status = callback(state->user_data, kind, url, &response);
     if (
       status == MLN_STATUS_OK && response.url != nullptr &&
       *response.url != '\0'
@@ -2575,14 +2812,31 @@ auto push_runtime_map_event_payload(
     .message = std::move(message)
   };
 
-  const std::scoped_lock lock(runtime->event_mutex);
-  if (map != nullptr && !runtime->event_maps.contains(map)) {
-    return;
+  {
+    const std::scoped_lock lock(runtime->event_mutex);
+    if (map != nullptr && !runtime->event_maps.contains(map)) {
+      return;
+    }
+    if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
+      runtime->map_loading_failures[map] = event.message;
+    }
+    // A render draws the latest update, so one unread render-update event
+    // covers every invalidation queued behind it. This matches the
+    // `uv_async_send` coalescing MapLibre's own headless frontend relies on.
+    // Comparing against the tail alone preserves the order of every other
+    // event.
+    if (
+      type == MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE && map != nullptr &&
+      !runtime->events.empty() && runtime->events.back().type == type &&
+      runtime->events.back().map == map
+    ) {
+      // The unread event already asks the host to render and already returns
+      // the next pump without parking.
+      return;
+    }
+    runtime->events.push_back(std::move(event));
   }
-  if (type == MLN_RUNTIME_EVENT_MAP_LOADING_FAILED && map != nullptr) {
-    runtime->map_loading_failures[map] = event.message;
-  }
-  runtime->events.push_back(std::move(event));
+  signal_wake(runtime->wake_state);
 }
 
 auto register_runtime_map_events(mln_runtime* runtime, const mln_map* map)

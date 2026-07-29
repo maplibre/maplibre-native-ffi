@@ -18,6 +18,10 @@ pub struct CameraOptions {
     pub pitch: Option<f64>,
     pub center_altitude: Option<f64>,
     pub padding: Option<EdgeInsets>,
+    /// Screen-space anchor for jump, ease, and fly commands.
+    ///
+    /// This field is input-only: MapLibre Native applies it to camera commands
+    /// and never reports it back, so it is always `None` on a camera read.
     pub anchor: Option<ScreenPoint>,
     pub roll: Option<f64>,
     pub field_of_view: Option<f64>,
@@ -95,6 +99,28 @@ pub struct AnimationOptions {
     pub velocity: Option<f64>,
     pub min_zoom: Option<f64>,
     pub easing: Option<UnitBezier>,
+    /// Caller-chosen identity for the transition these options start.
+    ///
+    /// When set, the transition emits exactly one runtime event of type
+    /// `RuntimeEventType::MapCameraTransitionFinished` carrying this value in
+    /// its [`CameraTransitionFinishedEvent`](crate::CameraTransitionFinishedEvent)
+    /// payload. The value passes through uninterpreted, so callers pick their
+    /// own scheme, such as a monotonically increasing counter.
+    ///
+    /// The event arrives for every terminal outcome: running to completion,
+    /// being superseded by a later camera command, being cancelled by
+    /// `cancel_transitions`, or completing instantly as a zero-duration jump. A
+    /// command this API rejects, such as one carrying a non-finite enabled
+    /// camera field, starts no transition and emits no such event. MapLibre
+    /// Native reports the
+    /// moment the transition releases the camera without naming which outcome
+    /// occurred, so the event establishes transition identity rather than a
+    /// completion reason. A host that needs to tell completion from
+    /// cancellation compares the resulting camera against the requested one,
+    /// or tracks which transition ID is current.
+    ///
+    /// Leaving this field absent emits no such event.
+    pub transition_id: Option<u64>,
 }
 
 impl AnimationOptions {
@@ -116,6 +142,10 @@ impl AnimationOptions {
         if let Some(easing) = self.easing {
             raw.fields |= sys::MLN_ANIMATION_OPTION_EASING;
             raw.easing = unit_bezier_to_native(easing);
+        }
+        if let Some(transition_id) = self.transition_id {
+            raw.fields |= sys::MLN_ANIMATION_OPTION_TRANSITION_ID;
+            raw.transition_id = transition_id;
         }
         raw
     }
@@ -150,11 +180,22 @@ impl CameraFitOptions {
     }
 }
 
+/// Geographic constraint applied to the map camera center.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BoundsConstraint {
+    /// Keeps the camera center inside the given bounds.
+    Bounded(LatLngBounds),
+    /// Leaves the camera center unconstrained, so the map pans freely across
+    /// the antimeridian. This differs from world bounds of -90/-180 to 90/180,
+    /// which clamp longitude to that range.
+    Unbounded,
+}
+
 /// Optional map camera constraint fields.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
 pub struct BoundOptions {
-    pub bounds: Option<LatLngBounds>,
+    pub bounds: Option<BoundsConstraint>,
     pub min_zoom: Option<f64>,
     pub max_zoom: Option<f64>,
     pub min_pitch: Option<f64>,
@@ -165,9 +206,15 @@ impl BoundOptions {
     fn to_native(&self) -> sys::mln_bound_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_bound_options_default() };
-        if let Some(bounds) = self.bounds {
-            raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
-            raw.bounds = lat_lng_bounds_to_native(bounds);
+        match self.bounds {
+            Some(BoundsConstraint::Bounded(bounds)) => {
+                raw.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+                raw.bounds = lat_lng_bounds_to_native(bounds);
+            }
+            Some(BoundsConstraint::Unbounded) => {
+                raw.fields |= sys::MLN_BOUND_OPTION_UNBOUNDED;
+            }
+            None => {}
         }
         if let Some(min_zoom) = self.min_zoom {
             raw.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
@@ -190,8 +237,15 @@ impl BoundOptions {
 
     fn from_native(raw: sys::mln_bound_options) -> Self {
         Self {
-            bounds: has(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS)
-                .then(|| lat_lng_bounds_from_native(raw.bounds)),
+            bounds: if has(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS) {
+                Some(BoundsConstraint::Bounded(lat_lng_bounds_from_native(
+                    raw.bounds,
+                )))
+            } else if has(raw.fields, sys::MLN_BOUND_OPTION_UNBOUNDED) {
+                Some(BoundsConstraint::Unbounded)
+            } else {
+                None
+            },
             min_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_ZOOM).then_some(raw.min_zoom),
             max_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MAX_ZOOM).then_some(raw.max_zoom),
             min_pitch: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_PITCH).then_some(raw.min_pitch),
@@ -448,6 +502,7 @@ mod tests {
             velocity: Some(2.0),
             min_zoom: Some(3.0),
             easing: Some(UnitBezier::new(0.0, 0.1, 0.2, 1.0)),
+            transition_id: Some(0),
         };
         let raw_animation = animation_options_to_native(&animation);
         assert_eq!(
@@ -460,6 +515,17 @@ mod tests {
                 | sys::MLN_ANIMATION_OPTION_VELOCITY
                 | sys::MLN_ANIMATION_OPTION_MIN_ZOOM
                 | sys::MLN_ANIMATION_OPTION_EASING
+                | sys::MLN_ANIMATION_OPTION_TRANSITION_ID
+        );
+        assert_eq!(raw_animation.transition_id, 0);
+
+        // A present zero transition ID stays distinguishable from an absent
+        // one, which leaves the mask bit clear.
+        let absent = AnimationOptions::default();
+        let raw_absent = animation_options_to_native(&absent);
+        assert_eq!(
+            raw_absent.fields & sys::MLN_ANIMATION_OPTION_TRANSITION_ID,
+            0
         );
 
         let fit = CameraFitOptions {
@@ -483,10 +549,10 @@ mod tests {
     #[test]
     fn bound_free_camera_and_projection_modes_round_trip() {
         let bounds = BoundOptions {
-            bounds: Some(LatLngBounds::new(
+            bounds: Some(BoundsConstraint::Bounded(LatLngBounds::new(
                 LatLng::new(1.0, 2.0),
                 LatLng::new(3.0, 4.0),
-            )),
+            ))),
             min_zoom: Some(5.0),
             max_zoom: Some(6.0),
             min_pitch: Some(7.0),
@@ -498,6 +564,17 @@ mod tests {
             std::mem::size_of::<sys::mln_bound_options>() as u32
         );
         assert_eq!(bound_options_from_native(raw_bounds), bounds);
+        assert_ne!(raw_bounds.fields & sys::MLN_BOUND_OPTION_BOUNDS, 0);
+        assert_eq!(raw_bounds.fields & sys::MLN_BOUND_OPTION_UNBOUNDED, 0);
+
+        let unbounded = BoundOptions {
+            bounds: Some(BoundsConstraint::Unbounded),
+            ..BoundOptions::default()
+        };
+        let raw_unbounded = bound_options_to_native(&unbounded);
+        assert_ne!(raw_unbounded.fields & sys::MLN_BOUND_OPTION_UNBOUNDED, 0);
+        assert_eq!(raw_unbounded.fields & sys::MLN_BOUND_OPTION_BOUNDS, 0);
+        assert_eq!(bound_options_from_native(raw_unbounded), unbounded);
 
         let free = FreeCameraOptions {
             position: Some(Vec3::new(1.0, 2.0, 3.0)),

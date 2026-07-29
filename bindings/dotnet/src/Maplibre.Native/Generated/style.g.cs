@@ -55,6 +55,22 @@ namespace Maplibre.Native.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
+    internal enum mln_geojson_source_option_field : uint
+    {
+        MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM = 1U << 0,
+        MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM = 1U << 1,
+        MLN_GEOJSON_SOURCE_OPTION_TOLERANCE = 1U << 2,
+        MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM = 1U << 3,
+        MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES = 1U << 4,
+        MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE = 1U << 5,
+        MLN_GEOJSON_SOURCE_OPTION_BUFFER = 1U << 6,
+        MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS = 1U << 7,
+        MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8,
+        MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9,
+        MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10,
+    }
+
+    [NativeTypeName("uint32_t")]
     internal enum mln_custom_geometry_source_option_field : uint
     {
         MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM = 1U << 0,
@@ -129,6 +145,44 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint raster_encoding;
+    }
+
+    internal unsafe partial struct mln_geojson_source_options
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint fields;
+
+        public double min_zoom;
+
+        public double max_zoom;
+
+        public double tolerance;
+
+        public double cluster_max_zoom;
+
+        [NativeTypeName("const mln_json_value *")]
+        public mln_json_value* cluster_properties;
+
+        [NativeTypeName("uint32_t")]
+        public uint tile_size;
+
+        [NativeTypeName("uint32_t")]
+        public uint buffer;
+
+        [NativeTypeName("uint32_t")]
+        public uint cluster_radius;
+
+        [NativeTypeName("uint32_t")]
+        public uint cluster_min_points;
+
+        [NativeTypeName("bool")]
+        public byte line_metrics;
+
+        [NativeTypeName("bool")]
+        public byte cluster;
     }
 
     internal partial struct mln_canonical_tile_id
@@ -242,6 +296,9 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_style_tile_source_options mln_style_tile_source_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_geojson_source_options mln_geojson_source_options_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_custom_geometry_source_options mln_custom_geometry_source_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -284,10 +341,10 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_geojson_source_url(mln_map* map, mln_string_view source_id, mln_string_view url);
+        public static extern mln_status mln_map_add_geojson_source_url(mln_map* map, mln_string_view source_id, mln_string_view url, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_map_add_geojson_source_data(mln_map* map, mln_string_view source_id, [NativeTypeName("const mln_geojson *")] mln_geojson* data);
+        public static extern mln_status mln_map_add_geojson_source_data(mln_map* map, mln_string_view source_id, [NativeTypeName("const mln_geojson *")] mln_geojson* data, [NativeTypeName("const mln_geojson_source_options *")] mln_geojson_source_options* options);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_geojson_source_url(mln_map* map, mln_string_view source_id, mln_string_view url);

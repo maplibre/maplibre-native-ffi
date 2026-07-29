@@ -23,13 +23,21 @@ pub const VulkanRenderTarget = union(enum) {
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-        map: *maplibre.MapHandle,
     ) !VulkanRenderTarget {
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = try VulkanOwnedTextureBackend.init(allocator, window, viewport, map) },
-            .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport, map) },
-            .native_surface => .{ .native_surface = try VulkanSurfaceBackend.init(allocator, window, viewport, map) },
+            .owned_texture => .{ .owned_texture = try VulkanOwnedTextureBackend.init(allocator, window, viewport) },
+            .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport) },
+            .native_surface => .{ .native_surface = try VulkanSurfaceBackend.init(allocator, window, viewport) },
         };
+    }
+
+    /// Attaches the render session on the map owner thread.
+    pub fn attach(self: *VulkanRenderTarget, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        switch (self.*) {
+            .owned_texture => |*backend| try backend.attach(map, viewport),
+            .borrowed_texture => |*backend| try backend.attach(map, viewport),
+            .native_surface => |*backend| try backend.attach(map, viewport),
+        }
     }
 
     pub fn deinit(self: *VulkanRenderTarget) void {
@@ -207,7 +215,6 @@ const VulkanOwnedTextureBackend = struct {
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !VulkanOwnedTextureBackend {
         var self = VulkanOwnedTextureBackend{
             .compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false),
@@ -215,8 +222,13 @@ const VulkanOwnedTextureBackend = struct {
             .pending_frame = null,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *VulkanOwnedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *VulkanOwnedTextureBackend) void {
@@ -381,7 +393,6 @@ const VulkanBorrowedTextureBackend = struct {
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
-        map: *maplibre.MapHandle,
     ) !VulkanBorrowedTextureBackend {
         var compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false);
         errdefer compositor.deinit();
@@ -391,8 +402,13 @@ const VulkanBorrowedTextureBackend = struct {
             .compositor = compositor,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *VulkanBorrowedTextureBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *VulkanBorrowedTextureBackend) void {
@@ -450,16 +466,20 @@ const VulkanSurfaceBackend = struct {
     fn init(
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
-        viewport: types.Viewport,
-        map: *maplibre.MapHandle,
+        _: types.Viewport,
     ) !VulkanSurfaceBackend {
         var self = VulkanSurfaceBackend{
             .context = try Context.init(allocator, window, false),
             .session = .none,
         };
         errdefer self.deinit();
-        self.session = try self.attachRenderTarget(map, viewport);
         return self;
+    }
+
+    /// Attaches the render session on this thread, which is the render loop
+    /// thread that owns the graphics resources above and will own the session.
+    fn attach(self: *VulkanSurfaceBackend, map: *maplibre.MapHandle, viewport: types.Viewport) !void {
+        self.session = try self.attachRenderTarget(map, viewport);
     }
 
     fn deinit(self: *VulkanSurfaceBackend) void {

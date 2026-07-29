@@ -278,7 +278,15 @@ class OpenGLTextureRenderableResource final
     }
   }
 
-  void swap() override { context.finish(); }
+  // A caller-owned texture is handed back to its owner as soon as the render
+  // update returns, so it completes every frame. A session-owned texture is
+  // handed over at acquire-frame, which completes the rendering itself, and
+  // CPU readback fences on glReadPixels in this context.
+  void swap() override {
+    if (borrowed_texture_ != 0) {
+      context.finish();
+    }
+  }
 
   auto readStillImage() -> mbgl::PremultipliedImage {
     bind();
@@ -376,7 +384,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   OpenGLTextureBackend(
     const mln_opengl_borrowed_texture_descriptor& descriptor, mbgl::Size size
   )
-      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::gfx::HeadlessBackend(size),
         context_(descriptor.context),
         borrowed_texture_(descriptor.texture) {}
@@ -443,6 +451,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       getDefaultRenderable().getResource<OpenGLTextureRenderableResource>();
     return renderable.texture();
   }
+
+  void finish_rendering() { getContext<mbgl::gl::Context>().finish(); }
 
  private:
   [[nodiscard]] auto has_native_context() const -> bool {
@@ -612,6 +622,10 @@ class OpenGLTextureSessionBackend final
   auto acquire_opengl_owned_frame(
     const mln_render_session& texture, mln_opengl_owned_texture_frame& out_frame
   ) -> mln_status override {
+    // The host samples this texture from its own context, so the session
+    // completes its rendering before exposing the texture name.
+    auto guard = mbgl::gfx::BackendScope{backend_};
+    backend_.finish_rendering();
     out_frame = mln_opengl_owned_texture_frame{
       .size = sizeof(mln_opengl_owned_texture_frame),
       .generation = texture.generation,
@@ -743,7 +757,7 @@ auto metal_owned_texture_attach(
   mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -766,7 +780,7 @@ auto metal_borrowed_texture_attach(
   mln_map* map, const mln_metal_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -795,7 +809,7 @@ auto vulkan_owned_texture_attach(
   mln_map* map, const mln_vulkan_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -818,7 +832,7 @@ auto vulkan_borrowed_texture_attach(
   mln_map* map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -848,7 +862,7 @@ auto opengl_owned_texture_attach(
   mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -873,7 +887,6 @@ auto opengl_owned_texture_attach(
 
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
-  session->owner_thread = map_owner_thread(map);
   set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::OpenGL;
   session->texture.mode = TextureSessionMode::Owned;
@@ -894,7 +907,7 @@ auto opengl_borrowed_texture_attach(
   mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   mln_render_session** out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  const auto map_status = validate_map_live(map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -919,7 +932,6 @@ auto opengl_borrowed_texture_attach(
 
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
-  session->owner_thread = map_owner_thread(map);
   set_borrowed_session_extent(
     *session, descriptor->extent, descriptor->physical_width,
     descriptor->physical_height

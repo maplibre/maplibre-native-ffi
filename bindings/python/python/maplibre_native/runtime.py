@@ -21,7 +21,27 @@ class NetworkStatus(UnknownIntEnum):
 
 
 class RuntimeEventType(UnknownIntEnum):
-    """Runtime event type values reported by the C API."""
+    """Runtime event type values reported by the C API.
+
+    The event type selects the meaning of ``RuntimeEvent.code`` and the payload
+    value carried by ``RuntimeEvent.payload``:
+
+    - ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` carry a
+      :class:`CameraChangeMode` as ``code`` and no payload.
+    - ``MAP_CAMERA_TRANSITION_FINISHED`` carries a
+      :class:`CameraTransitionFinishedPayload`.
+    - ``MAP_LOADING_FAILED`` carries the ordinal of MapLibre Native's internal
+      map load error kind as ``code`` and the failure text as ``message``.
+    - ``MAP_RENDER_FRAME_FINISHED`` carries a :class:`RenderFramePayload`,
+      ``MAP_RENDER_MAP_FINISHED`` a :class:`RenderMapPayload`,
+      ``MAP_STYLE_IMAGE_MISSING`` a :class:`StyleImageMissingPayload`, and
+      ``MAP_TILE_ACTION`` a :class:`TileActionPayload`.
+    - ``OFFLINE_OPERATION_COMPLETED`` carries the operation result as an
+      ``MaplibreStatus`` value in ``code`` and an
+      ``OfflineOperationCompleted`` payload reporting the same status.
+    - The remaining offline event types carry their matching offline payload.
+    - Every other event type reports ``code`` as ``0`` and no payload.
+    """
 
     MAP_CAMERA_WILL_CHANGE = 1
     MAP_CAMERA_IS_CHANGING = 2
@@ -45,6 +65,18 @@ class RuntimeEventType(UnknownIntEnum):
     OFFLINE_REGION_RESPONSE_ERROR = 20
     OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21
     OFFLINE_OPERATION_COMPLETED = 22
+    MAP_CAMERA_TRANSITION_FINISHED = 23
+
+
+class CameraChangeMode(UnknownIntEnum):
+    """Camera change kinds reported as ``code`` by camera change events.
+
+    ``MAP_CAMERA_WILL_CHANGE`` and ``MAP_CAMERA_DID_CHANGE`` events report one
+    of these values.
+    """
+
+    IMMEDIATE = 0
+    ANIMATED = 1
 
 
 class RuntimeEventSourceType(UnknownIntEnum):
@@ -184,6 +216,31 @@ class TileActionPayload:
 
 
 @dataclass(frozen=True, slots=True)
+class CameraTransitionFinishedPayload:
+    """Runtime camera transition-finished event payload.
+
+    A transition that carried a ``transition_id`` on its ``AnimationOptions``
+    reports its end once for every terminal outcome: running to completion,
+    being superseded by a later camera command, being cancelled by
+    ``MapHandle.cancel_transitions``, or completing instantly as a
+    zero-duration jump. A command this API rejects, such as one carrying a
+    non-finite enabled camera field, starts no transition and emits no such
+    event. MapLibre Native reports the moment the transition releases the camera without naming which
+    outcome occurred, so this payload establishes transition identity rather
+    than a completion reason.
+    """
+
+    transition_id: int
+
+    @classmethod
+    def _from_runtime_payload(
+        cls, payload: dict[str, object]
+    ) -> "CameraTransitionFinishedPayload":
+        """Build a camera transition-finished payload from RuntimeEvent.payload."""
+        return cls(transition_id=payload["transition_id"])
+
+
+@dataclass(frozen=True, slots=True)
 class UnknownRuntimeEventPayload:
     """Forward-compatible runtime event payload bytes."""
 
@@ -203,12 +260,26 @@ class RuntimeEventSource:
     """Copied runtime event source metadata."""
 
     source_type: RuntimeEventSourceType
+    """Kind of runtime object the event came from."""
+
     map_handle: MapHandle | None = None
+    """Source map when this binding can prove its identity.
+
+    The runtime holds its maps weakly, so a `MAP` event carries None here once
+    the caller drops its last reference to the source map or closes it. Keep a
+    reference to every map whose events you route by handle.
+    """
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimeEvent:
-    """Runtime event copied into Python-owned values."""
+    """Runtime event copied into Python-owned values.
+
+    ``event_type`` selects the meaning of ``code`` and the type of ``payload``.
+    ``code`` carries a :class:`CameraChangeMode`, a ``MaplibreStatus`` value, a
+    MapLibre Native error ordinal, or ``0``; see :class:`RuntimeEventType` for
+    the per-type meaning.
+    """
 
     event_type: RuntimeEventType
     source: RuntimeEventSource
@@ -248,6 +319,38 @@ class RuntimeOptions:
     asset_path: str | None = None
     cache_path: str | None = None
     maximum_cache_size: int | None = None
+
+
+class WakeSource(NativeHandleMixin):
+    """Releases a runtime owner thread parked in :meth:`RuntimeHandle.pump`.
+
+    A wake source is usable from any thread, which a host's task submission and
+    shutdown paths rely on. It stays usable after its runtime closes, and
+    signalling it then does nothing.
+    """
+
+    _handle_name = "WakeSource"
+
+    def __init__(self, native: Any, *, _create_key: object | None = None) -> None:
+        if _create_key is not _WAKE_SOURCE_CREATE_KEY:
+            msg = "WakeSource instances are created by RuntimeHandle.wake_source()"
+            raise TypeError(msg)
+        self._native = native
+
+    @classmethod
+    def _from_native(cls, native: Any) -> WakeSource:
+        return cls(native, _create_key=_WAKE_SOURCE_CREATE_KEY)
+
+    def signal(self) -> None:
+        """Set the runtime's wake flag and release the parked owner thread.
+
+        A signal raised while the owner thread is running sets the wake flag,
+        so the next :meth:`RuntimeHandle.pump` returns without parking.
+        """
+        self._native.signal()
+
+
+_WAKE_SOURCE_CREATE_KEY = object()
 
 
 class RuntimeHandle(NativeHandleMixin):
@@ -297,9 +400,43 @@ class RuntimeHandle(NativeHandleMixin):
             return None
         return map_handle
 
-    def run_once(self) -> None:
-        """Run one pending owner-thread task for this runtime."""
-        self._native.run_once()
+    def pump(self, timeout: float | None = 0.0) -> None:
+        """Advance this runtime.
+
+        The call parks the owner thread when ``timeout`` allows it, then drains
+        the owner-thread task queues. Drain the queued runtime events with
+        :meth:`poll_event` afterwards.
+
+        ``timeout`` is in seconds and sets the park bound. Zero drains and
+        returns; hosts pumping from a frame callback pass it. A positive value
+        parks for up to that long; hosts that own their pump thread pass one and
+        take their cadence from the runtime's own work. ``None`` parks until a
+        wake arrives.
+
+        The drain runs every task queued when it begins plus every task those
+        enqueue, so a single call can span a full style parse.
+
+        The runtime holds a wake flag. Style, tile, offline, and resource
+        responses set it, as do queued runtime events and
+        :meth:`WakeSource.signal`. A parking call returns as soon as the flag is
+        set and clears it before returning, and work arriving during the drain
+        sets it again. A call also returns without parking while unread runtime
+        events are queued. Timers and ready file descriptors set the flag only
+        when they queue owner-thread work, so pass a bounded timeout to cap how
+        long a call waits.
+
+        A non-zero timeout releases the GIL while it parks, so other Python
+        threads run and can signal a wake source. Call it outside any lock that
+        a signalling thread takes.
+        """
+        # A negative timeout is a caller mistake rather than a request for an
+        # unbounded park, which ``None`` spells, so it collapses to no wait.
+        timeout_ms = -1 if timeout is None else max(0, int(timeout * 1000))
+        self._native.pump(timeout_ms)
+
+    def wake_source(self) -> WakeSource:
+        """Acquire a wake source for this runtime, usable from any thread."""
+        return WakeSource._from_native(self._native.wake_source())  # noqa: SLF001
 
     def _offline_operation(
         self, start: Callable[..., int], *args: object
@@ -424,7 +561,13 @@ class RuntimeHandle(NativeHandleMixin):
         *,
         max_pending_callbacks: int = 64,
     ) -> None:
-        """Install or replace the runtime-scoped network resource provider."""
+        """Install or replace the runtime-scoped network resource provider.
+
+        Replacement is allowed while maps are live. When this call returns, the
+        previous callback is retired and no in-flight request can still reach
+        it. Requests it already took a handle for keep that handle, and each one
+        is completed and released as usual.
+        """
         from .resource import _adapt_resource_provider_callback
 
         self._native.set_resource_provider(
@@ -432,8 +575,24 @@ class RuntimeHandle(NativeHandleMixin):
             max_pending_callbacks,
         )
 
+    def clear_resource_provider(self) -> None:
+        """Clear the runtime-scoped network resource provider.
+
+        Later requests go to MapLibre's online file source. When this call
+        returns, the previous callback is retired and no in-flight request can
+        still reach it. Requests it already took a handle for keep that handle,
+        and each one is completed and released as usual.
+        """
+        self._native.clear_resource_provider()
+
     def poll_event(self) -> RuntimeEvent | None:
-        """Poll and copy one queued runtime event."""
+        """Poll and copy one queued runtime event.
+
+        Map-originated events resolve their source map through this runtime's
+        weakly held map table, so `RuntimeEvent.source.map_handle` is None once
+        the caller drops its last reference to that map. Keep a reference to
+        every map whose events you route by handle.
+        """
         event = self._native.poll_event()
         if event is None:
             return None
@@ -466,10 +625,14 @@ def _runtime_payload_from_native(payload: dict[str, object]) -> RuntimeEventPayl
         return OfflineRegionTileCountLimitExceeded._from_runtime_payload(payload)
     if kind == "offline_operation_completed":
         return OfflineOperationCompleted._from_runtime_payload(payload)
+    if kind == "camera_transition_finished":
+        return CameraTransitionFinishedPayload._from_runtime_payload(payload)
     return UnknownRuntimeEventPayload._from_runtime_payload(payload)
 
 
 __all__ = [
+    "CameraChangeMode",
+    "CameraTransitionFinishedPayload",
     "NetworkStatus",
     "RenderFramePayload",
     "RenderMapPayload",
@@ -511,5 +674,6 @@ RuntimeEventPayload = (
     | OfflineRegionResponseError
     | OfflineRegionTileCountLimitExceeded
     | OfflineOperationCompleted
+    | CameraTransitionFinishedPayload
     | UnknownRuntimeEventPayload
 )

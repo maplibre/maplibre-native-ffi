@@ -124,7 +124,14 @@ namespace MaplibreNative {
         OFFLINE_REGION_RESPONSE_ERROR = 20,
         OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
         OFFLINE_OPERATION_COMPLETED = 22,
+        MAP_CAMERA_TRANSITION_FINISHED = 23,
         UNKNOWN = 0
+    }
+
+    public enum CameraChangeMode {
+        IMMEDIATE = 0,
+        ANIMATED = 1,
+        UNKNOWN = 255
     }
 
     public enum RuntimeEventSourceType {

@@ -2,7 +2,9 @@ use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
 use std::marker::PhantomData;
+use std::ptr::NonNull;
 use std::rc::{Rc, Weak};
+use std::time::Duration;
 
 use maplibre_core::AmbientCacheOperation;
 use maplibre_native_core as maplibre_core;
@@ -31,7 +33,6 @@ pub(crate) use maplibre_core::runtime::{
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
     next_map_id: Cell<u64>,
-    has_created_map: Cell<bool>,
     map_ids: RefCell<HashMap<usize, MapId>>,
     map_states: RefCell<HashMap<usize, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
@@ -48,7 +49,6 @@ impl RuntimeState {
         Self {
             handle,
             next_map_id: Cell::new(1),
-            has_created_map: Cell::new(false),
             map_ids: RefCell::new(HashMap::new()),
             map_states: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
@@ -83,19 +83,58 @@ impl RuntimeState {
             + Sync
             + 'static,
     {
-        self.check_resource_callbacks_allowed()?;
-        let runtime = self.as_ptr()?;
         let replacement = ResourceProviderState::new(callback);
         let descriptor = replacement.descriptor();
+        self.install_resource_provider(replacement, descriptor)
+    }
+
+    /// Installs a provider descriptor whose callback is null so tests can
+    /// exercise the native install-failure rollback path, which real public
+    /// callers never reach because the wrapper always supplies a trampoline.
+    #[cfg(test)]
+    fn set_resource_provider_with_rejected_descriptor_for_testing<F>(
+        &self,
+        callback: F,
+    ) -> Result<()>
+    where
+        F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
+            + Send
+            + Sync
+            + 'static,
+    {
+        let replacement = ResourceProviderState::new(callback);
+        let mut descriptor = replacement.descriptor();
+        descriptor.callback = None;
+        self.install_resource_provider(replacement, descriptor)
+    }
+
+    fn install_resource_provider(
+        &self,
+        replacement: Box<ResourceProviderState>,
+        descriptor: sys::mln_resource_provider,
+    ) -> Result<()> {
+        let runtime = self.as_ptr()?;
 
         // SAFETY: runtime is live. descriptor contains a C trampoline and a
-        // user_data pointer to replacement, which remains alive on success. On
+        // user_data pointer to the boxed replacement, which remains alive on
+        // success. Native retires the previous provider before returning, so
+        // the previous state dropped below is unreachable from native. On
         // failure, native preserves the previous provider and replacement is
         // dropped below.
         maplibre_core::check(unsafe {
             sys::mln_runtime_set_resource_provider(runtime, &descriptor)
         })?;
         self.resource_provider.borrow_mut().replace(replacement);
+        Ok(())
+    }
+
+    fn clear_resource_provider(&self) -> Result<()> {
+        let runtime = self.as_ptr()?;
+
+        // SAFETY: runtime is live. Native clear waits for in-flight provider
+        // callbacks before returning, so dropping Rust callback state below is safe.
+        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_provider(runtime) })?;
+        self.resource_provider.borrow_mut().take();
         Ok(())
     }
 
@@ -128,19 +167,7 @@ impl RuntimeState {
         Ok(())
     }
 
-    fn check_resource_callbacks_allowed(&self) -> Result<()> {
-        if self.has_created_map.get() {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "resource callbacks must be configured before creating maps from the runtime",
-            ));
-        }
-        Ok(())
-    }
-
     pub(crate) fn register_map(&self, ptr: *mut sys::mln_map) -> MapId {
-        self.has_created_map.set(true);
         let id = MapId::new(self.next_map_id.get());
         self.next_map_id.set(id.get().saturating_add(1));
         self.map_ids.borrow_mut().insert(ptr as usize, id);
@@ -488,15 +515,21 @@ impl RuntimeHandle {
 
     /// Installs or replaces the runtime-scoped network resource provider.
     ///
-    /// The provider must be installed before creating maps from this runtime.
-    /// Native code may invoke it from worker or network threads, so the closure
-    /// must be thread-safe and `'static`. Keep the closure quick, and do not
-    /// call map or runtime APIs from it. Return `PassThrough` to let native
-    /// networking handle the request. Return `Handle` to complete or release
-    /// the provided `ResourceRequestHandle` inline or later. If the callback
-    /// completes the handle inline, the wrapper returns native `Handle` even
-    /// when the closure returns `PassThrough`, preventing native double
-    /// handling.
+    /// The provider may be installed or replaced before or after creating maps
+    /// from this runtime. Native code may invoke it from worker or network
+    /// threads, so the closure must be thread-safe and `'static`. Keep the
+    /// closure quick, and do not call map or runtime APIs from it. Return
+    /// `PassThrough` to let native networking handle the request. Return
+    /// `Handle` to complete or release the provided `ResourceRequestHandle`
+    /// inline or later. If the callback completes the handle inline, the
+    /// wrapper returns native `Handle` even when the closure returns
+    /// `PassThrough`, preventing native double handling.
+    ///
+    /// A successful replacement retires the previous provider before returning,
+    /// so this method releases the previous closure's Rust state once native
+    /// can no longer invoke it. Requests the previous provider already took a
+    /// `ResourceRequestHandle` for keep that handle; complete and release each
+    /// one as usual.
     pub fn set_resource_provider<F>(&self, callback: F) -> Result<()>
     where
         F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
@@ -505,6 +538,19 @@ impl RuntimeHandle {
             + 'static,
     {
         self.inner.set_resource_provider(callback)
+    }
+
+    /// Clears the runtime-scoped network resource provider.
+    ///
+    /// Clearing may happen before or after creating maps from this runtime.
+    /// Requests that reach the C API network file source then go to MapLibre's
+    /// online file source. Native clear waits for in-flight provider callbacks
+    /// before returning, so this method releases Rust callback state after a
+    /// successful clear. Requests the provider already took a
+    /// `ResourceRequestHandle` for keep that handle; complete and release each
+    /// one as usual.
+    pub fn clear_resource_provider(&self) -> Result<()> {
+        self.inner.clear_resource_provider()
     }
 
     /// Installs or replaces the runtime-scoped network URL transform.
@@ -777,14 +823,64 @@ impl RuntimeHandle {
         )
     }
 
-    /// Runs one pending owner-thread task for this runtime.
-    pub fn run_once(&self) -> Result<()> {
+    /// Advances this runtime.
+    ///
+    /// The call parks the owner thread when `timeout` allows it, then drains
+    /// the owner-thread task queues. Drain the queued runtime events with
+    /// [`Self::poll_event`] afterwards.
+    ///
+    /// `timeout` sets the park bound. `Some(Duration::ZERO)` drains and
+    /// returns; hosts pumping from a frame callback pass it. A longer `Some`
+    /// parks for up to that long; hosts that own their pump thread pass one and
+    /// take their cadence from the runtime's own work. `None` parks until a
+    /// wake arrives.
+    ///
+    /// The drain runs every task queued when it begins plus every task those
+    /// enqueue, so a single call can span a full style parse.
+    ///
+    /// The runtime holds a wake flag. Style, tile, offline, and resource
+    /// responses set it, as do queued runtime events and
+    /// [`WakeSource::signal`]. A parking call returns as soon as the flag is
+    /// set and clears it before returning, and work arriving during the drain
+    /// sets it again. A call also returns without parking while unread runtime
+    /// events are queued. Timers and ready file descriptors set the flag only
+    /// when they queue owner-thread work, so pass a bounded timeout to cap how
+    /// long a call waits.
+    ///
+    /// A non-zero timeout blocks the calling thread. Call it outside any lock
+    /// that a thread signalling a [`WakeSource`] takes, and outside native
+    /// callbacks.
+    pub fn pump(&self, timeout: Option<Duration>) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
+        let timeout_ms = timeout.map_or(-1, |timeout| {
+            i64::try_from(timeout.as_millis()).unwrap_or(i64::MAX)
+        });
         // SAFETY: runtime is a live runtime handle owned by this wrapper.
-        maplibre_core::check(unsafe { sys::mln_runtime_run_once(runtime) })
+        maplibre_core::check(unsafe { sys::mln_runtime_pump(runtime, timeout_ms) })
+    }
+
+    /// Acquires a [`WakeSource`] that releases this runtime's parked owner
+    /// thread. The returned source is usable from any thread.
+    pub fn wake_source(&self) -> Result<WakeSource> {
+        let runtime = self.inner.as_ptr()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_wake_source>::new();
+        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
+        // out is a valid null-initialized out-pointer owned by this call.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_wake_source_acquire(runtime, out.as_mut_ptr())
+        })?;
+        Ok(WakeSource {
+            ptr: out_handle(out, "mln_wake_source")?,
+        })
     }
 
     /// Polls one queued runtime event and copies it into an owned Rust value.
+    ///
+    /// Polling also advances binding-owned state that the event reports. A
+    /// polled [`crate::RuntimeEventType::MapStyleLoaded`] event releases the
+    /// upcall state of custom geometry sources the newly loaded style dropped,
+    /// so keep polling to completion to let that state be reclaimed; a map
+    /// whose events go unpolled keeps those sources' callback state alive.
     pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
         let runtime = self.inner.as_ptr()?;
         let mut event = empty_runtime_event();
@@ -828,6 +924,47 @@ impl RuntimeHandle {
         self.inner
             .close()
             .map_err(|error| HandleOperationError::new(error, self))
+    }
+}
+
+/// Releases a runtime owner thread parked in [`RuntimeHandle::pump`].
+///
+/// A wake source is usable from any thread, which a host's task submission and
+/// shutdown paths rely on. Each source holds its own reference to the runtime's
+/// wake state, so it stays usable after the runtime closes and signalling it
+/// then does nothing.
+#[derive(Debug)]
+pub struct WakeSource {
+    ptr: NonNull<sys::mln_wake_source>,
+}
+
+// SAFETY: The C API documents mln_wake_source_signal() and
+// mln_wake_source_destroy() as callable from any thread. The native handle owns
+// a reference-counted wake state whose mutable field is guarded by a native
+// mutex, and it holds only that state.
+unsafe impl Send for WakeSource {}
+// SAFETY: See the Send justification. Signalling takes `&self`, and native
+// synchronizes concurrent signals internally.
+unsafe impl Sync for WakeSource {}
+
+impl WakeSource {
+    /// Sets the runtime's wake flag and releases the parked owner thread.
+    ///
+    /// A signal raised while the owner thread is running sets the wake flag,
+    /// so the next [`RuntimeHandle::pump`] returns without parking. Signalling
+    /// after the runtime closes succeeds and does nothing.
+    pub fn signal(&self) -> Result<()> {
+        // SAFETY: ptr is a live wake source owned by this wrapper, and native
+        // accepts signals from any thread.
+        maplibre_core::check(unsafe { sys::mln_wake_source_signal(self.ptr.as_ptr()) })
+    }
+}
+
+impl Drop for WakeSource {
+    fn drop(&mut self) {
+        // SAFETY: ptr is a live wake source this wrapper owns and destroys
+        // exactly once, and native accepts destruction from any thread.
+        unsafe { sys::mln_wake_source_destroy(self.ptr.as_ptr()) };
     }
 }
 
@@ -907,7 +1044,7 @@ mod tests {
                     ),
                 ));
             }
-            runtime.run_once()?;
+            runtime.pump(Some(Duration::ZERO))?;
             while let Some(event) = runtime.poll_event()? {
                 let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload
                 else {
@@ -1217,7 +1354,7 @@ mod tests {
         options.maximum_cache_size = Some(0);
         let runtime = RuntimeHandle::with_options(&options).unwrap();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         runtime.close().unwrap();
     }
 
@@ -1241,7 +1378,7 @@ mod tests {
 
     fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
-            let _ = runtime.run_once();
+            let _ = runtime.pump(Some(Duration::ZERO));
             while let Ok(Some(event)) = runtime.poll_event() {
                 if event.event_type == event_type {
                     return true;
@@ -1252,15 +1389,138 @@ mod tests {
         false
     }
 
+    fn wait_for_map_loading_failure(runtime: &RuntimeHandle) -> RuntimeEvent {
+        for _ in 0..100 {
+            runtime.pump(Some(Duration::ZERO)).unwrap();
+            while let Some(event) = runtime.poll_event().unwrap() {
+                if event.event_type == RuntimeEventType::MapLoadingFailed {
+                    return event;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        panic!("expected a map loading-failure event");
+    }
+
     #[test]
     // Spec coverage: BND-080.
     fn runtime_create_run_poll_drain_and_close() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         let _ = runtime.poll_event().unwrap();
         let _ = runtime.poll_event().unwrap();
         while runtime.poll_event().unwrap().is_some() {}
+        runtime.close().unwrap();
+    }
+
+    // Pumps until the runtime is idle, so a park that follows is released by
+    // the signal the test raises.
+    fn quiesce(runtime: &RuntimeHandle) {
+        for _ in 0..100 {
+            runtime.pump(Some(Duration::ZERO)).unwrap();
+            let mut drained = false;
+            while runtime.poll_event().unwrap().is_some() {
+                drained = true;
+            }
+            if !drained {
+                return;
+            }
+        }
+        panic!("the runtime kept producing events while idle");
+    }
+
+    // Drives the runtime the way a parked host does, so a missing wake shows up
+    // as an expired timeout.
+    fn park_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        let started = Instant::now();
+        for _ in 0..20 {
+            runtime.pump(Some(Duration::from_secs(10))).unwrap();
+            assert!(
+                started.elapsed() < Duration::from_secs(5),
+                "parks sat out their timeouts instead of taking wakes"
+            );
+            while let Some(event) = runtime.poll_event().unwrap() {
+                if event.event_type == event_type {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    #[test]
+    // Spec coverage: BND-088.
+    fn parked_owner_thread_wakes_for_native_work_and_for_a_wake_source() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.url != "custom://style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                handle
+                    .complete(ResourceResponse::ok(
+                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                    ))
+                    .unwrap();
+                ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("custom://style.json").unwrap();
+        assert!(park_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+
+        // A source moved to another thread matches a host's submission path,
+        // and the park it releases has no other work to end it.
+        let source = runtime.wake_source().unwrap();
+        quiesce(&runtime);
+        let signaller = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(20));
+            source.signal().unwrap();
+            source
+        });
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "the parked owner thread timed out instead of taking the signal"
+        );
+        let source = signaller.join().unwrap();
+
+        // A wake source stays usable after its runtime closes, so hosts tear
+        // the two down in either order.
+        map.close().unwrap();
+        runtime.close().unwrap();
+        source.signal().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-089.
+    fn a_pump_clears_the_wake_flag_it_returns_on() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let source = runtime.wake_source().unwrap();
+        quiesce(&runtime);
+
+        source.signal().unwrap();
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_secs(10))).unwrap();
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "a pump waited even though the wake flag was set"
+        );
+
+        // The pump above cleared the wake flag, so this one waits its full timeout.
+        let started = Instant::now();
+        runtime.pump(Some(Duration::from_millis(200))).unwrap();
+        assert!(
+            started.elapsed() >= Duration::from_millis(100),
+            "the first pump left the wake flag set"
+        );
+
         runtime.close().unwrap();
     }
 
@@ -1291,7 +1551,7 @@ mod tests {
             // SAFETY: This intentionally exercises the C API's owner-thread
             // validation path with a live runtime handle from another thread.
             maplibre_core::check(unsafe {
-                sys::mln_runtime_run_once(runtime_ptr as *mut sys::mln_runtime)
+                sys::mln_runtime_pump(runtime_ptr as *mut sys::mln_runtime, 0)
             })
             .unwrap_err()
         })
@@ -1306,7 +1566,7 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-123.
-    fn resource_provider_installs_replaces_and_releases_state() {
+    fn resource_provider_installs_replaces_clears_and_releases_state() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let first = Arc::new(());
         let first_callback = Arc::clone(&first);
@@ -1330,12 +1590,26 @@ mod tests {
         assert_eq!(Arc::strong_count(&first), 1);
         assert_eq!(Arc::strong_count(&second), 2);
 
-        runtime.close().unwrap();
+        runtime.clear_resource_provider().unwrap();
         assert_eq!(Arc::strong_count(&second), 1);
+
+        let third = Arc::new(());
+        let third_callback = Arc::clone(&third);
+        runtime
+            .set_resource_provider(move |_, _| {
+                let _ = &third_callback;
+                crate::ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&third), 2);
+
+        runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&third), 1);
     }
 
     #[test]
-    // Spec coverage: BND-122.
+    // Spec coverage: BND-122. The rejected descriptor is an internal seam for
+    // native callback-install failure, which public callers cannot produce.
     fn resource_provider_replacement_rolls_back_when_native_install_fails() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let first = Arc::new(());
@@ -1346,40 +1620,90 @@ mod tests {
                 crate::ResourceProviderDecision::PassThrough
             })
             .unwrap();
-        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
         let second = Arc::new(());
         let second_callback = Arc::clone(&second);
         let error = runtime
-            .set_resource_provider(move |_, _| {
+            .inner
+            .set_resource_provider_with_rejected_descriptor_for_testing(move |_, _| {
                 let _ = &second_callback;
                 crate::ResourceProviderDecision::PassThrough
             })
             .unwrap_err();
 
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
         assert_eq!(Arc::strong_count(&first), 2);
         assert_eq!(Arc::strong_count(&second), 1);
 
-        map.close().unwrap();
         runtime.close().unwrap();
         assert_eq!(Arc::strong_count(&first), 1);
     }
 
+    // Requests a style no file source serves, so the loading-failure event that
+    // follows proves the request reached the network file source where the
+    // runtime-scoped provider sits. This keeps provider consultation observable
+    // without network access.
+    fn load_probe_style(runtime: &RuntimeHandle, map: &MapHandle, style_url: &str) {
+        map.set_style_url(style_url).unwrap();
+        let event = wait_for_map_loading_failure(runtime);
+        assert!(
+            event
+                .message
+                .as_deref()
+                .is_some_and(|message| message.contains("\"jar\""))
+        );
+    }
+
     #[test]
-    // Rust regression: enforces Rust's callback registration guard after a
-    // map has made runtime-scoped provider replacement unsafe.
-    fn resource_provider_rejects_install_after_map_was_closed() {
+    // Spec coverage: BND-142 and BND-154.
+    fn resource_provider_is_consulted_until_replaced_and_cleared_while_a_map_is_live() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+        let first_calls = Arc::new(AtomicUsize::new(0));
+        let first_callback_calls = Arc::clone(&first_calls);
+        runtime
+            .set_resource_provider(move |_, _| {
+                first_callback_calls.fetch_add(1, Ordering::SeqCst);
+                ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        load_probe_style(&runtime, &map, "jar:file:/packaged/first.json");
+        assert!(first_calls.load(Ordering::SeqCst) > 0);
+
+        let second_calls = Arc::new(AtomicUsize::new(0));
+        let second_callback_calls = Arc::clone(&second_calls);
+        runtime
+            .set_resource_provider(move |_, _| {
+                second_callback_calls.fetch_add(1, Ordering::SeqCst);
+                ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        let first_calls_after_replace = first_calls.load(Ordering::SeqCst);
+        load_probe_style(&runtime, &map, "jar:file:/packaged/second.json");
+        assert!(second_calls.load(Ordering::SeqCst) > 0);
+        assert_eq!(
+            first_calls.load(Ordering::SeqCst),
+            first_calls_after_replace
+        );
+
+        runtime.clear_resource_provider().unwrap();
+        let second_calls_after_clear = second_calls.load(Ordering::SeqCst);
+        load_probe_style(&runtime, &map, "jar:file:/packaged/third.json");
+        assert_eq!(
+            first_calls.load(Ordering::SeqCst),
+            first_calls_after_replace
+        );
+        assert_eq!(
+            second_calls.load(Ordering::SeqCst),
+            second_calls_after_clear
+        );
+
+        // Clearing an already cleared provider stays a successful no-op.
+        runtime.clear_resource_provider().unwrap();
+
         map.close().unwrap();
-
-        let error = runtime
-            .set_resource_provider(|_, _| ResourceProviderDecision::PassThrough)
-            .unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(error.raw_status(), None);
         runtime.close().unwrap();
     }
 
@@ -1481,22 +1805,7 @@ mod tests {
         let map_id = map.id();
         map.set_style_url("custom://broken-style.json").unwrap();
 
-        let mut loading_failed = None;
-        for _ in 0..100 {
-            runtime.run_once().unwrap();
-            while let Some(event) = runtime.poll_event().unwrap() {
-                if event.event_type == RuntimeEventType::MapLoadingFailed {
-                    loading_failed = Some(event);
-                    break;
-                }
-            }
-            if loading_failed.is_some() {
-                break;
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-
-        let event = loading_failed.expect("resource error should enqueue loading-failed event");
+        let event = wait_for_map_loading_failure(&runtime);
         let copied_message = event.message.clone();
         let _ = runtime.poll_event().unwrap();
 
@@ -1733,7 +2042,7 @@ mod tests {
         assert_eq!(error.raw_status(), None);
         let runtime = error.into_handle();
 
-        runtime.run_once().unwrap();
+        runtime.pump(Some(Duration::ZERO)).unwrap();
         map.close().unwrap();
         runtime.close().unwrap();
     }

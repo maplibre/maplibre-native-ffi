@@ -20,7 +20,7 @@ commands = [
 platforms = ["linux", "macos", "windows"]
 commands = [
   { task = "//bindings/kotlin:jvmTest" },
-  { task = "//bindings/kotlin:nativeTest", platforms = ["macos"] },
+  { task = "//bindings/kotlin:nativeTest", platforms = ["linux", "macos"], exclude = ["linux-arm64-egl", "linux-arm64-vulkan"] },
   { task = "//examples/compose-map:build" },
   { task = "//examples/lwjgl-map:build" },
 ]
@@ -45,5 +45,14 @@ platforms = ["linux", "macos"]
 commands = [{ task = "//bindings/vala:test" }]
 
 [[suites]]
+platforms = ["windows"]
+commands = [
+  { task = "//bindings/vala:test", include = ["windows-x64-wgl"] },
+]
+
+[[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
+
+# TODO(#412): Re-enable Dart CI after thread-affine ownership is safe across
+# isolate migration; affected test processes can otherwise wedge until timeout.

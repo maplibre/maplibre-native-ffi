@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from .geo import LatLngBounds
+from .errors import InvalidArgumentError
+from .json import JsonValue
 from .render import PremultipliedRgba8Image, TextureImageInfo
 
 _CUSTOM_GEOMETRY_SOURCE_HANDLE_CREATE_KEY = object()
@@ -46,6 +48,37 @@ class TileSourceOptions:
     tile_size: int | None = None
     vector_encoding: VectorTileEncoding | None = None
     raster_dem_encoding: RasterDemEncoding | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class GeoJsonSourceOptions:
+    """Options for GeoJSON sources.
+
+    MapLibre Native fixes these options when the source is created, so updating
+    a GeoJSON source's URL or data keeps the options it was added with.
+    """
+
+    min_zoom: float | None = None
+    max_zoom: float | None = None
+    tolerance: float | None = None
+    cluster_max_zoom: float | None = None
+    cluster_properties: JsonValue | None = None
+    """Cluster aggregation expressions keyed by property name, as a JSON object
+    whose members follow the MapLibre Style Spec `clusterProperties` form."""
+    tile_size: int | None = None
+    buffer: int | None = None
+    cluster_radius: int | None = None
+    cluster_min_points: int | None = None
+    line_metrics: bool | None = None
+    cluster: bool | None = None
+
+    def __post_init__(self) -> None:
+        for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
+            value = getattr(self, name)
+            if value is not None and not 0 <= value <= 0xFFFF_FFFF:
+                raise InvalidArgumentError(
+                    None, f"{name} must be within [0, 4294967295]"
+                )
 
 
 class StyleSourceType(UnknownIntEnum):
@@ -228,6 +261,7 @@ __all__ = [
     "CustomGeometrySourceEventType",
     "CustomGeometrySourceHandle",
     "CustomGeometrySourceOptions",
+    "GeoJsonSourceOptions",
     "LocationIndicatorImageKind",
     "RasterDemEncoding",
     "StyleImage",

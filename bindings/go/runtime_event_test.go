@@ -101,6 +101,7 @@ func TestRuntimeEventKnownPayloadsRequireFullStructSize(t *testing.T) {
 		RuntimeEventPayloadOfflineRegionResponseError,
 		RuntimeEventPayloadOfflineRegionTileCountLimit,
 		RuntimeEventPayloadOfflineOperationCompleted,
+		RuntimeEventPayloadCameraTransitionFinished,
 	} {
 		size := sizes[payloadType]
 		if size < 2 {
@@ -152,11 +153,16 @@ func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
 		}
 	}()
 
+	mapID, err := m.ID()
+	if err != nil {
+		t.Fatalf("ID(): %v", err)
+	}
+
 	event := runtimeEventMapSourceForTest(runtime, m)
 	if event.Source.Type != RuntimeEventSourceMap {
 		t.Fatalf("source type = %v, want map", event.Source.Type)
 	}
-	if event.Source.MapID == 0 || event.Source.MapID != m.id {
-		t.Fatalf("source map ID = %d, want %d", event.Source.MapID, m.id)
+	if event.Source.MapID == 0 || event.Source.MapID != mapID {
+		t.Fatalf("source map ID = %d, want %d", event.Source.MapID, mapID)
 	}
 }

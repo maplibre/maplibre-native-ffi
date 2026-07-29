@@ -6,10 +6,10 @@ swift.platform = "ubuntu24.04"
 
 [vars]
 host_native_preset = "linux-{{ arch() }}-vulkan"
-# Highest glibc release our published Linux natives may require. Raising this
-# drops support for distributions that ship an older glibc, so change it
-# together with the CI runner images in ci/workflow.py.
-glibc_floor = "2.39"
+# Highest glibc release our published Linux natives may require. The zig
+# toolchain sets this from MLN_FFI_ZIG_GLIBC rather than from the build host,
+# so change it together with cmake/toolchains/zig-linux.cmake.
+glibc_floor = "2.17"
 
 [bootstrap.packages]
 "apt:build-essential" = "latest"
@@ -23,25 +23,32 @@ glibc_floor = "2.39"
 "apt:libncurses6" = "latest"
 "apt:libsqlite3-0" = "latest"
 "apt:libvulkan-dev" = "latest"
-"apt:ninja-build" = "latest"
+"apt:libx11-dev" = "latest"
+# The Swift toolchain's libFoundationXML.so links libxml2.so.2, which SwiftPM
+# needs. Ubuntu 26.04 and later ship only libxml2-16 (libxml2.so.16) and drop
+# this package, so Swift there needs a toolchain built for that release rather
+# than the ubuntu24.04 build pinned above.
+"apt:libxml2" = "latest"
 "apt:pkg-config" = "latest"
 "apt:valac" = "latest"
+"apt:xvfb" = "latest"
 "dnf:clang-devel" = "latest"
 "dnf:clang" = "latest"
 "dnf:gcc" = "latest"
 "dnf:gcc-c++" = "latest"
 "dnf:glib2-devel" = "latest"
 "dnf:glslang" = "latest"
-"dnf:libicu-devel" = "latest"
 "dnf:libglvnd-devel" = "latest"
-"dnf:libstdc++-static" = "latest"
+"dnf:libicu-devel" = "latest"
+"dnf:libX11-devel" = "latest"
+"dnf:libxml2" = "latest"
 "dnf:mesa-libEGL-devel" = "latest"
 "dnf:ncurses-libs" = "latest"
-"dnf:ninja-build" = "latest"
 "dnf:pkgconf-pkg-config" = "latest"
 "dnf:sqlite-libs" = "latest"
 "dnf:vulkan-loader-devel" = "latest"
 "dnf:vala" = "latest"
+"dnf:xorg-x11-server-Xvfb" = "latest"
 
 [tasks.check-glibc-floor]
 description = "Verify a built Linux native requires no glibc newer than the floor."

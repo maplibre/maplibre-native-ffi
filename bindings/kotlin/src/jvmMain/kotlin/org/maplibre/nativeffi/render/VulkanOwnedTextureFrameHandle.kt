@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
 /** Explicit handle for a Vulkan session-owned texture frame. */
@@ -10,11 +11,11 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: VulkanOwnedTextureFrame,
 ) : AutoCloseable {
-  private val core =
-    OwnedTextureFrameHandleCore(
-      "VulkanOwnedTextureFrameHandle",
-      "Vulkan owned texture frame handle is closed",
-    )
+  private val core = OwnedTextureFrameHandleCore("VulkanOwnedTextureFrameHandle")
+
+  init {
+    HandleLeakCleaner.registerFrame(this, core)
+  }
 
   public actual fun frame(): VulkanOwnedTextureFrame {
     core.ensureOpen()

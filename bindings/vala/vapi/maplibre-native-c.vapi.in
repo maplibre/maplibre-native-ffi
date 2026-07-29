@@ -246,7 +246,8 @@ namespace MaplibreNative.Raw {
         OFFLINE_REGION_STATUS_CHANGED,
         OFFLINE_REGION_RESPONSE_ERROR,
         OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED,
-        OFFLINE_OPERATION_COMPLETED
+        OFFLINE_OPERATION_COMPLETED,
+        MAP_CAMERA_TRANSITION_FINISHED
     }
 
     [CCode (cname = "mln_runtime_event_source_type", cprefix = "MLN_RUNTIME_EVENT_SOURCE_", has_type_id = false)]
@@ -265,7 +266,14 @@ namespace MaplibreNative.Raw {
         OFFLINE_REGION_STATUS,
         OFFLINE_REGION_RESPONSE_ERROR,
         OFFLINE_REGION_TILE_COUNT_LIMIT,
-        OFFLINE_OPERATION_COMPLETED
+        OFFLINE_OPERATION_COMPLETED,
+        CAMERA_TRANSITION_FINISHED
+    }
+
+    [CCode (cname = "mln_camera_change_mode", cprefix = "MLN_CAMERA_CHANGE_MODE_", has_type_id = false)]
+    public enum CameraChangeMode {
+        IMMEDIATE,
+        ANIMATED
     }
 
     [CCode (cname = "mln_render_mode", cprefix = "MLN_RENDER_MODE_", has_type_id = false)]
@@ -502,6 +510,22 @@ namespace MaplibreNative.Raw {
         WRAP
     }
 
+    [CCode (cname = "mln_geojson_source_option_field", cprefix = "MLN_GEOJSON_SOURCE_OPTION_", has_type_id = false)]
+    [Flags]
+    public enum GeoJsonSourceOptionField {
+        MIN_ZOOM,
+        MAX_ZOOM,
+        TOLERANCE,
+        CLUSTER_MAX_ZOOM,
+        CLUSTER_PROPERTIES,
+        TILE_SIZE,
+        BUFFER,
+        CLUSTER_RADIUS,
+        CLUSTER_MIN_POINTS,
+        LINE_METRICS,
+        CLUSTER
+    }
+
     [CCode (cname = "mln_style_image_option_field", cprefix = "MLN_STYLE_IMAGE_OPTION_", has_type_id = false)]
     [Flags]
     public enum StyleImageOptionField {
@@ -540,6 +564,10 @@ namespace MaplibreNative.Raw {
     [Compact]
     [CCode (cname = "mln_runtime", free_function = "")]
     public class Runtime {}
+
+    [Compact]
+    [CCode (cname = "mln_wake_source", free_function = "")]
+    public class WakeSource {}
 
     [Compact]
     [CCode (cname = "mln_map", free_function = "")]
@@ -743,6 +771,13 @@ namespace MaplibreNative.Raw {
     }
 
     [SimpleType]
+    [CCode (cname = "mln_runtime_event_camera_transition_finished", has_type_id = false)]
+    public struct RuntimeEventCameraTransitionFinished {
+        public uint32 size;
+        public uint64 transition_id;
+    }
+
+    [SimpleType]
     [CCode (cname = "mln_map_options", has_type_id = false)]
     public struct MapOptions {
         public uint32 size;
@@ -750,6 +785,7 @@ namespace MaplibreNative.Raw {
         public uint32 height;
         public double scale_factor;
         public uint32 map_mode;
+        public bool fast_pfor_enabled;
     }
 
     [SimpleType]
@@ -1081,6 +1117,7 @@ namespace MaplibreNative.Raw {
         public double velocity;
         public double min_zoom;
         public UnitBezier easing;
+        public uint64 transition_id;
     }
 
     [SimpleType]
@@ -1346,6 +1383,24 @@ namespace MaplibreNative.Raw {
     }
 
     [SimpleType]
+    [CCode (cname = "mln_geojson_source_options", has_type_id = false)]
+    public struct GeoJsonSourceOptions {
+        public uint32 size;
+        public uint32 fields;
+        public double min_zoom;
+        public double max_zoom;
+        public double tolerance;
+        public double cluster_max_zoom;
+        public JsonValue* cluster_properties;
+        public uint32 tile_size;
+        public uint32 buffer;
+        public uint32 cluster_radius;
+        public uint32 cluster_min_points;
+        public bool line_metrics;
+        public bool cluster;
+    }
+
+    [SimpleType]
     [CCode (cname = "mln_style_image_options", has_type_id = false)]
     public struct StyleImageOptions {
         public uint32 size;
@@ -1504,6 +1559,9 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_thread_last_error_message")]
     public static unowned string thread_last_error_message ();
 
+    [CCode (cname = "mln_thread_token")]
+    public static uint64 thread_token ();
+
     [CCode (cname = "mln_network_status_get")]
     public static Status network_status_get (out uint32 out_status);
 
@@ -1528,6 +1586,9 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_runtime_set_resource_provider")]
     public static Status runtime_set_resource_provider (Runtime runtime, ResourceProvider* provider);
 
+    [CCode (cname = "mln_runtime_clear_resource_provider")]
+    public static Status runtime_clear_resource_provider (Runtime runtime);
+
     [CCode (cname = "mln_resource_request_complete")]
     public static Status resource_request_complete (ResourceRequestHandle handle, ResourceResponse* response);
 
@@ -1543,8 +1604,17 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_runtime_destroy")]
     public static Status runtime_destroy (Runtime runtime);
 
-    [CCode (cname = "mln_runtime_run_once")]
-    public static Status runtime_run_once (Runtime runtime);
+    [CCode (cname = "mln_runtime_pump")]
+    public static Status runtime_pump (Runtime runtime, int64 timeout_ms);
+
+    [CCode (cname = "mln_runtime_wake_source_acquire")]
+    public static Status runtime_wake_source_acquire (Runtime runtime, out WakeSource source);
+
+    [CCode (cname = "mln_wake_source_signal")]
+    public static Status wake_source_signal (WakeSource source);
+
+    [CCode (cname = "mln_wake_source_destroy")]
+    public static void wake_source_destroy (WakeSource source);
 
     [CCode (cname = "mln_runtime_poll_event")]
     public static Status runtime_poll_event (Runtime runtime, RuntimeEvent* out_event, out bool out_has_event);
@@ -1635,6 +1705,9 @@ namespace MaplibreNative.Raw {
 
     [CCode (cname = "mln_map_create")]
     public static Status map_create (Runtime runtime, MapOptions* options, out Map map);
+
+    [CCode (cname = "mln_map_get_size")]
+    public static Status map_get_size (Map map, out uint32 out_width, out uint32 out_height, out double out_scale_factor);
 
     [CCode (cname = "mln_map_destroy")]
     public static Status map_destroy (Map map);
@@ -1786,6 +1859,9 @@ namespace MaplibreNative.Raw {
     [CCode (cname = "mln_style_tile_source_options_default")]
     public static StyleTileSourceOptions style_tile_source_options_default ();
 
+    [CCode (cname = "mln_geojson_source_options_default")]
+    public static GeoJsonSourceOptions geojson_source_options_default ();
+
     [CCode (cname = "mln_custom_geometry_source_options_default")]
     public static CustomGeometrySourceOptions custom_geometry_source_options_default ();
 
@@ -1811,10 +1887,10 @@ namespace MaplibreNative.Raw {
     public static Status map_add_style_source_json (Map map, StringView source_id, JsonValue* source_json);
 
     [CCode (cname = "mln_map_add_geojson_source_url")]
-    public static Status map_add_geojson_source_url (Map map, StringView source_id, StringView url);
+    public static Status map_add_geojson_source_url (Map map, StringView source_id, StringView url, GeoJsonSourceOptions* options);
 
     [CCode (cname = "mln_map_add_geojson_source_data")]
-    public static Status map_add_geojson_source_data (Map map, StringView source_id, GeoJson* data);
+    public static Status map_add_geojson_source_data (Map map, StringView source_id, GeoJson* data, GeoJsonSourceOptions* options);
 
     [CCode (cname = "mln_map_set_geojson_source_url")]
     public static Status map_set_geojson_source_url (Map map, StringView source_id, StringView url);

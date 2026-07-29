@@ -1,0 +1,18 @@
+# Rust dependency notices
+
+Generated from the locked `maplibre-native-platform` dependency graph by
+[`cargo-about`](https://github.com/EmbarkStudios/cargo-about).
+
+{{#each licenses}}
+## {{name}} ({{id}})
+
+Used by:
+{{#each used_by}}
+- [{{crate.name}} {{crate.version}}]({{#if crate.repository}}{{crate.repository}}{{else}}https://crates.io/crates/{{crate.name}}{{/if}})
+{{/each}}
+
+```
+{{{text}}}
+```
+
+{{/each}}

@@ -8,6 +8,8 @@ namespace MaplibreNative {
         private double min_zoom_value;
         private bool has_easing;
         private UnitBezier easing_value;
+        private bool has_transition_id;
+        private uint64 transition_id_value;
 
         public AnimationOptions () {
         }
@@ -52,6 +54,16 @@ namespace MaplibreNative {
             return has_easing;
         }
 
+        public void set_transition_id (uint64 value) {
+            transition_id_value = value;
+            has_transition_id = true;
+        }
+
+        public bool get_transition_id (out uint64 value) {
+            value = transition_id_value;
+            return has_transition_id;
+        }
+
         public AnimationOptions copy () {
             var copied = new AnimationOptions ();
             copied.has_duration_ms = has_duration_ms;
@@ -62,6 +74,8 @@ namespace MaplibreNative {
             copied.min_zoom_value = min_zoom_value;
             copied.has_easing = has_easing;
             copied.easing_value = easing_value;
+            copied.has_transition_id = has_transition_id;
+            copied.transition_id_value = transition_id_value;
             return copied;
         }
 
@@ -77,7 +91,9 @@ namespace MaplibreNative {
                     || (easing_value.x1 == other.easing_value.x1
                         && easing_value.y1 == other.easing_value.y1
                         && easing_value.x2 == other.easing_value.x2
-                        && easing_value.y2 == other.easing_value.y2));
+                        && easing_value.y2 == other.easing_value.y2))
+                && has_transition_id == other.has_transition_id
+                && (!has_transition_id || transition_id_value == other.transition_id_value);
         }
 
         internal Raw.AnimationOptions to_native () {
@@ -97,6 +113,10 @@ namespace MaplibreNative {
             if (has_easing) {
                 options.easing = easing_value.to_native ();
                 options.fields |= 1U << 3;
+            }
+            if (has_transition_id) {
+                options.transition_id = transition_id_value;
+                options.fields |= 1U << 4;
             }
             return options;
         }
@@ -188,6 +208,7 @@ namespace MaplibreNative {
     public class BoundOptions {
         private bool has_bounds;
         private LatLngBounds bounds_value;
+        private bool unbounded;
         private bool has_min_zoom;
         private double min_zoom_value;
         private bool has_max_zoom;
@@ -203,6 +224,8 @@ namespace MaplibreNative {
         internal BoundOptions.from_native (Raw.BoundOptions native) {
             if ((native.fields & (1U << 0)) != 0) {
                 set_bounds (LatLngBounds.from_native (native.bounds));
+            } else if ((native.fields & (1U << 5)) != 0) {
+                set_unbounded ();
             }
             if ((native.fields & (1U << 1)) != 0) {
                 set_min_zoom (native.min_zoom);
@@ -221,6 +244,16 @@ namespace MaplibreNative {
         public void set_bounds (LatLngBounds value) {
             bounds_value = value;
             has_bounds = true;
+            unbounded = false;
+        }
+
+        public void set_unbounded () {
+            has_bounds = false;
+            unbounded = true;
+        }
+
+        public bool is_unbounded () {
+            return unbounded;
         }
 
         public bool get_bounds (out LatLngBounds value) {
@@ -272,6 +305,7 @@ namespace MaplibreNative {
             var copied = new BoundOptions ();
             copied.has_bounds = has_bounds;
             copied.bounds_value = bounds_value;
+            copied.unbounded = unbounded;
             copied.has_min_zoom = has_min_zoom;
             copied.min_zoom_value = min_zoom_value;
             copied.has_max_zoom = has_max_zoom;
@@ -285,6 +319,7 @@ namespace MaplibreNative {
 
         public bool equal (BoundOptions other) {
             return has_bounds == other.has_bounds
+                && unbounded == other.unbounded
                 && (!has_bounds
                     || (bounds_value.southwest.latitude == other.bounds_value.southwest.latitude
                         && bounds_value.southwest.longitude == other.bounds_value.southwest.longitude
@@ -305,6 +340,8 @@ namespace MaplibreNative {
             if (has_bounds) {
                 options.bounds = bounds_value.to_native ();
                 options.fields |= 1U << 0;
+            } else if (unbounded) {
+                options.fields |= 1U << 5;
             }
             if (has_min_zoom) {
                 options.min_zoom = min_zoom_value;

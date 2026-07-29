@@ -406,7 +406,11 @@ class OpenGLOwnedTextureFrame:
 
 
 class DetachedRenderSessionHandle(NativeHandleMixin):
-    """Close-only render session handle after backend resources detach."""
+    """Close-only render session handle after backend resources detach.
+
+    A detached session holds no reference to its former map, so it stays
+    destroyable after that map closes.
+    """
 
     _handle_name = "DetachedRenderSessionHandle"
 
@@ -422,7 +426,7 @@ class DetachedRenderSessionHandle(NativeHandleMixin):
 
 
 class RenderSessionHandle(NativeHandleMixin):
-    """Owner-thread render session handle bound to a retained map wrapper."""
+    """Render session handle affine to the thread that attached it."""
 
     _handle_name = "RenderSessionHandle"
 
@@ -437,7 +441,7 @@ class RenderSessionHandle(NativeHandleMixin):
             msg = "RenderSessionHandle instances are created by MapHandle"
             raise TypeError(msg)
         self._native = native
-        self._map = map_handle
+        self._map: MapHandle | None = map_handle
 
     @classmethod
     def _from_native(cls, native: Any, map_handle: MapHandle) -> "RenderSessionHandle":
@@ -466,8 +470,18 @@ class RenderSessionHandle(NativeHandleMixin):
         return bool(self._native.render_update())
 
     def detach(self) -> DetachedRenderSessionHandle:
-        """Detach backend resources and return a close-only handle."""
-        return DetachedRenderSessionHandle._from_native(self._native.detach())  # noqa: SLF001
+        """Detach backend resources and return a close-only handle.
+
+        Detach ends this session's hold on the map, so a detached session
+        leaves the map free to close. Close the returned handle whenever it
+        suits the host; it stays destroyable after the map closes because a
+        detached session no longer reaches its map.
+        """
+        native = self._native.detach()
+        # The original wrapper can remain observable through `detached`, but it
+        # no longer retains the map after native detach succeeds.
+        self._map = None
+        return DetachedRenderSessionHandle._from_native(native)  # noqa: SLF001
 
     def reduce_memory_use(self) -> None:
         """Ask the session renderer to release cached resources where possible."""

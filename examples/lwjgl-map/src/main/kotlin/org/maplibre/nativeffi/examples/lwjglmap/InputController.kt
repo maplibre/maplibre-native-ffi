@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.pow
 import org.lwjgl.glfw.GLFW.GLFW_KEY_0
 import org.lwjgl.glfw.GLFW.GLFW_KEY_A
@@ -28,15 +26,20 @@ import org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback
 import org.lwjgl.glfw.GLFW.glfwSetKeyCallback
 import org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback
 import org.lwjgl.glfw.GLFW.glfwSetScrollCallback
-import org.maplibre.nativeffi.camera.AnimationOptions
-import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.geo.ScreenPoint
-import org.maplibre.nativeffi.map.MapHandle
 
+/**
+ * Decodes GLFW input into camera commands.
+ *
+ * GLFW delivers these callbacks on the render loop thread, which does not own the map, so this only
+ * produces commands; the runtime loop applies them on the map's thread. Anything needing the
+ * current viewport is converted here, where the viewport lives.
+ */
 internal class InputController(
   private val window: Long,
-  private val map: MapHandle,
-  private val renderRequested: () -> Unit,
+  private val commands: CommandQueue,
+  private val renderRequest: RenderRequest,
+  private val viewport: () -> Viewport,
 ) : AutoCloseable {
   private var leftDown = false
   private var rightDown = false
@@ -47,10 +50,6 @@ internal class InputController(
   private var cursorY = 0.0
 
   init {
-    installCallbacks()
-  }
-
-  private fun installCallbacks() {
     glfwSetCursorPosCallback(window) { _, x, y -> onCursor(x, y) }
     glfwSetMouseButtonCallback(window) { _, button, action, mods -> onMouse(button, action, mods) }
     glfwSetScrollCallback(window) { _, _, yOffset -> onScroll(yOffset) }
@@ -64,14 +63,18 @@ internal class InputController(
     val dy = y - lastY
     lastX = x
     lastY = y
-    if (rightDown || (leftDown && ctrlDown)) {
-      setBearing(currentBearing() + dx * DRAG_ROTATE_FACTOR, animated = false)
-      setPitch(currentPitch() - dy * DRAG_PITCH_FACTOR, animated = false)
-      renderRequested()
-    } else if (leftDown) {
-      map.moveBy(dx, dy)
-      renderRequested()
+    if (dx == 0.0 && dy == 0.0) {
+      return
     }
+    if (rightDown || (leftDown && ctrlDown)) {
+      commands.push(CameraCommand.AdjustBearing(dx * DRAG_ROTATE_FACTOR))
+      commands.push(CameraCommand.PitchBy(dy * DRAG_PITCH_FACTOR))
+    } else if (leftDown) {
+      commands.push(CameraCommand.MoveBy(dx, dy))
+    } else {
+      return
+    }
+    renderRequest.set()
   }
 
   private fun onMouse(button: Int, action: Int, mods: Int) {
@@ -86,7 +89,9 @@ internal class InputController(
           if (action == GLFW_PRESS) true else if (action == GLFW_RELEASE) false else rightDown
     }
     if (action == GLFW_PRESS) {
-      map.cancelTransitions()
+      // Queued ahead of the drag's own commands, so the transition stops before the first delta
+      // lands.
+      commands.push(CameraCommand.CancelTransitions)
     }
   }
 
@@ -94,8 +99,8 @@ internal class InputController(
     // GLFW reports OS-adjusted scroll deltas; use them directly so trackpads with natural
     // scrolling behave like the host platform expects.
     val scale = 2.0.pow(yOffset * 0.25)
-    map.scaleBy(scale, ScreenPoint(cursorX, cursorY))
-    renderRequested()
+    commands.push(CameraCommand.ScaleBy(scale, ScreenPoint(cursorX, cursorY)))
+    renderRequest.set()
   }
 
   private fun onKey(key: Int, action: Int, mods: Int) {
@@ -103,106 +108,51 @@ internal class InputController(
     if (action != GLFW_PRESS && action != GLFW_REPEAT) {
       return
     }
-    val changed =
+    val command =
       when (key) {
         GLFW_KEY_LEFT,
-        GLFW_KEY_A -> {
-          map.moveByAnimated(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION)
-          true
-        }
+        GLFW_KEY_A -> CameraCommand.MoveByAnimated(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
         GLFW_KEY_RIGHT,
-        GLFW_KEY_D -> {
-          map.moveByAnimated(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION)
-          true
-        }
+        GLFW_KEY_D -> CameraCommand.MoveByAnimated(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION_MS)
 
         GLFW_KEY_UP,
-        GLFW_KEY_W -> {
-          map.moveByAnimated(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION)
-          true
-        }
+        GLFW_KEY_W -> CameraCommand.MoveByAnimated(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
         GLFW_KEY_DOWN,
-        GLFW_KEY_S -> {
-          map.moveByAnimated(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION)
-          true
-        }
+        GLFW_KEY_S -> CameraCommand.MoveByAnimated(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_EQUAL -> {
-          map.scaleByAnimated(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION)
-          true
-        }
+        GLFW_KEY_EQUAL ->
+          CameraCommand.ScaleByAnimated(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION_MS)
 
-        GLFW_KEY_MINUS -> {
-          map.scaleByAnimated(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION)
-          true
-        }
-
-        GLFW_KEY_Q -> {
-          setBearing(currentBearing() - KEYBOARD_BEARING, animated = true)
-          true
-        }
-
-        GLFW_KEY_E -> {
-          setBearing(currentBearing() + KEYBOARD_BEARING, animated = true)
-          true
-        }
-
-        GLFW_KEY_RIGHT_BRACKET -> {
-          setPitch(currentPitch() + KEYBOARD_PITCH, animated = true)
-          true
-        }
-
-        GLFW_KEY_LEFT_BRACKET -> {
-          setPitch(currentPitch() - KEYBOARD_PITCH, animated = true)
-          true
-        }
-
-        GLFW_KEY_0 -> {
-          map.easeTo(
-            CameraOptions().apply {
-              bearing = 0.0
-              pitch = 0.0
-            },
-            RESET_ANIMATION,
+        GLFW_KEY_MINUS ->
+          CameraCommand.ScaleByAnimated(
+            1.0 / KEYBOARD_ZOOM,
+            viewportCenter(),
+            KEYBOARD_ANIMATION_MS,
           )
-          true
-        }
 
-        else -> false
+        GLFW_KEY_Q -> CameraCommand.AdjustBearingAnimated(-KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+
+        GLFW_KEY_E -> CameraCommand.AdjustBearingAnimated(KEYBOARD_BEARING, KEYBOARD_ANIMATION_MS)
+        GLFW_KEY_RIGHT_BRACKET ->
+          CameraCommand.AdjustPitchAnimated(KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+
+        GLFW_KEY_LEFT_BRACKET ->
+          CameraCommand.AdjustPitchAnimated(-KEYBOARD_PITCH, KEYBOARD_ANIMATION_MS)
+
+        GLFW_KEY_0 -> CameraCommand.ResetOrientation(RESET_ANIMATION_MS)
+        else -> null
       }
-    if (changed) {
-      renderRequested()
+    if (command != null) {
+      commands.push(command)
+      renderRequest.set()
     }
   }
-
-  private fun currentBearing(): Double = map.camera.bearing ?: 0.0
-
-  private fun currentPitch(): Double = map.camera.pitch ?: 0.0
 
   private fun viewportCenter(): ScreenPoint {
-    val viewport = Viewport.read(window)
-    return ScreenPoint(viewport.width() / 2.0, viewport.height() / 2.0)
-  }
-
-  private fun setBearing(bearing: Double, animated: Boolean) {
-    val camera = CameraOptions().apply { this.bearing = bearing }
-    if (animated) {
-      map.easeTo(camera, KEYBOARD_ANIMATION)
-    } else {
-      map.jumpTo(camera)
-    }
-  }
-
-  private fun setPitch(pitch: Double, animated: Boolean) {
-    val clamped = max(0.0, min(60.0, pitch))
-    val camera = CameraOptions().apply { this.pitch = clamped }
-    if (animated) {
-      map.easeTo(camera, KEYBOARD_ANIMATION)
-    } else {
-      map.jumpTo(camera)
-    }
+    val current = viewport()
+    return ScreenPoint(current.width() / 2.0, current.height() / 2.0)
   }
 
   override fun close() {
@@ -219,8 +169,8 @@ internal class InputController(
     private const val KEYBOARD_ZOOM = 1.25
     private const val KEYBOARD_BEARING = 10.0
     private const val KEYBOARD_PITCH = 5.0
-    private val KEYBOARD_ANIMATION = animation(160.0)
-    private val RESET_ANIMATION = animation(220.0)
+    private const val KEYBOARD_ANIMATION_MS = 160.0
+    private const val RESET_ANIMATION_MS = 220.0
 
     fun printControls() {
       println("Controls:")
@@ -233,8 +183,5 @@ internal class InputController(
       println("  ] / [: pitch")
       println("  0: reset pitch and bearing")
     }
-
-    private fun animation(durationMs: Double): AnimationOptions =
-      AnimationOptions().apply { this.durationMs = durationMs }
   }
 }

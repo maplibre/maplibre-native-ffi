@@ -1,7 +1,7 @@
 use std::error::Error as StdError;
 
 use maplibre_native::{
-    Error, ErrorKind, MapHandle, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
+    Error, ErrorKind, MapAttachRef, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
     VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 
@@ -29,7 +29,7 @@ pub enum RenderTarget {
 impl RenderTarget {
     pub fn attach(
         mode: Mode,
-        map: &MapHandle,
+        map: &MapAttachRef,
         graphics: &GraphicsContext,
         viewport: Viewport,
     ) -> maplibre_native::Result<Self> {
@@ -163,7 +163,7 @@ impl RenderTarget {
 }
 
 fn attach_owned_texture(
-    map: &MapHandle,
+    map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
 ) -> maplibre_native::Result<RenderTarget> {
@@ -187,7 +187,7 @@ fn attach_owned_texture(
 }
 
 fn attach_borrowed_texture(
-    map: &MapHandle,
+    map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
 ) -> maplibre_native::Result<RenderTarget> {
@@ -224,7 +224,7 @@ fn attach_borrowed_texture(
 }
 
 fn attach_surface(
-    map: &MapHandle,
+    map: &MapAttachRef,
     vulkan: &VulkanContext,
     viewport: Viewport,
 ) -> maplibre_native::Result<RenderTarget> {

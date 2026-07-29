@@ -3,10 +3,10 @@ use maplibre_native_sys as sys;
 
 use crate::Result;
 pub use maplibre_core::events::{
-    OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
-    UnknownRuntimeEventPayload,
+    CameraTransitionFinishedEvent, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent,
+    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
+    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, StyleImageMissingEvent,
+    TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 
@@ -41,6 +41,14 @@ pub enum RuntimeEventSource {
 pub struct RuntimeEvent {
     pub event_type: RuntimeEventType,
     pub source: RuntimeEventSource,
+    /// Secondary event detail whose meaning `event_type` selects.
+    ///
+    /// Camera will-change and did-change events carry a
+    /// [`CameraChangeMode`](crate::CameraChangeMode), which decodes as
+    /// `CameraChangeMode::from_raw(code as u32)`. Offline operation-completion
+    /// events carry the operation's native status value. Map loading-failure
+    /// events carry the ordinal of MapLibre Native's internal load error kind,
+    /// whose text is in `message`. Every other event type carries 0.
     pub code: i32,
     pub message: Option<String>,
     pub payload: RuntimeEventPayload,

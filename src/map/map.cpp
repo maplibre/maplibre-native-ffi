@@ -14,11 +14,14 @@
 #include <ratio>
 #include <span>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include <mbgl/actor/actor_ref.hpp>
+#include <mbgl/actor/mailbox.hpp>
 #include <mbgl/actor/scheduler.hpp>
 #include <mbgl/gfx/rendering_stats.hpp>
 #include <mbgl/map/bound_options.hpp>
@@ -33,9 +36,10 @@
 #include <mbgl/renderer/renderer_observer.hpp>
 #include <mbgl/renderer/update_parameters.hpp>
 #include <mbgl/style/conversion.hpp>
-#include <mbgl/style/conversion/layer.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/light.hpp>   // IWYU pragma: keep
-#include <mbgl/style/conversion/source.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/geojson_options.hpp>  // IWYU pragma: keep
+#include <mbgl/style/conversion/layer.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/light.hpp>            // IWYU pragma: keep
+#include <mbgl/style/conversion/source.hpp>           // IWYU pragma: keep
 #include <mbgl/style/conversion_impl.hpp>
 #include <mbgl/style/image.hpp>
 #include <mbgl/style/layer.hpp>
@@ -60,6 +64,7 @@
 #include <mbgl/util/feature.hpp>
 #include <mbgl/util/geo.hpp>
 #include <mbgl/util/image.hpp>
+#include <mbgl/util/immutable.hpp>
 #include <mbgl/util/projection.hpp>
 #include <mbgl/util/range.hpp>
 #include <mbgl/util/size.hpp>
@@ -515,6 +520,290 @@ auto to_native_tileset(
     tileset.bounds = to_native_lat_lng_bounds(options.bounds);
   }
   return tileset;
+}
+
+auto has_geojson_source_option(
+  const mln_geojson_source_options& options, uint32_t field
+) -> bool {
+  return (options.fields & field) != 0U;
+}
+
+auto effective_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_geojson_source_options {
+  auto result = mln::core::geojson_source_options_default();
+  if (options == nullptr) {
+    return result;
+  }
+
+  result.fields = options->fields;
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM)) {
+    result.min_zoom = options->min_zoom;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM)) {
+    result.max_zoom = options->max_zoom;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TOLERANCE)
+  ) {
+    result.tolerance = options->tolerance;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM
+    )
+  ) {
+    result.cluster_max_zoom = options->cluster_max_zoom;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    )
+  ) {
+    result.cluster_properties = options->cluster_properties;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE)
+  ) {
+    result.tile_size = options->tile_size;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_BUFFER)) {
+    result.buffer = options->buffer;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS
+    )
+  ) {
+    result.cluster_radius = options->cluster_radius;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
+    )
+  ) {
+    result.cluster_min_points = options->cluster_min_points;
+  }
+  if (
+    has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS)
+  ) {
+    result.line_metrics = options->line_metrics;
+  }
+  if (has_geojson_source_option(*options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER)) {
+    result.cluster = options->cluster;
+  }
+  return result;
+}
+
+auto validate_geojson_source_options(const mln_geojson_source_options* options)
+  -> mln_status {
+  if (options == nullptr) {
+    return MLN_STATUS_OK;
+  }
+  if (options->size < sizeof(mln_geojson_source_options)) {
+    mln::core::set_thread_error("mln_geojson_source_options.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM) |
+    MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM | MLN_GEOJSON_SOURCE_OPTION_TOLERANCE |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MAX_ZOOM |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES |
+    MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE | MLN_GEOJSON_SOURCE_OPTION_BUFFER |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS |
+    MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS |
+    MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS | MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
+  if ((options->fields & ~known_fields) != 0U) {
+    mln::core::set_thread_error(
+      "mln_geojson_source_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto effective = effective_geojson_source_options(options);
+  for (const auto& [zoom, name] : {
+         std::pair{effective.min_zoom, "min_zoom"},
+         std::pair{effective.max_zoom, "max_zoom"},
+         std::pair{effective.cluster_max_zoom, "cluster_max_zoom"},
+       }) {
+    if (
+      !std::isfinite(zoom) || zoom < 0.0 || zoom > 255.0 ||
+      std::floor(zoom) != zoom
+    ) {
+      auto message = std::string{name} + " must be an integer within [0, 255]";
+      mln::core::set_thread_error(message.c_str());
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  if (effective.min_zoom > effective.max_zoom) {
+    mln::core::set_thread_error(
+      "min_zoom must be less than or equal to max_zoom"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!std::isfinite(effective.tolerance) || effective.tolerance < 0.0) {
+    mln::core::set_thread_error("tolerance must be finite and non-negative");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.tile_size == 0 || effective.tile_size > 65535U) {
+    mln::core::set_thread_error("tile_size must be within [1, 65535]");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.buffer > 65535U) {
+    mln::core::set_thread_error("buffer must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.cluster_radius > 65535U) {
+    mln::core::set_thread_error("cluster_radius must be at most 65535");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    has_geojson_source_option(
+      *options, MLN_GEOJSON_SOURCE_OPTION_CLUSTER_PROPERTIES
+    ) &&
+    effective.cluster_properties == nullptr
+  ) {
+    mln::core::set_thread_error(
+      "cluster_properties must not be null when its field is present"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (effective.cluster_properties != nullptr) {
+    if (!mln::core::validate_style_json_value(effective.cluster_properties)) {
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (effective.cluster_properties->type != MLN_JSON_VALUE_TYPE_OBJECT) {
+      mln::core::set_thread_error("cluster_properties must be a JSON object");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+  }
+  return MLN_STATUS_OK;
+}
+
+/**
+ * Converts validated options into mbgl form.
+ *
+ * Cluster properties are handed to Converter<GeoJSONOptions> as a one-member
+ * object so MapLibre Native parses the aggregation expressions.
+ */
+auto to_native_geojson_source_options(const mln_geojson_source_options& options)
+  -> std::optional<mbgl::Immutable<mbgl::style::GeoJSONOptions>> {
+  auto native = mbgl::style::GeoJSONOptions{};
+  native.minzoom = static_cast<uint8_t>(options.min_zoom);
+  native.maxzoom = static_cast<uint8_t>(options.max_zoom);
+  native.tileSize = static_cast<uint16_t>(options.tile_size);
+  native.buffer = static_cast<uint16_t>(options.buffer);
+  native.tolerance = options.tolerance;
+  native.lineMetrics = options.line_metrics;
+  native.cluster = options.cluster;
+  native.clusterRadius = static_cast<uint16_t>(options.cluster_radius);
+  native.clusterMaxZoom = static_cast<uint8_t>(options.cluster_max_zoom);
+  native.clusterMinPoints = options.cluster_min_points;
+
+  if (options.cluster_properties != nullptr) {
+    constexpr auto key = std::string_view{"clusterProperties"};
+    const auto member = mln_json_member{
+      .key = {.data = key.data(), .size = key.size()},
+      .value = options.cluster_properties
+    };
+    const auto wrapper = mln_json_value{
+      .size = sizeof(mln_json_value),
+      .type = MLN_JSON_VALUE_TYPE_OBJECT,
+      .data = {.object_value = {.members = &member, .member_count = 1}}
+    };
+    auto error = mbgl::style::conversion::Error{};
+    auto converted =
+      mbgl::style::conversion::convert<mbgl::style::GeoJSONOptions>(
+        mbgl::style::conversion::Convertible{&wrapper}, error
+      );
+    if (!converted) {
+      mln::core::set_style_conversion_error("GeoJSON source options", error);
+      return std::nullopt;
+    }
+    native.clusterProperties = std::move(converted->clusterProperties);
+  }
+
+  return mbgl::makeMutable<mbgl::style::GeoJSONOptions>(std::move(native));
+}
+
+auto geojson_geometry_type_name(const mbgl::Geometry<double>& geometry)
+  -> std::string_view {
+  return geometry.match(
+    [](const mbgl::EmptyGeometry&) -> std::string_view { return "empty"; },
+    [](const mbgl::Point<double>&) -> std::string_view { return "point"; },
+    [](const mbgl::LineString<double>&) -> std::string_view {
+      return "line string";
+    },
+    [](const mbgl::Polygon<double>&) -> std::string_view { return "polygon"; },
+    [](const mbgl::MultiPoint<double>&) -> std::string_view {
+      return "multi-point";
+    },
+    [](const mbgl::MultiLineString<double>&) -> std::string_view {
+      return "multi-line string";
+    },
+    [](const mbgl::MultiPolygon<double>&) -> std::string_view {
+      return "multi-polygon";
+    },
+    [](const mapbox::geometry::geometry_collection<double>&)
+      -> std::string_view { return "geometry collection"; }
+  );
+}
+
+auto geojson_alternative_name(const mbgl::GeoJSON& geojson)
+  -> std::string_view {
+  return geojson.match(
+    [](const mbgl::Geometry<double>&) -> std::string_view {
+      return "a bare geometry";
+    },
+    [](const mbgl::GeoJSONFeature&) -> std::string_view {
+      return "a single feature";
+    },
+    [](const mbgl::FeatureCollection&) -> std::string_view {
+      return "a feature collection";
+    }
+  );
+}
+
+/**
+ * Reports whether clustered data satisfies supercluster's input requirements.
+ *
+ * MapLibre Native engages clustering for feature collections only, and it reads
+ * each feature's geometry as a point. A bare geometry or a single feature tiles
+ * without clustering, and a feature carrying other geometry raises a variant
+ * access error inside supercluster while mln_map_add_geojson_source_data() or
+ * mln_map_set_geojson_source_data() builds the index. Checking here names the
+ * source and the constraint instead of clustering silently or failing deep
+ * inside MapLibre Native.
+ *
+ * An empty feature collection stays accepted: it carries nothing to cluster,
+ * and a later mln_map_set_geojson_source_data() clusters the features it
+ * supplies.
+ */
+auto validate_clustered_geojson(
+  const std::string& source_id, const mbgl::GeoJSON& geojson
+) -> bool {
+  if (!geojson.is<mbgl::FeatureCollection>()) {
+    const auto message = "clustered GeoJSON source \"" + source_id +
+                         "\" requires a feature collection; the data is " +
+                         std::string{geojson_alternative_name(geojson)};
+    mln::core::set_thread_error(message.c_str());
+    return false;
+  }
+
+  const auto& features = geojson.get<mbgl::FeatureCollection>();
+  for (std::size_t index = 0; index < features.size(); ++index) {
+    const auto& geometry = features.at(index).geometry;
+    if (geometry.is<mbgl::Point<double>>()) {
+      continue;
+    }
+    const auto message =
+      "clustered GeoJSON source \"" + source_id +
+      "\" requires point geometry on every feature; feature " +
+      std::to_string(index) + " has " +
+      std::string{geojson_geometry_type_name(geometry)} + " geometry";
+    mln::core::set_thread_error(message.c_str());
+    return false;
+  }
+  return true;
 }
 
 auto has_custom_geometry_source_option(
@@ -1001,6 +1290,18 @@ auto payload_bytes(const Payload& payload) -> std::vector<std::byte> {
   return result;
 }
 
+auto to_c_camera_change_mode(mbgl::MapObserver::CameraChangeMode mode)
+  -> int32_t {
+  switch (mode) {
+    case mbgl::MapObserver::CameraChangeMode::Immediate:
+      return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+    case mbgl::MapObserver::CameraChangeMode::Animated:
+      return MLN_CAMERA_CHANGE_MODE_ANIMATED;
+  }
+  assert(false);
+  return MLN_CAMERA_CHANGE_MODE_IMMEDIATE;
+}
+
 auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
   switch (mode) {
     case mbgl::MapObserver::RenderMode::Partial:
@@ -1102,7 +1403,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
       : runtime_(runtime), map_(map) {}
 
   void onCameraWillChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onCameraIsChanging() override {
@@ -1110,7 +1413,9 @@ class HeadlessObserver final : public mbgl::MapObserver {
   }
 
   void onCameraDidChange(CameraChangeMode mode) override {
-    push(MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, static_cast<int32_t>(mode));
+    push(
+      MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE, to_c_camera_change_mode(mode)
+    );
   }
 
   void onWillStartLoadingMap() override {
@@ -1211,13 +1516,187 @@ class HeadlessObserver final : public mbgl::MapObserver {
   mln_map* map_;
 };
 
+// Delivers mbgl::RendererObserver callbacks on the map's run loop instead of on
+// whichever thread rendered.
+//
+// mbgl::Map::Impl is itself the RendererObserver, and its handlers reach deep
+// into map-thread state: onInvalidate() calls onUpdate(), and
+// onDidFinishRenderingFrame() reads the transform's transition state, publishes
+// the next update, and completes still-image requests. Handing that pointer
+// straight to a renderer on another thread would be a data race, so every
+// callback becomes a message on a mailbox bound to the runtime's run loop and
+// runs during the host's next mln_runtime_pump().
+//
+// This forwards unconditionally, including when the render session shares the
+// map's owner thread, so there is one delivery order rather than two.
+//
+// onRegisterShaders is deliberately absent. mbgl calls it synchronously during
+// renderer setup with a gfx::ShaderRegistry reference that is only valid for
+// that call, and the type is not copyable, so it cannot become a message. The
+// inherited no-op matches both Android's forwarder and this repo's behavior
+// today, because HeadlessObserver does not implement the corresponding
+// MapObserver hook. A future shader-registry hook (issue #101) has to be a
+// synchronous render-thread callback rather than an observer event.
+class ForwardingRendererObserver final : public mbgl::RendererObserver {
+ public:
+  ForwardingRendererObserver(
+    mbgl::Scheduler& map_scheduler, mbgl::RendererObserver& delegate
+  )
+      : mailbox_(std::make_shared<mbgl::Mailbox>(map_scheduler)),
+        delegate_(delegate, mailbox_) {}
+
+  ForwardingRendererObserver(const ForwardingRendererObserver&) = delete;
+  auto operator=(const ForwardingRendererObserver&)
+    -> ForwardingRendererObserver& = delete;
+  ForwardingRendererObserver(ForwardingRendererObserver&&) = delete;
+  auto operator=(ForwardingRendererObserver&&)
+    -> ForwardingRendererObserver& = delete;
+
+  ~ForwardingRendererObserver() override { mailbox_->close(); }
+
+  // Stops delivery ahead of destruction. Mailbox::close() waits for an
+  // in-flight receive and drops anything queued, so the delegate can be torn
+  // down after this returns. Idempotent, so the destructor keeps its own call.
+  auto close() -> void { mailbox_->close(); }
+
+  void onInvalidate() override {
+    delegate_.invoke(&mbgl::RendererObserver::onInvalidate);
+  }
+
+  void onResourceError(std::exception_ptr error) override {
+    delegate_.invoke(&mbgl::RendererObserver::onResourceError, error);
+  }
+
+  void onWillStartRenderingMap() override {
+    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingMap);
+  }
+
+  void onWillStartRenderingFrame() override {
+    delegate_.invoke(&mbgl::RendererObserver::onWillStartRenderingFrame);
+  }
+
+  void onDidFinishRenderingFrame(
+    RenderMode mode, bool repaint_needed, bool placement_changed,
+    const mbgl::gfx::RenderingStats& stats
+  ) override {
+    // Disambiguate: the name carries three overloads and only this one is
+    // implemented by mbgl::Map::Impl.
+    void (mbgl::RendererObserver::*method)(
+      RenderMode, bool, bool, const mbgl::gfx::RenderingStats&
+    ) = &mbgl::RendererObserver::onDidFinishRenderingFrame;
+    delegate_.invoke(method, mode, repaint_needed, placement_changed, stats);
+  }
+
+  void onDidFinishRenderingMap() override {
+    delegate_.invoke(&mbgl::RendererObserver::onDidFinishRenderingMap);
+  }
+
+  void onStyleImageMissing(
+    const std::string& id, const StyleImageMissingCallback& done
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onStyleImageMissing, id, done);
+  }
+
+  void onRemoveUnusedStyleImages(const std::vector<std::string>& ids) override {
+    delegate_.invoke(&mbgl::RendererObserver::onRemoveUnusedStyleImages, ids);
+  }
+
+  void onPreCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onPreCompileShader, id, type, defines
+    );
+  }
+
+  void onPostCompileShader(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onPostCompileShader, id, type, defines
+    );
+  }
+
+  void onShaderCompileFailed(
+    mbgl::shaders::BuiltIn id, mbgl::gfx::Backend::Type type,
+    const std::string& defines
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onShaderCompileFailed, id, type, defines
+    );
+  }
+
+  void onGlyphsLoaded(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onGlyphsLoaded, stack, range);
+  }
+
+  void onGlyphsError(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range,
+    std::exception_ptr error
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onGlyphsError, stack, range, error
+    );
+  }
+
+  void onGlyphsRequested(
+    const mbgl::FontStack& stack, const mbgl::GlyphRange& range
+  ) override {
+    delegate_.invoke(&mbgl::RendererObserver::onGlyphsRequested, stack, range);
+  }
+
+  void onTileAction(
+    mbgl::TileOperation operation, const mbgl::OverscaledTileID& id,
+    const std::string& source_id
+  ) override {
+    delegate_.invoke(
+      &mbgl::RendererObserver::onTileAction, operation, id, source_id
+    );
+  }
+
+  void onRenderError(std::exception_ptr error) override {
+    delegate_.invoke(&mbgl::RendererObserver::onRenderError, error);
+  }
+
+ private:
+  std::shared_ptr<mbgl::Mailbox> mailbox_;
+  mbgl::ActorRef<mbgl::RendererObserver> delegate_;
+};
+
+// Map mutations a render session reaches for from its own owner thread. Posting
+// them through a mailbox on the map's run loop keeps mbgl::Map single-threaded,
+// and Mailbox::close() during map teardown turns late messages into no-ops.
+class MapCommands {
+ public:
+  explicit MapCommands(mbgl::Map& map) : map_(map) {}
+
+  auto set_size(uint32_t width, uint32_t height) -> void {
+    map_.setSize(mbgl::Size{width, height});
+  }
+
+  auto trigger_repaint() -> void { map_.triggerRepaint(); }
+
+ private:
+  mbgl::Map& map_;
+};
+
 class HeadlessFrontend final : public mbgl::RendererFrontend {
  public:
+  // The thread pool tag buckets this map's background work in the
+  // process-global scheduler. A default-constructed identity is unique per map;
+  // SimpleIdentity::Empty is the id-0 sentinel, which pools every map's work
+  // into one bucket and, worse, makes waitForEmpty() unable to wait on it at
+  // all, because ThreadedSchedulerBase::waitForEmpty remaps the empty tag to
+  // the pool's own identity. Matches Android's MapRenderer.
   HeadlessFrontend(mln_runtime* runtime, mln_map* map)
       : runtime_(runtime),
         map_(map),
         thread_pool_(
-          mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity::Empty
+          mbgl::Scheduler::GetBackground(), mbgl::util::SimpleIdentity{}
         ) {}
 
   void reset() override {
@@ -1225,8 +1704,14 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
     latest_update_.reset();
   }
 
+  // mbgl::Map calls this once, from its constructor, on the map owner thread.
+  // The forwarder it builds is what render sessions hand to their renderer, so
+  // observer callbacks land on the map's run loop no matter which thread
+  // rendered.
   void setObserver(mbgl::RendererObserver& observer) override {
-    observer_ = &observer;
+    observer_ = std::make_unique<ForwardingRendererObserver>(
+      mln::core::runtime_run_loop(runtime_), observer
+    );
   }
 
   void update(std::shared_ptr<mbgl::UpdateParameters> update) override {
@@ -1245,8 +1730,25 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
 
   auto run_render_jobs() -> void { thread_pool_.runRenderJobs(); }
 
+  // Drains and retires this map's buckets in the process-global scheduler.
+  // The unique tag above means the task bucket is created on first use and only
+  // waitForEmpty() erases it, so without this every map that ever scheduled
+  // background work would leave a bucket behind for the worker loop to walk.
+  auto shutdown_thread_pool() -> void {
+    thread_pool_.runRenderJobs(/*closeQueue=*/true);
+    thread_pool_.waitForEmpty();
+  }
+
   [[nodiscard]] auto renderer_observer() const -> mbgl::RendererObserver* {
-    return observer_;
+    return observer_.get();
+  }
+
+  // Stops observer delivery before the map that backs the delegate is torn
+  // down. Called from destroy_map() once the map is unreachable.
+  auto close_renderer_observer() -> void {
+    if (observer_ != nullptr) {
+      observer_->close();
+    }
   }
 
   [[nodiscard]] auto getThreadPool() const
@@ -1257,7 +1759,7 @@ class HeadlessFrontend final : public mbgl::RendererFrontend {
  private:
   mln_runtime* runtime_;
   mln_map* map_;
-  mbgl::RendererObserver* observer_ = nullptr;
+  std::unique_ptr<ForwardingRendererObserver> observer_;
   mbgl::TaggedScheduler thread_pool_;
   mutable std::mutex latest_update_mutex_;
   std::shared_ptr<mbgl::UpdateParameters> latest_update_;
@@ -1414,7 +1916,7 @@ auto validate_animation_options(const mln_animation_options* animation)
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_ANIMATION_OPTION_DURATION) |
     MLN_ANIMATION_OPTION_VELOCITY | MLN_ANIMATION_OPTION_MIN_ZOOM |
-    MLN_ANIMATION_OPTION_EASING;
+    MLN_ANIMATION_OPTION_EASING | MLN_ANIMATION_OPTION_TRANSITION_ID;
   if ((animation->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_animation_options.fields contains unknown bits"
@@ -1514,10 +2016,20 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_BOUND_OPTION_BOUNDS) | MLN_BOUND_OPTION_MIN_ZOOM |
     MLN_BOUND_OPTION_MAX_ZOOM | MLN_BOUND_OPTION_MIN_PITCH |
-    MLN_BOUND_OPTION_MAX_PITCH;
+    MLN_BOUND_OPTION_MAX_PITCH | MLN_BOUND_OPTION_UNBOUNDED;
   if ((options->fields & ~known_fields) != 0U) {
     mln::core::set_thread_error(
       "mln_bound_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    (options->fields & MLN_BOUND_OPTION_BOUNDS) != 0U &&
+    (options->fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U
+  ) {
+    mln::core::set_thread_error(
+      "MLN_BOUND_OPTION_BOUNDS and MLN_BOUND_OPTION_UNBOUNDED are mutually "
+      "exclusive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -2011,11 +2523,35 @@ auto from_native_camera(const mbgl::CameraOptions& camera)
   return result;
 }
 
-auto to_native_animation(const mln_animation_options* animation)
-  -> mbgl::AnimationOptions {
+auto camera_transition_finished_payload(uint64_t transition_id)
+  -> mln_runtime_event_camera_transition_finished {
+  return mln_runtime_event_camera_transition_finished{
+    .size = sizeof(mln_runtime_event_camera_transition_finished),
+    .transition_id = transition_id
+  };
+}
+
+// MapLibre Native owns the returned AnimationOptions for the lifetime of the
+// transition it starts, and Transform invokes transitionFinishFn on the map
+// owner thread. Enqueuing the finish event therefore uses the same push path as
+// the map observer. Events for a destroyed map are discarded by the push, so a
+// transition still holding this callback during map teardown enqueues nothing.
+auto to_native_animation(
+  mln_runtime* runtime, mln_map* map, const mln_animation_options* animation
+) -> mbgl::AnimationOptions {
   auto result = mbgl::AnimationOptions{};
   if (animation == nullptr) {
     return result;
+  }
+  if ((animation->fields & MLN_ANIMATION_OPTION_TRANSITION_ID) != 0U) {
+    result.transitionFinishFn = [runtime, map,
+                                 transition_id = animation->transition_id] {
+      mln::core::push_runtime_map_event_payload(
+        runtime, map, MLN_RUNTIME_EVENT_MAP_CAMERA_TRANSITION_FINISHED,
+        MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
+        payload_bytes(camera_transition_finished_payload(transition_id))
+      );
+    };
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
     result.duration = std::chrono::duration_cast<mbgl::Duration>(
@@ -2254,6 +2790,14 @@ auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
   };
 }
 
+// mbgl keeps the unbounded flag private, so compare against a
+// default-constructed value. mbgl::LatLngBounds::operator== treats any two
+// unbounded values as equal and an unbounded value as distinct from every
+// bounded one, which makes this an exact test for the flag.
+auto is_unbounded_lat_lng_bounds(const mbgl::LatLngBounds& bounds) -> bool {
+  return bounds == mbgl::LatLngBounds{};
+}
+
 auto to_native_lat_lngs(const mln_lat_lng* coordinates, size_t coordinate_count)
   -> std::vector<mbgl::LatLng> {
   auto result = std::vector<mbgl::LatLng>{};
@@ -2299,6 +2843,11 @@ auto to_native_bound_options(const mln_bound_options& options)
   if ((options.fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
   }
+  if ((options.fields & MLN_BOUND_OPTION_UNBOUNDED) != 0U) {
+    // A default-constructed LatLngBounds is the mbgl unbounded constraint:
+    // constrain() returns its input unchanged.
+    result.withLatLngBounds(mbgl::LatLngBounds{});
+  }
   if ((options.fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U) {
     result.withMinZoom(options.min_zoom);
   }
@@ -2318,8 +2867,12 @@ auto from_native_bound_options(const mbgl::BoundOptions& options)
   -> mln_bound_options {
   auto result = mln::core::bound_options_default();
   if (options.bounds) {
-    result.fields |= MLN_BOUND_OPTION_BOUNDS;
-    result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    if (is_unbounded_lat_lng_bounds(*options.bounds)) {
+      result.fields |= MLN_BOUND_OPTION_UNBOUNDED;
+    } else {
+      result.fields |= MLN_BOUND_OPTION_BOUNDS;
+      result.bounds = from_native_lat_lng_bounds(*options.bounds);
+    }
   }
   if (options.minZoom) {
     result.fields |= MLN_BOUND_OPTION_MIN_ZOOM;
@@ -2395,10 +2948,18 @@ struct mln_map {
   mln_runtime* runtime = nullptr;
   std::thread::id owner_thread;
   uint32_t map_mode = MLN_MAP_MODE_CONTINUOUS;
+  double scale_factor = default_scale_factor;
   bool still_image_request_pending = false;
   std::unique_ptr<HeadlessObserver> observer;
   std::unique_ptr<HeadlessFrontend> frontend;
   std::unique_ptr<mbgl::Map> map;
+  // Declared after `map` so reverse-order destruction retires the command
+  // channel before the mbgl::Map it targets.
+  std::unique_ptr<MapCommands> commands;
+  std::shared_ptr<mbgl::Mailbox> command_mailbox;
+  std::optional<mbgl::ActorRef<MapCommands>> command_ref;
+  // Guarded by map_registry_mutex(); a render session on another thread clears
+  // it from map_detach_render_target_session().
   void* render_target_session = nullptr;
 };
 
@@ -2447,6 +3008,36 @@ auto finish_still_image_request(mln_map* map, std::exception_ptr error)
   );
 }
 
+// Checks a map handle is non-null and live. The caller holds
+// map_registry_mutex(), so it can act on the result without the handle being
+// retired in between. Callers that only need the answer use
+// validate_map_live().
+auto validate_map_live_locked(mln_map* map) -> mln_status {
+  if (map == nullptr) {
+    set_thread_error("map must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (!map_registry().contains(map)) {
+    set_thread_error("map is not a live handle");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+// Adds the owner-thread check to validate_map_live_locked(). Same locking
+// contract.
+auto validate_map_locked(mln_map* map) -> mln_status {
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (map->owner_thread != std::this_thread::get_id()) {
+    set_thread_error("map call must be made on its owner thread");
+    return MLN_STATUS_WRONG_THREAD;
+  }
+  return MLN_STATUS_OK;
+}
+
 }  // namespace
 
 auto map_options_default() noexcept -> mln_map_options {
@@ -2455,7 +3046,8 @@ auto map_options_default() noexcept -> mln_map_options {
     .width = default_map_width,
     .height = default_map_height,
     .scale_factor = default_scale_factor,
-    .map_mode = MLN_MAP_MODE_CONTINUOUS
+    .map_mode = MLN_MAP_MODE_CONTINUOUS,
+    .fast_pfor_enabled = false
   };
 }
 
@@ -2483,7 +3075,8 @@ auto animation_options_default() noexcept -> mln_animation_options {
     .duration_ms = 0,
     .velocity = 0,
     .min_zoom = 0,
-    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1}
+    .easing = {.x1 = 0, .y1 = 0, .x2 = 0.25, .y2 = 1},
+    .transition_id = 0
   };
 }
 
@@ -2572,6 +3165,25 @@ auto style_tile_source_options_default() noexcept
   };
 }
 
+auto geojson_source_options_default() noexcept -> mln_geojson_source_options {
+  const auto defaults = mbgl::style::GeoJSONOptions{};
+  return mln_geojson_source_options{
+    .size = sizeof(mln_geojson_source_options),
+    .fields = 0,
+    .min_zoom = static_cast<double>(defaults.minzoom),
+    .max_zoom = static_cast<double>(defaults.maxzoom),
+    .tolerance = defaults.tolerance,
+    .cluster_max_zoom = static_cast<double>(defaults.clusterMaxZoom),
+    .cluster_properties = nullptr,
+    .tile_size = defaults.tileSize,
+    .buffer = defaults.buffer,
+    .cluster_radius = defaults.clusterRadius,
+    .cluster_min_points = static_cast<uint32_t>(defaults.clusterMinPoints),
+    .line_metrics = defaults.lineMetrics,
+    .cluster = defaults.cluster
+  };
+}
+
 auto custom_geometry_source_options_default() noexcept
   -> mln_custom_geometry_source_options {
   return mln_custom_geometry_source_options{
@@ -2623,24 +3235,14 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
   };
 }
 
-auto validate_map(mln_map* map) -> mln_status {
-  if (map == nullptr) {
-    set_thread_error("map must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-
+auto validate_map_live(mln_map* map) -> mln_status {
   const std::scoped_lock lock(map_registry_mutex());
-  if (!map_registry().contains(map)) {
-    set_thread_error("map is not a live handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
+  return validate_map_live_locked(map);
+}
 
-  if (map->owner_thread != std::this_thread::get_id()) {
-    set_thread_error("map call must be made on its owner thread");
-    return MLN_STATUS_WRONG_THREAD;
-  }
-
-  return MLN_STATUS_OK;
+auto validate_map(mln_map* map) -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  return validate_map_locked(map);
 }
 
 auto validate_map_projection(mln_map_projection* projection) -> mln_status {
@@ -2692,6 +3294,7 @@ auto create_map(
   owned_map->runtime = runtime;
   owned_map->owner_thread = std::this_thread::get_id();
   owned_map->map_mode = effective.map_mode;
+  owned_map->scale_factor = effective.scale_factor;
   try {
     owned_map->observer = std::make_unique<HeadlessObserver>(runtime, handle);
     owned_map->frontend = std::make_unique<HeadlessFrontend>(runtime, handle);
@@ -2699,10 +3302,18 @@ auto create_map(
     auto map_options = mbgl::MapOptions{};
     map_options.withMapMode(to_native_map_mode(effective.map_mode))
       .withSize(mbgl::Size{effective.width, effective.height})
-      .withPixelRatio(static_cast<float>(effective.scale_factor));
+      .withPixelRatio(static_cast<float>(effective.scale_factor))
+      .withFastPFOREnabled(effective.fast_pfor_enabled);
     owned_map->map = std::make_unique<mbgl::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)
+    );
+
+    owned_map->commands = std::make_unique<MapCommands>(*owned_map->map);
+    owned_map->command_mailbox =
+      std::make_shared<mbgl::Mailbox>(runtime_run_loop(runtime));
+    owned_map->command_ref.emplace(
+      *owned_map->commands, owned_map->command_mailbox
     );
 
     const std::scoped_lock lock(map_registry_mutex());
@@ -2717,24 +3328,36 @@ auto create_map(
 }
 
 auto destroy_map(mln_map* map) -> mln_status {
-  const auto status = validate_map(map);
-  if (status != MLN_STATUS_OK) {
-    return status;
-  }
-
-  if (map->render_target_session != nullptr) {
-    set_thread_error("map still has an attached render session");
-    return MLN_STATUS_INVALID_STATE;
-  }
-
-  auto* runtime = map->runtime;
+  auto* runtime = static_cast<mln_runtime*>(nullptr);
   auto owned_map = std::unique_ptr<mln_map>{};
   {
+    // One critical section covers validation, the render-session check, and
+    // taking ownership. A render session on another thread can only detach by
+    // taking this same lock, so it either wins and clears the slot before we
+    // read it, or loses and finds the map already retired.
     const std::scoped_lock lock(map_registry_mutex());
+    const auto status = validate_map_locked(map);
+    if (status != MLN_STATUS_OK) {
+      return status;
+    }
+    if (map->render_target_session != nullptr) {
+      set_thread_error("map still has an attached render session");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    runtime = map->runtime;
     const auto found = map_registry().find(map);
     owned_map = std::move(found->second);
     map_registry().erase(found);
   }
+  // Stop both cross-thread channels before tearing the map down. Nothing can
+  // produce new messages by now: the map is unreachable, and it only got here
+  // with no render session attached. Closing waits out anything in flight and
+  // drops the rest.
+  owned_map->frontend->close_renderer_observer();
+  owned_map->command_mailbox->close();
+  // Retire this map's scheduler buckets. This can block on in-flight background
+  // work, which is why it runs outside the registry lock.
+  owned_map->frontend->shutdown_thread_pool();
   discard_runtime_map_events(runtime, map);
   owned_map.reset();
   release_runtime_map(runtime);
@@ -2779,11 +3402,37 @@ auto map_request_still_image(mln_map* map) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto map_owner_thread(const mln_map* map) -> std::thread::id {
-  return map->owner_thread;
+auto map_scale_factor(const mln_map* map) -> double {
+  return map->scale_factor;
 }
 
+// Map-thread only. The render path must not reach this; it posts through
+// map_post_set_size() / map_post_trigger_repaint() instead.
 auto map_native(mln_map* map) -> mbgl::Map* { return map->map.get(); }
+
+// Both posting helpers hold map_registry_mutex() across the liveness check and
+// the send, so the map cannot be retired in between. Mailbox::push takes only
+// its own mutex and the run loop's, so there is no path back to this lock.
+auto map_post_set_size(mln_map* map, uint32_t width, uint32_t height)
+  -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  map->command_ref->invoke(&MapCommands::set_size, width, height);
+  return MLN_STATUS_OK;
+}
+
+auto map_post_trigger_repaint(mln_map* map) -> mln_status {
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  map->command_ref->invoke(&MapCommands::trigger_repaint);
+  return MLN_STATUS_OK;
+}
 
 auto map_latest_update(mln_map* map)
   -> std::shared_ptr<mbgl::UpdateParameters> {
@@ -2798,9 +3447,16 @@ auto map_run_render_jobs(mln_map* map) -> void {
   map->frontend->run_render_jobs();
 }
 
+// Attaching claims the map's single render-session slot. It runs on the render
+// session's own thread, which may differ from the map owner thread, so this
+// validates liveness only. Holding map_registry_mutex() across the check and
+// the claim is what makes it race-free against a concurrent destroy_map() on
+// the map owner thread: either the slot is claimed first and destroy_map()
+// refuses, or the map is retired first and this returns an invalid handle.
 auto map_attach_render_target_session(mln_map* map, void* session)
   -> mln_status {
-  const auto status = validate_map(map);
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -2816,9 +3472,14 @@ auto map_attach_render_target_session(mln_map* map, void* session)
   return MLN_STATUS_OK;
 }
 
+// Detaching runs on the render session's owner thread, which may differ from
+// the map owner thread, so this validates liveness only. Holding
+// map_registry_mutex() across the check and the clear is what makes it
+// race-free against a concurrent destroy_map() on the map owner thread.
 auto map_detach_render_target_session(mln_map* map, void* session)
   -> mln_status {
-  const auto status = validate_map(map);
+  const std::scoped_lock lock(map_registry_mutex());
+  const auto status = validate_map_live_locked(map);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -3181,7 +3842,8 @@ auto map_list_style_source_ids(mln_map* map, mln_style_id_list** out_source_ids)
 }
 
 auto map_add_geojson_source_url(
-  mln_map* map, mln_string_view source_id, mln_string_view url
+  mln_map* map, mln_string_view source_id, mln_string_view url,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3198,6 +3860,10 @@ auto map_add_geojson_source_url(
     set_thread_error("url must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3206,14 +3872,23 @@ auto map_add_geojson_source_url(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  auto native_options =
+    to_native_geojson_source_options(effective_geojson_source_options(options));
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setURL(string_from_view(url));
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
 }
 
 auto map_add_geojson_source_data(
-  mln_map* map, mln_string_view source_id, const mln_geojson* data
+  mln_map* map, mln_string_view source_id, const mln_geojson* data,
+  const mln_geojson_source_options* options
 ) -> mln_status {
   const auto status = validate_map(map);
   if (status != MLN_STATUS_OK) {
@@ -3228,6 +3903,10 @@ auto map_add_geojson_source_data(
   if (!geojson) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
+  const auto options_status = validate_geojson_source_options(options);
+  if (options_status != MLN_STATUS_OK) {
+    return options_status;
+  }
 
   auto& style = map->map->getStyle();
   const auto id = string_from_view(source_id);
@@ -3236,7 +3915,19 @@ auto map_add_geojson_source_data(
     return add_status;
   }
 
-  auto source = std::make_unique<mbgl::style::GeoJSONSource>(id);
+  const auto effective = effective_geojson_source_options(options);
+  if (effective.cluster && !validate_clustered_geojson(id, *geojson)) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto native_options = to_native_geojson_source_options(effective);
+  if (!native_options) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto source = std::make_unique<mbgl::style::GeoJSONSource>(
+    id, std::move(*native_options)
+  );
   source->setGeoJSON(*geojson);
   style.addSource(std::move(source));
   return MLN_STATUS_OK;
@@ -3301,6 +3992,12 @@ auto map_set_geojson_source_data(
   auto* geojson_source = source->as<mbgl::style::GeoJSONSource>();
   if (geojson_source == nullptr) {
     set_thread_error("source is not a GeoJSON source");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    geojson_source->getOptions().cluster &&
+    !validate_clustered_geojson(string_from_view(source_id), *geojson)
+  ) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -4922,7 +5619,9 @@ auto map_ease_to(
     return animation_status;
   }
 
-  map->map->easeTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->easeTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -4943,7 +5642,9 @@ auto map_fly_to(
     return animation_status;
   }
 
-  map->map->flyTo(to_native_camera(*camera), to_native_animation(animation));
+  map->map->flyTo(
+    to_native_camera(*camera), to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5046,6 +5747,31 @@ auto map_dump_debug_logs(mln_map* map) -> mln_status {
     return status;
   }
   map->map->dumpDebugLogs();
+  return MLN_STATUS_OK;
+}
+
+auto map_get_size(
+  mln_map* map, uint32_t* out_width, uint32_t* out_height,
+  double* out_scale_factor
+) -> mln_status {
+  const auto status = validate_map(map);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_width == nullptr || out_height == nullptr || out_scale_factor == nullptr
+  ) {
+    set_thread_error(
+      "out_width, out_height, and out_scale_factor must not be null"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto options = map->map->getMapOptions();
+  const auto size = options.size();
+  *out_width = size.width;
+  *out_height = size.height;
+  *out_scale_factor = map->scale_factor;
   return MLN_STATUS_OK;
 }
 
@@ -5526,7 +6252,8 @@ auto map_move_by_animated(
   }
 
   map->map->moveBy(
-    mbgl::ScreenCoordinate{delta_x, delta_y}, to_native_animation(animation)
+    mbgl::ScreenCoordinate{delta_x, delta_y},
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -5561,7 +6288,9 @@ auto map_scale_by_animated(
     return animation_status;
   }
 
-  map->map->scaleBy(scale, native_anchor, to_native_animation(animation));
+  map->map->scaleBy(
+    scale, native_anchor, to_native_animation(map->runtime, map, animation)
+  );
   return MLN_STATUS_OK;
 }
 
@@ -5593,7 +6322,8 @@ auto map_rotate_by_animated(
   }
 
   map->map->rotateBy(
-    screen_point(first), screen_point(second), to_native_animation(animation)
+    screen_point(first), screen_point(second),
+    to_native_animation(map->runtime, map, animation)
   );
   return MLN_STATUS_OK;
 }
@@ -5618,7 +6348,7 @@ auto map_pitch_by_animated(
     return animation_status;
   }
 
-  map->map->pitchBy(pitch, to_native_animation(animation));
+  map->map->pitchBy(pitch, to_native_animation(map->runtime, map, animation));
   return MLN_STATUS_OK;
 }
 

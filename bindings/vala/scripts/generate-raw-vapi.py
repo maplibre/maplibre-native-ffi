@@ -30,6 +30,11 @@ DELEGATE_DECLARATION = re.compile(
     r"((?:\s*\[[^\]]+\]\s*)+)"
     r"public\s+delegate\s+\S+\s+(\w+)"
 )
+DELEGATE_SIGNATURE = re.compile(
+    r"((?:\s*\[[^\]]+\]\s*)+)"
+    r"public\s+delegate\s+(.+?)\s+(\w+)\s*\((.*?)\)\s*;",
+    re.DOTALL,
+)
 FUNCTION_DECLARATION = re.compile(
     r'\[CCode \(cname = "(mln_[^"]+)"\)\]\s*'
     r"public static\s+([^;]+);"
@@ -159,6 +164,39 @@ def vapi_function_signatures(
     return signatures
 
 
+def vapi_delegate_signatures(
+    source: str,
+    types: dict[str, tuple[str, str]],
+) -> dict[str, str]:
+    signatures: dict[str, str] = {}
+    for match in DELEGATE_SIGNATURE.finditer(source):
+        attributes, return_type, _, parameter_text = match.groups()
+        delegate_name = c_name(attributes)
+        if delegate_name is None:
+            continue
+        parameters: list[str] = []
+        if parameter_text.strip():
+            for parameter in parameter_text.split(","):
+                parameter_parts = re.fullmatch(
+                    r"(?:(out|ref)\s+)?(.+?)\s+\w+",
+                    parameter.strip(),
+                )
+                if parameter_parts is None:
+                    raise SystemExit(
+                        "cannot parse raw VAPI delegate parameter for "
+                        f"{delegate_name}: {parameter.strip()}"
+                    )
+                direction, vala_type = parameter_parts.groups()
+                c_type = vala_type_to_c(vala_type, types)
+                if direction in {"out", "ref"}:
+                    c_type += " *"
+                parameters.append(c_type)
+        signatures[delegate_name] = normalize_c_type(
+            f"{vala_type_to_c(return_type, types)} ({', '.join(parameters)})"
+        )
+    return signatures
+
+
 def vapi_struct_layouts(
     source: str,
     types: dict[str, tuple[str, str]],
@@ -251,7 +289,7 @@ def flatten_record_fields(
             continue
         field_name = child["name"]
         field_type = child["type"]["qualType"]
-        if previous_anonymous_record is not None and "(unnamed at " in field_type:
+        if previous_anonymous_record is not None and "unnamed union at" in field_type:
             fields.extend(
                 flatten_record_fields(
                     previous_anonymous_record,
@@ -285,14 +323,26 @@ def clang_struct_layouts(
 def compare_declarations(source: str) -> None:
     types = named_c_types(source)
     expected_functions = vapi_function_signatures(source, types)
+    expected_delegates = vapi_delegate_signatures(source, types)
     expected_structs = vapi_struct_layouts(source, types)
     ast = run_clang_ast()
     actual_functions = clang_function_signatures(ast)
+    actual_delegates = {
+        node["name"]: normalize_c_type(
+            re.sub(r"\(\s*\*\s*\)", "", node["type"]["qualType"], count=1)
+        )
+        for node in walk_ast(ast)
+        if node.get("kind") == "TypedefDecl" and node.get("name") in expected_delegates
+    }
     actual_structs = clang_struct_layouts(ast, set(expected_structs))
 
     differences: list[str] = []
     for name, signature in sorted(expected_functions.items()):
         actual = actual_functions.get(name)
+        if actual != signature:
+            differences.append(f"{name}: VAPI {signature!r}, C header {actual!r}")
+    for name, signature in sorted(expected_delegates.items()):
+        actual = actual_delegates.get(name)
         if actual != signature:
             differences.append(f"{name}: VAPI {signature!r}, C header {actual!r}")
     for name, layout in sorted(expected_structs.items()):
@@ -330,6 +380,7 @@ def validate_source(source: str) -> None:
     header_text = "\n".join(
         path.read_text(encoding="utf-8")
         for path in sorted((REPOSITORY_ROOT / "include").rglob("*.h"))
+        if path.name != "callback_adapter.h"
     )
     c_functions = public_c_functions(header_text)
     declared_functions = vapi_functions(source)

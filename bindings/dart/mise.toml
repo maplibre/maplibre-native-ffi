@@ -1,0 +1,82 @@
+[tools]
+"core:dart" = "{{vars.dart_version}}"
+
+# The built-in provider runs `dart pub get` and tracks pubspec.yaml/pubspec.lock
+# against .dart_tool/package_config.json. Use `dart pub upgrade` to move the
+# lockfile deliberately.
+[deps.dart]
+auto = true
+
+# `dart format` takes only files and directories, so it cannot join dprint's
+# stdin/stdout exec plugin like the other language formatters. hk calls these
+# path-taking tasks directly instead.
+[tasks._format-check]
+description = "Check Dart formatting."
+hide = true
+raw_args = true
+dir = "../.."
+run = "dart format --output=none --set-exit-if-changed"
+
+[tasks._format-fix]
+description = "Format Dart files."
+hide = true
+raw_args = true
+dir = "../.."
+run = "dart format"
+
+[tasks.ffigen]
+run = "dart run tool/ffigen.dart"
+sources = [
+  "tool/ffigen.dart",
+  "pubspec.yaml",
+  "pubspec.lock",
+  "../../include/maplibre_native_c.h",
+  "../../include/maplibre_native_c/**/*.h",
+]
+outputs = ["lib/src/internal/c/maplibre_native_c.g.dart"]
+
+[tasks.ffigen-check]
+run = """
+mkdir -p .dart_tool
+trap 'rm -f .dart_tool/maplibre_native_c.check.g.dart' EXIT
+dart run tool/ffigen.dart --output .dart_tool/maplibre_native_c.check.g.dart
+# Report the drift rather than just the exit code. ffigen parses with whatever
+# libclang the host provides, and that is unpinned, so a mismatch here needs to
+# name what actually differs before anyone can act on it.
+if ! diff -u lib/src/internal/c/maplibre_native_c.g.dart .dart_tool/maplibre_native_c.check.g.dart; then
+  echo "error: the committed ffigen bindings differ from a fresh generation" >&2
+  echo "Regenerate with 'mise run //bindings/dart:ffigen' and commit the result." >&2
+  exit 1
+fi
+"""
+
+[tasks.format]
+run = "dart format lib test tool"
+
+[tasks.analyze]
+depends = [":ffigen-check"]
+run = "dart analyze"
+
+[tasks.build]
+depends = [":analyze"]
+
+[tasks.test]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [
+  { task = "//:build", args = ["{{usage.preset}}"] },
+  ":analyze",
+]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  native_library="$native_install_dir/lib/libmaplibre-native-c.dylib"
+else
+  native_library="$native_install_dir/lib/libmaplibre-native-c.so"
+fi
+MLN_FFI_NATIVE_LIBRARY="$native_library" dart test
+'''
+run_windows = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+MLN_FFI_NATIVE_LIBRARY="$native_install_dir/bin/maplibre-native-c.dll" dart test
+'''

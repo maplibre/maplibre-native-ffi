@@ -23,6 +23,7 @@ namespace Maplibre.Native.Internal.C
         MLN_ANIMATION_OPTION_VELOCITY = 1U << 1,
         MLN_ANIMATION_OPTION_MIN_ZOOM = 1U << 2,
         MLN_ANIMATION_OPTION_EASING = 1U << 3,
+        MLN_ANIMATION_OPTION_TRANSITION_ID = 1U << 4,
     }
 
     [NativeTypeName("uint32_t")]
@@ -41,6 +42,7 @@ namespace Maplibre.Native.Internal.C
         MLN_BOUND_OPTION_MAX_ZOOM = 1U << 2,
         MLN_BOUND_OPTION_MIN_PITCH = 1U << 3,
         MLN_BOUND_OPTION_MAX_PITCH = 1U << 4,
+        MLN_BOUND_OPTION_UNBOUNDED = 1U << 5,
     }
 
     [NativeTypeName("uint32_t")]
@@ -145,6 +147,9 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("uint32_t")]
         public uint map_mode;
+
+        [NativeTypeName("bool")]
+        public byte fast_pfor_enabled;
     }
 
     internal partial struct mln_screen_point
@@ -220,6 +225,9 @@ namespace Maplibre.Native.Internal.C
         public double min_zoom;
 
         public mln_unit_bezier easing;
+
+        [NativeTypeName("uint64_t")]
+        public ulong transition_id;
     }
 
     internal partial struct mln_camera_fit_options
@@ -352,7 +360,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L336_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L405_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -428,7 +436,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L393_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L462_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -512,7 +520,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint identifier_type;
 
-        [NativeTypeName("__AnonymousRecord_map_L448_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L517_C3")]
         public _identifier_e__Union identifier;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -559,7 +567,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L479_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L548_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -653,7 +661,7 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("uint32_t")]
         public uint type;
 
-        [NativeTypeName("__AnonymousRecord_map_L549_C3")]
+        [NativeTypeName("__AnonymousRecord_map_L619_C3")]
         public _data_e__Union data;
 
         [StructLayout(LayoutKind.Explicit)]
@@ -820,6 +828,9 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_create(mln_runtime* runtime, [NativeTypeName("const mln_map_options *")] mln_map_options* options, mln_map** out_map);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_size(mln_map* map, [NativeTypeName("uint32_t *")] uint* out_width, [NativeTypeName("uint32_t *")] uint* out_height, double* out_scale_factor);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_request_repaint(mln_map* map);

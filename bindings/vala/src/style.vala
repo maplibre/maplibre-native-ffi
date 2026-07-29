@@ -311,6 +311,105 @@ namespace MaplibreNative {
         }
     }
 
+    public class GeoJsonSourceOptions {
+        public double? min_zoom { get; set; }
+        public double? max_zoom { get; set; }
+        public double? tolerance { get; set; }
+        public double? cluster_max_zoom { get; set; }
+        public JsonValue? cluster_properties { get; set; }
+        public uint32? tile_size { get; set; }
+        public uint32? buffer { get; set; }
+        public uint32? cluster_radius { get; set; }
+        public uint32? cluster_min_points { get; set; }
+        public bool? line_metrics { get; set; }
+        public bool? cluster { get; set; }
+
+        public GeoJsonSourceOptions copy () {
+            var copied = new GeoJsonSourceOptions ();
+            copied.min_zoom = min_zoom;
+            copied.max_zoom = max_zoom;
+            copied.tolerance = tolerance;
+            copied.cluster_max_zoom = cluster_max_zoom;
+            copied.cluster_properties = cluster_properties == null ? null : cluster_properties.copy ();
+            copied.tile_size = tile_size;
+            copied.buffer = buffer;
+            copied.cluster_radius = cluster_radius;
+            copied.cluster_min_points = cluster_min_points;
+            copied.line_metrics = line_metrics;
+            copied.cluster = cluster;
+            return copied;
+        }
+
+        public bool equal (GeoJsonSourceOptions other) {
+            return min_zoom == other.min_zoom
+                && max_zoom == other.max_zoom
+                && tolerance == other.tolerance
+                && cluster_max_zoom == other.cluster_max_zoom
+                && ((cluster_properties == null && other.cluster_properties == null)
+                    || (cluster_properties != null
+                        && other.cluster_properties != null
+                        && cluster_properties.equal (other.cluster_properties)))
+                && tile_size == other.tile_size
+                && buffer == other.buffer
+                && cluster_radius == other.cluster_radius
+                && cluster_min_points == other.cluster_min_points
+                && line_metrics == other.line_metrics
+                && cluster == other.cluster;
+        }
+
+        internal Raw.GeoJsonSourceOptions to_native (ref Raw.JsonValue cluster_properties_storage, out JsonValue? cluster_properties_owner) throws Error {
+            Raw.GeoJsonSourceOptions options = Raw.geojson_source_options_default ();
+            cluster_properties_owner = null;
+            if (min_zoom != null) {
+                options.min_zoom = min_zoom;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.MIN_ZOOM;
+            }
+            if (max_zoom != null) {
+                options.max_zoom = max_zoom;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.MAX_ZOOM;
+            }
+            if (tolerance != null) {
+                options.tolerance = tolerance;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.TOLERANCE;
+            }
+            if (cluster_max_zoom != null) {
+                options.cluster_max_zoom = cluster_max_zoom;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.CLUSTER_MAX_ZOOM;
+            }
+            if (cluster_properties != null) {
+                cluster_properties_owner = cluster_properties.copy ();
+                cluster_properties_storage = cluster_properties_owner.to_native ();
+                options.cluster_properties = &cluster_properties_storage;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.CLUSTER_PROPERTIES;
+            }
+            if (tile_size != null) {
+                options.tile_size = tile_size;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.TILE_SIZE;
+            }
+            if (buffer != null) {
+                options.buffer = buffer;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.BUFFER;
+            }
+            if (cluster_radius != null) {
+                options.cluster_radius = cluster_radius;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.CLUSTER_RADIUS;
+            }
+            if (cluster_min_points != null) {
+                options.cluster_min_points = cluster_min_points;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.CLUSTER_MIN_POINTS;
+            }
+            if (line_metrics != null) {
+                options.line_metrics = line_metrics;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.LINE_METRICS;
+            }
+            if (cluster != null) {
+                options.cluster = cluster;
+                options.fields |= (uint32) Raw.GeoJsonSourceOptionField.CLUSTER;
+            }
+            return options;
+        }
+    }
+
     public class PremultipliedRgba8Image {
         public uint32 width { get; private set; }
         public uint32 height { get; private set; }

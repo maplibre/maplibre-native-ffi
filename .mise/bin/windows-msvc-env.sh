@@ -8,7 +8,7 @@ esac
 windows_host_architecture="${MLN_FFI_WINDOWS_HOST_ARCHITECTURE:-$(uname -m)}"
 case "$windows_host_architecture" in
   aarch64 | arm64) msvc_arch=arm64 ;;
-  x86_64 | amd64) msvc_arch=x64 ;;
+  x64 | x86_64 | amd64) msvc_arch=x64 ;;
   *) echo "Unsupported Windows host architecture: $windows_host_architecture" >&2; return 1 ;;
 esac
 
@@ -47,42 +47,157 @@ if [[ ! -x "$vswhere" ]]; then
   return 1
 fi
 
-vs_install="$("$vswhere" -latest -version '[17.0,18.0)' -products '*' \
-  -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
-  -property installationPath | tr -d '\r' | sed -n '1p')"
+vs_query() {
+  "$vswhere" -latest -version '[17.0,18.0)' -products '*' \
+    -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 \
+    -property "$1" | tr -d '\r' | sed -n '1p'
+}
+
+vs_install="$(vs_query installationPath)"
 if [[ -z "$vs_install" ]]; then
   echo "Visual Studio 2022 with the Desktop development with C++ workload was not found" >&2
   return 1
 fi
 
-vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
-loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
-cat > "$loader" <<EOF
+# `set` reports every variable cmd.exe inherited, not just what VsDevCmd added.
+# Replaying an inherited value in a later shell is what makes it wrong: a GitHub
+# Actions step's $GITHUB_ENV names a file the runner consumes and retires when
+# that step ends, so a second step handed the first one's path writes where
+# nothing reads. Keep the cache to what VsDevCmd itself contributed.
+is_vsdevcmd_contribution() {
+  local name="$1" value="$2"
+  case "$name" in
+    # Per-step or per-shell state VsDevCmd never sets. MSYS2 can rewrite paths
+    # on the way into cmd.exe, so these can differ without VsDevCmd's help.
+    GITHUB_* | RUNNER_* | ACTIONS_* | INPUT_* | \
+      HOME | PWD | OLDPWD | SHLVL | CD | PROMPT | \
+      TMP | TEMP | TMPDIR | BASH_ENV | MSYS* | CYGWIN)
+      return 1
+      ;;
+  esac
+  [[ -z "${!name+set}" ]] && return 0
+  [[ "${!name}" != "$value" ]]
+}
+
+# Every mise task, and on CI every `shell: bash` step, starts a fresh Git Bash
+# that sources this file. Resolving the environment from scratch each time costs
+# a cmd.exe running VsDevCmd.bat plus a walk of the redist tree, which is slow
+# everywhere and is the dominant source of process creation on Windows ARM64,
+# where the MSYS2 runtime crashes under that churn. Resolving it once per
+# toolchain and replaying the result keeps later shells to one vswhere pair.
+#
+# The key covers everything the cached values derive from: the install path, the
+# installed version, and the target architecture. An in-place Visual Studio
+# update changes the version and so retires the entry.
+vs_version="$(vs_query installationVersion)"
+cache_key="${vs_install//[^A-Za-z0-9]/_}-${vs_version//[^A-Za-z0-9]/_}-${msvc_arch}"
+cache_file="${TMPDIR:-/tmp}/mln-msvc-env-${cache_key}.sh"
+
+vs_path_prefix=
+vs_path_suffix=
+crt_path=
+cache_complete=
+if [[ -r "$cache_file" ]]; then
+  # shellcheck source=/dev/null
+  source "$cache_file"
+fi
+
+# The cache sets its completion marker last, so a truncated file reads as a miss
+# rather than a partial replay. The resolved values cannot serve as the marker:
+# both are legitimately empty when this shell already has the entries VsDevCmd
+# would add.
+if [[ -z "$cache_complete" ]]; then
+  vs_dev_cmd="${vs_install}\\Common7\\Tools\\VsDevCmd.bat"
+  loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
+  # `set` is what cmd.exe reports the status of, so a failed call has to stop the
+  # script before it runs. Without this a half-initialized environment reads as
+  # success, and now that the result is cached it would be replayed all job.
+  cat > "$loader" <<EOF
 @echo off
 call "$vs_dev_cmd" -arch=$msvc_arch -host_arch=$msvc_arch >nul
+if errorlevel 1 exit /b 1
 set
 EOF
 
-loader_windows="$(cygpath -w "$loader")"
-if ! environment="$(cmd.exe //d //s //c "$loader_windows")"; then
+  loader_windows="$(cygpath -w "$loader")"
+  if ! environment="$(cmd.exe //d //s //c "$loader_windows")"; then
+    rm -f "$loader"
+    echo "VsDevCmd.bat failed to initialize the Visual Studio environment" >&2
+    return 1
+  fi
   rm -f "$loader"
-  echo "VsDevCmd.bat failed to initialize the Visual Studio environment" >&2
-  return 1
+
+  cache_body=
+  while IFS='=' read -r name value; do
+    [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    case "$name" in
+      Path | PATH) msvc_path="$(cygpath -u -p "$value")" ;;
+      *)
+        # Compare before exporting: the test reads the variable's current value,
+        # which an export on this line would have already overwritten.
+        if is_vsdevcmd_contribution "$name" "$value"; then
+          cache_body+="export $name=$(printf '%q' "$value")"$'\n'
+        fi
+        export "$name=$value"
+        ;;
+    esac
+  done < <(tr -d '\r' <<< "$environment")
+
+  # clang-cl locates MSVC, and derives the _MSC_VER that decides which language
+  # dialects CMake will offer, from these. Refuse to publish an entry without
+  # them rather than hand every later shell a toolchain it cannot find.
+  if [[ -z "${VCToolsInstallDir:-}" || -z "${INCLUDE:-}" ]]; then
+    echo "VsDevCmd.bat did not set VCToolsInstallDir and INCLUDE" >&2
+    return 1
+  fi
+
+  # cmd.exe inherited this shell's PATH, so its Path is those entries plus
+  # VsDevCmd's. Keep the additions for the same reason the variables above are
+  # filtered: the inherited half belongs to the shell that generated the cache,
+  # and prepending its copy here would let stale entries win.
+  #
+  # VsDevCmd both prepends and appends, and which side an entry landed on is the
+  # whole of its precedence. Visual Studio appends its own CMake, which has to
+  # keep losing to the one mise puts on PATH; hoisting every addition in front
+  # of the inherited entries hands the build a different CMake than the pinned
+  # one. Split the additions at the first inherited entry and restore each side
+  # around the sourcing shell's own PATH.
+  inherited_path=":$PATH:"
+  vs_path_prefix=
+  vs_path_suffix=
+  seen_inherited=0
+  while IFS= read -r entry; do
+    [[ -n "$entry" ]] || continue
+    if [[ "$inherited_path" == *":$entry:"* ]]; then
+      seen_inherited=1
+      continue
+    fi
+    if ((seen_inherited)); then
+      vs_path_suffix="${vs_path_suffix:+$vs_path_suffix:}$entry"
+    else
+      vs_path_prefix="${vs_path_prefix:+$vs_path_prefix:}$entry"
+    fi
+  done < <(tr ':' '\n' <<< "$msvc_path")
+
+  redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
+  crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
+  if [[ -n "$crt_path" ]]; then
+    crt_path="$(dirname "$crt_path")"
+  fi
+
+  # Publish through a rename so a concurrent shell sees either no entry or a
+  # complete one. Writing the cache is best effort: a failure here costs the
+  # next shell a rebuild, which is what it would have paid anyway.
+  cache_body+="vs_path_prefix=$(printf '%q' "$vs_path_prefix")"$'\n'
+  cache_body+="vs_path_suffix=$(printf '%q' "$vs_path_suffix")"$'\n'
+  cache_body+="crt_path=$(printf '%q' "$crt_path")"$'\n'
+  cache_body+="cache_complete=1"$'\n'
+  if cache_staging="$(mktemp "${cache_file}.XXXXXX" 2>/dev/null)"; then
+    if ! { printf '%s' "$cache_body" > "$cache_staging" &&
+      mv -f "$cache_staging" "$cache_file"; }; then
+      rm -f "$cache_staging"
+    fi
+  fi
 fi
-rm -f "$loader"
 
-while IFS='=' read -r name value; do
-  [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
-  case "$name" in
-    Path | PATH) msvc_path="$(cygpath -u -p "$value")" ;;
-    *) export "$name=$value" ;;
-  esac
-done < <(tr -d '\r' <<< "$environment")
-
-redist_root="$(cygpath -u "${vs_install}\\VC\\Redist\\MSVC")"
-crt_path="$(find "$redist_root" -path "*/${msvc_arch}/Microsoft.VC143.CRT/msvcp140_codecvt_ids.dll" -print 2>/dev/null | sort -r | sed -n '1p')"
-if [[ -n "$crt_path" ]]; then
-  crt_path="$(dirname "$crt_path")"
-fi
-
-export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${msvc_path:+$msvc_path:}$original_path"
+export PATH="${crt_path:+$crt_path:}$standalone_llvm_bin:${vs_path_prefix:+$vs_path_prefix:}$original_path${vs_path_suffix:+:$vs_path_suffix}"

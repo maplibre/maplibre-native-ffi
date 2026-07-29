@@ -2,7 +2,13 @@ package org.maplibre.nativeffi.map
 
 import kotlin.jvm.JvmInline
 
-/** Tile operation reported by runtime tile action events. */
+/**
+ * Tile operation reported by runtime tile action events.
+ *
+ * This is an open domain: MapLibre Native may report a value that has no named constant here, so a
+ * `when` over this type needs an `else` branch. Unknown values are preserved as their raw
+ * [nativeValue] rather than collapsed to a known constant.
+ */
 @JvmInline
 public value class TileOperation(public val nativeValue: Int) {
   public companion object {

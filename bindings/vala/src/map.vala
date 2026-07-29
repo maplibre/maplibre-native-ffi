@@ -4,6 +4,7 @@ namespace MaplibreNative {
         public uint32 height { get; set; default = 256; }
         public double scale_factor { get; set; default = 1.0; }
         public MapMode mode { get; set; default = MapMode.CONTINUOUS; }
+        public bool fast_pfor_enabled { get; set; default = false; }
 
         public MapOptions copy () {
             var copied = new MapOptions ();
@@ -11,6 +12,7 @@ namespace MaplibreNative {
             copied.height = height;
             copied.scale_factor = scale_factor;
             copied.mode = mode;
+            copied.fast_pfor_enabled = fast_pfor_enabled;
             return copied;
         }
 
@@ -18,7 +20,8 @@ namespace MaplibreNative {
             return width == other.width
                 && height == other.height
                 && scale_factor == other.scale_factor
-                && mode == other.mode;
+                && mode == other.mode
+                && fast_pfor_enabled == other.fast_pfor_enabled;
         }
 
         internal Raw.MapOptions to_native () {
@@ -27,7 +30,20 @@ namespace MaplibreNative {
             options.height = height;
             options.scale_factor = scale_factor;
             options.map_mode = (uint32) mode;
+            options.fast_pfor_enabled = fast_pfor_enabled;
             return options;
+        }
+    }
+
+    public struct MapSize {
+        public uint32 width;
+        public uint32 height;
+        public double scale_factor;
+
+        public MapSize (uint32 width, uint32 height, double scale_factor) {
+            this.width = width;
+            this.height = height;
+            this.scale_factor = scale_factor;
         }
     }
 
@@ -354,12 +370,21 @@ namespace MaplibreNative {
 
         public MapHandle (RuntimeHandle runtime, MapOptions? options = null) throws Error {
             this.runtime = runtime;
-            var native_options = (options ?? new MapOptions ()).to_native ();
+            var options_snapshot = (options ?? new MapOptions ()).copy ();
+            var native_options = options_snapshot.to_native ();
             Raw.Map created;
             var runtime_lease = runtime.require_live ();
             check_status (Raw.map_create (runtime_lease.native, &native_options, out created));
             native = (owned) created;
             runtime.register_map (this);
+        }
+
+        public MapSize get_size () throws Error {
+            uint32 width;
+            uint32 height;
+            double scale_factor;
+            check_status (Raw.map_get_size (require_live ().native, out width, out height, out scale_factor));
+            return MapSize (width, height, scale_factor);
         }
 
         ~MapHandle () {
@@ -910,22 +935,40 @@ namespace MaplibreNative {
             return new RenderSessionHandle (this, (owned) session);
         }
 
-        public void add_geojson_source_url (string source_id, string url) throws Error {
-            add_geojson_source_url_utf8 (new Utf8String (source_id), new Utf8String (url));
+        public void add_geojson_source_url (string source_id, string url, GeoJsonSourceOptions? options = null) throws Error {
+            add_geojson_source_url_utf8 (new Utf8String (source_id), new Utf8String (url), options);
         }
 
-        public void add_geojson_source_url_utf8 (Utf8String source_id, Utf8String url) throws Error {
-            check_status (Raw.map_add_geojson_source_url (require_live ().native, source_id.to_native (), url.to_native ()));
+        public void add_geojson_source_url_utf8 (Utf8String source_id, Utf8String url, GeoJsonSourceOptions? options = null) throws Error {
+            Raw.GeoJsonSourceOptions native_options = {};
+            Raw.GeoJsonSourceOptions* native_options_pointer = null;
+            Raw.JsonValue cluster_properties_storage = {};
+            JsonValue? cluster_properties_owner = null;
+            GeoJsonSourceOptions? options_storage = options == null ? null : options.copy ();
+            if (options_storage != null) {
+                native_options = options_storage.to_native (ref cluster_properties_storage, out cluster_properties_owner);
+                native_options_pointer = &native_options;
+            }
+            check_status (Raw.map_add_geojson_source_url (require_live ().native, source_id.to_native (), url.to_native (), native_options_pointer));
         }
 
-        public void add_geojson_source_data (string source_id, GeoJson data) throws Error {
-            add_geojson_source_data_utf8 (new Utf8String (source_id), data);
+        public void add_geojson_source_data (string source_id, GeoJson data, GeoJsonSourceOptions? options = null) throws Error {
+            add_geojson_source_data_utf8 (new Utf8String (source_id), data, options);
         }
 
-        public void add_geojson_source_data_utf8 (Utf8String source_id, GeoJson data) throws Error {
+        public void add_geojson_source_data_utf8 (Utf8String source_id, GeoJson data, GeoJsonSourceOptions? options = null) throws Error {
             var data_storage = data.copy ();
             var native_data = data_storage.to_native ();
-            check_status (Raw.map_add_geojson_source_data (require_live ().native, source_id.to_native (), &native_data));
+            Raw.GeoJsonSourceOptions native_options = {};
+            Raw.GeoJsonSourceOptions* native_options_pointer = null;
+            Raw.JsonValue cluster_properties_storage = {};
+            JsonValue? cluster_properties_owner = null;
+            GeoJsonSourceOptions? options_storage = options == null ? null : options.copy ();
+            if (options_storage != null) {
+                native_options = options_storage.to_native (ref cluster_properties_storage, out cluster_properties_owner);
+                native_options_pointer = &native_options;
+            }
+            check_status (Raw.map_add_geojson_source_data (require_live ().native, source_id.to_native (), &native_data, native_options_pointer));
         }
 
         public void set_geojson_source_url (string source_id, string url) throws Error {

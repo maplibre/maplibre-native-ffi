@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 #MISE description="Run a quick command in the local devcontainer image."
+#MISE shell="bash"
 set -euo pipefail
 
 host_arch="$(uname -m)"

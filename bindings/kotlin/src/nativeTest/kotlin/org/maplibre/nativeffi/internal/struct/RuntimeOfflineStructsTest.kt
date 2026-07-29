@@ -25,6 +25,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
@@ -351,6 +352,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
           MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
           MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION,
           MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS,
+          MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED,
         )
         .forEach { payloadType ->
           val event = alloc<mln_runtime_event>()

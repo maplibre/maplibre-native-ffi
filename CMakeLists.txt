@@ -44,20 +44,25 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(mln_options)
 include(mln_maplibre_native)
-include(mln_target)
+include(mln_c_api)
+include(mln_licenses)
 include(mln_install)
 
 mln_configure_options()
 mln_validate_platform()
 mln_add_maplibre_native()
 mln_select_platform()
+# Before the render backend, which only looks for a graphics loader when the
+# test harness that links it is being built.
+include(CTest)
+
 mln_select_render_backend()
 mln_add_c_api_library(maplibre_native_c)
+mln_add_core_licenses(maplibre_native_c)
 mln_install_c_api_library(maplibre_native_c)
 
 add_library(maplibre_native_ffi::c ALIAS maplibre_native_c)
 
-include(CTest)
 if(BUILD_TESTING AND MLN_FFI_ARTIFACT_NAME)
   include(cmake/mln_tests.cmake)
   mln_add_c_api_test()

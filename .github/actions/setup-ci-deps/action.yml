@@ -18,6 +18,17 @@ inputs:
     description: Restore the Zig package cache and expose its key for a later save
     required: false
     default: "false"
+  gradle:
+    description: Set up Gradle and its user-home cache; jobs that run no Gradle build leave this off
+    required: false
+    default: "true"
+  save-toolchains:
+    description: >-
+      Save the toolchain cache when this job misses it. One job per runner label
+      claims this so a miss costs one archive of the toolchain tree per runner
+      instead of one per job.
+    required: false
+    default: "false"
 
 outputs:
   zig-cache-key:
@@ -49,17 +60,31 @@ runs:
         New-Item -Path $reporting -Force | Out-Null
         Set-ItemProperty -Path $reporting -Name DontShowUI -Value 1 -Type DWord
 
+    # The gitlink SHA is what decides the checkout, so key on it directly. A
+    # tag file can be left behind by a pin bump; the recorded commit cannot.
+    - name: Resolve the MapLibre Native pin
+      id: mln-pin
+      shell: bash
+      run: >-
+        echo "sha=$(git ls-tree HEAD third_party/maplibre-native | awk '{print $3}')"
+        >> "$GITHUB_OUTPUT"
+
     - name: Cache MapLibre Native source
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           third_party/maplibre-native
           .git/modules/third_party/maplibre-native
-        key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
-        # sync-submodules re-syncs whatever it restores, so an older checkout
-        # turns a pin bump into an incremental fetch instead of a fresh clone.
+        key: mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules') }}-${{ steps.mln-pin.outputs.sha }}
+        # Restore only caches created with the current selective-sync logic.
+        # A stale submodule worktree can otherwise report the recorded commit
+        # while retaining files from the previous checkout.
         restore-keys: |
-          mln-src-v2-
+          mln-src-v4-${{ hashFiles('.gitmodules', '.mise/bin/sync-submodules') }}-
+
+    - name: Sync MapLibre Native source
+      shell: bash
+      run: .mise/bin/sync-submodules
 
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
@@ -90,20 +115,27 @@ runs:
       uses: ./.github/actions/setup-windows-opengl-software
 
     - name: Cache Cargo packages
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
-        key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
+        # The workspace lock file alone: a `**` glob also matches the
+        # submodule's, which an earlier step restores from another cache, so the
+        # key would depend on that cache's contents.
+        key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-${{ hashFiles('Cargo.lock') }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-
+          ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v2-
 
-    # uv, pnpm, NuGet, and Go each default to a different per-OS cache location,
-    # and some of those paths carry a tool-version suffix. Pinning them under
-    # one directory keeps a single cache entry accurate on every runner. Windows
+    # uv, pnpm, and NuGet each default to a different per-OS cache location, and
+    # some of those paths carry a tool-version suffix. Pinning them under one
+    # directory keeps a single cache entry accurate on every runner. Windows
     # tools need a native path, so prefer USERPROFILE with forward slashes.
+    #
+    # Only download caches belong here, because the key is a lock file hash: an
+    # exact hit skips the save, which is right for an entry that is complete
+    # when first written. A build cache needs a key that moves with the sources.
     - name: Pin package download caches
       shell: bash
       run: |
@@ -117,53 +149,49 @@ runs:
           echo "UV_CACHE_DIR=$cache_root/uv"
           echo "npm_config_store_dir=$cache_root/pnpm"
           echo "NUGET_PACKAGES=$cache_root/nuget"
-          # bindings/go declares no module requirements, so only the build cache
-          # is worth carrying between jobs.
-          echo "GOCACHE=$cache_root/go-build"
         } >> "$GITHUB_ENV"
 
     - name: Cache package downloads
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.ci-package-cache
-        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v1-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', '**/dotnet-tools.json', '**/go.mod') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-pkg-v2-${{ hashFiles('pnpm-lock.yaml', 'uv.lock', 'Directory.Packages.props', '.config/dotnet-tools.json', 'bindings/dotnet/.config/dotnet-tools.json') }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-pkg-v1-
+          ${{ runner.os }}-${{ runner.arch }}-pkg-v2-
 
     # Zig's global cache holds downloaded package tarballs, which keeps SDL's
     # source dependencies off the network. Windows resolves it under
     # LOCALAPPDATA; every other platform, including macOS, uses ~/.cache.
     #
-    # Restore only. `actions/cache` saves in a post step even when the job
-    # failed, so a fetch that died partway published an incomplete cache under
-    # the exact key — and because a key is never overwritten, every later run
-    # restored the same gaps and retried the same downloads, turning one
-    # transient network error into a permanent one. The job saves this cache
-    # itself, after the checks that populate it pass.
+    # Restore only; the job saves this cache itself, after the checks that
+    # populate it pass. A key is never overwritten, so a partial fetch that won
+    # the key would make one transient network error permanent.
     - name: Compute Zig package cache key
       if: ${{ inputs.zig == 'true' }}
       id: zig-cache-key
       shell: bash
       run: >-
-        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-${{ hashFiles('**/build.zig.zon') }}"
+        echo "key=${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-${{ hashFiles('**/build.zig.zon') }}"
         >> "$GITHUB_OUTPUT"
 
+    # Only `p`, the downloaded package tarballs. The rest of the global cache
+    # holds compilation artifacts keyed by this key's `build.zig.zon` hash, so
+    # they go stale the moment a source file changes and never get replaced.
     - name: Restore Zig packages
       if: ${{ inputs.zig == 'true' }}
       id: zig-packages
-      uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
-          ~/.cache/zig
-          ~/AppData/Local/zig
+          ~/.cache/zig/p
+          ~/AppData/Local/zig/p
         key: ${{ steps.zig-cache-key.outputs.key }}
         restore-keys: |
-          ${{ runner.os }}-${{ runner.arch }}-zig-packages-v1-
+          ${{ runner.os }}-${{ runner.arch }}-zig-packages-v2-
 
-    # Downloading and extracting the SDK takes about 40 seconds, which is not
-    # worth the ~1 GB it occupied in a 10 GB repository cache shared with every
-    # other target. The entry was evicted between runs anyway, so the two OHOS
-    # jobs paid the download and the upload.
+    # Not cached: the SDK is large enough to compete with every other target for
+    # the shared repository cache, and re-fetching it costs less than the
+    # eviction pressure an entry that size adds.
     - name: Setup OpenHarmony SDK
       if: ${{ startsWith(inputs.target, 'ohos-') }}
       shell: bash
@@ -204,6 +232,7 @@ runs:
     # project uses the wrapper, so no `gradle-version` is requested and the
     # mise-managed JDK stays in charge.
     - name: Cache Gradle User Home
+      if: ${{ inputs.gradle == 'true' }}
       uses: gradle/actions/setup-gradle@3f131e8634966bd73d06cc69884922b02e6faf92 # v6.2.0
       with:
         add-job-summary: on-failure
@@ -244,7 +273,7 @@ runs:
 
     - name: Install Windows Vulkan SDK
       if: ${{ startsWith(inputs.target, 'windows-') && endsWith(inputs.target, '-vulkan') }}
-      uses: jakoch/install-vulkan-sdk-action@b394a1abed9cb019d8e637eeadac93d73e0853da # v1.5.5
+      uses: jakoch/install-vulkan-sdk-action@37effcfa045411f8bfbbda26df2fd1b3bf3436fa # v1.6.0
       with:
         # The action's cache key is the OS, architecture and this version, and a
         # hit returns before the runtime is installed, so the entry saved
@@ -285,32 +314,159 @@ runs:
           throw "no vulkan-1.dll in $($candidates -join ', ') or on PATH"
         }
 
-    - name: Bootstrap repository
-      uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+    # `mise-action` writes its cache inside its own step and declares no post
+    # step, so nothing installed after it reaches the entry — including the
+    # rustup tree, which lives outside the mise data directory either way.
+    # Restore before it runs and save once every install has succeeded.
+    #
+    # The hashed set mirrors `[monorepo].config_roots`. Naming the roots keeps a
+    # `**` glob out of the submodule an earlier step restores from a cache.
+    - name: Compute toolchain cache key
+      id: toolchain-key
+      shell: bash
+      run: |
+        prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
+        echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
+
+    - name: Restore toolchains
+      id: toolchains
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        cache: true
-        cache_key_prefix: mise-v4
+        # mise keeps its data under LOCALAPPDATA on Windows and the XDG data
+        # directory everywhere else. `core:rust` defers to rustup, which owns
+        # ~/.rustup and the proxies in ~/.cargo/bin.
+        path: |
+          ~/.local/share/mise
+          ~/AppData/Local/mise
+          ~/.rustup
+          ~/.cargo/bin
+        key: ${{ steps.toolchain-key.outputs.key }}
+        # A near-miss still saves most of the downloads: `mise install` adds
+        # what changed and leaves the rest alone.
+        restore-keys: |
+          ${{ steps.toolchain-key.outputs.prefix }}-
+
+    - name: Bootstrap repository
+      uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+      with:
+        cache: false
         bootstrap: true
 
-    # The mise action may restore Rust install metadata without the rustup
-    # toolchain, components, or cross targets declared in mise.toml.
-    - name: Repair cached Rust toolchain
+    # An exact key match means the cached rustup tree was built from this
+    # mise.toml, components and cross targets included, so a working `cargo`
+    # is enough to trust it. Anything less reinstalls: a partial match can
+    # predate a target added since, which no version check would catch.
+    #
+    # `--force` uninstalls the toolchain before it reinstalls one, so a single
+    # transient failure leaves the runner with no Rust at all and fails the job.
+    # ARM64 runners kill freshly spawned processes often enough to hit this:
+    # rustup has died by signal milliseconds after exec, having written nothing.
+    # Retry so the second attempt restores what the first one removed.
+    - name: Repair cached Rust toolchain (Unix)
+      if: runner.os != 'Windows'
       shell: bash
-      run: MISE_NO_HOOKS=1 mise install --force rust
+      env:
+        TOOLCHAINS_CACHE_HIT: ${{ steps.toolchains.outputs.cache-hit }}
+      run: |
+        if [[ "${TOOLCHAINS_CACHE_HIT}" == "true" ]] &&
+          cargo --version && rustc --version; then
+          echo "Rust toolchain restored from cache"
+          exit 0
+        fi
+        for attempt in 1 2 3; do
+          if MISE_NO_HOOKS=1 mise install --force rust; then
+            exit 0
+          fi
+          echo "::warning::mise install --force rust failed (attempt ${attempt}/3)"
+          sleep $((attempt * 5))
+        done
+        exit 1
 
-    # Project tools live in each project's config, so the root install covers
-    # only the repository-wide set. Installing the rest lazily would leave every
-    # job holding a different subset when the shared mise cache key is saved,
-    # and the winner would decide what later jobs restore. The devcontainer
-    # aggregate is the same set the published image bakes.
-    - name: Install project toolchains
+    # Windows ARM64 can terminate Git Bash itself with a native exception while
+    # it waits for the forced reinstall. Keep the retry supervisor in PowerShell
+    # so a crashed mise or rustup process returns control for the next attempt.
+    - name: Repair cached Rust toolchain (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        TOOLCHAINS_CACHE_HIT: ${{ steps.toolchains.outputs.cache-hit }}
+      run: |
+        if (
+          $env:TOOLCHAINS_CACHE_HIT -eq "true" -and
+          (Get-Command cargo -ErrorAction SilentlyContinue) -and
+          (Get-Command rustc -ErrorAction SilentlyContinue)
+        ) {
+          cargo --version
+          if ($LASTEXITCODE -eq 0) {
+            rustc --version
+            if ($LASTEXITCODE -eq 0) {
+              Write-Output "Rust toolchain restored from cache"
+              exit 0
+            }
+          }
+        }
+        $env:MISE_NO_HOOKS = "1"
+        foreach ($attempt in 1..3) {
+          mise install --force rust
+          if ($LASTEXITCODE -eq 0) {
+            exit 0
+          }
+          Write-Output "::warning::mise install --force rust failed (attempt $attempt/3)"
+          Start-Sleep -Seconds ($attempt * 5)
+        }
+        exit 1
+
+    # `mise bootstrap` above installs the root config's tools; `--monorepo` adds
+    # every `[monorepo].config_roots` entry, which is what the jobs run against.
+    # Installing them here rather than lazily keeps the cache saved below
+    # identical no matter which job writes it.
+    - name: Install project toolchains (Unix)
+      if: runner.os != 'Windows'
       shell: bash
-      run: MISE_NO_HOOKS=1 mise -C .devcontainer install
+      run: MISE_NO_HOOKS=1 mise install --monorepo
+
+    # Git Bash/MSYS2 is x86_64 under Windows ARM64 emulation and can terminate
+    # with a native exception while spawning processes. Keep the retry supervisor
+    # in native PowerShell so it survives that failure:
+    # https://github.com/actions/runner-images/issues/14052
+    # https://github.com/git-for-windows/git/issues/6287
+    - name: Install project toolchains (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      run: |
+        $env:MISE_NO_HOOKS = "1"
+        foreach ($attempt in 1..2) {
+          mise install --monorepo
+          if ($LASTEXITCODE -eq 0) {
+            exit 0
+          }
+          Write-Output "::warning::mise install --monorepo failed (attempt $attempt/2)"
+          if ($attempt -lt 2) {
+            Start-Sleep -Seconds 5
+          }
+        }
+        exit 1
+
+    # Every job restores; one job per runner label saves. Otherwise a miss has
+    # every job archive the toolchain tree for one of them to win the key, and
+    # the losers pay the archive before the conflict is reported.
+    - name: Save toolchains
+      if: ${{ inputs.save-toolchains == 'true' && steps.toolchains.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.local/share/mise
+          ~/AppData/Local/mise
+          ~/.rustup
+          ~/.cargo/bin
+        key: ${{ steps.toolchain-key.outputs.key }}
 
     # Public reads use the R2 custom domain (same defaults as mise.toml). Writes
     # use the account S3 endpoint + key prefix so object URLs match OpenDAL's
     # path-style public GETs: https://sccache.sargunv.dev/<bucket>/<key>
-    - name: Wire sccache into CMake
+    - name: Wire sccache into CMake (Unix)
+      if: runner.os != 'Windows'
       shell: bash
       env:
         SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
@@ -353,3 +509,57 @@ runs:
           } >> "$GITHUB_ENV"
           echo "Configured sccache R2 backend (public read-only)"
         fi
+
+    # This step is another Git Bash startup boundary exposed to the same
+    # Windows ARM64 emulation failure as the toolchain install above. Keep the
+    # orchestration native even though it only writes environment variables:
+    # https://github.com/actions/runner-images/issues/14052
+    # https://github.com/git-for-windows/git/issues/6287
+    - name: Wire sccache into CMake (Windows)
+      if: runner.os == 'Windows'
+      shell: pwsh
+      env:
+        SCCACHE_ACCESS_KEY_ID: ${{ inputs.sccache-access-key-id }}
+        SCCACHE_SECRET_ACCESS_KEY: ${{ inputs.sccache-secret-access-key }}
+      run: |
+        $bucket = "maplibre-native-ffi-sccache"
+        $accountId = "6cda5be3bf367f2885f3696d3c9b2653"
+        $publicEndpoint = "https://sccache.sargunv.dev"
+        $writeEndpoint = "https://${accountId}.r2.cloudflarestorage.com"
+
+        @(
+          "SCCACHE_BUCKET=$bucket"
+          "SCCACHE_REGION=auto"
+          "SCCACHE_S3_USE_SSL=true"
+          "SCCACHE_BASEDIRS=$env:GITHUB_WORKSPACE"
+          "SCCACHE_IDLE_TIMEOUT=0"
+          "CMAKE_C_COMPILER_LAUNCHER=sccache"
+          "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+          "RUSTC_WRAPPER=sccache"
+          # sccache declines to cache incrementally compiled crates, which is
+          # the cargo default for the dev profile that `cargo test` uses.
+          "CARGO_INCREMENTAL=0"
+        ) >> $env:GITHUB_ENV
+
+        if (
+          $env:GITHUB_EVENT_NAME -ne "pull_request" -and
+          $env:SCCACHE_ACCESS_KEY_ID -and
+          $env:SCCACHE_SECRET_ACCESS_KEY
+        ) {
+          @(
+            "SCCACHE_ENDPOINT=$writeEndpoint"
+            "SCCACHE_S3_KEY_PREFIX=$bucket/"
+            # mise.toml exports SCCACHE_S3_NO_CREDENTIALS=1 for public reads;
+            # clear it so authenticated writes are not rejected by sccache.
+            "SCCACHE_S3_NO_CREDENTIALS=0"
+            "AWS_ACCESS_KEY_ID=$env:SCCACHE_ACCESS_KEY_ID"
+            "AWS_SECRET_ACCESS_KEY=$env:SCCACHE_SECRET_ACCESS_KEY"
+          ) >> $env:GITHUB_ENV
+          Write-Output "Configured sccache R2 backend (read-write)"
+        } else {
+          @(
+            "SCCACHE_ENDPOINT=$publicEndpoint"
+            "SCCACHE_S3_NO_CREDENTIALS=1"
+          ) >> $env:GITHUB_ENV
+          Write-Output "Configured sccache R2 backend (public read-only)"
+        }

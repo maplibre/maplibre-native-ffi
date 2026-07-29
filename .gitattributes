@@ -1,5 +1,22 @@
 *           text=auto eol=lf
 *.bat       text eol=crlf
 *.jar       binary
-third_party/** linguist-vendored
-.github/workflows/ci.yml linguist-generated=true
+
+# Vendored: third-party sources committed as-is.
+third_party/**                                              linguist-vendored=true
+gradlew                                                     linguist-vendored=true
+gradlew.bat                                                 linguist-vendored=true
+gradle/wrapper/**                                           linguist-vendored=true
+
+# Generated: refresh with the generator, never edit by hand.
+/.codex/environments/environment.toml                       linguist-generated=true
+/.github/workflows/ci.yml                                   linguist-generated=true
+/bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart  linguist-generated=true
+/bindings/dotnet/src/Maplibre.Native/Generated/*.g.cs       linguist-generated=true
+
+# Generated: dependency lockfiles.
+Cargo.lock                                                  linguist-generated=true
+mise.lock                                                   linguist-generated=true
+pnpm-lock.yaml                                              linguist-generated=true
+pubspec.lock                                                linguist-generated=true
+uv.lock                                                     linguist-generated=true

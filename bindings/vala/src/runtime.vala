@@ -53,6 +53,7 @@ namespace MaplibreNative {
         OFFLINE_REGION_RESPONSE_ERROR = 6,
         OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
         OFFLINE_OPERATION_COMPLETED = 8,
+        CAMERA_TRANSITION_FINISHED = 9,
         UNKNOWN = 255
     }
 
@@ -601,6 +602,14 @@ namespace MaplibreNative {
         }
     }
 
+    public class RuntimeEventCameraTransitionFinished {
+        public uint64 transition_id { get; private set; }
+
+        internal RuntimeEventCameraTransitionFinished.from_native (Raw.RuntimeEventCameraTransitionFinished native) {
+            transition_id = native.transition_id;
+        }
+    }
+
     /**
      * Handles a copied resource request on the native worker or network thread
      * that issued it. Implementations stay thread-safe and return promptly,
@@ -932,6 +941,7 @@ namespace MaplibreNative {
         public RuntimeEventType event_type { get; private set; }
         public RuntimeEventSourceType source_type { get; private set; }
         public int32 code { get; private set; }
+        public CameraChangeMode? camera_change_mode { get; private set; }
         public RuntimeEventPayloadType payload_type { get; private set; }
         public string? message {
             owned get { return message_storage.to_string_or_null (); }
@@ -950,6 +960,7 @@ namespace MaplibreNative {
         public RuntimeEventOfflineRegionResponseError? offline_region_response_error { get; private set; }
         public RuntimeEventOfflineRegionTileCountLimit? offline_region_tile_count_limit { get; private set; }
         public RuntimeEventOfflineOperationCompleted? offline_operation_completed { get; private set; }
+        public RuntimeEventCameraTransitionFinished? camera_transition_finished { get; private set; }
 
         internal RuntimeEvent (RuntimeHandle runtime, Raw.RuntimeEvent native) throws Error {
             event_type = runtime_event_type_from_raw (native.type);
@@ -961,6 +972,10 @@ namespace MaplibreNative {
                 }
             }
             code = native.code;
+            if (event_type == RuntimeEventType.MAP_CAMERA_WILL_CHANGE
+                || event_type == RuntimeEventType.MAP_CAMERA_DID_CHANGE) {
+                camera_change_mode = (CameraChangeMode) ((uint32) native.code);
+            }
             payload_type = runtime_event_payload_type_from_raw (native.payload_type);
             message_storage = copy_sized_utf8 (native.message, native.message_size, "runtime event message");
             payload_storage = copy_sized_bytes ((uint8*) native.payload, native.payload_size, "runtime event payload");
@@ -999,6 +1014,10 @@ namespace MaplibreNative {
                 case RuntimeEventPayloadType.OFFLINE_OPERATION_COMPLETED:
                     validate_payload (native, sizeof (Raw.RuntimeEventOfflineOperationCompleted));
                     offline_operation_completed = new RuntimeEventOfflineOperationCompleted.from_native (runtime, ((Raw.RuntimeEventOfflineOperationCompleted*) native.payload)[0]);
+                    break;
+                case RuntimeEventPayloadType.CAMERA_TRANSITION_FINISHED:
+                    validate_payload (native, sizeof (Raw.RuntimeEventCameraTransitionFinished));
+                    camera_transition_finished = new RuntimeEventCameraTransitionFinished.from_native (((Raw.RuntimeEventCameraTransitionFinished*) native.payload)[0]);
                     break;
                 default:
                     break;
@@ -1321,6 +1340,52 @@ namespace MaplibreNative {
         }
     }
 
+    public class WakeSource {
+        private Raw.WakeSource? native;
+        private Mutex mutex;
+
+        internal WakeSource (owned Raw.WakeSource native) {
+            this.native = (owned) native;
+        }
+
+        public bool closed {
+            get {
+                mutex.lock ();
+                var value = native == null;
+                mutex.unlock ();
+                return value;
+            }
+        }
+
+        public void signal () throws Error {
+            mutex.lock ();
+            if (native == null) {
+                mutex.unlock ();
+                clear_unknown_status ();
+                throw new Error.INVALID_STATE ("wake source is closed");
+            }
+            try {
+                check_status (Raw.wake_source_signal (native));
+            } finally {
+                mutex.unlock ();
+            }
+        }
+
+        public void close () {
+            mutex.lock ();
+            unowned Raw.WakeSource? closing = native;
+            native = null;
+            mutex.unlock ();
+            if (closing != null) {
+                Raw.wake_source_destroy (closing);
+            }
+        }
+
+        ~WakeSource () {
+            close ();
+        }
+    }
+
     public class RuntimeHandle {
         private Raw.Runtime? native;
         private ResourceTransformRegistration? resource_transform;
@@ -1348,7 +1413,8 @@ namespace MaplibreNative {
                 clear_unknown_status ();
                 throw new Error.ABI_MISMATCH ("MapLibre Native C ABI version mismatch: expected %u, loaded %u", EXPECTED_C_ABI_VERSION, actual_version);
             }
-            var native_options = (options ?? new RuntimeOptions ()).to_native ();
+            var options_snapshot = (options ?? new RuntimeOptions ()).copy ();
+            var native_options = options_snapshot.to_native ();
             Raw.Runtime created;
             check_status (Raw.runtime_create (&native_options, out created));
             native = (owned) created;
@@ -1465,9 +1531,20 @@ namespace MaplibreNative {
             registry_mutex.unlock ();
         }
 
-        public void run_once () throws Error {
+        public void pump (int64 timeout_ms = 0) throws Error {
+            if (timeout_ms < -1) {
+                clear_unknown_status ();
+                throw new Error.INVALID_ARGUMENT ("runtime pump timeout must be -1 or non-negative");
+            }
             var lease = require_live ();
-            check_status (Raw.runtime_run_once (lease.native));
+            check_status (Raw.runtime_pump (lease.native, timeout_ms));
+        }
+
+        public WakeSource acquire_wake_source () throws Error {
+            var lease = require_live ();
+            Raw.WakeSource source;
+            check_status (Raw.runtime_wake_source_acquire (lease.native, out source));
+            return new WakeSource ((owned) source);
         }
 
         public RuntimeEvent? poll_event () throws Error {
@@ -1635,6 +1712,22 @@ namespace MaplibreNative {
             }
         }
 
+        public void clear_resource_provider () throws Error {
+            var lease = require_live ();
+            ResourceProviderRegistration? previous = null;
+            registry_mutex.lock ();
+            try {
+                check_status (Raw.runtime_clear_resource_provider (lease.native));
+                previous = resource_provider;
+                resource_provider = null;
+            } finally {
+                registry_mutex.unlock ();
+            }
+            if (previous != null) {
+                previous.close ();
+            }
+        }
+
         public void set_resource_transform (owned ResourceTransformCallback callback) throws Error {
             var lease = require_live ();
             ResourceTransformRegistration? previous = null;
@@ -1697,12 +1790,9 @@ namespace MaplibreNative {
             Raw.Geometry geometry_storage = {};
             Geometry? geometry_owner;
             var native_definition = definition.to_native (ref geometry_storage, out geometry_owner);
-            uint8* metadata_data = null;
-            size_t metadata_size = 0;
-            if (metadata != null && metadata.length > 0) {
-                metadata_data = metadata;
-                metadata_size = metadata.length;
-            }
+            var metadata_snapshot = metadata == null ? new uint8[0] : copy_byte_array (metadata);
+            uint8* metadata_data = metadata_snapshot.length == 0 ? null : metadata_snapshot;
+            size_t metadata_size = metadata_snapshot.length;
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_create_start (lease.native, &native_definition, metadata_data, metadata_size, out operation_id));
             return register_offline_operation (operation_id, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
@@ -1731,12 +1821,9 @@ namespace MaplibreNative {
 
         public OfflineOperationHandle offline_region_update_metadata_start (OfflineRegionId region_id, uint8[]? metadata = null) throws Error {
             var lease = require_live ();
-            uint8* metadata_data = null;
-            size_t metadata_size = 0;
-            if (metadata != null && metadata.length > 0) {
-                metadata_data = metadata;
-                metadata_size = metadata.length;
-            }
+            var metadata_snapshot = metadata == null ? new uint8[0] : copy_byte_array (metadata);
+            uint8* metadata_data = metadata_snapshot.length == 0 ? null : metadata_snapshot;
+            size_t metadata_size = metadata_snapshot.length;
             uint64 operation_id;
             check_status (Raw.runtime_offline_region_update_metadata_start (lease.native, region_id.to_native (), metadata_data, metadata_size, out operation_id));
             return register_offline_operation (operation_id, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);

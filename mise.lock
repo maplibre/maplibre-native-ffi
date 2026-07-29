@@ -440,9 +440,62 @@ conda_deps = [
     "vcomp14-14.51.36231-h1b9f54f_39",
 ]
 
+[[tools.dart]]
+version = "3.12.2"
+backend = "http:dart"
+
+[tools.dart."platforms.linux-arm64"]
+checksum = "sha256:f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-arm64-release.zip"
+
+[tools.dart."platforms.linux-x64"]
+checksum = "blake3:877573f488e7365a1759616d1310537c091f8b6e6998cbb3e519dd9ec970429e"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-linux-x64-release.zip"
+
+[tools.dart."platforms.macos-arm64"]
+checksum = "sha256:cd8753928e77b6b665bd70dce0e64b4ec6d2e2fde141d6409bb716c8ac1f1c0a"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-macos-arm64-release.zip"
+
+[tools.dart."platforms.windows-arm64"]
+checksum = "sha256:ef0168b2bbceccda659e3d9a0f5ebebd5326ef84800ca6af7ccceeb1cfd3daf0"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-arm64-release.zip"
+
+[tools.dart."platforms.windows-x64"]
+checksum = "sha256:77fd96c823ed09a85e58209a2c5f16b0fc02e5ed4f3e3d46fddf4be763d498d6"
+url = "https://storage.googleapis.com/dart-archive/channels/stable/release/3.12.2/sdk/dartsdk-windows-x64-release.zip"
+
 [[tools.dotnet]]
 version = "10.0.203"
 backend = "core:dotnet"
+
+[[tools."github:EmbarkStudios/cargo-about"]]
+version = "0.9.1"
+backend = "github:EmbarkStudios/cargo-about"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-arm64"]
+checksum = "sha256:d13ff19fedb566f859831c0b71c22120e7c598c7753d5f1018dd7353c6ced02a"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461985054"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.linux-x64"]
+checksum = "sha256:c0e7dc6f5d74b0beec5c0053d39ab24514c717d19acd91886907a22457ea9e98"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984931"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.macos-arm64"]
+checksum = "sha256:6a38fe166d17a674269d4373256c0b6bd93acc2553e12de0517cb9ecc73c9c02"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461984679"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-arm64"]
+checksum = "sha256:e2b695e4787381fa36e99ee85d5c6439eec21dd09d875572802124867da42af7"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-aarch64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986459"
+
+[tools."github:EmbarkStudios/cargo-about"."platforms.windows-x64"]
+checksum = "sha256:318893aff6b9efd60f70470f5827b9577ae20a805cf9732d5612862a78508581"
+url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-pc-windows-msvc.tar.gz"
+url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986502"
 
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
@@ -549,6 +602,35 @@ url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_aarch64.zip"
 [tools.java."platforms.windows-x64"]
 checksum = "sha256:ddd68ee54e78b6b19388f517b8a61fbed2856ae3320febe42449bac3021e2729"
 url = "https://cdn.azul.com/zulu/bin/zulu25.34.17-ca-jdk25.0.3-win_x64.zip"
+
+[[tools.ninja]]
+version = "1.13.2"
+backend = "aqua:ninja-build/ninja"
+
+[tools.ninja."platforms.linux-arm64"]
+checksum = "sha256:fd2cacc8050a7f12a16a2e48f9e06fca5c14fc4c2bee2babb67b58be17a607fc"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux-aarch64.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318864579"
+
+[tools.ninja."platforms.linux-x64"]
+checksum = "sha256:5749cbc4e668273514150a80e387a957f933c6ed3f5f11e03fb30955e2bbead6"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-linux.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318865358"
+
+[tools.ninja."platforms.macos-arm64"]
+checksum = "sha256:c99048673aa765960a99cf10c6ddb9f1fad506099ff0a0e137ad8960a88f321b"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-mac.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863524"
+
+[tools.ninja."platforms.windows-arm64"]
+checksum = "sha256:e52f0bdef9dfb1003229dbd6508a508c4073fd017247002adc66e5e806cb0391"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-winarm64.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863570"
+
+[tools.ninja."platforms.windows-x64"]
+checksum = "sha256:07fc8261b42b20e71d1720b39068c2e14ffcee6396b76fb7a795fb460b78dc65"
+url = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-win.zip"
+url_api = "https://api.github.com/repos/ninja-build/ninja/releases/assets/318863577"
 
 [[tools.node]]
 version = "24.11.0"

@@ -20,6 +20,10 @@ depends = [
 ]
 run = '''
 set -euo pipefail
+if [[ -n "${MLN_FFI_VALA_MSYS2_ROOT:-}" ]]; then
+  vala_msys2_root="$(cygpath -u "$MLN_FFI_VALA_MSYS2_ROOT")"
+  export PATH="$vala_msys2_root/ucrt64/bin:$PATH"
+fi
 mkdir -p build/vapi build/include build/c
 valac \
   --vapidir vapi \
@@ -42,9 +46,20 @@ set -euo pipefail
 mkdir -p build
 
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+if [[ -n "${MLN_FFI_VALA_MSYS2_ROOT:-}" ]]; then
+  vala_msys2_root="$(cygpath -u "$MLN_FFI_VALA_MSYS2_ROOT")"
+  export PATH="$vala_msys2_root/ucrt64/bin:$native_install_dir/bin:$PATH"
+fi
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
 export LD_LIBRARY_PATH="$native_install_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 export DYLD_LIBRARY_PATH="$native_install_dir/lib${DYLD_LIBRARY_PATH:+:${DYLD_LIBRARY_PATH}}"
+
+binding_cc="${CC:-cc}"
+valac_cc_args=()
+if [[ "$usage_preset" == windows-*-wgl ]]; then
+  binding_cc="${vala_msys2_root:?}/ucrt64/bin/gcc.exe"
+  valac_cc_args=(--cc "$binding_cc")
+fi
 
 metal_support_object="build/metal_support.o"
 metal_framework_args=()
@@ -68,20 +83,28 @@ void mln_vala_metal_test_window_layer_destroy(MlnValaMetalWindowLayer* window_la
 void* mln_vala_metal_test_texture_create(void* device, uint32_t width, uint32_t height) { (void)device; (void)width; (void)height; return 0; }
 void mln_vala_metal_test_object_release(void* object) { (void)object; }
 STUB
-  ${CC:-cc} -c build/metal_support_stub.c -o "$metal_support_object"
+  "$binding_cc" -c build/metal_support_stub.c -o "$metal_support_object"
 fi
 
-native_packages=(maplibre-native-c vulkan)
+native_packages=()
+if [[ "$usage_preset" == windows-*-wgl ]]; then
+  native_packages=()
+else
+  native_packages+=(maplibre-native-c vulkan)
+fi
 if [[ "$(uname -s)" == "Linux" ]]; then
   native_packages+=(egl)
 fi
-read -r -a native_args <<< "$(pkg-config --cflags --libs "${native_packages[@]}")"
+native_args=()
+if [[ "$usage_preset" != windows-*-wgl ]]; then
+  read -r -a native_args <<< "$(pkg-config --cflags --libs "${native_packages[@]}")"
+fi
 compiler_args=()
 for argument in "${native_args[@]}"; do
   compiler_args+=(-X "$argument")
 done
 if [[ "$(uname -s)" == "Linux" ]]; then
-  compiler_args+=(-X -lstdc++)
+  compiler_args+=(-X -lstdc++ -X -lX11)
 fi
 if [[ "$usage_preset" == *-egl ]]; then
   compiler_args+=(-X -DMLN_VALA_TEST_EGL=1)
@@ -96,7 +119,10 @@ if [[ "$(uname -s)" == "Darwin" && "$usage_preset" == *-egl ]]; then
   )
 elif [[ "$usage_preset" == windows-*-wgl ]]; then
   compiler_args+=(
+    -X -DMLN_VALA_TEST_NO_VULKAN=1
     -X -DMLN_VALA_TEST_WGL=1
+    -X "-I$native_install_dir/include"
+    -X "$native_install_dir/lib/maplibre-native-c.lib"
     -X -lopengl32
     -X -lgdi32
     -X -luser32
@@ -104,6 +130,7 @@ elif [[ "$usage_preset" == windows-*-wgl ]]; then
 fi
 
 valac \
+  "${valac_cc_args[@]}" \
   --vapidir vapi \
   --pkg maplibre-native-c \
   --pkg glib-2.0 \
@@ -118,13 +145,22 @@ valac \
   tests/compile/vulkan_support.c \
   -o build/minimal
 
-./build/minimal
-MLN_VALA_RUN_OFFLINE_REGION_SMOKE=1 \
-MLN_VALA_RUN_STYLE_URL_SMOKE=1 \
-MLN_VALA_RUN_DEM_LAYER_SMOKE=1 \
-MLN_VALA_RUN_STYLE_LIGHT_SMOKE=1 \
-MLN_VALA_RUN_LOCATION_INDICATOR_PROPERTY_SMOKE=1 \
-MLN_VALA_RUN_TEXTURE_BACKEND_COMPILE_SMOKE=1 \
-MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE=1 \
-./build/minimal
+run_minimal() {
+  if [[ "$(uname -s)" == "Linux" && "$usage_preset" == *-vulkan ]]; then
+    xvfb-run -a "$@"
+  else
+    "$@"
+  fi
+}
+
+run_minimal ./build/minimal
+run_minimal env \
+  MLN_VALA_RUN_OFFLINE_REGION_SMOKE=1 \
+  MLN_VALA_RUN_STYLE_URL_SMOKE=1 \
+  MLN_VALA_RUN_DEM_LAYER_SMOKE=1 \
+  MLN_VALA_RUN_STYLE_LIGHT_SMOKE=1 \
+  MLN_VALA_RUN_LOCATION_INDICATOR_PROPERTY_SMOKE=1 \
+  MLN_VALA_RUN_TEXTURE_BACKEND_COMPILE_SMOKE=1 \
+  MLN_VALA_RUN_FEATURE_EXTENSION_SMOKE=1 \
+  ./build/minimal
 '''

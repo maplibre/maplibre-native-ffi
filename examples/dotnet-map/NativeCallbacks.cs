@@ -7,7 +7,13 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static unsafe class NativeCallbacks
 {
-    private static readonly Glfw Glfw = Glfw.GetApi();
+    private static readonly Glfw Glfw = CreateGlfw();
+
+    private static Glfw CreateGlfw()
+    {
+        NativeLibraryResolver.PreloadGlfw();
+        return Glfw.GetApi();
+    }
 
     public static NativePointer GlfwGetProcAddress =>
         NativePointer.FromBorrowedAddress(

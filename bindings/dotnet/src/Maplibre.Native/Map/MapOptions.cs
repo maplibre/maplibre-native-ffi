@@ -32,6 +32,15 @@ public sealed record MapOptions
     /// <summary>Map rendering mode.</summary>
     public MapMode? MapMode { get; set; }
 
+    /// <summary>
+    /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR encodings, fixed for
+    /// the lifetime of the map. Enable this on maps that read vector sources created with
+    /// <see cref="Style.VectorTileEncoding.Mlt"/> from a tile set that uses FastPFOR. A map created
+    /// with this <c>false</c> decodes every other MLT encoding and logs a tile parse warning for
+    /// the FastPFOR ones.
+    /// </summary>
+    public bool? FastPforEnabled { get; set; }
+
     internal mln_map_options ToNative()
     {
         var options = NativeMethods.mln_map_options_default();
@@ -50,6 +59,10 @@ public sealed record MapOptions
         if (MapMode is { } mapMode)
         {
             options.map_mode = (uint)mapMode;
+        }
+        if (FastPforEnabled is { } fastPforEnabled)
+        {
+            options.fast_pfor_enabled = fastPforEnabled ? (byte)1 : (byte)0;
         }
         return options;
     }

@@ -129,6 +129,21 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Pointer));
     }
 
+    /// <summary>
+    /// Gets the map's logical viewport size in UI pixels and its pixel ratio. The size starts at
+    /// the creation width and height, and follows the attach and resize rules documented on
+    /// <see cref="MapOptions"/>. The scale factor is fixed for the lifetime of the map and is
+    /// independent of any render target's scale factor.
+    /// </summary>
+    public (uint Width, uint Height, double ScaleFactor) GetSize()
+    {
+        uint width;
+        uint height;
+        double scaleFactor;
+        NativeStatus.Check(NativeMethods.mln_map_get_size(Pointer, &width, &height, &scaleFactor));
+        return (width, height, scaleFactor);
+    }
+
     /// <summary>Gets the map's viewport options.</summary>
     public ViewportOptions GetViewportOptions()
     {
@@ -736,15 +751,23 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a GeoJSON source that loads data from a URL.</summary>
-    public void AddGeoJsonSourceUrl(string sourceId, string url)
+    /// <remarks>
+    /// <paramref name="options" /> is fixed when the source is created;
+    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep the options
+    /// the source was added with.
+    /// </remarks>
+    public void AddGeoJsonSourceUrl(string sourceId, string url, GeoJsonSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
+        using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_geojson_source_url(
                 Pointer,
                 nativeSourceId.Value,
-                nativeUrl.Value
+                nativeUrl.Value,
+                nativeOptions is null ? null : &optionsValue
             )
         );
     }
@@ -764,15 +787,23 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a GeoJSON source with inline data.</summary>
-    public void AddGeoJsonSourceData(string sourceId, GeoJson data)
+    /// <remarks>
+    /// <paramref name="options" /> is fixed when the source is created;
+    /// <see cref="SetGeoJsonSourceUrl" /> and <see cref="SetGeoJsonSourceData" /> keep the options
+    /// the source was added with.
+    /// </remarks>
+    public void AddGeoJsonSourceData(string sourceId, GeoJson data, GeoJsonSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeGeoJson.From(data);
+        using var nativeOptions = options is null ? null : NativeGeoJsonSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_geojson_source_data(
                 Pointer,
                 nativeSourceId.Value,
-                nativeData.Pointer
+                nativeData.Pointer,
+                nativeOptions is null ? null : &optionsValue
             )
         );
     }

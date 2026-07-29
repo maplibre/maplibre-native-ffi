@@ -1,9 +1,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#if !defined(MLN_VALA_TEST_NO_VULKAN)
+#ifdef __linux__
+#define VK_USE_PLATFORM_XLIB_KHR
+#include <X11/Xlib.h>
+#endif
 #include <vulkan/vulkan.h>
 #ifdef __APPLE__
 #include <vulkan/vulkan_metal.h>
+#endif
 #endif
 
 #ifndef VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME
@@ -23,6 +29,8 @@ typedef struct MlnValaVulkanTestContext {
   uint32_t graphics_queue_family_index;
   void* get_instance_proc_addr;
   void* get_device_proc_addr;
+  void* x_display;
+  uint64_t x_window;
 } MlnValaVulkanTestContext;
 
 typedef struct MlnValaVulkanBorrowedImage {
@@ -33,6 +41,62 @@ typedef struct MlnValaVulkanBorrowedImage {
   uint32_t initial_layout;
   uint32_t final_layout;
 } MlnValaVulkanBorrowedImage;
+
+#if defined(MLN_VALA_TEST_NO_VULKAN)
+
+bool mln_vala_vulkan_test_context_create(
+  MlnValaVulkanTestContext* out_context
+) {
+  (void)out_context;
+  return false;
+}
+
+bool mln_vala_vulkan_test_borrowed_image_create(
+  MlnValaVulkanTestContext* context, uint32_t width, uint32_t height,
+  MlnValaVulkanBorrowedImage* out_image
+) {
+  (void)context;
+  (void)width;
+  (void)height;
+  (void)out_image;
+  return false;
+}
+
+void mln_vala_vulkan_test_borrowed_image_destroy(
+  MlnValaVulkanTestContext* context, MlnValaVulkanBorrowedImage* image
+) {
+  (void)context;
+  (void)image;
+}
+
+bool mln_vala_vulkan_test_surface_supported(MlnValaVulkanTestContext* context) {
+  (void)context;
+  return false;
+}
+bool mln_vala_vulkan_test_surface_required(void) { return false; }
+bool mln_vala_vulkan_test_surface_uses_metal_layer(void) { return false; }
+
+bool mln_vala_vulkan_test_surface_create(
+  MlnValaVulkanTestContext* context, void* metal_layer, void** out_surface
+) {
+  (void)context;
+  (void)metal_layer;
+  (void)out_surface;
+  return false;
+}
+
+void mln_vala_vulkan_test_surface_destroy(
+  MlnValaVulkanTestContext* context, void* surface
+) {
+  (void)context;
+  (void)surface;
+}
+
+void mln_vala_vulkan_test_context_destroy(MlnValaVulkanTestContext* context) {
+  (void)context;
+}
+
+#else
 
 static bool has_device_extension(
   VkPhysicalDevice physical_device, const char* name
@@ -143,15 +207,15 @@ bool mln_vala_vulkan_test_context_create(
       VK_EXT_METAL_SURFACE_EXTENSION_NAME;
   }
 #endif
-#elif defined(VK_EXT_headless_surface)
+#elif defined(__linux__)
   if (
     has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
-    has_instance_extension(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME)
+    has_instance_extension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME)
   ) {
     instance_extensions[instance_extension_count++] =
       VK_KHR_SURFACE_EXTENSION_NAME;
     instance_extensions[instance_extension_count++] =
-      VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME;
+      VK_KHR_XLIB_SURFACE_EXTENSION_NAME;
   }
 #endif
 
@@ -404,7 +468,15 @@ void mln_vala_vulkan_test_borrowed_image_destroy(
   }
 }
 
-bool mln_vala_vulkan_test_surface_supported(void) {
+bool mln_vala_vulkan_test_surface_create(
+  MlnValaVulkanTestContext* context, void* metal_layer, void** out_surface
+);
+
+void mln_vala_vulkan_test_surface_destroy(
+  MlnValaVulkanTestContext* context, void* surface
+);
+
+bool mln_vala_vulkan_test_surface_supported(MlnValaVulkanTestContext* context) {
 #ifdef __APPLE__
 #ifdef VK_EXT_METAL_SURFACE_EXTENSION_NAME
   return has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
@@ -413,22 +485,32 @@ bool mln_vala_vulkan_test_surface_supported(void) {
   return false;
 #endif
 #else
-#ifdef VK_EXT_headless_surface
-  return has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
-         has_instance_extension(VK_EXT_HEADLESS_SURFACE_EXTENSION_NAME);
+#ifdef __linux__
+  if (
+    context == NULL || !has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) ||
+    !has_instance_extension(VK_KHR_XLIB_SURFACE_EXTENSION_NAME)
+  ) {
+    return false;
+  }
+  void* surface = NULL;
+  if (!mln_vala_vulkan_test_surface_create(context, NULL, &surface)) {
+    return false;
+  }
+  VkBool32 present_supported = VK_FALSE;
+  VkResult result = vkGetPhysicalDeviceSurfaceSupportKHR(
+    (VkPhysicalDevice)context->physical_device,
+    context->graphics_queue_family_index, (VkSurfaceKHR)surface,
+    &present_supported
+  );
+  mln_vala_vulkan_test_surface_destroy(context, surface);
+  return result == VK_SUCCESS && present_supported == VK_TRUE;
 #else
   return false;
 #endif
 #endif
 }
 
-bool mln_vala_vulkan_test_surface_required(void) {
-#ifdef __linux__
-  return true;
-#else
-  return false;
-#endif
-}
+bool mln_vala_vulkan_test_surface_required(void) { return false; }
 
 bool mln_vala_vulkan_test_surface_uses_metal_layer(void) {
 #ifdef __APPLE__
@@ -470,26 +552,47 @@ bool mln_vala_vulkan_test_surface_create(
   }
   *out_surface = surface;
   return true;
-#elif defined(VK_EXT_headless_surface)
+#elif defined(__linux__)
   (void)metal_layer;
-  PFN_vkCreateHeadlessSurfaceEXT create_surface =
-    (PFN_vkCreateHeadlessSurfaceEXT)vkGetInstanceProcAddr(
-      (VkInstance)context->instance, "vkCreateHeadlessSurfaceEXT"
-    );
-  if (create_surface == NULL) {
+  Display* display = XOpenDisplay(NULL);
+  if (display == NULL) {
     return false;
   }
-  VkHeadlessSurfaceCreateInfoEXT surface_info;
+  Window window = XCreateSimpleWindow(
+    display, DefaultRootWindow(display), 0, 0, 64, 64, 0, 0, 0
+  );
+  if (window == 0) {
+    XCloseDisplay(display);
+    return false;
+  }
+  XMapWindow(display, window);
+  XSync(display, False);
+  PFN_vkCreateXlibSurfaceKHR create_surface =
+    (PFN_vkCreateXlibSurfaceKHR)vkGetInstanceProcAddr(
+      (VkInstance)context->instance, "vkCreateXlibSurfaceKHR"
+    );
+  if (create_surface == NULL) {
+    XDestroyWindow(display, window);
+    XCloseDisplay(display);
+    return false;
+  }
+  VkXlibSurfaceCreateInfoKHR surface_info;
   memset(&surface_info, 0, sizeof(surface_info));
-  surface_info.sType = VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT;
+  surface_info.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
+  surface_info.dpy = display;
+  surface_info.window = window;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   if (
     create_surface(
       (VkInstance)context->instance, &surface_info, NULL, &surface
     ) != VK_SUCCESS
   ) {
+    XDestroyWindow(display, window);
+    XCloseDisplay(display);
     return false;
   }
+  context->x_display = display;
+  context->x_window = (uint64_t)window;
   *out_surface = surface;
   return true;
 #else
@@ -509,6 +612,16 @@ void mln_vala_vulkan_test_surface_destroy(
   vkDestroySurfaceKHR(
     (VkInstance)context->instance, (VkSurfaceKHR)surface, NULL
   );
+#ifdef __linux__
+  if (context->x_display != NULL) {
+    if (context->x_window != 0) {
+      XDestroyWindow((Display*)context->x_display, (Window)context->x_window);
+      context->x_window = 0;
+    }
+    XCloseDisplay((Display*)context->x_display);
+    context->x_display = NULL;
+  }
+#endif
 }
 
 void mln_vala_vulkan_test_context_destroy(MlnValaVulkanTestContext* context) {
@@ -530,3 +643,5 @@ void mln_vala_vulkan_test_context_destroy(MlnValaVulkanTestContext* context) {
   context->get_instance_proc_addr = NULL;
   context->get_device_proc_addr = NULL;
 }
+
+#endif

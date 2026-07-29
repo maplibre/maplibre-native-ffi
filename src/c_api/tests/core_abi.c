@@ -10,6 +10,7 @@
 #include <pthread.h>
 #endif
 
+#include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
 
@@ -60,21 +61,19 @@ static void runtime_rejects_unknown_flags(void) {
 // binding-owned handle state prevents.
 static void runtime_rejects_stale_handles(void) {
   mln_runtime* runtime = mln_test_create_runtime();
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_destroy(runtime));
+  mln_test_destroy_runtime(runtime);
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_runtime_destroy(runtime)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_run_once(runtime)
+    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(runtime, 0)
   );
 }
 
 // This verifies the public null-handle contract for a raw entry point that
 // bindings do not call with null.
-static void runtime_run_once_rejects_null_runtime(void) {
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_runtime_run_once(NULL)
-  );
+static void runtime_pump_rejects_null_runtime(void) {
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_runtime_pump(NULL, 0));
 }
 
 // This verifies raw event polling rejects a null runtime handle that binding
@@ -127,7 +126,7 @@ static void map_create_rejects_invalid_arguments(void) {
 static void map_lifecycle_rejects_invalid_state_and_stale_handles(void) {
   mln_runtime* runtime = mln_test_create_runtime();
   mln_map* map = mln_test_create_map(runtime);
-  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_map_destroy(map));
+  mln_test_destroy_map(map);
   TEST_ASSERT_EQUAL_INT(MLN_STATUS_INVALID_ARGUMENT, mln_map_destroy(map));
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_json(map, "{}")
@@ -250,7 +249,7 @@ void run_core_abi_tests(void) {
   RUN_TEST(runtime_rejects_invalid_arguments);
   RUN_TEST(runtime_rejects_unknown_flags);
   RUN_TEST(runtime_rejects_stale_handles);
-  RUN_TEST(runtime_run_once_rejects_null_runtime);
+  RUN_TEST(runtime_pump_rejects_null_runtime);
   RUN_TEST(runtime_event_polling_rejects_null_runtime);
   RUN_TEST(map_create_rejects_invalid_arguments);
   RUN_TEST(map_lifecycle_rejects_invalid_state_and_stale_handles);

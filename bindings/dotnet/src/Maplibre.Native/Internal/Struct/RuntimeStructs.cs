@@ -85,6 +85,11 @@ internal static unsafe class RuntimeStructs
                 ReadOfflineOperationCompleted(
                     (mln_runtime_event_offline_operation_completed*)payload
                 ),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_CAMERA_TRANSITION_FINISHED
+                when HasPayload<mln_runtime_event_camera_transition_finished>(payloadSize) =>
+                ReadCameraTransitionFinished(
+                    (mln_runtime_event_camera_transition_finished*)payload
+                ),
             _ => new RuntimeEventPayload.Unknown(
                 payloadType,
                 CopyBytes((byte*)payload, payloadSize)
@@ -148,6 +153,10 @@ internal static unsafe class RuntimeStructs
             payload->result_status,
             payload->found != 0
         );
+
+    private static RuntimeEventPayload.CameraTransitionFinished ReadCameraTransitionFinished(
+        mln_runtime_event_camera_transition_finished* payload
+    ) => new(payload->transition_id);
 
     private static RenderingStats RenderingStats(mln_rendering_stats value) =>
         new(
