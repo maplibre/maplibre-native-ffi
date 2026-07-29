@@ -18,6 +18,7 @@ const {
   InvalidArgumentError,
   InvalidStateError,
   MaplibreError,
+  MapAttachReference,
   MapHandle,
   MapOptions,
   MapProjectionHandle,
@@ -121,6 +122,8 @@ test("concept subpath modules expose curated public API groups", () => {
   assert.equal(geoModule.projectedMetersForLatLng, projectedMetersForLatLng);
   assert.equal(logModule.setLogCallback, setLogCallback);
   assert.equal(mapModule.MapHandle, MapHandle);
+  assert.equal(mapModule.MapAttachReference, MapAttachReference);
+  assert.equal(renderModule.MapAttachReference, MapAttachReference);
   assert.equal(mapModule.MapOptions, MapOptions);
   assert.equal(mapModule.GeoJsonSourceOptions, GeoJsonSourceOptions);
   assert.equal(offlineModule.OfflineOperationHandle, OfflineOperationHandle);
@@ -840,9 +843,8 @@ test("finalizers release abandoned request and texture scopes", () => {
 
 test("runtime event lookup does not retain abandoned map wrappers", () => {
   const packageRoot = path.join(__dirname, "..");
-  // A deliberately abandoned native map can keep backend work alive on Windows.
-  // Exit after the weak reference proves the JavaScript wrapper was collected;
-  // native finalizer scheduling is deliberately outside this lookup test.
+  // Use the identity-registry seam so native finalizer scheduling and backend
+  // teardown stay outside this focused weak-retention test.
   const script = `
     process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS = "1";
     const assert = require("node:assert/strict");
@@ -850,8 +852,10 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
 
     async function main() {
       const runtime = new binding.RuntimeHandle();
-      let map = runtime.createMap({ width: 16, height: 16 });
+      let map = { identity: "map wrapper" };
       const reference = new WeakRef(map);
+      runtime._registerMapIdentityForTesting(map, 123n);
+      assert.equal(runtime._mapForAddressForTesting(123n), map);
       map = undefined;
       let collected = false;
       for (let attempt = 0; attempt < 100 && !collected; attempt += 1) {
@@ -862,6 +866,8 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
         await new Promise((resolve) => setImmediate(resolve));
       }
       assert.equal(collected, true);
+      assert.equal(runtime._mapForAddressForTesting(123n), null);
+      runtime.close();
     }
 
     main().then(
@@ -901,6 +907,46 @@ test("provider callbacks do not retain abandoned runtime wrappers", () => {
         );
       }
       assert.equal(reports.length, 1);
+    }
+
+    main().catch((error) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
+  `;
+  const result = spawnSync(process.execPath, ["--expose-gc", "-e", script], {
+    encoding: "utf8",
+    timeout: 5_000,
+  });
+  assert.equal(result.signal, null, result.stderr);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("replacing a provider releases its callback while requests may retire", () => {
+  const packageRoot = path.join(__dirname, "..");
+  const script = `
+    const assert = require("node:assert/strict");
+    const binding = require(${JSON.stringify(packageRoot)});
+
+    async function main() {
+      const runtime = new binding.RuntimeHandle();
+      let marker = { retainedBy: "old provider callback" };
+      const reference = new WeakRef(marker);
+      runtime.setResourceProviderRoutes([], (() => {
+        const captured = marker;
+        return () => void captured.retainedBy;
+      })());
+      marker = undefined;
+      runtime.setResourceProviderRoutes([], () => {});
+      let collected = false;
+      for (let attempt = 0; attempt < 100 && !collected; attempt += 1) {
+        global.gc();
+        await new Promise((resolve) => setImmediate(resolve));
+        collected = reference.deref() === undefined;
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+      assert.equal(collected, true);
+      runtime.close();
     }
 
     main().catch((error) => {
@@ -1180,6 +1226,103 @@ test("handles stay local while workers create their own runtime", async () => {
   assert.deepEqual(result, { ok: true });
 });
 
+test("wake sources move to workers and release an unbounded pump", async () => {
+  const runtime = new RuntimeHandle();
+  const wakeSource = runtime.acquireWakeSource();
+  const transfer = structuredClone(wakeSource.transfer());
+  assert.equal(wakeSource.closed, true);
+  const worker = new Worker(
+    `
+      const { parentPort, workerData } = require("node:worker_threads");
+      const { WakeSourceHandle } = require(workerData.packageRoot);
+      try {
+        const source = WakeSourceHandle.fromTransfer(workerData.transfer);
+        let consumed = false;
+        try {
+          WakeSourceHandle.fromTransfer(workerData.transfer);
+        } catch {
+          consumed = true;
+        }
+        source.signal();
+        source.close();
+        parentPort.postMessage({ ok: true, consumed });
+      } catch (error) {
+        parentPort.postMessage({ ok: false, message: error?.message });
+      }
+    `,
+    {
+      eval: true,
+      workerData: {
+        packageRoot: path.join(__dirname, ".."),
+        transfer,
+      },
+    },
+  );
+
+  try {
+    runtime.pump(null);
+    const result = await new Promise((resolve, reject) => {
+      worker.once("message", resolve);
+      worker.once("error", reject);
+    });
+    assert.deepEqual(result, { ok: true, consumed: true });
+  } finally {
+    await worker.terminate();
+    runtime.close();
+  }
+});
+
+test("map attach references move between N-API environments exactly once", async () => {
+  const runtime = new RuntimeHandle();
+  const map = runtime.createMap();
+  const localReference = map.attachReference();
+  const transfer = structuredClone(localReference.transfer());
+  assert.equal(localReference.closed, true);
+  const worker = new Worker(
+    `
+      const { parentPort, workerData } = require("node:worker_threads");
+      const { MapAttachReference } = require(workerData.packageRoot);
+      try {
+        const reference = MapAttachReference.fromTransfer(workerData.transfer);
+        let consumed = false;
+        try {
+          MapAttachReference.fromTransfer(workerData.transfer);
+        } catch {
+          consumed = true;
+        }
+        parentPort.postMessage({
+          ok: reference instanceof MapAttachReference,
+          consumed,
+          transfer: reference.transfer(),
+        });
+      } catch (error) {
+        parentPort.postMessage({ ok: false, message: error?.message });
+      }
+    `,
+    {
+      eval: true,
+      workerData: { packageRoot: path.join(__dirname, ".."), transfer },
+    },
+  );
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      worker.once("message", resolve);
+      worker.once("error", reject);
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.consumed, true);
+    const returned = MapAttachReference.fromTransfer(result.transfer);
+    assert.equal(returned.closed, false);
+    map.close();
+    assert.equal(returned.closed, true);
+  } finally {
+    await worker.terminate();
+    if (!map.closed) map.close();
+    runtime.close();
+  }
+});
+
 test("offline operations expose discardable handles", () => {
   const runtime = new RuntimeHandle();
 
@@ -1417,6 +1560,17 @@ test("map events expose proven public map identity without native addresses", as
 });
 
 test("resource provider routes validate Node handoff shape", async () => {
+  assert.throws(
+    () =>
+      nativeAddon.nativeResourceRequestComplete("resource-request:999999", {
+        status: "error",
+        errorReason: 999_001,
+      }),
+    (error) =>
+      error instanceof Error &&
+      error.message.includes('"kind":"InvalidState"') &&
+      error.message.includes('"diagnostic":"ResourceRequestHandle is closed"'),
+  );
   const runtime = new RuntimeHandle();
 
   try {
@@ -2686,6 +2840,22 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
         ),
       InvalidArgumentError,
     );
+    for (const [field, value] of [
+      ["tileSize", 511.5],
+      ["buffer", -1],
+      ["clusterRadius", 40.5],
+      ["clusterMinPoints", Number.MAX_SAFE_INTEGER + 1],
+    ]) {
+      assert.throws(
+        () =>
+          map.addGeoJsonSourceData(
+            `invalid-${field}`,
+            { type: "FeatureCollection", features: [] },
+            { [field]: value },
+          ),
+        InvalidArgumentError,
+      );
+    }
     assert.throws(
       () =>
         map.addStyleSourceJson("non-finite", {

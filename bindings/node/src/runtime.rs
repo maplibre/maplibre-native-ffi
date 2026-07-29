@@ -237,7 +237,7 @@ pub struct ResourceProviderRequest {
 #[napi(object)]
 pub struct ResourceResponseInput {
     pub status: Option<String>,
-    pub error_reason: Option<String>,
+    pub error_reason: Option<Either<String, u32>>,
     pub bytes: Option<Uint8Array>,
     pub error_message: Option<String>,
     pub must_revalidate: Option<bool>,
@@ -250,11 +250,14 @@ pub struct ResourceResponseInput {
 static RESOURCE_REQUEST_TOKEN_IDS: AtomicU64 = AtomicU64::new(1);
 static RESOURCE_REQUEST_HANDLES: OnceLock<Mutex<HashMap<String, ResourceRequestRegistration>>> =
     OnceLock::new();
+static WAKE_SOURCE_TRANSFER_IDS: AtomicU64 = AtomicU64::new(1);
+static WAKE_SOURCE_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<SharedWakeSource>>>> =
+    OnceLock::new();
 
 #[derive(Clone)]
 struct ResourceRequestRegistration {
     handle: Arc<core::resource::ResourceRequestHandleState>,
-    provider: Weak<ResourceProviderState>,
+    requests: Weak<ResourceProviderRequests>,
 }
 
 struct ResourceMatcher {
@@ -276,6 +279,10 @@ struct ResourceTransformState {
 struct ResourceProviderState {
     routes: Vec<ResourceMatcher>,
     callback: ThreadsafeFunction<ResourceProviderRequest>,
+    requests: Arc<ResourceProviderRequests>,
+}
+
+struct ResourceProviderRequests {
     pending_completion_tokens: Mutex<HashSet<String>>,
 }
 
@@ -284,37 +291,134 @@ pub struct NativeRuntimeHandle {
     state: NativeHandleState<sys::mln_runtime>,
     resource_transform: Mutex<Option<Arc<ResourceTransformState>>>,
     resource_provider: Mutex<Option<Arc<ResourceProviderState>>>,
-    retired_resource_providers: Mutex<Vec<Arc<ResourceProviderState>>>,
+    retired_resource_requests: Mutex<Vec<Arc<ResourceProviderRequests>>>,
 }
 
 #[napi(js_name = "NativeWakeSourceHandle")]
 pub struct NativeWakeSourceHandle {
-    state: NativeHandleState<sys::mln_wake_source>,
+    source: Mutex<Option<Arc<SharedWakeSource>>>,
+}
+
+struct SharedWakeSource {
+    address: Mutex<Option<usize>>,
+}
+
+impl SharedWakeSource {
+    fn new(source: NonNull<sys::mln_wake_source>) -> Self {
+        Self {
+            address: Mutex::new(Some(source.as_ptr() as usize)),
+        }
+    }
+
+    fn signal(&self) -> Result<()> {
+        let address = self
+            .address
+            .lock()
+            .map_err(|_| error::invalid_state("wake source state lock is poisoned"))?
+            .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))?;
+        core::check(unsafe { sys::mln_wake_source_signal(address as *mut _) })
+            .map_err(error::from_core)
+    }
+
+    fn close(&self) {
+        let address = self
+            .address
+            .lock()
+            .ok()
+            .and_then(|mut address| address.take());
+        if let Some(address) = address {
+            unsafe { sys::mln_wake_source_destroy(address as *mut _) };
+        }
+    }
+
+    fn is_closed(&self) -> bool {
+        self.address
+            .lock()
+            .map(|address| address.is_none())
+            .unwrap_or(true)
+    }
+}
+
+impl Drop for SharedWakeSource {
+    fn drop(&mut self) {
+        self.close();
+    }
 }
 
 #[napi]
 impl NativeWakeSourceHandle {
     #[napi]
     pub fn signal(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_wake_source_signal(self.state.as_ptr()) })
-            .map_err(error::from_core)
+        self.live_source()?.signal()
     }
 
     #[napi]
     pub fn close(&self) {
-        unsafe { self.state.close_infallible(sys::mln_wake_source_destroy) };
+        if let Ok(mut source) = self.source.lock() {
+            source.take();
+        }
     }
 
     #[napi(getter)]
     pub fn closed(&self) -> bool {
-        self.state.is_closed()
+        self.source
+            .lock()
+            .map(|source| source.as_ref().is_none_or(|source| source.is_closed()))
+            .unwrap_or(true)
+    }
+
+    #[napi(js_name = "transferToken")]
+    pub fn transfer_token(&self) -> Result<String> {
+        let source = self
+            .source
+            .lock()
+            .map_err(|_| error::invalid_state("wake source handle lock is poisoned"))?
+            .take()
+            .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))?;
+        let token = format!(
+            "wake-source-transfer:{}",
+            WAKE_SOURCE_TRANSFER_IDS.fetch_add(1, Ordering::Relaxed)
+        );
+        let mut transfers = wake_source_transfers()
+            .lock()
+            .map_err(|_| error::invalid_state("wake source transfer registry lock is poisoned"))?;
+        transfers.insert(token.clone(), source);
+        Ok(token)
     }
 }
 
 impl Drop for NativeWakeSourceHandle {
     fn drop(&mut self) {
-        unsafe { self.state.close_infallible(sys::mln_wake_source_destroy) };
+        if let Ok(mut source) = self.source.lock() {
+            source.take();
+        }
     }
+}
+
+impl NativeWakeSourceHandle {
+    fn live_source(&self) -> Result<Arc<SharedWakeSource>> {
+        self.source
+            .lock()
+            .map_err(|_| error::invalid_state("wake source handle lock is poisoned"))?
+            .clone()
+            .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))
+    }
+}
+
+#[napi(js_name = "nativeWakeSourceHandleFromTransfer")]
+pub fn native_wake_source_handle_from_transfer(token: String) -> Result<NativeWakeSourceHandle> {
+    let source = wake_source_transfers()
+        .lock()
+        .map_err(|_| error::invalid_state("wake source transfer registry lock is poisoned"))?
+        .remove(&token)
+        .ok_or_else(|| error::invalid_state("wake source transfer token is invalid or consumed"))?;
+    Ok(NativeWakeSourceHandle {
+        source: Mutex::new(Some(source)),
+    })
+}
+
+fn wake_source_transfers() -> &'static Mutex<HashMap<String, Arc<SharedWakeSource>>> {
+    WAKE_SOURCE_TRANSFERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[napi(js_name = "createNativeRuntimeHandle")]
@@ -334,7 +438,7 @@ pub fn create_native_runtime_handle(
         state,
         resource_transform: Mutex::new(None),
         resource_provider: Mutex::new(None),
-        retired_resource_providers: Mutex::new(Vec::new()),
+        retired_resource_requests: Mutex::new(Vec::new()),
     })
 }
 
@@ -414,9 +518,11 @@ impl NativeRuntimeHandle {
             sys::mln_runtime_wake_source_acquire(self.state.as_ptr(), &mut source)
         })
         .map_err(error::from_core)?;
-        let state = unsafe { NativeHandleState::from_raw_ptr(source, "WakeSource") }
-            .map_err(error::from_core)?;
-        Ok(NativeWakeSourceHandle { state })
+        let source = NonNull::new(source)
+            .ok_or_else(|| error::invalid_state("native wake source is null"))?;
+        Ok(NativeWakeSourceHandle {
+            source: Mutex::new(Some(Arc::new(SharedWakeSource::new(source)))),
+        })
     }
 
     #[napi(js_name = "setResourceProviderRoutes")]
@@ -434,7 +540,9 @@ impl NativeRuntimeHandle {
                 .map(resource_matcher_from_input)
                 .collect::<Result<Vec<_>>>()?,
             callback,
-            pending_completion_tokens: Mutex::new(HashSet::new()),
+            requests: Arc::new(ResourceProviderRequests {
+                pending_completion_tokens: Mutex::new(HashSet::new()),
+            }),
         });
         let descriptor = core::resource::resource_provider_descriptor(
             Some(resource_provider_trampoline),
@@ -449,10 +557,7 @@ impl NativeRuntimeHandle {
         })
         .map_err(error::from_core)?;
         if let Some(replaced) = provider_slot.replace(provider) {
-            match self.retired_resource_providers.lock() {
-                Ok(mut retired) => retired.push(replaced),
-                Err(_) => std::mem::forget(replaced),
-            }
+            self.retain_pending_resource_requests(&replaced);
         }
         Ok(())
     }
@@ -467,10 +572,7 @@ impl NativeRuntimeHandle {
             .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?
             .take();
         if let Some(replaced) = replaced {
-            match self.retired_resource_providers.lock() {
-                Ok(mut retired) => retired.push(replaced),
-                Err(_) => std::mem::forget(replaced),
-            }
+            self.retain_pending_resource_requests(&replaced);
         }
         Ok(())
     }
@@ -1019,11 +1121,11 @@ fn register_resource_request_handle(
             completion_token.clone(),
             ResourceRequestRegistration {
                 handle,
-                provider: Arc::downgrade(provider),
+                requests: Arc::downgrade(&provider.requests),
             },
         );
     }
-    let pending = provider.pending_completion_tokens.lock();
+    let pending = provider.requests.pending_completion_tokens.lock();
     let Ok(mut pending) = pending else {
         let _ = resource_request_handles()
             .lock()
@@ -1042,8 +1144,8 @@ fn unregister_resource_request_handle(
         .ok()
         .and_then(|mut handles| handles.remove(completion_token));
     if let Some(registration) = &registration
-        && let Some(provider) = registration.provider.upgrade()
-        && let Ok(mut pending) = provider.pending_completion_tokens.lock()
+        && let Some(requests) = registration.requests.upgrade()
+        && let Ok(mut pending) = requests.pending_completion_tokens.lock()
     {
         pending.remove(completion_token);
     }
@@ -1175,8 +1277,11 @@ fn resource_provider_request_from_core(
 
 fn resource_response_from_input(input: ResourceResponseInput) -> Result<core::ResourceResponse> {
     let status = resource_response_status_from_string(input.status.as_deref().unwrap_or("ok"))?;
-    let error_reason =
-        resource_error_reason_from_string(input.error_reason.as_deref().unwrap_or("none"))?;
+    let error_reason = match input.error_reason {
+        Some(Either::A(value)) => resource_error_reason_from_string(&value)?,
+        Some(Either::B(value)) => core::ResourceErrorReason::from_raw(value),
+        None => core::ResourceErrorReason::None,
+    };
     let mut response = core::ResourceResponse::default();
     response.status = status;
     response.error_reason = error_reason;
@@ -1630,13 +1735,36 @@ impl NativeRuntimeHandle {
         if let Ok(mut provider) = self.resource_provider.lock() {
             *provider = None;
         }
-        if let Ok(mut retired) = self.retired_resource_providers.lock() {
+        if let Ok(mut retired) = self.retired_resource_requests.lock() {
             retired.clear();
+        }
+    }
+
+    fn retain_pending_resource_requests(&self, provider: &ResourceProviderState) {
+        let has_pending = provider
+            .requests
+            .pending_completion_tokens
+            .lock()
+            .map(|pending| !pending.is_empty())
+            .unwrap_or(true);
+        if let Ok(mut retired) = self.retired_resource_requests.lock() {
+            retired.retain(|requests| {
+                requests
+                    .pending_completion_tokens
+                    .lock()
+                    .map(|pending| !pending.is_empty())
+                    .unwrap_or(true)
+            });
+            if has_pending {
+                retired.push(Arc::clone(&provider.requests));
+            }
+        } else if has_pending {
+            std::mem::forget(Arc::clone(&provider.requests));
         }
     }
 }
 
-impl Drop for ResourceProviderState {
+impl Drop for ResourceProviderRequests {
     fn drop(&mut self) {
         let pending = self
             .pending_completion_tokens
@@ -1669,9 +1797,9 @@ impl Drop for NativeRuntimeHandle {
             {
                 std::mem::forget(provider);
             }
-            if let Ok(mut retired) = self.retired_resource_providers.lock() {
-                for provider in retired.drain(..) {
-                    std::mem::forget(provider);
+            if let Ok(mut retired) = self.retired_resource_requests.lock() {
+                for requests in retired.drain(..) {
+                    std::mem::forget(requests);
                 }
             }
         }

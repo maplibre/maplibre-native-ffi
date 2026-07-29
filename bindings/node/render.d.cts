@@ -1,5 +1,6 @@
 export {
   RenderSessionHandle,
+  MapAttachReference,
   MetalOwnedTextureFrame,
   VulkanOwnedTextureFrame,
   OpenGLOwnedTextureFrame,
@@ -32,4 +33,5 @@ export {
   type SourceFeatureQueryOptionsInput,
   type QueriedFeature,
   type FeatureExtensionResult,
+  type MapAttachReferenceTransfer,
 } from "./index.cjs";

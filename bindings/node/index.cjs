@@ -1468,6 +1468,24 @@ class WakeSourceHandle {
     return translateNativeErrors(() => liveNativeOf(this).signal());
   }
 
+  transfer() {
+    return Object.freeze({
+      kind: "wakeSource",
+      token: translateNativeErrors(() => liveNativeOf(this).transferToken()),
+    });
+  }
+
+  static fromTransfer(transfer) {
+    return new WakeSourceHandle(
+      CONSTRUCTION_TOKEN,
+      translateNativeErrors(() =>
+        native.nativeWakeSourceHandleFromTransfer(
+          transferToken(transfer, "wakeSource", "wake source"),
+        ),
+      ),
+    );
+  }
+
   close() {
     return translateNativeErrors(() => nativeOf(this).close());
   }
@@ -1850,6 +1868,20 @@ class RuntimeHandle {
     if (nativeAddress != null) {
       this.#mapsByAddress.set(nativeAddress, new WeakRef(map));
     }
+  }
+
+  _registerMapIdentityForTesting(map, nativeAddress) {
+    if (process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS !== "1") {
+      throw new InvalidStateError(null, "test seams are disabled");
+    }
+    this.#mapsByAddress.set(nativeAddress, new WeakRef(map));
+  }
+
+  _mapForAddressForTesting(nativeAddress) {
+    if (process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS !== "1") {
+      throw new InvalidStateError(null, "test seams are disabled");
+    }
+    return this.#mapForAddress(nativeAddress);
   }
 
   _unregisterMap(map) {
@@ -2295,14 +2327,133 @@ class RenderSessionHandle {
 }
 
 function attachRenderSession(map, attach) {
-  if (!(map instanceof MapHandle)) {
-    throw new InvalidArgumentError(null, "map must be a MapHandle");
+  if (!(map instanceof MapHandle) && !(map instanceof MapAttachReference)) {
+    throw new InvalidArgumentError(
+      null,
+      "map must be a MapHandle or MapAttachReference",
+    );
   }
   return new RenderSessionHandle(
     CONSTRUCTION_TOKEN,
     translateNativeErrors(attach),
     map,
   );
+}
+
+class MapAttachReference {
+  constructor(token, nativeHandle) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "map attach references are created by MapHandle.attachReference()",
+      );
+    }
+    recordHandleEnvironment(this);
+    defineCheckedNative(this, nativeHandle);
+  }
+
+  static fromTransfer(transfer) {
+    return new MapAttachReference(
+      CONSTRUCTION_TOKEN,
+      translateNativeErrors(() =>
+        native.nativeMapAttachReferenceFromTransfer(
+          transferToken(transfer, "mapAttachReference", "map attach reference"),
+        ),
+      ),
+    );
+  }
+
+  get closed() {
+    return nativeOf(this).closed;
+  }
+
+  transfer() {
+    return Object.freeze({
+      kind: "mapAttachReference",
+      token: translateNativeErrors(() => liveNativeOf(this).transferToken()),
+    });
+  }
+
+  attachMetalOwnedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createMetalOwnedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeMetalOwnedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachMetalBorrowedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createMetalBorrowedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeMetalBorrowedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachMetalSurface(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createMetalSurfaceRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeMetalSurfaceDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachVulkanOwnedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createVulkanOwnedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeVulkanOwnedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachVulkanBorrowedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createVulkanBorrowedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeVulkanBorrowedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachVulkanSurface(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createVulkanSurfaceRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeVulkanSurfaceDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachOpenGLOwnedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createOpenGLOwnedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeOpenGLOwnedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachOpenGLBorrowedTexture(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createOpenGLBorrowedTextureRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeOpenGLBorrowedTextureDescriptor(descriptor),
+      ),
+    );
+  }
+
+  attachOpenGLSurface(descriptor) {
+    return attachRenderSession(this, () =>
+      native.createOpenGLSurfaceRenderSessionFromReference(
+        liveNativeOf(this),
+        normalizeOpenGLSurfaceDescriptor(descriptor),
+      ),
+    );
+  }
 }
 
 class MapHandle {
@@ -2352,6 +2503,13 @@ class MapHandle {
 
   getSize() {
     return translateNativeErrors(() => liveNativeOf(this).getSize());
+  }
+
+  attachReference() {
+    return new MapAttachReference(
+      CONSTRUCTION_TOKEN,
+      translateNativeErrors(() => liveNativeOf(this).createAttachReference()),
+    );
   }
 
   attachMetalOwnedTexture(descriptor) {
@@ -3210,12 +3368,34 @@ function stringifyJson(value) {
   return json;
 }
 
+function transferToken(transfer, kind, label) {
+  if (
+    transfer == null ||
+    typeof transfer !== "object" ||
+    transfer.kind !== kind ||
+    typeof transfer.token !== "string"
+  ) {
+    throw new InvalidArgumentError(null, `${label} transfer is invalid`);
+  }
+  return transfer.token;
+}
+
 function geoJsonSourceOptionsToNative(options) {
   if (options == null) {
     return undefined;
   }
   const value = new GeoJsonSourceOptions(options);
   const nativeOptions = Object.assign({}, value);
+  nativeOptions.tileSize = optionalUnsigned32(value.tileSize, "tileSize");
+  nativeOptions.buffer = optionalUnsigned32(value.buffer, "buffer");
+  nativeOptions.clusterRadius = optionalUnsigned32(
+    value.clusterRadius,
+    "clusterRadius",
+  );
+  nativeOptions.clusterMinPoints = optionalUnsigned32(
+    value.clusterMinPoints,
+    "clusterMinPoints",
+  );
   nativeOptions.clusterProperties =
     value.clusterProperties === undefined
       ? undefined
@@ -3352,6 +3532,7 @@ module.exports = {
   ResourceRequestHandle,
   OfflineOperationHandle,
   MapHandle,
+  MapAttachReference,
   MapProjectionHandle,
   RenderSessionHandle,
   MetalOwnedTextureFrame,
@@ -3402,6 +3583,7 @@ module.exports.WakeSourceHandle = WakeSourceHandle;
 module.exports.ResourceRequestHandle = ResourceRequestHandle;
 module.exports.OfflineOperationHandle = OfflineOperationHandle;
 module.exports.MapHandle = MapHandle;
+module.exports.MapAttachReference = MapAttachReference;
 module.exports.MapProjectionHandle = MapProjectionHandle;
 module.exports.RenderSessionHandle = RenderSessionHandle;
 module.exports.MetalOwnedTextureFrame = MetalOwnedTextureFrame;

@@ -5,6 +5,7 @@ export {
   CameraOptions,
   FreeCameraOptions,
   MapHandle,
+  MapAttachReference,
   MapOptions,
   MapProjectionHandle,
   MapTileOptions,

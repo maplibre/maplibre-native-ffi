@@ -90,7 +90,11 @@ const geometry: RenderedQueryGeometry = {
   kind: "point",
   point: { x: 0, y: 0 },
 };
-const response: ResourceResponseInput = { status: "ok", modifiedUnixMs: 1n };
+const response: ResourceResponseInput = {
+  status: "error",
+  errorReason: 999_001,
+  modifiedUnixMs: 1n,
+};
 const route: ResourceRoute = { urlPrefix: "custom://", kind: "source" };
 const unknownResourceKind: ResourceKindValue = {
   kind: "unknown",

@@ -12,6 +12,7 @@ export const WakeSourceHandle = root.WakeSourceHandle;
 export const ResourceRequestHandle = root.ResourceRequestHandle;
 export const OfflineOperationHandle = root.OfflineOperationHandle;
 export const MapHandle = root.MapHandle;
+export const MapAttachReference = root.MapAttachReference;
 export const MapProjectionHandle = root.MapProjectionHandle;
 export const RenderSessionHandle = root.RenderSessionHandle;
 export const MetalOwnedTextureFrame = root.MetalOwnedTextureFrame;

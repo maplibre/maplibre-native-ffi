@@ -643,6 +643,7 @@ export interface ResourceResponseInput {
     | "connection"
     | "rateLimit"
     | "other"
+    | number
     | null;
   bytes?: Uint8Array | null;
   errorMessage?: string | null;
@@ -729,10 +730,17 @@ export declare class RuntimeHandle {
 
 export declare class WakeSourceHandle {
   private constructor(nativeHandle: unknown);
+  static fromTransfer(transfer: WakeSourceTransfer): WakeSourceHandle;
   readonly closed: boolean;
   signal(): void;
+  transfer(): WakeSourceTransfer;
   close(): void;
   [Symbol.dispose](): void;
+}
+
+export interface WakeSourceTransfer {
+  readonly kind: "wakeSource";
+  readonly token: string;
 }
 
 export interface OfflineTilePyramidRegionDefinition {
@@ -1069,9 +1077,45 @@ export type FeatureExtensionResult =
   | { kind: "featureCollection"; features: JsonValue[] }
   | { kind: "unknown"; rawType: number };
 
+export interface MapAttachReferenceTransfer {
+  readonly kind: "mapAttachReference";
+  readonly token: string;
+}
+
+export declare class MapAttachReference {
+  private constructor(nativeHandle: unknown);
+  static fromTransfer(transfer: MapAttachReferenceTransfer): MapAttachReference;
+  readonly closed: boolean;
+  transfer(): MapAttachReferenceTransfer;
+  attachMetalOwnedTexture(
+    descriptor: MetalOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle;
+  attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle;
+  attachOpenGLOwnedTexture(
+    descriptor: OpenGLOwnedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachOpenGLBorrowedTexture(
+    descriptor: OpenGLBorrowedTextureDescriptor,
+  ): RenderSessionHandle;
+  attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle;
+}
+
 export declare class RenderSessionHandle {
-  private constructor(nativeHandle: unknown, map: MapHandle);
-  readonly map: MapHandle;
+  private constructor(
+    nativeHandle: unknown,
+    map: MapHandle | MapAttachReference,
+  );
+  readonly map: MapHandle | MapAttachReference;
   readonly closed: boolean;
   close(): void;
   resize(width: number, height: number, scaleFactor: number): void;
@@ -1131,6 +1175,7 @@ export declare class MapHandle {
   close(): void;
   createProjection(): MapProjectionHandle;
   getSize(): MapSize;
+  attachReference(): MapAttachReference;
   attachMetalOwnedTexture(
     descriptor: MetalOwnedTextureDescriptor,
   ): RenderSessionHandle;

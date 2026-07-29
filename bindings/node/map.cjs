@@ -3,6 +3,7 @@
 const root = require("./index.cjs");
 
 exports.MapHandle = root.MapHandle;
+exports.MapAttachReference = root.MapAttachReference;
 exports.MapProjectionHandle = root.MapProjectionHandle;
 exports.MapOptions = root.MapOptions;
 exports.CameraOptions = root.CameraOptions;

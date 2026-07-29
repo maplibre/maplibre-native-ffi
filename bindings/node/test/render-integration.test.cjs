@@ -1,7 +1,9 @@
 "use strict";
 
 const assert = require("node:assert/strict");
+const path = require("node:path");
 const test = require("node:test");
+const { Worker } = require("node:worker_threads");
 
 const {
   NativePointer,
@@ -224,5 +226,107 @@ test("configured backend renders and reads an owned texture through public JS", 
     nativeFixture.close();
     nativeFixture.close();
     assert.equal(nativeFixture.closed, true);
+  }
+});
+
+test("a worker attaches and owns a render session through a transferred map reference", async () => {
+  const runtime = new RuntimeHandle({ cachePath: ":memory:" });
+  const map = runtime.createMap({
+    width: WIDTH,
+    height: HEIGHT,
+    scaleFactor: 1,
+    mapMode: "static",
+  });
+  const transfer = map.attachReference().transfer();
+  const worker = new Worker(
+    `
+      const { parentPort, workerData } = require("node:worker_threads");
+      const {
+        MapAttachReference,
+        NativePointer,
+        supportedOpenGLContextProviders,
+        supportedRenderBackends,
+      } = require(workerData.packageRoot);
+      const { NativeTestRenderContext } = require(workerData.nativeRoot);
+
+      function pointer(address) {
+        return NativePointer.unsafeFromAddress(address);
+      }
+
+      try {
+        const reference = MapAttachReference.fromTransfer(workerData.transfer);
+        const nativeFixture = NativeTestRenderContext.create();
+        const fixture = nativeFixture.descriptor();
+        const extent = { width: workerData.width, height: workerData.height, scaleFactor: 1 };
+        let session;
+        if (fixture.backend === "metal") {
+          if (!supportedRenderBackends().metal) throw new Error("Metal unavailable");
+          session = reference.attachMetalOwnedTexture({
+            extent,
+            context: { device: pointer(fixture.deviceAddress) },
+          });
+        } else if (fixture.backend === "vulkan") {
+          if (!supportedRenderBackends().vulkan) throw new Error("Vulkan unavailable");
+          session = reference.attachVulkanOwnedTexture({
+            extent,
+            context: {
+              instance: pointer(fixture.instanceAddress),
+              physicalDevice: pointer(fixture.physicalDeviceAddress),
+              device: pointer(fixture.deviceAddress),
+              graphicsQueue: pointer(fixture.graphicsQueueAddress),
+              graphicsQueueFamilyIndex: fixture.graphicsQueueFamilyIndex,
+              getInstanceProcAddr: pointer(fixture.getInstanceProcAddrAddress),
+              getDeviceProcAddr: pointer(fixture.getDeviceProcAddrAddress),
+            },
+          });
+        } else {
+          if (!supportedRenderBackends().opengl || !supportedOpenGLContextProviders()[fixture.backend]) {
+            throw new Error("OpenGL provider unavailable");
+          }
+          const context = fixture.backend === "egl"
+            ? {
+                platform: "egl",
+                display: pointer(fixture.displayAddress),
+                config: pointer(fixture.configAddress),
+                shareContext: pointer(fixture.shareContextAddress),
+              }
+            : {
+                platform: "wgl",
+                deviceContext: pointer(fixture.deviceContextAddress),
+                shareContext: pointer(fixture.shareContextAddress),
+                getProcAddress: pointer(fixture.getProcAddressAddress),
+              };
+          session = reference.attachOpenGLOwnedTexture({ extent, context });
+        }
+        session.renderUpdate();
+        session.close();
+        nativeFixture.close();
+        parentPort.postMessage({ ok: true, backend: fixture.backend });
+      } catch (error) {
+        parentPort.postMessage({ ok: false, name: error?.name, message: error?.message });
+      }
+    `,
+    {
+      eval: true,
+      workerData: {
+        packageRoot: path.join(__dirname, ".."),
+        nativeRoot: path.join(__dirname, "..", "index.js"),
+        transfer,
+        width: WIDTH,
+        height: HEIGHT,
+      },
+    },
+  );
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      worker.once("message", resolve);
+      worker.once("error", reject);
+    });
+    assert.equal(result.ok, true, result.message);
+  } finally {
+    await worker.terminate();
+    map.close();
+    runtime.close();
   }
 });

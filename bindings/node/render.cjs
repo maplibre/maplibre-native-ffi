@@ -3,6 +3,7 @@
 const root = require("./index.cjs");
 
 exports.RenderSessionHandle = root.RenderSessionHandle;
+exports.MapAttachReference = root.MapAttachReference;
 exports.MetalOwnedTextureFrame = root.MetalOwnedTextureFrame;
 exports.VulkanOwnedTextureFrame = root.VulkanOwnedTextureFrame;
 exports.OpenGLOwnedTextureFrame = root.OpenGLOwnedTextureFrame;

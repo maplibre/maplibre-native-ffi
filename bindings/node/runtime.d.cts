@@ -31,6 +31,7 @@ export {
   type OfflineOperationResultKind,
   type NetworkStatusValue,
   type NativeLeakReport,
+  type WakeSourceTransfer,
   type RenderBackends,
   type OpenGLContextProviders,
 } from "./index.cjs";

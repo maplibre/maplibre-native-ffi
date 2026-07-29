@@ -8,7 +8,8 @@ use napi_derive::napi;
 use crate::{
     error,
     map::{
-        NativeMapHandle, json_value_to_serde, json_value_to_string, parse_geojson, parse_json_value,
+        NativeMapAttachReference, NativeMapHandle, json_value_to_serde, json_value_to_string,
+        parse_geojson, parse_json_value,
     },
     values::ScreenPoint,
 };
@@ -247,11 +248,26 @@ pub fn create_metal_owned_texture_render_session(
     map: &NativeMapHandle,
     descriptor: MetalOwnedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_metal_owned_texture(map, descriptor)
+}
+
+#[napi(js_name = "createMetalOwnedTextureRenderSessionFromReference")]
+pub fn create_metal_owned_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: MetalOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_metal_owned_texture(map, descriptor)
+}
+
+fn attach_metal_owned_texture(
+    map: &impl MapAttachTarget,
+    descriptor: MetalOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_metal_owned_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context.device = descriptor.context.device_ptr()?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_metal_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_metal_owned_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -260,13 +276,28 @@ pub fn create_metal_borrowed_texture_render_session(
     map: &NativeMapHandle,
     descriptor: MetalBorrowedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_metal_borrowed_texture(map, descriptor)
+}
+
+#[napi(js_name = "createMetalBorrowedTextureRenderSessionFromReference")]
+pub fn create_metal_borrowed_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: MetalBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_metal_borrowed_texture(map, descriptor)
+}
+
+fn attach_metal_borrowed_texture(
+    map: &impl MapAttachTarget,
+    descriptor: MetalBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.physical_width = descriptor.physical_width;
     raw_descriptor.physical_height = descriptor.physical_height;
     raw_descriptor.texture = bigint_to_ptr(&descriptor.texture_address, "textureAddress")?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_metal_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_metal_borrowed_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -275,12 +306,27 @@ pub fn create_metal_surface_render_session(
     map: &NativeMapHandle,
     descriptor: MetalSurfaceDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_metal_surface(map, descriptor)
+}
+
+#[napi(js_name = "createMetalSurfaceRenderSessionFromReference")]
+pub fn create_metal_surface_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: MetalSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_metal_surface(map, descriptor)
+}
+
+fn attach_metal_surface(
+    map: &impl MapAttachTarget,
+    descriptor: MetalSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_metal_surface_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context.device = descriptor.context.device_ptr()?;
     raw_descriptor.layer = bigint_to_ptr(&descriptor.layer_address, "layerAddress")?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_metal_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_metal_surface_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -289,17 +335,47 @@ pub fn create_vulkan_owned_texture_render_session(
     map: &NativeMapHandle,
     descriptor: VulkanOwnedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_owned_texture(map, descriptor)
+}
+
+#[napi(js_name = "createVulkanOwnedTextureRenderSessionFromReference")]
+pub fn create_vulkan_owned_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: VulkanOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_owned_texture(map, descriptor)
+}
+
+fn attach_vulkan_owned_texture(
+    map: &impl MapAttachTarget,
+    descriptor: VulkanOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context = descriptor.context.into_native()?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_vulkan_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_vulkan_owned_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
 #[napi(js_name = "createVulkanBorrowedTextureRenderSession")]
 pub fn create_vulkan_borrowed_texture_render_session(
     map: &NativeMapHandle,
+    descriptor: VulkanBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_borrowed_texture(map, descriptor)
+}
+
+#[napi(js_name = "createVulkanBorrowedTextureRenderSessionFromReference")]
+pub fn create_vulkan_borrowed_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: VulkanBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_borrowed_texture(map, descriptor)
+}
+
+fn attach_vulkan_borrowed_texture(
+    map: &impl MapAttachTarget,
     descriptor: VulkanBorrowedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
@@ -312,8 +388,8 @@ pub fn create_vulkan_borrowed_texture_render_session(
     raw_descriptor.format = descriptor.format;
     raw_descriptor.initial_layout = descriptor.initial_layout;
     raw_descriptor.final_layout = descriptor.final_layout;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_vulkan_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_vulkan_borrowed_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -322,12 +398,27 @@ pub fn create_vulkan_surface_render_session(
     map: &NativeMapHandle,
     descriptor: VulkanSurfaceDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_surface(map, descriptor)
+}
+
+#[napi(js_name = "createVulkanSurfaceRenderSessionFromReference")]
+pub fn create_vulkan_surface_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: VulkanSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_vulkan_surface(map, descriptor)
+}
+
+fn attach_vulkan_surface(
+    map: &impl MapAttachTarget,
+    descriptor: VulkanSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_vulkan_surface_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context = descriptor.context.into_native()?;
     raw_descriptor.surface = bigint_to_ptr(&descriptor.surface_address, "surfaceAddress")?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_vulkan_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_vulkan_surface_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -336,17 +427,47 @@ pub fn create_opengl_owned_texture_render_session(
     map: &NativeMapHandle,
     descriptor: OpenGLOwnedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_owned_texture(map, descriptor)
+}
+
+#[napi(js_name = "createOpenGLOwnedTextureRenderSessionFromReference")]
+pub fn create_opengl_owned_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: OpenGLOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_owned_texture(map, descriptor)
+}
+
+fn attach_opengl_owned_texture(
+    map: &impl MapAttachTarget,
+    descriptor: OpenGLOwnedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_opengl_owned_texture_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context = descriptor.context.into_native()?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_opengl_owned_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_opengl_owned_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
 #[napi(js_name = "createOpenGLBorrowedTextureRenderSession")]
 pub fn create_opengl_borrowed_texture_render_session(
     map: &NativeMapHandle,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_borrowed_texture(map, descriptor)
+}
+
+#[napi(js_name = "createOpenGLBorrowedTextureRenderSessionFromReference")]
+pub fn create_opengl_borrowed_texture_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: OpenGLBorrowedTextureDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_borrowed_texture(map, descriptor)
+}
+
+fn attach_opengl_borrowed_texture(
+    map: &impl MapAttachTarget,
     descriptor: OpenGLBorrowedTextureDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_opengl_borrowed_texture_descriptor_default() };
@@ -356,8 +477,8 @@ pub fn create_opengl_borrowed_texture_render_session(
     raw_descriptor.context = descriptor.context.into_native()?;
     raw_descriptor.texture = descriptor.texture;
     raw_descriptor.target = descriptor.target;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_opengl_borrowed_texture_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_opengl_borrowed_texture_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -366,12 +487,27 @@ pub fn create_opengl_surface_render_session(
     map: &NativeMapHandle,
     descriptor: OpenGLSurfaceDescriptor,
 ) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_surface(map, descriptor)
+}
+
+#[napi(js_name = "createOpenGLSurfaceRenderSessionFromReference")]
+pub fn create_opengl_surface_render_session_from_reference(
+    map: &NativeMapAttachReference,
+    descriptor: OpenGLSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
+    attach_opengl_surface(map, descriptor)
+}
+
+fn attach_opengl_surface(
+    map: &impl MapAttachTarget,
+    descriptor: OpenGLSurfaceDescriptor,
+) -> Result<NativeRenderSessionHandle> {
     let mut raw_descriptor = unsafe { sys::mln_opengl_surface_descriptor_default() };
     raw_descriptor.extent = descriptor.extent.into_native();
     raw_descriptor.context = descriptor.context.into_native()?;
     raw_descriptor.surface = bigint_to_ptr(&descriptor.surface_address, "surfaceAddress")?;
-    attach_render_session(map, |out_session| unsafe {
-        sys::mln_opengl_surface_attach(map.as_ptr(), &raw_descriptor, out_session)
+    attach_render_session(map, |map, out_session| unsafe {
+        sys::mln_opengl_surface_attach(map, &raw_descriptor, out_session)
     })
 }
 
@@ -1205,15 +1341,31 @@ fn coordinates_to_serde(coordinates: Vec<core::LatLng>) -> serde_json::Value {
     )
 }
 
+trait MapAttachTarget {
+    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T>;
+}
+
+impl MapAttachTarget for NativeMapHandle {
+    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+        self.with_live_for_attach(attach)
+    }
+}
+
+impl MapAttachTarget for NativeMapAttachReference {
+    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+        self.with_live(attach)
+    }
+}
+
 fn attach_render_session(
-    map: &NativeMapHandle,
-    attach: impl FnOnce(*mut *mut sys::mln_render_session) -> sys::mln_status,
+    map: &impl MapAttachTarget,
+    attach: impl FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
 ) -> Result<NativeRenderSessionHandle> {
     let mut session = std::ptr::null_mut();
-    core::check(attach(&mut session)).map_err(error::from_core)?;
+    let status = map.with_live(|map| attach(map, &mut session))?;
+    core::check(status).map_err(error::from_core)?;
     let state = unsafe { NativeHandleState::from_raw_ptr(session, "RenderSessionHandle") }
         .map_err(error::from_core)?;
-    let _ = map;
     Ok(NativeRenderSessionHandle {
         state,
         frame_acquired: Cell::new(false),

@@ -2,9 +2,10 @@ use std::{
     collections::HashMap,
     ffi::{CString, c_void},
     panic::{AssertUnwindSafe, catch_unwind},
+    ptr::NonNull,
     sync::{
-        Arc, Condvar, Mutex, OnceLock,
-        atomic::{AtomicUsize, Ordering},
+        Arc, Condvar, Mutex, OnceLock, RwLock,
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 
@@ -246,7 +247,124 @@ pub struct StyleImage {
 #[napi(js_name = "NativeMapHandle")]
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
+    address: Arc<MapAddress>,
     custom_geometry_sources: Mutex<HashMap<String, CustomGeometrySourceRegistration>>,
+}
+
+pub(crate) struct MapAddress(RwLock<Option<NonNull<sys::mln_map>>>);
+
+// SAFETY: the pointer is read only while holding the RwLock and is handed to
+// C's synchronized map registry. Map close takes the write lock, so allocation
+// reuse cannot race a cross-thread attach.
+unsafe impl Send for MapAddress {}
+unsafe impl Sync for MapAddress {}
+
+impl MapAddress {
+    fn new(ptr: NonNull<sys::mln_map>) -> Self {
+        Self(RwLock::new(Some(ptr)))
+    }
+
+    pub(crate) fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Option<T> {
+        let address = self
+            .0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        (*address).map(|address| use_ptr(address.as_ptr()))
+    }
+
+    fn retire_with(&self, close: impl FnOnce() -> Result<()>) -> Result<()> {
+        let mut address = self
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        close()?;
+        *address = None;
+        Ok(())
+    }
+
+    fn retire(&self) {
+        *self
+            .0
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+
+    fn is_retired(&self) -> bool {
+        self.0
+            .read()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .is_none()
+    }
+}
+
+static MAP_ATTACH_TRANSFER_IDS: AtomicU64 = AtomicU64::new(1);
+static MAP_ATTACH_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<MapAddress>>>> = OnceLock::new();
+
+#[napi(js_name = "NativeMapAttachReference")]
+pub struct NativeMapAttachReference {
+    address: Mutex<Option<Arc<MapAddress>>>,
+}
+
+#[napi]
+impl NativeMapAttachReference {
+    #[napi(getter)]
+    pub fn closed(&self) -> bool {
+        self.address
+            .lock()
+            .map(|address| address.as_ref().is_none_or(|address| address.is_retired()))
+            .unwrap_or(true)
+    }
+
+    #[napi(js_name = "transferToken")]
+    pub fn transfer_token(&self) -> Result<String> {
+        let address = self
+            .address
+            .lock()
+            .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
+            .take()
+            .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
+        let token = format!(
+            "map-attach-transfer:{}",
+            MAP_ATTACH_TRANSFER_IDS.fetch_add(1, Ordering::Relaxed)
+        );
+        map_attach_transfers()
+            .lock()
+            .map_err(|_| error::invalid_state("map attach transfer registry lock is poisoned"))?
+            .insert(token.clone(), address);
+        Ok(token)
+    }
+}
+
+impl NativeMapAttachReference {
+    pub(crate) fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+        let address = self
+            .address
+            .lock()
+            .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
+            .clone()
+            .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
+        address
+            .with_live(use_ptr)
+            .ok_or_else(|| error::invalid_state("MapHandle is closed"))
+    }
+}
+
+#[napi(js_name = "nativeMapAttachReferenceFromTransfer")]
+pub fn native_map_attach_reference_from_transfer(
+    token: String,
+) -> Result<NativeMapAttachReference> {
+    let address = map_attach_transfers()
+        .lock()
+        .map_err(|_| error::invalid_state("map attach transfer registry lock is poisoned"))?
+        .remove(&token)
+        .ok_or_else(|| error::invalid_state("map attach transfer token is invalid or consumed"))?;
+    Ok(NativeMapAttachReference {
+        address: Mutex::new(Some(address)),
+    })
+}
+
+fn map_attach_transfers() -> &'static Mutex<HashMap<String, Arc<MapAddress>>> {
+    MAP_ATTACH_TRANSFERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[napi(js_name = "createNativeMapHandle")]
@@ -261,10 +379,11 @@ pub fn create_native_map_handle(
 
     core::check(unsafe { sys::mln_map_create(runtime.as_ptr(), &native_options, &mut map) })
         .map_err(error::from_core)?;
-    let state =
-        unsafe { NativeHandleState::from_raw_ptr(map, "MapHandle") }.map_err(error::from_core)?;
+    let pointer = NonNull::new(map).ok_or_else(|| error::invalid_state("native map is null"))?;
+    let state = unsafe { NativeHandleState::from_raw(pointer, "MapHandle") };
     Ok(NativeMapHandle {
         state,
+        address: Arc::new(MapAddress::new(pointer)),
         custom_geometry_sources: Mutex::new(HashMap::new()),
     })
 }
@@ -275,9 +394,20 @@ impl NativeMapHandle {
         self.state.as_ptr()
     }
 
+    pub(crate) fn with_live_for_attach<T>(
+        &self,
+        attach: impl FnOnce(*mut sys::mln_map) -> T,
+    ) -> Result<T> {
+        self.address
+            .with_live(attach)
+            .ok_or_else(|| error::invalid_state("MapHandle is closed"))
+    }
+
     #[napi]
     pub fn close(&self) -> Result<()> {
-        unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)?;
+        self.address.retire_with(|| {
+            unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)
+        })?;
         self.clear_all_custom_geometry_source_state();
         Ok(())
     }
@@ -290,6 +420,17 @@ impl NativeMapHandle {
     #[napi(getter, js_name = "nativeAddress")]
     pub fn native_address(&self) -> BigInt {
         BigInt::from(self.state.as_ptr() as usize as u64)
+    }
+
+    #[napi(js_name = "createAttachReference")]
+    pub fn create_attach_reference(&self) -> Result<NativeMapAttachReference> {
+        let address = self
+            .address
+            .with_live(|_| Arc::clone(&self.address))
+            .ok_or_else(|| error::invalid_state("MapHandle is closed"))?;
+        Ok(NativeMapAttachReference {
+            address: Mutex::new(Some(address)),
+        })
     }
 
     #[napi(js_name = "requestRepaint")]
@@ -1946,6 +2087,7 @@ impl NativeMapHandle {
 impl Drop for NativeMapHandle {
     fn drop(&mut self) {
         if let Some(address) = self.state.leak_for_report() {
+            self.address.retire();
             crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut sources) = self.custom_geometry_sources.lock() {
                 for (_, source) in sources.drain() {

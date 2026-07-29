@@ -1,5 +1,6 @@
 export {
   MapHandle,
+  MapAttachReference,
   MapProjectionHandle,
   MapOptions,
   CameraOptions,
@@ -36,4 +37,5 @@ export {
   type CustomGeometrySourceOptions,
   type CustomGeometrySourceCallback,
   type LocationIndicatorImageKind,
+  type MapAttachReferenceTransfer,
 } from "./index.cjs";

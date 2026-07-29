@@ -5,6 +5,7 @@ export {
   OpenGLOwnedTextureFrame,
   RenderedFeatureQueryOptions,
   RenderSessionHandle,
+  MapAttachReference,
   renderTargetExtentPhysicalSize,
   SourceFeatureQueryOptions,
   VulkanOwnedTextureFrame,
