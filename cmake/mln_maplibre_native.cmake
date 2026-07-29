@@ -34,6 +34,13 @@ function(mln_add_maplibre_native)
       mbgl-core
       BEFORE
       PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+
+    foreach(MLN_FFI_MLT_TARGET mlt-cpp mlt-cpp-encoder)
+      target_include_directories(
+        ${MLN_FFI_MLT_TARGET}
+        BEFORE
+        PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/ohos/compat)
+    endforeach()
   endif()
 
   if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
