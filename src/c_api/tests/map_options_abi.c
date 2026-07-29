@@ -524,6 +524,22 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
   destroy_map_fixture(fixture);
 }
 
+// FastPFOR decoding stays off unless a host asks for it, and a map accepts the
+// opt-in. Whether an MLT tile using those encodings actually decodes is covered
+// end to end in mlt_decode_abi.c.
+static void map_options_default_leaves_fast_pfor_decoding_off(void) {
+  const mln_map_options defaults = mln_map_options_default();
+  TEST_ASSERT_FALSE(defaults.fast_pfor_enabled);
+
+  mln_runtime* runtime = mln_test_create_runtime();
+  mln_map_options options = mln_map_options_default();
+  options.fast_pfor_enabled = true;
+  mln_map* map = mln_test_create_map_with_options(runtime, &options);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 // This verifies the raw size accessor reports the creation size, follows a
 // render session attach and resize, keeps the creation pixel ratio across a
 // render target that carries a different scale factor, and rejects each null
@@ -694,6 +710,7 @@ void run_map_options_abi_tests(void) {
   RUN_TEST(standalone_projection_rejects_invalid_arguments);
   RUN_TEST(projected_meters_reject_invalid_arguments);
   RUN_TEST(map_debug_options_reject_raw_invalid_arguments);
+  RUN_TEST(map_options_default_leaves_fast_pfor_decoding_off);
   RUN_TEST(map_size_tracks_attach_and_resize);
   RUN_TEST(map_viewport_options_reject_invalid_arguments);
   RUN_TEST(map_tile_options_reject_invalid_arguments);

@@ -107,6 +107,14 @@ function(mln_add_c_api_test)
     target_compile_options(mln_c_api_tests PRIVATE /we4505)
   endif()
 
+  # Tile fixtures the suite feeds through a resource provider come from the
+  # MapLibre Native submodule rather than being duplicated here, so a submodule
+  # bump that moves one surfaces as a test failure instead of silent drift.
+  target_compile_definitions(
+    mln_c_api_tests
+    PRIVATE
+      "MLN_TEST_FIXTURE_DIR=\"${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures\"")
+
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_BACKEND_METAL=1)
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")

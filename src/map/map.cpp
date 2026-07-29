@@ -3046,7 +3046,8 @@ auto map_options_default() noexcept -> mln_map_options {
     .width = default_map_width,
     .height = default_map_height,
     .scale_factor = default_scale_factor,
-    .map_mode = MLN_MAP_MODE_CONTINUOUS
+    .map_mode = MLN_MAP_MODE_CONTINUOUS,
+    .fast_pfor_enabled = false
   };
 }
 
@@ -3301,7 +3302,8 @@ auto create_map(
     auto map_options = mbgl::MapOptions{};
     map_options.withMapMode(to_native_map_mode(effective.map_mode))
       .withSize(mbgl::Size{effective.width, effective.height})
-      .withPixelRatio(static_cast<float>(effective.scale_factor));
+      .withPixelRatio(static_cast<float>(effective.scale_factor))
+      .withFastPFOREnabled(effective.fast_pfor_enabled);
     owned_map->map = std::make_unique<mbgl::Map>(
       *owned_map->frontend, *owned_map->observer, map_options,
       resource_options_for_runtime(runtime)

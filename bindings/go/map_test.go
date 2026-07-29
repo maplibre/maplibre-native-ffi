@@ -312,6 +312,32 @@ func TestMapSizeReportsCreationExtentAndPixelRatio(t *testing.T) {
 	}
 }
 
+func TestMapAcceptsFastPFORDecoding(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	if defaults := (MapOptions{}); defaults.FastPFOREnabled {
+		t.Fatalf("MapOptions{}.FastPFOREnabled = true; want false")
+	}
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	options := NewMapOptions(256, 256, 1)
+	options.FastPFOREnabled = true
+	m, err := runtime.NewMapWithOptions(options)
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	if err := m.Close(); err != nil {
+		t.Errorf("Map Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Errorf("Runtime Close(): %v", err)
+	}
+}
+
 func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	lockOSThreadForTest(t)
 

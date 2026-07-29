@@ -248,11 +248,18 @@ class OptionsValueSemanticsTest {
           height = 200
           scaleFactor = 2.0
           mapMode = MapMode(0)
+          fastPforEnabled = false
         }
       },
       copyOf = { it.copy() },
       mutators =
-        listOf({ width = 300 }, { height = 400 }, { scaleFactor = 3.0 }, { mapMode = MapMode(1) }),
+        listOf(
+          { width = 300 },
+          { height = 400 },
+          { scaleFactor = 3.0 },
+          { mapMode = MapMode(1) },
+          { fastPforEnabled = true },
+        ),
     )
   }
 

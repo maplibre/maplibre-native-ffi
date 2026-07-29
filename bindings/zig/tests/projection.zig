@@ -5,9 +5,14 @@ const maplibre = @import("maplibre_native");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
+// The camera center projects to the middle of the viewport, so tests that check
+// that state the extent instead of leaning on the creation default.
+const viewport_extent: u32 = 512;
+
 fn expectCenterPoint(point: maplibre.ScreenPoint) !void {
-    try testing.expectApproxEqAbs(@as(f64, 256.0), point.x, 0.001);
-    try testing.expectApproxEqAbs(@as(f64, 256.0), point.y, 0.001);
+    const middle: f64 = @as(f64, @floatFromInt(viewport_extent)) / 2.0;
+    try testing.expectApproxEqAbs(middle, point.x, 0.001);
+    try testing.expectApproxEqAbs(middle, point.y, 0.001);
 }
 
 fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void {
@@ -32,7 +37,7 @@ test "map projection mode updates snapshot fields through public binding" {
 test "map converts between lat lngs and screen points" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map.close() catch @panic("map close failed");
 
     try map.jumpTo(.{ .center = center, .zoom = 10.0 });
@@ -63,7 +68,7 @@ test "map converts between lat lngs and screen points" {
 test "standalone projection converts and updates camera" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
-    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{ .width = viewport_extent, .height = viewport_extent });
     defer map.close() catch @panic("map close failed");
 
     try map.jumpTo(.{ .center = center, .zoom = 10.0 });

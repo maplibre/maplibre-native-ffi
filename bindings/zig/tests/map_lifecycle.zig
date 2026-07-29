@@ -120,6 +120,29 @@ test "map options validate through public binding" {
     try testing.expectError(error.InvalidArgument, maplibre.MapHandle.create(&runtime, .{ .scale_factor = 0 }));
 }
 
+test "map creation accepts FastPFOR decoding" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{ .fast_pfor_enabled = true });
+    defer map.close() catch @panic("map close failed");
+}
+
+// Unset fields take the C API defaults rather than values this binding repeats,
+// so mln_map_options_default() stays the single source for them.
+test "unset map options take the C creation defaults" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const size = try map.getSize();
+    try testing.expectEqual(@as(u32, 256), size.width);
+    try testing.expectEqual(@as(u32, 256), size.height);
+    try testing.expectEqual(@as(f64, 1.0), size.scale_factor);
+}
+
 test "continuous repaint request makes render update available" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

@@ -1491,6 +1491,7 @@ final class MapOptions {
     this.height = 256,
     this.scaleFactor = 1,
     this.mapMode = MapMode.continuous,
+    this.fastPforEnabled = false,
   });
 
   /// Initial map width in logical pixels.
@@ -1504,6 +1505,28 @@ final class MapOptions {
 
   /// Map rendering mode.
   final MapMode mapMode;
+
+  /// Decodes MapLibre Tile (MLT) tiles whose integer streams use FastPFOR
+  /// encodings, fixed for the lifetime of the map.
+  ///
+  /// Enable this on maps that read vector sources created with
+  /// `VectorTileEncoding.mlt` from a tile set that uses FastPFOR. A map created
+  /// with this false decodes every other MLT encoding and logs a tile parse
+  /// warning for the FastPFOR ones.
+  final bool fastPforEnabled;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MapOptions &&
+      other.width == width &&
+      other.height == height &&
+      other.scaleFactor == scaleFactor &&
+      other.mapMode == mapMode &&
+      other.fastPforEnabled == fastPforEnabled;
+
+  @override
+  int get hashCode =>
+      Object.hash(width, height, scaleFactor, mapMode, fastPforEnabled);
 }
 
 /// A map's logical viewport size and pixel ratio.
@@ -1552,6 +1575,7 @@ final class MapHandle {
       nativeOptions.ref.height = _positiveUint32(options.height, 'map height');
       nativeOptions.ref.scale_factor = options.scaleFactor;
       nativeOptions.ref.map_mode = options.mapMode.rawValue;
+      nativeOptions.ref.fast_pfor_enabled = options.fastPforEnabled;
       final outMap = arena<Pointer<raw.mln_map>>();
       outMap.value = nullptr;
 

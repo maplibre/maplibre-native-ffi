@@ -7103,14 +7103,30 @@ fn create_runtime(
 #[pyfunction]
 fn create_map(
     runtime: &RuntimeHandle,
-    width: u32,
-    height: u32,
-    scale_factor: f64,
-    map_mode: u32,
+    width: Option<u32>,
+    height: Option<u32>,
+    scale_factor: Option<f64>,
+    map_mode: Option<u32>,
+    fast_pfor_enabled: Option<bool>,
 ) -> PyResult<MapHandle> {
-    let mode = maplibre_core::MapMode::from_raw(map_mode);
-    let mut options = maplibre_core::MapOptions::new(width, height, scale_factor);
-    options.mode = mode;
+    // Default() reads mln_map_options_default(), so an argument left unset keeps
+    // the C creation default instead of one this binding repeats.
+    let mut options = maplibre_core::MapOptions::default();
+    if let Some(width) = width {
+        options.width = width;
+    }
+    if let Some(height) = height {
+        options.height = height;
+    }
+    if let Some(scale_factor) = scale_factor {
+        options.scale_factor = scale_factor;
+    }
+    if let Some(map_mode) = map_mode {
+        options.mode = maplibre_core::MapMode::from_raw(map_mode);
+    }
+    if let Some(fast_pfor_enabled) = fast_pfor_enabled {
+        options.fast_pfor_enabled = fast_pfor_enabled;
+    }
     let raw_options = maplibre_core::options::map_options_to_native(&options).map_err(map_error)?;
     let runtime_state = runtime.state_for_operation()?;
     let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();

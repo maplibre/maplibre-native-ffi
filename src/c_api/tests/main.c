@@ -28,6 +28,7 @@ int main(void) {
   run_owned_texture_abi_tests();
   run_render_thread_abi_tests();
   run_query_abi_tests();
+  run_mlt_decode_abi_tests();
   run_resources_abi_tests();
   run_runtime_wake_abi_tests();
   run_style_values_abi_tests();

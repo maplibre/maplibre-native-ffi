@@ -28,7 +28,7 @@ vendor_paths=(
   vendor/supercluster # clustering
   vendor/kdbush.hpp # spatial index
   vendor/PMTiles # PMTiles headers (MLN_WITH_PMTILES)
-  vendor/maplibre-tile-spec # mlt-cpp (MLT JSON/FASTPFOR/TESTS off in FFI)
+  vendor/maplibre-tile-spec # mlt-cpp (MLT JSON/TESTS off in FFI)
   vendor/maplibre-native-base/deps/cheap-ruler-cpp
   vendor/maplibre-native-base/deps/geojson-vt-cpp
   vendor/maplibre-native-base/deps/geojson.hpp
