@@ -206,13 +206,13 @@ impl RuntimeState {
     fn source_for_event(&self, raw: &sys::mln_runtime_event) -> RuntimeEventSource {
         match raw.source_type {
             sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME => RuntimeEventSource::Runtime,
-            sys::MLN_RUNTIME_EVENT_SOURCE_MAP => self
-                .map_states
-                .borrow()
-                .get(&MapId::new(raw.source))
-                .map(|_| MapId::new(raw.source))
-                .map(RuntimeEventSource::Map)
-                .unwrap_or(RuntimeEventSource::UnknownMap),
+            // The id is copied out of the event, names one map for the life of
+            // the process, and grants nothing on its own, so it is reported
+            // whether or not this runtime still holds a wrapper for that map.
+            sys::MLN_RUNTIME_EVENT_SOURCE_MAP if raw.source != 0 => {
+                RuntimeEventSource::Map(MapId::new(raw.source))
+            }
+            sys::MLN_RUNTIME_EVENT_SOURCE_MAP => RuntimeEventSource::UnknownMap,
             source_type => RuntimeEventSource::Unknown(source_type),
         }
     }
@@ -1516,19 +1516,39 @@ mod tests {
 
     #[test]
     // Spec coverage: BND-086.
-    fn unregistered_map_event_source_becomes_unknown_map() {
+    fn map_event_source_exposes_the_copied_id_without_a_wrapper() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let mut raw = empty_runtime_event();
         raw.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
         raw.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-        // A synthetic map handle that names no live map.
+        // A synthetic map handle that this runtime holds no wrapper for.
         raw.source = 0x0200_0000_0000_002a;
 
         let source = runtime.inner.source_for_event(&raw);
         let event = RuntimeEvent::from_native(&raw, source).unwrap();
 
-        assert_eq!(event.source, RuntimeEventSource::UnknownMap);
+        // The id identifies the map without granting access to it.
+        assert_eq!(
+            event.source,
+            RuntimeEventSource::Map(MapId::new(0x0200_0000_0000_002a))
+        );
         assert_eq!(event.event_type, RuntimeEventType::MapStyleLoaded);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    // Spec coverage: BND-086.
+    fn map_event_source_without_an_id_reports_an_unknown_map() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let mut raw = empty_runtime_event();
+        raw.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
+        raw.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
+        raw.source = 0;
+
+        let source = runtime.inner.source_for_event(&raw);
+        let event = RuntimeEvent::from_native(&raw, source).unwrap();
+
+        assert_eq!(event.source, RuntimeEventSource::UnknownMap);
         runtime.close().unwrap();
     }
 
