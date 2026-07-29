@@ -31,6 +31,7 @@ namespace MaplibreNative {
         private Cond idle;
         private bool releasing;
         private uint active_native_leases;
+        private unowned Thread<void*> owner_thread;
 
         public bool closed {
             get {
@@ -43,6 +44,7 @@ namespace MaplibreNative {
 
         internal MapProjectionHandle (owned Raw.MapProjection native) {
             this.native = (owned) native;
+            owner_thread = Thread.self<void*> ();
         }
 
         ~MapProjectionHandle () {
@@ -77,6 +79,7 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null) {
                 state_mutex.unlock ();
@@ -104,6 +107,13 @@ namespace MaplibreNative {
             idle.broadcast ();
             state_mutex.unlock ();
             check_status (status);
+        }
+
+        private void ensure_owner_thread () throws Error {
+            if (Thread.self<void*> () != owner_thread) {
+                clear_unknown_status ();
+                throw new Error.WRONG_THREAD ("map projection called from a thread other than its owner thread");
+            }
         }
 
         public CameraOptions get_camera () throws Error {

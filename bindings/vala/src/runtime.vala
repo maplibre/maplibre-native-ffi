@@ -432,6 +432,13 @@ namespace MaplibreNative {
         }
     }
 
+    internal void validate_optional_offline_region_snapshot (bool found, Raw.OfflineRegionSnapshot? snapshot) throws Error {
+        if (found != (snapshot != null)) {
+            clear_unknown_status ();
+            throw new Error.INVALID_STATE ("offline region get result has inconsistent found flag and snapshot");
+        }
+    }
+
     public struct RenderingStats {
         public double encoding_time;
         public double rendering_time;
@@ -2088,8 +2095,20 @@ namespace MaplibreNative {
             }
             operation.finish_consume ();
             unregister_offline_operation (operation_id);
-            if (!found || snapshot == null) {
+            try {
+                validate_optional_offline_region_snapshot (found, snapshot);
+            } catch (Error error) {
+                if (snapshot != null) {
+                    Raw.offline_region_snapshot_destroy ((owned) snapshot);
+                }
+                throw error;
+            }
+            if (!found) {
                 return null;
+            }
+            if (snapshot == null) {
+                clear_unknown_status ();
+                throw new Error.INVALID_STATE ("offline region get returned no snapshot");
             }
             return copy_offline_region_snapshot ((owned) snapshot);
         }

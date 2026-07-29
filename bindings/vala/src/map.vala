@@ -358,6 +358,7 @@ namespace MaplibreNative {
         private Cond idle;
         private bool releasing;
         private uint active_native_leases;
+        private unowned Thread<void*> owner_thread;
 
         public bool closed {
             get {
@@ -376,6 +377,7 @@ namespace MaplibreNative {
             var runtime_lease = runtime.require_live ();
             check_status (Raw.map_create (runtime_lease.native, &native_options, out created));
             native = (owned) created;
+            owner_thread = Thread.self<void*> ();
             runtime.register_map (this);
         }
 
@@ -506,6 +508,7 @@ namespace MaplibreNative {
         }
 
         public void close () throws Error {
+            ensure_owner_thread ();
             state_mutex.lock ();
             if (native == null) {
                 state_mutex.unlock ();
@@ -535,6 +538,13 @@ namespace MaplibreNative {
             check_status (status);
             runtime.unregister_map (this);
             clear_custom_geometry_sources ();
+        }
+
+        private void ensure_owner_thread () throws Error {
+            if (Thread.self<void*> () != owner_thread) {
+                clear_unknown_status ();
+                throw new Error.WRONG_THREAD ("map called from a thread other than its owner thread");
+            }
         }
 
         public void request_repaint () throws Error {

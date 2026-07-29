@@ -298,6 +298,49 @@ void exercise_runtime_wrong_thread_close() throws MaplibreNative.Error {
   runtime.close();
 }
 
+void exercise_map_wrong_thread_close(MaplibreNative.MapHandle map) throws MaplibreNative.Error {
+  bool wrong_thread = false;
+  var caller = new GLib.Thread<void>("vala-map-wrong-thread", () => {
+    try {
+      map.close();
+    } catch (MaplibreNative.Error.WRONG_THREAD error) {
+      wrong_thread = true;
+    } catch (MaplibreNative.Error error) {
+      assert_not_reached();
+    }
+  });
+  caller.join();
+  assert(wrong_thread);
+  assert(!map.closed);
+  map.get_size();
+}
+
+void exercise_projection_wrong_thread_close(MaplibreNative.MapProjectionHandle projection) throws MaplibreNative.Error {
+  bool wrong_thread = false;
+  var caller = new GLib.Thread<void>("vala-projection-wrong-thread", () => {
+    try {
+      projection.close();
+    } catch (MaplibreNative.Error.WRONG_THREAD error) {
+      wrong_thread = true;
+    } catch (MaplibreNative.Error error) {
+      assert_not_reached();
+    }
+  });
+  caller.join();
+  assert(wrong_thread);
+  assert(!projection.closed);
+  projection.get_camera();
+}
+
+void exercise_optional_offline_snapshot_validation() throws MaplibreNative.Error {
+  try {
+    MaplibreNative.validate_optional_offline_region_snapshot(true, null);
+    assert_not_reached();
+  } catch (MaplibreNative.Error.INVALID_STATE error) {
+    assert(error.message == "offline region get result has inconsistent found flag and snapshot");
+  }
+}
+
 void exercise_render_session_wrong_thread_precedence(MaplibreNative.RenderSessionHandle session) throws MaplibreNative.Error {
   var frame = session.acquire_vulkan_owned_texture_frame();
   bool wrong_thread = false;
@@ -1412,6 +1455,7 @@ int main() {
     exercise_json_null_rejection();
     exercise_option_value_semantics();
     exercise_runtime_wrong_thread_close();
+    exercise_optional_offline_snapshot_validation();
     var backends = MaplibreNative.supported_render_backends();
     assert(backends != 0);
     MaplibreNative.opengl_supported_context_providers();
@@ -1477,6 +1521,7 @@ int main() {
     map_options.scale_factor = 1.0;
     map_options.fast_pfor_enabled = true;
     var map = new MaplibreNative.MapHandle(runtime, map_options);
+    exercise_map_wrong_thread_close(map);
     var map_size = map.get_size();
     assert(map_size.width == 128 && map_size.height == 64 && map_size.scale_factor == 1.0);
     var empty_rendered_query_options = new MaplibreNative.RenderedFeatureQueryOptions();
@@ -2038,6 +2083,7 @@ int main() {
     projection.set_camera(camera);
     projection.set_visible_coordinates({ MaplibreNative.LatLng(-1.0, -1.0), MaplibreNative.LatLng(1.0, 1.0) }, MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
     projection.set_visible_geometry(line_geometry, MaplibreNative.EdgeInsets(0.0, 0.0, 0.0, 0.0));
+    exercise_projection_wrong_thread_close(projection);
     exercise_projection_close_race(projection);
     bool closed_projection_failed = false;
     try {
