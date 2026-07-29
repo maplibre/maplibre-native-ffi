@@ -214,10 +214,11 @@ auto validate_opengl_borrowed_descriptor(
 }
 
 auto validate_frame(
-  mln_render_session_object* texture, const void* frame, size_t frame_size,
+  mln_render_session texture, const void* frame, size_t frame_size,
   const char* message
 ) -> mln_status {
-  const auto status = mln::core::validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = mln::core::validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1061,7 +1062,7 @@ auto opengl_owned_texture_acquire_frame(
     return MLN_STATUS_UNSUPPORTED;
   }
 
-  const auto frame_status = fill_opengl_frame(texture, out_frame);
+  const auto frame_status = fill_opengl_frame(live, out_frame);
   if (frame_status != MLN_STATUS_OK) {
     return frame_status;
   }

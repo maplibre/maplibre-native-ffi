@@ -414,7 +414,7 @@ auto metal_owned_texture_acquire_frame(
     return MLN_STATUS_UNSUPPORTED;
   }
 
-  const auto frame_status = fill_frame(texture, out_frame);
+  const auto frame_status = fill_frame(live, out_frame);
   if (frame_status != MLN_STATUS_OK) {
     return frame_status;
   }
