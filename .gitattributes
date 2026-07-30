@@ -4,8 +4,8 @@
 
 # Vendored: third-party sources committed as-is.
 third_party/**                                              linguist-vendored=true
-gradlew                                                     linguist-vendored=true
-gradlew.bat                                                 linguist-vendored=true
+gradlew                                                     -text linguist-vendored=true
+gradlew.bat                                                 -text linguist-vendored=true
 gradle/wrapper/**                                           linguist-vendored=true
 
 # Generated: refresh with the generator, never edit by hand.
