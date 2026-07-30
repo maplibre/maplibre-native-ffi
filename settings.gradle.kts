@@ -22,6 +22,8 @@ if (androidSdkDir() != null) {
 
 include(":examples:compose-map")
 
+include(":examples:compose-web-map")
+
 include(":examples:lwjgl-map")
 
 fun androidSdkDir(): File? {

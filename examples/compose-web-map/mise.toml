@@ -1,0 +1,23 @@
+[tasks.build]
+description = "Build the Compose Web zero-copy MapLibre prototype."
+dir = "{{config_root}}/../.."
+tools = { emsdk = "4.0.10" }
+run = '''
+set -euo pipefail
+cmake --workflow --preset browser-wasm32-webgl
+./gradlew :examples:compose-web-map:wasmJsBrowserDevelopmentExecutableDistribution
+'''
+
+[tasks.run]
+description = "Run the Compose Web zero-copy MapLibre prototype."
+run = '''
+set -euo pipefail
+mise run build
+repo_root="$(cd ../.. && pwd)"
+exec pnpm exec vp dev \
+  "$repo_root/examples/compose-web-map/build/dist/wasmJs/developmentExecutable" \
+  --config "$repo_root/examples/compose-web-map/vite.config.ts" \
+  --host 0.0.0.0 \
+  --port 8080 \
+  --strictPort
+'''

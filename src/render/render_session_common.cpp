@@ -88,6 +88,9 @@ auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
 #elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
+#elif defined(MLN_RENDER_BACKEND_OPENGL) && \
+  defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL;
 #else
   return 0;
 #endif
@@ -116,6 +119,12 @@ auto opengl_context_descriptor_default() noexcept
     .config = nullptr,
     .share_context = nullptr,
     .get_proc_address = nullptr,
+  };
+#elif defined(MLN_FFI_OPENGL_PROVIDER_WEBGL)
+  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+  result.data.webgl = mln_webgl_context_descriptor{
+    .size = sizeof(mln_webgl_context_descriptor),
+    .context = 0,
   };
 #endif
   return result;
@@ -267,6 +276,26 @@ auto validate_opengl_context(
       set_thread_error(
         "EGL display, config, and share_context must not be null"
       );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WEBGL) {
+    if (
+      require_supported_provider &&
+      (opengl_supported_context_provider_mask() &
+       MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WEBGL) == 0
+    ) {
+      set_thread_error("OpenGL WebGL context provider is not supported");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    if (context.data.webgl.size < sizeof(mln_webgl_context_descriptor)) {
+      set_thread_error("mln_webgl_context_descriptor.size is too small");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (context.data.webgl.context <= 0) {
+      set_thread_error("WebGL context handle must be positive");
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     return MLN_STATUS_OK;

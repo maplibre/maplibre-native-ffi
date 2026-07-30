@@ -31,5 +31,6 @@ bindings/openharmony/library/libs/
 bindings/openharmony/library/include/
 bindings/openharmony/library/BuildProfile.ets
 .kotlin
+/kotlin-js-store/
 .devcontainer/mise-oci/
 .devcontainer/mise-oci.tar

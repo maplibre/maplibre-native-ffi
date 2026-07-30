@@ -31,11 +31,11 @@ struct InitialCamera {
 class App {
  public:
   App(
-    Viewport viewport, InitialCamera camera, void* webgpuDevice,
-    void* webgpuQueue, mln_status& outStatus
+    Viewport viewport, InitialCamera camera, void* nativeContext,
+    void* nativeTarget, mln_status& outStatus
   )
       : viewport_(viewport) {
-    outStatus = initialize(camera, webgpuDevice, webgpuQueue);
+    outStatus = initialize(camera, nativeContext, nativeTarget);
   }
 
   ~App() {
@@ -103,7 +103,31 @@ class App {
     return true;
   }
 
+#if defined(MLN_COMPOSE_WEBGL)
+  auto resizeBorrowed(Viewport viewport, int32_t webglContext, uint32_t texture)
+    -> bool {
+    if (session_ != MLN_HANDLE_NULL) {
+      if (!check(
+            "destroy render session", mln_render_session_destroy(session_)
+          )) {
+        return false;
+      }
+      session_ = MLN_HANDLE_NULL;
+    }
+    viewport_ = viewport;
+    if (!attachBorrowedTexture(webglContext, texture)) {
+      return false;
+    }
+    logViewport();
+    requestRender();
+    return true;
+  }
+#endif
+
   auto acquireOwnedTexture() -> uintptr_t {
+#if defined(MLN_COMPOSE_WEBGL)
+    return 0;
+#else
     if (!releaseOwnedTextureFrame()) {
       return 0;
     }
@@ -119,9 +143,13 @@ class App {
     }
     hasOwnedFrame_ = true;
     return reinterpret_cast<uintptr_t>(ownedFrame_.texture);
+#endif
   }
 
   auto releaseOwnedTextureFrame() -> bool {
+#if defined(MLN_COMPOSE_WEBGL)
+    return true;
+#else
     if (!hasOwnedFrame_) {
       return true;
     }
@@ -130,6 +158,7 @@ class App {
     ownedFrame_ = {};
     hasOwnedFrame_ = false;
     return check("release owned texture frame", status);
+#endif
   }
 
   auto moveBy(double deltaX, double deltaY) -> bool {
@@ -221,7 +250,7 @@ class App {
     double pitch;
   };
 
-  auto initialize(InitialCamera camera, void* webgpuDevice, void* webgpuQueue)
+  auto initialize(InitialCamera camera, void* nativeContext, void* nativeTarget)
     -> mln_status {
     if (!validViewport(viewport_)) {
       std::fprintf(stderr, "browser map init failed: invalid viewport\n");
@@ -230,12 +259,20 @@ class App {
 
     const auto backends = mln_supported_render_backend_mask();
     std::fprintf(stderr, "supported render backends: 0x%x\n", backends);
+#if defined(MLN_COMPOSE_WEBGL)
+    std::fprintf(stderr, "render target: borrowed-texture\n");
+    std::fprintf(
+      stderr,
+      "render target status: zero-copy WebGL texture sampled by Compose/Skia\n"
+    );
+#else
     std::fprintf(stderr, "render target: owned-texture\n");
     std::fprintf(
       stderr,
       "render target status: samples MapLibre-owned texture frames into the "
       "host swapchain\n"
     );
+#endif
     std::fprintf(
       stderr,
       "Controls:\n"
@@ -249,12 +286,21 @@ class App {
       "  0: reset pitch and bearing\n"
     );
     logViewport();
+#if defined(MLN_COMPOSE_WEBGL)
+    if ((backends & MLN_RENDER_BACKEND_FLAG_OPENGL) == 0) {
+      std::fprintf(
+        stderr, "browser map init failed: OpenGL backend is unavailable\n"
+      );
+      return MLN_STATUS_UNSUPPORTED;
+    }
+#else
     if ((backends & MLN_RENDER_BACKEND_FLAG_WEBGPU) == 0) {
       std::fprintf(
         stderr, "browser map init failed: WebGPU backend is unavailable\n"
       );
       return MLN_STATUS_UNSUPPORTED;
     }
+#endif
 
     auto runtimeOptions = mln_runtime_options_default();
     runtimeOptions.cache_path = ":memory:";
@@ -295,21 +341,54 @@ class App {
       return status;
     }
 
+#if defined(MLN_COMPOSE_WEBGL)
+    if (!attachBorrowedTexture(
+          static_cast<int32_t>(reinterpret_cast<intptr_t>(nativeContext)),
+          static_cast<uint32_t>(reinterpret_cast<uintptr_t>(nativeTarget))
+        )) {
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+#else
     auto descriptor = mln_webgpu_owned_texture_descriptor_default();
     descriptor.extent.width = viewport_.width;
     descriptor.extent.height = viewport_.height;
     descriptor.extent.scale_factor = viewport_.scaleFactor;
-    descriptor.context.device = webgpuDevice;
-    descriptor.context.queue = webgpuQueue;
+    descriptor.context.device = nativeContext;
+    descriptor.context.queue = nativeTarget;
     status = mln_webgpu_owned_texture_attach(map_, &descriptor, &session_);
     if (status != MLN_STATUS_OK) {
       logError("attach WebGPU owned texture", status);
       return status;
     }
+#endif
 
     renderPending_ = true;
     return MLN_STATUS_OK;
   }
+
+#if defined(MLN_COMPOSE_WEBGL)
+  auto attachBorrowedTexture(int32_t webglContext, uint32_t texture) -> bool {
+    uint32_t physicalWidth = 0;
+    uint32_t physicalHeight = 0;
+    if (!physicalSize(viewport_, physicalWidth, physicalHeight)) {
+      return false;
+    }
+    auto descriptor = mln_opengl_borrowed_texture_descriptor_default();
+    descriptor.extent.width = viewport_.width;
+    descriptor.extent.height = viewport_.height;
+    descriptor.extent.scale_factor = viewport_.scaleFactor;
+    descriptor.physical_width = physicalWidth;
+    descriptor.physical_height = physicalHeight;
+    descriptor.context.platform = MLN_OPENGL_CONTEXT_PLATFORM_WEBGL;
+    descriptor.context.data.webgl.size = sizeof(mln_webgl_context_descriptor);
+    descriptor.context.data.webgl.context = webglContext;
+    descriptor.texture = texture;
+    descriptor.target = 0x0DE1;  // GL_TEXTURE_2D
+    const auto status =
+      mln_opengl_borrowed_texture_attach(map_, &descriptor, &session_);
+    return check("attach WebGL borrowed texture", status);
+  }
+#endif
 
   auto drainEvents() -> bool {
     auto renderRequested = false;
@@ -485,8 +564,10 @@ class App {
   mln_runtime runtime_ = MLN_HANDLE_NULL;
   mln_map map_ = MLN_HANDLE_NULL;
   mln_render_session session_ = MLN_HANDLE_NULL;
+#if !defined(MLN_COMPOSE_WEBGL)
   mln_webgpu_owned_texture_frame ownedFrame_ = {};
   bool hasOwnedFrame_ = false;
+#endif
   bool renderPending_ = true;
 };
 
@@ -571,6 +652,29 @@ EMSCRIPTEN_KEEPALIVE auto mln_browser_map_resize(
            ? 0
            : 1;
 }
+
+#if defined(MLN_COMPOSE_WEBGL)
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_resize_borrowed(
+  uint32_t logicalWidth, uint32_t logicalHeight, double scaleFactor,
+  int32_t webglContext, uint32_t texture
+) -> int {
+  return withApp(
+           false,
+           [&](App& current) {
+             return current.resizeBorrowed(
+               Viewport{
+                 .width = logicalWidth,
+                 .height = logicalHeight,
+                 .scaleFactor = scaleFactor,
+               },
+               webglContext, texture
+             );
+           }
+         )
+           ? 0
+           : 1;
+}
+#endif
 
 EMSCRIPTEN_KEEPALIVE auto mln_browser_map_move_by(double deltaX, double deltaY)
   -> int {

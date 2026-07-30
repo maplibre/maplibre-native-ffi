@@ -329,7 +329,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   void destroy_native_context() {}
 #endif
 
-  mln_opengl_surface_descriptor descriptor_{};
+  [[maybe_unused]] mln_opengl_surface_descriptor descriptor_{};
 
 #if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   void* render_context_ = nullptr;

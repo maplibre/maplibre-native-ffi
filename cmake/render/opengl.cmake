@@ -53,6 +53,15 @@ function(mln_configure_render_dependencies target)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     target_link_libraries(${target} INTERFACE OpenGL::GL Gdi32 User32)
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    # Emscripten's zlib port supplies the headers used by the shared default
+    # storage sources as well as the final linked implementation.
+    target_compile_options(${target} INTERFACE "-sUSE_ZLIB=1")
+    target_link_options(
+      ${target}
+      INTERFACE
+        "-sUSE_ZLIB=1" "-sMIN_WEBGL_VERSION=2" "-sMAX_WEBGL_VERSION=2"
+        "-sFULL_ES3=1")
   else()
     message(
       FATAL_ERROR
@@ -65,6 +74,11 @@ function(mln_configure_renderer target)
 
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    # The browser integration imports its host WebGL context directly and uses
+    # this project's texture backend, so upstream's EGL headless host is absent.
+    set(MLN_FFI_VENDOR_OPENGL_SOURCES)
+  endif()
 
   target_include_directories(
     ${target}
@@ -128,6 +142,13 @@ function(mln_configure_renderer target)
       PROPERTIES
         COMPILE_OPTIONS
         "/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
+    target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
+  elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "webgl")
+    target_compile_definitions(
+      ${target}
+      PRIVATE MLN_FFI_OPENGL_PROVIDER_WEBGL=1)
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
     target_link_libraries(${target} PRIVATE MLN_FFI::RenderDependencies)
   else()
     message(
