@@ -198,7 +198,7 @@ namespace MaplibreNative {
             Raw.JsonValue* value;
             check_status (Raw.json_snapshot_get (snapshot, out value));
             if (value == null) {
-                return null;
+                throw new Error.INVALID_STATE ("live JSON snapshot has no root value");
             }
             return JsonValue.from_native (value[0]);
         } finally {

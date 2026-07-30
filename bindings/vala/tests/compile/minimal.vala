@@ -1622,6 +1622,7 @@ int main() {
       map.set_style_url("maplibre://styles/vala-smoke");
     }
     map.set_style_json("{\"version\":8,\"sources\":{},\"layers\":[]}");
+    assert(wait_for_runtime_event(runtime, MaplibreNative.RuntimeEventType.MAP_STYLE_LOADED, 128));
     var lifetime_options = new MaplibreNative.CustomGeometrySourceOptions(fetch_custom_geometry_tile);
     map.add_custom_geometry_source("transient-custom-geometry", lifetime_options);
     assert(map.custom_geometry_source_registration_count == 1);

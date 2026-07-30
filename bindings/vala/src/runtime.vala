@@ -1138,7 +1138,9 @@ namespace MaplibreNative {
             if (source_type == RuntimeEventSourceType.MAP) {
                 source_id = new MapId (native.source);
                 source_map = runtime.resolve_map (native.source);
-                if (event_type == RuntimeEventType.MAP_STYLE_LOADED && source_map != null) {
+                if ((event_type == RuntimeEventType.MAP_STYLE_LOADED
+                     || event_type == RuntimeEventType.MAP_LOADING_FAILED)
+                    && source_map != null) {
                     source_map.release_replaced_custom_geometry_sources ();
                 }
             }
