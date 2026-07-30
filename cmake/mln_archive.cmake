@@ -48,8 +48,8 @@ function(mln_complete_static_dependencies_for_target out_var)
   get_target_property(MLN_FFI_RENDER_STATIC_DEPENDENCIES
                       mln_ffi_render_dependencies MLN_FFI_STATIC_ARCHIVES)
   if(MLN_FFI_RENDER_STATIC_DEPENDENCIES)
-    mln_append_existing_targets(MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
-                                ${MLN_FFI_RENDER_STATIC_DEPENDENCIES})
+    list(APPEND MLN_FFI_COMPLETE_STATIC_DEPENDENCIES
+         ${MLN_FFI_RENDER_STATIC_DEPENDENCIES})
   endif()
 
   set(${out_var} ${MLN_FFI_COMPLETE_STATIC_DEPENDENCIES} PARENT_SCOPE)
