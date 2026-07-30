@@ -125,19 +125,47 @@ struct OfflineOperationEventState {
 
 namespace {
 
-// Leases the resource transform registration for a MapLibre-owned thread.
-//
-// The registry lock proves the platform context is a live runtime, and the
-// work done under it is a reference count increment that completes without
+#if UINTPTR_MAX < UINT64_MAX
+using PlatformContextRegistry = std::unordered_map<void*, mln_runtime>;
 
-// Every supported target is 64-bit, so a runtime handle round-trips through
-// mbgl's void* platform context without a side table. The assert is the
-// tripwire if that ever stops being true.
-static_assert(
-  sizeof(void*) >= sizeof(std::uint64_t),
-  "the platform context carries a 64-bit runtime handle"
-);
+auto platform_context_registry_mutex() -> std::mutex& {
+  static std::mutex value;
+  return value;
+}
 
+auto platform_context_registry() -> PlatformContextRegistry& {
+  static PlatformContextRegistry value;
+  return value;
+}
+
+auto register_platform_context(
+  mln::core::RuntimeObject* runtime, mln_runtime handle
+) -> void {
+  const std::scoped_lock lock(platform_context_registry_mutex());
+  platform_context_registry().emplace(runtime, handle);
+}
+
+auto unregister_platform_context(mln::core::RuntimeObject* runtime) -> void {
+  const std::scoped_lock lock(platform_context_registry_mutex());
+  platform_context_registry().erase(runtime);
+}
+
+auto platform_context_for_runtime(mln_runtime runtime) noexcept -> void* {
+  return mln::core::handle_table<mln::core::RuntimeObject>().try_resolve(
+    runtime
+  );
+}
+
+auto runtime_from_platform_context(void* platform_context) noexcept
+  -> mln_runtime {
+  const std::scoped_lock lock(platform_context_registry_mutex());
+  const auto found = platform_context_registry().find(platform_context);
+  return found == platform_context_registry().end() ? MLN_HANDLE_NULL
+                                                    : found->second;
+}
+#else
+// A 64-bit target carries the runtime id directly. A narrower target keeps the
+// live pointer-to-id registry above so the id is neither truncated nor decoded.
 auto platform_context_for_runtime(mln_runtime runtime) noexcept -> void* {
   // NOLINTNEXTLINE(performance-no-int-to-ptr)
   return reinterpret_cast<void*>(static_cast<std::uintptr_t>(runtime));
@@ -149,6 +177,7 @@ auto runtime_from_platform_context(void* platform_context) noexcept
     reinterpret_cast<std::uintptr_t>(platform_context)
   );
 }
+#endif
 
 auto live_runtime_threads_mutex() -> std::mutex& {
   static std::mutex value;
@@ -168,6 +197,10 @@ auto owner_thread_has_live_runtime(std::thread::id owner_thread) -> bool {
   return live_runtime_threads().contains(owner_thread);
 }
 
+// Leases the resource transform registration for a MapLibre-owned thread.
+//
+// The handle-table lock proves the platform context names a live runtime, and
+// the work done under it is a reference count increment that completes without
 // waiting on any per-runtime lock. Callers take the returned state's lock
 // afterwards, so a writer waiting on that lock delays this runtime alone
 // rather than every `mln_*` call in the process.
@@ -1069,6 +1102,9 @@ auto create_runtime(
   auto* published = owned_runtime.get();
   *out_runtime = handle_table<RuntimeObject>().insert(std::move(owned_runtime));
   published->self = *out_runtime;
+#if UINTPTR_MAX < UINT64_MAX
+  register_platform_context(published, *out_runtime);
+#endif
   return MLN_STATUS_OK;
 }
 
@@ -2443,6 +2479,9 @@ auto destroy_runtime(mln_runtime runtime) -> mln_status {
     const std::scoped_lock lock(live_runtime_threads_mutex());
     live_runtime_threads().erase(owner_thread);
   }
+#if UINTPTR_MAX < UINT64_MAX
+  unregister_platform_context(owned_runtime.get());
+#endif
 
   // A resource transform callback that entered `invoke_resource_transform()`
   // before the erase above holds a shared transform lock, so this wait covers

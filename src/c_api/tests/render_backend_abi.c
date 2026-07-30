@@ -73,9 +73,9 @@ static void webgpu_texture_descriptors_validate_on_host_backends(void) {
   TEST_ASSERT_EQUAL_UINT32(256, borrowed.physical_width);
   TEST_ASSERT_EQUAL_UINT32(256, borrowed.physical_height);
 
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
-  mln_render_session* session = NULL;
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_render_session session = MLN_HANDLE_NULL;
   borrowed.context.device = fake_handle;
   borrowed.texture = fake_handle;
   borrowed.texture_view = fake_handle;
@@ -87,7 +87,7 @@ static void webgpu_texture_descriptors_validate_on_host_backends(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
   );
-  TEST_ASSERT_NULL(session);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
 
   invalid = borrowed;
   invalid.context.device = NULL;
@@ -95,13 +95,13 @@ static void webgpu_texture_descriptors_validate_on_host_backends(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_webgpu_borrowed_texture_attach(map, &invalid, &session)
   );
-  TEST_ASSERT_NULL(session);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_UNSUPPORTED,
     mln_webgpu_borrowed_texture_attach(map, &borrowed, &session)
   );
-  TEST_ASSERT_NULL(session);
+  TEST_ASSERT_EQUAL_UINT64(MLN_HANDLE_NULL, session);
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
 }

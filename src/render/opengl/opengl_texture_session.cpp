@@ -960,10 +960,11 @@ auto opengl_borrowed_texture_attach(
 }
 
 auto webgpu_owned_texture_attach(
-  mln_map* map, const mln_webgpu_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_webgpu_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -991,10 +992,11 @@ auto webgpu_owned_texture_attach(
 }
 
 auto webgpu_borrowed_texture_attach(
-  mln_map* map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -1093,9 +1095,10 @@ auto vulkan_owned_texture_release_frame(
 }
 
 auto webgpu_owned_texture_acquire_frame(
-  mln_render_session* texture, mln_webgpu_owned_texture_frame* out_frame
+  mln_render_session texture, mln_webgpu_owned_texture_frame* out_frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1111,9 +1114,10 @@ auto webgpu_owned_texture_acquire_frame(
 }
 
 auto webgpu_owned_texture_release_frame(
-  mln_render_session* texture, const mln_webgpu_owned_texture_frame* frame
+  mln_render_session texture, const mln_webgpu_owned_texture_frame* frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
