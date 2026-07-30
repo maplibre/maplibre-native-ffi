@@ -35,6 +35,7 @@ import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
@@ -296,6 +297,59 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     } finally {
       map.close()
       assertEquals(0, map.customGeometrySourceCountForTesting())
+      runtime.close()
+    }
+  }
+
+  // BND-105: typed layer base accessors round-trip through native style state.
+
+  @Test
+  fun layerBaseAccessorsRoundTripThroughNativeStyle() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
+    try {
+      map.setStyleJson(
+        "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":" +
+          "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":[" +
+          "{\"id\":\"bg\",\"type\":\"background\"}," +
+          "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}"
+      )
+
+      assertEquals("", map.layerSourceLayer("fill"))
+      map.setLayerSourceLayer("fill", "roads")
+      assertEquals("roads", map.layerSourceLayer("fill"))
+      assertEquals("geo", map.layerSourceId("fill"))
+
+      // A layer type that takes no source is rejected rather than silently ignored.
+      assertFailsWith<InvalidArgumentException> { map.setLayerSourceLayer("bg", "roads") }
+      assertEquals("", map.layerSourceId("bg"))
+
+      // An unset zoom range crosses the boundary as infinities.
+      assertEquals(Double.NEGATIVE_INFINITY, map.layerMinZoom("fill"))
+      assertEquals(Double.POSITIVE_INFINITY, map.layerMaxZoom("fill"))
+      map.setLayerMinZoom("fill", 4.0)
+      map.setLayerMaxZoom("fill", 12.5)
+      assertEquals(4.0, map.layerMinZoom("fill"))
+      assertEquals(12.5, map.layerMaxZoom("fill"))
+
+      assertEquals(StyleLayerVisibility.VISIBLE, map.layerVisibility("fill"))
+      map.setLayerVisibility("fill", StyleLayerVisibility.NONE)
+      assertEquals(StyleLayerVisibility.NONE, map.layerVisibility("fill"))
+
+      // An unknown raw visibility passes through to C, which rejects it.
+      assertFailsWith<InvalidArgumentException> {
+        map.setLayerVisibility("fill", StyleLayerVisibility(900))
+      }
+      assertFailsWith<InvalidArgumentException> { map.layerMinZoom("missing") }
+    } finally {
+      map.close()
       runtime.close()
     }
   }

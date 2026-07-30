@@ -47,6 +47,14 @@ public expect class RuntimeHandle : AutoCloseable {
     operation: AmbientCacheOperation
   ): OfflineOperationHandle<Unit>
 
+  /**
+   * Starts a change to this runtime's maximum ambient cache size.
+   *
+   * MapLibre evicts ambient resources to fit the new budget, so lowering it discards cached
+   * resources. Offline regions are unaffected.
+   */
+  public fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit>
+
   public fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
     metadata: ByteArray,

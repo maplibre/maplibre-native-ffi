@@ -243,6 +243,51 @@ func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
 	t.Fatal("offline completion event was not reported")
 }
 
+func TestSetMaximumAmbientCacheSizeReportsCompletion(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"})
+	if err != nil {
+		t.Fatalf("NewRuntimeWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	operation, err := runtime.StartSetMaximumAmbientCacheSize(8 << 20)
+	if err != nil {
+		t.Fatalf("StartSetMaximumAmbientCacheSize(): %v", err)
+	}
+	for range make([]struct{}, 5000) {
+		if err := runtime.Pump(0); err != nil {
+			t.Fatalf("Pump(): %v", err)
+		}
+		event, err := runtime.PollEvent()
+		if err != nil {
+			t.Fatalf("PollEvent(): %v", err)
+		}
+		if event == nil {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
+		if !ok || payload.OperationID != operation.ID() {
+			continue
+		}
+		if payload.OperationKind != OfflineOperationSetMaximumAmbientCacheSize || payload.ResultKind != OfflineOperationResultNone || payload.ResultStatus != 0 {
+			t.Fatalf("payload = %#v", payload)
+		}
+		if err := operation.Discard(); err != nil {
+			t.Fatalf("Discard(): %v", err)
+		}
+		return
+	}
+	t.Fatal("maximum ambient cache size completion event was not reported")
+}
+
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 	lockOSThreadForTest(t)
 

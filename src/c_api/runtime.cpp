@@ -15,7 +15,6 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
     .flags = 0,
     .asset_path = nullptr,
     .cache_path = nullptr,
-    .maximum_cache_size = 0,
   };
 }
 
@@ -103,6 +102,16 @@ auto mln_runtime_run_ambient_cache_operation_start(
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::run_ambient_cache_operation_start(
       runtime, operation, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_set_maximum_ambient_cache_size_start(
+  mln_runtime runtime, uint64_t size, mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::set_maximum_ambient_cache_size_start(
+      runtime, size, out_operation_id
     );
   });
 }

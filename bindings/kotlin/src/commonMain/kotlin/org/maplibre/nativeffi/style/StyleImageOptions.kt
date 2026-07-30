@@ -11,17 +11,38 @@ public class StyleImageOptions {
 
   public var sdf: Boolean? = null
 
+  /**
+   * Horizontally stretchable intervals. A present empty list stays distinguishable from an absent
+   * one.
+   */
+  public var stretchX: List<ImageStretch>? = null
+
+  /** Vertically stretchable intervals. */
+  public var stretchY: List<ImageStretch>? = null
+
+  /** Content box used when `icon-text-fit` applies. */
+  public var content: ImageContent? = null
+
+  public var textFitWidth: StyleImageTextFit? = null
+
+  public var textFitHeight: StyleImageTextFit? = null
+
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */
   public fun copy(block: StyleImageOptions.() -> Unit = {}): StyleImageOptions =
     StyleImageOptions()
       .also {
         it.pixelRatio = pixelRatio
         it.sdf = sdf
+        it.stretchX = stretchX?.toList()
+        it.stretchY = stretchY?.toList()
+        it.content = content
+        it.textFitWidth = textFitWidth
+        it.textFitHeight = textFitHeight
       }
       .apply(block)
 
   private val fields: List<Any?>
-    get() = listOf(pixelRatio, sdf)
+    get() = listOf(pixelRatio, sdf, stretchX, stretchY, content, textFitWidth, textFitHeight)
 
   override fun equals(other: Any?): Boolean = other is StyleImageOptions && fields == other.fields
 

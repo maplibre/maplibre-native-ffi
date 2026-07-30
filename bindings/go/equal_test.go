@@ -267,16 +267,14 @@ func TestRuntimeOptionsEqualComparesFieldValues(t *testing.T) {
 		"RuntimeOptions",
 		func() RuntimeOptions {
 			return RuntimeOptions{
-				AssetPath:        "assets",
-				CachePath:        "cache",
-				MaximumCacheSize: optionPtr(uint64(1024)),
+				AssetPath: "assets",
+				CachePath: "cache",
 			}
 		},
 		RuntimeOptions.Equal,
 		[]func(*RuntimeOptions){
 			func(o *RuntimeOptions) { o.AssetPath = "other-assets" },
 			func(o *RuntimeOptions) { o.CachePath = "other-cache" },
-			func(o *RuntimeOptions) { o.MaximumCacheSize = optionPtr(uint64(2048)) },
 		},
 	)
 }
@@ -336,12 +334,13 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 				ClusterProperties: optionPtr(JSONObject(
 					JSONMember{Name: "total", Value: JSONArray(JSONString("+"), JSONArray(JSONString("get"), JSONString("rank")))},
 				)),
-				TileSize:         optionPtr(uint32(256)),
-				Buffer:           optionPtr(uint32(64)),
-				ClusterRadius:    optionPtr(uint32(0)),
-				ClusterMinPoints: optionPtr(uint32(2)),
-				LineMetrics:      optionPtr(true),
-				Cluster:          optionPtr(true),
+				TileSize:          optionPtr(uint32(256)),
+				Buffer:            optionPtr(uint32(64)),
+				ClusterRadius:     optionPtr(uint32(0)),
+				ClusterMinPoints:  optionPtr(uint32(2)),
+				LineMetrics:       optionPtr(true),
+				Cluster:           optionPtr(true),
+				SynchronousUpdate: optionPtr(true),
 			}
 		},
 		StyleGeoJSONSourceOptions.Equal,
@@ -361,6 +360,7 @@ func TestStyleGeoJSONSourceOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *StyleGeoJSONSourceOptions) { o.ClusterMinPoints = optionPtr(uint32(3)) },
 			func(o *StyleGeoJSONSourceOptions) { o.LineMetrics = optionPtr(false) },
 			func(o *StyleGeoJSONSourceOptions) { o.Cluster = optionPtr(false) },
+			func(o *StyleGeoJSONSourceOptions) { o.SynchronousUpdate = optionPtr(false) },
 		},
 	)
 }
@@ -390,12 +390,28 @@ func TestStyleImageOptionsEqualComparesFieldValues(t *testing.T) {
 		t,
 		"StyleImageOptions",
 		func() StyleImageOptions {
-			return StyleImageOptions{PixelRatio: optionPtr(float32(2)), SDF: optionPtr(true)}
+			return StyleImageOptions{
+				PixelRatio:    optionPtr(float32(2)),
+				SDF:           optionPtr(true),
+				StretchX:      []ImageStretch{{From: 0, To: 1}},
+				StretchY:      []ImageStretch{},
+				Content:       optionPtr(ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5}),
+				TextFitWidth:  optionPtr(StyleImageTextFitStretchOnly),
+				TextFitHeight: optionPtr(StyleImageTextFitProportional),
+			}
 		},
 		StyleImageOptions.Equal,
 		[]func(*StyleImageOptions){
 			func(o *StyleImageOptions) { o.PixelRatio = optionPtr(float32(3)) },
 			func(o *StyleImageOptions) { o.SDF = optionPtr(false) },
+			func(o *StyleImageOptions) { o.StretchX = []ImageStretch{{From: 0, To: 2}} },
+			// A present empty slice stays distinguishable from an absent one.
+			func(o *StyleImageOptions) { o.StretchY = nil },
+			func(o *StyleImageOptions) { o.Content = nil },
+			func(o *StyleImageOptions) { o.TextFitWidth = optionPtr(StyleImageTextFitProportional) },
+			func(o *StyleImageOptions) {
+				o.TextFitHeight = optionPtr(StyleImageTextFitStretchOrShrink)
+			},
 		},
 	)
 }

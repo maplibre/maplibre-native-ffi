@@ -12,7 +12,7 @@ import (
 func TestRuntimeCreateWithOptions(t *testing.T) {
 	lockOSThreadForTest(t)
 
-	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"}.WithMaximumCacheSize(0))
+	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"})
 	if err != nil {
 		t.Fatalf("NewRuntimeWithOptions(): %v", err)
 	}

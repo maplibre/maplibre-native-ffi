@@ -102,6 +102,125 @@ test "style layer JSON helpers manage lifecycle and order" {
     try testing.expect((try map.getStyleLayerJson(testing.allocator, "empty-circle")) == null);
 }
 
+test "nine-patch style images round-trip stretch, content, and text fit" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    const pixels = [_]u8{0} ** 16;
+    const image = maplibre.PremultipliedRgba8Image{
+        .width = 2,
+        .height = 2,
+        .stride = 8,
+        .pixels = pixels[0..],
+    };
+    const stretch_x = [_]maplibre.ImageStretch{.{ .from = 0.0, .to = 1.0 }};
+    const stretch_y = [_]maplibre.ImageStretch{
+        .{ .from = 0.0, .to = 1.0 },
+        .{ .from = 1.0, .to = 2.0 },
+    };
+    try map.setStyleImage(testing.allocator, "patch", image, .{
+        .stretch_x = stretch_x[0..],
+        .stretch_y = stretch_y[0..],
+        .content = .{ .left = 0.5, .top = 0.5, .right = 1.5, .bottom = 1.5 },
+        .text_fit_height = .proportional,
+    });
+
+    const info = (try map.getStyleImageInfo(testing.allocator, "patch")).?;
+    try testing.expectEqual(@as(usize, 1), info.stretch_x_count);
+    try testing.expectEqual(@as(usize, 2), info.stretch_y_count);
+    try testing.expectEqual(@as(f32, 1.5), info.content.?.right);
+    // An absent text fit stays distinguishable from a present default.
+    try testing.expect(info.text_fit_width == null);
+    try testing.expectEqual(maplibre.StyleImageTextFit.proportional, info.text_fit_height.?);
+
+    var stretches = (try map.copyStyleImageStretches(testing.allocator, "patch")).?;
+    defer stretches.deinit();
+    try testing.expectEqual(@as(usize, 1), stretches.stretch_x.len);
+    try testing.expectEqual(@as(f32, 1.0), stretches.stretch_x[0].to);
+    try testing.expectEqual(@as(usize, 2), stretches.stretch_y.len);
+    try testing.expectEqual(@as(f32, 2.0), stretches.stretch_y[1].to);
+
+    try testing.expect((try map.copyStyleImageStretches(testing.allocator, "missing")) == null);
+
+    // A backwards interval is rejected by C.
+    const backwards = [_]maplibre.ImageStretch{.{ .from = 2.0, .to = 1.0 }};
+    try testing.expectError(
+        error.InvalidArgument,
+        map.setStyleImage(testing.allocator, "bad", image, .{ .stretch_x = backwards[0..] }),
+    );
+}
+
+test "layer base accessors round-trip source, zoom range, and visibility" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    {
+        var empty = try map.copyLayerSourceLayer(testing.allocator, "point-circle");
+        defer empty.deinit();
+        try testing.expectEqualStrings("", empty.value);
+    }
+    try map.setLayerSourceLayer(testing.allocator, "point-circle", "roads");
+    {
+        var source_layer = try map.copyLayerSourceLayer(testing.allocator, "point-circle");
+        defer source_layer.deinit();
+        try testing.expectEqualStrings("roads", source_layer.value);
+    }
+    {
+        var source_id = try map.copyLayerSourceId(testing.allocator, "point-circle");
+        defer source_id.deinit();
+        try testing.expectEqualStrings("point", source_id.value);
+    }
+
+    // A layer type that takes no source is rejected rather than silently ignored.
+    try testing.expectError(
+        error.InvalidArgument,
+        map.setLayerSourceLayer(testing.allocator, "background", "roads"),
+    );
+    {
+        var background_source = try map.copyLayerSourceId(testing.allocator, "background");
+        defer background_source.deinit();
+        try testing.expectEqualStrings("", background_source.value);
+    }
+
+    // An unset zoom range crosses the boundary as infinities.
+    try testing.expectEqual(
+        -std.math.inf(f64),
+        try map.getLayerMinZoom(testing.allocator, "point-circle"),
+    );
+    try testing.expectEqual(
+        std.math.inf(f64),
+        try map.getLayerMaxZoom(testing.allocator, "point-circle"),
+    );
+    try map.setLayerMinZoom(testing.allocator, "point-circle", 4.0);
+    try map.setLayerMaxZoom(testing.allocator, "point-circle", 12.5);
+    try testing.expectEqual(@as(f64, 4.0), try map.getLayerMinZoom(testing.allocator, "point-circle"));
+    try testing.expectEqual(@as(f64, 12.5), try map.getLayerMaxZoom(testing.allocator, "point-circle"));
+
+    try testing.expectEqual(
+        maplibre.StyleLayerVisibility.visible,
+        try map.getLayerVisibility(testing.allocator, "point-circle"),
+    );
+    try map.setLayerVisibility(testing.allocator, "point-circle", .none);
+    try testing.expectEqual(
+        maplibre.StyleLayerVisibility.none,
+        try map.getLayerVisibility(testing.allocator, "point-circle"),
+    );
+
+    // An unknown raw visibility passes through to C, which rejects it.
+    try testing.expectError(
+        error.InvalidArgument,
+        map.setLayerVisibility(testing.allocator, "point-circle", .{ .unknown = 900 }),
+    );
+    try testing.expectError(
+        error.InvalidArgument,
+        map.getLayerMinZoom(testing.allocator, "missing"),
+    );
+}
+
 test "layer properties accept semantic JSON values and return owned snapshots" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");

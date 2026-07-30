@@ -30,12 +30,14 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned JVM FFM map handle. */
@@ -387,6 +389,65 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun layerFilter(layerId: String): JsonValue? {
     NativeAccess.ensureLoaded()
     return NativeAccess.layerFilter(requireLiveHandle(), layerId)
+  }
+
+  public actual fun styleImageStretches(
+    imageId: String
+  ): Pair<List<ImageStretch>, List<ImageStretch>>? {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleImageStretches(requireLiveHandle(), imageId)
+  }
+
+  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerSourceLayer(requireLiveHandle(), layerId, sourceLayer)
+  }
+
+  public actual fun layerSourceLayer(layerId: String): String {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerSourceLayer(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setLayerSourceId(layerId: String, sourceId: String) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerSourceId(requireLiveHandle(), layerId, sourceId)
+  }
+
+  public actual fun layerSourceId(layerId: String): String {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerSourceId(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerMinZoom(requireLiveHandle(), layerId, minZoom)
+  }
+
+  public actual fun layerMinZoom(layerId: String): Double {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerMinZoom(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerMaxZoom(requireLiveHandle(), layerId, maxZoom)
+  }
+
+  public actual fun layerMaxZoom(layerId: String): Double {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.layerMaxZoom(requireLiveHandle(), layerId)
+  }
+
+  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setLayerVisibility(requireLiveHandle(), layerId, visibility.nativeValue)
+  }
+
+  public actual fun layerVisibility(layerId: String): StyleLayerVisibility {
+    NativeAccess.ensureLoaded()
+    return StyleLayerVisibility.fromNative(
+      NativeAccess.layerVisibility(requireLiveHandle(), layerId)
+    )
   }
 
   public actual fun requestRepaint() {

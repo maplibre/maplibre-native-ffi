@@ -270,16 +270,10 @@ class OptionsValueSemanticsTest {
         RuntimeOptions().apply {
           assetPath = "assets"
           cachePath = "cache"
-          maximumCacheSize = 1024L
         }
       },
       copyOf = { it.copy() },
-      mutators =
-        listOf(
-          { assetPath = "other-assets" },
-          { cachePath = "other-cache" },
-          { maximumCacheSize = 2048L },
-        ),
+      mutators = listOf({ assetPath = "other-assets" }, { cachePath = "other-cache" }),
     )
   }
 
@@ -329,6 +323,7 @@ class OptionsValueSemanticsTest {
           clusterMinPoints = 3
           lineMetrics = true
           cluster = true
+          synchronousUpdate = true
         }
       },
       copyOf = { it.copy() },
@@ -345,6 +340,7 @@ class OptionsValueSemanticsTest {
           { clusterMinPoints = 2 },
           { lineMetrics = false },
           { cluster = false },
+          { synchronousUpdate = false },
         ),
     )
   }

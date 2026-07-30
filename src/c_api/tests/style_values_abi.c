@@ -1,11 +1,15 @@
 // Raw C ABI coverage: malformed descriptor counts and unknown enum values are
 // hidden by binding-owned style values.
 
+#include <math.h>
 #include <string.h>
 
 #include "abi_tests.h"
 #include "test_support.h"
 #include "unity.h"
+
+#define MLN_STRING_LITERAL(text) \
+  ((mln_string_view){.data = (text), .size = sizeof(text) - 1})
 
 // This verifies malformed coordinate counts and unknown rasterization enum
 // values hidden by binding value types.
@@ -310,10 +314,350 @@ static void clustered_geojson_data_requires_a_feature_collection(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// A vector source plus one layer that takes a source and one that does not, so
+// the typed layer accessors can be exercised against both.
+static const char layer_accessor_style_json[] =
+  "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
+  "\"tiles\":[\"https://example.com/{z}/{x}/{y}.mvt\"]}},"
+  "\"layers\":[{\"id\":\"lines\",\"type\":\"line\",\"source\":\"vec\","
+  "\"source-layer\":\"roads\"},{\"id\":\"bg\",\"type\":\"background\"}]}";
+
+// This verifies the typed layer accessors reject a layer type that takes no
+// source, which MapLibre's own setProperty path accepts as a silent no-op.
+static void layer_source_accessors_reject_sourceless_layer_types(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+  );
+
+  const mln_string_view background = MLN_STRING_LITERAL("bg");
+  const mln_string_view source_layer = MLN_STRING_LITERAL("roads");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_layer_source_layer(map, background, source_layer)
+  );
+  const char* message = mln_thread_last_error_message();
+  TEST_ASSERT_NOT_NULL(message);
+  TEST_ASSERT_NOT_NULL(strstr(message, "source-layer"));
+
+  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_layer_source_id(map, background, source_id)
+  );
+
+  // The style-spec property path still reaches the same layer and reports OK
+  // without changing it, which is why the typed setters exist.
+  const mln_json_value roads = {
+    .size = sizeof(mln_json_value),
+    .type = MLN_JSON_VALUE_TYPE_STRING,
+    .data = {.string_value = {.data = "roads", .size = 5}}
+  };
+  const mln_string_view property_name = MLN_STRING_LITERAL("source-layer");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_property(map, background, property_name, &roads)
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// This verifies the raw buffer contract for copied layer text: the required
+// size is reported even when the caller's capacity is too small.
+static void layer_text_accessors_report_required_capacity(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+  );
+
+  // A null buffer with zero capacity is a size probe, so it reports the length
+  // and succeeds rather than sharing a status with a missing layer.
+  const mln_string_view lines = MLN_STRING_LITERAL("lines");
+  size_t required = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_layer_source_layer(map, lines, NULL, 0, &required)
+  );
+  TEST_ASSERT_EQUAL_size_t(5, required);
+
+  char too_small[4] = {0};
+  required = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_layer_source_layer(
+      map, lines, too_small, sizeof(too_small), &required
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(5, required);
+
+  char buffer[8] = {0};
+  required = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_layer_source_layer(
+                     map, lines, buffer, sizeof(buffer), &required
+                   )
+  );
+  TEST_ASSERT_EQUAL_size_t(5, required);
+  TEST_ASSERT_EQUAL_INT(0, memcmp(buffer, "roads", 5));
+
+  // A sourceless layer reads back as empty rather than failing.
+  const mln_string_view background = MLN_STRING_LITERAL("bg");
+  required = 123;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_layer_source_id(
+                     map, background, buffer, sizeof(buffer), &required
+                   )
+  );
+  TEST_ASSERT_EQUAL_size_t(0, required);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_layer_source_layer(map, lines, buffer, sizeof(buffer), NULL)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_layer_source_layer(map, lines, NULL, sizeof(buffer), &required)
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// This verifies the unbounded zoom range crosses the ABI as infinities and that
+// a raw NaN and an unknown visibility value are rejected.
+static void layer_zoom_and_visibility_accessors_carry_raw_domains(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+  );
+
+  const mln_string_view lines = MLN_STRING_LITERAL("lines");
+  double min_zoom = 0.0;
+  double max_zoom = 0.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_min_zoom(map, lines, &min_zoom)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_max_zoom(map, lines, &max_zoom)
+  );
+  TEST_ASSERT_TRUE(isinf(min_zoom) && min_zoom < 0.0);
+  TEST_ASSERT_TRUE(isinf(max_zoom) && max_zoom > 0.0);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_min_zoom(map, lines, 4.0)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_layer_max_zoom(map, lines, 12.5)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_min_zoom(map, lines, &min_zoom)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_max_zoom(map, lines, &max_zoom)
+  );
+  TEST_ASSERT_EQUAL_DOUBLE(4.0, min_zoom);
+  TEST_ASSERT_EQUAL_DOUBLE(12.5, max_zoom);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_layer_min_zoom(map, lines, NAN)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_layer_max_zoom(map, lines, NAN)
+  );
+
+  uint32_t visibility = 999;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_visibility(map, lines, &visibility)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_VISIBILITY_VISIBLE, visibility);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_layer_visibility(map, lines, MLN_STYLE_LAYER_VISIBILITY_NONE)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_layer_visibility(map, lines, &visibility)
+  );
+  TEST_ASSERT_EQUAL_UINT32(MLN_STYLE_LAYER_VISIBILITY_NONE, visibility);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_layer_visibility(map, lines, 999)
+  );
+
+  // A missing layer is rejected the same way the rest of the layer family does.
+  const mln_string_view missing = MLN_STRING_LITERAL("nope");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_layer_min_zoom(map, missing, &min_zoom)
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
+// This verifies raw stretch and content descriptors, unknown text-fit values,
+// and the stretch copy buffer contract that binding image types hide.
+static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_json(map, layer_accessor_style_json)
+  );
+
+  const uint8_t pixels[4 * 4] = {0};
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 2;
+  image.height = 2;
+  image.stride = 8;
+  image.pixels = pixels;
+  image.byte_length = sizeof(pixels);
+
+  const mln_string_view image_id = MLN_STRING_LITERAL("patch");
+
+  // A backwards interval, a non-finite bound, and a null array with a non-zero
+  // count are all rejected.
+  const mln_image_stretch backwards[] = {{.from = 2.0F, .to = 1.0F}};
+  mln_style_image_options options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+  options.stretch_x = backwards;
+  options.stretch_x_count = 1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+  options.stretch_y = NULL;
+  options.stretch_y_count = 1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_CONTENT;
+  options.content.left = 2.0F;
+  options.content.right = 1.0F;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+  options.text_fit_width = 999;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  // An accepted nine-patch reports its stretches, content, and text fit back.
+  const mln_image_stretch stretch_x[] = {{.from = 0.0F, .to = 1.0F}};
+  const mln_image_stretch stretch_y[] = {
+    {.from = 0.0F, .to = 1.0F}, {.from = 1.0F, .to = 2.0F}
+  };
+  options = mln_style_image_options_default();
+  options.fields =
+    MLN_STYLE_IMAGE_OPTION_STRETCH_X | MLN_STYLE_IMAGE_OPTION_STRETCH_Y |
+    MLN_STYLE_IMAGE_OPTION_CONTENT | MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+  options.stretch_x = stretch_x;
+  options.stretch_x_count = 1;
+  options.stretch_y = stretch_y;
+  options.stretch_y_count = 2;
+  options.content.left = 0.5F;
+  options.content.top = 0.5F;
+  options.content.right = 1.5F;
+  options.content.bottom = 1.5F;
+  options.text_fit_height = MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  mln_style_image_info info = mln_style_image_info_default();
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_image_info(map, image_id, &info, &found)
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_size_t(1, info.stretch_x_count);
+  TEST_ASSERT_EQUAL_size_t(2, info.stretch_y_count);
+  TEST_ASSERT_TRUE(info.has_content);
+  TEST_ASSERT_EQUAL_FLOAT(0.5F, info.content.left);
+  TEST_ASSERT_EQUAL_FLOAT(1.5F, info.content.bottom);
+  TEST_ASSERT_FALSE(info.has_text_fit_width);
+  TEST_ASSERT_TRUE(info.has_text_fit_height);
+  TEST_ASSERT_EQUAL_UINT32(
+    MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL, info.text_fit_height
+  );
+
+  // Null arrays with zero capacity probe the counts and succeed.
+  size_t x_count = 0;
+  size_t y_count = 0;
+  found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_image_stretches(
+                     map, image_id, NULL, 0, &x_count, NULL, 0, &y_count, &found
+                   )
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_size_t(1, x_count);
+  TEST_ASSERT_EQUAL_size_t(2, y_count);
+
+  // An undersized array reports the counts and fails.
+  mln_image_stretch too_small[1] = {{.from = 0.0F, .to = 0.0F}};
+  x_count = 0;
+  y_count = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_image_stretches(
+      map, image_id, NULL, 0, &x_count, too_small, 1, &y_count, &found
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(2, y_count);
+
+  mln_image_stretch copied_x[1] = {{.from = 0.0F, .to = 0.0F}};
+  mln_image_stretch copied_y[2] = {
+    {.from = 0.0F, .to = 0.0F}, {.from = 0.0F, .to = 0.0F}
+  };
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_copy_style_image_stretches(
+      map, image_id, copied_x, 1, &x_count, copied_y, 2, &y_count, &found
+    )
+  );
+  TEST_ASSERT_EQUAL_FLOAT(1.0F, copied_x[0].to);
+  TEST_ASSERT_EQUAL_FLOAT(1.0F, copied_y[1].from);
+  TEST_ASSERT_EQUAL_FLOAT(2.0F, copied_y[1].to);
+
+  // A missing image reports zero counts without failing.
+  const mln_string_view missing = MLN_STRING_LITERAL("nope");
+  x_count = 123;
+  y_count = 123;
+  found = true;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_image_stretches(
+                     map, missing, NULL, 0, &x_count, NULL, 0, &y_count, &found
+                   )
+  );
+  TEST_ASSERT_FALSE(found);
+  TEST_ASSERT_EQUAL_size_t(0, x_count);
+  TEST_ASSERT_EQUAL_size_t(0, y_count);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
   RUN_TEST(geojson_source_options_reject_unsafe_raw_headers);
   RUN_TEST(clustered_geojson_data_reports_non_point_geometry);
   RUN_TEST(clustered_geojson_data_requires_a_feature_collection);
+  RUN_TEST(layer_source_accessors_reject_sourceless_layer_types);
+  RUN_TEST(layer_text_accessors_report_required_capacity);
+  RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
+  RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
 }

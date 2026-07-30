@@ -67,6 +67,22 @@ class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
+  fun setMaximumAmbientCacheSizeHandleReportsKindAndRejectsNegativeSize() {
+    val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
+    try {
+      val operation = runtime.startSetMaximumAmbientCacheSize(8L shl 20)
+      assertEquals(OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE, operation.kind)
+      assertEquals(OfflineOperationResultKind.NONE, operation.resultKind)
+      operation.close()
+
+      // Binding-owned validation fails before crossing into C.
+      assertFailsWith<InvalidArgumentException> { runtime.startSetMaximumAmbientCacheSize(-1L) }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  @Test
   fun offlineRegionApisCreateObserveAndCopyPublicEvents() {
     val runtime = RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" })
     try {

@@ -55,6 +55,12 @@ public class GeoJsonSourceOptions {
 
   public var cluster: Boolean? = null
 
+  /**
+   * Applies data updates synchronously, so data set through the GeoJSON data update API reaches the
+   * next rendered frame instead of being tiled on a worker and shown in a later one.
+   */
+  public var synchronousUpdate: Boolean? = null
+
   /** Returns an independent copy of this descriptor with [block] applied to the copy. */
   public fun copy(block: GeoJsonSourceOptions.() -> Unit = {}): GeoJsonSourceOptions =
     GeoJsonSourceOptions()
@@ -70,6 +76,7 @@ public class GeoJsonSourceOptions {
         it.clusterMinPoints = clusterMinPoints
         it.lineMetrics = lineMetrics
         it.cluster = cluster
+        it.synchronousUpdate = synchronousUpdate
       }
       .apply(block)
 
@@ -87,6 +94,7 @@ public class GeoJsonSourceOptions {
         clusterMinPoints,
         lineMetrics,
         cluster,
+        synchronousUpdate,
       )
 
   override fun equals(other: Any?): Boolean =

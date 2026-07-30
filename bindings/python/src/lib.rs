@@ -920,6 +920,22 @@ impl RuntimeHandle {
         Ok(operation_id)
     }
 
+    fn set_maximum_ambient_cache_size_start(&self, size: u64) -> PyResult<u64> {
+        let state = self.state_for_operation()?;
+        let mut operation_id = 0;
+        // SAFETY: The C API validates the runtime handle, owner-thread
+        // affinity, and writable operation_id pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_runtime_set_maximum_ambient_cache_size_start(
+                state.handle(),
+                size,
+                &mut operation_id,
+            )
+        })
+        .map_err(map_error)?;
+        Ok(operation_id)
+    }
+
     fn offline_region_create_start(
         &self,
         definition: &Bound<'_, PyAny>,
@@ -2120,6 +2136,7 @@ impl MapHandle {
         cluster_min_points: Option<u32>,
         line_metrics: Option<bool>,
         cluster: Option<bool>,
+        synchronous_update: Option<bool>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
@@ -2136,6 +2153,7 @@ impl MapHandle {
             cluster_min_points,
             line_metrics,
             cluster,
+            synchronous_update,
         )?;
         let options =
             maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
@@ -2167,6 +2185,7 @@ impl MapHandle {
         cluster_min_points: Option<u32>,
         line_metrics: Option<bool>,
         cluster: Option<bool>,
+        synchronous_update: Option<bool>,
     ) -> PyResult<()> {
         let state = self.state();
         let source_id = maplibre_core::string::string_view(&source_id);
@@ -2184,6 +2203,7 @@ impl MapHandle {
             cluster_min_points,
             line_metrics,
             cluster,
+            synchronous_update,
         )?;
         let options =
             maplibre_core::style::geojson_source_options_to_native(&options).map_err(map_error)?;
@@ -2782,6 +2802,130 @@ impl MapHandle {
         json_snapshot_to_py(py, out.get())
     }
 
+    fn set_layer_source_layer(&self, layer_id: String, source_layer: String) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let source_layer = maplibre_core::string::string_view(&source_layer);
+        // SAFETY: The C API validates the map pointer and both string views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_source_layer(state.handle(), layer_id.raw(), source_layer.raw())
+        })
+        .map_err(map_error)
+    }
+
+    fn copy_layer_source_layer(&self, layer_id: String) -> PyResult<String> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, and each buffer
+        // and out pointer it is given.
+        unsafe {
+            copy_layer_text(|text, capacity, out_size| {
+                sys::mln_map_copy_layer_source_layer(
+                    state.handle(),
+                    layer_id.raw(),
+                    text,
+                    capacity,
+                    out_size,
+                )
+            })
+        }
+    }
+
+    fn set_layer_source_id(&self, layer_id: String, source_id: String) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let source_id = maplibre_core::string::string_view(&source_id);
+        // SAFETY: The C API validates the map pointer and both string views.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_source_id(state.handle(), layer_id.raw(), source_id.raw())
+        })
+        .map_err(map_error)
+    }
+
+    fn copy_layer_source_id(&self, layer_id: String) -> PyResult<String> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, and each buffer
+        // and out pointer it is given.
+        unsafe {
+            copy_layer_text(|text, capacity, out_size| {
+                sys::mln_map_copy_layer_source_id(
+                    state.handle(),
+                    layer_id.raw(),
+                    text,
+                    capacity,
+                    out_size,
+                )
+            })
+        }
+    }
+
+    fn set_layer_min_zoom(&self, layer_id: String, min_zoom: f64) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer and layer ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_min_zoom(state.handle(), layer_id.raw(), min_zoom)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_layer_min_zoom(&self, layer_id: String) -> PyResult<f64> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut min_zoom = 0.0;
+        // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_min_zoom(state.handle(), layer_id.raw(), &mut min_zoom)
+        })
+        .map_err(map_error)?;
+        Ok(min_zoom)
+    }
+
+    fn set_layer_max_zoom(&self, layer_id: String, max_zoom: f64) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer and layer ID.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_max_zoom(state.handle(), layer_id.raw(), max_zoom)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_layer_max_zoom(&self, layer_id: String) -> PyResult<f64> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut max_zoom = 0.0;
+        // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_max_zoom(state.handle(), layer_id.raw(), &mut max_zoom)
+        })
+        .map_err(map_error)?;
+        Ok(max_zoom)
+    }
+
+    fn set_layer_visibility(&self, layer_id: String, visibility: u32) -> PyResult<()> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        // SAFETY: The C API validates the map pointer, layer ID, and enum value.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_visibility(state.handle(), layer_id.raw(), visibility)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_layer_visibility(&self, layer_id: String) -> PyResult<u32> {
+        let state = self.state();
+        let layer_id = maplibre_core::string::string_view(&layer_id);
+        let mut visibility = 0;
+        // SAFETY: The C API validates the map pointer, layer ID, and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_visibility(state.handle(), layer_id.raw(), &mut visibility)
+        })
+        .map_err(map_error)?;
+        Ok(visibility)
+    }
+
     fn set_layer_filter(
         &self,
         layer_id: String,
@@ -2888,6 +3032,11 @@ impl MapHandle {
         pixels: Vec<u8>,
         pixel_ratio: Option<f32>,
         sdf: Option<bool>,
+        stretch_x: Option<Vec<(f32, f32)>>,
+        stretch_y: Option<Vec<(f32, f32)>>,
+        content: Option<(f32, f32, f32, f32)>,
+        text_fit_width: Option<u32>,
+        text_fit_height: Option<u32>,
     ) -> PyResult<()> {
         let state = self.state();
         let image_id = maplibre_core::string::string_view(&image_id);
@@ -2897,7 +3046,17 @@ impl MapHandle {
         image.stride = stride;
         image.pixels = pixels.as_ptr();
         image.byte_length = pixels.len();
-        let options = style_image_options_from_parts(pixel_ratio, sdf);
+        let (mut options, native_stretch_x, native_stretch_y) = style_image_options_from_parts(
+            pixel_ratio,
+            sdf,
+            stretch_x,
+            stretch_y,
+            content,
+            text_fit_width,
+            text_fit_height,
+        );
+        options.stretch_x = native_stretch_x.as_ptr();
+        options.stretch_y = native_stretch_y.as_ptr();
         // SAFETY: The C API validates the map pointer, image ID, image descriptor,
         // options, and pixel storage. pixels is retained for this call.
         maplibre_core::check(unsafe {
@@ -2912,6 +3071,60 @@ impl MapHandle {
 
     fn style_image_exists(&self, image_id: String) -> PyResult<bool> {
         self.string_bool_call_with(image_id, sys::mln_map_style_image_exists)
+    }
+
+    fn copy_style_image_stretches(
+        &self,
+        image_id: String,
+    ) -> PyResult<Option<(Vec<(f32, f32)>, Vec<(f32, f32)>)>> {
+        let state = self.state();
+        let image_id = maplibre_core::string::string_view(&image_id);
+        let mut x_count = 0;
+        let mut y_count = 0;
+        let mut found = false;
+        // SAFETY: The C API validates the map pointer and image ID. Null arrays
+        // with zero capacity make this a size probe.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_image_stretches(
+                state.handle(),
+                image_id.raw(),
+                std::ptr::null_mut(),
+                0,
+                &mut x_count,
+                std::ptr::null_mut(),
+                0,
+                &mut y_count,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        if !found {
+            return Ok(None);
+        }
+
+        let mut raw_x = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; x_count];
+        let mut raw_y = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; y_count];
+        // SAFETY: Each buffer is writable for its reported count.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_image_stretches(
+                state.handle(),
+                image_id.raw(),
+                raw_x.as_mut_ptr(),
+                raw_x.len(),
+                &mut x_count,
+                raw_y.as_mut_ptr(),
+                raw_y.len(),
+                &mut y_count,
+                &mut found,
+            )
+        })
+        .map_err(map_error)?;
+        let to_public = |raw: &[sys::mln_image_stretch]| -> Vec<(f32, f32)> {
+            raw.iter()
+                .map(|stretch| (stretch.from, stretch.to))
+                .collect()
+        };
+        Ok(Some((to_public(&raw_x), to_public(&raw_y))))
     }
 
     fn get_style_image_info(
@@ -4723,6 +4936,7 @@ fn geojson_source_options_from_parts(
     cluster_min_points: Option<u32>,
     line_metrics: Option<bool>,
     cluster: Option<bool>,
+    synchronous_update: Option<bool>,
 ) -> PyResult<maplibre_core::GeoJsonSourceOptions> {
     let mut options = maplibre_core::GeoJsonSourceOptions::default();
     if let Some(min_zoom) = min_zoom {
@@ -4757,6 +4971,9 @@ fn geojson_source_options_from_parts(
     }
     if let Some(cluster) = cluster {
         options.cluster = Some(cluster);
+    }
+    if let Some(synchronous_update) = synchronous_update {
+        options.synchronous_update = Some(synchronous_update);
     }
     Ok(options)
 }
@@ -6018,10 +6235,22 @@ fn premultiplied_rgba8_image_from_parts(
     image
 }
 
+/// Materializes style image options plus the stretch storage native borrows for
+/// the duration of the call. The caller keeps both alive until the C call returns.
+#[allow(clippy::too_many_arguments)]
 fn style_image_options_from_parts(
     pixel_ratio: Option<f32>,
     sdf: Option<bool>,
-) -> sys::mln_style_image_options {
+    stretch_x: Option<Vec<(f32, f32)>>,
+    stretch_y: Option<Vec<(f32, f32)>>,
+    content: Option<(f32, f32, f32, f32)>,
+    text_fit_width: Option<u32>,
+    text_fit_height: Option<u32>,
+) -> (
+    sys::mln_style_image_options,
+    Vec<sys::mln_image_stretch>,
+    Vec<sys::mln_image_stretch>,
+) {
     // SAFETY: Default constructor takes no arguments and initializes size.
     let mut options = unsafe { sys::mln_style_image_options_default() };
     if let Some(pixel_ratio) = pixel_ratio {
@@ -6032,7 +6261,43 @@ fn style_image_options_from_parts(
         options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
         options.sdf = sdf;
     }
-    options
+    let to_native = |stretches: &[(f32, f32)]| -> Vec<sys::mln_image_stretch> {
+        stretches
+            .iter()
+            .map(|(from, to)| sys::mln_image_stretch {
+                from: *from,
+                to: *to,
+            })
+            .collect()
+    };
+    let native_stretch_x = stretch_x.as_deref().map(to_native).unwrap_or_default();
+    let native_stretch_y = stretch_y.as_deref().map(to_native).unwrap_or_default();
+    if stretch_x.is_some() {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+        options.stretch_x_count = native_stretch_x.len();
+    }
+    if stretch_y.is_some() {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+        options.stretch_y_count = native_stretch_y.len();
+    }
+    if let Some((left, top, right, bottom)) = content {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_CONTENT;
+        options.content = sys::mln_image_content {
+            left,
+            top,
+            right,
+            bottom,
+        };
+    }
+    if let Some(value) = text_fit_width {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+        options.text_fit_width = value;
+    }
+    if let Some(value) = text_fit_height {
+        options.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+        options.text_fit_height = value;
+    }
+    (options, native_stretch_x, native_stretch_y)
 }
 
 fn style_image_info_to_py(py: Python<'_>, info: &sys::mln_style_image_info) -> PyResult<Py<PyAny>> {
@@ -6043,6 +6308,25 @@ fn style_image_info_to_py(py: Python<'_>, info: &sys::mln_style_image_info) -> P
     dict.set_item("byte_length", info.byte_length)?;
     dict.set_item("pixel_ratio", info.pixel_ratio)?;
     dict.set_item("sdf", info.sdf)?;
+    dict.set_item("stretch_x_count", info.stretch_x_count)?;
+    dict.set_item("stretch_y_count", info.stretch_y_count)?;
+    dict.set_item(
+        "content",
+        info.has_content.then_some((
+            info.content.left,
+            info.content.top,
+            info.content.right,
+            info.content.bottom,
+        )),
+    )?;
+    dict.set_item(
+        "text_fit_width",
+        info.has_text_fit_width.then_some(info.text_fit_width),
+    )?;
+    dict.set_item(
+        "text_fit_height",
+        info.has_text_fit_height.then_some(info.text_fit_height),
+    )?;
     Ok(dict.into_any().unbind())
 }
 
@@ -6942,10 +7226,9 @@ fn create_runtime_with_abi_version_for_test(
     actual_abi_version: u32,
     asset_path: Option<String>,
     cache_path: Option<String>,
-    maximum_cache_size: Option<u64>,
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version_value(actual_abi_version).map_err(map_error)?;
-    create_runtime(asset_path, cache_path, maximum_cache_size)
+    create_runtime(asset_path, cache_path)
 }
 
 /// Test helper that exercises private runtime event payload wire conversion.
@@ -7087,12 +7370,40 @@ fn camera_transition_finished_event_for_test(
     event_to_py(py, copied)
 }
 
+/// Probes the required byte length, then copies the layer text into a `String`.
+///
+/// # Safety
+///
+/// `copy` must forward its arguments to a C entry point that writes at most
+/// `capacity` bytes through the text pointer and the required length through the
+/// size pointer.
+unsafe fn copy_layer_text(
+    copy: impl Fn(*mut c_char, usize, *mut usize) -> sys::mln_status,
+) -> PyResult<String> {
+    let mut required = 0;
+    maplibre_core::check(copy(std::ptr::null_mut(), 0, &mut required)).map_err(map_error)?;
+    if required == 0 {
+        return Ok(String::new());
+    }
+
+    let mut bytes = vec![0u8; required];
+    let mut copied = 0;
+    maplibre_core::check(copy(
+        bytes.as_mut_ptr().cast::<c_char>(),
+        bytes.len(),
+        &mut copied,
+    ))
+    .map_err(map_error)?;
+    bytes.truncate(copied.min(bytes.len()));
+    String::from_utf8(bytes)
+        .map_err(|error| invalid_argument_error(format!("native layer text is not UTF-8: {error}")))
+}
+
 /// Creates a runtime handle on the current thread.
 #[pyfunction]
 fn create_runtime(
     asset_path: Option<String>,
     cache_path: Option<String>,
-    maximum_cache_size: Option<u64>,
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
     let mut options = maplibre_core::RuntimeOptions::default();
@@ -7101,9 +7412,6 @@ fn create_runtime(
     }
     if let Some(cache_path) = cache_path {
         options.cache_path = Some(cache_path);
-    }
-    if let Some(maximum_cache_size) = maximum_cache_size {
-        options.maximum_cache_size = Some(maximum_cache_size);
     }
     let native_options =
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;

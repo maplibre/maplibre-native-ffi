@@ -89,6 +89,15 @@ fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibr
     try handle.discard();
 }
 
+fn setMaximumAmbientCacheSize(runtime: *maplibre.RuntimeHandle, size: u64) !void {
+    const handle = try runtime.startSetMaximumAmbientCacheSize(size);
+    _ = waitForOfflineOperation(runtime, handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
 fn createOfflineRegion(
     runtime: *maplibre.RuntimeHandle,
     allocator: std.mem.Allocator,
@@ -484,8 +493,9 @@ test "http style can load from ambient cache after online load" {
     defer testing.allocator.free(style_url);
 
     {
-        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path, .maximum_cache_size = 1024 * 1024 }, null);
+        var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
         defer runtime.close() catch @panic("runtime close failed");
+        try setMaximumAmbientCacheSize(&runtime, 1024 * 1024);
         var map = try maplibre.MapHandle.create(&runtime, .{});
         defer map.close() catch @panic("map close failed");
         try map.setStyleUrl(testing.allocator, style_url);

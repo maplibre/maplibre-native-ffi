@@ -4,23 +4,19 @@ import Foundation
 public struct RuntimeOptions: Equatable, Sendable {
   public var assetPath: String?
   public var cachePath: String?
-  public var maximumCacheSize: UInt64?
 
   public init(
     assetPath: String? = nil,
-    cachePath: String? = nil,
-    maximumCacheSize: UInt64? = nil
+    cachePath: String? = nil
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
-    self.maximumCacheSize = maximumCacheSize
   }
 
   var nativeInput: NativeRuntimeOptionsInput {
     NativeRuntimeOptionsInput(
       assetPath: assetPath,
-      cachePath: cachePath,
-      maximumCacheSize: maximumCacheSize
+      cachePath: cachePath
     )
   }
 }

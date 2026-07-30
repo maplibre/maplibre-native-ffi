@@ -43,7 +43,8 @@ pub use enums::{
     OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode,
     ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
     ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, RuntimeEventType, SourceType,
-    TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
+    StyleImageTextFit, StyleLayerVisibility, TileLodMode, TileOperation, TileScheme,
+    VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
@@ -71,7 +72,8 @@ pub use runtime::{
     set_network_status_raw,
 };
 pub use style::{
-    GeoJsonSourceOptions, SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, SourceInfo, StyleImage, StyleImageOptions,
+    TileSourceOptions,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,

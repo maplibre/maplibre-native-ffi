@@ -1,13 +1,14 @@
 use std::ptr;
 
 pub(crate) use maplibre_core::style::{
-    GeoJsonSourceOptionsNativeExt, NativeGeoJsonSourceOptions, NativeTileSourceOptions,
-    NativeTileUrls, StyleImageOptionsNativeExt, TileSourceOptionsNativeExt,
+    GeoJsonSourceOptionsNativeExt, NativeGeoJsonSourceOptions, NativeStyleImageOptions,
+    NativeTileSourceOptions, NativeTileUrls, StyleImageOptionsNativeExt,
+    TileSourceOptionsNativeExt,
 };
 pub use maplibre_core::{
-    GeoJsonSourceOptions, LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType,
-    StyleImage, StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
+    RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
+    StyleImageTextFit, StyleLayerVisibility, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::const_ptr_or_null;
@@ -508,7 +509,9 @@ impl super::MapHandle {
         let image_id = maplibre_core::string::string_view(image_id);
         let image = maplibre_core::values::premultiplied_rgba8_image_to_native(image);
         let options = options.map(StyleImageOptions::to_native);
-        let options_ptr = options.as_ref().map_or(ptr::null(), ptr::from_ref);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeStyleImageOptions::as_ptr);
         // SAFETY: map is live, image_id is an explicit-length view valid for
         // this call, image points into the borrowed Rust image for this call,
         // and options_ptr is either null or points to call-scoped options.
@@ -1077,6 +1080,198 @@ impl super::MapHandle {
         )
     }
 
+    /// Copies one runtime style image's stretchable intervals.
+    ///
+    /// Returns `None` when no image carries `image_id`.
+    pub fn style_image_stretches(
+        &self,
+        image_id: &str,
+    ) -> Result<Option<(Vec<ImageStretch>, Vec<ImageStretch>)>> {
+        let map = self.inner.native()?;
+        let image_id = maplibre_core::string::string_view(image_id);
+        let mut x_count = 0;
+        let mut y_count = 0;
+        let mut found = false;
+        // SAFETY: map is live, image_id stays valid for this call, both arrays
+        // are null with zero capacity so this is a size probe, and the output
+        // pointers refer to writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_image_stretches(
+                map,
+                image_id.raw(),
+                ptr::null_mut(),
+                0,
+                &mut x_count,
+                ptr::null_mut(),
+                0,
+                &mut y_count,
+                &mut found,
+            )
+        })?;
+        if !found {
+            return Ok(None);
+        }
+
+        let mut stretch_x = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; x_count];
+        let mut stretch_y = vec![sys::mln_image_stretch { from: 0.0, to: 0.0 }; y_count];
+        // SAFETY: each buffer is writable for its reported count, and the output
+        // pointers refer to writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_copy_style_image_stretches(
+                map,
+                image_id.raw(),
+                stretch_x.as_mut_ptr(),
+                stretch_x.len(),
+                &mut x_count,
+                stretch_y.as_mut_ptr(),
+                stretch_y.len(),
+                &mut y_count,
+                &mut found,
+            )
+        })?;
+        let to_public = |stretches: &[sys::mln_image_stretch]| -> Vec<ImageStretch> {
+            stretches
+                .iter()
+                .map(|stretch| ImageStretch::new(stretch.from, stretch.to))
+                .collect()
+        };
+        Ok(Some((to_public(&stretch_x), to_public(&stretch_y))))
+    }
+
+    /// Sets one layer's source-layer ID.
+    ///
+    /// Layer types that take no source, such as background, are rejected.
+    pub fn set_layer_source_layer(&self, layer_id: &str, source_layer: &str) -> Result<()> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let source_layer = maplibre_core::string::string_view(source_layer);
+        // SAFETY: map is live and both string views stay valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_source_layer(map, layer_id.raw(), source_layer.raw())
+        })
+    }
+
+    /// Copies one layer's source-layer ID, empty when the layer carries none.
+    pub fn layer_source_layer(&self, layer_id: &str) -> Result<String> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        // SAFETY: map is live, layer_id stays valid for both calls, and each
+        // call writes only through the pointers it is given.
+        unsafe {
+            copy_layer_text(|text, capacity, out_size| {
+                sys::mln_map_copy_layer_source_layer(map, layer_id.raw(), text, capacity, out_size)
+            })
+        }
+    }
+
+    /// Sets one layer's source ID.
+    ///
+    /// Layer types that take no source, such as background, are rejected. The
+    /// named source need not exist yet.
+    pub fn set_layer_source_id(&self, layer_id: &str, source_id: &str) -> Result<()> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let source_id = maplibre_core::string::string_view(source_id);
+        // SAFETY: map is live and both string views stay valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_source_id(map, layer_id.raw(), source_id.raw())
+        })
+    }
+
+    /// Copies one layer's source ID, empty when the layer carries none.
+    pub fn layer_source_id(&self, layer_id: &str) -> Result<String> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        // SAFETY: map is live, layer_id stays valid for both calls, and each
+        // call writes only through the pointers it is given.
+        unsafe {
+            copy_layer_text(|text, capacity, out_size| {
+                sys::mln_map_copy_layer_source_id(map, layer_id.raw(), text, capacity, out_size)
+            })
+        }
+    }
+
+    /// Sets the lowest zoom at which one layer draws.
+    ///
+    /// Pass `f64::NEG_INFINITY` for no lower bound.
+    pub fn set_layer_min_zoom(&self, layer_id: &str, min_zoom: f64) -> Result<()> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        // SAFETY: map is live and layer_id stays valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_min_zoom(map, layer_id.raw(), min_zoom)
+        })
+    }
+
+    /// Reads the lowest zoom at which one layer draws.
+    ///
+    /// A layer with no lower bound reports `f64::NEG_INFINITY`.
+    pub fn layer_min_zoom(&self, layer_id: &str) -> Result<f64> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut min_zoom = 0.0;
+        // SAFETY: map is live, layer_id stays valid for this call, and min_zoom
+        // is writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_min_zoom(map, layer_id.raw(), &mut min_zoom)
+        })?;
+        Ok(min_zoom)
+    }
+
+    /// Sets the highest zoom at which one layer draws.
+    ///
+    /// Pass `f64::INFINITY` for no upper bound.
+    pub fn set_layer_max_zoom(&self, layer_id: &str, max_zoom: f64) -> Result<()> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        // SAFETY: map is live and layer_id stays valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_max_zoom(map, layer_id.raw(), max_zoom)
+        })
+    }
+
+    /// Reads the highest zoom at which one layer draws.
+    ///
+    /// A layer with no upper bound reports `f64::INFINITY`.
+    pub fn layer_max_zoom(&self, layer_id: &str) -> Result<f64> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut max_zoom = 0.0;
+        // SAFETY: map is live, layer_id stays valid for this call, and max_zoom
+        // is writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_max_zoom(map, layer_id.raw(), &mut max_zoom)
+        })?;
+        Ok(max_zoom)
+    }
+
+    /// Sets whether one layer draws.
+    pub fn set_layer_visibility(
+        &self,
+        layer_id: &str,
+        visibility: StyleLayerVisibility,
+    ) -> Result<()> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        // SAFETY: map is live and layer_id stays valid for this call.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_layer_visibility(map, layer_id.raw(), visibility.raw_value())
+        })
+    }
+
+    /// Reads whether one layer draws.
+    pub fn layer_visibility(&self, layer_id: &str) -> Result<StyleLayerVisibility> {
+        let map = self.inner.native()?;
+        let layer_id = maplibre_core::string::string_view(layer_id);
+        let mut visibility = 0;
+        // SAFETY: map is live, layer_id stays valid for this call, and
+        // visibility is writable storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_layer_visibility(map, layer_id.raw(), &mut visibility)
+        })?;
+        Ok(StyleLayerVisibility::from_raw(visibility))
+    }
+
     /// Copies current style source IDs into owned Rust strings.
     pub fn style_source_ids(&self) -> Result<Vec<String>> {
         let map = self.inner.native()?;
@@ -1102,4 +1297,40 @@ impl super::MapHandle {
         // core copies and releases it.
         unsafe { maplibre_core::style::copy_style_id_list(out.into_live("mln_style_id_list")?) }
     }
+}
+
+/// Probes the required byte length, then copies the text into an owned `String`.
+///
+/// # Safety
+///
+/// `copy` must forward its arguments to a C entry point that writes at most
+/// `capacity` bytes through the text pointer and the required length through the
+/// size pointer.
+unsafe fn copy_layer_text(
+    copy: impl Fn(*mut std::os::raw::c_char, usize, *mut usize) -> sys::mln_status,
+) -> Result<String> {
+    let mut required = 0;
+    maplibre_core::check(copy(ptr::null_mut(), 0, &mut required))?;
+    if required == 0 {
+        return Ok(String::new());
+    }
+
+    let mut buffer = vec![0u8; required];
+    let mut copied = 0;
+    maplibre_core::check(copy(buffer.as_mut_ptr().cast(), buffer.len(), &mut copied))?;
+    if copied > buffer.len() {
+        return Err(Error::new(
+            ErrorKind::NativeError,
+            None,
+            "native layer text size exceeded caller buffer",
+        ));
+    }
+    buffer.truncate(copied);
+    String::from_utf8(buffer).map_err(|_| {
+        Error::new(
+            ErrorKind::NativeError,
+            None,
+            "native layer text was not valid UTF-8",
+        )
+    })
 }

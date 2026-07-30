@@ -1,3 +1,4 @@
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
 using Maplibre.Native.Render;
@@ -91,5 +92,48 @@ public sealed class StyleImageTests
         Assert.False(map.StyleImageExists("dot"));
         Assert.Null(map.StyleImageInfo("dot"));
         Assert.Null(map.CopyStyleImagePremultipliedRgba8("dot"));
+    }
+
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public void NinePatchStyleImageRoundTripsStretchContentAndTextFit()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
+        var image = new PremultipliedRgba8Image(new byte[16], new TextureImageInfo(2, 2, 8, 16));
+        var options = new StyleImageOptions
+        {
+            StretchX = [new ImageStretch(0, 1)],
+            StretchY = [new ImageStretch(0, 1), new ImageStretch(1, 2)],
+            Content = new ImageContent(0.5f, 0.5f, 1.5f, 1.5f),
+            TextFitHeight = StyleImageTextFit.Proportional,
+        };
+        map.SetStyleImage("patch", image, options);
+
+        var info = map.StyleImageInfo("patch");
+        Assert.NotNull(info);
+        Assert.Equal(1UL, info.StretchXCount);
+        Assert.Equal(2UL, info.StretchYCount);
+        Assert.Equal(new ImageContent(0.5f, 0.5f, 1.5f, 1.5f), info.Content);
+        // An absent text fit stays distinguishable from a present default.
+        Assert.Null(info.TextFitWidth);
+        Assert.Equal(StyleImageTextFit.Proportional, info.TextFitHeight);
+
+        var stretches = map.StyleImageStretches("patch");
+        Assert.NotNull(stretches);
+        Assert.Equal([new ImageStretch(0, 1)], stretches.Value.StretchX);
+        Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], stretches.Value.StretchY);
+        Assert.Null(map.StyleImageStretches("missing"));
+
+        // A backwards interval is rejected by C.
+        Assert.Throws<InvalidArgumentException>(() =>
+            map.SetStyleImage(
+                "bad",
+                image,
+                new StyleImageOptions { StretchX = [new ImageStretch(2, 1)] }
+            )
+        );
     }
 }

@@ -181,6 +181,10 @@ type StyleGeoJSONSourceOptions struct {
 	ClusterMinPoints  *uint32
 	LineMetrics       *bool
 	Cluster           *bool
+	// SynchronousUpdate applies data updates synchronously, so data set through
+	// SetGeoJSONSourceData reaches the next rendered frame instead of being tiled on a worker
+	// and shown in a later one.
+	SynchronousUpdate *bool
 }
 
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
@@ -196,7 +200,8 @@ func (options StyleGeoJSONSourceOptions) Equal(other StyleGeoJSONSourceOptions) 
 		equalPointer(options.ClusterRadius, other.ClusterRadius) &&
 		equalPointer(options.ClusterMinPoints, other.ClusterMinPoints) &&
 		equalPointer(options.LineMetrics, other.LineMetrics) &&
-		equalPointer(options.Cluster, other.Cluster)
+		equalPointer(options.Cluster, other.Cluster) &&
+		equalPointer(options.SynchronousUpdate, other.SynchronousUpdate)
 }
 
 // Clone returns an independent deep copy of this descriptor.
@@ -216,6 +221,7 @@ func (options StyleGeoJSONSourceOptions) Clone() StyleGeoJSONSourceOptions {
 	cloned.ClusterMinPoints = clonePointer(options.ClusterMinPoints)
 	cloned.LineMetrics = clonePointer(options.LineMetrics)
 	cloned.Cluster = clonePointer(options.Cluster)
+	cloned.SynchronousUpdate = clonePointer(options.SynchronousUpdate)
 	return cloned
 }
 
@@ -307,6 +313,14 @@ func (options StyleGeoJSONSourceOptions) WithCluster(cluster bool) StyleGeoJSONS
 	return options
 }
 
+// WithSynchronousUpdate returns a copy that sets whether data updates apply synchronously.
+func (options StyleGeoJSONSourceOptions) WithSynchronousUpdate(synchronousUpdate bool) StyleGeoJSONSourceOptions {
+	options = options.Clone()
+	options.SynchronousUpdate = new(bool)
+	*options.SynchronousUpdate = synchronousUpdate
+	return options
+}
+
 // cStyleGeoJSONSourceOptions keeps the native options struct in C storage because the descriptor
 // carries the cluster property tree owned by a Go-side materializer.
 type cStyleGeoJSONSourceOptions struct {
@@ -371,6 +385,10 @@ func newCStyleGeoJSONSourceOptions(options *StyleGeoJSONSourceOptions) (*cStyleG
 	if options.Cluster != nil {
 		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_CLUSTER
 		raw.raw.cluster = C.bool(*options.Cluster)
+	}
+	if options.SynchronousUpdate != nil {
+		raw.raw.fields |= C.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+		raw.raw.synchronous_update = C.bool(*options.SynchronousUpdate)
 	}
 	return raw, nil
 }
@@ -468,30 +486,160 @@ type PremultipliedRGBA8Image struct {
 	ByteLength uint64
 }
 
+// ImageStretch is one stretchable interval along an image axis, in image pixels.
+type ImageStretch struct {
+	From float32
+	To   float32
+}
+
+// ImageContent holds content-box insets in image pixels, from the image's top-left.
+type ImageContent struct {
+	Left   float32
+	Top    float32
+	Right  float32
+	Bottom float32
+}
+
+// StyleImageTextFit reports how a stretchable image fits text along one axis.
+type StyleImageTextFit uint32
+
+// Style image text-fit values.
+const (
+	StyleImageTextFitStretchOrShrink StyleImageTextFit = StyleImageTextFit(C.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK)
+	StyleImageTextFitStretchOnly     StyleImageTextFit = StyleImageTextFit(C.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY)
+	StyleImageTextFitProportional    StyleImageTextFit = StyleImageTextFit(C.MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL)
+)
+
 // StyleImageOptions configures a runtime style image.
 type StyleImageOptions struct {
 	PixelRatio *float32
 	SDF        *bool
+	// StretchX and StretchY are the stretchable intervals along each axis. A present empty
+	// slice stays distinguishable from an absent one.
+	StretchX []ImageStretch
+	StretchY []ImageStretch
+	// Content is the content box used when icon-text-fit applies.
+	Content       *ImageContent
+	TextFitWidth  *StyleImageTextFit
+	TextFitHeight *StyleImageTextFit
 }
 
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
-// compares the optional fields by pointer identity.
+// does not compile for structs holding slices.
 func (options StyleImageOptions) Equal(other StyleImageOptions) bool {
 	return equalPointer(options.PixelRatio, other.PixelRatio) &&
-		equalPointer(options.SDF, other.SDF)
+		equalPointer(options.SDF, other.SDF) &&
+		equalStretches(options.StretchX, other.StretchX) &&
+		equalStretches(options.StretchY, other.StretchY) &&
+		equalPointer(options.Content, other.Content) &&
+		equalPointer(options.TextFitWidth, other.TextFitWidth) &&
+		equalPointer(options.TextFitHeight, other.TextFitHeight)
 }
 
-func cStyleImageOptions(options StyleImageOptions) C.mln_style_image_options {
-	raw := C.mln_style_image_options_default()
+// equalStretches compares stretch slices by content, keeping a present empty slice distinct
+// from an absent one.
+func equalStretches(left, right []ImageStretch) bool {
+	if (left == nil) != (right == nil) || len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+// Clone returns an independent deep copy of this descriptor.
+func (options StyleImageOptions) Clone() StyleImageOptions {
+	cloned := options
+	cloned.PixelRatio = clonePointer(options.PixelRatio)
+	cloned.SDF = clonePointer(options.SDF)
+	if options.StretchX != nil {
+		cloned.StretchX = append([]ImageStretch(nil), options.StretchX...)
+	}
+	if options.StretchY != nil {
+		cloned.StretchY = append([]ImageStretch(nil), options.StretchY...)
+	}
+	cloned.Content = clonePointer(options.Content)
+	cloned.TextFitWidth = clonePointer(options.TextFitWidth)
+	cloned.TextFitHeight = clonePointer(options.TextFitHeight)
+	return cloned
+}
+
+// cStyleImageOptions keeps the stretch arrays in C storage because the native options struct
+// borrows them for the duration of the call.
+type cStyleImageOptionsScope struct {
+	raw      C.mln_style_image_options
+	stretchX unsafe.Pointer
+	stretchY unsafe.Pointer
+}
+
+func newCStyleImageOptions(options StyleImageOptions) cStyleImageOptionsScope {
+	scope := cStyleImageOptionsScope{raw: C.mln_style_image_options_default()}
 	if options.PixelRatio != nil {
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
-		raw.pixel_ratio = C.float(*options.PixelRatio)
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
+		scope.raw.pixel_ratio = C.float(*options.PixelRatio)
 	}
 	if options.SDF != nil {
-		raw.fields |= C.MLN_STYLE_IMAGE_OPTION_SDF
-		raw.sdf = C.bool(*options.SDF)
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_SDF
+		scope.raw.sdf = C.bool(*options.SDF)
 	}
-	return raw
+	if options.StretchX != nil {
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_STRETCH_X
+		scope.stretchX = allocCStretches(options.StretchX)
+		scope.raw.stretch_x = (*C.mln_image_stretch)(scope.stretchX)
+		scope.raw.stretch_x_count = C.size_t(len(options.StretchX))
+	}
+	if options.StretchY != nil {
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+		scope.stretchY = allocCStretches(options.StretchY)
+		scope.raw.stretch_y = (*C.mln_image_stretch)(scope.stretchY)
+		scope.raw.stretch_y_count = C.size_t(len(options.StretchY))
+	}
+	if options.Content != nil {
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_CONTENT
+		scope.raw.content.left = C.float(options.Content.Left)
+		scope.raw.content.top = C.float(options.Content.Top)
+		scope.raw.content.right = C.float(options.Content.Right)
+		scope.raw.content.bottom = C.float(options.Content.Bottom)
+	}
+	if options.TextFitWidth != nil {
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+		scope.raw.text_fit_width = C.uint32_t(*options.TextFitWidth)
+	}
+	if options.TextFitHeight != nil {
+		scope.raw.fields |= C.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+		scope.raw.text_fit_height = C.uint32_t(*options.TextFitHeight)
+	}
+	return scope
+}
+
+func (scope *cStyleImageOptionsScope) free() {
+	if scope.stretchX != nil {
+		C.free(scope.stretchX)
+		scope.stretchX = nil
+	}
+	if scope.stretchY != nil {
+		C.free(scope.stretchY)
+		scope.stretchY = nil
+	}
+}
+
+func allocCStretches(stretches []ImageStretch) unsafe.Pointer {
+	if len(stretches) == 0 {
+		// A present empty array still needs a non-null pointer only when the count is
+		// non-zero, so an empty slice keeps a null pointer with a zero count.
+		return nil
+	}
+	size := C.size_t(len(stretches)) * C.size_t(unsafe.Sizeof(C.mln_image_stretch{}))
+	allocation := C.malloc(size)
+	raw := (*[1 << 20]C.mln_image_stretch)(allocation)
+	for index, stretch := range stretches {
+		raw[index].from = C.float(stretch.From)
+		raw[index].to = C.float(stretch.To)
+	}
+	return allocation
 }
 
 // StyleImageInfo contains copied runtime style image metadata.
@@ -502,6 +650,14 @@ type StyleImageInfo struct {
 	ByteLength uint64
 	PixelRatio float32
 	SDF        bool
+	// StretchXCount and StretchYCount report the interval counts. Read the intervals
+	// themselves with StyleImageStretches.
+	StretchXCount uint64
+	StretchYCount uint64
+	// Content is the content box, absent when the image carries none.
+	Content       *ImageContent
+	TextFitWidth  *StyleImageTextFit
+	TextFitHeight *StyleImageTextFit
 }
 
 type cPremultipliedRGBA8Image struct {
@@ -528,14 +684,87 @@ func (image cPremultipliedRGBA8Image) free() {
 }
 
 func styleImageInfoFromC(info C.mln_style_image_info) StyleImageInfo {
-	return StyleImageInfo{
-		Width:      uint32(info.width),
-		Height:     uint32(info.height),
-		Stride:     uint32(info.stride),
-		ByteLength: uint64(info.byte_length),
-		PixelRatio: float32(info.pixel_ratio),
-		SDF:        bool(info.sdf),
+	result := StyleImageInfo{
+		Width:         uint32(info.width),
+		Height:        uint32(info.height),
+		Stride:        uint32(info.stride),
+		ByteLength:    uint64(info.byte_length),
+		PixelRatio:    float32(info.pixel_ratio),
+		SDF:           bool(info.sdf),
+		StretchXCount: uint64(info.stretch_x_count),
+		StretchYCount: uint64(info.stretch_y_count),
 	}
+	if bool(info.has_content) {
+		result.Content = &ImageContent{
+			Left:   float32(info.content.left),
+			Top:    float32(info.content.top),
+			Right:  float32(info.content.right),
+			Bottom: float32(info.content.bottom),
+		}
+	}
+	if bool(info.has_text_fit_width) {
+		fit := StyleImageTextFit(info.text_fit_width)
+		result.TextFitWidth = &fit
+	}
+	if bool(info.has_text_fit_height) {
+		fit := StyleImageTextFit(info.text_fit_height)
+		result.TextFitHeight = &fit
+	}
+	return result
+}
+
+// StyleImageStretches returns one runtime style image's stretchable intervals, and whether the
+// image exists. It probes the required counts, then copies.
+func (m *MapHandle) StyleImageStretches(imageID string) (stretchX, stretchY []ImageStretch, found bool, err error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return nil, nil, false, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	imageView := newCStringView(imageID)
+	defer imageView.free()
+
+	var xCount, yCount C.size_t
+	var rawFound C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_copy_style_image_stretches(
+			C.mln_map(ptr), imageView.raw(), nil, 0, &xCount, nil, 0, &yCount, &rawFound,
+		))
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	if !bool(rawFound) {
+		return nil, nil, false, nil
+	}
+
+	rawX := make([]C.mln_image_stretch, int(xCount))
+	rawY := make([]C.mln_image_stretch, int(yCount))
+	var xPointer, yPointer *C.mln_image_stretch
+	if len(rawX) > 0 {
+		xPointer = &rawX[0]
+	}
+	if len(rawY) > 0 {
+		yPointer = &rawY[0]
+	}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_copy_style_image_stretches(
+			C.mln_map(ptr), imageView.raw(),
+			xPointer, C.size_t(len(rawX)), &xCount,
+			yPointer, C.size_t(len(rawY)), &yCount, &rawFound,
+		))
+	}); err != nil {
+		return nil, nil, false, err
+	}
+	return stretchesFromC(rawX), stretchesFromC(rawY), true, nil
+}
+
+func stretchesFromC(raw []C.mln_image_stretch) []ImageStretch {
+	stretches := make([]ImageStretch, len(raw))
+	for index, stretch := range raw {
+		stretches[index] = ImageStretch{From: float32(stretch.from), To: float32(stretch.to)}
+	}
+	return stretches
 }
 
 // LocationIndicatorImageKind identifies an image-name slot on a location indicator layer.
@@ -753,9 +982,10 @@ func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image,
 	defer imageView.free()
 	rawImage := newCPremultipliedRGBA8Image(image)
 	defer rawImage.free()
-	rawOptions := cStyleImageOptions(options)
+	rawOptions := newCStyleImageOptions(options)
+	defer rawOptions.free()
 	return checkNative(func() int32 {
-		return int32(C.mln_map_set_style_image(C.mln_map(ptr), imageView.raw(), &rawImage.raw, &rawOptions))
+		return int32(C.mln_map_set_style_image(C.mln_map(ptr), imageView.raw(), &rawImage.raw, &rawOptions.raw))
 	})
 }
 
@@ -1658,6 +1888,193 @@ func (m *MapHandle) LayerProperty(layerID string, propertyName string) (JSONValu
 		return JSONValue{}, err
 	}
 	return cJSONSnapshotValue(snapshot)
+}
+
+// StyleLayerVisibility reports whether a style layer draws.
+type StyleLayerVisibility uint32
+
+// Style layer visibility values.
+const (
+	StyleLayerVisibilityVisible StyleLayerVisibility = StyleLayerVisibility(C.MLN_STYLE_LAYER_VISIBILITY_VISIBLE)
+	StyleLayerVisibilityNone    StyleLayerVisibility = StyleLayerVisibility(C.MLN_STYLE_LAYER_VISIBILITY_NONE)
+)
+
+// SetLayerSourceLayer sets one layer's source-layer ID. Layer types that take no
+// source, such as background, are rejected.
+func (m *MapHandle) SetLayerSourceLayer(layerID string, sourceLayer string) error {
+	return m.setLayerText(layerID, sourceLayer, func(rawMap C.mln_map, layer, text C.mln_string_view) int32 {
+		return int32(C.mln_map_set_layer_source_layer(rawMap, layer, text))
+	})
+}
+
+// LayerSourceLayer returns one layer's source-layer ID, empty when the layer
+// carries none.
+func (m *MapHandle) LayerSourceLayer(layerID string) (string, error) {
+	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_string_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+		return int32(C.mln_map_copy_layer_source_layer(rawMap, layer, text, capacity, size))
+	})
+}
+
+// SetLayerSourceID sets one layer's source ID. Layer types that take no source,
+// such as background, are rejected. The named source need not exist yet.
+func (m *MapHandle) SetLayerSourceID(layerID string, sourceID string) error {
+	return m.setLayerText(layerID, sourceID, func(rawMap C.mln_map, layer, text C.mln_string_view) int32 {
+		return int32(C.mln_map_set_layer_source_id(rawMap, layer, text))
+	})
+}
+
+// LayerSourceID returns one layer's source ID, empty when the layer carries
+// none.
+func (m *MapHandle) LayerSourceID(layerID string) (string, error) {
+	return m.copyLayerText(layerID, func(rawMap C.mln_map, layer C.mln_string_view, text *C.char, capacity C.size_t, size *C.size_t) int32 {
+		return int32(C.mln_map_copy_layer_source_id(rawMap, layer, text, capacity, size))
+	})
+}
+
+// SetLayerMinZoom sets the lowest zoom at which one layer draws. Pass
+// math.Inf(-1) for no lower bound.
+func (m *MapHandle) SetLayerMinZoom(layerID string, minZoom float64) error {
+	return m.setLayerZoom(layerID, minZoom, func(rawMap C.mln_map, layer C.mln_string_view, zoom C.double) int32 {
+		return int32(C.mln_map_set_layer_min_zoom(rawMap, layer, zoom))
+	})
+}
+
+// LayerMinZoom returns the lowest zoom at which one layer draws. A layer with no
+// lower bound reports math.Inf(-1).
+func (m *MapHandle) LayerMinZoom(layerID string) (float64, error) {
+	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_string_view, out *C.double) int32 {
+		return int32(C.mln_map_get_layer_min_zoom(rawMap, layer, out))
+	})
+}
+
+// SetLayerMaxZoom sets the highest zoom at which one layer draws. Pass
+// math.Inf(1) for no upper bound.
+func (m *MapHandle) SetLayerMaxZoom(layerID string, maxZoom float64) error {
+	return m.setLayerZoom(layerID, maxZoom, func(rawMap C.mln_map, layer C.mln_string_view, zoom C.double) int32 {
+		return int32(C.mln_map_set_layer_max_zoom(rawMap, layer, zoom))
+	})
+}
+
+// LayerMaxZoom returns the highest zoom at which one layer draws. A layer with
+// no upper bound reports math.Inf(1).
+func (m *MapHandle) LayerMaxZoom(layerID string) (float64, error) {
+	return m.layerZoom(layerID, func(rawMap C.mln_map, layer C.mln_string_view, out *C.double) int32 {
+		return int32(C.mln_map_get_layer_max_zoom(rawMap, layer, out))
+	})
+}
+
+// SetLayerVisibility sets whether one layer draws.
+func (m *MapHandle) SetLayerVisibility(layerID string, visibility StyleLayerVisibility) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_layer_visibility(C.mln_map(ptr), layerView.raw(), C.uint32_t(visibility)))
+	})
+}
+
+// LayerVisibility returns whether one layer draws.
+func (m *MapHandle) LayerVisibility(layerID string) (StyleLayerVisibility, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return StyleLayerVisibilityVisible, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	var visibility C.uint32_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_layer_visibility(C.mln_map(ptr), layerView.raw(), &visibility))
+	}); err != nil {
+		return StyleLayerVisibilityVisible, err
+	}
+	return StyleLayerVisibility(visibility), nil
+}
+
+func (m *MapHandle) setLayerText(layerID string, text string, set func(C.mln_map, C.mln_string_view, C.mln_string_view) int32) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	textView := newCStringView(text)
+	defer textView.free()
+	return checkNative(func() int32 {
+		return set(C.mln_map(ptr), layerView.raw(), textView.raw())
+	})
+}
+
+// copyLayerText probes the required length, then copies. A null buffer with zero
+// capacity is a size probe the C API answers with OK.
+func (m *MapHandle) copyLayerText(layerID string, copy func(C.mln_map, C.mln_string_view, *C.char, C.size_t, *C.size_t) int32) (string, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return "", err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+
+	var required C.size_t
+	if err := checkNative(func() int32 {
+		return copy(C.mln_map(ptr), layerView.raw(), nil, 0, &required)
+	}); err != nil {
+		return "", err
+	}
+	if required == 0 {
+		return "", nil
+	}
+
+	buffer := make([]byte, int(required))
+	var size C.size_t
+	if err := checkNative(func() int32 {
+		return copy(C.mln_map(ptr), layerView.raw(), (*C.char)(unsafe.Pointer(&buffer[0])), C.size_t(len(buffer)), &size)
+	}); err != nil {
+		return "", err
+	}
+	return string(buffer[:int(size)]), nil
+}
+
+func (m *MapHandle) setLayerZoom(layerID string, zoom float64, set func(C.mln_map, C.mln_string_view, C.double) int32) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	return checkNative(func() int32 {
+		return set(C.mln_map(ptr), layerView.raw(), C.double(zoom))
+	})
+}
+
+func (m *MapHandle) layerZoom(layerID string, get func(C.mln_map, C.mln_string_view, *C.double) int32) (float64, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	layerView := newCStringView(layerID)
+	defer layerView.free()
+	var zoom C.double
+	if err := checkNative(func() int32 {
+		return get(C.mln_map(ptr), layerView.raw(), &zoom)
+	}); err != nil {
+		return 0, err
+	}
+	return float64(zoom), nil
 }
 
 // SetLayerFilter sets or clears one style layer filter. Passing nil clears the

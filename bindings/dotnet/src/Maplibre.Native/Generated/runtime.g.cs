@@ -10,12 +10,6 @@ namespace Maplibre.Native.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
-    internal enum mln_runtime_option_flag : uint
-    {
-        MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE = 1U << 0,
-    }
-
-    [NativeTypeName("uint32_t")]
     internal enum mln_ambient_cache_operation : uint
     {
         MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
@@ -52,6 +46,7 @@ namespace Maplibre.Native.Internal.C
         MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
         MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
         MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
+        MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
     }
 
     [NativeTypeName("uint32_t")]
@@ -257,9 +252,6 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("const char *")]
         public sbyte* cache_path;
-
-        [NativeTypeName("uint64_t")]
-        public ulong maximum_cache_size;
     }
 
     internal partial struct mln_rendering_stats
@@ -627,6 +619,9 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_run_ambient_cache_operation_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint32_t")] uint operation, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_runtime_set_maximum_ambient_cache_size_start([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("uint64_t")] ulong size, [NativeTypeName("mln_offline_operation_id *")] ulong* out_operation_id);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_runtime_offline_operation_discard([NativeTypeName("mln_runtime")] MlnRuntime runtime, [NativeTypeName("mln_offline_operation_id")] ulong operation_id);

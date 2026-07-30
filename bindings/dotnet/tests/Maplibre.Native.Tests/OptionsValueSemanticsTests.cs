@@ -232,16 +232,9 @@ public sealed class OptionsValueSemanticsTests
     public void RuntimeOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
-            () =>
-                new RuntimeOptions
-                {
-                    AssetPath = "assets",
-                    CachePath = "cache",
-                    MaximumCacheSize = 1024,
-                },
+            () => new RuntimeOptions { AssetPath = "assets", CachePath = "cache" },
             options => options.AssetPath = "other-assets",
-            options => options.CachePath = "other-cache",
-            options => options.MaximumCacheSize = 2048
+            options => options.CachePath = "other-cache"
         );
     }
 
@@ -291,6 +284,7 @@ public sealed class OptionsValueSemanticsTests
                     ClusterRadius = 60,
                     ClusterMaximumZoom = 15,
                     ClusterMinimumPoints = 3,
+                    SynchronousUpdate = true,
                     ClusterProperties = new JsonValue.Object([
                         new JsonMember("sum", new JsonValue.Int(1)),
                     ]),
@@ -305,6 +299,7 @@ public sealed class OptionsValueSemanticsTests
             options => options.ClusterRadius = 50,
             options => options.ClusterMaximumZoom = 17,
             options => options.ClusterMinimumPoints = 2,
+            options => options.SynchronousUpdate = false,
             options =>
                 options.ClusterProperties = new JsonValue.Object([
                     new JsonMember("sum", new JsonValue.Int(2)),

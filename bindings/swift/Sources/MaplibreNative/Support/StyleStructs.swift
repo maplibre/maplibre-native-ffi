@@ -111,6 +111,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
   var clusterMinPoints: UInt32?
   var lineMetrics: Bool?
   var cluster: Bool?
+  var synchronousUpdate: Bool?
 
   init(
     minZoom: Double? = nil,
@@ -123,7 +124,8 @@ struct NativeGeoJSONSourceOptions: Equatable {
     clusterRadius: UInt32? = nil,
     clusterMinPoints: UInt32? = nil,
     lineMetrics: Bool? = nil,
-    cluster: Bool? = nil
+    cluster: Bool? = nil,
+    synchronousUpdate: Bool? = nil
   ) {
     self.minZoom = minZoom
     self.maxZoom = maxZoom
@@ -136,6 +138,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     self.clusterMinPoints = clusterMinPoints
     self.lineMetrics = lineMetrics
     self.cluster = cluster
+    self.synchronousUpdate = synchronousUpdate
   }
 
   func withNativeOptions<Result>(
@@ -144,7 +147,7 @@ struct NativeGeoJSONSourceOptions: Equatable {
     if minZoom == nil, maxZoom == nil, tolerance == nil, clusterMaxZoom == nil,
        clusterProperties == nil, tileSize == nil, buffer == nil,
        clusterRadius == nil, clusterMinPoints == nil, lineMetrics == nil,
-       cluster == nil
+       cluster == nil, synchronousUpdate == nil
     {
       return try body(nil)
     }
@@ -193,6 +196,10 @@ struct NativeGeoJSONSourceOptions: Equatable {
     if let cluster {
       options.fields |= MLN_GEOJSON_SOURCE_OPTION_CLUSTER.rawValue
       options.cluster = cluster
+    }
+    if let synchronousUpdate {
+      options.fields |= MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE.rawValue
+      options.synchronous_update = synchronousUpdate
     }
     return try withUnsafePointer(to: &options) { options in
       try withExtendedLifetime(arena) { try body(options) }
@@ -246,25 +253,82 @@ struct NativePremultipliedRGBA8Image: Equatable {
 struct NativeStyleImageOptions: Equatable {
   let pixelRatio: Float?
   let sdf: Bool?
+  let stretchX: [ImageStretch]?
+  let stretchY: [ImageStretch]?
+  let content: ImageContent?
+  let textFitWidth: StyleImageTextFit?
+  let textFitHeight: StyleImageTextFit?
 
-  init(pixelRatio: Float? = nil, sdf: Bool? = nil) {
+  init(
+    pixelRatio: Float? = nil,
+    sdf: Bool? = nil,
+    stretchX: [ImageStretch]? = nil,
+    stretchY: [ImageStretch]? = nil,
+    content: ImageContent? = nil,
+    textFitWidth: StyleImageTextFit? = nil,
+    textFitHeight: StyleImageTextFit? = nil
+  ) {
     self.pixelRatio = pixelRatio
     self.sdf = sdf
+    self.stretchX = stretchX
+    self.stretchY = stretchY
+    self.content = content
+    self.textFitWidth = textFitWidth
+    self.textFitHeight = textFitHeight
   }
 
+  /// Materializes the options with the stretch arrays kept alive for the call,
+  /// which native borrows rather than copies until it returns.
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_style_image_options>) throws -> Result
   ) throws -> Result {
-    var options = mln_style_image_options_default()
-    if let pixelRatio {
-      options.fields |= MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue
-      options.pixel_ratio = pixelRatio
+    var nativeStretchX = (stretchX ?? []).map {
+      mln_image_stretch(from: $0.from, to: $0.to)
     }
-    if let sdf {
-      options.fields |= MLN_STYLE_IMAGE_OPTION_SDF.rawValue
-      options.sdf = sdf
+    var nativeStretchY = (stretchY ?? []).map {
+      mln_image_stretch(from: $0.from, to: $0.to)
     }
-    return try withUnsafePointer(to: &options, body)
+    return try nativeStretchX.withUnsafeMutableBufferPointer { bufferX in
+      try nativeStretchY.withUnsafeMutableBufferPointer { bufferY in
+        var options = mln_style_image_options_default()
+        if let pixelRatio {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue
+          options.pixel_ratio = pixelRatio
+        }
+        if let sdf {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_SDF.rawValue
+          options.sdf = sdf
+        }
+        if let stretchX {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_X.rawValue
+          options.stretch_x = UnsafePointer(bufferX.baseAddress)
+          options.stretch_x_count = stretchX.count
+        }
+        if let stretchY {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_STRETCH_Y.rawValue
+          options.stretch_y = UnsafePointer(bufferY.baseAddress)
+          options.stretch_y_count = stretchY.count
+        }
+        if let content {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_CONTENT.rawValue
+          options.content = mln_image_content(
+            left: content.left,
+            top: content.top,
+            right: content.right,
+            bottom: content.bottom
+          )
+        }
+        if let textFitWidth {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH.rawValue
+          options.text_fit_width = textFitWidth.rawValue
+        }
+        if let textFitHeight {
+          options.fields |= MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT.rawValue
+          options.text_fit_height = textFitHeight.rawValue
+        }
+        return try withUnsafePointer(to: &options, body)
+      }
+    }
   }
 }
 
@@ -453,6 +517,11 @@ struct NativeStyleImageInfo: Equatable {
   let byteLength: Int
   let pixelRatio: Float
   let sdf: Bool
+  let stretchXCount: Int
+  let stretchYCount: Int
+  let content: ImageContent?
+  let textFitWidth: StyleImageTextFit?
+  let textFitHeight: StyleImageTextFit?
 
   init(_ raw: mln_style_image_info) {
     width = raw.width
@@ -461,6 +530,22 @@ struct NativeStyleImageInfo: Equatable {
     byteLength = raw.byte_length
     pixelRatio = raw.pixel_ratio
     sdf = raw.sdf
+    stretchXCount = raw.stretch_x_count
+    stretchYCount = raw.stretch_y_count
+    content = raw.has_content
+      ? ImageContent(
+        left: raw.content.left,
+        top: raw.content.top,
+        right: raw.content.right,
+        bottom: raw.content.bottom
+      )
+      : nil
+    textFitWidth = raw.has_text_fit_width
+      ? StyleImageTextFit(rawValue: raw.text_fit_width)
+      : nil
+    textFitHeight = raw.has_text_fit_height
+      ? StyleImageTextFit(rawValue: raw.text_fit_height)
+      : nil
   }
 }
 

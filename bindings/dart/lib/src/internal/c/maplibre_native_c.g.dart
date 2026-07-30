@@ -312,6 +312,36 @@ class MaplibreNativeC {
             int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
           >();
 
+  mln_status mln_runtime_set_maximum_ambient_cache_size_start(
+    Dartmln_runtime runtime,
+    int size,
+    ffi.Pointer<mln_offline_operation_id> out_operation_id,
+  ) {
+    return mln_status.fromValue(
+      _mln_runtime_set_maximum_ambient_cache_size_start(
+        runtime,
+        size,
+        out_operation_id,
+      ),
+    );
+  }
+
+  late final _mln_runtime_set_maximum_ambient_cache_size_startPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_runtime,
+            ffi.Uint64,
+            ffi.Pointer<mln_offline_operation_id>,
+          )
+        >
+      >('mln_runtime_set_maximum_ambient_cache_size_start');
+  late final _mln_runtime_set_maximum_ambient_cache_size_start =
+      _mln_runtime_set_maximum_ambient_cache_size_startPtr
+          .asFunction<
+            int Function(int, int, ffi.Pointer<mln_offline_operation_id>)
+          >();
+
   mln_status mln_runtime_offline_operation_discard(
     Dartmln_runtime runtime,
     Dartmln_offline_operation_id operation_id,
@@ -3786,6 +3816,64 @@ class MaplibreNativeC {
             )
           >();
 
+  mln_status mln_map_copy_style_image_stretches(
+    Dartmln_map map,
+    mln_string_view image_id,
+    ffi.Pointer<mln_image_stretch> out_stretch_x,
+    int stretch_x_capacity,
+    ffi.Pointer<ffi.Size> out_stretch_x_count,
+    ffi.Pointer<mln_image_stretch> out_stretch_y,
+    int stretch_y_capacity,
+    ffi.Pointer<ffi.Size> out_stretch_y_count,
+    ffi.Pointer<ffi.Bool> out_found,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_copy_style_image_stretches(
+        map,
+        image_id,
+        out_stretch_x,
+        stretch_x_capacity,
+        out_stretch_x_count,
+        out_stretch_y,
+        stretch_y_capacity,
+        out_stretch_y_count,
+        out_found,
+      ),
+    );
+  }
+
+  late final _mln_map_copy_style_image_stretchesPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_map,
+            mln_string_view,
+            ffi.Pointer<mln_image_stretch>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+            ffi.Pointer<mln_image_stretch>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+            ffi.Pointer<ffi.Bool>,
+          )
+        >
+      >('mln_map_copy_style_image_stretches');
+  late final _mln_map_copy_style_image_stretches =
+      _mln_map_copy_style_image_stretchesPtr
+          .asFunction<
+            int Function(
+              int,
+              mln_string_view,
+              ffi.Pointer<mln_image_stretch>,
+              int,
+              ffi.Pointer<ffi.Size>,
+              ffi.Pointer<mln_image_stretch>,
+              int,
+              ffi.Pointer<ffi.Size>,
+              ffi.Pointer<ffi.Bool>,
+            )
+          >();
+
   mln_status mln_map_add_image_source_url(
     Dartmln_map map,
     mln_string_view source_id,
@@ -4522,6 +4610,248 @@ class MaplibreNativeC {
   late final _mln_map_get_layer_filter = _mln_map_get_layer_filterPtr
       .asFunction<
         int Function(int, mln_string_view, ffi.Pointer<mln_json_snapshot>)
+      >();
+
+  mln_status mln_map_set_layer_source_layer(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    mln_string_view source_layer,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_layer_source_layer(map, layer_id, source_layer),
+    );
+  }
+
+  late final _mln_map_set_layer_source_layerPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
+        >
+      >('mln_map_set_layer_source_layer');
+  late final _mln_map_set_layer_source_layer =
+      _mln_map_set_layer_source_layerPtr
+          .asFunction<int Function(int, mln_string_view, mln_string_view)>();
+
+  mln_status mln_map_copy_layer_source_layer(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    ffi.Pointer<ffi.Char> out_source_layer,
+    int source_layer_capacity,
+    ffi.Pointer<ffi.Size> out_source_layer_size,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_copy_layer_source_layer(
+        map,
+        layer_id,
+        out_source_layer,
+        source_layer_capacity,
+        out_source_layer_size,
+      ),
+    );
+  }
+
+  late final _mln_map_copy_layer_source_layerPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_map,
+            mln_string_view,
+            ffi.Pointer<ffi.Char>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+          )
+        >
+      >('mln_map_copy_layer_source_layer');
+  late final _mln_map_copy_layer_source_layer =
+      _mln_map_copy_layer_source_layerPtr
+          .asFunction<
+            int Function(
+              int,
+              mln_string_view,
+              ffi.Pointer<ffi.Char>,
+              int,
+              ffi.Pointer<ffi.Size>,
+            )
+          >();
+
+  mln_status mln_map_set_layer_source_id(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    mln_string_view source_id,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_layer_source_id(map, layer_id, source_id),
+    );
+  }
+
+  late final _mln_map_set_layer_source_idPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, mln_string_view)
+        >
+      >('mln_map_set_layer_source_id');
+  late final _mln_map_set_layer_source_id = _mln_map_set_layer_source_idPtr
+      .asFunction<int Function(int, mln_string_view, mln_string_view)>();
+
+  mln_status mln_map_copy_layer_source_id(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    ffi.Pointer<ffi.Char> out_source_id,
+    int source_id_capacity,
+    ffi.Pointer<ffi.Size> out_source_id_size,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_copy_layer_source_id(
+        map,
+        layer_id,
+        out_source_id,
+        source_id_capacity,
+        out_source_id_size,
+      ),
+    );
+  }
+
+  late final _mln_map_copy_layer_source_idPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_map,
+            mln_string_view,
+            ffi.Pointer<ffi.Char>,
+            ffi.Size,
+            ffi.Pointer<ffi.Size>,
+          )
+        >
+      >('mln_map_copy_layer_source_id');
+  late final _mln_map_copy_layer_source_id = _mln_map_copy_layer_source_idPtr
+      .asFunction<
+        int Function(
+          int,
+          mln_string_view,
+          ffi.Pointer<ffi.Char>,
+          int,
+          ffi.Pointer<ffi.Size>,
+        )
+      >();
+
+  mln_status mln_map_set_layer_min_zoom(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    double min_zoom,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_layer_min_zoom(map, layer_id, min_zoom),
+    );
+  }
+
+  late final _mln_map_set_layer_min_zoomPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)
+        >
+      >('mln_map_set_layer_min_zoom');
+  late final _mln_map_set_layer_min_zoom = _mln_map_set_layer_min_zoomPtr
+      .asFunction<int Function(int, mln_string_view, double)>();
+
+  mln_status mln_map_get_layer_min_zoom(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    ffi.Pointer<ffi.Double> out_min_zoom,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_get_layer_min_zoom(map, layer_id, out_min_zoom),
+    );
+  }
+
+  late final _mln_map_get_layer_min_zoomPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Double>)
+        >
+      >('mln_map_get_layer_min_zoom');
+  late final _mln_map_get_layer_min_zoom = _mln_map_get_layer_min_zoomPtr
+      .asFunction<
+        int Function(int, mln_string_view, ffi.Pointer<ffi.Double>)
+      >();
+
+  mln_status mln_map_set_layer_max_zoom(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    double max_zoom,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_layer_max_zoom(map, layer_id, max_zoom),
+    );
+  }
+
+  late final _mln_map_set_layer_max_zoomPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Double)
+        >
+      >('mln_map_set_layer_max_zoom');
+  late final _mln_map_set_layer_max_zoom = _mln_map_set_layer_max_zoomPtr
+      .asFunction<int Function(int, mln_string_view, double)>();
+
+  mln_status mln_map_get_layer_max_zoom(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    ffi.Pointer<ffi.Double> out_max_zoom,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_get_layer_max_zoom(map, layer_id, out_max_zoom),
+    );
+  }
+
+  late final _mln_map_get_layer_max_zoomPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Double>)
+        >
+      >('mln_map_get_layer_max_zoom');
+  late final _mln_map_get_layer_max_zoom = _mln_map_get_layer_max_zoomPtr
+      .asFunction<
+        int Function(int, mln_string_view, ffi.Pointer<ffi.Double>)
+      >();
+
+  mln_status mln_map_set_layer_visibility(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    int visibility,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_layer_visibility(map, layer_id, visibility),
+    );
+  }
+
+  late final _mln_map_set_layer_visibilityPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Uint32)
+        >
+      >('mln_map_set_layer_visibility');
+  late final _mln_map_set_layer_visibility = _mln_map_set_layer_visibilityPtr
+      .asFunction<int Function(int, mln_string_view, int)>();
+
+  mln_status mln_map_get_layer_visibility(
+    Dartmln_map map,
+    mln_string_view layer_id,
+    ffi.Pointer<ffi.Uint32> out_visibility,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_get_layer_visibility(map, layer_id, out_visibility),
+    );
+  }
+
+  late final _mln_map_get_layer_visibilityPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, mln_string_view, ffi.Pointer<ffi.Uint32>)
+        >
+      >('mln_map_get_layer_visibility');
+  late final _mln_map_get_layer_visibility = _mln_map_get_layer_visibilityPtr
+      .asFunction<
+        int Function(int, mln_string_view, ffi.Pointer<ffi.Uint32>)
       >();
 
   mln_metal_surface_descriptor mln_metal_surface_descriptor_default() {
@@ -5442,20 +5772,6 @@ enum mln_network_status {
   };
 }
 
-enum mln_runtime_option_flag {
-  MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE(1);
-
-  final int value;
-  const mln_runtime_option_flag(this.value);
-
-  static mln_runtime_option_flag fromValue(int value) => switch (value) {
-    1 => MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE,
-    _ => throw ArgumentError(
-      'Unknown value for mln_runtime_option_flag: $value',
-    ),
-  };
-}
-
 enum mln_ambient_cache_operation {
   MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE(1),
   MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE(2),
@@ -5527,7 +5843,8 @@ enum mln_offline_operation_kind {
   MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED(8),
   MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE(9),
   MLN_OFFLINE_OPERATION_REGION_INVALIDATE(10),
-  MLN_OFFLINE_OPERATION_REGION_DELETE(11);
+  MLN_OFFLINE_OPERATION_REGION_DELETE(11),
+  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE(12);
 
   final int value;
   const mln_offline_operation_kind(this.value);
@@ -5544,6 +5861,7 @@ enum mln_offline_operation_kind {
     9 => MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
     10 => MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
     11 => MLN_OFFLINE_OPERATION_REGION_DELETE,
+    12 => MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
     _ => throw ArgumentError(
       'Unknown value for mln_offline_operation_kind: $value',
     ),
@@ -5927,9 +6245,6 @@ final class mln_runtime_options extends ffi.Struct {
   external ffi.Pointer<ffi.Char> asset_path;
 
   external ffi.Pointer<ffi.Char> cache_path;
-
-  @ffi.Uint64()
-  external int maximum_cache_size;
 }
 
 final class mln_rendering_stats extends ffi.Struct {
@@ -7684,6 +7999,62 @@ enum mln_style_raster_dem_encoding {
   };
 }
 
+final class mln_image_stretch extends ffi.Struct {
+  @ffi.Float()
+  external double from;
+
+  @ffi.Float()
+  external double to;
+}
+
+final class mln_image_content extends ffi.Struct {
+  @ffi.Float()
+  external double left;
+
+  @ffi.Float()
+  external double top;
+
+  @ffi.Float()
+  external double right;
+
+  @ffi.Float()
+  external double bottom;
+}
+
+enum mln_style_image_text_fit {
+  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK(0),
+  MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY(1),
+  MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL(2);
+
+  final int value;
+  const mln_style_image_text_fit(this.value);
+
+  static mln_style_image_text_fit fromValue(int value) => switch (value) {
+    0 => MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+    1 => MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY,
+    2 => MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
+    _ => throw ArgumentError(
+      'Unknown value for mln_style_image_text_fit: $value',
+    ),
+  };
+}
+
+enum mln_style_layer_visibility {
+  MLN_STYLE_LAYER_VISIBILITY_VISIBLE(0),
+  MLN_STYLE_LAYER_VISIBILITY_NONE(1);
+
+  final int value;
+  const mln_style_layer_visibility(this.value);
+
+  static mln_style_layer_visibility fromValue(int value) => switch (value) {
+    0 => MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
+    1 => MLN_STYLE_LAYER_VISIBILITY_NONE,
+    _ => throw ArgumentError(
+      'Unknown value for mln_style_layer_visibility: $value',
+    ),
+  };
+}
+
 enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM(1),
   MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM(2),
@@ -7695,7 +8066,8 @@ enum mln_geojson_source_option_field {
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIUS(128),
   MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS(256),
   MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS(512),
-  MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024);
+  MLN_GEOJSON_SOURCE_OPTION_CLUSTER(1024),
+  MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE(2048);
 
   final int value;
   const mln_geojson_source_option_field(this.value);
@@ -7713,6 +8085,7 @@ enum mln_geojson_source_option_field {
         256 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS,
         512 => MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS,
         1024 => MLN_GEOJSON_SOURCE_OPTION_CLUSTER,
+        2048 => MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE,
         _ => throw ArgumentError(
           'Unknown value for mln_geojson_source_option_field: $value',
         ),
@@ -7748,7 +8121,12 @@ enum mln_custom_geometry_source_option_field {
 
 enum mln_style_image_option_field {
   MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO(1),
-  MLN_STYLE_IMAGE_OPTION_SDF(2);
+  MLN_STYLE_IMAGE_OPTION_SDF(2),
+  MLN_STYLE_IMAGE_OPTION_STRETCH_X(4),
+  MLN_STYLE_IMAGE_OPTION_STRETCH_Y(8),
+  MLN_STYLE_IMAGE_OPTION_CONTENT(16),
+  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH(32),
+  MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT(64);
 
   final int value;
   const mln_style_image_option_field(this.value);
@@ -7756,6 +8134,11 @@ enum mln_style_image_option_field {
   static mln_style_image_option_field fromValue(int value) => switch (value) {
     1 => MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO,
     2 => MLN_STYLE_IMAGE_OPTION_SDF,
+    4 => MLN_STYLE_IMAGE_OPTION_STRETCH_X,
+    8 => MLN_STYLE_IMAGE_OPTION_STRETCH_Y,
+    16 => MLN_STYLE_IMAGE_OPTION_CONTENT,
+    32 => MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH,
+    64 => MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT,
     _ => throw ArgumentError(
       'Unknown value for mln_style_image_option_field: $value',
     ),
@@ -7869,6 +8252,9 @@ final class mln_geojson_source_options extends ffi.Struct {
 
   @ffi.Bool()
   external bool cluster;
+
+  @ffi.Bool()
+  external bool synchronous_update;
 }
 
 final class mln_canonical_tile_id extends ffi.Struct {
@@ -7958,6 +8344,24 @@ final class mln_style_image_options extends ffi.Struct {
   @ffi.Uint32()
   external int fields;
 
+  external ffi.Pointer<mln_image_stretch> stretch_x;
+
+  @ffi.Size()
+  external int stretch_x_count;
+
+  external ffi.Pointer<mln_image_stretch> stretch_y;
+
+  @ffi.Size()
+  external int stretch_y_count;
+
+  external mln_image_content content;
+
+  @ffi.Uint32()
+  external int text_fit_width;
+
+  @ffi.Uint32()
+  external int text_fit_height;
+
   @ffi.Float()
   external double pixel_ratio;
 
@@ -7981,11 +8385,34 @@ final class mln_style_image_info extends ffi.Struct {
   @ffi.Size()
   external int byte_length;
 
+  @ffi.Size()
+  external int stretch_x_count;
+
+  @ffi.Size()
+  external int stretch_y_count;
+
+  external mln_image_content content;
+
+  @ffi.Uint32()
+  external int text_fit_width;
+
+  @ffi.Uint32()
+  external int text_fit_height;
+
   @ffi.Float()
   external double pixel_ratio;
 
   @ffi.Bool()
   external bool sdf;
+
+  @ffi.Bool()
+  external bool has_content;
+
+  @ffi.Bool()
+  external bool has_text_fit_width;
+
+  @ffi.Bool()
+  external bool has_text_fit_height;
 }
 
 final class mln_metal_surface_descriptor extends ffi.Struct {

@@ -88,6 +88,98 @@ func TestDedicatedStyleLayerHelpers(t *testing.T) {
 	}
 }
 
+const layerAccessorStyleJSON = `{"version":8,"sources":{"geo":{"type":"geojson",` +
+	`"data":{"type":"FeatureCollection","features":[]}}},"layers":[` +
+	`{"id":"bg","type":"background"},{"id":"fill","type":"fill","source":"geo"}]}`
+
+func TestLayerBaseAccessorsRoundTrip(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(layerAccessorStyleJSON); err != nil {
+		t.Fatalf("SetStyleJSON(): %v", err)
+	}
+
+	if got, err := m.LayerSourceLayer("fill"); err != nil || got != "" {
+		t.Fatalf("LayerSourceLayer(fill) = %q, %v; want \"\", nil", got, err)
+	}
+	if err := m.SetLayerSourceLayer("fill", "roads"); err != nil {
+		t.Fatalf("SetLayerSourceLayer(): %v", err)
+	}
+	if got, err := m.LayerSourceLayer("fill"); err != nil || got != "roads" {
+		t.Fatalf("LayerSourceLayer(fill) = %q, %v; want \"roads\", nil", got, err)
+	}
+	if got, err := m.LayerSourceID("fill"); err != nil || got != "geo" {
+		t.Fatalf("LayerSourceID(fill) = %q, %v; want \"geo\", nil", got, err)
+	}
+
+	// A layer type that takes no source is rejected rather than silently ignored.
+	err = m.SetLayerSourceLayer("bg", "roads")
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetLayerSourceLayer(bg) error = %v; want ErrInvalidArgument", err)
+	}
+	if got, err := m.LayerSourceID("bg"); err != nil || got != "" {
+		t.Fatalf("LayerSourceID(bg) = %q, %v; want \"\", nil", got, err)
+	}
+
+	// An unset zoom range crosses the boundary as infinities.
+	if got, err := m.LayerMinZoom("fill"); err != nil || !math.IsInf(got, -1) {
+		t.Fatalf("LayerMinZoom(fill) = %v, %v; want -Inf, nil", got, err)
+	}
+	if got, err := m.LayerMaxZoom("fill"); err != nil || !math.IsInf(got, 1) {
+		t.Fatalf("LayerMaxZoom(fill) = %v, %v; want +Inf, nil", got, err)
+	}
+	if err := m.SetLayerMinZoom("fill", 4); err != nil {
+		t.Fatalf("SetLayerMinZoom(): %v", err)
+	}
+	if err := m.SetLayerMaxZoom("fill", 12.5); err != nil {
+		t.Fatalf("SetLayerMaxZoom(): %v", err)
+	}
+	if got, err := m.LayerMinZoom("fill"); err != nil || got != 4 {
+		t.Fatalf("LayerMinZoom(fill) = %v, %v; want 4, nil", got, err)
+	}
+	if got, err := m.LayerMaxZoom("fill"); err != nil || got != 12.5 {
+		t.Fatalf("LayerMaxZoom(fill) = %v, %v; want 12.5, nil", got, err)
+	}
+
+	if got, err := m.LayerVisibility("fill"); err != nil || got != StyleLayerVisibilityVisible {
+		t.Fatalf("LayerVisibility(fill) = %v, %v; want visible, nil", got, err)
+	}
+	if err := m.SetLayerVisibility("fill", StyleLayerVisibilityNone); err != nil {
+		t.Fatalf("SetLayerVisibility(): %v", err)
+	}
+	if got, err := m.LayerVisibility("fill"); err != nil || got != StyleLayerVisibilityNone {
+		t.Fatalf("LayerVisibility(fill) = %v, %v; want none, nil", got, err)
+	}
+
+	// An unknown raw visibility passes through to C, which rejects it.
+	err = m.SetLayerVisibility("fill", StyleLayerVisibility(900))
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetLayerVisibility(900) error = %v; want ErrInvalidArgument", err)
+	}
+
+	if _, err := m.LayerMinZoom("missing"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("LayerMinZoom(missing) error = %v; want ErrInvalidArgument", err)
+	}
+}
+
 func TestStyleLayerJSONAndPropertySnapshots(t *testing.T) {
 	lockOSThreadForTest(t)
 

@@ -50,6 +50,39 @@ namespace Maplibre.Native.Internal.C
         MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM = 1,
     }
 
+    internal partial struct mln_image_stretch
+    {
+        public float from;
+
+        public float to;
+    }
+
+    internal partial struct mln_image_content
+    {
+        public float left;
+
+        public float top;
+
+        public float right;
+
+        public float bottom;
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_style_image_text_fit : uint
+    {
+        MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK = 0,
+        MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY = 1,
+        MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL = 2,
+    }
+
+    [NativeTypeName("uint32_t")]
+    internal enum mln_style_layer_visibility : uint
+    {
+        MLN_STYLE_LAYER_VISIBILITY_VISIBLE = 0,
+        MLN_STYLE_LAYER_VISIBILITY_NONE = 1,
+    }
+
     [NativeTypeName("uint32_t")]
     internal enum mln_geojson_source_option_field : uint
     {
@@ -64,6 +97,7 @@ namespace Maplibre.Native.Internal.C
         MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS = 1U << 8,
         MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS = 1U << 9,
         MLN_GEOJSON_SOURCE_OPTION_CLUSTER = 1U << 10,
+        MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE = 1U << 11,
     }
 
     [NativeTypeName("uint32_t")]
@@ -83,6 +117,11 @@ namespace Maplibre.Native.Internal.C
     {
         MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO = 1U << 0,
         MLN_STYLE_IMAGE_OPTION_SDF = 1U << 1,
+        MLN_STYLE_IMAGE_OPTION_STRETCH_X = 1U << 2,
+        MLN_STYLE_IMAGE_OPTION_STRETCH_Y = 1U << 3,
+        MLN_STYLE_IMAGE_OPTION_CONTENT = 1U << 4,
+        MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH = 1U << 5,
+        MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6,
     }
 
     [NativeTypeName("uint32_t")]
@@ -179,6 +218,9 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("bool")]
         public byte cluster;
+
+        [NativeTypeName("bool")]
+        public byte synchronous_update;
     }
 
     internal partial struct mln_canonical_tile_id
@@ -249,13 +291,33 @@ namespace Maplibre.Native.Internal.C
         public nuint byte_length;
     }
 
-    internal partial struct mln_style_image_options
+    internal unsafe partial struct mln_style_image_options
     {
         [NativeTypeName("uint32_t")]
         public uint size;
 
         [NativeTypeName("uint32_t")]
         public uint fields;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_x;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_x_count;
+
+        [NativeTypeName("const mln_image_stretch *")]
+        public mln_image_stretch* stretch_y;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_y_count;
+
+        public mln_image_content content;
+
+        [NativeTypeName("uint32_t")]
+        public uint text_fit_width;
+
+        [NativeTypeName("uint32_t")]
+        public uint text_fit_height;
 
         public float pixel_ratio;
 
@@ -280,10 +342,33 @@ namespace Maplibre.Native.Internal.C
         [NativeTypeName("size_t")]
         public nuint byte_length;
 
+        [NativeTypeName("size_t")]
+        public nuint stretch_x_count;
+
+        [NativeTypeName("size_t")]
+        public nuint stretch_y_count;
+
+        public mln_image_content content;
+
+        [NativeTypeName("uint32_t")]
+        public uint text_fit_width;
+
+        [NativeTypeName("uint32_t")]
+        public uint text_fit_height;
+
         public float pixel_ratio;
 
         [NativeTypeName("bool")]
         public byte sdf;
+
+        [NativeTypeName("bool")]
+        public byte has_content;
+
+        [NativeTypeName("bool")]
+        public byte has_text_fit_width;
+
+        [NativeTypeName("bool")]
+        public byte has_text_fit_height;
     }
 
     internal static unsafe partial class NativeMethods
@@ -394,6 +479,9 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_map_copy_style_image_premultiplied_rgba8([NativeTypeName("mln_map")] MlnMap map, mln_string_view image_id, [NativeTypeName("uint8_t *")] byte* out_pixels, [NativeTypeName("size_t")] nuint pixel_capacity, [NativeTypeName("size_t *")] nuint* out_byte_length, bool* out_found);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_copy_style_image_stretches([NativeTypeName("mln_map")] MlnMap map, mln_string_view image_id, mln_image_stretch* out_stretch_x, [NativeTypeName("size_t")] nuint stretch_x_capacity, [NativeTypeName("size_t *")] nuint* out_stretch_x_count, mln_image_stretch* out_stretch_y, [NativeTypeName("size_t")] nuint stretch_y_capacity, [NativeTypeName("size_t *")] nuint* out_stretch_y_count, bool* out_found);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_add_image_source_url([NativeTypeName("mln_map")] MlnMap map, mln_string_view source_id, [NativeTypeName("const mln_lat_lng *")] mln_lat_lng* coordinates, [NativeTypeName("size_t")] nuint coordinate_count, mln_string_view url);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -473,5 +561,35 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_get_layer_filter([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, [NativeTypeName("mln_json_snapshot *")] MlnJsonSnapshot* out_filter);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, mln_string_view source_layer);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_copy_layer_source_layer([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, [NativeTypeName("char *")] sbyte* out_source_layer, [NativeTypeName("size_t")] nuint source_layer_capacity, [NativeTypeName("size_t *")] nuint* out_source_layer_size);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, mln_string_view source_id);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_copy_layer_source_id([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, [NativeTypeName("char *")] sbyte* out_source_id, [NativeTypeName("size_t")] nuint source_id_capacity, [NativeTypeName("size_t *")] nuint* out_source_id_size);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_layer_min_zoom([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, double min_zoom);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_layer_min_zoom([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, double* out_min_zoom);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_layer_max_zoom([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, double max_zoom);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_layer_max_zoom([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, double* out_max_zoom);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_layer_visibility([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, [NativeTypeName("uint32_t")] uint visibility);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_layer_visibility([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, [NativeTypeName("uint32_t *")] uint* out_visibility);
     }
 }

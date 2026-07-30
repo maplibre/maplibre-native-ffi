@@ -139,6 +139,12 @@ auto map_get_style_image_info(
   mln_map map, mln_string_view image_id, mln_style_image_info* out_info,
   bool* out_found
 ) -> mln_status;
+auto map_copy_style_image_stretches(
+  mln_map map, mln_string_view image_id, mln_image_stretch* out_stretch_x,
+  size_t stretch_x_capacity, size_t* out_stretch_x_count,
+  mln_image_stretch* out_stretch_y, size_t stretch_y_capacity,
+  size_t* out_stretch_y_count, bool* out_found
+) -> mln_status;
 auto map_copy_style_image_premultiplied_rgba8(
   mln_map map, mln_string_view image_id, uint8_t* out_pixels,
   size_t pixel_capacity, size_t* out_byte_length, bool* out_found
@@ -233,6 +239,38 @@ auto map_set_layer_filter(
 ) -> mln_status;
 auto map_get_layer_filter(
   mln_map map, mln_string_view layer_id, mln_json_snapshot* out_filter
+) -> mln_status;
+auto map_set_layer_source_layer(
+  mln_map map, mln_string_view layer_id, mln_string_view source_layer
+) -> mln_status;
+auto map_copy_layer_source_layer(
+  mln_map map, mln_string_view layer_id, char* out_source_layer,
+  size_t source_layer_capacity, size_t* out_source_layer_size
+) -> mln_status;
+auto map_set_layer_source_id(
+  mln_map map, mln_string_view layer_id, mln_string_view source_id
+) -> mln_status;
+auto map_copy_layer_source_id(
+  mln_map map, mln_string_view layer_id, char* out_source_id,
+  size_t source_id_capacity, size_t* out_source_id_size
+) -> mln_status;
+auto map_set_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double min_zoom
+) -> mln_status;
+auto map_get_layer_min_zoom(
+  mln_map map, mln_string_view layer_id, double* out_min_zoom
+) -> mln_status;
+auto map_set_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double max_zoom
+) -> mln_status;
+auto map_get_layer_max_zoom(
+  mln_map map, mln_string_view layer_id, double* out_max_zoom
+) -> mln_status;
+auto map_set_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t visibility
+) -> mln_status;
+auto map_get_layer_visibility(
+  mln_map map, mln_string_view layer_id, uint32_t* out_visibility
 ) -> mln_status;
 auto map_get_camera(mln_map map, mln_camera_options* out_camera) -> mln_status;
 auto map_jump_to(mln_map map, const mln_camera_options* camera) -> mln_status;

@@ -206,6 +206,7 @@ final class GeoJsonSourceOptions {
     this.clusterMinPoints,
     this.lineMetrics,
     this.cluster,
+    this.synchronousUpdate,
   });
 
   /// Optional minimum tiling zoom.
@@ -241,6 +242,10 @@ final class GeoJsonSourceOptions {
   /// Optional point-clustering switch.
   final bool? cluster;
 
+  /// Optional synchronous-update switch. When set, data updates are tiled
+  /// inline so they reach the next rendered frame instead of a later one.
+  final bool? synchronousUpdate;
+
   @override
   bool operator ==(Object other) =>
       other is GeoJsonSourceOptions &&
@@ -254,7 +259,8 @@ final class GeoJsonSourceOptions {
       other.clusterRadius == clusterRadius &&
       other.clusterMinPoints == clusterMinPoints &&
       other.lineMetrics == lineMetrics &&
-      other.cluster == cluster;
+      other.cluster == cluster &&
+      other.synchronousUpdate == synchronousUpdate;
 
   @override
   int get hashCode => Object.hash(
@@ -269,19 +275,163 @@ final class GeoJsonSourceOptions {
     clusterMinPoints,
     lineMetrics,
     cluster,
+    synchronousUpdate,
   );
+}
+
+/// Whether a style layer draws.
+final class StyleLayerVisibility {
+  const StyleLayerVisibility._(this.rawValue, this.name);
+
+  /// Creates a visibility from a native raw value.
+  factory StyleLayerVisibility.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => visible,
+    1 => none,
+    _ => StyleLayerVisibility._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// The layer draws.
+  static const visible = StyleLayerVisibility._(0, 'visible');
+
+  /// The layer does not draw.
+  static const none = StyleLayerVisibility._(1, 'none');
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is StyleLayerVisibility && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
+}
+
+/// Style image options.
+final class ImageStretch {
+  /// Creates a stretchable interval.
+  const ImageStretch(this.from, this.to);
+
+  /// Interval start, in image pixels.
+  final double from;
+
+  /// Interval end, in image pixels.
+  final double to;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ImageStretch && other.from == from && other.to == to;
+
+  @override
+  int get hashCode => Object.hash(from, to);
+}
+
+/// Content-box insets in image pixels, measured from the image's top-left.
+final class ImageContent {
+  /// Creates content-box insets.
+  const ImageContent({
+    required this.left,
+    required this.top,
+    required this.right,
+    required this.bottom,
+  });
+
+  /// Left inset.
+  final double left;
+
+  /// Top inset.
+  final double top;
+
+  /// Right inset.
+  final double right;
+
+  /// Bottom inset.
+  final double bottom;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ImageContent &&
+      other.left == left &&
+      other.top == top &&
+      other.right == right &&
+      other.bottom == bottom;
+
+  @override
+  int get hashCode => Object.hash(left, top, right, bottom);
+}
+
+/// How a stretchable image fits text along one axis.
+final class StyleImageTextFit {
+  const StyleImageTextFit._(this.rawValue, this.name);
+
+  /// Creates a text fit from a native raw value.
+  factory StyleImageTextFit.fromRawValue(int rawValue) => switch (rawValue) {
+    0 => stretchOrShrink,
+    1 => stretchOnly,
+    2 => proportional,
+    _ => StyleImageTextFit._(rawValue, 'unknown($rawValue)'),
+  };
+
+  /// The image stretches or shrinks to fit the text.
+  static const stretchOrShrink = StyleImageTextFit._(0, 'stretchOrShrink');
+
+  /// The image only stretches to fit the text.
+  static const stretchOnly = StyleImageTextFit._(1, 'stretchOnly');
+
+  /// The image scales proportionally to fit the text.
+  static const proportional = StyleImageTextFit._(2, 'proportional');
+
+  /// Raw native value.
+  final int rawValue;
+
+  /// Human-readable name.
+  final String name;
+
+  @override
+  bool operator ==(Object other) =>
+      other is StyleImageTextFit && other.rawValue == rawValue;
+
+  @override
+  int get hashCode => rawValue.hashCode;
 }
 
 /// Style image options.
 final class StyleImageOptions {
   /// Creates style image options.
-  const StyleImageOptions({this.pixelRatio, this.sdf});
+  const StyleImageOptions({
+    this.pixelRatio,
+    this.sdf,
+    this.stretchX,
+    this.stretchY,
+    this.content,
+    this.textFitWidth,
+    this.textFitHeight,
+  });
 
   /// Optional pixel ratio.
   final double? pixelRatio;
 
   /// Optional signed-distance-field flag.
   final bool? sdf;
+
+  /// Optional horizontally stretchable intervals. A present empty list stays
+  /// distinguishable from an absent one.
+  final List<ImageStretch>? stretchX;
+
+  /// Optional vertically stretchable intervals.
+  final List<ImageStretch>? stretchY;
+
+  /// Optional content box used when `icon-text-fit` applies.
+  final ImageContent? content;
+
+  /// Optional text fit along the width axis.
+  final StyleImageTextFit? textFitWidth;
+
+  /// Optional text fit along the height axis.
+  final StyleImageTextFit? textFitHeight;
 }
 
 /// Caller-owned premultiplied RGBA8 image pixels.
@@ -317,7 +467,28 @@ final class StyleImageInfo {
     required this.byteLength,
     required this.pixelRatio,
     required this.sdf,
+    this.stretchXCount = 0,
+    this.stretchYCount = 0,
+    this.content,
+    this.textFitWidth,
+    this.textFitHeight,
   });
+
+  /// Interval counts for the stretchable axes. Read the intervals themselves
+  /// with `MapHandle.getStyleImageStretches`.
+  final int stretchXCount;
+
+  /// Vertical interval count.
+  final int stretchYCount;
+
+  /// Content box, absent when the image carries none.
+  final ImageContent? content;
+
+  /// Text fit along the width axis, absent when the image carries none.
+  final StyleImageTextFit? textFitWidth;
+
+  /// Text fit along the height axis, absent when the image carries none.
+  final StyleImageTextFit? textFitHeight;
 
   /// Image width in pixels.
   final int width;

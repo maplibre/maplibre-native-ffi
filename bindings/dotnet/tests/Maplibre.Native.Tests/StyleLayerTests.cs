@@ -1,3 +1,4 @@
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
 using Maplibre.Native.Runtime;
@@ -35,5 +36,46 @@ public sealed class StyleLayerTests
         Assert.Equal("color-relief", map.StyleLayerType("relief"));
         Assert.True(map.StyleLayerExists("location"));
         Assert.Equal("location-indicator", map.StyleLayerType("location"));
+    }
+
+    [BindingSpecTest("BND-105")]
+    [Fact]
+    public void LayerBaseAccessorsRoundTripThroughNativeMap()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+        map.SetStyleJson(
+            "{\"version\":8,\"sources\":{\"geo\":{\"type\":\"geojson\",\"data\":"
+                + "{\"type\":\"FeatureCollection\",\"features\":[]}}},\"layers\":["
+                + "{\"id\":\"bg\",\"type\":\"background\"},"
+                + "{\"id\":\"fill\",\"type\":\"fill\",\"source\":\"geo\"}]}"
+        );
+
+        Assert.Equal(string.Empty, map.GetLayerSourceLayer("fill"));
+        map.SetLayerSourceLayer("fill", "roads");
+        Assert.Equal("roads", map.GetLayerSourceLayer("fill"));
+        Assert.Equal("geo", map.GetLayerSourceId("fill"));
+
+        // A layer type that takes no source is rejected rather than silently ignored.
+        Assert.Throws<InvalidArgumentException>(() => map.SetLayerSourceLayer("bg", "roads"));
+        Assert.Equal(string.Empty, map.GetLayerSourceId("bg"));
+
+        // An unset zoom range crosses the boundary as infinities.
+        Assert.Equal(double.NegativeInfinity, map.GetLayerMinZoom("fill"));
+        Assert.Equal(double.PositiveInfinity, map.GetLayerMaxZoom("fill"));
+        map.SetLayerMinZoom("fill", 4);
+        map.SetLayerMaxZoom("fill", 12.5);
+        Assert.Equal(4, map.GetLayerMinZoom("fill"));
+        Assert.Equal(12.5, map.GetLayerMaxZoom("fill"));
+
+        Assert.Equal(StyleLayerVisibility.Visible, map.GetLayerVisibility("fill"));
+        map.SetLayerVisibility("fill", StyleLayerVisibility.None);
+        Assert.Equal(StyleLayerVisibility.None, map.GetLayerVisibility("fill"));
+
+        // An unknown raw visibility passes through to C, which rejects it.
+        Assert.Throws<InvalidArgumentException>(() =>
+            map.SetLayerVisibility("fill", (StyleLayerVisibility)900)
+        );
+        Assert.Throws<InvalidArgumentException>(() => map.GetLayerMinZoom("missing"));
     }
 }

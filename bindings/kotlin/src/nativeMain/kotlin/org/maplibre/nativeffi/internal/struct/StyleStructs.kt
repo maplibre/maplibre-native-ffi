@@ -23,10 +23,16 @@ import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER_RADIU
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MAX_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TILE_SIZE
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_SOURCE_OPTION_TOLERANCE
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_CONTENT
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_SDF
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_STRETCH_X
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
@@ -38,6 +44,7 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENC
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
+import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
@@ -55,10 +62,13 @@ import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageContent
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Copies style-owned list and metadata handles into Kotlin values. */
@@ -104,7 +114,45 @@ internal object StyleStructs {
       native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_SDF
       native.sdf = it
     }
+    value?.stretchX?.let {
+      native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_STRETCH_X
+      native.stretch_x = imageStretchArray(it, scope)
+      native.stretch_x_count = it.size.toULong()
+    }
+    value?.stretchY?.let {
+      native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+      native.stretch_y = imageStretchArray(it, scope)
+      native.stretch_y_count = it.size.toULong()
+    }
+    value?.content?.let {
+      native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_CONTENT
+      native.content.left = it.left
+      native.content.top = it.top
+      native.content.right = it.right
+      native.content.bottom = it.bottom
+    }
+    value?.textFitWidth?.let {
+      native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+      native.text_fit_width = it.nativeValue.toUInt()
+    }
+    value?.textFitHeight?.let {
+      native.fields = native.fields or MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+      native.text_fit_height = it.nativeValue.toUInt()
+    }
     return native.ptr
+  }
+
+  private fun imageStretchArray(
+    stretches: List<ImageStretch>,
+    scope: MemScope,
+  ): CPointer<mln_image_stretch>? {
+    if (stretches.isEmpty()) return null
+    val array = scope.allocArray<mln_image_stretch>(stretches.size)
+    stretches.forEachIndexed { index, stretch ->
+      array[index].from = stretch.from
+      array[index].to = stretch.to
+    }
+    return array
   }
 
   fun styleImageInfo(value: mln_style_image_info): StyleImageInfo =
@@ -115,6 +163,18 @@ internal object StyleStructs {
       checkedLong(value.byte_length, "style image byte length"),
       value.pixel_ratio,
       value.sdf,
+      checkedLong(value.stretch_x_count, "style image stretch x count"),
+      checkedLong(value.stretch_y_count, "style image stretch y count"),
+      if (value.has_content)
+        ImageContent(
+          value.content.left,
+          value.content.top,
+          value.content.right,
+          value.content.bottom,
+        )
+      else null,
+      if (value.has_text_fit_width) StyleImageTextFit.fromNative(value.text_fit_width) else null,
+      if (value.has_text_fit_height) StyleImageTextFit.fromNative(value.text_fit_height) else null,
     )
 
   private fun checkedInt(value: UInt, name: String): Int {
@@ -227,6 +287,10 @@ internal object StyleStructs {
     value.cluster?.let {
       native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_CLUSTER
       native.cluster = it
+    }
+    value.synchronousUpdate?.let {
+      native.fields = native.fields or MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+      native.synchronous_update = it
     }
     return native.ptr
   }

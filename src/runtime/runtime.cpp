@@ -892,9 +892,7 @@ auto validate_runtime_options(const mln_runtime_options* options)
     mln::core::set_thread_error("mln_runtime_options.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  constexpr auto known_flags =
-    static_cast<uint32_t>(MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE);
-  if ((options->flags & ~known_flags) != 0) {
+  if (options->flags != 0) {
     mln::core::set_thread_error(
       "mln_runtime_options.flags contains unknown bits"
     );
@@ -924,11 +922,6 @@ auto database_source_for_runtime(RuntimeObject* runtime)
   // always returns DatabaseFileSource for FileSourceType::Database. MapLibre is
   // built without RTTI, so keep this path non-RTTI as well.
   auto database = std::static_pointer_cast<mbgl::DatabaseFileSource>(source);
-  if (database != nullptr && runtime->has_maximum_cache_size) {
-    database->setMaximumAmbientCacheSize(
-      runtime->maximum_cache_size, [](std::exception_ptr) -> void {}
-    );
-  }
   runtime->database_source = database;
   return runtime->database_source;
 }
@@ -1044,11 +1037,6 @@ auto create_runtime(
     options == nullptr || options->cache_path == nullptr
       ? std::string{}
       : std::string{options->cache_path};
-  owned_runtime->has_maximum_cache_size =
-    options != nullptr &&
-    (options->flags & MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE) != 0;
-  owned_runtime->maximum_cache_size =
-    options == nullptr ? 0 : options->maximum_cache_size;
   owned_runtime->offline_event_state =
     std::make_shared<OfflineRegionEventState>();
   owned_runtime->offline_event_state->runtime = owned_runtime.get();
@@ -1212,6 +1200,44 @@ auto run_ambient_cache_operation_start(
             "ambient cache operation failed after validation"
           );
       }
+    }
+  );
+}
+
+auto set_maximum_ambient_cache_size_start(
+  mln_runtime runtime, std::uint64_t size,
+  mln_offline_operation_id* out_operation_id
+) -> mln_status {
+  if (out_operation_id != nullptr) {
+    *out_operation_id = 0;
+  }
+  mln::core::RuntimeObject* live = nullptr;
+  const auto runtime_status = validate_runtime(runtime, live);
+  if (runtime_status != MLN_STATUS_OK) {
+    return runtime_status;
+  }
+  if (out_operation_id == nullptr) {
+    set_thread_error("out_operation_id must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto database = database_source_for_runtime(live);
+  if (database == nullptr) {
+    set_thread_error("database file source is unavailable");
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+
+  return schedule_registered_offline_operation(
+    live, MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE,
+    MLN_OFFLINE_OPERATION_RESULT_NONE, out_operation_id,
+    [&](auto state, auto operation_id) -> void {
+      database->setMaximumAmbientCacheSize(
+        size, [state, operation_id](std::exception_ptr exception) -> void {
+          complete_from_exception(
+            state, operation_id, exception,
+            "setting the maximum ambient cache size failed"
+          );
+        }
+      );
     }
   );
 }
@@ -2698,9 +2724,6 @@ auto resource_options_for_runtime(mln_runtime runtime)
   if (!live->cache_path.empty()) {
     options.withCachePath(live->cache_path);
   }
-  if (live->has_maximum_cache_size) {
-    options.withMaximumCacheSize(live->maximum_cache_size);
-  }
   return options;
 }
 
@@ -2724,23 +2747,6 @@ auto acquire_resource_provider_for_platform_context(
   return ResourceProviderLease{
     state, std::move(provider_lock), state->provider
   };
-}
-
-auto find_maximum_cache_size_for_platform_context(
-  void* platform_context
-) noexcept -> std::optional<std::uint64_t> {
-  if (platform_context == nullptr) {
-    return std::nullopt;
-  }
-
-  auto& table = handle_table<RuntimeObject>();
-  const std::scoped_lock lock(table.mutex());
-  const auto* runtime =
-    table.try_resolve_locked(runtime_from_platform_context(platform_context));
-  if (runtime == nullptr || !runtime->has_maximum_cache_size) {
-    return std::nullopt;
-  }
-  return runtime->maximum_cache_size;
 }
 
 auto has_resource_transform_for_platform_context(

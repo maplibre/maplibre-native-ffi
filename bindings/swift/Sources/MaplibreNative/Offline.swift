@@ -130,6 +130,18 @@ public extension RuntimeHandle {
     }
   }
 
+  /// Starts a change to this runtime's maximum ambient cache size. MapLibre
+  /// evicts ambient resources to fit the new budget, so lowering it discards
+  /// cached resources. Offline regions are unaffected.
+  func setMaximumAmbientCacheSizeStart(_ size: UInt64) throws -> UInt64 {
+    try mapNativeFailure {
+      try NativeOffline.setMaximumAmbientCacheSizeStart(
+        requireLiveHandle(),
+        size: size
+      )
+    }
+  }
+
   func discardOfflineOperation(_ operationId: UInt64) throws {
     try mapNativeFailure {
       try checkStatus(mln_runtime_offline_operation_discard(
