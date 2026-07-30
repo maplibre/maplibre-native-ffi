@@ -14,7 +14,8 @@ use crate::{
 #[non_exhaustive]
 pub struct RawRuntimeEventSource {
     pub source_type: u32,
-    pub source_address: usize,
+    /// The source handle id, which names one object for the process's life.
+    pub source_id: u64,
 }
 
 /// Rendering statistics copied from a render-frame event payload.
@@ -265,7 +266,7 @@ pub unsafe fn runtime_event_from_native(
         event_type: RuntimeEventType::from_raw(raw.type_),
         source: RawRuntimeEventSource {
             source_type: raw.source_type,
-            source_address: raw.source as usize,
+            source_id: raw.source,
         },
         code: raw.code,
         message,
@@ -278,7 +279,7 @@ pub fn empty_runtime_event() -> sys::mln_runtime_event {
         size: mem::size_of::<sys::mln_runtime_event>() as u32,
         type_: 0,
         source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        source: std::ptr::null_mut(),
+        source: 0,
         code: 0,
         payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE,
         payload: std::ptr::null(),
@@ -453,8 +454,9 @@ mod tests {
     fn unknown_payload_preserves_raw_type_bytes_message_and_source() {
         let bytes = [1u8, 2, 3, 4];
         let message = b"future payload";
-        let mut source_sentinel = 0_u8;
-        let source = ptr::addr_of_mut!(source_sentinel).cast();
+        // A synthetic map handle: the event carries an id, and this one names
+        // no live map, which is what this test wants.
+        let source = 0x0200_0000_0000_002a_u64;
         let raw = sys::mln_runtime_event {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: 999_001,
@@ -475,7 +477,7 @@ mod tests {
             event.source,
             RawRuntimeEventSource {
                 source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-                source_address: source as usize,
+                source_id: source,
             }
         );
         assert_eq!(event.code, -7);
@@ -497,7 +499,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: 999_001,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-            source: ptr::null_mut(),
+            source: 0,
             code: -7,
             payload_type: 999_002,
             payload: bytes.as_ptr().cast(),
@@ -532,7 +534,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-            source: ptr::null_mut(),
+            source: 0,
             code: 0,
             payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING,
             payload: ptr::addr_of!(payload).cast(),
@@ -563,7 +565,7 @@ mod tests {
             size: mem::size_of::<sys::mln_runtime_event>() as u32,
             type_: sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED,
             source_type: sys::MLN_RUNTIME_EVENT_SOURCE_MAP,
-            source: ptr::null_mut(),
+            source: 0,
             code: 0,
             payload_type: sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP,
             payload: ptr::addr_of!(payload).cast(),

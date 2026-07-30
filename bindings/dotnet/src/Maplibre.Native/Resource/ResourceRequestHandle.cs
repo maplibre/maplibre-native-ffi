@@ -6,16 +6,16 @@ using Maplibre.Native.Internal.Struct;
 namespace Maplibre.Native.Resource;
 
 internal unsafe delegate mln_status ResourceRequestComplete(
-    mln_resource_request_handle* handle,
+    MlnResourceRequest handle,
     mln_resource_response* response
 );
 
 internal unsafe delegate mln_status ResourceRequestCancelled(
-    mln_resource_request_handle* handle,
+    MlnResourceRequest handle,
     bool* cancelled
 );
 
-internal unsafe delegate void ResourceRequestRelease(mln_resource_request_handle* handle);
+internal unsafe delegate void ResourceRequestRelease(MlnResourceRequest handle);
 
 /// <summary>Resource provider request handle.</summary>
 public sealed unsafe class ResourceRequestHandle : IDisposable
@@ -24,13 +24,13 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     private readonly ResourceRequestComplete complete;
     private readonly ResourceRequestCancelled cancelled;
     private readonly ResourceRequestRelease release;
-    private mln_resource_request_handle* handle;
+    private MlnResourceRequest handle;
     private bool providerDecisionFinalized;
     private bool releaseAccountedFor;
     private bool closed;
     private bool completed;
 
-    internal ResourceRequestHandle(mln_resource_request_handle* handle)
+    internal ResourceRequestHandle(MlnResourceRequest handle)
         : this(
             handle,
             static (request, response) =>
@@ -41,15 +41,18 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         ) { }
 
     internal ResourceRequestHandle(
-        mln_resource_request_handle* handle,
+        MlnResourceRequest handle,
         ResourceRequestComplete complete,
         ResourceRequestCancelled cancelled,
         ResourceRequestRelease release
     )
     {
-        if (handle is null)
+        if (handle.IsNull)
         {
-            throw new ArgumentNullException(nameof(handle));
+            throw new ArgumentException(
+                "Resource request handle is the null handle.",
+                nameof(handle)
+            );
         }
 
         this.complete = complete;
@@ -201,8 +204,8 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
 
         releaseAccountedFor = true;
         var current = handle;
-        handle = null;
-        if (current is not null)
+        handle = default;
+        if (!current.IsNull)
         {
             release(current);
         }
@@ -213,13 +216,13 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     {
         providerDecisionFinalized = true;
         releaseAccountedFor = true;
-        handle = null;
+        handle = default;
         closed = true;
     }
 
     private void ThrowIfClosed()
     {
-        if (closed || handle is null)
+        if (closed || handle.IsNull)
         {
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,

@@ -10,7 +10,7 @@ func startOfflineOperationZeroIDForTest(runtime *RuntimeHandle) (*OfflineOperati
 		runtime,
 		OfflineOperationRegionSetObserved,
 		OfflineOperationResultNone,
-		func(ptr *nativeRuntime, out *C.mln_offline_operation_id) int32 {
+		func(handle nativeRuntime, out *C.mln_offline_operation_id) int32 {
 			*out = 0
 			return 0
 		},

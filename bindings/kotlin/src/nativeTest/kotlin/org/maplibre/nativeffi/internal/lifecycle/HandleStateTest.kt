@@ -8,7 +8,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
@@ -16,10 +15,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.rawPtr
-import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -35,102 +31,90 @@ class HandleStateTest : org.maplibre.nativeffi.NativeTestBase() {
 
   @Test
   fun failedNativeDestroyLeavesHandleLiveAndRetryable() {
-    val handle = nativeHeap.alloc<ByteVar>()
-    try {
-      val state = HandleState("TestHandle", handle.ptr)
-      var attempts = 0
+    val handle = SyntheticHandles.map()
+    val state = HandleState("TestHandle", handle)
+    var attempts = 0
 
-      val failure =
-        assertFailsWith<NativeErrorException> {
-          state.closeOnce {
-            attempts += 1
-            MaplibreStatus.NATIVE_ERROR.nativeCode
-          }
+    val failure =
+      assertFailsWith<NativeErrorException> {
+        state.closeOnce {
+          attempts += 1
+          MaplibreStatus.NATIVE_ERROR.nativeCode
         }
-
-      assertEquals(MaplibreStatus.NATIVE_ERROR, failure.status)
-      assertEquals(1, attempts)
-      assertFalse(state.isReleased())
-      assertEquals(handle.ptr.rawValue, state.requireLive().rawValue)
-
-      state.closeOnce {
-        attempts += 1
-        MaplibreStatus.OK.nativeCode
       }
 
-      assertEquals(2, attempts)
-      assertTrue(state.isReleased())
+    assertEquals(MaplibreStatus.NATIVE_ERROR, failure.status)
+    assertEquals(1, attempts)
+    assertFalse(state.isReleased())
+    assertEquals(handle, state.requireLive())
 
-      state.closeOnce {
-        attempts += 1
-        error("destroy must not be called after release")
-      }
-
-      assertEquals(2, attempts)
-    } finally {
-      nativeHeap.free(handle.rawPtr)
+    state.closeOnce {
+      attempts += 1
+      MaplibreStatus.OK.nativeCode
     }
+
+    assertEquals(2, attempts)
+    assertTrue(state.isReleased())
+
+    state.closeOnce {
+      attempts += 1
+      error("destroy must not be called after release")
+    }
+
+    assertEquals(2, attempts)
   }
 
   @Test
   fun releasingHandleRejectsPublicAccessAndReentrantRelease() {
-    val handle = nativeHeap.alloc<ByteVar>()
-    try {
-      val state = HandleState("TestHandle", handle.ptr)
-      var attempts = 0
+    val handle = SyntheticHandles.map()
+    val state = HandleState("TestHandle", handle)
+    var attempts = 0
 
-      state.closeOnce {
-        attempts += 1
-        val accessError = assertFailsWith<InvalidStateException> { state.requireLive() }
-        assertEquals(MaplibreStatus.INVALID_STATE, accessError.status)
-        assertEquals("TestHandle is currently releasing", accessError.diagnostic)
+    state.closeOnce {
+      attempts += 1
+      val accessError = assertFailsWith<InvalidStateException> { state.requireLive() }
+      assertEquals(MaplibreStatus.INVALID_STATE, accessError.status)
+      assertEquals("TestHandle is currently releasing", accessError.diagnostic)
 
-        val closeError =
-          assertFailsWith<InvalidStateException> {
-            state.closeOnce {
-              attempts += 1
-              MaplibreStatus.OK.nativeCode
-            }
+      val closeError =
+        assertFailsWith<InvalidStateException> {
+          state.closeOnce {
+            attempts += 1
+            MaplibreStatus.OK.nativeCode
           }
-        assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
-        assertEquals("TestHandle is currently releasing", closeError.diagnostic)
-        MaplibreStatus.OK.nativeCode
-      }
-
-      assertEquals(1, attempts)
-      assertTrue(state.isReleased())
-    } finally {
-      nativeHeap.free(handle.rawPtr)
+        }
+      assertEquals(MaplibreStatus.INVALID_STATE, closeError.status)
+      assertEquals("TestHandle is currently releasing", closeError.diagnostic)
+      MaplibreStatus.OK.nativeCode
     }
+
+    assertEquals(1, attempts)
+    assertTrue(state.isReleased())
   }
 
   @Test
   fun concurrentReleaseDuringNativeDestroyRejectsSecondCloseAndDestroysOnce() {
-    val handle = nativeHeap.alloc<ByteVar>()
-    try {
-      val state = HandleState("TestHandle", handle.ptr)
-      val phase = AtomicInt(0)
-      val concurrentCloseError = AtomicReference<Throwable?>(null)
-      var attempts = 0
+    val handle = SyntheticHandles.map()
+    val state = HandleState("TestHandle", handle)
+    val phase = AtomicInt(0)
+    val concurrentCloseError = AtomicReference<Throwable?>(null)
+    var attempts = 0
 
-      runConcurrentClose(ConcurrentHandleClose(state, phase, concurrentCloseError)) {
-        state.closeOnce {
-          attempts += 1
-          phase.store(PHASE_RELEASING)
-          waitForPhase(phase, PHASE_CONCURRENT_CLOSE_FINISHED)
-          MaplibreStatus.OK.nativeCode
-        }
+    runConcurrentClose(ConcurrentHandleClose(state, phase, concurrentCloseError)) {
+      state.closeOnce {
+        attempts += 1
+        phase.store(PHASE_RELEASING)
+        waitForPhase(phase, PHASE_CONCURRENT_CLOSE_FINISHED)
+        MaplibreStatus.OK.nativeCode
       }
-
-      val error = concurrentCloseError.load()
-      assertTrue(error is InvalidStateException)
-      assertEquals(MaplibreStatus.INVALID_STATE, error.status)
-      assertEquals("TestHandle is currently releasing", error.diagnostic)
-      assertEquals(1, attempts)
-      assertTrue(state.isReleased())
-    } finally {
-      nativeHeap.free(handle.rawPtr)
     }
+
+    val error = concurrentCloseError.load()
+    assertTrue(error is InvalidStateException)
+    assertEquals(MaplibreStatus.INVALID_STATE, error.status)
+    assertEquals("TestHandle is currently releasing", error.diagnostic)
+    assertEquals(1, attempts)
+    assertTrue(state.isReleased())
   }
 
   @Test
@@ -181,7 +165,7 @@ class HandleStateTest : org.maplibre.nativeffi.NativeTestBase() {
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 private class ConcurrentHandleClose(
-  private val state: HandleState<ByteVar>,
+  private val state: HandleState<NativeMap>,
   private val phase: AtomicInt,
   private val error: AtomicReference<Throwable?>,
 ) {

@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.resource
 
-import cnames.structs.mln_resource_request_handle
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
@@ -16,25 +15,24 @@ import org.maplibre.nativeffi.internal.c.mln_resource_request_cancelled
 import org.maplibre.nativeffi.internal.c.mln_resource_request_complete
 import org.maplibre.nativeffi.internal.c.mln_resource_request_release
 import org.maplibre.nativeffi.internal.c.mln_resource_response
+import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public actual class ResourceRequestHandle
 internal constructor(
-  private val handle: CPointer<mln_resource_request_handle>,
-  private val completer:
-    (CPointer<mln_resource_request_handle>, CPointer<mln_resource_response>) -> Int =
+  private val handle: NativeResourceRequest,
+  private val completer: (ULong, CPointer<mln_resource_response>) -> Int =
     ::mln_resource_request_complete,
-  private val cancellationChecker:
-    (CPointer<mln_resource_request_handle>, CPointer<BooleanVar>) -> Int =
+  private val cancellationChecker: (ULong, CPointer<BooleanVar>) -> Int =
     { requestHandle, outCancelled ->
       mln_resource_request_cancelled(requestHandle, outCancelled)
     },
-  private val releaser: (CPointer<mln_resource_request_handle>) -> Unit =
-    ::mln_resource_request_release,
+  private val releaser: (ULong) -> Unit = ::mln_resource_request_release,
 ) : AutoCloseable {
-  private val core = ResourceRequestHandleCore { releaser(handle) }
+  private val core = ResourceRequestHandleCore { releaser(handle.rawHandleValue) }
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(core) { it.close() }
 
   public actual fun complete(response: ResourceResponse) {
@@ -44,7 +42,7 @@ internal constructor(
       val nativeStatus = memScoped {
         val nativeResponse = ResourceStructs.resourceResponse(response, this)
         reachedNative = true
-        completer(handle, nativeResponse)
+        completer(handle.rawHandleValue, nativeResponse)
       }
       val nativeFailure =
         if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
@@ -66,7 +64,7 @@ internal constructor(
     memScoped {
       val outCancelled = alloc<BooleanVar>()
       outCancelled.value = false
-      Status.check(cancellationChecker(handle, outCancelled.ptr))
+      Status.check(cancellationChecker(handle.rawHandleValue, outCancelled.ptr))
       outCancelled.value
     }
   }

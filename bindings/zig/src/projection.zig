@@ -2,7 +2,6 @@ const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 const map_module = @import("map.zig");
 const MapHandle = map_module.MapHandle;
-const NativeMapProjection = opaque {};
 const native_temp = @import("native_temp.zig");
 const runtime_module = @import("runtime.zig");
 const status = @import("status.zig");
@@ -10,7 +9,6 @@ const std = @import("std");
 const values = @import("values.zig");
 
 const ProjectionState = struct {
-    native: ?*NativeMapProjection,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     active_leases: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
     closing: bool = false,
@@ -18,7 +16,7 @@ const ProjectionState = struct {
 
 const ProjectionLease = struct {
     state: *ProjectionState,
-    native: *c.mln_map_projection,
+    native: c.mln_map_projection,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 
     fn release(self: ProjectionLease) void {
@@ -26,34 +24,28 @@ const ProjectionLease = struct {
     }
 };
 
-const ProjectionRegistrySlot = struct {
-    state: ?*ProjectionState,
-    generation: u64,
-};
-
+// The C API issues each projection a generational handle and rejects a released
+// one, so this holds only the state this binding owns on top of it.
 var projection_registry_lock = std.atomic.Value(bool).init(false);
-var projection_registry: std.ArrayList(ProjectionRegistrySlot) = .empty;
-var projection_free_list: std.ArrayList(usize) = .empty;
+var projection_registry: std.AutoHashMapUnmanaged(c.mln_map_projection, *ProjectionState) = .empty;
 
-pub const MapProjectionHandle = enum(u128) {
+pub const MapProjectionHandle = enum(c.mln_map_projection) {
     _,
 
     pub fn create(map: *MapHandle) status.Error!MapProjectionHandle {
-        var projection: ?*c.mln_map_projection = null;
+        var projection: c.mln_map_projection = 0;
         const diagnostic_store = map_module.diagnosticStore(map);
         try status.checkStatus(
             c.mln_map_projection_create(try map_module.native(map), &projection),
             diagnostic_store,
         );
-        errdefer {
-            if (projection) |handle| _ = c.mln_map_projection_destroy(handle);
-        }
+        errdefer _ = c.mln_map_projection_destroy(projection);
 
         const projection_state = try std.heap.smp_allocator.create(ProjectionState);
-        projection_state.* = .{ .native = @ptrCast(projection.?), .diagnostic_store = diagnostic_store };
+        projection_state.* = .{ .diagnostic_store = diagnostic_store };
         errdefer std.heap.smp_allocator.destroy(projection_state);
 
-        return try registerProjectionState(projection_state);
+        return try registerProjectionState(projection, projection_state);
     }
 
     pub fn getCamera(self: *MapProjectionHandle) status.Error!values.CameraOptions {
@@ -147,59 +139,34 @@ pub const MapProjectionHandle = enum(u128) {
     }
 };
 
-fn registerProjectionState(projection_state: *ProjectionState) std.mem.Allocator.Error!MapProjectionHandle {
+fn registerProjectionState(
+    projection: c.mln_map_projection,
+    projection_state: *ProjectionState,
+) std.mem.Allocator.Error!MapProjectionHandle {
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    if (projection_free_list.items.len > 0) {
-        const slot_index = projection_free_list.pop().?;
-        projection_registry.items[slot_index].state = projection_state;
-        projection_registry.items[slot_index].generation = runtime_module.nextHandleGeneration();
-        return projectionHandle(slot_index + 1, projection_registry.items[slot_index].generation);
-    }
-
-    const generation = runtime_module.nextHandleGeneration();
-    try projection_free_list.ensureTotalCapacity(std.heap.smp_allocator, projection_registry.items.len + 1);
-    try projection_registry.append(std.heap.smp_allocator, .{ .state = projection_state, .generation = generation });
-    return projectionHandle(projection_registry.items.len, generation);
-}
-
-fn projectionHandle(index: usize, generation: u64) MapProjectionHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn projectionHandleIndex(handle: MapProjectionHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn projectionHandleGeneration(handle: MapProjectionHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try projection_registry.put(std.heap.smp_allocator, projection, projection_state);
+    return @enumFromInt(projection);
 }
 
 fn projectionLease(handle: MapProjectionHandle) status.BindingError!ProjectionLease {
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const index = projectionHandleIndex(handle) orelse return error.ClosedHandle;
-    if (index > projection_registry.items.len) return error.ClosedHandle;
-    const slot = projection_registry.items[index - 1];
-    if (slot.generation != projectionHandleGeneration(handle)) return error.ClosedHandle;
-    const projection_state = slot.state orelse return error.ClosedHandle;
+    const projection_state = projection_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
     if (projection_state.closing) return error.ActiveBorrow;
-    const projection: *c.mln_map_projection = @ptrCast(projection_state.native orelse return error.ClosedHandle);
     _ = projection_state.active_leases.fetchAdd(1, .seq_cst);
     return .{
         .state = projection_state,
-        .native = projection,
+        .native = @intFromEnum(handle),
         .diagnostic_store = projection_state.diagnostic_store,
     };
 }
 
 const ProjectionClose = struct {
     state: *ProjectionState,
-    native: *c.mln_map_projection,
+    native: c.mln_map_projection,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
@@ -207,19 +174,13 @@ fn beginProjectionClose(handle: MapProjectionHandle) status.BindingError!?Projec
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const index = projectionHandleIndex(handle) orelse return null;
-    if (index > projection_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &projection_registry.items[slot_index];
-    if (slot.generation != projectionHandleGeneration(handle)) return null;
-    const projection_state = slot.state orelse return null;
+    const projection_state = projection_registry.get(@intFromEnum(handle)) orelse return null;
     if (projection_state.closing) return error.ActiveBorrow;
     if (projection_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
-    const projection: *c.mln_map_projection = @ptrCast(projection_state.native orelse return null);
     projection_state.closing = true;
     return .{
         .state = projection_state,
-        .native = projection,
+        .native = @intFromEnum(handle),
         .diagnostic_store = projection_state.diagnostic_store,
     };
 }
@@ -235,17 +196,8 @@ fn finishProjectionClose(handle: MapProjectionHandle) ?*ProjectionState {
     lockProjectionRegistry();
     defer unlockProjectionRegistry();
 
-    const index = projectionHandleIndex(handle) orelse return null;
-    if (index > projection_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &projection_registry.items[slot_index];
-    if (slot.generation != projectionHandleGeneration(handle)) return null;
-    const projection_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = runtime_module.nextHandleGeneration();
-    projection_state.native = null;
-    projection_free_list.appendAssumeCapacity(slot_index);
-    return projection_state;
+    const entry = projection_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    return entry.value;
 }
 
 fn lockProjectionRegistry() void {

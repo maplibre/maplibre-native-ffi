@@ -40,17 +40,4 @@ public sealed class GeneratedLayoutTests
                 .ToInt32()
         );
     }
-
-    // Support invariant for generated raw declarations: opaque C handles stay
-    // pointer-sized at the call boundary.
-    [Fact]
-    public void OpaqueHandlesArePointerSizedAtCallBoundary()
-    {
-        unsafe
-        {
-            Assert.Equal(IntPtr.Size, sizeof(mln_runtime*));
-            Assert.Equal(IntPtr.Size, sizeof(mln_map*));
-            Assert.Equal(IntPtr.Size, sizeof(mln_render_session*));
-        }
-    }
 }

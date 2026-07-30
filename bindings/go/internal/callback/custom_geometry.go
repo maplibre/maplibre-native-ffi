@@ -14,7 +14,6 @@ import "C"
 import (
 	"runtime/cgo"
 	"sync"
-	"unsafe"
 )
 
 // CanonicalTileID identifies one canonical tile for custom geometry callbacks.
@@ -61,7 +60,7 @@ func newCustomGeometrySourceState(options CustomGeometrySourceOptions) *CustomGe
 }
 
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
-func AddCustomGeometrySource(m unsafe.Pointer, sourceID string, options CustomGeometrySourceOptions) (*CustomGeometrySourceState, int32) {
+func AddCustomGeometrySource(m uint64, sourceID string, options CustomGeometrySourceOptions) (*CustomGeometrySourceState, int32) {
 	if options.FetchTile == nil {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
@@ -86,7 +85,7 @@ func AddCustomGeometrySource(m unsafe.Pointer, sourceID string, options CustomGe
 	raw.clip = C.bool(options.Clip)
 	raw.wrap = C.bool(options.Wrap)
 
-	status := int32(C.mln_map_add_custom_geometry_source((*C.mln_map)(m), sourceView, &raw))
+	status := int32(C.mln_map_add_custom_geometry_source(C.mln_map(m), sourceView, &raw))
 	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
 		return nil, status

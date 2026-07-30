@@ -17,5 +17,6 @@ export 'src/runtime/runtime.dart'
     hide
         CustomGeometryCallbackLifecycleProbe,
         copyRuntimeEventForTesting,
-        customGeometryCallbackProbeForTesting;
+        customGeometryCallbackProbeForTesting,
+        mapAttachRefIdForTesting;
 export 'src/style/style.dart';

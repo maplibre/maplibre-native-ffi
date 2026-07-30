@@ -211,12 +211,12 @@ type RenderSessionHandle struct {
 	frame       bool
 }
 
-var destroyRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
-	return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
+var destroyRenderSessionHandle = func(native nativeRenderSession) int32 {
+	return int32(C.mln_render_session_destroy(C.mln_render_session(native)))
 }
 
-var detachRenderSessionHandle = func(ptr *nativeRenderSession) int32 {
-	return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr))))
+var detachRenderSessionHandle = func(native nativeRenderSession) int32 {
+	return int32(C.mln_render_session_detach(C.mln_render_session(native)))
 }
 
 type metalOwnedTextureFrameState struct {
@@ -454,7 +454,7 @@ func (context OpenGLContextDescriptor) toC() C.mln_opengl_context_descriptor {
 	return raw
 }
 
-func newRenderSessionHandle(parent *MapHandle, session *nativeRenderSession) (*RenderSessionHandle, error) {
+func newRenderSessionHandle(parent *MapHandle, session nativeRenderSession) (*RenderSessionHandle, error) {
 	state, err := handle.New(session, "RenderSessionHandle", parent)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
@@ -476,14 +476,14 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_metal_surface_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_metal_surface_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachVulkanSurface attaches a Vulkan native surface render target to this
@@ -501,14 +501,14 @@ func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*Re
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_vulkan_surface_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_vulkan_surface_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachOpenGLSurface attaches an OpenGL native surface render target to this
@@ -529,14 +529,14 @@ func (m *MapHandle) AttachOpenGLSurface(descriptor OpenGLSurfaceDescriptor) (*Re
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_opengl_surface_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_opengl_surface_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachMetalOwnedTexture attaches a Metal session-owned texture render target.
@@ -551,14 +551,14 @@ func (m *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescript
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_metal_owned_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_metal_owned_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachMetalBorrowedTexture attaches a Metal caller-owned texture render
@@ -575,14 +575,14 @@ func (m *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDe
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_metal_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_metal_borrowed_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachVulkanOwnedTexture attaches a Vulkan session-owned texture render target.
@@ -597,14 +597,14 @@ func (m *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescri
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_vulkan_owned_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_vulkan_owned_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachVulkanBorrowedTexture attaches a Vulkan caller-owned texture render
@@ -621,14 +621,14 @@ func (m *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTexture
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_vulkan_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_vulkan_borrowed_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachOpenGLOwnedTexture attaches an OpenGL session-owned texture render target.
@@ -646,14 +646,14 @@ func (m *MapHandle) AttachOpenGLOwnedTexture(descriptor OpenGLOwnedTextureDescri
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_opengl_owned_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_opengl_owned_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
 // AttachOpenGLBorrowedTexture attaches an OpenGL caller-owned texture render target.
@@ -671,25 +671,25 @@ func (m *MapHandle) AttachOpenGLBorrowedTexture(descriptor OpenGLBorrowedTexture
 	defer release()
 	defer m.state.KeepAlive()
 
-	var session *C.mln_render_session
+	var session C.mln_render_session
 	rawDescriptor := descriptor.toC()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_opengl_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+		return int32(C.mln_opengl_borrowed_texture_attach(C.mln_map(ptr), &rawDescriptor, &session))
 	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
+	return newRenderSessionHandle(m, nativeRenderSession(session))
 }
 
-func (session *RenderSessionHandle) ptr() (*nativeRenderSession, func(), error) {
+func (session *RenderSessionHandle) ptr() (nativeRenderSession, func(), error) {
 	if session == nil || session.state == nil {
-		return nil, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
+		return 0, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
 	borrow, live := session.state.Borrow()
 	if !live {
-		return nil, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
+		return 0, nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is closed")
 	}
-	return borrow.Ptr(), borrow.Release, nil
+	return borrow.Handle(), borrow.Release, nil
 }
 
 func (session *RenderSessionHandle) withNoAcquiredFrame(call func() error) error {
@@ -730,7 +730,7 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_resize((*C.mln_render_session)(unsafe.Pointer(ptr)), C.uint32_t(extent.Width), C.uint32_t(extent.Height), C.double(extent.ScaleFactor)))
+			return int32(C.mln_render_session_resize(C.mln_render_session(ptr), C.uint32_t(extent.Width), C.uint32_t(extent.Height), C.double(extent.ScaleFactor)))
 		})
 	})
 }
@@ -754,7 +754,7 @@ func (session *RenderSessionHandle) RenderUpdate() (bool, error) {
 	var rendered C.bool
 	err = session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr)), &rendered))
+			return int32(C.mln_render_session_render_update(C.mln_render_session(ptr), &rendered))
 		})
 	})
 	if err != nil {
@@ -800,7 +800,7 @@ func (session *RenderSessionHandle) ReduceMemoryUse() error {
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_reduce_memory_use((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_reduce_memory_use(C.mln_render_session(ptr)))
 		})
 	})
 }
@@ -816,7 +816,7 @@ func (session *RenderSessionHandle) ClearData() error {
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_clear_data((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_clear_data(C.mln_render_session(ptr)))
 		})
 	})
 }
@@ -832,7 +832,7 @@ func (session *RenderSessionHandle) DumpDebugLogs() error {
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			return int32(C.mln_render_session_dump_debug_logs(C.mln_render_session(ptr)))
 		})
 	})
 }
@@ -853,7 +853,7 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureIma
 	err = session.withNoAcquiredFrame(func() error {
 		rawInfo := C.mln_texture_image_info_default()
 		failure := internalstatus.CheckCall(func() int32 {
-			return int32(C.mln_texture_read_premultiplied_rgba8((*C.mln_render_session)(unsafe.Pointer(ptr)), nil, 0, &rawInfo))
+			return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(ptr), nil, 0, &rawInfo))
 		}, threadLastErrorMessage)
 		info = textureImageInfoFromC(rawInfo)
 		if failure == nil {
@@ -891,14 +891,14 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (T
 	return info, err
 }
 
-func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr *nativeRenderSession, buffer []byte) (TextureImageInfo, error) {
+func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr nativeRenderSession, buffer []byte) (TextureImageInfo, error) {
 	rawInfo := C.mln_texture_image_info_default()
 	var rawBuffer *C.uint8_t
 	if len(buffer) > 0 {
 		rawBuffer = (*C.uint8_t)(unsafe.Pointer(&buffer[0]))
 	}
 	if err := checkNative(func() int32 {
-		return int32(C.mln_texture_read_premultiplied_rgba8((*C.mln_render_session)(unsafe.Pointer(ptr)), rawBuffer, C.size_t(len(buffer)), &rawInfo))
+		return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(ptr), rawBuffer, C.size_t(len(buffer)), &rawInfo))
 	}); err != nil {
 		runtime.KeepAlive(buffer)
 		return textureImageInfoFromC(rawInfo), err
@@ -925,7 +925,7 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 	}
 	rawFrame := C.mln_metal_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_metal_owned_texture_frame{}))}
 	if err := checkNative(func() int32 {
-		return int32(C.mln_metal_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawFrame))
+		return int32(C.mln_metal_owned_texture_acquire_frame(C.mln_render_session(ptr), &rawFrame))
 	}); err != nil {
 		return nil, err
 	}
@@ -962,7 +962,7 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 	}
 	rawFrame := C.mln_vulkan_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_vulkan_owned_texture_frame{}))}
 	if err := checkNative(func() int32 {
-		return int32(C.mln_vulkan_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawFrame))
+		return int32(C.mln_vulkan_owned_texture_acquire_frame(C.mln_render_session(ptr), &rawFrame))
 	}); err != nil {
 		return nil, err
 	}
@@ -1001,7 +1001,7 @@ func (session *RenderSessionHandle) AcquireOpenGLTextureFrame() (*OpenGLOwnedTex
 	}
 	rawFrame := C.mln_opengl_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_opengl_owned_texture_frame{}))}
 	if err := checkNative(func() int32 {
-		return int32(C.mln_opengl_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawFrame))
+		return int32(C.mln_opengl_owned_texture_acquire_frame(C.mln_render_session(ptr), &rawFrame))
 	}); err != nil {
 		return nil, err
 	}
@@ -1190,7 +1190,7 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_metal_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &state.raw))
+		return int32(C.mln_metal_owned_texture_release_frame(C.mln_render_session(ptr), &state.raw))
 	}); err != nil {
 		return err
 	}
@@ -1220,7 +1220,7 @@ func (frame *VulkanOwnedTextureFrame) Close() error {
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_vulkan_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &state.raw))
+		return int32(C.mln_vulkan_owned_texture_release_frame(C.mln_render_session(ptr), &state.raw))
 	}); err != nil {
 		return err
 	}
@@ -1250,7 +1250,7 @@ func (frame *OpenGLOwnedTextureFrame) Close() error {
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_opengl_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &state.raw))
+		return int32(C.mln_opengl_owned_texture_release_frame(C.mln_render_session(ptr), &state.raw))
 	}); err != nil {
 		return err
 	}
@@ -1269,8 +1269,8 @@ func (session *RenderSessionHandle) Close() error {
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
 		if err := checkNative(func() int32 {
-			return session.state.Close(func(ptr *nativeRenderSession) int32 {
-				return destroyRenderSessionHandle(ptr)
+			return session.state.Close(func(native nativeRenderSession) int32 {
+				return destroyRenderSessionHandle(native)
 			})
 		}); err != nil {
 			return err

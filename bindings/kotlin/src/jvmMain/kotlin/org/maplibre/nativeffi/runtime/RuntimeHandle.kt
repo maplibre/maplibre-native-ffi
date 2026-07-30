@@ -1,12 +1,12 @@
 package org.maplibre.nativeffi.runtime
 
-import java.lang.foreign.MemorySegment
 import java.lang.ref.WeakReference
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.loader.NativeAccess.NativeRuntimeEvent
 import org.maplibre.nativeffi.internal.status.Status
@@ -19,9 +19,9 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned runtime handle backed by the JVM FFM bridge. */
-public actual class RuntimeHandle private constructor(private val handle: MemorySegment) :
+public actual class RuntimeHandle private constructor(private val handle: NativeRuntime) :
   AutoCloseable {
-  private val core = HandleStateCore("RuntimeHandle", handle.address())
+  private val core = HandleStateCore("RuntimeHandle", handle.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -353,27 +353,26 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
 
-  internal fun nativeHandle(): MemorySegment = requireLiveHandle()
+  internal fun nativeHandle(): NativeRuntime = requireLiveHandle()
 
   internal fun registerMap(map: MapHandle) {
-    liveMaps[map.nativeAddress()] = WeakReference(map)
+    liveMaps[map.nativeHandleId()] = WeakReference(map)
   }
 
   internal fun unregisterMap(map: MapHandle) {
-    val address = map.nativeAddress()
-    if (liveMaps[address]?.get() === map) {
-      liveMaps.remove(address)
-    }
+    // An id names one map for the life of the process, so this key can only be
+    // this map's.
+    liveMaps.remove(map.nativeHandleId())
   }
 
-  private fun requireLiveHandle(): MemorySegment {
+  private fun requireLiveHandle(): NativeRuntime {
     core.requireLive()
     return handle
   }
 
   private fun NativeRuntimeEvent.toRuntimeEvent(): RuntimeEvent {
     val sourceType = RuntimeEventSourceType.fromNative(sourceType)
-    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceAddress) else null
+    val mapSource = if (sourceType == RuntimeEventSourceType.MAP) mapFor(sourceId) else null
     val eventType = RuntimeEventType.fromNative(type)
     if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
       mapSource?.releaseDetachedCustomGeometrySources()
@@ -389,12 +388,12 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
     )
   }
 
-  private fun mapFor(address: Long): MapHandle? {
-    if (address == 0L) return null
-    val reference = liveMaps[address] ?: return null
+  private fun mapFor(id: Long): MapHandle? {
+    if (id == 0L) return null
+    val reference = liveMaps[id] ?: return null
     val map = reference.get()
     if (map == null) {
-      liveMaps.remove(address)
+      liveMaps.remove(id)
     }
     return map
   }

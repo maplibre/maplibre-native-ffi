@@ -38,6 +38,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
+        // Every C handle is the same uint64_t, so a plain type alias would let
+        // a map be passed where a runtime is expected. A transparent newtype
+        // per handle keeps the distinction the opaque struct pointers used to
+        // give us, at no ABI cost.
+        .new_type_alias(concat!(
+            "^mln_(runtime|map|map_projection|render_session|wake_source",
+            "|resource_request_handle|offline_region_snapshot",
+            "|offline_region_list|json_snapshot|style_id_list",
+            "|feature_query_result|feature_extension_result)$"
+        ))
         .prepend_enum_name(false)
         .layout_tests(true)
         .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))

@@ -45,7 +45,7 @@ typedef struct mlt_tile_provider {
 // inline, so tiles are the only resource that reaches the network file source.
 static uint32_t serve_recorded_tile(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) {
   mlt_tile_provider* state = user_data;
   (void)request;
@@ -67,7 +67,7 @@ static uint32_t serve_recorded_tile(
 // count stays zero until the map has both parsed the tile and folded it into
 // the render tree.
 static size_t query_admin_feature_count(
-  mln_runtime* runtime, mln_render_session* session
+  mln_runtime runtime, mln_render_session session
 ) {
   const mln_string_view source_layers[] = {MLN_STRING_LITERAL("admin")};
   mln_source_feature_query_options options =
@@ -84,7 +84,7 @@ static size_t query_admin_feature_count(
     );
     TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, mln_runtime_pump(runtime, 0));
 
-    mln_feature_query_result* result = NULL;
+    mln_feature_query_result result = MLN_HANDLE_NULL;
     const mln_status status = mln_render_session_query_source_features(
       session, MLN_STRING_LITERAL("mlt-source"), &options, &result
     );
@@ -119,7 +119,7 @@ static size_t decode_recorded_tile(
     .bytes = tile_bytes, .byte_count = tile_size, .served = 0
   };
 
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   const mln_resource_provider provider = {
     .size = sizeof(mln_resource_provider),
     .callback = serve_recorded_tile,
@@ -133,7 +133,7 @@ static size_t decode_recorded_tile(
   map_options.width = 64;
   map_options.height = 64;
   map_options.fast_pfor_enabled = fast_pfor_enabled;
-  mln_map* map = mln_test_create_map_with_options(runtime, &map_options);
+  mln_map map = mln_test_create_map_with_options(runtime, &map_options);
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_json(map, mlt_style_json)

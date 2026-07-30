@@ -305,8 +305,8 @@ mln_texture_image_info_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_attach(
-  mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -338,8 +338,8 @@ MLN_API mln_status mln_metal_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_borrowed_texture_attach(
-  mln_map* map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -367,8 +367,8 @@ MLN_API mln_status mln_metal_borrowed_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_owned_texture_attach(
-  mln_map* map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -407,8 +407,8 @@ MLN_API mln_status mln_vulkan_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_borrowed_texture_attach(
-  mln_map* map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -436,8 +436,8 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_attach(
-  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -472,8 +472,8 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_borrowed_texture_attach(
-  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -501,7 +501,7 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *   renderer backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_texture_read_premultiplied_rgba8(
-  mln_render_session* session, uint8_t* out_data, size_t out_data_capacity,
+  mln_render_session session, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info
 ) MLN_NOEXCEPT;
 
@@ -528,7 +528,7 @@ MLN_API mln_status mln_texture_read_premultiplied_rgba8(
  *   texture, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_acquire_frame(
-  mln_render_session* session, mln_metal_owned_texture_frame* out_frame
+  mln_render_session session, mln_metal_owned_texture_frame* out_frame
 ) MLN_NOEXCEPT;
 
 /**
@@ -546,7 +546,7 @@ MLN_API mln_status mln_metal_owned_texture_acquire_frame(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_owned_texture_release_frame(
-  mln_render_session* session, const mln_metal_owned_texture_frame* frame
+  mln_render_session session, const mln_metal_owned_texture_frame* frame
 ) MLN_NOEXCEPT;
 
 /**
@@ -571,7 +571,7 @@ MLN_API mln_status mln_metal_owned_texture_release_frame(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_owned_texture_acquire_frame(
-  mln_render_session* session, mln_vulkan_owned_texture_frame* out_frame
+  mln_render_session session, mln_vulkan_owned_texture_frame* out_frame
 ) MLN_NOEXCEPT;
 
 /**
@@ -589,7 +589,7 @@ MLN_API mln_status mln_vulkan_owned_texture_acquire_frame(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_owned_texture_release_frame(
-  mln_render_session* session, const mln_vulkan_owned_texture_frame* frame
+  mln_render_session session, const mln_vulkan_owned_texture_frame* frame
 ) MLN_NOEXCEPT;
 
 /**
@@ -619,7 +619,7 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
-  mln_render_session* session, mln_opengl_owned_texture_frame* out_frame
+  mln_render_session session, mln_opengl_owned_texture_frame* out_frame
 ) MLN_NOEXCEPT;
 
 /**
@@ -638,7 +638,7 @@ MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_release_frame(
-  mln_render_session* session, const mln_opengl_owned_texture_frame* frame
+  mln_render_session session, const mln_opengl_owned_texture_frame* frame
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

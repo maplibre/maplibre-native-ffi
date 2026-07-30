@@ -1,20 +1,14 @@
 package org.maplibre.nativeffi.runtime
 
-import cnames.structs.mln_offline_region_list
-import cnames.structs.mln_offline_region_snapshot
-import cnames.structs.mln_runtime
-import cnames.structs.mln_wake_source
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.WeakReference
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
@@ -56,6 +50,13 @@ import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeRuntime
+import org.maplibre.nativeffi.internal.lifecycle.asHandle
+import org.maplibre.nativeffi.internal.lifecycle.offlineRegionListHandle
+import org.maplibre.nativeffi.internal.lifecycle.offlineRegionSnapshotHandle
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.lifecycle.runtimeHandle
+import org.maplibre.nativeffi.internal.lifecycle.wakeSourceHandle
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
@@ -71,8 +72,8 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public actual class RuntimeHandle
 internal constructor(
-  handle: CPointer<mln_runtime>,
-  private val destroyer: (CPointer<mln_runtime>) -> Int = ::mln_runtime_destroy,
+  handle: NativeRuntime,
+  private val destroyer: (ULong) -> Int = ::mln_runtime_destroy,
 ) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
@@ -80,14 +81,14 @@ internal constructor(
   private var resourceProviderState: ResourceProviderState? = null
 
   public actual fun pump(timeoutMillis: Long) {
-    Status.check(mln_runtime_pump(state.requireLive(), timeoutMillis))
+    Status.check(mln_runtime_pump(state.requireLive().rawHandleValue, timeoutMillis))
   }
 
   public actual fun acquireWakeSource(): WakeSource = memScoped {
-    val outSource = alloc<CPointerVarOf<CPointer<mln_wake_source>>>()
-    outSource.value = null
-    Status.check(mln_runtime_wake_source_acquire(state.requireLive(), outSource.ptr))
-    WakeSource(outSource.value)
+    val outSource = alloc<ULongVar>()
+    outSource.value = 0uL
+    Status.check(mln_runtime_wake_source_acquire(state.requireLive().rawHandleValue, outSource.ptr))
+    WakeSource(outSource.value.asHandle("mln_runtime_wake_source_acquire", ::wakeSourceHandle))
   }
 
   public actual fun startAmbientCacheOperation(
@@ -96,7 +97,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_run_ambient_cache_operation_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         operation.nativeValue.toUInt(),
         outOperationId.ptr,
       )
@@ -115,7 +116,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_create_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         RuntimeStructs.offlineRegionDefinition(definition, this),
         RuntimeStructs.metadata(metadata, this),
         metadata.size.toULong(),
@@ -133,7 +134,11 @@ internal constructor(
     memScoped {
       val outOperationId = alloc<ULongVar>()
       Status.check(
-        mln_runtime_offline_region_get_start(state.requireLive(), id, outOperationId.ptr)
+        mln_runtime_offline_region_get_start(
+          state.requireLive().rawHandleValue,
+          id,
+          outOperationId.ptr,
+        )
       )
       offlineOperation(
         outOperationId.value,
@@ -145,7 +150,12 @@ internal constructor(
   public actual fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> =
     memScoped {
       val outOperationId = alloc<ULongVar>()
-      Status.check(mln_runtime_offline_regions_list_start(state.requireLive(), outOperationId.ptr))
+      Status.check(
+        mln_runtime_offline_regions_list_start(
+          state.requireLive().rawHandleValue,
+          outOperationId.ptr,
+        )
+      )
       offlineOperation(
         outOperationId.value,
         OfflineOperationKind.REGIONS_LIST,
@@ -160,7 +170,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_regions_merge_database_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         path,
         outOperationId.ptr,
       )
@@ -179,7 +189,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_update_metadata_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         id,
         RuntimeStructs.metadata(metadata, this),
         metadata.size.toULong(),
@@ -198,7 +208,11 @@ internal constructor(
   ): OfflineOperationHandle<OfflineRegionStatus> = memScoped {
     val outOperationId = alloc<ULongVar>()
     Status.check(
-      mln_runtime_offline_region_get_status_start(state.requireLive(), id, outOperationId.ptr)
+      mln_runtime_offline_region_get_status_start(
+        state.requireLive().rawHandleValue,
+        id,
+        outOperationId.ptr,
+      )
     )
     offlineOperation(
       outOperationId.value,
@@ -214,7 +228,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_set_observed_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         id,
         observed,
         outOperationId.ptr,
@@ -237,7 +251,7 @@ internal constructor(
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_set_download_state_start(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         id,
         downloadState.nativeValue.toUInt(),
         outOperationId.ptr,
@@ -254,7 +268,11 @@ internal constructor(
     memScoped {
       val outOperationId = alloc<ULongVar>()
       Status.check(
-        mln_runtime_offline_region_invalidate_start(state.requireLive(), id, outOperationId.ptr)
+        mln_runtime_offline_region_invalidate_start(
+          state.requireLive().rawHandleValue,
+          id,
+          outOperationId.ptr,
+        )
       )
       offlineOperation(
         outOperationId.value,
@@ -266,7 +284,11 @@ internal constructor(
   public actual fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
     val outOperationId = alloc<ULongVar>()
     Status.check(
-      mln_runtime_offline_region_delete_start(state.requireLive(), id, outOperationId.ptr)
+      mln_runtime_offline_region_delete_start(
+        state.requireLive().rawHandleValue,
+        id,
+        outOperationId.ptr,
+      )
     )
     offlineOperation(
       outOperationId.value,
@@ -278,8 +300,8 @@ internal constructor(
   public actual fun takeCreateOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo = memScoped {
-    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
-    outRegion.value = null
+    val outRegion = alloc<ULongVar>()
+    outRegion.value = 0uL
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -287,18 +309,24 @@ internal constructor(
         OfflineOperationResultKind.REGION,
       )
     Status.check(
-      mln_runtime_offline_region_create_take_result(state.requireLive(), operationId, outRegion.ptr)
+      mln_runtime_offline_region_create_take_result(
+        state.requireLive().rawHandleValue,
+        operationId,
+        outRegion.ptr,
+      )
     )
     operation.markConsumed()
-    RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+    RuntimeStructs.offlineRegionSnapshot(
+      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+    )
   }
 
   public actual fun takeOfflineRegionResult(
     operation: OfflineOperationHandle<OfflineRegionInfo?>
   ): OfflineRegionInfo? = memScoped {
-    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
+    val outRegion = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
-    outRegion.value = null
+    outRegion.value = 0uL
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -307,7 +335,7 @@ internal constructor(
       )
     Status.check(
       mln_runtime_offline_region_get_take_result(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         operationId,
         outRegion.ptr,
         outFound.ptr,
@@ -315,14 +343,17 @@ internal constructor(
     )
     operation.markConsumed()
     if (!outFound.value) null
-    else RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+    else
+      RuntimeStructs.offlineRegionSnapshot(
+        outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+      )
   }
 
   public actual fun takeOfflineRegionsResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo> = memScoped {
-    val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
-    outRegions.value = null
+    val outRegions = alloc<ULongVar>()
+    outRegions.value = 0uL
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -330,17 +361,23 @@ internal constructor(
         OfflineOperationResultKind.REGION_LIST,
       )
     Status.check(
-      mln_runtime_offline_regions_list_take_result(state.requireLive(), operationId, outRegions.ptr)
+      mln_runtime_offline_regions_list_take_result(
+        state.requireLive().rawHandleValue,
+        operationId,
+        outRegions.ptr,
+      )
     )
     operation.markConsumed()
-    RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
+    RuntimeStructs.offlineRegionList(
+      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
+    )
   }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
     operation: OfflineOperationHandle<List<OfflineRegionInfo>>
   ): List<OfflineRegionInfo> = memScoped {
-    val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
-    outRegions.value = null
+    val outRegions = alloc<ULongVar>()
+    outRegions.value = 0uL
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -349,20 +386,22 @@ internal constructor(
       )
     Status.check(
       mln_runtime_offline_regions_merge_database_take_result(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         operationId,
         outRegions.ptr,
       )
     )
     operation.markConsumed()
-    RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
+    RuntimeStructs.offlineRegionList(
+      outRegions.value.asHandle("mln_offline_region_list", ::offlineRegionListHandle)
+    )
   }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
     operation: OfflineOperationHandle<OfflineRegionInfo>
   ): OfflineRegionInfo = memScoped {
-    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
-    outRegion.value = null
+    val outRegion = alloc<ULongVar>()
+    outRegion.value = 0uL
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -371,13 +410,15 @@ internal constructor(
       )
     Status.check(
       mln_runtime_offline_region_update_metadata_take_result(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         operationId,
         outRegion.ptr,
       )
     )
     operation.markConsumed()
-    RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+    RuntimeStructs.offlineRegionSnapshot(
+      outRegion.value.asHandle("mln_offline_region_snapshot", ::offlineRegionSnapshotHandle)
+    )
   }
 
   public actual fun takeOfflineRegionStatusResult(
@@ -393,7 +434,7 @@ internal constructor(
       )
     Status.check(
       mln_runtime_offline_region_get_status_take_result(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         operationId,
         outStatus.ptr,
       )
@@ -413,7 +454,7 @@ internal constructor(
     val id = operation.requireLive(this)
     val runtime =
       try {
-        state.requireLive()
+        state.requireLive().rawHandleValue
       } catch (error: InvalidStateException) {
         operation.markConsumed()
         throw error
@@ -424,7 +465,10 @@ internal constructor(
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback) {
     setResourceProvider(callback) { replacement ->
-      mln_runtime_set_resource_provider(state.requireLive(), replacement.descriptor())
+      mln_runtime_set_resource_provider(
+        state.requireLive().rawHandleValue,
+        replacement.descriptor(),
+      )
     }
   }
 
@@ -455,7 +499,7 @@ internal constructor(
 
   public actual fun clearResourceProvider() {
     resourceProviderState?.checkCanClose()
-    Status.check(mln_runtime_clear_resource_provider(state.requireLive()))
+    Status.check(mln_runtime_clear_resource_provider(state.requireLive().rawHandleValue))
     val previous = resourceProviderState
     resourceProviderState = null
     previous?.close()
@@ -463,7 +507,10 @@ internal constructor(
 
   public actual fun setResourceTransform(callback: ResourceTransformCallback) {
     setResourceTransform(callback) { replacement ->
-      mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
+      mln_runtime_set_resource_transform(
+        state.requireLive().rawHandleValue,
+        replacement.descriptor(),
+      )
     }
   }
 
@@ -494,7 +541,7 @@ internal constructor(
 
   public actual fun clearResourceTransform() {
     resourceTransformState?.checkCanClose()
-    Status.check(mln_runtime_clear_resource_transform(state.requireLive()))
+    Status.check(mln_runtime_clear_resource_transform(state.requireLive().rawHandleValue))
     val previous = resourceTransformState
     resourceTransformState = null
     previous?.close()
@@ -505,7 +552,9 @@ internal constructor(
     event.size = sizeOf<mln_runtime_event>().toUInt()
     val hasEvent = alloc<BooleanVar>()
     hasEvent.value = false
-    Status.check(mln_runtime_poll_event(state.requireLive(), event.ptr, hasEvent.ptr))
+    Status.check(
+      mln_runtime_poll_event(state.requireLive().rawHandleValue, event.ptr, hasEvent.ptr)
+    )
     if (!hasEvent.value) {
       return@memScoped null
     }
@@ -516,7 +565,7 @@ internal constructor(
   public actual override fun close() {
     resourceProviderState?.checkCanClose()
     resourceTransformState?.checkCanClose()
-    state.closeOnce(destroyer) {
+    state.closeOnce({ runtime -> destroyer(runtime.rawHandleValue) }) {
       resourceProviderState?.close()
       resourceTransformState?.close()
       resourceProviderState = null
@@ -527,9 +576,9 @@ internal constructor(
   public actual val isClosed: Boolean
     get() = state.isReleased()
 
-  internal fun nativeHandle(): CPointer<mln_runtime> = state.requireLive()
+  internal fun nativeHandle(): NativeRuntime = state.requireLive()
 
-  internal fun nativeAddress(): Long = state.address()
+  internal fun nativeHandleId(): Long = state.handleId()
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     state.retainChild(childTypeName)
@@ -543,14 +592,14 @@ internal constructor(
   internal fun applyEventSideEffectsForTesting(
     eventType: RuntimeEventType,
     sourceType: RuntimeEventSourceType,
-    sourceAddress: Long?,
-  ): MapHandle? = applyEventSideEffects(eventType, sourceType, sourceAddress)
+    sourceId: Long,
+  ): MapHandle? = applyEventSideEffects(eventType, sourceType, sourceId)
 
   private fun runtimeEvent(event: mln_runtime_event): RuntimeEvent {
     val eventType = RuntimeEventType.fromNative(event.type)
     val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
-    val sourceAddress = event.source?.rawValue?.toLong()
-    val mapSource = applyEventSideEffects(eventType, sourceType, sourceAddress)
+    val sourceId = event.source.toLong()
+    val mapSource = applyEventSideEffects(eventType, sourceType, sourceId)
     return RuntimeEvent(
       eventType,
       sourceType,
@@ -565,11 +614,10 @@ internal constructor(
   private fun applyEventSideEffects(
     eventType: RuntimeEventType,
     sourceType: RuntimeEventSourceType,
-    sourceAddress: Long?,
+    sourceId: Long,
   ): MapHandle? {
     val mapSource =
-      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null)
-        liveMaps[sourceAddress]?.value
+      if (sourceType == RuntimeEventSourceType.MAP && sourceId != 0L) liveMaps[sourceId]?.value
       else null
     if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
       mapSource?.releaseDetachedCustomGeometrySources()
@@ -578,14 +626,13 @@ internal constructor(
   }
 
   internal fun registerMap(map: MapHandle) {
-    liveMaps[map.nativeAddress()] = WeakReference(map)
+    liveMaps[map.nativeHandleId()] = WeakReference(map)
   }
 
   internal fun unregisterMap(map: MapHandle) {
-    val address = map.nativeAddress()
-    if (liveMaps[address]?.value === map) {
-      liveMaps.remove(address)
-    }
+    // An id names one map for the life of the process, so this key can only be
+    // this map's.
+    liveMaps.remove(map.nativeHandleId())
   }
 
   public actual companion object {
@@ -595,15 +642,13 @@ internal constructor(
     internal fun createForTesting(
       options: RuntimeOptions = RuntimeOptions(),
       actualAbiVersion: Long = Maplibre.EXPECTED_C_ABI_VERSION,
-      creator:
-        (CPointer<mln_runtime_options>, CPointer<CPointerVarOf<CPointer<mln_runtime>>>) -> Int,
+      creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
     ): RuntimeHandle = create(options, actualAbiVersion, creator)
 
     private fun create(
       options: RuntimeOptions,
       actualAbiVersion: Long,
-      creator:
-        (CPointer<mln_runtime_options>, CPointer<CPointerVarOf<CPointer<mln_runtime>>>) -> Int,
+      creator: (CPointer<mln_runtime_options>, CPointer<ULongVar>) -> Int,
     ): RuntimeHandle = memScoped {
       Maplibre.checkCompatibleCAbi(actualAbiVersion)
       val nativeOptions = alloc<mln_runtime_options>()
@@ -616,10 +661,10 @@ internal constructor(
         nativeOptions.maximum_cache_size = it.toULong()
       }
 
-      val outRuntime = alloc<CPointerVarOf<CPointer<mln_runtime>>>()
-      outRuntime.value = null
+      val outRuntime = alloc<ULongVar>()
+      outRuntime.value = 0uL
       Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
-      RuntimeHandle(requireNotNull(outRuntime.value) { "mln_runtime_create returned null" })
+      RuntimeHandle(outRuntime.value.asHandle("mln_runtime_create", ::runtimeHandle))
     }
   }
 }

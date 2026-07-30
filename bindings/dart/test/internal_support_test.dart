@@ -13,8 +13,17 @@ import 'package:maplibre_native_ffi/src/internal/status/status.dart';
 import 'package:maplibre_native_ffi/src/runtime/runtime.dart';
 import 'package:ffi/ffi.dart';
 import 'package:test/test.dart';
+import 'package:maplibre_native_ffi/src/internal/lifecycle/native_handles.dart';
 
-final class _FakeNativeHandle extends Opaque {}
+/// A handle of a distinct kind for tests that exercise binding-owned
+/// bookkeeping without a live native object.
+///
+/// The kind byte matches the C API's map kind, so a value reaching a
+/// diagnostic reads as an obviously synthetic map handle rather than a
+/// plausible one.
+extension type const _FakeNativeHandle(int raw) implements NativeHandle {}
+
+const _fakeHandle = _FakeNativeHandle(0x0200000000001234);
 
 final class _FakeCallbackState extends RetainedCallbackState {
   var closes = 0;
@@ -180,7 +189,7 @@ void main() {
   group('native handle state', () {
     test('close succeeds once and later closes are no-ops', () {
       final state = NativeHandleState<_FakeNativeHandle>(
-        Pointer.fromAddress(0x1234),
+        _fakeHandle,
         'fake_handle',
       );
       var closes = 0;
@@ -200,13 +209,13 @@ void main() {
 
     test('owner isolate mismatch rejects use before native calls', () {
       final state = NativeHandleState<_FakeNativeHandle>(
-        Pointer.fromAddress(0x1234),
+        _fakeHandle,
         'fake_handle',
         ownerIsolateHash: Isolate.current.hashCode + 1,
         leakReporting: false,
       );
 
-      expect(() => state.pointer, throwsA(isA<WrongThreadException>()));
+      expect(() => state.handle, throwsA(isA<WrongThreadException>()));
       expect(
         () => state.close((_) => nativeStatusOk, () => 'unused'),
         throwsA(isA<WrongThreadException>()),
@@ -220,14 +229,14 @@ void main() {
       // catch it and say why, rather than letting a bare wrong-thread status
       // surface from an unrelated-looking call.
       final state = NativeHandleState<_FakeNativeHandle>(
-        Pointer.fromAddress(0x1234),
+        _fakeHandle,
         'fake_handle',
         ownerThreadToken: -1,
         leakReporting: false,
       );
 
       expect(
-        () => state.pointer,
+        () => state.handle,
         throwsA(
           isA<WrongThreadException>().having(
             (error) => error.diagnostic,
@@ -247,7 +256,7 @@ void main() {
 
     test('failed close leaves handle live for retry', () {
       final state = NativeHandleState<_FakeNativeHandle>(
-        Pointer.fromAddress(0x1234),
+        _fakeHandle,
         'fake_handle',
       );
 
@@ -301,7 +310,7 @@ void main() {
       event.ref.size = sizeOf<raw.mln_runtime_event>();
       event.ref.type = 0xfeed;
       event.ref.source_type = 0xbeef;
-      event.ref.source = nullptr;
+      event.ref.source = 0;
       event.ref.code = 17;
       event.ref.payload_type = 0xf00d;
       event.ref.payload = unknownPayload.cast<Void>();

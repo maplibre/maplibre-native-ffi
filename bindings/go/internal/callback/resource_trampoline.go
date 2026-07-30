@@ -50,7 +50,7 @@ func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *
 }
 
 //export goMaplibreResourceProvider
-func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource_request, rawHandle *C.mln_resource_request_handle) (decision C.uint32_t) {
+func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource_request, rawHandle C.mln_resource_request_handle) (decision C.uint32_t) {
 	defer func() {
 		if recover() != nil {
 			decision = C.uint32_t(^uint32(0))

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 void render_still_image(
-  mln_runtime* runtime, mln_map* map, mln_render_session* session
+  mln_runtime runtime, mln_map map, mln_render_session session
 ) {
   if (mln_map_request_still_image(map) != MLN_STATUS_OK) return;
 

@@ -18,7 +18,7 @@ static bool asks_for_another_frame(const mln_runtime_event* event) {
 }
 
 void run_one_frame(
-  mln_runtime* runtime, mln_map* map, mln_render_session* session, bool* pending
+  mln_runtime runtime, mln_map map, mln_render_session session, bool* pending
 ) {
   // Zero drains and returns: this loop takes its cadence from the caller.
   mln_runtime_pump(runtime, 0);

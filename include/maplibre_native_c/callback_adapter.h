@@ -136,12 +136,12 @@ typedef struct mln_adapter_queued_resource_provider {
  *
  * Every pointer field is owned by this record and stays valid until
  * mln_adapter_resource_provider_request_destroy(). The handle field carries the
- * request handle the host completes, usually through a token created by
- * mln_adapter_resource_request_token_create().
+ * request handle the host completes; it is an ordinary handle value the host
+ * moves between execution contexts and passes to mln_resource_request_*().
  */
 typedef struct mln_adapter_queued_resource_request {
   void* owner;
-  mln_resource_request_handle* handle;
+  mln_resource_request_handle handle;
   const char* url;
   uint32_t kind;
   uint32_t loading_method;
@@ -201,14 +201,14 @@ typedef struct mln_adapter_log_record {
 /**
  * Creates a token describing a handle the host has not closed yet.
  *
- * The token copies type_name and does not retain handle. Hosts attach the token
- * to a finalizer so an unclosed handle can be reported from a context that can
- * no longer touch the handle itself.
+ * The token copies type_name and records handle so the report can name it.
+ * Hosts attach the token to a finalizer so an unclosed handle can be reported
+ * from a context that can no longer touch the handle itself.
  *
  * Returns null when the token cannot be allocated.
  */
 MLN_API void* mln_adapter_handle_leak_token_create(
-  const char* type_name, void* handle
+  const char* type_name, uint64_t handle
 ) MLN_NOEXCEPT;
 
 /** Releases a leak token without reporting it. */
@@ -268,7 +268,7 @@ MLN_API mln_status mln_adapter_resource_transform_rewrite_callback(
  */
 MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /**
@@ -282,7 +282,7 @@ MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
  */
 MLN_API uint32_t mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /** Releases a queued request record delivered to a listener. */
@@ -310,70 +310,6 @@ MLN_API void mln_adapter_custom_geometry_callbacks_retire(
   mln_custom_geometry_source_tile_callback fetch_tile,
   mln_custom_geometry_source_tile_callback cancel_tile, void* user_data
 ) MLN_NOEXCEPT;
-
-/**
- * Registers handle under an integer token the host carries across execution
- * contexts.
- *
- * The token owns the handle from this point: complete it with
- * mln_adapter_resource_request_token_complete() or drop it with
- * mln_adapter_resource_request_token_release(), and leave the handle itself
- * alone.
- *
- * Returns 0 when handle is null or the token cannot be recorded.
- */
-MLN_API uint64_t mln_adapter_resource_request_token_create(
-  mln_resource_request_handle* handle
-) MLN_NOEXCEPT;
-
-/**
- * Reports whether the request behind token was cancelled.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when the token is unknown or out_cancelled is
- *   null.
- * - The status reported by mln_resource_request_cancelled().
- */
-MLN_API mln_status mln_adapter_resource_request_token_cancelled(
-  uint64_t token, bool* out_cancelled
-) MLN_NOEXCEPT;
-
-/**
- * Completes the request behind token and retires the token.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when the token is unknown or response is null.
- * - The status reported by mln_resource_request_complete().
- */
-MLN_API mln_status mln_adapter_resource_request_token_complete(
-  uint64_t token, const mln_resource_response* response
-) MLN_NOEXCEPT;
-
-/**
- * Releases the request behind token without completing it, and retires the
- * token.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when the token is unknown.
- */
-MLN_API mln_status
-mln_adapter_resource_request_token_release(uint64_t token) MLN_NOEXCEPT;
-
-/**
- * Blocks until token is completed or released.
- *
- * Hosts use this to drain outstanding requests during teardown. Call it from a
- * context that is not responsible for completing the token.
- *
- * Returns:
- * - MLN_STATUS_OK once the token is retired.
- * - MLN_STATUS_INVALID_ARGUMENT when token is 0.
- */
-MLN_API mln_status
-mln_adapter_resource_request_token_wait(uint64_t token) MLN_NOEXCEPT;
 
 // NOLINTEND(modernize-use-using,modernize-use-trailing-return-type)
 

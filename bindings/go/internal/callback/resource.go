@@ -38,7 +38,7 @@ func newResourceTransformState(callback ResourceTransformCallback) *ResourceTran
 }
 
 // SetResourceTransform installs or replaces a runtime-scoped resource transform.
-func SetResourceTransform(runtime unsafe.Pointer, callback ResourceTransformCallback) (*ResourceTransformState, int32) {
+func SetResourceTransform(runtime uint64, callback ResourceTransformCallback) (*ResourceTransformState, int32) {
 	if callback == nil {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
@@ -49,7 +49,7 @@ func SetResourceTransform(runtime unsafe.Pointer, callback ResourceTransformCall
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
 	status := int32(C.mln_runtime_set_resource_transform(
-		(*C.mln_runtime)(runtime),
+		C.mln_runtime(runtime),
 		&descriptor,
 	))
 	if status != int32(C.MLN_STATUS_OK) {
@@ -60,8 +60,8 @@ func SetResourceTransform(runtime unsafe.Pointer, callback ResourceTransformCall
 }
 
 // ClearResourceTransform clears the runtime-scoped resource transform.
-func ClearResourceTransform(runtime unsafe.Pointer) int32 {
-	return int32(C.mln_runtime_clear_resource_transform((*C.mln_runtime)(runtime)))
+func ClearResourceTransform(runtime uint64) int32 {
+	return int32(C.mln_runtime_clear_resource_transform(C.mln_runtime(runtime)))
 }
 
 // Release frees callback state after native no longer references it.
@@ -163,7 +163,7 @@ type ResourceProviderState struct {
 // ResourceRequestHandle owns a provider request handle selected for handling.
 type ResourceRequestHandle struct {
 	mu                sync.Mutex
-	handle            *C.mln_resource_request_handle
+	handle            C.mln_resource_request_handle
 	decisionFinalized bool
 	providerOwned     bool
 	releaseAccounted  bool
@@ -175,10 +175,10 @@ var (
 	ErrResourceRequestCompleted = errors.New("resource request already completed")
 	ErrResourceRequestClosed    = errors.New("resource request handle is closed")
 
-	completeResourceRequest = func(handle *C.mln_resource_request_handle, response *C.mln_resource_response) int32 {
+	completeResourceRequest = func(handle C.mln_resource_request_handle, response *C.mln_resource_response) int32 {
 		return int32(C.mln_resource_request_complete(handle, response))
 	}
-	releaseResourceRequest = func(handle *C.mln_resource_request_handle) {
+	releaseResourceRequest = func(handle C.mln_resource_request_handle) {
 		C.mln_resource_request_release(handle)
 	}
 )
@@ -190,7 +190,7 @@ func newResourceProviderState(callback ResourceProviderCallback) *ResourceProvid
 }
 
 // SetResourceProvider installs or replaces a runtime-scoped resource provider.
-func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
+func SetResourceProvider(runtime uint64, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
 	if callback == nil {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
@@ -201,7 +201,7 @@ func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallba
 		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
 	status := int32(C.mln_runtime_set_resource_provider(
-		(*C.mln_runtime)(runtime),
+		C.mln_runtime(runtime),
 		&descriptor,
 	))
 	if status != int32(C.MLN_STATUS_OK) {
@@ -212,8 +212,8 @@ func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallba
 }
 
 // ClearResourceProvider clears the runtime-scoped resource provider.
-func ClearResourceProvider(runtime unsafe.Pointer) int32 {
-	return int32(C.mln_runtime_clear_resource_provider((*C.mln_runtime)(runtime)))
+func ClearResourceProvider(runtime uint64) int32 {
+	return int32(C.mln_runtime_clear_resource_provider(C.mln_runtime(runtime)))
 }
 
 // Release frees provider callback state after native no longer references it.
@@ -226,35 +226,39 @@ func (state *ResourceProviderState) Release() {
 	})
 }
 
-func newResourceRequestHandle(handle *C.mln_resource_request_handle) (*ResourceRequestHandle, int32) {
-	if handle == nil {
+func newResourceRequestHandle(handle C.mln_resource_request_handle) (*ResourceRequestHandle, int32) {
+	if handle == 0 {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	return &ResourceRequestHandle{handle: handle}, int32(C.MLN_STATUS_OK)
 }
 
+// A synthetic request handle for tests. It reaches only the test hooks below,
+// never the C API, and the kind byte matches a resource request so a value that
+// escapes into a diagnostic reads as an obviously synthetic handle.
+const testResourceRequestHandle = C.mln_resource_request_handle(0x0c00_0000_0000_0034)
+
 func newResourceRequestHandleForTest() *ResourceRequestHandle {
-	return &ResourceRequestHandle{handle: (*C.mln_resource_request_handle)(C.malloc(1))}
+	return &ResourceRequestHandle{handle: testResourceRequestHandle}
 }
 
 func freeResourceRequestHandleForTest(handle *ResourceRequestHandle) {
-	if handle == nil || handle.handle == nil {
+	if handle == nil {
 		return
 	}
-	C.free(unsafe.Pointer(handle.handle))
-	handle.handle = nil
+	handle.handle = 0
 }
 
 func setResourceRequestHooksForTest(complete func() int32, release func()) func() {
 	previousComplete := completeResourceRequest
 	previousRelease := releaseResourceRequest
 	if complete != nil {
-		completeResourceRequest = func(*C.mln_resource_request_handle, *C.mln_resource_response) int32 {
+		completeResourceRequest = func(C.mln_resource_request_handle, *C.mln_resource_response) int32 {
 			return complete()
 		}
 	}
 	if release != nil {
-		releaseResourceRequest = func(*C.mln_resource_request_handle) {
+		releaseResourceRequest = func(C.mln_resource_request_handle) {
 			release()
 		}
 	}
@@ -455,8 +459,6 @@ func copyCBytes(data unsafe.Pointer, size C.size_t) ([]byte, bool) {
 func invokeResourceProviderTrampolineForTest(state *ResourceProviderState) uint32 {
 	rawURL := C.CString("https://example.com/style.json")
 	defer C.free(unsafe.Pointer(rawURL))
-	rawHandle := C.malloc(1)
-	defer C.free(rawHandle)
 	rawRequest := C.mln_resource_request{
 		size: C.uint32_t(unsafe.Sizeof(C.mln_resource_request{})),
 		url:  rawURL,
@@ -465,7 +467,7 @@ func invokeResourceProviderTrampolineForTest(state *ResourceProviderState) uint3
 	return uint32(goMaplibreResourceProvider(
 		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		&rawRequest,
-		(*C.mln_resource_request_handle)(rawHandle),
+		testResourceRequestHandle,
 	))
 }
 
