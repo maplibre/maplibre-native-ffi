@@ -21,11 +21,22 @@
 #include "geojson/geojson.hpp"
 
 #include "diagnostics/diagnostics.hpp"
+#include "handles/handle_table.hpp"
 #include "maplibre_native_c.h"
 
-struct mln_json_snapshot {
-  std::unique_ptr<mln::core::OwnedJsonDescriptor> value;
+namespace mln::core {
+
+struct JsonSnapshotObject {
+  std::unique_ptr<OwnedJsonDescriptor> value;
 };
+
+template <>
+struct HandleTraits<JsonSnapshotObject> {
+  static constexpr auto kind = HandleKind::JsonSnapshot;
+  static constexpr auto leasable = false;
+};
+
+}  // namespace mln::core
 
 namespace {
 
@@ -42,18 +53,6 @@ Overloaded(Ts...) -> Overloaded<Ts...>;
 using GeometryDescriptorPtr =
   std::unique_ptr<mln::core::OwnedGeometryDescriptor>;
 using JsonDescriptorPtr = std::unique_ptr<mln::core::OwnedJsonDescriptor>;
-
-auto json_snapshot_mutex() -> std::mutex& {
-  static auto value = std::mutex{};
-  return value;
-}
-
-auto json_snapshots() -> std::unordered_map<
-  const mln_json_snapshot*, std::unique_ptr<mln_json_snapshot>>& {
-  static auto value = std::unordered_map<
-    const mln_json_snapshot*, std::unique_ptr<mln_json_snapshot>>{};
-  return value;
-}
 
 auto validate_depth(std::size_t depth) -> bool {
   if (depth > max_recursive_depth) {
@@ -808,55 +807,46 @@ auto to_c_json_value(const mbgl::Value& value)
   return make_json_descriptor(value, 0);
 }
 
-auto json_snapshot_create(mbgl::Value value, mln_json_snapshot** out_snapshot)
+auto json_snapshot_create(mbgl::Value value, mln_json_snapshot* out_snapshot)
   -> mln_status {
   if (out_snapshot == nullptr) {
     set_thread_error("out_state must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (*out_snapshot != nullptr) {
-    set_thread_error("*out_state must be null");
+  if (*out_snapshot != MLN_HANDLE_NULL) {
+    set_thread_error("*out_state must be the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto snapshot = std::make_unique<mln_json_snapshot>();
+  auto snapshot = std::make_shared<JsonSnapshotObject>();
   snapshot->value = to_c_json_value(value);
-  auto* handle = snapshot.get();
-  const auto lock = std::scoped_lock{json_snapshot_mutex()};
-  json_snapshots().emplace(handle, std::move(snapshot));
-  *out_snapshot = handle;
+  *out_snapshot =
+    handle_table<JsonSnapshotObject>().insert(std::move(snapshot));
   return MLN_STATUS_OK;
 }
 
 auto json_snapshot_get(
-  const mln_json_snapshot* snapshot, const mln_json_value** out_value
+  mln_json_snapshot snapshot, const mln_json_value** out_value
 ) -> mln_status {
-  if (snapshot == nullptr) {
-    set_thread_error("JSON snapshot must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_value == nullptr) {
     set_thread_error("out_value must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto lock = std::scoped_lock{json_snapshot_mutex()};
-  const auto found = json_snapshots().find(snapshot);
-  if (found == json_snapshots().end()) {
-    set_thread_error("JSON snapshot is not a live handle");
+  // A snapshot carries no thread affinity, so another thread may destroy it
+  // mid-read. The lock spans the read for that reason.
+  auto& table = handle_table<JsonSnapshotObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live = table.resolve_locked(snapshot);
+  if (live == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  *out_value = &found->second->value->root;
+  *out_value = &live->value->root;
   return MLN_STATUS_OK;
 }
 
-auto json_snapshot_destroy(mln_json_snapshot* snapshot) -> void {
-  if (snapshot == nullptr) {
-    return;
-  }
-
-  const auto lock = std::scoped_lock{json_snapshot_mutex()};
-  json_snapshots().erase(snapshot);
+auto json_snapshot_destroy(mln_json_snapshot snapshot) -> void {
+  static_cast<void>(handle_table<JsonSnapshotObject>().remove(snapshot));
 }
 
 auto to_native_feature(const mln_feature* feature)

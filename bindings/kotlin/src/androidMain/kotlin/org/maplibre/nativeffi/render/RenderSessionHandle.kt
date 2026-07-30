@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render
 import java.nio.charset.StandardCharsets
 import org.bytedeco.javacpp.BoolPointer
 import org.bytedeco.javacpp.BytePointer
+import org.bytedeco.javacpp.LongPointer
 import org.bytedeco.javacpp.Pointer
 import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.javacpp.SizeTPointer
@@ -29,9 +30,9 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
 /** Owned Android JNI render session handle. Close it on the thread that attached it. */
 public actual class RenderSessionHandle
-private constructor(private val map: MapHandle, private val handleAddress: Long) : AutoCloseable {
+private constructor(private val map: MapHandle, private val handleId: Long) : AutoCloseable {
   private val mapRetention = map.retainChild("RenderSessionHandle")
-  private val core = HandleStateCore("RenderSessionHandle", handleAddress, map)
+  private val core = HandleStateCore("RenderSessionHandle", handleId, map)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -50,12 +51,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     Status.requireArgument(width >= 0) { "width must be non-negative" }
     Status.requireArgument(height >= 0) { "height must be non-negative" }
     Status.check(
-      MaplibreNativeC.mln_render_session_resize(
-        renderSession(requireLiveAddress()),
-        width,
-        height,
-        scaleFactor,
-      )
+      MaplibreNativeC.mln_render_session_resize(requireLiveHandle(), width, height, scaleFactor)
     )
   }
 
@@ -65,10 +61,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     BoolPointer(1).use { outRendered ->
       outRendered.put(0, false)
       Status.check(
-        MaplibreNativeC.mln_render_session_render_update(
-          renderSession(requireLiveAddress()),
-          outRendered,
-        )
+        MaplibreNativeC.mln_render_session_render_update(requireLiveHandle(), outRendered)
       )
       return outRendered.get()
     }
@@ -77,30 +70,26 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
   public actual fun detach() {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("detach")
-    Status.check(MaplibreNativeC.mln_render_session_detach(renderSession(requireLiveAddress())))
+    Status.check(MaplibreNativeC.mln_render_session_detach(requireLiveHandle()))
     mapRetention.close()
   }
 
   public actual fun reduceMemoryUse() {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("reduce memory use")
-    Status.check(
-      MaplibreNativeC.mln_render_session_reduce_memory_use(renderSession(requireLiveAddress()))
-    )
+    Status.check(MaplibreNativeC.mln_render_session_reduce_memory_use(requireLiveHandle()))
   }
 
   public actual fun clearData() {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("clear data")
-    Status.check(MaplibreNativeC.mln_render_session_clear_data(renderSession(requireLiveAddress())))
+    Status.check(MaplibreNativeC.mln_render_session_clear_data(requireLiveHandle()))
   }
 
   public actual fun dumpDebugLogs() {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("dump debug logs")
-    Status.check(
-      MaplibreNativeC.mln_render_session_dump_debug_logs(renderSession(requireLiveAddress()))
-    )
+    Status.check(MaplibreNativeC.mln_render_session_dump_debug_logs(requireLiveHandle()))
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
@@ -110,7 +99,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
       JsonScope(value).use { nativeValue ->
         Status.check(
           MaplibreNativeC.mln_render_session_set_feature_state(
-            renderSession(requireLiveAddress()),
+            requireLiveHandle(),
             nativeSelector.selector,
             nativeValue.value,
           )
@@ -123,11 +112,11 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("get feature state")
     FeatureStateSelectorScope(selector).use { nativeSelector ->
-      PointerPointer<Pointer>(1).use { outState ->
-        outState.put(0, null as Pointer?)
+      LongPointer(1).use { outState ->
+        outState.put(0, 0L)
         Status.check(
           MaplibreNativeC.mln_render_session_get_feature_state(
-            renderSession(requireLiveAddress()),
+            requireLiveHandle(),
             nativeSelector.selector,
             outState,
           )
@@ -143,7 +132,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     FeatureStateSelectorScope(selector).use { nativeSelector ->
       Status.check(
         MaplibreNativeC.mln_render_session_remove_feature_state(
-          renderSession(requireLiveAddress()),
+          requireLiveHandle(),
           nativeSelector.selector,
         )
       )
@@ -158,11 +147,11 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     activeFrame.ensureInactive("query rendered features")
     RenderedQueryGeometryScope(geometry).use { nativeGeometry ->
       RenderedFeatureQueryOptionsScope(options).use { nativeOptions ->
-        PointerPointer<Pointer>(1).use { outResult ->
-          outResult.put(0, null as Pointer?)
+        LongPointer(1).use { outResult ->
+          outResult.put(0, 0L)
           Status.check(
             MaplibreNativeC.mln_render_session_query_rendered_features(
-              renderSession(requireLiveAddress()),
+              requireLiveHandle(),
               nativeGeometry.geometry,
               nativeOptions.options,
               outResult,
@@ -182,11 +171,11 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     activeFrame.ensureInactive("query source features")
     StringViewScope(sourceId).use { nativeSourceId ->
       SourceFeatureQueryOptionsScope(options).use { nativeOptions ->
-        PointerPointer<Pointer>(1).use { outResult ->
-          outResult.put(0, null as Pointer?)
+        LongPointer(1).use { outResult ->
+          outResult.put(0, 0L)
           Status.check(
             MaplibreNativeC.mln_render_session_query_source_features(
-              renderSession(requireLiveAddress()),
+              requireLiveHandle(),
               nativeSourceId.view,
               nativeOptions.options,
               outResult,
@@ -212,11 +201,11 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
         StringViewScope(extension).use { nativeExtension ->
           StringViewScope(extensionField).use { nativeExtensionField ->
             JsonScope(arguments ?: JsonValue.Null).use { nativeArguments ->
-              PointerPointer<Pointer>(1).use { outResult ->
-                outResult.put(0, null as Pointer?)
+              LongPointer(1).use { outResult ->
+                outResult.put(0, 0L)
                 Status.check(
                   MaplibreNativeC.mln_render_session_query_feature_extensions(
-                    renderSession(requireLiveAddress()),
+                    requireLiveHandle(),
                     nativeSourceId.view,
                     nativeFeature.feature,
                     nativeExtension.view,
@@ -240,7 +229,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     val outInfo = MaplibreNativeC.mln_texture_image_info_default()
     val status =
       MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
-        renderSession(requireLiveAddress()),
+        requireLiveHandle(),
         null as BytePointer?,
         0L,
         outInfo,
@@ -262,7 +251,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     val outInfo = MaplibreNativeC.mln_texture_image_info_default()
     Status.check(
       MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
-        renderSession(requireLiveAddress()),
+        requireLiveHandle(),
         buffer.borrowBuffer(),
         buffer.byteLength(),
         outInfo,
@@ -278,10 +267,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(
-          renderSession(requireLiveAddress()),
-          nativeFrame,
-        )
+        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
       )
       val scope = FrameScope()
       return MetalOwnedTextureFrameHandle(
@@ -304,10 +290,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(
-          renderSession(requireLiveAddress()),
-          nativeFrame,
-        )
+        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
       )
       val scope = FrameScope()
       return VulkanOwnedTextureFrameHandle(
@@ -330,10 +313,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     nativeFrame.size(nativeFrame.sizeof())
     try {
       Status.check(
-        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(
-          renderSession(requireLiveAddress()),
-          nativeFrame,
-        )
+        MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(requireLiveHandle(), nativeFrame)
       )
       val scope = FrameScope()
       return OpenGLOwnedTextureFrameHandle(
@@ -353,41 +333,26 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("destroy")
     core.closeOnce(
-      destroy = { MaplibreNativeC.mln_render_session_destroy(renderSession(handleAddress)) },
+      destroy = { MaplibreNativeC.mln_render_session_destroy(handleId) },
       afterSuccess = { mapRetention.close() },
     )
   }
 
-  private fun requireLiveAddress(): Long {
+  private fun requireLiveHandle(): Long {
     core.requireLive()
-    return handleAddress
+    return handleId
   }
 
   internal fun releaseMetalFrame(frame: MaplibreNativeC.mln_metal_owned_texture_frame) {
-    Status.check(
-      MaplibreNativeC.mln_metal_owned_texture_release_frame(
-        renderSession(requireLiveAddress()),
-        frame,
-      )
-    )
+    Status.check(MaplibreNativeC.mln_metal_owned_texture_release_frame(requireLiveHandle(), frame))
   }
 
   internal fun releaseVulkanFrame(frame: MaplibreNativeC.mln_vulkan_owned_texture_frame) {
-    Status.check(
-      MaplibreNativeC.mln_vulkan_owned_texture_release_frame(
-        renderSession(requireLiveAddress()),
-        frame,
-      )
-    )
+    Status.check(MaplibreNativeC.mln_vulkan_owned_texture_release_frame(requireLiveHandle(), frame))
   }
 
   internal fun releaseOpenGLFrame(frame: MaplibreNativeC.mln_opengl_owned_texture_frame) {
-    Status.check(
-      MaplibreNativeC.mln_opengl_owned_texture_release_frame(
-        renderSession(requireLiveAddress()),
-        frame,
-      )
-    )
+    Status.check(MaplibreNativeC.mln_opengl_owned_texture_release_frame(requireLiveHandle(), frame))
   }
 
   internal fun finishFrameBorrow() {
@@ -401,7 +366,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_metal_owned_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           metalOwnedTextureDescriptor(descriptor),
           outSession,
         )
@@ -413,7 +378,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_metal_borrowed_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           metalBorrowedTextureDescriptor(descriptor),
           outSession,
         )
@@ -425,7 +390,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_vulkan_owned_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           vulkanOwnedTextureDescriptor(descriptor),
           outSession,
         )
@@ -437,7 +402,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           vulkanBorrowedTextureDescriptor(descriptor),
           outSession,
         )
@@ -449,7 +414,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_opengl_owned_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           openglOwnedTextureDescriptor(descriptor),
           outSession,
         )
@@ -461,7 +426,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_opengl_borrowed_texture_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           openglBorrowedTextureDescriptor(descriptor),
           outSession,
         )
@@ -473,7 +438,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_metal_surface_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           metalSurfaceDescriptor(descriptor),
           outSession,
         )
@@ -485,7 +450,7 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_vulkan_surface_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           vulkanSurfaceDescriptor(descriptor),
           outSession,
         )
@@ -497,24 +462,20 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
     ): RenderSessionHandle =
       attach(map) { outSession ->
         MaplibreNativeC.mln_opengl_surface_attach(
-          map(map.nativeAddress()),
+          map.nativeHandleId(),
           openglSurfaceDescriptor(descriptor),
           outSession,
         )
       }
 
-    private fun attach(
-      map: MapHandle,
-      block: (PointerPointer<MaplibreNativeC.mln_render_session>) -> Int,
-    ): RenderSessionHandle {
+    private fun attach(map: MapHandle, block: (LongPointer) -> Int): RenderSessionHandle {
       NativeAccess.ensureLoaded()
-      PointerPointer<MaplibreNativeC.mln_render_session>(1).use { outSession ->
-        outSession.put(0, null as Pointer?)
+      LongPointer(1).use { outSession ->
+        outSession.put(0, 0L)
         Status.check(block(outSession))
-        val session = outSession.get(MaplibreNativeC.mln_render_session::class.java, 0)
-        val address = if (session == null || session.isNull) 0L else session.address()
-        require(address != 0L) { "render session attach returned a null session" }
-        return RenderSessionHandle(map, address)
+        val session = outSession.get()
+        require(session != 0L) { "render session attach returned a null session" }
+        return RenderSessionHandle(map, session)
       }
     }
   }
@@ -713,10 +674,10 @@ private fun openglOwnedTextureFrame(
 private fun address(pointer: Pointer?): Long =
   if (pointer == null || pointer.isNull) 0L else pointer.address()
 
-private fun jsonSnapshot(outSnapshot: PointerPointer<Pointer>): JsonValue? {
-  val snapshotPointer = outSnapshot.get(Pointer::class.java, 0) ?: return null
-  if (snapshotPointer.isNull) return null
-  val snapshot = MaplibreNativeC.mln_json_snapshot(snapshotPointer)
+private fun jsonSnapshot(outSnapshot: LongPointer): JsonValue? {
+  // A null snapshot means the value is absent, which the C API reports as success.
+  val snapshot = outSnapshot.get()
+  if (snapshot == 0L) return null
   return try {
     PointerPointer<Pointer>(1).use { outValue ->
       outValue.put(0, null as Pointer?)
@@ -770,18 +731,11 @@ private fun stringView(value: MaplibreNativeC.mln_string_view): String {
   return String(bytes, StandardCharsets.UTF_8)
 }
 
-private fun map(address: Long): MaplibreNativeC.mln_map =
-  MaplibreNativeC.mln_map(AddressPointer(address))
-
-private fun renderSession(address: Long): MaplibreNativeC.mln_render_session =
-  MaplibreNativeC.mln_render_session(AddressPointer(address))
-
 private fun pointerOrNull(pointer: NativePointer): Pointer? =
   if (pointer.isNull) null else AddressPointer(pointer.address)
 
-private fun featureQueryResult(outResult: PointerPointer<Pointer>): List<QueriedFeature> {
-  val pointer = outResult.get(Pointer::class.java, 0)
-  val result = MaplibreNativeC.mln_feature_query_result(pointer)
+private fun featureQueryResult(outResult: LongPointer): List<QueriedFeature> {
+  val result = outResult.get()
   return try {
     SizeTPointer(1).use { outCount ->
       Status.check(MaplibreNativeC.mln_feature_query_result_count(result, outCount))
@@ -804,9 +758,8 @@ private fun featureQueryResult(outResult: PointerPointer<Pointer>): List<Queried
   }
 }
 
-private fun featureExtensionResult(outResult: PointerPointer<Pointer>): FeatureExtensionResult {
-  val pointer = outResult.get(Pointer::class.java, 0)
-  val result = MaplibreNativeC.mln_feature_extension_result(pointer)
+private fun featureExtensionResult(outResult: LongPointer): FeatureExtensionResult {
+  val result = outResult.get()
   return try {
     val info = MaplibreNativeC.mln_feature_extension_result_info()
     try {
@@ -1399,6 +1352,7 @@ private class StringViewScope(value: String) : AutoCloseable {
   }
 }
 
+/** A `void*` built from a raw address, for backend-native pointers and user data. */
 private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
   init {
     this.address = address

@@ -2,7 +2,18 @@ import Foundation
 
 struct NativeHandleLeak: Equatable {
   let typeName: String
-  let address: UInt
+  /// The C API handle id the leak is about, or zero when the leaked resource is
+  /// a texture frame rather than a C API handle. Backend-native addresses never
+  /// appear here; they belong to ``NativePointer``.
+  let handle: UInt64
+  /// What the leak names when it is not a C API handle.
+  let detail: String
+
+  init(typeName: String, handle: UInt64, detail: String = "") {
+    self.typeName = typeName
+    self.handle = handle
+    self.detail = detail
+  }
 }
 
 private func writeStandardError(_ message: String) {
@@ -15,7 +26,10 @@ enum NativeHandleLeakReporter {
   private static let lock = NSLock()
   private static let defaultHandler: @Sendable (NativeHandleLeak)
     -> Void = { leak in
-      let message = "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n"
+      let subject = leak.handle == 0
+        ? leak.detail
+        : "native handle 0x\(String(leak.handle, radix: 16))"
+      let message = "Leaked \(leak.typeName) \(subject); close handles explicitly on their owner thread.\n"
       writeStandardError(message)
     }
 

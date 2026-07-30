@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
@@ -13,9 +12,9 @@ import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned Android JNI standalone projection snapshot. */
-public actual class MapProjectionHandle internal constructor(private val handleAddress: Long) :
+public actual class MapProjectionHandle internal constructor(private val handleId: Long) :
   AutoCloseable {
-  private val core = HandleStateCore("MapProjectionHandle", handleAddress)
+  private val core = HandleStateCore("MapProjectionHandle", handleId)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -25,9 +24,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
     get() {
       NativeAccess.ensureLoaded()
       MaplibreNativeC.mln_camera_options_default().use { outCamera ->
-        Status.check(
-          MaplibreNativeC.mln_map_projection_get_camera(projection(requireLiveAddress()), outCamera)
-        )
+        Status.check(MaplibreNativeC.mln_map_projection_get_camera(requireLiveHandle(), outCamera))
         return projectionCameraOptions(outCamera)
       }
     }
@@ -36,10 +33,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
     NativeAccess.ensureLoaded()
     ProjectionCameraOptionsScope(camera).use { nativeCamera ->
       Status.check(
-        MaplibreNativeC.mln_map_projection_set_camera(
-          projection(requireLiveAddress()),
-          nativeCamera.options,
-        )
+        MaplibreNativeC.mln_map_projection_set_camera(requireLiveHandle(), nativeCamera.options)
       )
     }
   }
@@ -55,7 +49,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
         .use { nativePadding ->
           Status.check(
             MaplibreNativeC.mln_map_projection_set_visible_coordinates(
-              projection(requireLiveAddress()),
+              requireLiveHandle(),
               nativeCoordinates.coordinates,
               nativeCoordinates.count,
               nativePadding,
@@ -76,7 +70,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
         .use { nativePadding ->
           Status.check(
             MaplibreNativeC.mln_map_projection_set_visible_geometry(
-              projection(requireLiveAddress()),
+              requireLiveHandle(),
               nativeGeometry.value,
               nativePadding,
             )
@@ -90,7 +84,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
     MaplibreNativeC.mln_screen_point().use { outPoint ->
       Status.check(
         MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
-          projection(requireLiveAddress()),
+          requireLiveHandle(),
           MaplibreNativeC.mln_lat_lng()
             .latitude(coordinate.latitude)
             .longitude(coordinate.longitude),
@@ -106,7 +100,7 @@ public actual class MapProjectionHandle internal constructor(private val handleA
     MaplibreNativeC.mln_lat_lng().use { outCoordinate ->
       Status.check(
         MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
-          projection(requireLiveAddress()),
+          requireLiveHandle(),
           MaplibreNativeC.mln_screen_point().x(point.x).y(point.y),
           outCoordinate,
         )
@@ -119,23 +113,12 @@ public actual class MapProjectionHandle internal constructor(private val handleA
     get() = core.isReleased()
 
   public actual override fun close() {
-    core.closeOnce(
-      destroy = { MaplibreNativeC.mln_map_projection_destroy(projection(handleAddress)) }
-    )
+    core.closeOnce(destroy = { MaplibreNativeC.mln_map_projection_destroy(handleId) })
   }
 
-  private fun requireLiveAddress(): Long {
+  private fun requireLiveHandle(): Long {
     core.requireLive()
-    return handleAddress
-  }
-}
-
-private fun projection(address: Long): MaplibreNativeC.mln_map_projection =
-  MaplibreNativeC.mln_map_projection(ProjectionAddressPointer(address))
-
-private class ProjectionAddressPointer(address: Long) : Pointer(null as Pointer?) {
-  init {
-    this.address = address
+    return handleId
   }
 }
 

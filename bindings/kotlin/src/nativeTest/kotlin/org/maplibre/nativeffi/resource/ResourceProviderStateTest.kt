@@ -9,7 +9,6 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
@@ -22,7 +21,6 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.staticCFunction
 import kotlinx.cinterop.value
@@ -33,6 +31,8 @@ import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 import platform.posix.pthread_create
 import platform.posix.pthread_join
@@ -76,11 +76,10 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         priorData[2] = 3U
         request.prior_data = priorData
         request.prior_data_size = 3UL
-        val fakeHandle =
-          alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+        val fakeHandle = SyntheticHandles.resourceRequest()
         assertEquals(
           ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
-          state.invoke(request.ptr, fakeHandle),
+          state.invoke(request.ptr, fakeHandle.rawHandleValue),
         )
       }
       assertEquals(ResourceKind(900), copied?.kind)
@@ -174,8 +173,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun requestHandleReleasesProviderOwnedHandleOnceAndRejectsAfterClose() {
     memScoped {
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle = ResourceRequestHandle(fakeHandle, releaser = { releases++ })
 
       assertEquals(
@@ -195,8 +193,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun providerOwnedHandleClosedBeforeDecisionReleasesAfterDecisionExactlyOnce() {
     memScoped {
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle = ResourceRequestHandle(fakeHandle, releaser = { releases++ })
 
       handle.close()
@@ -213,8 +210,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun passThroughDecisionLetsNativeOwnRelease() {
     memScoped {
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle = ResourceRequestHandle(fakeHandle, releaser = { releases++ })
 
       assertEquals(
@@ -231,8 +227,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var completions = 0
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -261,8 +256,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
       var completions = 0
       var cancellationChecks = 0
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -299,8 +293,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var completions = 0
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -333,8 +326,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
       var completions = 0
       var cancellationChecks = 0
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -380,9 +372,8 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
       memScoped {
         val request = alloc<mln_resource_request>()
         request.url = null
-        val fakeHandle =
-          alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
-        assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle))
+        val fakeHandle = SyntheticHandles.resourceRequest()
+        assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
       }
     } finally {
       state.close()
@@ -405,15 +396,14 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
         )
       val request = alloc<mln_resource_request>()
       request.url = null
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
 
       assertEquals(
         ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
-        state.invoke(request.ptr, fakeHandle),
+        state.invoke(request.ptr, fakeHandle.rawHandleValue),
       )
       assertTrue(state.isClosedForTesting())
-      assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle))
+      assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
       assertEquals(1, calls)
       state.close()
     }
@@ -426,8 +416,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var completions = 0
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -461,13 +450,12 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun nativeCompletionFailureKeepsDiagnosticCapturedBeforeReleaseCleanup() {
     memScoped {
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
           completer = { _, _ -> mln_network_status_set(999_999U) },
-          releaser = { mln_runtime_destroy(null) },
+          releaser = { mln_runtime_destroy(0uL) },
         )
 
       assertEquals(
@@ -488,8 +476,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun closeDuringCompletionWaitsForCompletionBeforeNativeRelease() {
     memScoped {
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       lateinit var handle: ResourceRequestHandle
       handle =
         ResourceRequestHandle(
@@ -520,8 +507,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
       val phase = AtomicInt(RESOURCE_PHASE_READY)
       val error = AtomicReference<Throwable?>(null)
       val releases = AtomicInt(0)
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       val handle =
         ResourceRequestHandle(
           fakeHandle,
@@ -556,8 +542,7 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   fun closeDuringCancellationCheckWaitsForCheckBeforeNativeRelease() {
     memScoped {
       var releases = 0
-      val fakeHandle =
-        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val fakeHandle = SyntheticHandles.resourceRequest()
       lateinit var handle: ResourceRequestHandle
       handle =
         ResourceRequestHandle(

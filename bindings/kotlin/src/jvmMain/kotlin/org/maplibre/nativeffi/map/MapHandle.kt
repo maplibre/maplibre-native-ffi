@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeMap
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -39,12 +40,10 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned JVM FFM map handle. */
 public actual class MapHandle
-private constructor(
-  private val runtime: RuntimeHandle,
-  private val handle: java.lang.foreign.MemorySegment,
-) : AutoCloseable {
+private constructor(private val runtime: RuntimeHandle, private val handle: NativeMap) :
+  AutoCloseable {
   private val runtimeRetention = runtime.retainChild("MapHandle")
-  private val core = HandleStateCore("MapHandle", handle.address())
+  private val core = HandleStateCore("MapHandle", handle.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -724,7 +723,7 @@ private constructor(
     }
   }
 
-  internal fun nativeAddress(): Long = handle.address()
+  internal fun nativeHandleId(): Long = handle.raw
 
   internal fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
@@ -740,7 +739,7 @@ private constructor(
     }
   }
 
-  private fun requireLiveHandle(): java.lang.foreign.MemorySegment {
+  private fun requireLiveHandle(): NativeMap {
     core.requireLive()
     return handle
   }

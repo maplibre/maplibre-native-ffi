@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.Geometry
@@ -8,12 +7,13 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 
 /** Owned JVM FFM standalone projection snapshot. */
-public actual class MapProjectionHandle internal constructor(private val handle: MemorySegment) :
-  AutoCloseable {
-  private val core = HandleStateCore("MapProjectionHandle", handle.address())
+public actual class MapProjectionHandle
+internal constructor(private val handle: NativeMapProjection) : AutoCloseable {
+  private val core = HandleStateCore("MapProjectionHandle", handle.raw)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -57,7 +57,7 @@ public actual class MapProjectionHandle internal constructor(private val handle:
     core.closeOnce(destroy = { NativeAccess.destroyMapProjection(handle) })
   }
 
-  private fun requireLiveHandle(): MemorySegment {
+  private fun requireLiveHandle(): NativeMapProjection {
     core.requireLive()
     return handle
   }

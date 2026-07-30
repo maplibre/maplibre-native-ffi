@@ -20,26 +20,23 @@ pub(crate) struct MapProjectionState {
 }
 
 impl MapProjectionState {
-    fn new(ptr: std::ptr::NonNull<sys::mln_map_projection>) -> Self {
-        // SAFETY: ptr came from successful mln_map_projection_create and is
+    fn new(native: sys::mln_map_projection) -> Result<Self> {
+        // SAFETY: native came from successful mln_map_projection_create and is
         // paired with the matching projection destroy function.
         let handle = unsafe {
-            ThreadAffineNativeHandle::from_raw(
-                ptr,
+            ThreadAffineNativeHandle::from_handle(
+                native,
                 sys::mln_map_projection_destroy,
                 "mln_map_projection",
             )
-        };
-        Self { handle }
+        }?;
+        Ok(Self { handle })
     }
 
-    fn as_ptr(&self) -> Result<*mut sys::mln_map_projection> {
-        let ptr = self.handle.as_ptr();
-        if ptr.is_null() {
-            Err(closed_handle_error("MapProjectionHandle"))
-        } else {
-            Ok(ptr)
-        }
+    fn native(&self) -> Result<sys::mln_map_projection> {
+        self.handle
+            .live_handle()
+            .ok_or_else(|| closed_handle_error("MapProjectionHandle"))
     }
 
     fn is_closed(&self) -> bool {
@@ -69,14 +66,14 @@ impl fmt::Debug for MapProjectionHandle {
 
 impl MapProjectionHandle {
     pub(crate) fn new(map: &MapHandle) -> Result<Self> {
-        let map_ptr = map.inner.as_ptr()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();
+        let map_ptr = map.inner.native()?;
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_map_projection>::new();
         // SAFETY: map_ptr is a live map handle. out is a valid null-initialized
         // out-pointer owned by this call.
         maplibre_core::check(unsafe { sys::mln_map_projection_create(map_ptr, out.as_mut_ptr()) })?;
         let ptr = out_handle(out, "mln_map_projection")?;
         Ok(Self {
-            inner: MapProjectionState::new(ptr),
+            inner: MapProjectionState::new(ptr)?,
         })
     }
 
@@ -89,7 +86,7 @@ impl MapProjectionHandle {
 
     /// Reads the projection helper's current camera snapshot.
     pub fn camera(&self) -> Result<CameraOptions> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_camera_options_default() };
         // SAFETY: projection is live and raw has a valid size field for C to fill.
@@ -99,7 +96,7 @@ impl MapProjectionHandle {
 
     /// Applies camera fields to this projection helper.
     pub fn set_camera(&self, camera: &CameraOptions) -> Result<()> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         let raw = camera.to_native();
         // SAFETY: projection is live and raw is a materialized descriptor valid
         // for the duration of this call.
@@ -112,7 +109,7 @@ impl MapProjectionHandle {
         coordinates: &[LatLng],
         padding: EdgeInsets,
     ) -> Result<()> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         if coordinates.is_empty() {
             return Err(Error::invalid_argument(
                 "set_visible_coordinates requires at least one coordinate",
@@ -133,7 +130,7 @@ impl MapProjectionHandle {
 
     /// Updates the projection camera so geometry coordinates are visible.
     pub fn set_visible_geometry(&self, geometry: &Geometry, padding: EdgeInsets) -> Result<()> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         let native_geometry = geometry.try_to_native()?;
         // SAFETY: projection is live, native_geometry owns backing storage for
         // the duration of this call, and padding is passed by value.
@@ -148,7 +145,7 @@ impl MapProjectionHandle {
 
     /// Converts a geographic world coordinate to a screen point.
     pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         let mut raw_point = empty_screen_point();
         // SAFETY: projection is live, coordinate is passed by value, and
         // raw_point is writable output storage.
@@ -164,7 +161,7 @@ impl MapProjectionHandle {
 
     /// Converts a screen point to a geographic world coordinate.
     pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
-        let projection = self.inner.as_ptr()?;
+        let projection = self.inner.native()?;
         let mut raw_coordinate = empty_lat_lng();
         // SAFETY: projection is live, point is passed by value, and
         // raw_coordinate is writable output storage.

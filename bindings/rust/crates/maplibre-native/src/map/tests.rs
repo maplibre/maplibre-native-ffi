@@ -500,7 +500,7 @@ fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
     let mut event = empty_runtime_event();
     event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
     event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.as_ptr().cast();
+    event.source = map.inner.handle.handle().0;
     runtime.inner.apply_event_side_effects_for_testing(&event);
 
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
@@ -523,7 +523,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     // points to writable storage. This bypasses the binding cleanup path to
     // model native style replacement detaching the source.
     let status = unsafe {
-        sys::mln_map_remove_style_source(map.inner.handle.as_ptr(), source_id.raw(), &mut removed)
+        sys::mln_map_remove_style_source(map.inner.handle.handle(), source_id.raw(), &mut removed)
     };
     assert_eq!(status, sys::MLN_STATUS_OK);
     assert!(removed);
@@ -532,7 +532,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     let mut event = empty_runtime_event();
     event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
     event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
-    event.source = map.inner.handle.as_ptr().cast();
+    event.source = map.inner.handle.handle().0;
     runtime.inner.apply_event_side_effects_for_testing(&event);
 
     assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
@@ -909,6 +909,88 @@ fn projection_mode_round_trips_through_real_c_api() {
     let copied_projection_mode = map.projection_mode().unwrap();
 
     assert_eq!(copied_projection_mode.axonometric, Some(false));
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-045.
+fn a_released_map_id_replayed_after_a_new_map_reports_it_stale() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+
+    let first = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let released = first.inner.native().unwrap();
+    first.close().unwrap();
+
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
+    let second = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    let mut width = 0;
+    let mut height = 0;
+    let mut scale = 0.0;
+    // SAFETY: the id is well-formed and the out-pointers are live locals; the
+    // C API resolves the id rather than dereferencing it.
+    let status = unsafe { sys::mln_map_get_size(released, &mut width, &mut height, &mut scale) };
+    assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
+    assert!(maplibre_native_core::error::capture_thread_diagnostic().contains("stale"));
+
+    // The live map is unaffected by the replay.
+    assert_eq!(second.size().unwrap().0, MapOptions::default().width);
+    second.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-047.
+fn a_map_id_passed_to_a_runtime_operation_reports_invalid_argument() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // `mln_map` and `mln_runtime` are distinct newtypes, so this call has no
+    // expression in the safe API and needs the raw id.
+    let wrong_kind = sys::mln_runtime(map.inner.native().unwrap().0);
+    // SAFETY: the value is well-formed; the C API rejects it on its kind tag.
+    let status = unsafe { sys::mln_runtime_pump(wrong_kind, 0) };
+
+    assert_eq!(status, sys::MLN_STATUS_INVALID_ARGUMENT);
+    let message = maplibre_native_core::error::capture_thread_diagnostic();
+    assert!(message.contains("map"), "{message}");
+    assert!(message.contains("runtime"), "{message}");
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-049.
+fn a_live_map_id_called_from_another_thread_reports_wrong_thread() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    let live = map.inner.native().unwrap();
+    let (status, message) = std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                let mut width = 0;
+                let mut height = 0;
+                let mut scale = 0.0;
+                // SAFETY: the id is live; only the calling thread is wrong.
+                let status =
+                    unsafe { sys::mln_map_get_size(live, &mut width, &mut height, &mut scale) };
+                (
+                    status,
+                    maplibre_native_core::error::capture_thread_diagnostic(),
+                )
+            })
+            .join()
+            .unwrap()
+    });
+
+    // The id is live, so the owner-thread rule decides rather than identity.
+    assert_eq!(status, sys::MLN_STATUS_WRONG_THREAD);
+    assert!(!message.contains("stale"), "{message}");
 
     map.close().unwrap();
     runtime.close().unwrap();

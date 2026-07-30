@@ -2,42 +2,53 @@ using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Status;
 
-namespace Maplibre.Native.Internal.Handle;
+namespace Maplibre.Native.Internal.Pointer;
 
-internal unsafe delegate mln_status StatusDestroy<T>(T* handle)
-    where T : unmanaged;
+internal delegate mln_status StatusDestroy<T>(T handle)
+    where T : unmanaged, IMlnHandle;
 
-internal sealed unsafe class NativeHandleState<T>
-    where T : unmanaged
+/// <summary>
+/// Close-once ownership for one native handle.
+/// </summary>
+/// <remarks>
+/// The C API issues generational handles and rejects a released one, so this
+/// tracks ownership rather than identity. The null handle means closed.
+/// </remarks>
+internal sealed class NativeHandleState<T>
+    where T : unmanaged, IMlnHandle
 {
     private readonly object gate = new();
     private readonly StatusDestroy<T> destroy;
     private readonly string typeName;
-    private nint address;
+    private readonly ulong issued;
+    private T handle;
+    private bool closed;
     private bool releaseInProgress;
+    private int activeUses;
 
-    internal NativeHandleState(T* handle, StatusDestroy<T> destroy, string typeName)
+    internal NativeHandleState(T handle, StatusDestroy<T> destroy, string typeName)
     {
-        if (handle is null)
+        if (handle.Value == 0)
         {
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                $"{typeName} pointer is null.",
+                $"{typeName} handle is the null handle.",
                 null
             );
         }
 
         this.destroy = destroy;
         this.typeName = typeName;
-        address = (nint)handle;
+        this.handle = handle;
+        issued = handle.Value;
     }
 
     ~NativeHandleState()
     {
-        var current = address;
-        if (current != 0)
+        if (!closed)
         {
+            var current = issued;
             NativeLeakReporter.Report(
                 new NativeLeakReport(
                     NativeLeakReportKind.LeakedHandle,
@@ -56,50 +67,100 @@ internal sealed unsafe class NativeHandleState<T>
         {
             lock (gate)
             {
-                return address == 0;
+                return closed;
             }
         }
     }
 
-    internal T* Pointer
+    internal T Handle
     {
         get
         {
             lock (gate)
             {
-                if (releaseInProgress)
-                {
-                    throw new InvalidStateException(
-                        MaplibreStatus.InvalidState,
-                        null,
-                        $"{typeName} is closing.",
-                        null
-                    );
-                }
-
-                var handle = (T*)address;
-                if (handle is null)
-                {
-                    throw new InvalidStateException(
-                        MaplibreStatus.InvalidState,
-                        null,
-                        $"{typeName} is closed.",
-                        null
-                    );
-                }
-
-                return handle;
+                return HandleLocked();
             }
         }
     }
 
-    internal void Close()
+    private T HandleLocked()
     {
-        T* handle;
+        if (releaseInProgress)
+        {
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is closing.",
+                null
+            );
+        }
+
+        if (closed)
+        {
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is closed.",
+                null
+            );
+        }
+
+        return handle;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
+    /// </summary>
+    /// <remarks>
+    /// Handles whose release is confined to one thread get this ordering from the owner-thread rule
+    /// and can call native directly after reading <see cref="Handle" />. Handles the host may use
+    /// and release from different threads use this instead, so a release that begins mid-call waits
+    /// for the call to finish. That is what keeps a losing race reporting this wrapper's own
+    /// closed-handle error instead of the C API's rejection of an id retired underneath it.
+    /// <para>
+    /// <paramref name="use" /> runs outside the lock, so concurrent uses proceed together. Calling
+    /// <see cref="Close" /> from inside <paramref name="use" /> on the same thread would wait on
+    /// itself.
+    /// </para>
+    /// </remarks>
+    internal TResult WithLive<TResult>(Func<T, TResult> use)
+    {
+        T live;
         lock (gate)
         {
-            handle = BeginReleaseLocked();
-            if (handle is null)
+            live = HandleLocked();
+            activeUses++;
+        }
+
+        try
+        {
+            return use(live);
+        }
+        finally
+        {
+            lock (gate)
+            {
+                activeUses--;
+                Monitor.PulseAll(gate);
+            }
+        }
+    }
+
+    internal void WithLive(Action<T> use)
+    {
+        WithLive<object?>(handle =>
+        {
+            use(handle);
+            return null;
+        });
+    }
+
+    internal void Close()
+    {
+        T handle;
+        lock (gate)
+        {
+            if (!BeginReleaseLocked(out handle))
             {
                 return;
             }
@@ -127,18 +188,16 @@ internal sealed unsafe class NativeHandleState<T>
 
     internal bool TryClose()
     {
-        T* handle;
-        nint current;
+        T handle;
         lock (gate)
         {
-            handle = BeginReleaseLocked();
-            if (handle is null)
+            if (!BeginReleaseLocked(out handle))
             {
                 return true;
             }
-
-            current = address;
         }
+
+        var current = handle.Value;
 
         mln_status status;
         try
@@ -170,20 +229,29 @@ internal sealed unsafe class NativeHandleState<T>
         return true;
     }
 
-    private T* BeginReleaseLocked()
+    private bool BeginReleaseLocked(out T live)
     {
         while (releaseInProgress)
         {
             Monitor.Wait(gate);
         }
 
-        var handle = (T*)address;
-        if (handle is not null)
+        live = handle;
+        if (closed)
         {
-            releaseInProgress = true;
+            return false;
         }
 
-        return handle;
+        releaseInProgress = true;
+
+        // Marking the release turns new uses away from here on. Uses that already read the handle
+        // still hold it, so wait for them before destroying it.
+        while (activeUses > 0)
+        {
+            Monitor.Wait(gate);
+        }
+
+        return true;
     }
 
     private void EndFailedRelease()
@@ -199,7 +267,7 @@ internal sealed unsafe class NativeHandleState<T>
     {
         lock (gate)
         {
-            address = 0;
+            closed = true;
             releaseInProgress = false;
             GC.SuppressFinalize(this);
             Monitor.PulseAll(gate);

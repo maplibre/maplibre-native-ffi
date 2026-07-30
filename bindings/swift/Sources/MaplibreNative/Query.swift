@@ -183,11 +183,11 @@ public extension RenderSessionHandle {
       try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
         try options.nativeOptions.withNativeOptions { nativeOptions in
           let result = try NativeQuery.renderedFeatures(
-            session: requireLivePointer(),
+            session: requireLiveHandle(),
             geometry: nativeGeometry,
             options: nativeOptions
           )
-          defer { mln_feature_query_result_destroy(result) }
+          defer { mln_feature_query_result_destroy(result.raw) }
           return try NativeFeatureQueryResultReader(handle: result)
             .copyFeatures().map(QueriedFeature.init(native:))
         }
@@ -204,11 +204,11 @@ public extension RenderSessionHandle {
       let sourceId = arena.view(sourceId)
       return try options.nativeOptions.withNativeOptions { nativeOptions in
         let result = try NativeQuery.sourceFeatures(
-          session: requireLivePointer(),
+          session: requireLiveHandle(),
           sourceId: sourceId,
           options: nativeOptions
         )
-        defer { mln_feature_query_result_destroy(result) }
+        defer { mln_feature_query_result_destroy(result.raw) }
         return try NativeFeatureQueryResultReader(handle: result).copyFeatures()
           .map(QueriedFeature.init(native:))
       }
@@ -235,14 +235,14 @@ public extension RenderSessionHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let result = try NativeQuery.featureExtensions(
-        session: requireLivePointer(),
+        session: requireLiveHandle(),
         sourceId: arena.view(sourceId),
         feature: arena.allocateFeature(feature.nativeFeature),
         extensionName: arena.view(extensionName),
         extensionField: arena.view(extensionField),
         arguments: arguments.map { arena.allocate($0.nativeValue) }
       )
-      defer { mln_feature_extension_result_destroy(result) }
+      defer { mln_feature_extension_result_destroy(result.raw) }
       return try FeatureExtensionResult(native: NativeQuery
         .featureExtensionResultCopy(result))
     }
@@ -255,7 +255,7 @@ public extension RenderSessionHandle {
       let arena = NativeInputArena()
       try selector.nativeSelector.withNativeSelector { selector in
         try checkStatus(mln_render_session_set_feature_state(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           selector,
           arena.allocate(state.nativeValue)
         ))
@@ -266,7 +266,7 @@ public extension RenderSessionHandle {
   func featureState(selector: FeatureStateSelector) throws -> JSONValue? {
     try mapNativeFailure {
       try selector.nativeSelector.withNativeSelector { selector in
-        try NativeQuery.featureState(requireLivePointer(), selector: selector)
+        try NativeQuery.featureState(requireLiveHandle(), selector: selector)
           .map(JSONValue.init(native:))
       }
     }
@@ -276,7 +276,7 @@ public extension RenderSessionHandle {
     try mapNativeFailure {
       try selector.nativeSelector.withNativeSelector { selector in
         try checkStatus(mln_render_session_remove_feature_state(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           selector
         ))
       }

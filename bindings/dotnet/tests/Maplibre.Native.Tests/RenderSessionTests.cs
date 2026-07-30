@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
-using Maplibre.Native.Internal.Handle;
+using Maplibre.Native.Internal.Pointer;
 using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Map;
 using Maplibre.Native.Query;
@@ -335,7 +335,7 @@ public sealed unsafe class RenderSessionTests
         var pointer = (mln_metal_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
         pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
-        var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
+        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
         var scope = new FrameScope(nameof(MetalOwnedTextureFrameHandle));
         var releaseCalls = 0;
         var state = new TextureFrameState<mln_metal_owned_texture_frame>(
@@ -431,7 +431,7 @@ public sealed unsafe class RenderSessionTests
                 return mln_status.MLN_STATUS_OK;
             }
         );
-        var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
+        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
         var pointer = (mln_metal_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
         pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
@@ -468,7 +468,7 @@ public sealed unsafe class RenderSessionTests
             var report = Assert.Single(reports);
             Assert.Equal(NativeLeakReportKind.DisposeFailed, report.Kind);
             Assert.Equal(nameof(RenderSessionHandle), report.TypeName);
-            Assert.Equal((nint)1234, report.Address);
+            Assert.Equal(SyntheticHandles.RenderSession(1234).Value, report.Handle);
             Assert.Null(report.Status);
             Assert.Contains("texture frame is active", report.Message, StringComparison.Ordinal);
         }
@@ -498,24 +498,24 @@ public sealed unsafe class RenderSessionTests
         // Support invariant for BND-162 and BND-171: deterministic attach hooks
         // verify .NET routes each public OpenGL attach path to the matching native family.
         var attachCalls = new List<string>();
-        var destroyed = new List<nint>();
+        var destroyed = new List<ulong>();
         using var methods = RenderSessionHandle.UseOpenGLAttachMethodsForTest(
             (_, _, outSession) =>
             {
                 attachCalls.Add("surface");
-                *outSession = (mln_render_session*)101;
+                *outSession = SyntheticHandles.RenderSession(101);
                 return mln_status.MLN_STATUS_OK;
             },
             (_, _, outSession) =>
             {
                 attachCalls.Add("owned");
-                *outSession = (mln_render_session*)102;
+                *outSession = SyntheticHandles.RenderSession(102);
                 return mln_status.MLN_STATUS_OK;
             },
             (_, _, outSession) =>
             {
                 attachCalls.Add("borrowed");
-                *outSession = (mln_render_session*)103;
+                *outSession = SyntheticHandles.RenderSession(103);
                 return mln_status.MLN_STATUS_OK;
             }
         );
@@ -525,7 +525,7 @@ public sealed unsafe class RenderSessionTests
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             session =>
             {
-                destroyed.Add((nint)session);
+                destroyed.Add(session.Value);
                 return mln_status.MLN_STATUS_OK;
             }
         );
@@ -574,7 +574,14 @@ public sealed unsafe class RenderSessionTests
         owned.Close();
         callerOwned.Close();
 
-        Assert.Equal([(nint)101, (nint)102, (nint)103], destroyed);
+        Assert.Equal(
+            [
+                SyntheticHandles.RenderSession(101).Value,
+                SyntheticHandles.RenderSession(102).Value,
+                SyntheticHandles.RenderSession(103).Value,
+            ],
+            destroyed
+        );
         Assert.Equal(77u, borrowed.Texture);
         Assert.Equal(0x0de1u, borrowed.Target);
         var borrowedContext = Assert.IsType<WglContextDescriptor>(borrowed.Context);
@@ -595,11 +602,11 @@ public sealed unsafe class RenderSessionTests
                 attachCalls++;
                 if (attachCalls == 1)
                 {
-                    *outSession = (mln_render_session*)101;
+                    *outSession = SyntheticHandles.RenderSession(101);
                     return mln_status.MLN_STATUS_OK;
                 }
 
-                *outSession = null;
+                *outSession = default;
                 return mln_status.MLN_STATUS_INVALID_STATE;
             },
             (_, _, _) => mln_status.MLN_STATUS_UNSUPPORTED,
@@ -659,7 +666,7 @@ public sealed unsafe class RenderSessionTests
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
-        var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
+        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
 
         session.Resize(320, 240, 2);
         Assert.False(session.RenderUpdate());
@@ -693,7 +700,7 @@ public sealed unsafe class RenderSessionTests
             },
             (_, _) => throw new InvalidOperationException("copy failed")
         );
-        var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
+        var session = RenderSessionHandle.CreateForTest(SyntheticHandles.RenderSession(1234));
 
         var error = Assert.Throws<InvalidOperationException>(() =>
             session.AcquireMetalOwnedTextureFrame()

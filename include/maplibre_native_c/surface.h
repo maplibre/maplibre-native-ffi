@@ -97,8 +97,8 @@ mln_opengl_surface_descriptor_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_surface_attach(
-  mln_map* map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -127,8 +127,8 @@ MLN_API mln_status mln_metal_surface_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_surface_attach(
-  mln_map* map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 /**
@@ -157,8 +157,8 @@ MLN_API mln_status mln_vulkan_surface_attach(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_surface_attach(
-  mln_map* map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

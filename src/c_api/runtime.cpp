@@ -20,7 +20,7 @@ auto mln_runtime_options_default(void) noexcept -> mln_runtime_options {
 }
 
 auto mln_runtime_create(
-  const mln_runtime_options* options, mln_runtime** out_runtime
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::create_runtime(options, out_runtime);
@@ -28,14 +28,14 @@ auto mln_runtime_create(
 }
 
 auto mln_runtime_set_resource_provider(
-  mln_runtime* runtime, const mln_resource_provider* provider
+  mln_runtime runtime, const mln_resource_provider* provider
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::set_resource_provider(runtime, provider);
   });
 }
 
-auto mln_runtime_clear_resource_provider(mln_runtime* runtime) noexcept
+auto mln_runtime_clear_resource_provider(mln_runtime runtime) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::clear_resource_provider(runtime);
@@ -43,7 +43,7 @@ auto mln_runtime_clear_resource_provider(mln_runtime* runtime) noexcept
 }
 
 auto mln_resource_request_complete(
-  mln_resource_request_handle* handle, const mln_resource_response* response
+  mln_resource_request_handle handle, const mln_resource_response* response
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::complete_resource_request(handle, response);
@@ -51,20 +51,28 @@ auto mln_resource_request_complete(
 }
 
 auto mln_resource_request_cancelled(
-  const mln_resource_request_handle* handle, bool* out_cancelled
+  mln_resource_request_handle handle, bool* out_cancelled
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::resource_request_cancelled(handle, out_cancelled);
   });
 }
 
-auto mln_resource_request_release(mln_resource_request_handle* handle) noexcept
+auto mln_resource_request_wait_until_retired(
+  mln_resource_request_handle handle
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::wait_for_resource_request_retired(handle);
+  });
+}
+
+auto mln_resource_request_release(mln_resource_request_handle handle) noexcept
   -> void {
   mln::core::release_resource_request(handle);
 }
 
 auto mln_runtime_set_resource_transform(
-  mln_runtime* runtime, const mln_resource_transform* transform
+  mln_runtime runtime, const mln_resource_transform* transform
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::set_resource_transform(runtime, transform);
@@ -81,7 +89,7 @@ auto mln_resource_transform_response_set_url(
   });
 }
 
-auto mln_runtime_clear_resource_transform(mln_runtime* runtime) noexcept
+auto mln_runtime_clear_resource_transform(mln_runtime runtime) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::clear_resource_transform(runtime);
@@ -89,7 +97,7 @@ auto mln_runtime_clear_resource_transform(mln_runtime* runtime) noexcept
 }
 
 auto mln_runtime_run_ambient_cache_operation_start(
-  mln_runtime* runtime, uint32_t operation,
+  mln_runtime runtime, uint32_t operation,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -100,7 +108,7 @@ auto mln_runtime_run_ambient_cache_operation_start(
 }
 
 auto mln_runtime_offline_operation_discard(
-  mln_runtime* runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_offline_operation_id operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_operation_discard(runtime, operation_id);
@@ -108,7 +116,7 @@ auto mln_runtime_offline_operation_discard(
 }
 
 auto mln_runtime_offline_region_create_start(
-  mln_runtime* runtime, const mln_offline_region_definition* definition,
+  mln_runtime runtime, const mln_offline_region_definition* definition,
   const uint8_t* metadata, size_t metadata_size,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
@@ -120,7 +128,7 @@ auto mln_runtime_offline_region_create_start(
 }
 
 auto mln_runtime_offline_region_get_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -131,7 +139,7 @@ auto mln_runtime_offline_region_get_start(
 }
 
 auto mln_runtime_offline_regions_list_start(
-  mln_runtime* runtime, mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_regions_list_start(runtime, out_operation_id);
@@ -139,7 +147,7 @@ auto mln_runtime_offline_regions_list_start(
 }
 
 auto mln_runtime_offline_regions_merge_database_start(
-  mln_runtime* runtime, const char* side_database_path,
+  mln_runtime runtime, const char* side_database_path,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -150,9 +158,8 @@ auto mln_runtime_offline_regions_merge_database_start(
 }
 
 auto mln_runtime_offline_region_update_metadata_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_operation_id* out_operation_id
+  mln_runtime runtime, mln_offline_region_id region_id, const uint8_t* metadata,
+  size_t metadata_size, mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_update_metadata_start(
@@ -162,7 +169,7 @@ auto mln_runtime_offline_region_update_metadata_start(
 }
 
 auto mln_runtime_offline_region_get_status_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -173,7 +180,7 @@ auto mln_runtime_offline_region_get_status_start(
 }
 
 auto mln_runtime_offline_region_set_observed_start(
-  mln_runtime* runtime, mln_offline_region_id region_id, bool observed,
+  mln_runtime runtime, mln_offline_region_id region_id, bool observed,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -184,7 +191,7 @@ auto mln_runtime_offline_region_set_observed_start(
 }
 
 auto mln_runtime_offline_region_set_download_state_start(
-  mln_runtime* runtime, mln_offline_region_id region_id, uint32_t state,
+  mln_runtime runtime, mln_offline_region_id region_id, uint32_t state,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -199,7 +206,7 @@ auto mln_runtime_offline_region_set_download_state_start(
 }
 
 auto mln_runtime_offline_region_invalidate_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -210,7 +217,7 @@ auto mln_runtime_offline_region_invalidate_start(
 }
 
 auto mln_runtime_offline_region_delete_start(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_runtime runtime, mln_offline_region_id region_id,
   mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -221,8 +228,8 @@ auto mln_runtime_offline_region_delete_start(
 }
 
 auto mln_runtime_offline_region_create_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_create_take_result(
@@ -232,8 +239,8 @@ auto mln_runtime_offline_region_create_take_result(
 }
 
 auto mln_runtime_offline_region_get_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region, bool* out_found
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_get_take_result(
@@ -243,8 +250,8 @@ auto mln_runtime_offline_region_get_take_result(
 }
 
 auto mln_runtime_offline_regions_list_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list** out_regions
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list* out_regions
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_regions_list_take_result(
@@ -254,8 +261,8 @@ auto mln_runtime_offline_regions_list_take_result(
 }
 
 auto mln_runtime_offline_regions_merge_database_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_list** out_regions
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list* out_regions
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_regions_merge_database_take_result(
@@ -265,8 +272,8 @@ auto mln_runtime_offline_regions_merge_database_take_result(
 }
 
 auto mln_runtime_offline_region_update_metadata_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
-  mln_offline_region_snapshot** out_region
+  mln_runtime runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot* out_region
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_update_metadata_take_result(
@@ -276,7 +283,7 @@ auto mln_runtime_offline_region_update_metadata_take_result(
 }
 
 auto mln_runtime_offline_region_get_status_take_result(
-  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_runtime runtime, mln_offline_operation_id operation_id,
   mln_offline_region_status* out_status
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -287,7 +294,7 @@ auto mln_runtime_offline_region_get_status_take_result(
 }
 
 auto mln_offline_region_snapshot_get(
-  const mln_offline_region_snapshot* snapshot, mln_offline_region_info* out_info
+  mln_offline_region_snapshot snapshot, mln_offline_region_info* out_info
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_snapshot_get(snapshot, out_info);
@@ -295,13 +302,13 @@ auto mln_offline_region_snapshot_get(
 }
 
 auto mln_offline_region_snapshot_destroy(
-  mln_offline_region_snapshot* snapshot
+  mln_offline_region_snapshot snapshot
 ) noexcept -> void {
   mln::core::offline_region_snapshot_destroy(snapshot);
 }
 
 auto mln_offline_region_list_count(
-  const mln_offline_region_list* list, size_t* out_count
+  mln_offline_region_list list, size_t* out_count
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_list_count(list, out_count);
@@ -309,26 +316,25 @@ auto mln_offline_region_list_count(
 }
 
 auto mln_offline_region_list_get(
-  const mln_offline_region_list* list, size_t index,
-  mln_offline_region_info* out_info
+  mln_offline_region_list list, size_t index, mln_offline_region_info* out_info
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_list_get(list, index, out_info);
   });
 }
 
-auto mln_offline_region_list_destroy(mln_offline_region_list* list) noexcept
+auto mln_offline_region_list_destroy(mln_offline_region_list list) noexcept
   -> void {
   mln::core::offline_region_list_destroy(list);
 }
 
-auto mln_runtime_destroy(mln_runtime* runtime) noexcept -> mln_status {
+auto mln_runtime_destroy(mln_runtime runtime) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::destroy_runtime(runtime);
   });
 }
 
-auto mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) noexcept
+auto mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::pump_runtime(runtime, timeout_ms);
@@ -336,25 +342,25 @@ auto mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) noexcept
 }
 
 auto mln_runtime_wake_source_acquire(
-  mln_runtime* runtime, mln_wake_source** out_source
+  mln_runtime runtime, mln_wake_source* out_source
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::acquire_wake_source(runtime, out_source);
   });
 }
 
-auto mln_wake_source_signal(mln_wake_source* source) noexcept -> mln_status {
+auto mln_wake_source_signal(mln_wake_source source) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::signal_wake_source(source);
   });
 }
 
-auto mln_wake_source_destroy(mln_wake_source* source) noexcept -> void {
+auto mln_wake_source_destroy(mln_wake_source source) noexcept -> void {
   mln::core::destroy_wake_source(source);
 }
 
 auto mln_runtime_poll_event(
-  mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event
+  mln_runtime runtime, mln_runtime_event* out_event, bool* out_has_event
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::poll_runtime_event(runtime, out_event, out_has_event);

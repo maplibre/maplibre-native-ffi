@@ -237,7 +237,7 @@ pub fn resource_response_to_native(
 pub type ResourceProviderCallbackFn = unsafe extern "C" fn(
     *mut c_void,
     *const sys::mln_resource_request,
-    *mut sys::mln_resource_request_handle,
+    sys::mln_resource_request_handle,
 ) -> u32;
 
 pub fn resource_provider_descriptor(
@@ -307,12 +307,12 @@ pub fn status_for_error(error: &Error) -> sys::mln_status {
 pub const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;
 
 pub type CompleteRequestFn = unsafe extern "C" fn(
-    *mut sys::mln_resource_request_handle,
+    sys::mln_resource_request_handle,
     *const sys::mln_resource_response,
 ) -> sys::mln_status;
 pub type CancelledRequestFn =
-    unsafe extern "C" fn(*const sys::mln_resource_request_handle, *mut bool) -> sys::mln_status;
-pub type ReleaseRequestFn = unsafe extern "C" fn(*mut sys::mln_resource_request_handle);
+    unsafe extern "C" fn(sys::mln_resource_request_handle, *mut bool) -> sys::mln_status;
+pub type ReleaseRequestFn = unsafe extern "C" fn(sys::mln_resource_request_handle);
 
 #[derive(Clone, Copy, Debug)]
 pub struct ResourceRequestHandleFns {
@@ -374,17 +374,17 @@ impl ResourceRequestHandleState {
     /// coordinates completion, cancellation checks, provider decision
     /// finalization, and provider-owned release.
     pub unsafe fn new(
-        handle: *mut sys::mln_resource_request_handle,
+        handle: sys::mln_resource_request_handle,
         fns: ResourceRequestHandleFns,
     ) -> Result<Arc<Self>> {
-        if handle.is_null() {
+        if handle.0 == 0 {
             return Err(Error::invalid_argument(
-                "resource request handle must not be null",
+                "resource request handle must not be the null handle",
             ));
         }
         Ok(Arc::new(Self {
             inner: Mutex::new(ResourceRequestHandleInner {
-                handle: handle as usize,
+                handle: handle.0 as usize,
                 decision_finalized: false,
                 provider_owned: false,
                 release_accounted_for: false,
@@ -395,8 +395,8 @@ impl ResourceRequestHandleState {
         }))
     }
 
-    fn handle_ptr(inner: &ResourceRequestHandleInner) -> *mut sys::mln_resource_request_handle {
-        inner.handle as *mut sys::mln_resource_request_handle
+    fn native_handle(inner: &ResourceRequestHandleInner) -> sys::mln_resource_request_handle {
+        sys::mln_resource_request_handle(inner.handle as u64)
     }
 
     pub fn complete(&self, response: &ResourceResponse) -> Result<()> {
@@ -417,7 +417,7 @@ impl ResourceRequestHandleState {
         inner.closed = true;
         // SAFETY: handle is live while not closed/released, and native response
         // points to storage retained for this call. The C API copies contents.
-        let status = unsafe { (self.fns.complete)(Self::handle_ptr(&inner), native.as_ptr()) };
+        let status = unsafe { (self.fns.complete)(Self::native_handle(&inner), native.as_ptr()) };
         let result = crate::check(status);
         if inner.decision_finalized && inner.provider_owned {
             self.release_if_owned_locked(&mut inner);
@@ -433,7 +433,7 @@ impl ResourceRequestHandleState {
         let mut cancelled = false;
         // SAFETY: handle is live while not closed/released, and cancelled points
         // to writable bool storage.
-        crate::check(unsafe { (self.fns.cancelled)(Self::handle_ptr(&inner), &mut cancelled) })?;
+        crate::check(unsafe { (self.fns.cancelled)(Self::native_handle(&inner), &mut cancelled) })?;
         Ok(cancelled)
     }
 
@@ -498,7 +498,7 @@ impl ResourceRequestHandleState {
         if !inner.release_accounted_for {
             inner.release_accounted_for = true;
             // SAFETY: release is called exactly once for provider-owned handles.
-            unsafe { (self.fns.release)(Self::handle_ptr(inner)) };
+            unsafe { (self.fns.release)(Self::native_handle(inner)) };
         }
     }
 
@@ -570,7 +570,7 @@ mod tests {
     static CANCELLED_FINISHED: AtomicBool = AtomicBool::new(false);
 
     unsafe extern "C" fn fake_complete(
-        _handle: *mut sys::mln_resource_request_handle,
+        _handle: sys::mln_resource_request_handle,
         _response: *const sys::mln_resource_response,
     ) -> sys::mln_status {
         COMPLETE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -578,7 +578,7 @@ mod tests {
     }
 
     unsafe extern "C" fn fake_cancelled(
-        _handle: *const sys::mln_resource_request_handle,
+        _handle: sys::mln_resource_request_handle,
         out_cancelled: *mut bool,
     ) -> sys::mln_status {
         if out_cancelled.is_null() {
@@ -595,7 +595,7 @@ mod tests {
         sys::MLN_STATUS_OK
     }
 
-    unsafe extern "C" fn fake_release(_handle: *mut sys::mln_resource_request_handle) {
+    unsafe extern "C" fn fake_release(_handle: sys::mln_resource_request_handle) {
         RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -611,10 +611,11 @@ mod tests {
         CANCELLED_SLEEP_MS.store(0, Ordering::SeqCst);
         CANCELLED_STARTED.store(false, Ordering::SeqCst);
         CANCELLED_FINISHED.store(false, Ordering::SeqCst);
-        // SAFETY: Non-null sentinel handle is used only by fake functions.
+        // SAFETY: This synthetic handle reaches only the fake functions above,
+        // never the C API. The safe public API cannot build one.
         unsafe {
             ResourceRequestHandleState::new(
-                0x1234usize as *mut sys::mln_resource_request_handle,
+                sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
                 fake_fns(),
             )
         }

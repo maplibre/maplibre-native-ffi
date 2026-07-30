@@ -15,7 +15,6 @@ import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -37,6 +36,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.render.RenderMode
@@ -129,7 +129,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       val metadata = allocArray<UByteVar>(2)
       metadata[0] = 4U
       metadata[1] = 5U
-      val snapshot = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_offline_region_snapshot>()
+      val snapshot = SyntheticHandles.offlineRegionSnapshot()
       val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
 
       val info =
@@ -154,7 +154,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var destroys = 0
       val metadata = alloc<UByteVar>()
-      val snapshot = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_offline_region_snapshot>()
+      val snapshot = SyntheticHandles.offlineRegionSnapshot()
 
       assertFailsWith<IllegalArgumentException> {
         RuntimeStructs.offlineRegionSnapshot(
@@ -177,7 +177,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
       var destroys = 0
       val metadata = allocArray<UByteVar>(1)
       metadata[0] = 6U
-      val list = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_offline_region_list>()
+      val list = SyntheticHandles.offlineRegionList()
       val styleUrl = "asset://offline-style.json".cstr.getPointer(this)
 
       val regions =
@@ -207,7 +207,7 @@ class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var destroys = 0
       val metadata = alloc<UByteVar>()
-      val list = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_offline_region_list>()
+      val list = SyntheticHandles.offlineRegionList()
 
       assertFailsWith<IllegalArgumentException> {
         RuntimeStructs.offlineRegionList(

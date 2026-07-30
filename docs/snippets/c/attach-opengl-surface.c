@@ -4,8 +4,8 @@
 
 #include <maplibre_native_c.h>
 
-mln_render_session* attach_surface(
-  mln_map* map, void* egl_display, void* egl_config, void* egl_share_context,
+mln_render_session attach_surface(
+  mln_map map, void* egl_display, void* egl_config, void* egl_share_context,
   void* egl_surface, uint32_t logical_width, uint32_t logical_height,
   double scale_factor
 ) {
@@ -25,9 +25,9 @@ mln_render_session* attach_surface(
 
   descriptor.surface = egl_surface;
 
-  mln_render_session* session = NULL;
+  mln_render_session session = MLN_HANDLE_NULL;
   if (mln_opengl_surface_attach(map, &descriptor, &session) != MLN_STATUS_OK) {
-    return NULL;
+    return MLN_HANDLE_NULL;
   }
   return session;
 }

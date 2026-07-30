@@ -3531,3 +3531,63 @@ def test_transition_id_out_of_range_raises_binding_error(transition_id: int) -> 
                         duration_ms=0.0, transition_id=transition_id
                     ),
                 )
+
+
+def test_released_map_id_replayed_after_a_new_map_reports_it_stale() -> None:
+    """BND-045."""
+    with mln.RuntimeHandle() as runtime:
+        first = runtime.create_map()
+        released = first._native.id()
+        first.close()
+
+        # The released slot is the one the next map takes, so the replayed id
+        # names a retired generation of a slot that is live again.
+        second = runtime.create_map()
+
+        with pytest.raises(mln.InvalidArgumentError) as excinfo:
+            _native.map_size_by_id_for_test(released)
+        assert "stale" in str(excinfo.value)
+
+        # The live map is unaffected by the replay.
+        assert _native.map_size_by_id_for_test(second._native.id())[0] > 0
+        second.close()
+
+
+def test_map_id_passed_to_a_runtime_operation_reports_invalid_argument() -> None:
+    """BND-047."""
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+
+        with pytest.raises(mln.InvalidArgumentError) as excinfo:
+            _native.pump_runtime_with_map_id_for_test(map_handle._native.id())
+        message = str(excinfo.value)
+        assert "map" in message
+        assert "runtime" in message
+
+        map_handle.close()
+
+
+def test_live_map_id_called_from_another_thread_reports_wrong_thread() -> None:
+    """BND-049."""
+    with mln.RuntimeHandle() as runtime:
+        map_handle = runtime.create_map()
+        live = map_handle._native.id()
+
+        failures: list[BaseException] = []
+
+        def call_from_other_thread() -> None:
+            try:
+                _native.map_size_by_id_for_test(live)
+            except BaseException as error:  # noqa: BLE001 - recorded for the assert
+                failures.append(error)
+
+        thread = threading.Thread(target=call_from_other_thread)
+        thread.start()
+        thread.join()
+
+        # The id is live, so the owner-thread rule decides rather than identity.
+        assert len(failures) == 1
+        assert isinstance(failures[0], mln.WrongThreadError)
+        assert "stale" not in str(failures[0])
+
+        map_handle.close()

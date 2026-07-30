@@ -88,7 +88,7 @@ import Testing
 }
 
 @Test func imageSourceCoordinatesRejectInvalidCountBeforeCallingC() throws {
-  let map = try #require(OpaquePointer(bitPattern: 0x1))
+  let map = SyntheticHandles.map()
   let sourceId = mln_string_view()
   let coordinate = NativeLatLng(latitude: 1, longitude: 2)
 

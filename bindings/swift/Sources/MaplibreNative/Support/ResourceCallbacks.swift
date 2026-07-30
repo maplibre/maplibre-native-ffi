@@ -114,24 +114,30 @@ struct NativeResourceResponseInput: Equatable {
 }
 
 struct NativeResourceRequestHandleFunctions {
-  let complete: @Sendable (OpaquePointer, NativeResourceResponseInput) throws
+  let complete: @Sendable (
+    NativeResourceRequestHandle,
+    NativeResourceResponseInput
+  ) throws
     -> Void
-  let cancelled: @Sendable (OpaquePointer) throws -> Bool
-  let release: @Sendable (OpaquePointer?) -> Void
+  let cancelled: @Sendable (NativeResourceRequestHandle) throws -> Bool
+  let release: @Sendable (NativeResourceRequestHandle) -> Void
 
   static let native = Self(
     complete: { handle, response in
       try response.withNativeResponse { nativeResponse in
-        try checkStatus(mln_resource_request_complete(handle, nativeResponse))
+        try checkStatus(mln_resource_request_complete(
+          handle.raw,
+          nativeResponse
+        ))
       }
     },
     cancelled: { handle in
       try NativeMemory.withTemporary(false) { cancelled in
-        try checkStatus(mln_resource_request_cancelled(handle, cancelled))
+        try checkStatus(mln_resource_request_cancelled(handle.raw, cancelled))
       }.value
     },
     release: { handle in
-      mln_resource_request_release(handle)
+      mln_resource_request_release(handle.raw)
     }
   )
 }
@@ -145,7 +151,7 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
 
   private let functions: NativeResourceRequestHandleFunctions
   private let condition = NSCondition()
-  private var pointer: OpaquePointer?
+  private var handle: NativeResourceRequestHandle?
   private var providerOwnership = ProviderOwnership.pending
   private var finalizedProviderDecision: UInt32?
   private var completed = false
@@ -153,16 +159,16 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   private var inFlightOperations = 0
 
   init(
-    pointer: OpaquePointer?,
+    handle: NativeResourceRequestHandle,
     functions: NativeResourceRequestHandleFunctions = .native
   ) throws {
-    guard let pointer else {
+    guard !handle.isNull else {
       throw NativeStatusFailure(
         rawStatus: 0,
-        diagnostic: "resource request handle is null"
+        diagnostic: "resource request handle is the null handle"
       )
     }
-    self.pointer = pointer
+    self.handle = handle
     self.functions = functions
   }
 
@@ -190,7 +196,7 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       } else {
         providerOwnership = .nativeWillRelease
         finalizedProviderDecision = decision
-        pointer = nil
+        handle = nil
         releaseRequested = true
       }
       return (
@@ -234,22 +240,24 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     }
   }
 
-  private func beginNativeOperation() throws -> OpaquePointer {
+  private func beginNativeOperation() throws -> NativeResourceRequestHandle {
     try condition.withLock {
-      guard !releaseRequested, let pointer else {
+      guard !releaseRequested, let handle else {
         throw NativeStatusFailure(
           rawStatus: 0,
           diagnostic: "resource request handle is closed"
         )
       }
       inFlightOperations += 1
-      return pointer
+      return handle
     }
   }
 
-  private func beginCompletionOperation() throws -> OpaquePointer {
+  private func beginCompletionOperation() throws
+    -> NativeResourceRequestHandle
+  {
     try condition.withLock {
-      guard !releaseRequested, let pointer else {
+      guard !releaseRequested, let handle else {
         throw NativeStatusFailure(
           rawStatus: 0,
           diagnostic: "resource request handle is closed"
@@ -263,7 +271,7 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
       }
       completed = true
       inFlightOperations += 1
-      return pointer
+      return handle
     }
   }
 
@@ -279,12 +287,12 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     }
   }
 
-  private func takeReleasableHandleLocked() -> OpaquePointer? {
+  private func takeReleasableHandleLocked() -> NativeResourceRequestHandle? {
     guard providerOwnership == .providerOwned, inFlightOperations == 0,
           completed || releaseRequested else { return nil }
-    let handle = pointer
-    pointer = nil
-    return handle
+    let releasable = handle
+    handle = nil
+    return releasable
   }
 }
 
@@ -401,7 +409,7 @@ private final class NativeResourceProviderBox: @unchecked Sendable {
 
   func invoke(
     request: UnsafePointer<mln_resource_request>?,
-    handle: OpaquePointer?
+    rawHandle: mln_resource_request_handle
   ) -> UInt32 {
     guard let request else {
       return UInt32.max
@@ -410,7 +418,7 @@ private final class NativeResourceProviderBox: @unchecked Sendable {
     var state: NativeResourceRequestHandleState?
     do {
       let createdState = try NativeResourceRequestHandleState(
-        pointer: handle,
+        handle: NativeResourceRequestHandle(raw: rawHandle),
         functions: handleFunctions
       )
       state = createdState
@@ -427,12 +435,12 @@ private final class NativeResourceProviderBox: @unchecked Sendable {
 private func resourceProviderTrampoline(
   userData: UnsafeMutableRawPointer?,
   request: UnsafePointer<mln_resource_request>?,
-  handle: OpaquePointer?
+  rawHandle: mln_resource_request_handle
 ) -> UInt32 {
   guard let userData else { return UInt32.max }
   let box = Unmanaged<NativeResourceProviderBox>.fromOpaque(userData)
     .takeUnretainedValue()
-  return box.invoke(request: request, handle: handle)
+  return box.invoke(request: request, rawHandle: rawHandle)
 }
 
 final class NativeResourceProviderState: @unchecked Sendable {
@@ -458,10 +466,13 @@ final class NativeResourceProviderState: @unchecked Sendable {
   }
 
   func invokeForTesting(request: mln_resource_request,
-                        handle: OpaquePointer?) -> UInt32
+                        rawHandle: mln_resource_request_handle) -> UInt32
   {
     withUnsafePointer(to: request) { request in
-      retainedBox.takeUnretainedValue().invoke(request: request, handle: handle)
+      retainedBox.takeUnretainedValue().invoke(
+        request: request,
+        rawHandle: rawHandle
+      )
     }
   }
 

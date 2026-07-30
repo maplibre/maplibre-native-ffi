@@ -9,8 +9,8 @@
 #include "unity.h"
 
 typedef struct map_fixture {
-  mln_runtime* runtime;
-  mln_map* map;
+  mln_runtime runtime;
+  mln_map map;
 } map_fixture;
 
 static map_fixture create_map_fixture(void) {
@@ -87,7 +87,7 @@ typedef struct transition_event_tally {
   int32_t last_did_change_code;
 } transition_event_tally;
 
-static transition_event_tally drain_transition_events(mln_runtime* runtime) {
+static transition_event_tally drain_transition_events(mln_runtime runtime) {
   transition_event_tally tally = {0, 0, false, -1};
   for (;;) {
     mln_runtime_event event = {.size = sizeof(mln_runtime_event)};
@@ -262,7 +262,7 @@ static bool near_longitude(double actual, double expected) {
   return delta > -1e-6 && delta < 1e-6;
 }
 
-static double jumped_longitude(mln_map* map, double longitude) {
+static double jumped_longitude(mln_map map, double longitude) {
   mln_camera_options camera = mln_camera_options_default();
   camera.fields = MLN_CAMERA_OPTION_CENTER | MLN_CAMERA_OPTION_ZOOM;
   camera.latitude = 0.0;
@@ -425,16 +425,16 @@ static void standalone_projection_rejects_invalid_arguments(void) {
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_create(fixture.map, NULL)
   );
-  mln_map_projection* projection = (mln_map_projection*)(uintptr_t)1;
+  mln_map_projection projection = 1;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_projection_create(fixture.map, &projection)
   );
-  projection = NULL;
+  projection = MLN_HANDLE_NULL;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_projection_create(fixture.map, &projection)
   );
-  TEST_ASSERT_NOT_NULL(projection);
+  TEST_ASSERT_NOT_EQUAL_UINT64(MLN_HANDLE_NULL, projection);
   mln_camera_options camera = mln_camera_options_default();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_projection_get_camera(projection, NULL)
@@ -488,7 +488,7 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
   uint32_t out_options = 0;
   bool out_bool = false;
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_debug_options(NULL, 0)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_debug_options(MLN_HANDLE_NULL, 0)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -498,11 +498,12 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
     MLN_STATUS_INVALID_ARGUMENT, mln_map_get_debug_options(fixture.map, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_debug_options(NULL, &out_options)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_debug_options(MLN_HANDLE_NULL, &out_options)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_set_rendering_stats_view_enabled(NULL, true)
+    mln_map_set_rendering_stats_view_enabled(MLN_HANDLE_NULL, true)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
@@ -510,16 +511,17 @@ static void map_debug_options_reject_raw_invalid_arguments(void) {
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_rendering_stats_view_enabled(NULL, &out_bool)
+    mln_map_get_rendering_stats_view_enabled(MLN_HANDLE_NULL, &out_bool)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_is_fully_loaded(fixture.map, NULL)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_is_fully_loaded(NULL, &out_bool)
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_is_fully_loaded(MLN_HANDLE_NULL, &out_bool)
   );
   TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT, mln_map_dump_debug_logs(NULL)
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_dump_debug_logs(MLN_HANDLE_NULL)
   );
   destroy_map_fixture(fixture);
 }
@@ -531,10 +533,10 @@ static void map_options_default_leaves_fast_pfor_decoding_off(void) {
   const mln_map_options defaults = mln_map_options_default();
   TEST_ASSERT_FALSE(defaults.fast_pfor_enabled);
 
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
   options.fast_pfor_enabled = true;
-  mln_map* map = mln_test_create_map_with_options(runtime, &options);
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
@@ -545,12 +547,12 @@ static void map_options_default_leaves_fast_pfor_decoding_off(void) {
 // render target that carries a different scale factor, and rejects each null
 // output pointer independently.
 static void map_size_tracks_attach_and_resize(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
+  mln_runtime runtime = mln_test_create_runtime();
   mln_map_options options = mln_map_options_default();
   options.width = 512;
   options.height = 256;
   options.scale_factor = 1.1;
-  mln_map* map = mln_test_create_map_with_options(runtime, &options);
+  mln_map map = mln_test_create_map_with_options(runtime, &options);
 
   uint32_t width = 0;
   uint32_t height = 0;
@@ -598,7 +600,7 @@ static void map_size_tracks_attach_and_resize(void) {
 
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_map_get_size(NULL, &width, &height, &scale_factor)
+    mln_map_get_size(MLN_HANDLE_NULL, &width, &height, &scale_factor)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,

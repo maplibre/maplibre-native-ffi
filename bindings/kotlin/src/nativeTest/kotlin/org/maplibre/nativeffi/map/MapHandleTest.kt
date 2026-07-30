@@ -8,18 +8,27 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.COpaquePointer
+import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.StableRef
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.asStableRef
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.WrongThreadException
+import org.maplibre.nativeffi.internal.c.mln_map_get_size
+import org.maplibre.nativeffi.internal.c.mln_runtime_pump
+import org.maplibre.nativeffi.internal.lifecycle.NativeMap
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.runtime.RuntimeOptions
 import platform.posix.pthread_create
 import platform.posix.pthread_join
 import platform.posix.pthread_tVar
@@ -228,6 +237,80 @@ class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       pthread_join(thread.ptr[0], null)
     }
   }
+
+  @Test
+  fun releasedMapIdReplayedAfterANewMapIsReportedStale() {
+    // BND-045.
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val first =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+        },
+      )
+    val released = first.nativeHandle()
+    first.close()
+
+    // The released slot is the one the next map takes, so the replayed id
+    // names a retired generation of a slot that is live again.
+    val second =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+        },
+      )
+    try {
+      val error = assertFailsWith<InvalidArgumentException> { mapSizeForTesting(released) }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+      assertTrue(error.message!!.contains("stale"), error.message!!)
+
+      // The live map is unaffected by the replay.
+      mapSizeForTesting(second.nativeHandle())
+    } finally {
+      second.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun mapIdPassedToARuntimeOperationIsRejectedOnItsKind() {
+    // BND-047.
+    val runtime = RuntimeHandle.create(RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 64
+          height = 64
+        },
+      )
+    try {
+      // NativeMap and NativeRuntime are distinct value classes, so this call
+      // has no expression in the safe API and needs the raw id.
+      val error =
+        assertFailsWith<InvalidArgumentException> {
+          Status.check(mln_runtime_pump(map.nativeHandle().rawHandleValue, 0))
+        }
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status)
+      assertTrue(error.message!!.contains("map"), error.message!!)
+      assertTrue(error.message!!.contains("runtime"), error.message!!)
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+}
+
+@OptIn(ExperimentalForeignApi::class)
+private fun mapSizeForTesting(map: NativeMap) = memScoped {
+  val width = alloc<UIntVar>()
+  val height = alloc<UIntVar>()
+  val scaleFactor = alloc<DoubleVar>()
+  Status.check(mln_map_get_size(map.rawHandleValue, width.ptr, height.ptr, scaleFactor.ptr))
 }
 
 @OptIn(ExperimentalAtomicApi::class)
