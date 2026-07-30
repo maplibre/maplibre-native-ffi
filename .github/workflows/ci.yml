@@ -52,9 +52,11 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
         with:
-          gradle: false
           sccache-access-key-id: ${{ secrets.R2_SCCACHE_ACCESS_KEY_ID }}
           sccache-secret-access-key: ${{ secrets.R2_SCCACHE_SECRET_ACCESS_KEY }}
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools platforms;android-36
       - run: mise run //docs:build
 
   target-linux-x64-egl:
