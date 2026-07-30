@@ -29,11 +29,20 @@ mkdir -p ../../docs/public/reference
 zig build docs -Dinclude-dir=../../include --prefix ../../docs/public/reference/zig
 '''
 
+[tasks."api:kotlin"]
+depends = ["//bindings/kotlin:api"]
+run = '''
+rm -rf public/reference/kotlin
+mkdir -p public/reference
+cp -a ../bindings/kotlin/build/dokka/html/. public/reference/kotlin/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
   { task = "api:rust" },
   { task = "api:zig" },
+  { task = "api:kotlin" },
 ]
 
 [tasks.install]

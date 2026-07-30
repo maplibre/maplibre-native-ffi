@@ -61,6 +61,11 @@ export default defineConfig({
               link: "/reference/zig/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
+            {
+              label: "Kotlin API",
+              link: "/reference/kotlin/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {

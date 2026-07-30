@@ -5,6 +5,7 @@
 import argparse
 import difflib
 import pathlib
+import re
 import sys
 
 
@@ -21,6 +22,15 @@ CHECKOUT = PINS["actions/checkout"]
 CACHE_SAVE = PINS["actions/cache/save"]
 DOWNLOAD = PINS["actions/download-artifact"]
 UPLOAD = PINS["actions/upload-artifact"]
+SETUP_ANDROID = PINS["android-actions/setup-android"]
+
+
+def android_compile_sdk() -> str:
+    text = (ROOT / "gradle" / "libs.versions.toml").read_text(encoding="utf-8")
+    match = re.search(r'^android-compileSdk = "(\d+)"\s*$', text, re.MULTILINE)
+    if match is None:
+        raise SystemExit("android-compileSdk missing from gradle/libs.versions.toml")
+    return match.group(1)
 
 # Environment secrets for R2 writes live in the GitHub Environment `sccache`
 # (main only). PRs omit the environment and fall back to public read-only.
@@ -202,7 +212,12 @@ def render(source: dict[str, object], presets: dict[str, object]) -> str:
         "    timeout-minutes: 60",
         SCCACHE_ENVIRONMENT,
         "    steps:",
-        *setup(gradle=False),
+        # Dokka configures the Kotlin Multiplatform project, including the
+        # Android target, so docs generation needs Gradle and an SDK platform.
+        *setup(),
+        f"      - uses: {SETUP_ANDROID}",
+        "        with:",
+        f"          packages: platform-tools platforms;android-{android_compile_sdk()}",
         "      - run: mise run //docs:build",
         "",
     ]
