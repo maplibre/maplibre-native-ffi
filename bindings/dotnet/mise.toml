@@ -18,6 +18,20 @@ run = "scripts/generate-clangsharp.sh"
 [tasks.generate-check]
 run = "scripts/generate-clangsharp.sh --check"
 
+[tasks.api]
+description = "Generate DocFX HTML API reference for the .NET binding."
+# DocFX lives in a separate tool manifest from ClangSharp: restoring both in one
+# manifest hits a .NET SDK bug that reports DocFX's commands as ClangSharp's.
+run = '''
+rm -rf build/docfx build/docfx-api
+mkdir -p build
+(
+  cd docfx
+  dotnet tool restore --verbosity quiet
+  dotnet tool run docfx docfx.json
+)
+'''
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [

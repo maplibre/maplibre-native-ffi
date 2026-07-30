@@ -45,6 +45,14 @@ mkdir -p public/reference
 cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
 '''
 
+[tasks."api:dotnet"]
+depends = ["//bindings/dotnet:api"]
+run = '''
+rm -rf public/reference/dotnet
+mkdir -p public/reference
+cp -a ../bindings/dotnet/build/docfx/. public/reference/dotnet/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
@@ -52,6 +60,7 @@ run = [
   { task = "api:zig" },
   { task = "api:kotlin" },
   { task = "api:dart" },
+  { task = "api:dotnet" },
 ]
 
 [tasks.install]
