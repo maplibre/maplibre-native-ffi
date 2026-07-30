@@ -760,6 +760,13 @@ url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404-aarch64/swift-6
 [tools.swift."platforms.linux-x64"]
 url = "https://download.swift.org/swift-6.3.1-release/ubuntu2404/swift-6.3.1-RELEASE/swift-6.3.1-RELEASE-ubuntu24.04.tar.gz"
 
+[[tools.swift]]
+version = "6.3.1"
+backend = "core:swift"
+
+[tools.swift.options]
+swift_platform = "ubuntu24.04"
+
 [[tools.swiftformat]]
 version = "0.61.1"
 backend = "github:nicklockwood/SwiftFormat"

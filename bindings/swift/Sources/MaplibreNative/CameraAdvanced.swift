@@ -315,7 +315,7 @@ public struct MapTileOptions: Equatable, Sendable {
 public extension MapHandle {
   func setDebugOptions(_ options: MapDebugOptions) throws {
     try mapNativeFailure { try checkStatus(mln_map_set_debug_options(
-      requireLivePointer(),
+      requireLiveHandle().raw,
       options.rawValue
     )) }
   }
@@ -323,14 +323,14 @@ public extension MapHandle {
   func debugOptions() throws -> MapDebugOptions {
     try mapNativeFailure {
       try MapDebugOptions(rawValue: NativeMap
-        .debugOptions(requireLivePointer()))
+        .debugOptions(requireLiveHandle()))
     }
   }
 
   func setRenderingStatsViewEnabled(_ enabled: Bool) throws {
     try mapNativeFailure {
       try checkStatus(mln_map_set_rendering_stats_view_enabled(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         enabled
       ))
     }
@@ -338,17 +338,17 @@ public extension MapHandle {
 
   func renderingStatsViewEnabled() throws -> Bool {
     try mapNativeFailure {
-      try NativeMap.renderingStatsViewEnabled(requireLivePointer())
+      try NativeMap.renderingStatsViewEnabled(requireLiveHandle())
     }
   }
 
   func isFullyLoaded() throws -> Bool {
-    try mapNativeFailure { try NativeMap.isFullyLoaded(requireLivePointer()) }
+    try mapNativeFailure { try NativeMap.isFullyLoaded(requireLiveHandle()) }
   }
 
   func dumpDebugLogs() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_dump_debug_logs(requireLivePointer()))
+      try checkStatus(mln_map_dump_debug_logs(requireLiveHandle().raw))
     }
   }
 
@@ -359,13 +359,13 @@ public extension MapHandle {
   /// the lifetime of the map and is independent of any render target's scale
   /// factor.
   func size() throws -> (width: UInt32, height: UInt32, scaleFactor: Double) {
-    try mapNativeFailure { try NativeMap.size(requireLivePointer()) }
+    try mapNativeFailure { try NativeMap.size(requireLiveHandle()) }
   }
 
   func viewportOptions() throws -> MapViewportOptions {
     try mapNativeFailure {
       try MapViewportOptions(native: NativeMapViewportOptionsInput(NativeMap
-          .viewportOptions(requireLivePointer())))
+          .viewportOptions(requireLiveHandle())))
     }
   }
 
@@ -373,7 +373,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try options.nativeInput
         .withNativeOptions { try checkStatus(mln_map_set_viewport_options(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           $0
         )) }
     }
@@ -382,7 +382,7 @@ public extension MapHandle {
   func tileOptions() throws -> MapTileOptions {
     try mapNativeFailure {
       try MapTileOptions(native: NativeMapTileOptionsInput(NativeMap
-          .tileOptions(requireLivePointer())))
+          .tileOptions(requireLiveHandle())))
     }
   }
 
@@ -390,7 +390,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try options.nativeInput
         .withNativeOptions { try checkStatus(mln_map_set_tile_options(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           $0
         )) }
     }
@@ -404,7 +404,7 @@ public extension MapHandle {
         try (animation?.nativeInput ?? NativeAnimationOptionsInput())
           .withOptionalNativeOptions { nativeAnimation in
             try checkStatus(mln_map_fly_to(
-              requireLivePointer(),
+              requireLiveHandle().raw,
               nativeCamera,
               nativeAnimation
             ))
@@ -415,7 +415,7 @@ public extension MapHandle {
 
   func rotateBy(first: ScreenPoint, second: ScreenPoint) throws {
     try mapNativeFailure { try checkStatus(mln_map_rotate_by(
-      requireLivePointer(),
+      requireLiveHandle().raw,
       first.nativeInput.native,
       second.nativeInput.native
     )) }
@@ -429,7 +429,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { animation in
         try checkStatus(mln_map_rotate_by_animated(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           first.nativeInput.native,
           second.nativeInput.native,
           animation
@@ -440,7 +440,7 @@ public extension MapHandle {
 
   func pitchBy(_ pitch: Double) throws {
     try mapNativeFailure { try checkStatus(mln_map_pitch_by(
-      requireLivePointer(),
+      requireLiveHandle().raw,
       pitch
     )) }
   }
@@ -449,7 +449,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { animation in
         try checkStatus(mln_map_pitch_by_animated(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           pitch,
           animation
         ))
@@ -466,7 +466,7 @@ public extension MapHandle {
         .withOptionalNativeOptions { fitOptions in
           try CameraOptions(native: NativeCameraOptionsInput(NativeMap
               .cameraForLatLngBounds(
-                requireLivePointer(),
+                requireLiveHandle(),
                 bounds: bounds.nativeInput,
                 fitOptions: fitOptions
               )))
@@ -485,7 +485,7 @@ public extension MapHandle {
           .withOptionalNativeOptions { fitOptions in
             try CameraOptions(native: NativeCameraOptionsInput(NativeMap
                 .cameraForLatLngs(
-                  requireLivePointer(),
+                  requireLiveHandle(),
                   coordinates: coordinates.baseAddress,
                   count: coordinates.count,
                   fitOptions: fitOptions
@@ -505,7 +505,7 @@ public extension MapHandle {
         .withOptionalNativeOptions { fitOptions in
           try CameraOptions(native: NativeCameraOptionsInput(NativeMap
               .cameraForGeometry(
-                requireLivePointer(),
+                requireLiveHandle(),
                 geometry: arena.allocateGeometry(geometry.nativeGeometry),
                 fitOptions: fitOptions
               )))
@@ -519,7 +519,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { camera in
         try LatLngBounds(native: NativeMap.latLngBoundsForCamera(
-          requireLivePointer(),
+          requireLiveHandle(),
           camera: camera,
           unwrapped: unwrapped
         ))
@@ -530,7 +530,7 @@ public extension MapHandle {
   func bounds() throws -> BoundOptions {
     try mapNativeFailure {
       try BoundOptions(native: NativeBoundOptionsInput(NativeMap
-          .bounds(requireLivePointer())))
+          .bounds(requireLiveHandle())))
     }
   }
 
@@ -538,7 +538,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try bounds.nativeInput
         .withNativeOptions { try checkStatus(mln_map_set_bounds(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           $0
         )) }
     }
@@ -547,7 +547,7 @@ public extension MapHandle {
   func freeCameraOptions() throws -> FreeCameraOptions {
     try mapNativeFailure {
       try FreeCameraOptions(native: NativeFreeCameraOptionsInput(NativeMap
-          .freeCameraOptions(requireLivePointer())))
+          .freeCameraOptions(requireLiveHandle())))
     }
   }
 
@@ -555,7 +555,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try options.nativeInput
         .withNativeOptions { try checkStatus(mln_map_set_free_camera_options(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           $0
         )) }
     }
@@ -564,7 +564,7 @@ public extension MapHandle {
   func projectionMode() throws -> ProjectionMode {
     try mapNativeFailure {
       try ProjectionMode(native: NativeProjectionModeInput(NativeMap
-          .projectionMode(requireLivePointer())))
+          .projectionMode(requireLiveHandle())))
     }
   }
 
@@ -572,7 +572,7 @@ public extension MapHandle {
     try mapNativeFailure {
       try mode.nativeInput
         .withNativeMode { try checkStatus(mln_map_set_projection_mode(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           $0
         )) }
     }
@@ -580,14 +580,14 @@ public extension MapHandle {
 
   func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure { try ScreenPoint(native: NativeMap.pixelForLatLng(
-      requireLivePointer(),
+      requireLiveHandle(),
       coordinate: coordinate.nativeInput
     )) }
   }
 
   func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure { try LatLng(native: NativeMap.latLngForPixel(
-      requireLivePointer(),
+      requireLiveHandle(),
       point: point.nativeInput
     )) }
   }
@@ -595,7 +595,7 @@ public extension MapHandle {
   func pixels(for coordinates: [LatLng]) throws -> [ScreenPoint] {
     try mapNativeFailure {
       try NativeMap.pixelsForLatLngs(
-        requireLivePointer(),
+        requireLiveHandle(),
         coordinates: coordinates.map(\.nativeInput)
       ).map(ScreenPoint.init(native:))
     }
@@ -604,7 +604,7 @@ public extension MapHandle {
   func latLngs(for points: [ScreenPoint]) throws -> [LatLng] {
     try mapNativeFailure {
       try NativeMap.latLngsForPixels(
-        requireLivePointer(),
+        requireLiveHandle(),
         points: points.map(\.nativeInput)
       ).map(LatLng.init(native:))
     }

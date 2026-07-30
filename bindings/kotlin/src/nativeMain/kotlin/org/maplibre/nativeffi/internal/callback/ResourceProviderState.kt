@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.internal.callback
 
-import cnames.structs.mln_resource_request_handle
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -12,6 +11,7 @@ import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.internal.c.mln_resource_provider
+import org.maplibre.nativeffi.internal.lifecycle.resourceRequestHandle
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceRequestHandle
@@ -34,9 +34,10 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   fun invoke(
     request: CPointer<org.maplibre.nativeffi.internal.c.mln_resource_request>?,
-    handle: CPointer<mln_resource_request_handle>?,
+    rawHandle: ULong,
   ): UInt {
-    if (request == null || handle == null) return UInt.MAX_VALUE
+    if (request == null || rawHandle == 0uL) return UInt.MAX_VALUE
+    val handle = resourceRequestHandle(rawHandle)
     val lease = gate.enter() ?: return UInt.MAX_VALUE
     return try {
       val requestHandle = ResourceRequestHandle(handle)
@@ -70,6 +71,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 private fun resourceProviderCallback(
   userData: COpaquePointer?,
   request: CPointer<org.maplibre.nativeffi.internal.c.mln_resource_request>?,
-  handle: CPointer<mln_resource_request_handle>?,
+  rawHandle: ULong,
 ): UInt =
-  userData?.asStableRef<ResourceProviderState>()?.get()?.invoke(request, handle) ?: UInt.MAX_VALUE
+  userData?.asStableRef<ResourceProviderState>()?.get()?.invoke(request, rawHandle)
+    ?: UInt.MAX_VALUE

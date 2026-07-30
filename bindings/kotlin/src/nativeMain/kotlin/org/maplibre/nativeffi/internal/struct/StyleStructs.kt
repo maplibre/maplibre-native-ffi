@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.internal.struct
 
-import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -51,6 +50,8 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_options_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options_default
+import org.maplibre.nativeffi.internal.lifecycle.NativeStyleIdList
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
@@ -237,19 +238,19 @@ internal object StyleStructs {
     return array
   }
 
-  fun styleIdList(list: CPointer<mln_style_id_list>): List<String> =
+  fun styleIdList(list: NativeStyleIdList): List<String> =
     styleIdList(
-      list,
+      list.rawHandleValue,
       counter = ::mln_style_id_list_count,
       getter = ::mln_style_id_list_get,
       destroyer = ::mln_style_id_list_destroy,
     )
 
   fun styleIdList(
-    list: CPointer<mln_style_id_list>,
-    counter: (CPointer<mln_style_id_list>, CPointer<ULongVar>) -> Int,
-    getter: (CPointer<mln_style_id_list>, ULong, CPointer<mln_string_view>) -> Int,
-    destroyer: (CPointer<mln_style_id_list>) -> Unit,
+    list: ULong,
+    counter: (ULong, CPointer<ULongVar>) -> Int,
+    getter: (ULong, ULong, CPointer<mln_string_view>) -> Int,
+    destroyer: (ULong) -> Unit,
   ): List<String> =
     try {
       memScoped {

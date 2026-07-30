@@ -4,42 +4,43 @@ import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlin.experimental.ExperimentalNativeApi
 import kotlin.native.ref.Cleaner
 import kotlin.native.ref.createCleaner
-import kotlinx.cinterop.CPointed
-import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.rawValue
-import kotlinx.cinterop.toLong
 
 /** Shared closed-state bookkeeping for native handles. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
-internal class HandleState<T : CPointed>(
+@OptIn(ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
+internal class HandleState<T : NativeHandle>(
   private val typeName: String,
-  handle: CPointer<T>?,
+  handle: T,
   vararg parents: Any,
 ) {
-  private val liveHandle = requireNotNull(handle) { "$typeName native handle is null" }
-  private val core = HandleStateCore(typeName, liveHandle.rawValue.toLong(), *parents)
+  private val liveHandle = handle.also { require(!it.isNull) { "$typeName native handle is null" } }
+  private val core = HandleStateCore(typeName, liveHandle.raw, *parents)
   private val leakReport = core.leakReport
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
-  private var handle: CPointer<T>? = liveHandle
+  private var handle: T? = liveHandle
 
-  fun requireLive(): CPointer<T> {
+  fun requireLive(): T {
     core.requireLive()
     return handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
   }
 
+  /** Runs [block] with the live handle and release held off. See [HandleStateCore.withLive]. */
+  fun <R> withLive(block: (T) -> R): R = core.withLive {
+    val live = handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+    block(live)
+  }
+
   fun isReleased(): Boolean = core.isReleased()
 
-  fun address(): Long = core.address()
+  fun handleId(): Long = core.handleId()
 
   fun retainChild(childTypeName: String): HandleStateCore.ChildRetention =
     core.retainChild(childTypeName)
 
-  fun closeOnce(destroy: (CPointer<T>) -> Int) {
+  fun closeOnce(destroy: (T) -> Int) {
     closeOnce(destroy) {}
   }
 
-  fun closeOnce(destroy: (CPointer<T>) -> Int, afterSuccess: () -> Unit) {
+  fun closeOnce(destroy: (T) -> Int, afterSuccess: () -> Unit) {
     val live =
       handle
         ?: run {
@@ -57,10 +58,10 @@ internal class HandleState<T : CPointed>(
 
   internal class LeakReport(
     typeName: String,
-    address: Long,
+    handleId: Long,
     writeLine: (String) -> Unit = { message -> println(message) },
   ) {
-    private val delegate = HandleStateCore.LeakReport(typeName, address, writeLine)
+    private val delegate = HandleStateCore.LeakReport(typeName, handleId, writeLine)
 
     fun markReleased() {
       delegate.markReleased()

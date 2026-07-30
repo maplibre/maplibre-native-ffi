@@ -124,7 +124,7 @@ public extension RuntimeHandle {
   {
     try mapNativeFailure {
       try NativeOffline.runAmbientCacheOperationStart(
-        requireLivePointer(),
+        requireLiveHandle(),
         operation: operation.rawValue
       )
     }
@@ -133,7 +133,7 @@ public extension RuntimeHandle {
   func discardOfflineOperation(_ operationId: UInt64) throws {
     try mapNativeFailure {
       try checkStatus(mln_runtime_offline_operation_discard(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         operationId
       ))
     }
@@ -146,7 +146,7 @@ public extension RuntimeHandle {
     try mapNativeFailure {
       try definition.nativeDefinition.withNativeDefinition { definition in
         try NativeOffline.regionCreateStart(
-          requireLivePointer(),
+          requireLiveHandle(),
           definition: definition,
           metadata: metadata
         )
@@ -156,14 +156,14 @@ public extension RuntimeHandle {
 
   func offlineRegionGetStart(regionId: Int64) throws -> UInt64 {
     try mapNativeFailure { try NativeOffline.regionGetStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId
     ) }
   }
 
   func offlineRegionsListStart() throws -> UInt64 {
     try mapNativeFailure {
-      try NativeOffline.regionsListStart(requireLivePointer())
+      try NativeOffline.regionsListStart(requireLiveHandle())
     }
   }
 
@@ -171,7 +171,7 @@ public extension RuntimeHandle {
     -> UInt64
   {
     try mapNativeFailure { try NativeOffline.regionsMergeDatabaseStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       sideDatabasePath: sideDatabasePath
     ) }
   }
@@ -180,7 +180,7 @@ public extension RuntimeHandle {
                                         metadata: Data) throws -> UInt64
   {
     try mapNativeFailure { try NativeOffline.regionUpdateMetadataStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId,
       metadata: metadata
     ) }
@@ -188,7 +188,7 @@ public extension RuntimeHandle {
 
   func offlineRegionGetStatusStart(regionId: Int64) throws -> UInt64 {
     try mapNativeFailure { try NativeOffline.regionGetStatusStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId
     ) }
   }
@@ -197,7 +197,7 @@ public extension RuntimeHandle {
                                      observed: Bool) throws -> UInt64
   {
     try mapNativeFailure { try NativeOffline.regionSetObservedStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId,
       observed: observed
     ) }
@@ -208,7 +208,7 @@ public extension RuntimeHandle {
     state: OfflineRegionDownloadState
   ) throws -> UInt64 {
     try mapNativeFailure { try NativeOffline.regionSetDownloadStateStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId,
       state: state.rawValue
     ) }
@@ -216,14 +216,14 @@ public extension RuntimeHandle {
 
   func offlineRegionInvalidateStart(regionId: Int64) throws -> UInt64 {
     try mapNativeFailure { try NativeOffline.regionInvalidateStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId
     ) }
   }
 
   func offlineRegionDeleteStart(regionId: Int64) throws -> UInt64 {
     try mapNativeFailure { try NativeOffline.regionDeleteStart(
-      requireLivePointer(),
+      requireLiveHandle(),
       regionId: regionId
     ) }
   }
@@ -233,7 +233,7 @@ public extension RuntimeHandle {
   {
     try mapNativeFailure {
       try OfflineRegionInfo(native: NativeOffline.regionCreateTakeResult(
-        requireLivePointer(),
+        requireLiveHandle(),
         operationId: operationId
       ))
     }
@@ -243,7 +243,7 @@ public extension RuntimeHandle {
     -> OfflineRegionInfo?
   {
     try mapNativeFailure { try NativeOffline.regionGetTakeResult(
-      requireLivePointer(),
+      requireLiveHandle(),
       operationId: operationId
     ).map(OfflineRegionInfo.init(native:)) }
   }
@@ -252,7 +252,7 @@ public extension RuntimeHandle {
     -> [OfflineRegionInfo]
   {
     try mapNativeFailure { try NativeOffline.regionsListTakeResult(
-      requireLivePointer(),
+      requireLiveHandle(),
       operationId: operationId
     ).map(OfflineRegionInfo.init(native:)) }
   }
@@ -261,7 +261,7 @@ public extension RuntimeHandle {
     -> [OfflineRegionInfo]
   {
     try mapNativeFailure { try NativeOffline.regionsMergeDatabaseTakeResult(
-      requireLivePointer(),
+      requireLiveHandle(),
       operationId: operationId
     ).map(OfflineRegionInfo.init(native:)) }
   }
@@ -272,7 +272,7 @@ public extension RuntimeHandle {
     try mapNativeFailure {
       try OfflineRegionInfo(native: NativeOffline
         .regionUpdateMetadataTakeResult(
-          requireLivePointer(),
+          requireLiveHandle(),
           operationId: operationId
         ))
     }
@@ -284,7 +284,7 @@ public extension RuntimeHandle {
     try mapNativeFailure {
       try OfflineRegionStatus(native: NativeOffline
         .regionGetStatusTakeResult(
-          requireLivePointer(),
+          requireLiveHandle(),
           operationId: operationId
         ))
     }

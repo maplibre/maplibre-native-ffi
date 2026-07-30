@@ -295,7 +295,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_style_source_json(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(sourceId),
         arena.allocate(sourceJSON.nativeValue)
       ))
@@ -306,7 +306,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let removed = try NativeStyle.removeSource(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
       if removed { removeCustomGeometrySourceCallbacks(sourceId: sourceId) }
@@ -318,7 +318,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.sourceExists(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )
     }
@@ -328,7 +328,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.sourceType(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId)
       ).map { StyleSourceType(rawValue: $0) ?? .unknown }
     }
@@ -338,7 +338,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.sourceInfo(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId)
       ).map(StyleSourceInfo.init(native:))
     }
@@ -349,12 +349,12 @@ public extension MapHandle {
       let arena = NativeInputArena()
       let sourceIdView = arena.view(sourceId)
       guard let info = try NativeStyle.sourceInfo(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: sourceIdView
       ) else { return nil }
       guard info.hasAttribution else { return nil }
       return try NativeStyle.copySourceAttribution(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: sourceIdView,
         capacity: info.attributionSize
       ).0
@@ -362,7 +362,7 @@ public extension MapHandle {
   }
 
   func styleSourceIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.sourceIds(requireLivePointer()) }
+    try mapNativeFailure { try NativeStyle.sourceIds(requireLiveHandle()) }
   }
 
   /// Adds a GeoJSON source that loads data from a URL.
@@ -380,7 +380,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try options.nativeOptions.withNativeOptions { options in
         try checkStatus(mln_map_add_geojson_source_url(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           arena.view(sourceId),
           arena.view(url),
           options
@@ -405,7 +405,7 @@ public extension MapHandle {
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
         try options.nativeOptions.withNativeOptions { options in
           try checkStatus(mln_map_add_geojson_source_data(
-            requireLivePointer(),
+            requireLiveHandle().raw,
             arena.view(sourceId),
             data,
             options
@@ -419,7 +419,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_geojson_source_url(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(sourceId),
         arena.view(url)
       ))
@@ -431,7 +431,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
         try checkStatus(mln_map_set_geojson_source_data(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           arena.view(sourceId),
           data
         ))
@@ -444,7 +444,7 @@ public extension MapHandle {
     url: String,
     options: StyleTileSourceOptions,
     add: (
-      OpaquePointer,
+      mln_map,
       mln_string_view,
       mln_string_view,
       UnsafePointer<mln_style_tile_source_options>?
@@ -454,7 +454,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try options.nativeOptions.withNativeOptions { options in
         try checkStatus(add(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           arena.view(sourceId),
           arena.view(url),
           options
@@ -468,7 +468,7 @@ public extension MapHandle {
     tiles: [String],
     options: StyleTileSourceOptions,
     add: (
-      OpaquePointer,
+      mln_map,
       mln_string_view,
       UnsafePointer<mln_string_view>?,
       Int,
@@ -481,7 +481,7 @@ public extension MapHandle {
       try tileViews.withUnsafeBufferPointer { tiles in
         try options.nativeOptions.withNativeOptions { options in
           try checkStatus(add(
-            requireLivePointer(),
+            requireLiveHandle().raw,
             arena.view(sourceId),
             tiles.baseAddress,
             tiles.count,
@@ -593,7 +593,7 @@ public extension MapHandle {
       try options.nativeOptions(callbacks: callbacks)
         .withNativeOptions { nativeOptions in
           try checkStatus(mln_map_add_custom_geometry_source(
-            requireLivePointer(),
+            requireLiveHandle().raw,
             arena.view(sourceId),
             nativeOptions
           ))
@@ -611,7 +611,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
         try checkStatus(mln_map_set_custom_geometry_source_tile_data(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           arena.view(sourceId),
           tileId.nativeTileID.native,
           data
@@ -627,7 +627,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_invalidate_custom_geometry_source_tile(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(sourceId),
         tileId.nativeTileID.native
       ))
@@ -641,7 +641,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_invalidate_custom_geometry_source_region(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(sourceId),
         bounds.nativeInput.native
       ))
@@ -658,7 +658,7 @@ public extension MapHandle {
       try image.nativeImage.withNativeImage { image in
         try options.nativeOptions.withNativeOptions { options in
           try checkStatus(mln_map_set_style_image(
-            requireLivePointer(),
+            requireLiveHandle().raw,
             arena.view(imageId),
             image,
             options
@@ -672,7 +672,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.removeImage(
-        requireLivePointer(),
+        requireLiveHandle(),
         imageId: arena.view(imageId)
       )
     }
@@ -682,7 +682,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.imageExists(
-        requireLivePointer(),
+        requireLiveHandle(),
         imageId: arena.view(imageId)
       )
     }
@@ -692,7 +692,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.imageInfo(
-        requireLivePointer(),
+        requireLiveHandle(),
         imageId: arena.view(imageId)
       ).map(StyleImageInfo.init(native:))
     }
@@ -703,11 +703,11 @@ public extension MapHandle {
       let arena = NativeInputArena()
       let imageIdView = arena.view(imageId)
       guard let info = try NativeStyle.imageInfo(
-        requireLivePointer(),
+        requireLiveHandle(),
         imageId: imageIdView
       ) else { return nil }
       guard let pixels = try NativeStyle.copyImagePremultipliedRGBA8(
-        requireLivePointer(),
+        requireLiveHandle(),
         imageId: imageIdView,
         capacity: info.byteLength
       ).0 else { return nil }
@@ -723,7 +723,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try NativeStyle.addImageSourceURL(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId),
         coordinates: coordinates.map(\.nativeInput),
         url: arena.view(url)
@@ -740,7 +740,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try image.nativeImage.withNativeImage { image in
         try NativeStyle.addImageSourceImage(
-          requireLivePointer(),
+          requireLiveHandle(),
           sourceId: arena.view(sourceId),
           coordinates: coordinates.map(\.nativeInput),
           image: image
@@ -753,7 +753,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_image_source_url(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(sourceId),
         arena.view(url)
       ))
@@ -765,7 +765,7 @@ public extension MapHandle {
       let arena = NativeInputArena()
       try image.nativeImage.withNativeImage { image in
         try checkStatus(mln_map_set_image_source_image(
-          requireLivePointer(),
+          requireLiveHandle().raw,
           arena.view(sourceId),
           image
         ))
@@ -780,7 +780,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try NativeStyle.setImageSourceCoordinates(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId),
         coordinates: coordinates.map(\.nativeInput)
       )
@@ -791,7 +791,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.imageSourceCoordinates(
-        requireLivePointer(),
+        requireLiveHandle(),
         sourceId: arena.view(sourceId)
       )?.map(LatLng.init(native:))
     }
@@ -805,7 +805,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_hillshade_layer(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(sourceId),
         arena.view(beforeLayerId ?? "")
@@ -821,7 +821,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_color_relief_layer(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(sourceId),
         arena.view(beforeLayerId ?? "")
@@ -836,7 +836,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_location_indicator_layer(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(beforeLayerId ?? "")
       ))
@@ -851,7 +851,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_location_indicator_location(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         coordinate.nativeInput.native,
         altitude
@@ -863,7 +863,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_location_indicator_bearing(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         bearing
       ))
@@ -877,7 +877,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_location_indicator_accuracy_radius(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         radius
       ))
@@ -892,7 +892,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_location_indicator_image_name(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         kind.rawValue,
         arena.view(imageId)
@@ -907,7 +907,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_add_style_layer_json(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.allocate(layerJSON.nativeValue),
         arena.view(beforeLayerId ?? "")
       ))
@@ -918,7 +918,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.removeLayer(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
@@ -928,7 +928,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerExists(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
@@ -938,21 +938,21 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerType(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId)
       )
     }
   }
 
   func styleLayerIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.layerIds(requireLivePointer()) }
+    try mapNativeFailure { try NativeStyle.layerIds(requireLiveHandle()) }
   }
 
   func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_move_style_layer(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(beforeLayerId ?? "")
       ))
@@ -963,7 +963,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerJSON(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId)
       ).map(JSONValue.init(native:))
     }
@@ -973,7 +973,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_style_light_json(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.allocate(lightJSON.nativeValue)
       ))
     }
@@ -983,7 +983,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_style_light_property(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(propertyName),
         arena.allocate(value.nativeValue)
       ))
@@ -994,7 +994,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.lightProperty(
-        requireLivePointer(),
+        requireLiveHandle(),
         propertyName: arena.view(propertyName)
       ).map(JSONValue.init(native:))
     }
@@ -1008,7 +1008,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_layer_property(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         arena.view(propertyName),
         arena.allocate(value.nativeValue)
@@ -1022,7 +1022,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerProperty(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId),
         propertyName: arena.view(propertyName)
       ).map(JSONValue.init(native:))
@@ -1033,7 +1033,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_set_layer_filter(
-        requireLivePointer(),
+        requireLiveHandle().raw,
         arena.view(layerId),
         filter.map { arena.allocate($0.nativeValue) }
       ))
@@ -1044,7 +1044,7 @@ public extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       return try NativeStyle.layerFilter(
-        requireLivePointer(),
+        requireLiveHandle(),
         layerId: arena.view(layerId)
       ).map(JSONValue.init(native:))
     }

@@ -25,7 +25,7 @@ impl super::RenderSessionHandle {
         state: &JsonValue,
     ) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let selector = selector.to_native();
         let state = state.try_to_native()?;
         // SAFETY: session is live. selector and state own all call-scoped
@@ -38,9 +38,9 @@ impl super::RenderSessionHandle {
     /// Copies per-feature state from a render source in this session.
     pub fn get_feature_state(&self, selector: &FeatureStateSelector) -> Result<JsonValue> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let selector = selector.to_native();
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_json_snapshot>::new();
         // SAFETY: session is live, selector owns call-scoped storage, and out
         // is a null-initialized out-pointer owned by this call.
         maplibre_core::check(unsafe {
@@ -49,7 +49,7 @@ impl super::RenderSessionHandle {
         // SAFETY: On success, the C API returns either null or an owned JSON
         // snapshot handle for this call; core copies and releases it.
         Ok(
-            unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }?
+            unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }?
                 .unwrap_or_else(|| JsonValue::Object(Vec::new())),
         )
     }
@@ -57,7 +57,7 @@ impl super::RenderSessionHandle {
     /// Removes per-feature state selected for this session.
     pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let selector = selector.to_native();
         // SAFETY: session is live and selector owns all call-scoped storage
         // until the native call returns.
@@ -73,12 +73,12 @@ impl super::RenderSessionHandle {
         options: Option<&RenderedFeatureQueryOptions>,
     ) -> Result<Vec<QueriedFeature>> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let geometry = geometry.to_native();
         let options = options
             .map(RenderedFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
         // SAFETY: session is live; geometry and options retain all borrowed
         // descriptor storage for the call; out is a null-initialized owned
         // out-pointer.
@@ -96,7 +96,7 @@ impl super::RenderSessionHandle {
         // handle; core copies and releases it.
         unsafe {
             maplibre_core::query::copy_feature_query_result(
-                out.into_non_null("mln_feature_query_result")?,
+                out.into_live("mln_feature_query_result")?,
             )
         }
     }
@@ -108,12 +108,12 @@ impl super::RenderSessionHandle {
         options: Option<&SourceFeatureQueryOptions>,
     ) -> Result<Vec<QueriedFeature>> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let options = options
             .map(SourceFeatureQueryOptions::to_native)
             .transpose()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_query_result>::new();
         // SAFETY: session is live; source_id and options retain all borrowed
         // descriptor storage for the call; out is a null-initialized owned
         // out-pointer.
@@ -131,7 +131,7 @@ impl super::RenderSessionHandle {
         // handle; core copies and releases it.
         unsafe {
             maplibre_core::query::copy_feature_query_result(
-                out.into_non_null("mln_feature_query_result")?,
+                out.into_live("mln_feature_query_result")?,
             )
         }
     }
@@ -156,7 +156,7 @@ impl super::RenderSessionHandle {
         arguments: Option<&JsonValue>,
     ) -> Result<FeatureExtensionResult> {
         self.inner.ensure_no_frame_acquired()?;
-        let session = self.inner.as_ptr()?;
+        let session = self.inner.native()?;
         let source_id = maplibre_core::string::string_view(source_id);
         let extension = maplibre_core::string::string_view(extension);
         let extension_field = maplibre_core::string::string_view(extension_field);
@@ -169,7 +169,7 @@ impl super::RenderSessionHandle {
             ));
         }
         let arguments = arguments.map(JsonValue::try_to_native).transpose()?;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_feature_extension_result>::new();
+        let mut out = maplibre_core::ptr::OutHandle::<sys::mln_feature_extension_result>::new();
         // SAFETY: session is live; all string, feature, and optional JSON
         // descriptors retain borrowed storage for the call; out is a
         // null-initialized owned out-pointer.
@@ -190,7 +190,7 @@ impl super::RenderSessionHandle {
         // result handle; core copies and releases it.
         unsafe {
             maplibre_core::query::copy_feature_extension_result(
-                out.into_non_null("mln_feature_extension_result")?,
+                out.into_live("mln_feature_extension_result")?,
             )
         }
     }

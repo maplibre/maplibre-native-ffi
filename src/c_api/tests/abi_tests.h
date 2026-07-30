@@ -19,6 +19,7 @@
 // missing a call.
 
 void run_core_abi_tests(void);
+void run_handles_abi_tests(void);
 void run_map_options_abi_tests(void);
 void run_render_backend_abi_tests(void);
 void run_owned_texture_abi_tests(void);

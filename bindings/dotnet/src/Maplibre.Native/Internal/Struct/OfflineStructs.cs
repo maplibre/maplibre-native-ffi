@@ -8,24 +8,24 @@ using Maplibre.Native.Offline;
 namespace Maplibre.Native.Internal.Struct;
 
 internal unsafe delegate mln_status OfflineRegionSnapshotGet(
-    mln_offline_region_snapshot* snapshot,
+    MlnOfflineRegionSnapshot snapshot,
     mln_offline_region_info* outInfo
 );
 
-internal unsafe delegate void OfflineRegionSnapshotDestroy(mln_offline_region_snapshot* snapshot);
+internal unsafe delegate void OfflineRegionSnapshotDestroy(MlnOfflineRegionSnapshot snapshot);
 
 internal unsafe delegate mln_status OfflineRegionListCount(
-    mln_offline_region_list* list,
+    MlnOfflineRegionList list,
     nuint* outCount
 );
 
 internal unsafe delegate mln_status OfflineRegionListGet(
-    mln_offline_region_list* list,
+    MlnOfflineRegionList list,
     nuint index,
     mln_offline_region_info* outInfo
 );
 
-internal unsafe delegate void OfflineRegionListDestroy(mln_offline_region_list* list);
+internal unsafe delegate void OfflineRegionListDestroy(MlnOfflineRegionList list);
 
 internal sealed unsafe class NativeOfflineRegionDefinition : IDisposable
 {
@@ -165,9 +165,9 @@ internal static unsafe class OfflineStructs
     [ThreadStatic]
     private static OfflineRegionListDestroy? listDestroyForTest;
 
-    internal static OfflineRegionInfo ReadSnapshot(mln_offline_region_snapshot* snapshot)
+    internal static OfflineRegionInfo ReadSnapshot(MlnOfflineRegionSnapshot snapshot)
     {
-        if (snapshot is null)
+        if (snapshot.IsNull)
         {
             throw new InvalidOperationException("Native offline region snapshot was null.");
         }
@@ -184,9 +184,9 @@ internal static unsafe class OfflineStructs
         }
     }
 
-    internal static IReadOnlyList<OfflineRegionInfo> ReadList(mln_offline_region_list* list)
+    internal static IReadOnlyList<OfflineRegionInfo> ReadList(MlnOfflineRegionList list)
     {
-        if (list is null)
+        if (list.IsNull)
         {
             return [];
         }

@@ -32,6 +32,7 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "geojson/geojson.hpp"
+#include "handles/handle_table.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c.h"
 #include "style/style_value.hpp"
@@ -291,32 +292,40 @@ auto validate_webgpu_context(
 
 }  // namespace mln::core
 
-struct mln_feature_query_result {
-  std::vector<std::unique_ptr<mln::core::OwnedQueriedFeatureDescriptor>>
-    features;
+namespace mln::core {
+
+template <>
+struct HandleTraits<mln_render_session_object> {
+  static constexpr auto kind = HandleKind::RenderSession;
+  static constexpr auto leasable = false;
 };
 
-struct mln_feature_extension_result {
+struct FeatureQueryResultObject {
+  std::vector<std::unique_ptr<OwnedQueriedFeatureDescriptor>> features;
+};
+
+struct FeatureExtensionResultObject {
   mln_feature_extension_result_info info{};
-  std::unique_ptr<mln::core::OwnedJsonDescriptor> value;
-  std::vector<std::unique_ptr<mln::core::OwnedQueriedFeatureDescriptor>>
-    features;
+  std::unique_ptr<OwnedJsonDescriptor> value;
+  std::vector<std::unique_ptr<OwnedQueriedFeatureDescriptor>> features;
   std::vector<mln_feature> feature_roots;
 };
 
+template <>
+struct HandleTraits<FeatureQueryResultObject> {
+  static constexpr auto kind = HandleKind::FeatureQueryResult;
+  static constexpr auto leasable = false;
+};
+
+template <>
+struct HandleTraits<FeatureExtensionResultObject> {
+  static constexpr auto kind = HandleKind::FeatureExtensionResult;
+  static constexpr auto leasable = false;
+};
+
+}  // namespace mln::core
+
 namespace {
-
-auto render_session_mutex() -> std::mutex& {
-  static auto value = std::mutex{};
-  return value;
-}
-
-auto render_sessions() -> std::unordered_map<
-  mln_render_session*, std::unique_ptr<mln_render_session>>& {
-  static auto value = std::unordered_map<
-    mln_render_session*, std::unique_ptr<mln_render_session>>{};
-  return value;
-}
 
 auto set_native_stage_error(const char* stage, const std::exception& exception)
   -> void {
@@ -324,34 +333,7 @@ auto set_native_stage_error(const char* stage, const std::exception& exception)
   mln::core::set_thread_error(message.c_str());
 }
 
-auto feature_query_result_mutex() -> std::mutex& {
-  static auto value = std::mutex{};
-  return value;
-}
-
-auto feature_query_results() -> std::unordered_map<
-  const mln_feature_query_result*, std::unique_ptr<mln_feature_query_result>>& {
-  static auto value = std::unordered_map<
-    const mln_feature_query_result*,
-    std::unique_ptr<mln_feature_query_result>>{};
-  return value;
-}
-
-auto feature_extension_result_mutex() -> std::mutex& {
-  static auto value = std::mutex{};
-  return value;
-}
-
-auto feature_extension_results() -> std::unordered_map<
-  const mln_feature_extension_result*,
-  std::unique_ptr<mln_feature_extension_result>>& {
-  static auto value = std::unordered_map<
-    const mln_feature_extension_result*,
-    std::unique_ptr<mln_feature_extension_result>>{};
-  return value;
-}
-
-auto has_backend(const mln_render_session* session) -> bool {
+auto has_backend(const mln_render_session_object* session) -> bool {
   if (session->kind == mln::core::RenderSessionKind::Surface) {
     return session->surface.backend != nullptr;
   }
@@ -371,7 +353,7 @@ auto validate_dimensions(
   return MLN_STATUS_OK;
 }
 
-auto renderer_backend(mln_render_session* session)
+auto renderer_backend(mln_render_session_object* session)
   -> mbgl::gfx::RendererBackend* {
   if (session->kind == mln::core::RenderSessionKind::Surface) {
     return &session->surface.backend->renderer_backend();
@@ -380,7 +362,7 @@ auto renderer_backend(mln_render_session* session)
 }
 
 auto validate_renderer_backend(
-  mln_render_session* session, mbgl::gfx::RendererBackend*& out_backend
+  mln_render_session_object* session, mbgl::gfx::RendererBackend*& out_backend
 ) -> mln_status {
   if (session->renderer == nullptr) {
     mln::core::set_thread_error("render session renderer is not available");
@@ -446,27 +428,14 @@ auto validate_screen_point(mln_screen_point point) -> bool {
   return true;
 }
 
-auto validate_query_result_output(mln_feature_query_result** out_result)
-  -> mln_status {
+template <typename Handle>
+auto validate_result_output(Handle* out_result) -> mln_status {
   if (out_result == nullptr) {
     mln::core::set_thread_error("out_result must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (*out_result != nullptr) {
-    mln::core::set_thread_error("*out_result must be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
-}
-
-auto validate_extension_result_output(mln_feature_extension_result** out_result)
-  -> mln_status {
-  if (out_result == nullptr) {
-    mln::core::set_thread_error("out_result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (*out_result != nullptr) {
-    mln::core::set_thread_error("*out_result must be null");
+  if (*out_result != MLN_HANDLE_NULL) {
+    mln::core::set_thread_error("*out_result must be the null handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
@@ -798,32 +767,23 @@ auto make_queried_feature(
 auto create_feature_query_result(
   std::vector<mbgl::Feature> features,
   const std::optional<std::string>& source_id,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) -> mln_status {
-  const auto output_status = validate_query_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
 
-  auto result = std::make_unique<mln_feature_query_result>();
+  auto result = std::make_shared<mln::core::FeatureQueryResultObject>();
   result->features.reserve(features.size());
   for (const auto& feature : features) {
     result->features.emplace_back(make_queried_feature(feature, source_id));
   }
-  auto* handle = result.get();
-  const auto lock = std::scoped_lock{feature_query_result_mutex()};
-  feature_query_results().emplace(handle, std::move(result));
-  *out_result = handle;
+  *out_result =
+    mln::core::handle_table<mln::core::FeatureQueryResultObject>().insert(
+      std::move(result)
+    );
   return MLN_STATUS_OK;
-}
-
-auto find_feature_query_result_locked(const mln_feature_query_result* result)
-  -> const mln_feature_query_result* {
-  const auto found = feature_query_results().find(result);
-  if (found == feature_query_results().end()) {
-    return nullptr;
-  }
-  return found->second.get();
 }
 
 auto validate_non_empty_string(mln_string_view string, const char* name)
@@ -863,36 +823,36 @@ auto to_feature_extension_arguments(const mln_json_value* arguments)
 }
 
 auto create_feature_extension_value_result(
-  mbgl::Value value, mln_feature_extension_result** out_result
+  mbgl::Value value, mln_feature_extension_result* out_result
 ) -> mln_status {
-  const auto output_status = validate_extension_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
 
-  auto result = std::make_unique<mln_feature_extension_result>();
+  auto result = std::make_shared<mln::core::FeatureExtensionResultObject>();
   result->value = mln::core::to_c_json_value(value);
   result->info = mln_feature_extension_result_info{
     .size = sizeof(mln_feature_extension_result_info),
     .type = MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE,
     .data = {.value = &result->value->root}
   };
-  auto* handle = result.get();
-  const auto lock = std::scoped_lock{feature_extension_result_mutex()};
-  feature_extension_results().emplace(handle, std::move(result));
-  *out_result = handle;
+  *out_result =
+    mln::core::handle_table<mln::core::FeatureExtensionResultObject>().insert(
+      std::move(result)
+    );
   return MLN_STATUS_OK;
 }
 
 auto create_feature_extension_collection_result(
-  mbgl::FeatureCollection features, mln_feature_extension_result** out_result
+  mbgl::FeatureCollection features, mln_feature_extension_result* out_result
 ) -> mln_status {
-  const auto output_status = validate_extension_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
 
-  auto result = std::make_unique<mln_feature_extension_result>();
+  auto result = std::make_shared<mln::core::FeatureExtensionResultObject>();
   result->features.reserve(features.size());
   result->feature_roots.reserve(features.size());
   for (const auto& feature : features) {
@@ -915,15 +875,15 @@ auto create_feature_extension_collection_result(
       }
     }
   };
-  auto* handle = result.get();
-  const auto lock = std::scoped_lock{feature_extension_result_mutex()};
-  feature_extension_results().emplace(handle, std::move(result));
-  *out_result = handle;
+  *out_result =
+    mln::core::handle_table<mln::core::FeatureExtensionResultObject>().insert(
+      std::move(result)
+    );
   return MLN_STATUS_OK;
 }
 
 auto create_feature_extension_result(
-  mbgl::FeatureExtensionValue value, mln_feature_extension_result** out_result
+  mbgl::FeatureExtensionValue value, mln_feature_extension_result* out_result
 ) -> mln_status {
   if (value.is<mbgl::Value>()) {
     return create_feature_extension_value_result(
@@ -935,21 +895,11 @@ auto create_feature_extension_result(
   );
 }
 
-auto find_feature_extension_result_locked(
-  const mln_feature_extension_result* result
-) -> const mln_feature_extension_result* {
-  const auto found = feature_extension_results().find(result);
-  if (found == feature_extension_results().end()) {
-    return nullptr;
-  }
-  return found->second.get();
-}
-
 // The map's scale factor is fixed at creation and still selects sprites,
 // glyphs, and raster tiles, while the session's scale factor drives geometry
 // and shaders. A mismatch renders correctly sized geometry against imagery
 // chosen for a different density, so warn instead of failing the call.
-auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
+auto warn_on_scale_factor_mismatch(mln_map map, double scale_factor) -> void {
   constexpr auto tolerance = 1e-6;
   const auto creation_scale_factor = mln::core::map_scale_factor(map);
   if (std::abs(creation_scale_factor - scale_factor) <= tolerance) {
@@ -970,11 +920,9 @@ auto warn_on_scale_factor_mismatch(mln_map* map, double scale_factor) -> void {
 
 namespace mln::core {
 
-auto register_render_session(
-  mln_render_session* handle, std::unique_ptr<mln_render_session> session
-) -> void {
-  const auto lock = std::scoped_lock{render_session_mutex()};
-  render_sessions().emplace(handle, std::move(session));
+auto register_render_session(std::shared_ptr<mln_render_session_object> session)
+  -> mln_render_session {
+  return handle_table<mln_render_session_object>().insert(std::move(session));
 }
 
 void RenderSessionScheduler::schedule(std::function<void()>&& task) {
@@ -1029,17 +977,16 @@ auto RenderSessionScheduler::discard() -> void {
   batch.swap(queue_);
 }
 
-auto validate_render_session(mln_render_session* session) -> mln_status {
-  if (session == nullptr) {
-    set_thread_error("render session must not be null");
+// Only the attaching thread destroys a session, so the borrowed object stays
+// alive for as long as the calling thread can use it.
+auto validate_render_session(
+  mln_render_session session, mln_render_session_object*& out_session
+) -> mln_status {
+  out_session = handle_table<mln_render_session_object>().resolve(session);
+  if (out_session == nullptr) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  const auto lock = std::scoped_lock{render_session_mutex()};
-  if (!render_sessions().contains(session)) {
-    set_thread_error("render session is not a live handle");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (session->owner_thread != std::this_thread::get_id()) {
+  if (out_session->owner_thread != std::this_thread::get_id()) {
     set_thread_error(
       "render session call must be made on the thread that attached it"
     );
@@ -1048,34 +995,29 @@ auto validate_render_session(mln_render_session* session) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto validate_live_attached_render_session(mln_render_session* session)
-  -> mln_status {
-  const auto status = validate_render_session(session);
+auto validate_live_attached_render_session(
+  mln_render_session session, mln_render_session_object*& out_session
+) -> mln_status {
+  const auto status = validate_render_session(session, out_session);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (!session->attached || !has_backend(session)) {
+  if (!out_session->attached || !has_backend(out_session)) {
     set_thread_error("render session is detached");
     return MLN_STATUS_INVALID_STATE;
   }
   return MLN_STATUS_OK;
 }
 
-auto erase_render_session(mln_render_session* session)
-  -> std::unique_ptr<mln_render_session> {
-  const auto lock = std::scoped_lock{render_session_mutex()};
-  auto found = render_sessions().find(session);
-  if (found == render_sessions().end()) {
-    return nullptr;
-  }
-  auto owned = std::move(found->second);
-  render_sessions().erase(found);
-  return owned;
+auto erase_render_session(mln_render_session session)
+  -> std::shared_ptr<mln_render_session_object> {
+  return handle_table<mln_render_session_object>().remove(session);
 }
 
 auto attach_render_session(
-  std::unique_ptr<mln_render_session> session, mln_render_session** out_session,
-  RenderSessionKind kind, RenderSessionAttachMessages messages
+  std::shared_ptr<mln_render_session_object> session,
+  mln_render_session* out_session, RenderSessionKind kind,
+  RenderSessionAttachMessages messages
 ) -> mln_status {
   if (session == nullptr) {
     set_thread_error(messages.null_session);
@@ -1094,7 +1036,7 @@ auto attach_render_session(
   // the runtime loop thread.
   session->owner_thread = std::this_thread::get_id();
 
-  auto* map = session->map;
+  const auto map = session->map;
   auto* handle = session.get();
   const auto attach_status = map_attach_render_target_session(map, handle);
   if (attach_status != MLN_STATUS_OK) {
@@ -1126,42 +1068,40 @@ auto attach_render_session(
     }
     warn_on_scale_factor_mismatch(map, session->scale_factor);
 
-    register_render_session(handle, std::move(session));
+    *out_session = register_render_session(std::move(session));
   } catch (...) {
     static_cast<void>(map_detach_render_target_session(map, handle));
     throw;
   }
 
-  *out_session = handle;
   return MLN_STATUS_OK;
 }
 
 auto render_session_resize(
-  mln_render_session* session, uint32_t width, uint32_t height,
+  mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
   const auto dimensions_status = validate_dimensions(
     width, height, scale_factor,
-    session->kind == RenderSessionKind::Surface
+    live->kind == RenderSessionKind::Surface
       ? "surface dimensions and scale_factor must be positive"
       : "texture dimensions and scale_factor must be positive"
   );
   if (dimensions_status != MLN_STATUS_OK) {
     return dimensions_status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot resize while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
   if (
-    session->kind == RenderSessionKind::Texture &&
-    session->texture.mode == TextureSessionMode::Borrowed
+    live->kind == RenderSessionKind::Texture &&
+    live->texture.mode == TextureSessionMode::Borrowed
   ) {
     set_thread_error(
       "borrowed texture sessions cannot be resized; attach a new target"
@@ -1170,7 +1110,7 @@ auto render_session_resize(
   }
   const auto physical_status = validate_physical_size(
     width, height, scale_factor,
-    session->kind == RenderSessionKind::Surface
+    live->kind == RenderSessionKind::Surface
       ? "scaled surface dimensions are too large"
       : "scaled texture dimensions are too large"
   );
@@ -1180,36 +1120,37 @@ auto render_session_resize(
 
   const auto physical_width = physical_dimension(width, scale_factor);
   const auto physical_height = physical_dimension(height, scale_factor);
-  if (session->kind == RenderSessionKind::Surface) {
-    session->surface.backend->resize(physical_width, physical_height);
+  if (live->kind == RenderSessionKind::Surface) {
+    live->surface.backend->resize(physical_width, physical_height);
   } else {
-    session->texture.backend->headless_backend().setSize(
+    live->texture.backend->headless_backend().setSize(
       mbgl::Size{physical_width, physical_height}
     );
-    session->texture.rendered_native_texture = nullptr;
-    session->texture.acquired_native_texture = nullptr;
-    session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
+    live->texture.rendered_native_texture = nullptr;
+    live->texture.acquired_native_texture = nullptr;
+    live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
-  const auto size_status = map_post_set_size(session->map, width, height);
+  const auto size_status = map_post_set_size(live->map, width, height);
   if (size_status != MLN_STATUS_OK) {
     return size_status;
   }
-  warn_on_scale_factor_mismatch(session->map, scale_factor);
-  session->renderer.reset();
-  session->rendered_generation = 0;
-  session->width = width;
-  session->height = height;
-  session->physical_width = physical_width;
-  session->physical_height = physical_height;
-  session->scale_factor = scale_factor;
-  ++session->generation;
+  warn_on_scale_factor_mismatch(live->map, scale_factor);
+  live->renderer.reset();
+  live->rendered_generation = 0;
+  live->width = width;
+  live->height = height;
+  live->physical_width = physical_width;
+  live->physical_height = physical_height;
+  live->scale_factor = scale_factor;
+  ++live->generation;
   return MLN_STATUS_OK;
 }
 
 auto render_session_render_update(
-  mln_render_session* session, bool* out_rendered
+  mln_render_session session, bool* out_rendered
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1218,19 +1159,17 @@ auto render_session_render_update(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   *out_rendered = false;
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot render while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto* backend = renderer_backend(session);
+  auto* backend = renderer_backend(live);
   if (backend == nullptr) {
     set_thread_error("render session renderer backend is not available");
     return MLN_STATUS_NATIVE_ERROR;
   }
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   // Deliver tile and resource results first: destroying the tiles they retire
   // is what enqueues the GPU-release work that map_run_render_jobs() drains.
@@ -1239,10 +1178,10 @@ auto render_session_render_update(
   // thread's scheduler, this queue is the only place those results land, and it
   // drains nowhere else. Returning without draining would strand them whenever
   // there is no update to render, which is exactly the window a resize opens.
-  session->scheduler.drain();
-  map_run_render_jobs(session->map);
+  live->scheduler.drain();
+  map_run_render_jobs(live->map);
 
-  auto update = map_latest_update(session->map);
+  auto update = map_latest_update(live->map);
   if (!update) {
     return MLN_STATUS_OK;
   }
@@ -1255,21 +1194,20 @@ auto render_session_render_update(
   // update that matches instead. This cannot stall: Transform::resize
   // publishes a new update unless the size is already what we want.
   if (
-    update->transformState.getSize() !=
-    mbgl::Size{session->width, session->height}
+    update->transformState.getSize() != mbgl::Size{live->width, live->height}
   ) {
     return MLN_STATUS_OK;
   }
 
-  if (session->kind == RenderSessionKind::Texture) {
-    session->texture.backend->prepare_render_resources();
+  if (live->kind == RenderSessionKind::Texture) {
+    live->texture.backend->prepare_render_resources();
   }
-  if (session->renderer == nullptr) {
+  if (live->renderer == nullptr) {
     try {
-      session->renderer = std::make_unique<mbgl::Renderer>(
-        *backend, static_cast<float>(session->scale_factor)
+      live->renderer = std::make_unique<mbgl::Renderer>(
+        *backend, static_cast<float>(live->scale_factor)
       );
-      session->renderer->setObserver(map_renderer_observer(session->map));
+      live->renderer->setObserver(map_renderer_observer(live->map));
     } catch (const std::exception& exception) {
       set_native_stage_error("creating renderer", exception);
       return MLN_STATUS_NATIVE_ERROR;
@@ -1277,18 +1215,18 @@ auto render_session_render_update(
   }
 
   try {
-    session->renderer->render(update);
+    live->renderer->render(update);
   } catch (const std::exception& exception) {
     set_native_stage_error("rendering update", exception);
     return MLN_STATUS_NATIVE_ERROR;
   }
   // Absorb results that landed from worker threads during the render, so they
   // do not wait a whole frame.
-  session->scheduler.drain();
-  if (session->kind == RenderSessionKind::Texture) {
+  live->scheduler.drain();
+  if (live->kind == RenderSessionKind::Texture) {
     auto frame_rendered = true;
     const auto after_status =
-      session->texture.backend->after_render(*session, frame_rendered);
+      live->texture.backend->after_render(*live, frame_rendered);
     if (after_status != MLN_STATUS_OK) {
       return after_status;
     }
@@ -1296,19 +1234,18 @@ auto render_session_render_update(
       return MLN_STATUS_OK;
     }
   }
-  session->rendered_generation = session->generation;
+  live->rendered_generation = live->generation;
   *out_rendered = true;
   return MLN_STATUS_OK;
 }
 
-auto render_session_detach(mln_render_session* session) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+auto render_session_detach(mln_render_session session) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot detach while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -1319,44 +1256,42 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
   // map owner thread see no attached session and destroy the map — freeing that
   // observer underneath the drain and reset below.
   {
-    auto current = ScopedCurrentScheduler{session->scheduler};
+    auto current = ScopedCurrentScheduler{live->scheduler};
     // Let queued results land while the renderer they target still exists.
-    session->scheduler.drain();
-    session->renderer.reset();
-    session->surface.backend.reset();
-    session->texture.backend.reset();
+    live->scheduler.drain();
+    live->renderer.reset();
+    live->surface.backend.reset();
+    live->texture.backend.reset();
     // Anything enqueued during teardown is a mailbox receive or a bindOnce
     // continuation whose target is already gone, so running it would be a
     // no-op. Drop it rather than execute arbitrary work mid-teardown.
-    session->scheduler.discard();
+    live->scheduler.discard();
   }
 
-  const auto detach_status =
-    map_detach_render_target_session(session->map, session);
+  const auto detach_status = map_detach_render_target_session(live->map, live);
   if (detach_status != MLN_STATUS_OK) {
     return detach_status;
   }
-  session->attached = false;
-  session->rendered_generation = 0;
-  session->texture.rendered_native_texture = nullptr;
-  session->texture.acquired_native_texture = nullptr;
-  session->texture.acquired_frame_kind = TextureSessionFrameKind::None;
-  ++session->generation;
+  live->attached = false;
+  live->rendered_generation = 0;
+  live->texture.rendered_native_texture = nullptr;
+  live->texture.acquired_native_texture = nullptr;
+  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
+  ++live->generation;
   return MLN_STATUS_OK;
 }
 
-auto render_session_destroy(mln_render_session* session) -> mln_status {
-  const auto status = validate_render_session(session);
+auto render_session_destroy(mln_render_session session) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot destroy while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (session->attached) {
+  if (live->attached) {
     const auto detach_status = render_session_detach(session);
     if (detach_status != MLN_STATUS_OK) {
       return detach_status;
@@ -1367,66 +1302,70 @@ auto render_session_destroy(mln_render_session* session) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto render_session_reduce_memory_use(mln_render_session* session)
+auto render_session_reduce_memory_use(mln_render_session session)
   -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->reduceMemoryUse();
+  live->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
 }
 
-auto render_session_clear_data(mln_render_session* session) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+auto render_session_clear_data(mln_render_session session) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->clearData();
+  live->renderer->clearData();
   return MLN_STATUS_OK;
 }
 
-auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+auto render_session_dump_debug_logs(mln_render_session session) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->dumpDebugLogs();
+  live->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
 }
 
 auto render_session_set_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
+  mln_render_session session, const mln_feature_state_selector* selector,
   const mln_json_value* state
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1436,7 +1375,7 @@ auto render_session_set_feature_state(
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
@@ -1452,22 +1391,23 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->setFeatureState(
+  live->renderer->setFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id), *state_object
   );
-  static_cast<void>(map_post_trigger_repaint(session->map));
+  static_cast<void>(map_post_trigger_repaint(live->map));
   return MLN_STATUS_OK;
 }
 
 auto render_session_get_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
-  mln_json_snapshot** out_state
+  mln_render_session session, const mln_feature_state_selector* selector,
+  mln_json_snapshot* out_state
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1477,16 +1417,16 @@ auto render_session_get_feature_state(
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
 
   auto state = mbgl::FeatureState{};
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->getFeatureState(
+  live->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     string_from_view(selector->feature_id)
@@ -1495,9 +1435,10 @@ auto render_session_get_feature_state(
 }
 
 auto render_session_remove_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector
+  mln_render_session session, const mln_feature_state_selector* selector
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -1507,15 +1448,15 @@ auto render_session_remove_feature_state(
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
 
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  session->renderer->removeFeatureState(
+  live->renderer->removeFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
     optional_selector_string(
@@ -1525,20 +1466,21 @@ auto render_session_remove_feature_state(
       *selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY, selector->state_key
     )
   );
-  static_cast<void>(map_post_trigger_repaint(session->map));
+  static_cast<void>(map_post_trigger_repaint(live->map));
   return MLN_STATUS_OK;
 }
 
 auto render_session_query_rendered_features(
-  mln_render_session* session, const mln_rendered_query_geometry* geometry,
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  const auto output_status = validate_query_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
@@ -1570,7 +1512,7 @@ auto render_session_query_rendered_features(
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       clipped_box = clip_screen_box_to_viewport(
-        geometry->data.box, session->width, session->height
+        geometry->data.box, live->width, live->height
       );
       break;
     }
@@ -1587,32 +1529,31 @@ auto render_session_query_rendered_features(
 
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
 
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
-      features = session->renderer->queryRenderedFeatures(
+      features = live->renderer->queryRenderedFeatures(
         mbgl::ScreenCoordinate{geometry->data.point.x, geometry->data.point.y},
         *native_options
       );
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
       if (clipped_box) {
-        features = session->renderer->queryRenderedFeatures(
-          *clipped_box, *native_options
-        );
+        features =
+          live->renderer->queryRenderedFeatures(*clipped_box, *native_options);
       }
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING:
       features =
-        session->renderer->queryRenderedFeatures(line_string, *native_options);
+        live->renderer->queryRenderedFeatures(line_string, *native_options);
       break;
     default:
       set_thread_error("rendered query geometry type is invalid");
@@ -1624,15 +1565,16 @@ auto render_session_query_rendered_features(
 }
 
 auto render_session_query_source_features(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_source_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  const auto output_status = validate_query_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
@@ -1649,33 +1591,34 @@ auto render_session_query_source_features(
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
 
   auto native_source_id = string_from_view(source_id);
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
   auto features =
-    session->renderer->querySourceFeatures(native_source_id, *native_options);
+    live->renderer->querySourceFeatures(native_source_id, *native_options);
   return create_feature_query_result(
     std::move(features), native_source_id, out_result
   );
 }
 
 auto render_session_query_feature_extensions(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_feature* feature, mln_string_view extension,
   mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result** out_result
+  mln_feature_extension_result* out_result
 ) -> mln_status {
-  const auto status = validate_live_attached_render_session(session);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  const auto output_status = validate_extension_result_output(out_result);
+  const auto output_status = validate_result_output(out_result);
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
@@ -1696,16 +1639,16 @@ auto render_session_query_feature_extensions(
   }
   mbgl::gfx::RendererBackend* backend = nullptr;
   if (
-    const auto backend_status = validate_renderer_backend(session, backend);
+    const auto backend_status = validate_renderer_backend(live, backend);
     backend_status != MLN_STATUS_OK
   ) {
     return backend_status;
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
-  auto current = ScopedCurrentScheduler{session->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*backend};
-  auto result = session->renderer->queryFeatureExtensions(
+  auto result = live->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)
   );
@@ -1713,21 +1656,19 @@ auto render_session_query_feature_extensions(
 }
 
 auto feature_query_result_count(
-  const mln_feature_query_result* result, std::size_t* out_count
+  mln_feature_query_result result, std::size_t* out_count
 ) -> mln_status {
-  if (result == nullptr) {
-    set_thread_error("feature query result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_count == nullptr) {
     set_thread_error("out_count must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto lock = std::scoped_lock{feature_query_result_mutex()};
-  const auto* live_result = find_feature_query_result_locked(result);
+  // Query results carry no thread affinity, so another thread may destroy one
+  // mid-read. The lock spans the read for that reason.
+  auto& table = handle_table<FeatureQueryResultObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_result = table.resolve_locked(result);
   if (live_result == nullptr) {
-    set_thread_error("feature query result is not a live handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   *out_count = live_result->features.size();
@@ -1735,13 +1676,9 @@ auto feature_query_result_count(
 }
 
 auto feature_query_result_get(
-  const mln_feature_query_result* result, std::size_t index,
+  mln_feature_query_result result, std::size_t index,
   mln_queried_feature* out_feature
 ) -> mln_status {
-  if (result == nullptr) {
-    set_thread_error("feature query result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_feature == nullptr) {
     set_thread_error("out_feature must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1751,10 +1688,10 @@ auto feature_query_result_get(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto lock = std::scoped_lock{feature_query_result_mutex()};
-  const auto* live_result = find_feature_query_result_locked(result);
+  auto& table = handle_table<FeatureQueryResultObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_result = table.resolve_locked(result);
   if (live_result == nullptr) {
-    set_thread_error("feature query result is not a live handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (index >= live_result->features.size()) {
@@ -1765,22 +1702,14 @@ auto feature_query_result_get(
   return MLN_STATUS_OK;
 }
 
-auto feature_query_result_destroy(mln_feature_query_result* result) -> void {
-  if (result == nullptr) {
-    return;
-  }
-  const auto lock = std::scoped_lock{feature_query_result_mutex()};
-  feature_query_results().erase(result);
+auto feature_query_result_destroy(mln_feature_query_result result) -> void {
+  static_cast<void>(handle_table<FeatureQueryResultObject>().remove(result));
 }
 
 auto feature_extension_result_get(
-  const mln_feature_extension_result* result,
+  mln_feature_extension_result result,
   mln_feature_extension_result_info* out_info
 ) -> mln_status {
-  if (result == nullptr) {
-    set_thread_error("feature extension result must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   if (out_info == nullptr) {
     set_thread_error("out_info must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1790,23 +1719,21 @@ auto feature_extension_result_get(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const auto lock = std::scoped_lock{feature_extension_result_mutex()};
-  const auto* live_result = find_feature_extension_result_locked(result);
+  auto& table = handle_table<FeatureExtensionResultObject>();
+  const std::scoped_lock lock(table.mutex());
+  const auto* live_result = table.resolve_locked(result);
   if (live_result == nullptr) {
-    set_thread_error("feature extension result is not a live handle");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   *out_info = live_result->info;
   return MLN_STATUS_OK;
 }
 
-auto feature_extension_result_destroy(mln_feature_extension_result* result)
+auto feature_extension_result_destroy(mln_feature_extension_result result)
   -> void {
-  if (result == nullptr) {
-    return;
-  }
-  const auto lock = std::scoped_lock{feature_extension_result_mutex()};
-  feature_extension_results().erase(result);
+  static_cast<void>(
+    handle_table<FeatureExtensionResultObject>().remove(result)
+  );
 }
 
 }  // namespace mln::core

@@ -59,7 +59,7 @@ auto mln_rendered_query_geometry_line_string(
 }
 
 auto mln_render_session_resize(
-  mln_render_session* session, uint32_t width, uint32_t height,
+  mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -70,42 +70,42 @@ auto mln_render_session_resize(
 }
 
 auto mln_render_session_render_update(
-  mln_render_session* session, bool* out_rendered
+  mln_render_session session, bool* out_rendered
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_render_update(session, out_rendered);
   });
 }
 
-auto mln_render_session_detach(mln_render_session* session) noexcept
+auto mln_render_session_detach(mln_render_session session) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_detach(session);
   });
 }
 
-auto mln_render_session_destroy(mln_render_session* session) noexcept
+auto mln_render_session_destroy(mln_render_session session) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_destroy(session);
   });
 }
 
-auto mln_render_session_reduce_memory_use(mln_render_session* session) noexcept
+auto mln_render_session_reduce_memory_use(mln_render_session session) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_reduce_memory_use(session);
   });
 }
 
-auto mln_render_session_clear_data(mln_render_session* session) noexcept
+auto mln_render_session_clear_data(mln_render_session session) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_clear_data(session);
   });
 }
 
-auto mln_render_session_dump_debug_logs(mln_render_session* session) noexcept
+auto mln_render_session_dump_debug_logs(mln_render_session session) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_dump_debug_logs(session);
@@ -113,7 +113,7 @@ auto mln_render_session_dump_debug_logs(mln_render_session* session) noexcept
 }
 
 auto mln_render_session_set_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
+  mln_render_session session, const mln_feature_state_selector* selector,
   const mln_json_value* state
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -124,8 +124,8 @@ auto mln_render_session_set_feature_state(
 }
 
 auto mln_render_session_get_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
-  mln_json_snapshot** out_state
+  mln_render_session session, const mln_feature_state_selector* selector,
+  mln_json_snapshot* out_state
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_get_feature_state(
@@ -135,7 +135,7 @@ auto mln_render_session_get_feature_state(
 }
 
 auto mln_render_session_remove_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector
+  mln_render_session session, const mln_feature_state_selector* selector
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_remove_feature_state(session, selector);
@@ -143,9 +143,9 @@ auto mln_render_session_remove_feature_state(
 }
 
 auto mln_render_session_query_rendered_features(
-  mln_render_session* session, const mln_rendered_query_geometry* geometry,
+  mln_render_session session, const mln_rendered_query_geometry* geometry,
   const mln_rendered_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_rendered_features(
@@ -155,9 +155,9 @@ auto mln_render_session_query_rendered_features(
 }
 
 auto mln_render_session_query_source_features(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_source_feature_query_options* options,
-  mln_feature_query_result** out_result
+  mln_feature_query_result* out_result
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_source_features(
@@ -167,7 +167,7 @@ auto mln_render_session_query_source_features(
 }
 
 auto mln_feature_query_result_count(
-  const mln_feature_query_result* result, size_t* out_count
+  mln_feature_query_result result, size_t* out_count
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::feature_query_result_count(result, out_count);
@@ -175,7 +175,7 @@ auto mln_feature_query_result_count(
 }
 
 auto mln_feature_query_result_get(
-  const mln_feature_query_result* result, size_t index,
+  mln_feature_query_result result, size_t index,
   mln_queried_feature* out_feature
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -183,16 +183,16 @@ auto mln_feature_query_result_get(
   });
 }
 
-auto mln_feature_query_result_destroy(mln_feature_query_result* result) noexcept
+auto mln_feature_query_result_destroy(mln_feature_query_result result) noexcept
   -> void {
   mln::core::feature_query_result_destroy(result);
 }
 
 auto mln_render_session_query_feature_extensions(
-  mln_render_session* session, mln_string_view source_id,
+  mln_render_session session, mln_string_view source_id,
   const mln_feature* feature, mln_string_view extension,
   mln_string_view extension_field, const mln_json_value* arguments,
-  mln_feature_extension_result** out_result
+  mln_feature_extension_result* out_result
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_query_feature_extensions(
@@ -203,7 +203,7 @@ auto mln_render_session_query_feature_extensions(
 }
 
 auto mln_feature_extension_result_get(
-  const mln_feature_extension_result* result,
+  mln_feature_extension_result result,
   mln_feature_extension_result_info* out_info
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
@@ -212,19 +212,19 @@ auto mln_feature_extension_result_get(
 }
 
 auto mln_feature_extension_result_destroy(
-  mln_feature_extension_result* result
+  mln_feature_extension_result result
 ) noexcept -> void {
   mln::core::feature_extension_result_destroy(result);
 }
 
 auto mln_json_snapshot_get(
-  const mln_json_snapshot* snapshot, const mln_json_value** out_value
+  mln_json_snapshot snapshot, const mln_json_value** out_value
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::json_snapshot_get(snapshot, out_value);
   });
 }
 
-auto mln_json_snapshot_destroy(mln_json_snapshot* snapshot) noexcept -> void {
+auto mln_json_snapshot_destroy(mln_json_snapshot snapshot) noexcept -> void {
   mln::core::json_snapshot_destroy(snapshot);
 }

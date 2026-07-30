@@ -10,8 +10,8 @@
 // This verifies malformed coordinate counts and unknown rasterization enum
 // values hidden by binding value types.
 static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   const mln_lat_lng coordinates[] = {
     {.latitude = 38.0, .longitude = -123.0},
     {.latitude = 38.0, .longitude = -122.0},
@@ -45,8 +45,8 @@ static void style_value_helpers_reject_unsafe_raw_descriptors(void) {
 // Bindings always emit a full struct header, so only raw C callers can present
 // a short size or unknown field bits to the GeoJSON source adders.
 static void geojson_source_options_reject_unsafe_raw_headers(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   const mln_string_view url = {
     .data = "https://example.com/points.geojson", .size = 34
   };
@@ -157,8 +157,8 @@ static void geojson_source_options_reject_unsafe_raw_headers(void) {
 // carrying other geometry used to surface a bare variant access message. The
 // C API rejects it up front and names the source, feature, and constraint.
 static void clustered_geojson_data_reports_non_point_geometry(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
 
   const mln_geometry child = {
     .size = sizeof(mln_geometry),
@@ -232,8 +232,8 @@ static void clustered_geojson_data_reports_non_point_geometry(void) {
 }
 
 static void clustered_geojson_data_requires_a_feature_collection(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
 
   const mln_geometry point = {
     .size = sizeof(mln_geometry),

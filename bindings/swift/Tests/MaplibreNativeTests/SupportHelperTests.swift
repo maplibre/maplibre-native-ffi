@@ -74,7 +74,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleFactoryReportsSwiftNullHandleFailure() throws {
   do {
-    _ = try NativeHandleFactory
+    let _: NativeMapHandle = try NativeHandleFactory
       .create(nullDiagnostic: "factory returned null") { _ in }
     Issue.record("null handle should throw")
   } catch let failure as NativeStatusFailure {
@@ -107,10 +107,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeResultGuardReleasesExactlyOnce() throws {
   let releases = LockedBox(0)
-  let pointer = OpaquePointer(bitPattern: 0x1)
+  let handle = SyntheticHandles.resourceRequest()
   let guardHandle = try NativeResultGuard(
     typeName: "test_result",
-    pointer: pointer
+    handle: handle
   ) { _ in
     releases.update { $0 += 1 }
   }
@@ -125,7 +125,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
   let closes = LockedBox(0)
   let state = try NativeHandleState(
     typeName: "test_handle",
-    pointer: OpaquePointer(bitPattern: 0x2)
+    handle: SyntheticHandles.resourceRequest(0x2)
   )
 
   try state.closeOnce { _ in
@@ -143,7 +143,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
   let closes = LockedBox(0)
   let state = try NativeHandleState(
     typeName: "test_handle",
-    pointer: OpaquePointer(bitPattern: 0x5)
+    handle: SyntheticHandles.resourceRequest(0x5)
   )
 
   DispatchQueue.concurrentPerform(iterations: 16) { _ in
@@ -162,7 +162,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
   let closes = LockedBox(0)
   let state = try NativeHandleState(
     typeName: "test_handle",
-    pointer: OpaquePointer(bitPattern: 0x4)
+    handle: SyntheticHandles.resourceRequest(0x4)
   )
 
   do {
@@ -189,7 +189,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
   let state = try NativeHandleState(
     typeName: "test_handle",
-    pointer: OpaquePointer(bitPattern: 0x6)
+    handle: SyntheticHandles.resourceRequest(0x6)
   )
   let closeStarted = DispatchSemaphore(value: 0)
   let allowCloseToFail = DispatchSemaphore(value: 0)
@@ -231,6 +231,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleStateReportsLeaksWithoutDestroying() throws {
   let leaks = LockedBox([NativeHandleLeak]())
+  let leaked = SyntheticHandles.resourceRequest(0x3)
 
   try NativeHandleLeakTestSupport.withHandler({ leak in
     leaks.update { $0.append(leak) }
@@ -238,13 +239,13 @@ private final class LockedBox<Value>: @unchecked Sendable {
     do {
       _ = try NativeHandleState(
         typeName: "leaky_handle",
-        pointer: OpaquePointer(bitPattern: 0x3)
+        handle: leaked
       )
     }
 
     #expect(leaks.read { $0 } == [NativeHandleLeak(
       typeName: "leaky_handle",
-      address: 0x3
+      handle: leaked.raw
     )])
   }
 }

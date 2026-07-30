@@ -171,4 +171,34 @@ class HandleStateCoreTest {
 
     assertEquals(1, reports.size)
   }
+
+  @Test
+  fun aUseStartingAfterCloseBeginsIsRefused() {
+    val state = HandleStateCore("TestHandle", 0x1234)
+    var refusal: Throwable? = null
+
+    // Runs while closeOnce holds the releasing state, which is the window a use on another thread
+    // would land in.
+    state.closeOnce(
+      destroy = {
+        refusal = assertFailsWith<InvalidStateException> { state.withLive {} }
+        MaplibreStatus.OK.nativeCode
+      }
+    )
+
+    assertTrue(refusal!!.message!!.contains("releasing"))
+    assertFailsWith<InvalidStateException> { state.withLive {} }
+  }
+
+  @Test
+  fun withLiveReturnsTheBlockResultAndPropagatesFailures() {
+    val state = HandleStateCore("TestHandle", 0x1234)
+
+    assertEquals(7, state.withLive { 7 })
+    assertFailsWith<IllegalStateException> { state.withLive { error("boom") } }
+
+    // A block that threw must not leave a use counted, or close would wait forever.
+    state.closeOnce(destroy = { MaplibreStatus.OK.nativeCode })
+    assertTrue(state.isReleased())
+  }
 }

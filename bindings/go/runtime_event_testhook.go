@@ -41,11 +41,11 @@ func runtimeEventKnownPayloadSizesForTest() map[RuntimeEventPayloadType]uintptr 
 }
 
 func runtimeEventMapSourceForTest(runtime *RuntimeHandle, m *MapHandle) *RuntimeEvent {
-	ptr, _ := m.state.Ptr()
+	native, _ := m.state.Handle()
 	raw := C.mln_runtime_event{
 		size:        C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{})),
 		source_type: C.uint32_t(C.MLN_RUNTIME_EVENT_SOURCE_MAP),
-		source:      unsafe.Pointer(ptr),
+		source:      C.uint64_t(native),
 	}
 	return runtime.runtimeEventFromC(raw)
 }

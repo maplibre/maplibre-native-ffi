@@ -215,9 +215,10 @@ auto validate_descriptor(
 
 template <typename Descriptor>
 auto validate_attach_common(
-  mln_map* map, const Descriptor* descriptor, mln_render_session** out_session
+  mln_map map, const Descriptor* descriptor, mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = mln::core::validate_map(map);
+  mln::core::MapObject* live_map = nullptr;
+  const auto map_status = mln::core::validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -237,7 +238,7 @@ auto validate_attach_common(
 
 template <typename Descriptor>
 auto validate_owned_attach(
-  mln_map* map, const Descriptor* descriptor, mln_render_session** out_session
+  mln_map map, const Descriptor* descriptor, mln_render_session* out_session
 ) -> mln_status {
   const auto common_status =
     validate_attach_common(map, descriptor, out_session);
@@ -252,7 +253,7 @@ auto validate_owned_attach(
 
 template <typename Descriptor>
 auto validate_borrowed_attach(
-  mln_map* map, const Descriptor* descriptor, mln_render_session** out_session
+  mln_map map, const Descriptor* descriptor, mln_render_session* out_session
 ) -> mln_status {
   const auto common_status =
     validate_attach_common(map, descriptor, out_session);
@@ -266,7 +267,7 @@ auto validate_borrowed_attach(
 
 template <typename Descriptor>
 auto validate_surface_attach(
-  mln_map* map, const Descriptor* descriptor, mln_render_session** out_session
+  mln_map map, const Descriptor* descriptor, mln_render_session* out_session
 ) -> mln_status {
   const auto common_status =
     validate_attach_common(map, descriptor, out_session);
@@ -280,9 +281,10 @@ auto validate_surface_attach(
 }
 
 template <typename Frame>
-auto validate_frame(mln_render_session* session, const Frame* frame)
+auto validate_frame(mln_render_session session, const Frame* frame)
   -> mln_status {
-  const auto session_status = mln::core::validate_texture(session);
+  mln_render_session_object* live = nullptr;
+  const auto session_status = mln::core::validate_texture(session, live);
   if (session_status != MLN_STATUS_OK) {
     return session_status;
   }
@@ -391,8 +393,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
 }
 
 auto metal_surface_attach(
-  mln_map* map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_surface_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -402,8 +404,8 @@ auto metal_surface_attach(
 }
 
 auto vulkan_surface_attach(
-  mln_map* map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_surface_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -413,8 +415,8 @@ auto vulkan_surface_attach(
 }
 
 auto opengl_surface_attach(
-  mln_map* map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_surface_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -424,8 +426,8 @@ auto opengl_surface_attach(
 }
 
 auto metal_owned_texture_attach(
-  mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_owned_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -435,8 +437,8 @@ auto metal_owned_texture_attach(
 }
 
 auto metal_borrowed_texture_attach(
-  mln_map* map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_borrowed_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -446,8 +448,8 @@ auto metal_borrowed_texture_attach(
 }
 
 auto vulkan_owned_texture_attach(
-  mln_map* map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_owned_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -457,8 +459,8 @@ auto vulkan_owned_texture_attach(
 }
 
 auto vulkan_borrowed_texture_attach(
-  mln_map* map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_borrowed_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -468,8 +470,8 @@ auto vulkan_borrowed_texture_attach(
 }
 
 auto opengl_owned_texture_attach(
-  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_owned_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -479,8 +481,8 @@ auto opengl_owned_texture_attach(
 }
 
 auto opengl_borrowed_texture_attach(
-  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
   const auto status = validate_borrowed_attach(map, descriptor, out_session);
   if (status != MLN_STATUS_OK) {
@@ -490,7 +492,7 @@ auto opengl_borrowed_texture_attach(
 }
 
 auto metal_owned_texture_acquire_frame(
-  mln_render_session* session, mln_metal_owned_texture_frame* out_frame
+  mln_render_session session, mln_metal_owned_texture_frame* out_frame
 ) -> mln_status {
   const auto status = validate_frame(session, out_frame);
   if (status != MLN_STATUS_OK) {
@@ -500,7 +502,7 @@ auto metal_owned_texture_acquire_frame(
 }
 
 auto metal_owned_texture_release_frame(
-  mln_render_session* session, const mln_metal_owned_texture_frame* frame
+  mln_render_session session, const mln_metal_owned_texture_frame* frame
 ) -> mln_status {
   const auto status = validate_frame(session, frame);
   if (status != MLN_STATUS_OK) {
@@ -510,7 +512,7 @@ auto metal_owned_texture_release_frame(
 }
 
 auto vulkan_owned_texture_acquire_frame(
-  mln_render_session* session, mln_vulkan_owned_texture_frame* out_frame
+  mln_render_session session, mln_vulkan_owned_texture_frame* out_frame
 ) -> mln_status {
   const auto status = validate_frame(session, out_frame);
   if (status != MLN_STATUS_OK) {
@@ -520,7 +522,7 @@ auto vulkan_owned_texture_acquire_frame(
 }
 
 auto vulkan_owned_texture_release_frame(
-  mln_render_session* session, const mln_vulkan_owned_texture_frame* frame
+  mln_render_session session, const mln_vulkan_owned_texture_frame* frame
 ) -> mln_status {
   const auto status = validate_frame(session, frame);
   if (status != MLN_STATUS_OK) {
@@ -530,7 +532,7 @@ auto vulkan_owned_texture_release_frame(
 }
 
 auto opengl_owned_texture_acquire_frame(
-  mln_render_session* session, mln_opengl_owned_texture_frame* out_frame
+  mln_render_session session, mln_opengl_owned_texture_frame* out_frame
 ) -> mln_status {
   const auto status = validate_frame(session, out_frame);
   if (status != MLN_STATUS_OK) {
@@ -540,7 +542,7 @@ auto opengl_owned_texture_acquire_frame(
 }
 
 auto opengl_owned_texture_release_frame(
-  mln_render_session* session, const mln_opengl_owned_texture_frame* frame
+  mln_render_session session, const mln_opengl_owned_texture_frame* frame
 ) -> mln_status {
   const auto status = validate_frame(session, frame);
   if (status != MLN_STATUS_OK) {

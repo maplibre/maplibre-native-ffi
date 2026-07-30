@@ -63,13 +63,9 @@ struct AdapterLogCallbackEntry {
 
 struct AdapterHandleLeakToken {
   std::string type_name;
+  std::uint64_t handle = 0;
 };
 
-std::mutex resource_request_tokens_mutex;
-std::condition_variable resource_request_tokens_changed;
-std::unordered_map<std::uint64_t, mln_resource_request_handle*>
-  resource_request_tokens;
-std::uint64_t next_resource_request_token = 1;
 std::mutex log_setter_mutex;
 std::mutex log_state_mutex;
 std::unordered_map<void*, AdapterLogCallbackEntry> log_callbacks;
@@ -111,7 +107,7 @@ auto copy_prior_data(const mln_resource_request& request)
 }
 
 auto copy_request(
-  const mln_resource_request& request, mln_resource_request_handle* handle
+  const mln_resource_request& request, mln_resource_request_handle handle
 ) -> AdapterQueuedResourceRequestView* {
   auto copy = std::make_unique<AdapterQueuedResourceRequest>();
   copy->url = request.url == nullptr ? std::string{} : std::string{request.url};
@@ -198,12 +194,12 @@ void destroy_handle_leak_token(void* token) noexcept {
 }  // namespace
 
 extern "C" MLN_API auto mln_adapter_handle_leak_token_create(
-  const char* type_name, void* handle
+  const char* type_name, std::uint64_t handle
 ) noexcept -> void* {
   try {
     auto token = std::make_unique<AdapterHandleLeakToken>();
-    static_cast<void>(handle);
     token->type_name = type_name == nullptr ? std::string{} : type_name;
+    token->handle = handle;
     return token.release();
   } catch (...) {
     return nullptr;
@@ -221,9 +217,14 @@ extern "C" MLN_API void mln_adapter_handle_leak_report(void* token) noexcept {
   if (leak != nullptr) {
     static_cast<void>(std::fputs("maplibre_native_ffi: leaked ", stderr));
     static_cast<void>(std::fputs(leak->type_name.c_str(), stderr));
+    // A handle id names one object for the life of the process, so printing it
+    // lets a reader match the report against the log line that created it.
+    static_cast<void>(std::fprintf(
+      stderr, " handle %llu", static_cast<unsigned long long>(leak->handle)
+    ));
     static_cast<void>(std::fputs(
-      " native handle; close it from its owning execution context before "
-      "releasing the host object\n",
+      "; close it from its owning execution context before releasing the host "
+      "object\n",
       stderr
     ));
   }
@@ -342,11 +343,11 @@ extern "C" MLN_API auto mln_adapter_resource_transform_rewrite_callback(
 
 extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
   if (
     user_data == nullptr || request == nullptr || request->url == nullptr ||
-    handle == nullptr
+    handle == MLN_HANDLE_NULL
   ) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
@@ -368,11 +369,11 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
 
 extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
   if (
     user_data == nullptr || request == nullptr || request->url == nullptr ||
-    handle == nullptr
+    handle == MLN_HANDLE_NULL
   ) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
@@ -446,86 +447,4 @@ extern "C" MLN_API void mln_adapter_custom_geometry_callbacks_retire(
   if (cancel_tile != nullptr) {
     cancel_tile(user_data, RetirementTile);
   }
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_token_create(
-  mln_resource_request_handle* handle
-) noexcept -> std::uint64_t {
-  if (handle == nullptr) {
-    return 0;
-  }
-  try {
-    const auto lock = std::scoped_lock{resource_request_tokens_mutex};
-    auto token = next_resource_request_token++;
-    while (token == 0 || resource_request_tokens.contains(token)) {
-      token = next_resource_request_token++;
-    }
-    resource_request_tokens.emplace(token, handle);
-    return token;
-  } catch (...) {
-    return 0;
-  }
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_token_cancelled(
-  std::uint64_t token, bool* out_cancelled
-) noexcept -> mln_status {
-  if (token == 0 || out_cancelled == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
-  const auto iterator = resource_request_tokens.find(token);
-  if (iterator == resource_request_tokens.end()) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return mln_resource_request_cancelled(iterator->second, out_cancelled);
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_token_complete(
-  std::uint64_t token, const mln_resource_response* response
-) noexcept -> mln_status {
-  if (token == 0 || response == nullptr) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
-  const auto iterator = resource_request_tokens.find(token);
-  if (iterator == resource_request_tokens.end()) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto* handle = iterator->second;
-  const auto status = mln_resource_request_complete(handle, response);
-  mln_resource_request_release(handle);
-  resource_request_tokens.erase(iterator);
-  resource_request_tokens_changed.notify_all();
-  return status;
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_token_release(
-  std::uint64_t token
-) noexcept -> mln_status {
-  if (token == 0) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  const auto lock = std::scoped_lock{resource_request_tokens_mutex};
-  const auto iterator = resource_request_tokens.find(token);
-  if (iterator == resource_request_tokens.end()) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  mln_resource_request_release(iterator->second);
-  resource_request_tokens.erase(iterator);
-  resource_request_tokens_changed.notify_all();
-  return MLN_STATUS_OK;
-}
-
-extern "C" MLN_API auto mln_adapter_resource_request_token_wait(
-  std::uint64_t token
-) noexcept -> mln_status {
-  if (token == 0) {
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  auto lock = std::unique_lock{resource_request_tokens_mutex};
-  resource_request_tokens_changed.wait(lock, [token] {
-    return !resource_request_tokens.contains(token);
-  });
-  return MLN_STATUS_OK;
 }

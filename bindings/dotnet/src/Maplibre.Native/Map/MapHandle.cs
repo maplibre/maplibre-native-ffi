@@ -2,8 +2,8 @@ using Maplibre.Native.Camera;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
-using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Memory;
+using Maplibre.Native.Internal.Pointer;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Json;
@@ -14,7 +14,7 @@ using Maplibre.Native.Style;
 namespace Maplibre.Native.Map;
 
 internal unsafe delegate mln_status MapAddCustomGeometrySource(
-    mln_map* map,
+    MlnMap map,
     mln_string_view sourceId,
     mln_custom_geometry_source_options* options
 );
@@ -32,15 +32,15 @@ public sealed unsafe class MapHandle : IDisposable
     private static MapAddCustomGeometrySource? addCustomGeometrySourceForTest;
 
     private readonly RuntimeHandle runtime;
-    private readonly nint nativeAddress;
-    private readonly NativeHandleState<mln_map> state;
+    private readonly ulong nativeId;
+    private readonly NativeHandleState<MlnMap> state;
     private readonly Dictionary<string, CustomGeometrySourceState> customGeometrySources = [];
 
-    private MapHandle(RuntimeHandle runtime, mln_map* handle)
+    private MapHandle(RuntimeHandle runtime, MlnMap handle)
     {
         this.runtime = runtime;
-        nativeAddress = (nint)handle;
-        state = new NativeHandleState<mln_map>(
+        nativeId = handle.Value;
+        state = new NativeHandleState<MlnMap>(
             handle,
             static handle => NativeMethods.mln_map_destroy(handle),
             nameof(MapHandle)
@@ -53,17 +53,21 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(runtime);
         ArgumentNullException.ThrowIfNull(options);
         var nativeOptions = options.ToNative();
-        mln_map* map = null;
+        MlnMap map = default;
 
-        NativeStatus.Check(NativeMethods.mln_map_create(runtime.Pointer, &nativeOptions, &map));
+        NativeStatus.Check(NativeMethods.mln_map_create(runtime.Handle, &nativeOptions, &map));
         var handle = new MapHandle(runtime, map);
         runtime.RegisterMap(handle);
         return handle;
     }
 
-    internal mln_map* Pointer => state.Pointer;
+    internal MlnMap Handle => state.Handle;
 
-    internal nint NativeAddress => nativeAddress;
+    /// <summary>
+    /// The issued native handle id, readable after close so the runtime can
+    /// unregister this wrapper.
+    /// </summary>
+    internal ulong NativeId => nativeId;
 
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
@@ -71,26 +75,26 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Requests a repaint for a continuous map.</summary>
     public void RequestRepaint()
     {
-        NativeStatus.Check(NativeMethods.mln_map_request_repaint(Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_request_repaint(Handle));
     }
 
     /// <summary>Requests an asynchronous still-image render for a static map.</summary>
     public void RequestStillImage()
     {
-        NativeStatus.Check(NativeMethods.mln_map_request_still_image(Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_request_still_image(Handle));
     }
 
     /// <summary>Sets native debug drawing options.</summary>
     public void SetDebugOptions(DebugOptions options)
     {
-        NativeStatus.Check(NativeMethods.mln_map_set_debug_options(Pointer, (uint)options));
+        NativeStatus.Check(NativeMethods.mln_map_set_debug_options(Handle, (uint)options));
     }
 
     /// <summary>Gets native debug drawing options.</summary>
     public DebugOptions GetDebugOptions()
     {
         uint options = 0;
-        NativeStatus.Check(NativeMethods.mln_map_get_debug_options(Pointer, &options));
+        NativeStatus.Check(NativeMethods.mln_map_get_debug_options(Handle, &options));
         return (DebugOptions)options;
     }
 
@@ -99,7 +103,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         NativeStatus.Check(
             NativeMethods.mln_map_set_rendering_stats_view_enabled(
-                Pointer,
+                Handle,
                 enabled ? (byte)1 : (byte)0
             )
         );
@@ -110,7 +114,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         bool enabled = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_rendering_stats_view_enabled(Pointer, &enabled)
+            NativeMethods.mln_map_get_rendering_stats_view_enabled(Handle, &enabled)
         );
         return enabled;
     }
@@ -119,14 +123,14 @@ public sealed unsafe class MapHandle : IDisposable
     public bool IsFullyLoaded()
     {
         bool loaded = false;
-        NativeStatus.Check(NativeMethods.mln_map_is_fully_loaded(Pointer, &loaded));
+        NativeStatus.Check(NativeMethods.mln_map_is_fully_loaded(Handle, &loaded));
         return loaded;
     }
 
     /// <summary>Asks the native map to write debug logs through the native log system.</summary>
     public void DumpDebugLogs()
     {
-        NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Handle));
     }
 
     /// <summary>
@@ -140,7 +144,7 @@ public sealed unsafe class MapHandle : IDisposable
         uint width;
         uint height;
         double scaleFactor;
-        NativeStatus.Check(NativeMethods.mln_map_get_size(Pointer, &width, &height, &scaleFactor));
+        NativeStatus.Check(NativeMethods.mln_map_get_size(Handle, &width, &height, &scaleFactor));
         return (width, height, scaleFactor);
     }
 
@@ -148,7 +152,7 @@ public sealed unsafe class MapHandle : IDisposable
     public ViewportOptions GetViewportOptions()
     {
         var options = NativeMethods.mln_map_viewport_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_viewport_options(Pointer, &options));
+        NativeStatus.Check(NativeMethods.mln_map_get_viewport_options(Handle, &options));
         return MapStructs.ViewportOptionsFromNative(options);
     }
 
@@ -156,14 +160,14 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetViewportOptions(ViewportOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_viewport_options(Pointer, &nativeOptions));
+        NativeStatus.Check(NativeMethods.mln_map_set_viewport_options(Handle, &nativeOptions));
     }
 
     /// <summary>Gets tile tuning options.</summary>
     public TileOptions GetTileOptions()
     {
         var options = NativeMethods.mln_map_tile_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_tile_options(Pointer, &options));
+        NativeStatus.Check(NativeMethods.mln_map_get_tile_options(Handle, &options));
         return MapStructs.TileOptionsFromNative(options);
     }
 
@@ -171,14 +175,14 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetTileOptions(TileOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_tile_options(Pointer, &nativeOptions));
+        NativeStatus.Check(NativeMethods.mln_map_set_tile_options(Handle, &nativeOptions));
     }
 
     /// <summary>Gets the current camera descriptor.</summary>
     public CameraOptions GetCamera()
     {
         var camera = NativeMethods.mln_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_camera(Pointer, &camera));
+        NativeStatus.Check(NativeMethods.mln_map_get_camera(Handle, &camera));
         return MapStructs.CameraOptionsFromNative(camera);
     }
 
@@ -186,7 +190,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void JumpTo(CameraOptions camera)
     {
         var nativeCamera = MapStructs.ToNative(camera);
-        NativeStatus.Check(NativeMethods.mln_map_jump_to(Pointer, &nativeCamera));
+        NativeStatus.Check(NativeMethods.mln_map_jump_to(Handle, &nativeCamera));
     }
 
     /// <summary>Eases to the camera descriptor with animation options.</summary>
@@ -202,7 +206,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_ease_to(
-                Pointer,
+                Handle,
                 &nativeCamera,
                 animation is null ? null : &nativeAnimation
             )
@@ -223,7 +227,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_fly_to(
-                Pointer,
+                Handle,
                 &nativeCamera,
                 animation is null ? null : &nativeAnimation
             )
@@ -233,7 +237,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Moves the map by a screen delta.</summary>
     public void MoveBy(double deltaX, double deltaY)
     {
-        NativeStatus.Check(NativeMethods.mln_map_move_by(Pointer, deltaX, deltaY));
+        NativeStatus.Check(NativeMethods.mln_map_move_by(Handle, deltaX, deltaY));
     }
 
     /// <summary>Moves the map by a screen delta with animation options.</summary>
@@ -247,7 +251,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_move_by_animated(
-                Pointer,
+                Handle,
                 deltaX,
                 deltaY,
                 animation is null ? null : &nativeAnimation
@@ -260,7 +264,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         var nativeAnchor = anchor is { } value ? MapStructs.ToNative(value) : default;
         NativeStatus.Check(
-            NativeMethods.mln_map_scale_by(Pointer, scale, anchor.HasValue ? &nativeAnchor : null)
+            NativeMethods.mln_map_scale_by(Handle, scale, anchor.HasValue ? &nativeAnchor : null)
         );
     }
 
@@ -276,7 +280,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_scale_by_animated(
-                Pointer,
+                Handle,
                 scale,
                 anchor.HasValue ? &nativeAnchor : null,
                 animation is null ? null : &nativeAnimation
@@ -289,7 +293,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         var nativeFirst = MapStructs.ToNative(first);
         var nativeSecond = MapStructs.ToNative(second);
-        NativeStatus.Check(NativeMethods.mln_map_rotate_by(Pointer, nativeFirst, nativeSecond));
+        NativeStatus.Check(NativeMethods.mln_map_rotate_by(Handle, nativeFirst, nativeSecond));
     }
 
     /// <summary>Rotates around two screen points with animation options.</summary>
@@ -305,7 +309,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_rotate_by_animated(
-                Pointer,
+                Handle,
                 nativeFirst,
                 nativeSecond,
                 animation is null ? null : &nativeAnimation
@@ -316,7 +320,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Pitches the map by a delta in degrees.</summary>
     public void PitchBy(double pitch)
     {
-        NativeStatus.Check(NativeMethods.mln_map_pitch_by(Pointer, pitch));
+        NativeStatus.Check(NativeMethods.mln_map_pitch_by(Handle, pitch));
     }
 
     /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
@@ -330,7 +334,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
         NativeStatus.Check(
             NativeMethods.mln_map_pitch_by_animated(
-                Pointer,
+                Handle,
                 pitch,
                 animation is null ? null : &nativeAnimation
             )
@@ -340,7 +344,7 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Cancels in-flight camera transitions.</summary>
     public void CancelTransitions()
     {
-        NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Handle));
     }
 
     /// <summary>Calculates a camera that fits geographic bounds and fit options.</summary>
@@ -351,7 +355,7 @@ public sealed unsafe class MapHandle : IDisposable
         var camera = NativeMethods.mln_camera_options_default();
         NativeStatus.Check(
             NativeMethods.mln_map_camera_for_lat_lng_bounds(
-                Pointer,
+                Handle,
                 nativeBounds,
                 fitOptions is null ? null : &nativeFitOptions,
                 &camera
@@ -379,7 +383,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_camera_for_lat_lngs(
-                    Pointer,
+                    Handle,
                     nativeCoordinates.Length == 0 ? null : coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
                     fitOptions is null ? null : &nativeFitOptions,
@@ -398,7 +402,7 @@ public sealed unsafe class MapHandle : IDisposable
         var camera = NativeMethods.mln_camera_options_default();
         NativeStatus.Check(
             NativeMethods.mln_map_camera_for_geometry(
-                Pointer,
+                Handle,
                 nativeGeometry.Pointer,
                 fitOptions is null ? null : &nativeFitOptions,
                 &camera
@@ -413,7 +417,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeCamera = MapStructs.ToNative(camera);
         mln_lat_lng_bounds bounds = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_lat_lng_bounds_for_camera(Pointer, &nativeCamera, &bounds)
+            NativeMethods.mln_map_lat_lng_bounds_for_camera(Handle, &nativeCamera, &bounds)
         );
         return MapStructs.FromNative(bounds);
     }
@@ -425,7 +429,7 @@ public sealed unsafe class MapHandle : IDisposable
         mln_lat_lng_bounds bounds = default;
         NativeStatus.Check(
             NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(
-                Pointer,
+                Handle,
                 &nativeCamera,
                 &bounds
             )
@@ -437,7 +441,7 @@ public sealed unsafe class MapHandle : IDisposable
     public BoundOptions GetBounds()
     {
         var options = NativeMethods.mln_bound_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_bounds(Pointer, &options));
+        NativeStatus.Check(NativeMethods.mln_map_get_bounds(Handle, &options));
         return MapStructs.BoundOptionsFromNative(options);
     }
 
@@ -445,14 +449,14 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetBounds(BoundOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_bounds(Pointer, &nativeOptions));
+        NativeStatus.Check(NativeMethods.mln_map_set_bounds(Handle, &nativeOptions));
     }
 
     /// <summary>Gets free-camera options.</summary>
     public FreeCameraOptions GetFreeCameraOptions()
     {
         var options = NativeMethods.mln_free_camera_options_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_free_camera_options(Pointer, &options));
+        NativeStatus.Check(NativeMethods.mln_map_get_free_camera_options(Handle, &options));
         return MapStructs.FreeCameraOptionsFromNative(options);
     }
 
@@ -460,7 +464,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetFreeCameraOptions(FreeCameraOptions options)
     {
         var nativeOptions = MapStructs.ToNative(options);
-        NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Pointer, &nativeOptions));
+        NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Handle, &nativeOptions));
     }
 
     /// <summary>Converts a geographic coordinate to a screen pixel using the current map projection.</summary>
@@ -469,7 +473,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeCoordinate = CoreStructs.ToNative(coordinate);
         mln_screen_point point = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_pixel_for_lat_lng(Pointer, nativeCoordinate, &point)
+            NativeMethods.mln_map_pixel_for_lat_lng(Handle, nativeCoordinate, &point)
         );
         return MapStructs.FromNative(point);
     }
@@ -480,7 +484,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativePoint = MapStructs.ToNative(point);
         mln_lat_lng coordinate = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_lat_lng_for_pixel(Pointer, nativePoint, &coordinate)
+            NativeMethods.mln_map_lat_lng_for_pixel(Handle, nativePoint, &coordinate)
         );
         return CoreStructs.FromNative(coordinate);
     }
@@ -506,7 +510,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_pixels_for_lat_lngs(
-                    Pointer,
+                    Handle,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
                     pointsPointer
@@ -543,7 +547,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_lat_lngs_for_pixels(
-                    Pointer,
+                    Handle,
                     pointsPointer,
                     (nuint)nativePoints.Length,
                     coordinatesPointer
@@ -569,7 +573,7 @@ public sealed unsafe class MapHandle : IDisposable
     public ProjectionModeOptions GetProjectionMode()
     {
         var mode = NativeMethods.mln_projection_mode_default();
-        NativeStatus.Check(NativeMethods.mln_map_get_projection_mode(Pointer, &mode));
+        NativeStatus.Check(NativeMethods.mln_map_get_projection_mode(Handle, &mode));
         return MapStructs.ProjectionModeOptionsFromNative(mode);
     }
 
@@ -577,7 +581,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetProjectionMode(ProjectionModeOptions mode)
     {
         var nativeMode = MapStructs.ToNative(mode);
-        NativeStatus.Check(NativeMethods.mln_map_set_projection_mode(Pointer, &nativeMode));
+        NativeStatus.Check(NativeMethods.mln_map_set_projection_mode(Handle, &nativeMode));
     }
 
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
@@ -594,7 +598,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(url);
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_url(Pointer, nativeUrl.Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_set_style_url(Handle, nativeUrl.Pointer));
     }
 
     /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
@@ -611,7 +615,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeUtf8String.FromNullableString(json, nameof(json));
-        NativeStatus.Check(NativeMethods.mln_map_set_style_json(Pointer, nativeJson.Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_set_style_json(Handle, nativeJson.Pointer));
         ClearCustomGeometrySources();
     }
 
@@ -622,7 +626,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeJson = NativeJsonValue.From(sourceJson);
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_source_json(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeJson.Pointer
             )
@@ -635,7 +639,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         bool removed = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_source(Pointer, nativeSourceId.Value, &removed)
+            NativeMethods.mln_map_remove_style_source(Handle, nativeSourceId.Value, &removed)
         );
         if (removed && customGeometrySources.Remove(sourceId, out var state))
         {
@@ -650,7 +654,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         bool exists = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_style_source_exists(Pointer, nativeSourceId.Value, &exists)
+            NativeMethods.mln_map_style_source_exists(Handle, nativeSourceId.Value, &exists)
         );
         return exists;
     }
@@ -663,7 +667,7 @@ public sealed unsafe class MapHandle : IDisposable
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_source_type(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 &sourceType,
                 &found
@@ -679,12 +683,7 @@ public sealed unsafe class MapHandle : IDisposable
         var info = new mln_style_source_info { size = (uint)sizeof(mln_style_source_info) };
         bool found = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_style_source_info(
-                Pointer,
-                nativeSourceId.Value,
-                &info,
-                &found
-            )
+            NativeMethods.mln_map_get_style_source_info(Handle, nativeSourceId.Value, &info, &found)
         );
         if (!found)
         {
@@ -704,7 +703,7 @@ public sealed unsafe class MapHandle : IDisposable
                 {
                     NativeStatus.Check(
                         NativeMethods.mln_map_copy_style_source_attribution(
-                            Pointer,
+                            Handle,
                             nativeSourceId.Value,
                             (sbyte*)bufferPointer,
                             (nuint)buffer.Length,
@@ -745,8 +744,8 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Lists style source IDs in style order.</summary>
     public string[] StyleSourceIds()
     {
-        mln_style_id_list* list = null;
-        NativeStatus.Check(NativeMethods.mln_map_list_style_source_ids(Pointer, &list));
+        MlnStyleIdList list = default;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_source_ids(Handle, &list));
         return CopyStyleIdList(list);
     }
 
@@ -764,7 +763,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_geojson_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
                 nativeOptions is null ? null : &optionsValue
@@ -779,7 +778,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         NativeStatus.Check(
             NativeMethods.mln_map_set_geojson_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value
             )
@@ -800,7 +799,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_geojson_source_data(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeData.Pointer,
                 nativeOptions is null ? null : &optionsValue
@@ -815,7 +814,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeData = NativeGeoJson.From(data);
         NativeStatus.Check(
             NativeMethods.mln_map_set_geojson_source_data(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeData.Pointer
             )
@@ -832,7 +831,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             var descriptor = sourceState.Descriptor;
             NativeStatus.Check(
-                AddCustomGeometrySourceNative(Pointer, nativeSourceId.Value, &descriptor)
+                AddCustomGeometrySourceNative(Handle, nativeSourceId.Value, &descriptor)
             );
             if (customGeometrySources.Remove(sourceId, out var previous))
             {
@@ -859,7 +858,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeTileId = StyleStructs.ToNative(tileId);
         NativeStatus.Check(
             NativeMethods.mln_map_set_custom_geometry_source_tile_data(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeTileId,
                 nativeData.Pointer
@@ -873,7 +872,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         NativeStatus.Check(
             NativeMethods.mln_map_invalidate_custom_geometry_source_tile(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 StyleStructs.ToNative(tileId)
             )
@@ -886,7 +885,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         NativeStatus.Check(
             NativeMethods.mln_map_invalidate_custom_geometry_source_region(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 MapStructs.ToNative(bounds)
             )
@@ -902,7 +901,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_vector_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
                 nativeOptions is null ? null : &optionsValue
@@ -923,7 +922,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_vector_source_tiles(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
@@ -941,7 +940,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_raster_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
                 nativeOptions is null ? null : &optionsValue
@@ -962,7 +961,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_raster_source_tiles(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
@@ -980,7 +979,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_raster_dem_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value,
                 nativeOptions is null ? null : &optionsValue
@@ -1001,7 +1000,7 @@ public sealed unsafe class MapHandle : IDisposable
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_add_raster_dem_source_tiles(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeTiles.Count == 0 ? null : nativeTiles.Pointer,
                 nativeTiles.Count,
@@ -1023,7 +1022,7 @@ public sealed unsafe class MapHandle : IDisposable
         var nativeOptions = options is null ? default : StyleStructs.ToNative(options);
         NativeStatus.Check(
             NativeMethods.mln_map_set_style_image(
-                Pointer,
+                Handle,
                 nativeImageId.Value,
                 &imageValue,
                 options is null ? null : &nativeOptions
@@ -1037,7 +1036,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         bool removed = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_image(Pointer, nativeImageId.Value, &removed)
+            NativeMethods.mln_map_remove_style_image(Handle, nativeImageId.Value, &removed)
         );
         return removed;
     }
@@ -1048,7 +1047,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         bool exists = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_style_image_exists(Pointer, nativeImageId.Value, &exists)
+            NativeMethods.mln_map_style_image_exists(Handle, nativeImageId.Value, &exists)
         );
         return exists;
     }
@@ -1060,7 +1059,7 @@ public sealed unsafe class MapHandle : IDisposable
         var info = NativeMethods.mln_style_image_info_default();
         bool found = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_style_image_info(Pointer, nativeImageId.Value, &info, &found)
+            NativeMethods.mln_map_get_style_image_info(Handle, nativeImageId.Value, &info, &found)
         );
         return found ? StyleStructs.FromNative(info) : null;
     }
@@ -1082,7 +1081,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_copy_style_image_premultiplied_rgba8(
-                    Pointer,
+                    Handle,
                     nativeImageId.Value,
                     bytes.Length == 0 ? null : bytesPointer,
                     (nuint)bytes.Length,
@@ -1128,7 +1127,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_add_image_source_url(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
@@ -1153,7 +1152,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_add_image_source_image(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length,
@@ -1170,7 +1169,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeUrl = NativeStringView.From(url, nameof(url));
         NativeStatus.Check(
             NativeMethods.mln_map_set_image_source_url(
-                Pointer,
+                Handle,
                 nativeSourceId.Value,
                 nativeUrl.Value
             )
@@ -1184,7 +1183,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeImage = NativeStyleImage.From(image);
         var imageValue = nativeImage.Value;
         NativeStatus.Check(
-            NativeMethods.mln_map_set_image_source_image(Pointer, nativeSourceId.Value, &imageValue)
+            NativeMethods.mln_map_set_image_source_image(Handle, nativeSourceId.Value, &imageValue)
         );
     }
 
@@ -1197,7 +1196,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_set_image_source_coordinates(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)nativeCoordinates.Length
@@ -1217,7 +1216,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_map_get_image_source_coordinates(
-                    Pointer,
+                    Handle,
                     nativeSourceId.Value,
                     coordinatesPointer,
                     (nuint)coordinates.Length,
@@ -1248,7 +1247,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_hillshade_layer(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativeSourceId.Value,
                 nativeBeforeLayerId.Value
@@ -1264,7 +1263,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_color_relief_layer(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativeSourceId.Value,
                 nativeBeforeLayerId.Value
@@ -1279,7 +1278,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_location_indicator_layer(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativeBeforeLayerId.Value
             )
@@ -1292,7 +1291,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_location(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 CoreStructs.ToNative(coordinate),
                 altitude
@@ -1306,7 +1305,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_bearing(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 bearing
             )
@@ -1319,7 +1318,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_accuracy_radius(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 radius
             )
@@ -1337,7 +1336,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         NativeStatus.Check(
             NativeMethods.mln_map_set_location_indicator_image_name(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 (uint)imageKind,
                 nativeImageId.Value
@@ -1352,7 +1351,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_add_style_layer_json(
-                Pointer,
+                Handle,
                 nativeJson.Pointer,
                 nativeBeforeLayerId.Value
             )
@@ -1365,7 +1364,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         bool removed = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_remove_style_layer(Pointer, nativeLayerId.Value, &removed)
+            NativeMethods.mln_map_remove_style_layer(Handle, nativeLayerId.Value, &removed)
         );
         return removed;
     }
@@ -1376,7 +1375,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         bool exists = false;
         NativeStatus.Check(
-            NativeMethods.mln_map_style_layer_exists(Pointer, nativeLayerId.Value, &exists)
+            NativeMethods.mln_map_style_layer_exists(Handle, nativeLayerId.Value, &exists)
         );
         return exists;
     }
@@ -1389,7 +1388,7 @@ public sealed unsafe class MapHandle : IDisposable
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_layer_type(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 &layerType,
                 &found
@@ -1401,8 +1400,8 @@ public sealed unsafe class MapHandle : IDisposable
     /// <summary>Lists style layer IDs in style order.</summary>
     public string[] StyleLayerIds()
     {
-        mln_style_id_list* list = null;
-        NativeStatus.Check(NativeMethods.mln_map_list_style_layer_ids(Pointer, &list));
+        MlnStyleIdList list = default;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_layer_ids(Handle, &list));
         return CopyStyleIdList(list);
     }
 
@@ -1413,7 +1412,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
         NativeStatus.Check(
             NativeMethods.mln_map_move_style_layer(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativeBeforeLayerId.Value
             )
@@ -1424,11 +1423,11 @@ public sealed unsafe class MapHandle : IDisposable
     public JsonValue? GetStyleLayerJson(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        mln_json_snapshot* snapshot = null;
+        MlnJsonSnapshot snapshot = default;
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_layer_json(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 &snapshot,
                 &found
@@ -1441,7 +1440,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void SetStyleLightJson(JsonValue lightJson)
     {
         using var nativeJson = NativeJsonValue.From(lightJson);
-        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Pointer, nativeJson.Pointer));
+        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Handle, nativeJson.Pointer));
     }
 
     /// <summary>Sets one style light property from a JSON-like value.</summary>
@@ -1451,7 +1450,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeValue = NativeJsonValue.From(value);
         NativeStatus.Check(
             NativeMethods.mln_map_set_style_light_property(
-                Pointer,
+                Handle,
                 nativePropertyName.Value,
                 nativeValue.Pointer
             )
@@ -1462,10 +1461,10 @@ public sealed unsafe class MapHandle : IDisposable
     public JsonValue? GetStyleLightProperty(string propertyName)
     {
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        mln_json_snapshot* snapshot = null;
+        MlnJsonSnapshot snapshot = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_style_light_property(
-                Pointer,
+                Handle,
                 nativePropertyName.Value,
                 &snapshot
             )
@@ -1481,7 +1480,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeValue = NativeJsonValue.From(value);
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_property(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativePropertyName.Value,
                 nativeValue.Pointer
@@ -1494,10 +1493,10 @@ public sealed unsafe class MapHandle : IDisposable
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
-        mln_json_snapshot* snapshot = null;
+        MlnJsonSnapshot snapshot = default;
         NativeStatus.Check(
             NativeMethods.mln_map_get_layer_property(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativePropertyName.Value,
                 &snapshot
@@ -1513,7 +1512,7 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeFilter = filter is null ? null : NativeJsonValue.From(filter);
         NativeStatus.Check(
             NativeMethods.mln_map_set_layer_filter(
-                Pointer,
+                Handle,
                 nativeLayerId.Value,
                 nativeFilter?.Pointer
             )
@@ -1524,9 +1523,9 @@ public sealed unsafe class MapHandle : IDisposable
     public JsonValue? GetLayerFilter(string layerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
-        mln_json_snapshot* snapshot = null;
+        MlnJsonSnapshot snapshot = default;
         NativeStatus.Check(
-            NativeMethods.mln_map_get_layer_filter(Pointer, nativeLayerId.Value, &snapshot)
+            NativeMethods.mln_map_get_layer_filter(Handle, nativeLayerId.Value, &snapshot)
         );
         var value = ValueStructs.ReadJsonSnapshot(snapshot);
         return value is JsonValue.Null ? null : value;
@@ -1612,9 +1611,9 @@ public sealed unsafe class MapHandle : IDisposable
         return nativeCoordinates;
     }
 
-    private static string[] CopyStyleIdList(mln_style_id_list* list)
+    private static string[] CopyStyleIdList(MlnStyleIdList list)
     {
-        if (list is null)
+        if (list.IsNull)
         {
             return [];
         }

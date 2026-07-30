@@ -40,13 +40,13 @@ class App {
 
   ~App() {
     releaseOwnedTextureFrame();
-    if (session_ != nullptr) {
+    if (session_ != MLN_HANDLE_NULL) {
       report("destroy render session", mln_render_session_destroy(session_));
     }
-    if (map_ != nullptr) {
+    if (map_ != MLN_HANDLE_NULL) {
       report("destroy map", mln_map_destroy(map_));
     }
-    if (runtime_ != nullptr) {
+    if (runtime_ != MLN_HANDLE_NULL) {
       report("destroy runtime", mln_runtime_destroy(runtime_));
     }
   }
@@ -482,9 +482,9 @@ class App {
   }
 
   Viewport viewport_;
-  mln_runtime* runtime_ = nullptr;
-  mln_map* map_ = nullptr;
-  mln_render_session* session_ = nullptr;
+  mln_runtime runtime_ = MLN_HANDLE_NULL;
+  mln_map map_ = MLN_HANDLE_NULL;
+  mln_render_session session_ = MLN_HANDLE_NULL;
   mln_webgpu_owned_texture_frame ownedFrame_ = {};
   bool hasOwnedFrame_ = false;
   bool renderPending_ = true;

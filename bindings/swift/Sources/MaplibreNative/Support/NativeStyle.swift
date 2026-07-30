@@ -1,29 +1,29 @@
 internal import CMaplibreNativeC
 
 enum NativeStyle {
-  static func removeSource(_ map: OpaquePointer,
+  static func removeSource(_ map: NativeMapHandle,
                            sourceId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_source(map, sourceId, removed))
+      try checkStatus(mln_map_remove_style_source(map.raw, sourceId, removed))
     }.value
   }
 
-  static func sourceExists(_ map: OpaquePointer,
+  static func sourceExists(_ map: NativeMapHandle,
                            sourceId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_source_exists(map, sourceId, exists))
+      try checkStatus(mln_map_style_source_exists(map.raw, sourceId, exists))
     }.value
   }
 
-  static func sourceType(_ map: OpaquePointer,
+  static func sourceType(_ map: NativeMapHandle,
                          sourceId: mln_string_view) throws -> UInt32?
   {
     var type = UInt32(0)
     let found = try NativeMemory.withTemporary(false) { found in
       try checkStatus(mln_map_get_style_source_type(
-        map,
+        map.raw,
         sourceId,
         &type,
         found
@@ -32,7 +32,7 @@ enum NativeStyle {
     return found ? type : nil
   }
 
-  static func sourceInfo(_ map: OpaquePointer,
+  static func sourceInfo(_ map: NativeMapHandle,
                          sourceId: mln_string_view) throws
     -> NativeStyleSourceInfo?
   {
@@ -40,7 +40,7 @@ enum NativeStyle {
     info.size = UInt32(MemoryLayout<mln_style_source_info>.size)
     let found = try NativeMemory.withTemporary(false) { found in
       try checkStatus(mln_map_get_style_source_info(
-        map,
+        map.raw,
         sourceId,
         &info,
         found
@@ -50,7 +50,7 @@ enum NativeStyle {
   }
 
   static func copySourceAttribution(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     sourceId: mln_string_view,
     capacity: Int
   ) throws -> (String?, Int) {
@@ -60,7 +60,7 @@ enum NativeStyle {
       try NativeMemory.withTemporary(0) { outSize in
         try NativeMemory.withTemporary(false) { outFound in
           try checkStatus(mln_map_copy_style_source_attribution(
-            map,
+            map.raw,
             sourceId,
             buffer.baseAddress,
             capacity,
@@ -88,47 +88,53 @@ enum NativeStyle {
     return (attribution, size)
   }
 
-  static func sourceIds(_ map: OpaquePointer) throws -> [String] {
-    let list = try NativeMemory.withTemporary(OpaquePointer?.none) { list in
-      try checkStatus(mln_map_list_style_source_ids(map, list))
+  static func sourceIds(_ map: NativeMapHandle) throws -> [String] {
+    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
+      try checkStatus(mln_map_list_style_source_ids(map.raw, outHandle))
     }.value
-    guard let list
+    let list = NativeStyleIdListHandle(raw: listValue)
+    guard !list.isNull
     else {
       throw NativeStatusFailure.swiftNativeError("source ID list was null")
     }
-    defer { mln_style_id_list_destroy(list) }
+    defer { mln_style_id_list_destroy(list.raw) }
     return try copyStyleIdList(list)
   }
 
-  static func removeImage(_ map: OpaquePointer,
+  static func removeImage(_ map: NativeMapHandle,
                           imageId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_image(map, imageId, removed))
+      try checkStatus(mln_map_remove_style_image(map.raw, imageId, removed))
     }.value
   }
 
-  static func imageExists(_ map: OpaquePointer,
+  static func imageExists(_ map: NativeMapHandle,
                           imageId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_image_exists(map, imageId, exists))
+      try checkStatus(mln_map_style_image_exists(map.raw, imageId, exists))
     }.value
   }
 
-  static func imageInfo(_ map: OpaquePointer,
+  static func imageInfo(_ map: NativeMapHandle,
                         imageId: mln_string_view) throws
     -> NativeStyleImageInfo?
   {
     var info = mln_style_image_info_default()
     let found = try NativeMemory.withTemporary(false) { found in
-      try checkStatus(mln_map_get_style_image_info(map, imageId, &info, found))
+      try checkStatus(mln_map_get_style_image_info(
+        map.raw,
+        imageId,
+        &info,
+        found
+      ))
     }.value
     return found ? NativeStyleImageInfo(info) : nil
   }
 
   static func copyImagePremultipliedRGBA8(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     imageId: mln_string_view,
     capacity: Int
   ) throws -> ([UInt8]?, Int) {
@@ -138,7 +144,7 @@ enum NativeStyle {
       try NativeMemory.withTemporary(0) { outSize in
         try NativeMemory.withTemporary(false) { outFound in
           try checkStatus(mln_map_copy_style_image_premultiplied_rgba8(
-            map,
+            map.raw,
             imageId,
             buffer.baseAddress,
             capacity,
@@ -160,7 +166,7 @@ enum NativeStyle {
   }
 
   static func addImageSourceURL(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     sourceId: mln_string_view,
     coordinates: [NativeLatLng],
     url: mln_string_view
@@ -169,7 +175,7 @@ enum NativeStyle {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_add_image_source_url(
-        map,
+        map.raw,
         sourceId,
         coordinates.baseAddress,
         coordinates.count,
@@ -179,7 +185,7 @@ enum NativeStyle {
   }
 
   static func addImageSourceImage(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     sourceId: mln_string_view,
     coordinates: [NativeLatLng],
     image: UnsafePointer<mln_premultiplied_rgba8_image>
@@ -188,7 +194,7 @@ enum NativeStyle {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_add_image_source_image(
-        map,
+        map.raw,
         sourceId,
         coordinates.baseAddress,
         coordinates.count,
@@ -198,7 +204,7 @@ enum NativeStyle {
   }
 
   static func setImageSourceCoordinates(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     sourceId: mln_string_view,
     coordinates: [NativeLatLng]
   ) throws {
@@ -206,7 +212,7 @@ enum NativeStyle {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_set_image_source_coordinates(
-        map,
+        map.raw,
         sourceId,
         coordinates.baseAddress,
         coordinates.count
@@ -215,7 +221,7 @@ enum NativeStyle {
   }
 
   static func imageSourceCoordinates(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     sourceId: mln_string_view
   ) throws -> [NativeLatLng]? {
     var coordinates = [mln_lat_lng](repeating: mln_lat_lng(), count: 4)
@@ -224,7 +230,7 @@ enum NativeStyle {
       try NativeMemory.withTemporary(0) { count in
         try NativeMemory.withTemporary(false) { outFound in
           try checkStatus(mln_map_get_image_source_coordinates(
-            map,
+            map.raw,
             sourceId,
             coordinates.baseAddress,
             coordinates.count,
@@ -256,29 +262,29 @@ enum NativeStyle {
     }
   }
 
-  static func removeLayer(_ map: OpaquePointer,
+  static func removeLayer(_ map: NativeMapHandle,
                           layerId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { removed in
-      try checkStatus(mln_map_remove_style_layer(map, layerId, removed))
+      try checkStatus(mln_map_remove_style_layer(map.raw, layerId, removed))
     }.value
   }
 
-  static func layerExists(_ map: OpaquePointer,
+  static func layerExists(_ map: NativeMapHandle,
                           layerId: mln_string_view) throws -> Bool
   {
     try NativeMemory.withTemporary(false) { exists in
-      try checkStatus(mln_map_style_layer_exists(map, layerId, exists))
+      try checkStatus(mln_map_style_layer_exists(map.raw, layerId, exists))
     }.value
   }
 
-  static func layerType(_ map: OpaquePointer,
+  static func layerType(_ map: NativeMapHandle,
                         layerId: mln_string_view) throws -> String?
   {
     var layerType = mln_string_view()
     let found = try NativeMemory.withTemporary(false) { found in
       try checkStatus(mln_map_get_style_layer_type(
-        map,
+        map.raw,
         layerId,
         &layerType,
         found
@@ -290,95 +296,100 @@ enum NativeStyle {
     ) : nil
   }
 
-  static func layerIds(_ map: OpaquePointer) throws -> [String] {
-    let list = try NativeMemory.withTemporary(OpaquePointer?.none) { list in
-      try checkStatus(mln_map_list_style_layer_ids(map, list))
+  static func layerIds(_ map: NativeMapHandle) throws -> [String] {
+    let listValue = try NativeMemory.withTemporary(UInt64(0)) { outHandle in
+      try checkStatus(mln_map_list_style_layer_ids(map.raw, outHandle))
     }.value
-    guard let list
+    let list = NativeStyleIdListHandle(raw: listValue)
+    guard !list.isNull
     else {
       throw NativeStatusFailure.swiftNativeError("layer ID list was null")
     }
-    defer { mln_style_id_list_destroy(list) }
+    defer { mln_style_id_list_destroy(list.raw) }
     return try copyStyleIdList(list)
   }
 
-  static func layerJSON(_ map: OpaquePointer,
+  static func layerJSON(_ map: NativeMapHandle,
                         layerId: mln_string_view) throws -> NativeJSONValue?
   {
     let output = try NativeMemory
-      .withTemporary(OpaquePointer?.none) { snapshot in
+      .withTemporary(UInt64(0)) { outHandle in
         try NativeMemory.withTemporary(false) { found in
           try checkStatus(mln_map_get_style_layer_json(
-            map,
+            map.raw,
             layerId,
-            snapshot,
+            outHandle,
             found
           ))
-          if !found.pointee { snapshot.pointee = nil }
+          if !found.pointee { outHandle.pointee = 0 }
         }
       }.value
-    guard let snapshot = output else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot) }
+    let snapshot = NativeJSONSnapshotHandle(raw: output)
+    guard !snapshot.isNull else { return nil }
+    defer { mln_json_snapshot_destroy(snapshot.raw) }
     return try NativeJSONSnapshot.copyValue(snapshot)
   }
 
   static func lightProperty(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     propertyName: mln_string_view
   ) throws -> NativeJSONValue? {
-    let snapshot = try NativeMemory
-      .withTemporary(OpaquePointer?.none) { snapshot in
+    let snapshotValue = try NativeMemory
+      .withTemporary(UInt64(0)) { outHandle in
         try checkStatus(mln_map_get_style_light_property(
-          map,
+          map.raw,
           propertyName,
-          snapshot
+          outHandle
         ))
       }.value
-    guard let snapshot else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot) }
+    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
+    guard !snapshot.isNull else { return nil }
+    defer { mln_json_snapshot_destroy(snapshot.raw) }
     return try NativeJSONSnapshot.copyValue(snapshot)
   }
 
   static func layerProperty(
-    _ map: OpaquePointer,
+    _ map: NativeMapHandle,
     layerId: mln_string_view,
     propertyName: mln_string_view
   ) throws -> NativeJSONValue? {
-    let snapshot = try NativeMemory
-      .withTemporary(OpaquePointer?.none) { snapshot in
+    let snapshotValue = try NativeMemory
+      .withTemporary(UInt64(0)) { outHandle in
         try checkStatus(mln_map_get_layer_property(
-          map,
+          map.raw,
           layerId,
           propertyName,
-          snapshot
+          outHandle
         ))
       }.value
-    guard let snapshot else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot) }
+    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
+    guard !snapshot.isNull else { return nil }
+    defer { mln_json_snapshot_destroy(snapshot.raw) }
     return try NativeJSONSnapshot.copyValue(snapshot)
   }
 
-  static func layerFilter(_ map: OpaquePointer,
+  static func layerFilter(_ map: NativeMapHandle,
                           layerId: mln_string_view) throws -> NativeJSONValue?
   {
-    let snapshot = try NativeMemory
-      .withTemporary(OpaquePointer?.none) { snapshot in
-        try checkStatus(mln_map_get_layer_filter(map, layerId, snapshot))
+    let snapshotValue = try NativeMemory
+      .withTemporary(UInt64(0)) { outHandle in
+        try checkStatus(mln_map_get_layer_filter(map.raw, layerId, outHandle))
       }.value
-    guard let snapshot else { return nil }
-    defer { mln_json_snapshot_destroy(snapshot) }
+    let snapshot = NativeJSONSnapshotHandle(raw: snapshotValue)
+    guard !snapshot.isNull else { return nil }
+    defer { mln_json_snapshot_destroy(snapshot.raw) }
     return try NativeJSONSnapshot.copyValue(snapshot)
   }
 
-  private static func copyStyleIdList(_ list: OpaquePointer) throws
+  private static func copyStyleIdList(_ list: NativeStyleIdListHandle) throws
     -> [String]
   {
     let count = try NativeMemory.withTemporary(0) { count in
-      try checkStatus(mln_style_id_list_count(list, count))
+      try checkStatus(mln_style_id_list_count(list.raw, count))
     }.value
     return try (0 ..< count).map { index in
       let output = try NativeMemory.withTemporary(mln_string_view()) { value in
-        try checkStatus(mln_style_id_list_get(list, index, value))
+        try checkStatus(mln_style_id_list_get(list.raw, index, value))
       }
       return try NativeString.copyUTF8(
         data: output.value.data,

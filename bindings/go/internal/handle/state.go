@@ -10,17 +10,21 @@ import (
 
 // DestroyFunc releases one owned native handle. A non-OK status leaves the
 // handle live so callers can retry on the correct owner thread.
-type DestroyFunc[T any] func(*T) int32
+type DestroyFunc[T ~uint64] func(T) int32
 
 // ErrLiveChildren reports that an owner cannot close while dependent handles are
 // still live.
 var ErrLiveChildren = errors.New("handle has live children")
 
 // State stores close-once state for one owned native handle.
-type State[T any] struct {
+//
+// The C API issues generational handles and rejects a released one, so this
+// tracks close-once ownership rather than identity. The zero handle means
+// closed.
+type State[T ~uint64] struct {
 	mu        sync.Mutex
 	cond      *sync.Cond
-	ptr       *T
+	handle    T
 	typeName  string
 	parents   []any
 	borrows   int
@@ -28,10 +32,11 @@ type State[T any] struct {
 	releasing bool
 }
 
-// Borrow keeps one native pointer live until Release is called.
-type Borrow[T any] struct {
-	state *State[T]
-	ptr   *T
+// Borrow serializes one use of a native handle against release, so a close
+// waits for in-flight cgo calls rather than racing them.
+type Borrow[T ~uint64] struct {
+	state  *State[T]
+	handle T
 }
 
 // Child tracks one live dependent handle against its parent.
@@ -45,12 +50,12 @@ type childCounter interface {
 	removeChild()
 }
 
-// New creates close-once state for a non-nil owned native handle pointer.
-func New[T any](ptr *T, typeName string, parents ...any) (*State[T], error) {
-	if ptr == nil {
-		return nil, fmt.Errorf("%s pointer is nil", typeName)
+// New creates close-once state for an owned native handle.
+func New[T ~uint64](handle T, typeName string, parents ...any) (*State[T], error) {
+	if handle == 0 {
+		return nil, fmt.Errorf("%s handle is the null handle", typeName)
 	}
-	state := &State[T]{ptr: ptr, typeName: typeName, parents: parents}
+	state := &State[T]{handle: handle, typeName: typeName, parents: parents}
 	state.cond = sync.NewCond(&state.mu)
 	runtime.SetFinalizer(state, func(state *State[T]) {
 		state.reportLeakIfLive()
@@ -58,42 +63,43 @@ func New[T any](ptr *T, typeName string, parents ...any) (*State[T], error) {
 	return state, nil
 }
 
-// Ptr returns the native pointer and whether the handle is still live. The
-// returned pointer is only a snapshot; use Borrow for cgo calls.
-func (state *State[T]) Ptr() (*T, bool) {
+// Handle returns the native handle and whether it is still live. The result is
+// only a snapshot; use Borrow for cgo calls.
+func (state *State[T]) Handle() (T, bool) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	return state.ptr, state.ptr != nil
+	return state.handle, state.handle != 0
 }
 
-// Borrow returns the native pointer and keeps it live until the borrow is
-// released. Borrow fails while release is in progress.
+// Borrow returns the native handle and serializes it against release. Borrow
+// fails while release is in progress.
 func (state *State[T]) Borrow() (*Borrow[T], bool) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	if state.ptr == nil || state.releasing {
+	if state.handle == 0 || state.releasing {
 		return nil, false
 	}
 	state.borrows++
-	return &Borrow[T]{state: state, ptr: state.ptr}, true
+	return &Borrow[T]{state: state, handle: state.handle}, true
 }
 
-// Ptr returns the borrowed native pointer.
-func (borrow *Borrow[T]) Ptr() *T {
+// Handle returns the borrowed native handle.
+func (borrow *Borrow[T]) Handle() T {
 	if borrow == nil {
-		return nil
+		var zero T
+		return zero
 	}
-	return borrow.ptr
+	return borrow.handle
 }
 
-// Release ends this native pointer borrow. It is safe to call more than once.
+// Release ends this borrow. It is safe to call more than once.
 func (borrow *Borrow[T]) Release() {
 	if borrow == nil || borrow.state == nil {
 		return
 	}
 	state := borrow.state
 	borrow.state = nil
-	borrow.ptr = nil
+	borrow.handle = 0
 
 	state.mu.Lock()
 	state.borrows--
@@ -108,7 +114,7 @@ func (borrow *Borrow[T]) Release() {
 func (state *State[T]) IsClosed() bool {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	return state.ptr == nil
+	return state.handle == 0
 }
 
 // Close calls destroy at most once after a successful native release.
@@ -130,7 +136,7 @@ func (state *State[T]) CloseChecked(destroy DestroyFunc[T]) (int32, error) {
 	for state.releasing {
 		state.cond.Wait()
 	}
-	if state.ptr == nil {
+	if state.handle == 0 {
 		state.mu.Unlock()
 		return 0, nil
 	}
@@ -145,13 +151,13 @@ func (state *State[T]) CloseChecked(destroy DestroyFunc[T]) (int32, error) {
 		state.KeepAlive()
 		return 0, ErrLiveChildren
 	}
-	ptr := state.ptr
+	handle := state.handle
 	state.mu.Unlock()
 
-	status := destroy(ptr)
+	status := destroy(handle)
 	state.mu.Lock()
 	if status == 0 {
-		state.ptr = nil
+		state.handle = 0
 	}
 	state.releasing = false
 	state.cond.Broadcast()
@@ -201,7 +207,7 @@ func (state *State[T]) removeChild() {
 
 func (state *State[T]) reportLeakIfLive() {
 	state.mu.Lock()
-	live := state.ptr != nil
+	live := state.handle != 0
 	typeName := state.typeName
 	state.mu.Unlock()
 	if live {

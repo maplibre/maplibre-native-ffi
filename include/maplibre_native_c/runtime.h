@@ -428,11 +428,14 @@ typedef struct mln_runtime_event {
   /** One of mln_runtime_event_source_type. */
   uint32_t source_type;
   /**
-   * Source handle for this event. For map-originated events, this is an
-   * mln_map*. For runtime-originated events, this is an mln_runtime*. Borrowed;
-   * valid while the source handle remains live.
+   * Source handle for this event: the mln_map for map-originated events, the
+   * mln_runtime for runtime-originated events, selected by source_type. Every
+   * handle type is uint64_t, so this needs no cast.
+   *
+   * The value names one object for the life of the process, so a host may
+   * compare it against a handle it holds even after that handle is released.
    */
-  void* source;
+  uint64_t source;
   /**
    * Secondary event detail whose meaning type selects. Depending on type it
    * carries an mln_camera_change_mode, an mln_status, a MapLibre Native error
@@ -580,7 +583,7 @@ typedef struct mln_resource_response {
  */
 typedef uint32_t (*mln_resource_provider_callback)(
   void* user_data, const mln_resource_request* request,
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
 );
 
 typedef struct mln_resource_provider {
@@ -609,7 +612,7 @@ MLN_API mln_runtime_options mln_runtime_options_default(void) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_create(
-  const mln_runtime_options* options, mln_runtime** out_runtime
+  const mln_runtime_options* options, mln_runtime* out_runtime
 ) MLN_NOEXCEPT;
 
 /**
@@ -640,7 +643,7 @@ MLN_API mln_status mln_runtime_create(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_set_resource_provider(
-  mln_runtime* runtime, const mln_resource_provider* provider
+  mln_runtime runtime, const mln_resource_provider* provider
 ) MLN_NOEXCEPT;
 
 /**
@@ -661,7 +664,7 @@ MLN_API mln_status mln_runtime_set_resource_provider(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_runtime_clear_resource_provider(mln_runtime* runtime) MLN_NOEXCEPT;
+mln_runtime_clear_resource_provider(mln_runtime runtime) MLN_NOEXCEPT;
 
 /**
  * Completes a C API resource provider request.
@@ -682,7 +685,7 @@ mln_runtime_clear_resource_provider(mln_runtime* runtime) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_resource_request_complete(
-  mln_resource_request_handle* handle, const mln_resource_response* response
+  mln_resource_request_handle handle, const mln_resource_response* response
 ) MLN_NOEXCEPT;
 
 /**
@@ -697,7 +700,7 @@ MLN_API mln_status mln_resource_request_complete(
  * - MLN_STATUS_INVALID_ARGUMENT when handle or out_cancelled is null.
  */
 MLN_API mln_status mln_resource_request_cancelled(
-  const mln_resource_request_handle* handle, bool* out_cancelled
+  mln_resource_request_handle handle, bool* out_cancelled
 ) MLN_NOEXCEPT;
 
 /**
@@ -705,12 +708,29 @@ MLN_API mln_status mln_resource_request_cancelled(
  *
  * Release the handle exactly once after completing the request or deciding not
  * to complete it. A provider callback that returns
- * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline; the C
- * API defers reclamation until the callback returns. Passing null is a no-op. A
- * released handle must not be used again.
+ * MLN_RESOURCE_PROVIDER_DECISION_HANDLE may release the handle inline. Passing
+ * MLN_HANDLE_NULL is a no-op, as is passing a handle this call already
+ * released. A released handle reports MLN_STATUS_INVALID_ARGUMENT from every
+ * other request entry point, including from a copy another thread holds.
  */
 MLN_API void mln_resource_request_release(
-  mln_resource_request_handle* handle
+  mln_resource_request_handle handle
+) MLN_NOEXCEPT;
+
+/**
+ * Blocks until a resource request is completed or released.
+ *
+ * Hosts that hand a request to another execution context use this to drain
+ * outstanding requests during teardown, because a handled request keeps host
+ * state reachable until it is retired. Call it from a context that is not
+ * responsible for retiring the request.
+ *
+ * Returns:
+ * - MLN_STATUS_OK once the request is retired, including when it already was.
+ * - MLN_STATUS_INVALID_ARGUMENT when handle is MLN_HANDLE_NULL.
+ */
+MLN_API mln_status mln_resource_request_wait_until_retired(
+  mln_resource_request_handle handle
 ) MLN_NOEXCEPT;
 
 /**
@@ -733,7 +753,7 @@ MLN_API void mln_resource_request_release(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_set_resource_transform(
-  mln_runtime* runtime, const mln_resource_transform* transform
+  mln_runtime runtime, const mln_resource_transform* transform
 ) MLN_NOEXCEPT;
 
 /**
@@ -750,7 +770,7 @@ MLN_API mln_status mln_runtime_set_resource_transform(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_runtime_clear_resource_transform(mln_runtime* runtime) MLN_NOEXCEPT;
+mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
 
 /**
  * Starts a MapLibre ambient cache maintenance operation for this runtime.
@@ -771,7 +791,7 @@ mln_runtime_clear_resource_transform(mln_runtime* runtime) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
-  mln_runtime* runtime, uint32_t operation,
+  mln_runtime runtime, uint32_t operation,
   mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
@@ -791,7 +811,7 @@ MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_offline_operation_discard(
-  mln_runtime* runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_offline_operation_id operation_id
 ) MLN_NOEXCEPT;
 
 /**
@@ -828,7 +848,7 @@ MLN_API mln_status mln_runtime_offline_operation_discard(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
+MLN_API mln_status mln_runtime_destroy(mln_runtime runtime) MLN_NOEXCEPT;
 
 /**
  * Advances this runtime.
@@ -884,7 +904,7 @@ MLN_API mln_status mln_runtime_destroy(mln_runtime* runtime) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) MLN_NOEXCEPT;
+mln_runtime_pump(mln_runtime runtime, int64_t timeout_ms) MLN_NOEXCEPT;
 
 /**
  * Acquires a wake source that releases this runtime's parked owner thread.
@@ -903,7 +923,7 @@ mln_runtime_pump(mln_runtime* runtime, int64_t timeout_ms) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_wake_source_acquire(
-  mln_runtime* runtime, mln_wake_source** out_source
+  mln_runtime runtime, mln_wake_source* out_source
 ) MLN_NOEXCEPT;
 
 /**
@@ -922,7 +942,7 @@ MLN_API mln_status mln_runtime_wake_source_acquire(
  * - MLN_STATUS_INVALID_ARGUMENT when source is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_wake_source_signal(mln_wake_source* source) MLN_NOEXCEPT;
+MLN_API mln_status mln_wake_source_signal(mln_wake_source source) MLN_NOEXCEPT;
 
 /**
  * Destroys a wake source.
@@ -930,7 +950,7 @@ MLN_API mln_status mln_wake_source_signal(mln_wake_source* source) MLN_NOEXCEPT;
  * This function may be called from any thread. Null is a no-op. Destroy each
  * handle exactly once, once every thread that signals it has finished.
  */
-MLN_API void mln_wake_source_destroy(mln_wake_source* source) MLN_NOEXCEPT;
+MLN_API void mln_wake_source_destroy(mln_wake_source source) MLN_NOEXCEPT;
 
 /**
  * Pops the next queued runtime event.
@@ -968,7 +988,7 @@ MLN_API void mln_wake_source_destroy(mln_wake_source* source) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_runtime_poll_event(
-  mln_runtime* runtime, mln_runtime_event* out_event, bool* out_has_event
+  mln_runtime runtime, mln_runtime_event* out_event, bool* out_has_event
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

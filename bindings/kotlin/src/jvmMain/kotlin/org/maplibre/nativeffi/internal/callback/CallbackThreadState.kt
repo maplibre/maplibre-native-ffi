@@ -18,7 +18,3 @@ internal actual class CallbackThreadState actual constructor() {
 
   actual fun isInCallback(): Boolean = (depth.get() ?: 0) > 0
 }
-
-internal actual fun yieldCallbackClose() {
-  Thread.yield()
-}

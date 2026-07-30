@@ -1,5 +1,5 @@
 using Maplibre.Native.Internal.C;
-using Maplibre.Native.Internal.Handle;
+using Maplibre.Native.Internal.Pointer;
 using Maplibre.Native.Internal.Status;
 
 namespace Maplibre.Native.Runtime;
@@ -14,14 +14,11 @@ namespace Maplibre.Native.Runtime;
 /// </remarks>
 public sealed unsafe class WakeSource : IDisposable
 {
-    // Held across the native signal and across close, so a close on another
-    // thread cannot destroy the source between the pointer read and the call.
-    private readonly Lock nativeCallGate = new();
-    private readonly NativeHandleState<mln_wake_source> state;
+    private readonly NativeHandleState<MlnWakeSource> state;
 
-    internal WakeSource(mln_wake_source* source)
+    internal WakeSource(MlnWakeSource source)
     {
-        state = new NativeHandleState<mln_wake_source>(
+        state = new NativeHandleState<MlnWakeSource>(
             source,
             static handle =>
             {
@@ -43,27 +40,18 @@ public sealed unsafe class WakeSource : IDisposable
     /// </remarks>
     public void Signal()
     {
-        lock (nativeCallGate)
-        {
-            NativeStatus.Check(NativeMethods.mln_wake_source_signal(state.Pointer));
-        }
+        state.WithLive(handle => NativeStatus.Check(NativeMethods.mln_wake_source_signal(handle)));
     }
 
     /// <summary>Releases the wake source.</summary>
     public void Close()
     {
-        lock (nativeCallGate)
-        {
-            state.Close();
-        }
+        state.Close();
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        lock (nativeCallGate)
-        {
-            state.TryClose();
-        }
+        state.TryClose();
     }
 }

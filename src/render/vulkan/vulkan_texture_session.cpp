@@ -290,7 +290,8 @@ class VulkanTextureSessionBackend final
   }
 
   auto acquire_vulkan_owned_frame(
-    const mln_render_session& texture, mln_vulkan_owned_texture_frame& out_frame
+    const mln_render_session_object& texture,
+    mln_vulkan_owned_texture_frame& out_frame
   ) -> mln_status override {
     const auto resources = backend_.frame_resources();
     out_frame = mln_vulkan_owned_texture_frame{
@@ -378,10 +379,11 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
 }
 
 auto vulkan_owned_texture_attach(
-  mln_map* map, const mln_vulkan_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -408,7 +410,7 @@ auto vulkan_owned_texture_attach(
     return vulkan_status;
   }
 
-  auto session = std::make_unique<mln_render_session>();
+  auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Vulkan;
@@ -427,10 +429,11 @@ auto vulkan_owned_texture_attach(
 }
 
 auto vulkan_borrowed_texture_attach(
-  mln_map* map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -461,7 +464,7 @@ auto vulkan_borrowed_texture_attach(
     return vulkan_status;
   }
 
-  auto session = std::make_unique<mln_render_session>();
+  auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_borrowed_session_extent(
     *session, descriptor->extent, descriptor->physical_width,
@@ -483,9 +486,10 @@ auto vulkan_borrowed_texture_attach(
 }
 
 auto vulkan_owned_texture_acquire_frame(
-  mln_render_session* texture, mln_vulkan_owned_texture_frame* out_frame
+  mln_render_session texture, mln_vulkan_owned_texture_frame* out_frame
 ) -> mln_status {
-  const auto status = validate_live_attached_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -496,38 +500,39 @@ auto vulkan_owned_texture_acquire_frame(
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (texture->texture.acquired) {
+  if (live->texture.acquired) {
     set_thread_error("a texture frame is already acquired");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (texture->rendered_generation != texture->generation) {
+  if (live->rendered_generation != live->generation) {
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;
   }
   if (
-    texture->texture.mode != TextureSessionMode::Owned ||
-    texture->texture.api_kind != TextureSessionApi::Vulkan
+    live->texture.mode != TextureSessionMode::Owned ||
+    live->texture.api_kind != TextureSessionApi::Vulkan
   ) {
     set_thread_error("texture session cannot expose a Vulkan texture frame");
     return MLN_STATUS_UNSUPPORTED;
   }
 
   const auto acquire_status =
-    texture->texture.backend->acquire_vulkan_owned_frame(*texture, *out_frame);
+    live->texture.backend->acquire_vulkan_owned_frame(*live, *out_frame);
   if (acquire_status != MLN_STATUS_OK) {
     return acquire_status;
   }
-  texture->texture.acquired = true;
-  texture->texture.acquired_frame_id = out_frame->frame_id;
-  texture->texture.acquired_frame_kind = TextureSessionFrameKind::VulkanOwned;
-  ++texture->texture.next_frame_id;
+  live->texture.acquired = true;
+  live->texture.acquired_frame_id = out_frame->frame_id;
+  live->texture.acquired_frame_kind = TextureSessionFrameKind::VulkanOwned;
+  ++live->texture.next_frame_id;
   return MLN_STATUS_OK;
 }
 
 auto vulkan_owned_texture_release_frame(
-  mln_render_session* texture, const mln_vulkan_owned_texture_frame* frame
+  mln_render_session texture, const mln_vulkan_owned_texture_frame* frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -538,23 +543,23 @@ auto vulkan_owned_texture_release_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    !texture->texture.acquired ||
-    texture->texture.acquired_frame_kind != TextureSessionFrameKind::VulkanOwned
+    !live->texture.acquired ||
+    live->texture.acquired_frame_kind != TextureSessionFrameKind::VulkanOwned
   ) {
     set_thread_error("no texture frame is currently acquired");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (frame->generation != texture->generation) {
+  if (frame->generation != live->generation) {
     set_thread_error("frame generation does not match acquired frame");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (frame->frame_id != texture->texture.acquired_frame_id) {
+  if (frame->frame_id != live->texture.acquired_frame_id) {
     set_thread_error("frame identity does not match acquired frame");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  texture->texture.acquired = false;
-  texture->texture.acquired_frame_id = 0;
-  texture->texture.acquired_frame_kind = TextureSessionFrameKind::None;
+  live->texture.acquired = false;
+  live->texture.acquired_frame_id = 0;
+  live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   return MLN_STATUS_OK;
 }
 
@@ -594,10 +599,11 @@ auto metal_borrowed_texture_descriptor_default() noexcept
 }
 
 auto metal_owned_texture_attach(
-  mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -624,10 +630,11 @@ auto metal_owned_texture_attach(
 }
 
 auto metal_borrowed_texture_attach(
-  mln_map* map, const mln_metal_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -653,10 +660,11 @@ auto metal_borrowed_texture_attach(
 }
 
 auto opengl_owned_texture_attach(
-  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -683,10 +691,11 @@ auto opengl_owned_texture_attach(
 }
 
 auto opengl_borrowed_texture_attach(
-  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -774,9 +783,10 @@ auto webgpu_borrowed_texture_attach(
 }
 
 auto metal_owned_texture_acquire_frame(
-  mln_render_session* texture, mln_metal_owned_texture_frame* out_frame
+  mln_render_session texture, mln_metal_owned_texture_frame* out_frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -792,9 +802,10 @@ auto metal_owned_texture_acquire_frame(
 }
 
 auto metal_owned_texture_release_frame(
-  mln_render_session* texture, const mln_metal_owned_texture_frame* frame
+  mln_render_session texture, const mln_metal_owned_texture_frame* frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -807,9 +818,10 @@ auto metal_owned_texture_release_frame(
 }
 
 auto opengl_owned_texture_acquire_frame(
-  mln_render_session* texture, mln_opengl_owned_texture_frame* out_frame
+  mln_render_session texture, mln_opengl_owned_texture_frame* out_frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -825,9 +837,10 @@ auto opengl_owned_texture_acquire_frame(
 }
 
 auto opengl_owned_texture_release_frame(
-  mln_render_session* texture, const mln_opengl_owned_texture_frame* frame
+  mln_render_session texture, const mln_opengl_owned_texture_frame* frame
 ) -> mln_status {
-  const auto status = validate_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
