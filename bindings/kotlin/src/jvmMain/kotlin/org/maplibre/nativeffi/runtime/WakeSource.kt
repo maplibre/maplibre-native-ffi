@@ -9,11 +9,6 @@ import org.maplibre.nativeffi.internal.loader.NativeAccess
 /** Wake source backed by the JVM FFM bridge. */
 public actual class WakeSource private constructor(private val source: NativeWakeSource) :
   AutoCloseable {
-  // Signal and close are both any-thread, so the gate orders them against each other. Without it a
-  // signal that passed the live check could reach native after a concurrent close retired the id,
-  // reporting the C API's stale-handle status where every other binding reports success or its own
-  // closed error.
-  private val nativeCallGate = Any()
   private val core = HandleStateCore("WakeSource", source.raw)
 
   init {
@@ -25,21 +20,16 @@ public actual class WakeSource private constructor(private val source: NativeWak
 
   public actual fun signal() {
     NativeAccess.ensureLoaded()
-    synchronized(nativeCallGate) {
-      core.requireLive()
-      NativeAccess.signalWakeSource(source)
-    }
+    core.withLive { NativeAccess.signalWakeSource(source) }
   }
 
   public actual override fun close() {
-    synchronized(nativeCallGate) {
-      core.closeOnce(
-        destroy = {
-          NativeAccess.destroyWakeSource(source)
-          MaplibreStatus.OK.nativeCode
-        }
-      )
-    }
+    core.closeOnce(
+      destroy = {
+        NativeAccess.destroyWakeSource(source)
+        MaplibreStatus.OK.nativeCode
+      }
+    )
   }
 
   internal companion object {

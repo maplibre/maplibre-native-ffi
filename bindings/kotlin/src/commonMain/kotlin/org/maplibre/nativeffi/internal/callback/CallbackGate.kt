@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import org.maplibre.nativeffi.internal.lifecycle.yieldWhileClosing
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Platform-neutral callback entry gate with blocking close-after-last-callback cleanup. */
@@ -50,7 +51,7 @@ internal class CallbackGate(private val name: String, private val closeNative: (
           return
         }
       } else {
-        yieldCallbackClose()
+        yieldWhileClosing()
       }
     }
   }
@@ -102,5 +103,3 @@ internal expect class CallbackThreadState() {
 
   fun isInCallback(): Boolean
 }
-
-internal expect fun yieldCallbackClose()

@@ -24,6 +24,7 @@ internal sealed class NativeHandleState<T>
     private T handle;
     private bool closed;
     private bool releaseInProgress;
+    private int activeUses;
 
     internal NativeHandleState(T handle, StatusDestroy<T> destroy, string typeName)
     {
@@ -77,29 +78,81 @@ internal sealed class NativeHandleState<T>
         {
             lock (gate)
             {
-                if (releaseInProgress)
-                {
-                    throw new InvalidStateException(
-                        MaplibreStatus.InvalidState,
-                        null,
-                        $"{typeName} is closing.",
-                        null
-                    );
-                }
-
-                if (closed)
-                {
-                    throw new InvalidStateException(
-                        MaplibreStatus.InvalidState,
-                        null,
-                        $"{typeName} is closed.",
-                        null
-                    );
-                }
-
-                return handle;
+                return HandleLocked();
             }
         }
+    }
+
+    private T HandleLocked()
+    {
+        if (releaseInProgress)
+        {
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is closing.",
+                null
+            );
+        }
+
+        if (closed)
+        {
+            throw new InvalidStateException(
+                MaplibreStatus.InvalidState,
+                null,
+                $"{typeName} is closed.",
+                null
+            );
+        }
+
+        return handle;
+    }
+
+    /// <summary>
+    /// Runs <paramref name="use" /> with the handle and with release held off until it returns.
+    /// </summary>
+    /// <remarks>
+    /// Handles whose release is confined to one thread get this ordering from the owner-thread rule
+    /// and can call native directly after reading <see cref="Handle" />. Handles the host may use
+    /// and release from different threads use this instead, so a release that begins mid-call waits
+    /// for the call to finish. That is what keeps a losing race reporting this wrapper's own
+    /// closed-handle error instead of the C API's rejection of an id retired underneath it.
+    /// <para>
+    /// <paramref name="use" /> runs outside the lock, so concurrent uses proceed together. Calling
+    /// <see cref="Close" /> from inside <paramref name="use" /> on the same thread would wait on
+    /// itself.
+    /// </para>
+    /// </remarks>
+    internal TResult WithLive<TResult>(Func<T, TResult> use)
+    {
+        T live;
+        lock (gate)
+        {
+            live = HandleLocked();
+            activeUses++;
+        }
+
+        try
+        {
+            return use(live);
+        }
+        finally
+        {
+            lock (gate)
+            {
+                activeUses--;
+                Monitor.PulseAll(gate);
+            }
+        }
+    }
+
+    internal void WithLive(Action<T> use)
+    {
+        WithLive<object?>(handle =>
+        {
+            use(handle);
+            return null;
+        });
     }
 
     internal void Close()
@@ -190,6 +243,14 @@ internal sealed class NativeHandleState<T>
         }
 
         releaseInProgress = true;
+
+        // Marking the release turns new uses away from here on. Uses that already read the handle
+        // still hold it, so wait for them before destroying it.
+        while (activeUses > 0)
+        {
+            Monitor.Wait(gate);
+        }
+
         return true;
     }
 

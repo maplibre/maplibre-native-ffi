@@ -89,6 +89,7 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 }
 
+// BND-197.
 func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
 	state, err := New(testHandle, "test_handle")
 	if err != nil {

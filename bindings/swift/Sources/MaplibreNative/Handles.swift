@@ -18,6 +18,19 @@ class NativeHandleBox<Handle: NativeHandle>: @unchecked Sendable {
     state.isClosed
   }
 
+  /// Runs `use` with release held off. See `NativeHandleState.withLive`.
+  func withLive<T>(_ use: (Handle) throws -> T) throws -> T {
+    do {
+      return try state.withLive(use)
+    } catch let failure as NativeStatusFailure {
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: failure.diagnostic
+      )
+    }
+  }
+
   func requireLive() throws -> Handle {
     do {
       return try state.requireLive()

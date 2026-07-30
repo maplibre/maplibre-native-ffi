@@ -16,12 +16,42 @@ internal class HandleStateCore(
   val leakReport: LeakReport = LeakReport(typeName, handleId)
   private val releaseState = AtomicInt(STATE_LIVE)
   private val liveChildren = AtomicReference<List<String>>(emptyList())
+  private val activeUses = AtomicInt(0)
 
   fun requireLive() {
     when (releaseState.load()) {
       STATE_LIVE -> return
       STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
       else -> throw Status.released(typeName)
+    }
+  }
+
+  /**
+   * Runs [block] with release held off until it returns.
+   *
+   * Handles whose release is confined to one thread get this ordering from the owner-thread rule
+   * and can call native directly after [requireLive]. Handles the host may use and release from
+   * different threads use this instead, so a release that begins mid-call waits for the call to
+   * finish. That is what keeps a losing race reporting this wrapper's own closed-handle error
+   * instead of the C API's rejection of an id retired underneath it.
+   *
+   * [block] runs outside any lock, so concurrent uses proceed together. Calling [closeOnce] from
+   * inside [block] on the same thread would wait on itself.
+   */
+  fun <T> withLive(block: () -> T): T {
+    addActiveUse(1)
+    try {
+      requireLive()
+      return block()
+    } finally {
+      addActiveUse(-1)
+    }
+  }
+
+  private fun addActiveUse(delta: Int) {
+    while (true) {
+      val current = activeUses.load()
+      if (activeUses.compareAndSet(current, current + delta)) return
     }
   }
 
@@ -65,6 +95,11 @@ internal class HandleStateCore(
     if (children.isNotEmpty()) {
       releaseState.store(STATE_LIVE)
       throw Status.liveChildren(typeName, children)
+    }
+    // The state is RELEASING, so withLive turns new callers away from here on. Uses that already
+    // passed their liveness check still hold the handle, so wait for them before destroying it.
+    while (activeUses.load() != 0) {
+      yieldWhileClosing()
     }
     try {
       Status.check(destroy())

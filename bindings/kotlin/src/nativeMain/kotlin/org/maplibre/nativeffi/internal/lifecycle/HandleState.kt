@@ -23,6 +23,12 @@ internal class HandleState<T : NativeHandle>(
     return handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
   }
 
+  /** Runs [block] with the live handle and release held off. See [HandleStateCore.withLive]. */
+  fun <R> withLive(block: (T) -> R): R = core.withLive {
+    val live = handle ?: throw org.maplibre.nativeffi.internal.status.Status.released(typeName)
+    block(live)
+  }
+
   fun isReleased(): Boolean = core.isReleased()
 
   fun handleId(): Long = core.handleId()

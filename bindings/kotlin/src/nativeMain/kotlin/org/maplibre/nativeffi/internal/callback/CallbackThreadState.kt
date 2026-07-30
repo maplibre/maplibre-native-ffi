@@ -18,8 +18,3 @@ internal actual class CallbackThreadState actual constructor() {
 private object CallbackDepth {
   var depth: Int = 0
 }
-
-internal actual fun yieldCallbackClose() {
-  // Kotlin/Native has no common thread-yield primitive. Callback close is rare,
-  // and this loop only runs while another callback is actively exiting.
-}

@@ -148,12 +148,22 @@ Public release follows this operation:
    code.
 4. Keep owner-scoped support state live, including parent references, callback
    state, and request registries.
-5. Invoke the matching native release path.
-6. If native release succeeds, mark the wrapper closed and make later release
+5. Wait for uses that already passed their liveness check to return.
+6. Invoke the matching native release path.
+7. If native release succeeds, mark the wrapper closed and make later release
    calls no-op.
-7. If native release fails, restore the live state and return the native error
+8. If native release fails, restore the live state and return the native error
    with diagnostics. Consuming or move-based release APIs return the live owner
    state so callers can retry.
+
+Step 5 is what orders a use against a release for handles that have no
+owner-thread rule to do it. A handle whose release is confined to one thread
+satisfies it with no mechanism, because that thread cannot also be inside a use.
+A handle the host may use and release from different threads holds release off
+for the duration of a use, so a release that begins mid-call reports the
+binding's own closed-handle error rather than surfacing the C API's rejection of
+an id retired underneath the call. The mechanism belongs to the shared handle
+state, so every handle of that kind gets the same ordering.
 
 Deterministic cleanup hooks follow the same release operation when they can
 report release failure through the target language's normal error path.
@@ -513,9 +523,6 @@ The wake source follows this design:
 2. It is transferable and callable from any thread, and the binding declares
    that where the host language can express it.
 3. Signalling after the runtime is closed succeeds and does nothing.
-4. Where the host language can call signal and release concurrently, the binding
-   orders them against each other, so a signal reports either success or the
-   binding's own closed-handle error.
 
 ### Event polling
 
@@ -851,11 +858,18 @@ When the host language can run cleanup outside explicit release, include:
 When safe public code can call owner-thread-affine APIs from the wrong native
 thread or race release on the same owner-thread handle, include:
 
-| ID      | Test                                                                                                     |
-| ------- | -------------------------------------------------------------------------------------------------------- |
-| BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
-| BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
-| BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+| ID      | Test                                                                                                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress.                                                      |
+| BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.                                                             |
+| BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                                                                             |
+| BND-197 | A release racing a use of the same handle waits for the in-flight use, and a use starting after the release begins reports the binding's closed-handle error. |
+
+BND-197 applies to handles the host can use and release from different threads,
+which today means the wake source and the resource request. A binding that
+orders the two by holding one lock across the native call satisfies it by
+construction and has nothing beyond that lock to assert; a binding that counts
+in-flight uses and drains them exercises the counter directly.
 
 #### Render sessions on a second thread
 
