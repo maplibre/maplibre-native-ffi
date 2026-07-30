@@ -18,6 +18,7 @@ export const RenderSessionHandle = root.RenderSessionHandle;
 export const MetalOwnedTextureFrame = root.MetalOwnedTextureFrame;
 export const VulkanOwnedTextureFrame = root.VulkanOwnedTextureFrame;
 export const OpenGLOwnedTextureFrame = root.OpenGLOwnedTextureFrame;
+export const OpenGLTextureName = root.OpenGLTextureName;
 export const NativePointer = root.NativePointer;
 export const NativeBuffer = root.NativeBuffer;
 export const RuntimeOptions = root.RuntimeOptions;

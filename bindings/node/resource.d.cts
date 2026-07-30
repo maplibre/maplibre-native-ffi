@@ -9,4 +9,5 @@ export {
   type ResourceProviderRequest,
   type ResourceResponseInput,
   type ResourceProviderCallback,
+  type ResourceRequestTransfer,
 } from "./index.cjs";

@@ -2,6 +2,7 @@
 
 const { randomUUID } = require("node:crypto");
 const { isDeepStrictEqual } = require("node:util");
+const { MessageChannel } = require("node:worker_threads");
 const native = require("./index.js");
 
 const EXPECTED_C_ABI_VERSION = 0;
@@ -82,6 +83,12 @@ function copyOptionField(value) {
   }
   if (Array.isArray(value)) {
     return Object.freeze(value.map(copyOptionField));
+  }
+  if (!isPlainObject(value)) {
+    throw new InvalidArgumentError(
+      null,
+      "structured option fields must contain only arrays and plain or null-prototype objects",
+    );
   }
   const copy = {};
   for (const [key, nested] of Object.entries(value)) {
@@ -819,7 +826,12 @@ class OpenGLOwnedTextureFrame {
     return this.#read("frameId");
   }
   get texture() {
-    return this.#read("texture");
+    const validity = this.#registration.validity;
+    return new OpenGLTextureName(
+      CONSTRUCTION_TOKEN,
+      this.#read("texture"),
+      () => validity.active,
+    );
   }
   get target() {
     return this.#read("target");
@@ -860,6 +872,43 @@ class OpenGLOwnedTextureFrame {
 
   [Symbol.dispose]() {
     this.close();
+  }
+}
+
+class OpenGLTextureName {
+  constructor(token, value, isValid = () => true) {
+    if (token !== CONSTRUCTION_TOKEN) {
+      throw new InvalidArgumentError(
+        null,
+        "OpenGL texture names are created by owned texture frames",
+      );
+    }
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new InvalidArgumentError(
+        null,
+        "OpenGL texture name must be a non-negative safe integer",
+      );
+    }
+    Object.defineProperties(this, {
+      _value: { value },
+      _isValid: { value: isValid },
+    });
+    Object.freeze(this);
+  }
+
+  get value() {
+    if (!this._isValid()) {
+      throw new InvalidStateError(null, "OpenGL texture frame scope is closed");
+    }
+    return this._value;
+  }
+
+  get isNull() {
+    return this.value === 0;
+  }
+
+  toString() {
+    return `OpenGLTextureName[value=${this.value}]`;
   }
 }
 
@@ -1131,19 +1180,31 @@ function registerRuntimeResourceRequest(runtime, registration) {
 }
 
 function unregisterRuntimeResourceRequest(runtime, registration) {
-  runtimeResourceRequests.get(runtime)?.delete(registration);
+  if (runtime != null) {
+    runtimeResourceRequests.get(runtime)?.delete(registration);
+  }
 }
 
-function closeQueuedResourceRequest(request) {
+function rejectQueuedResourceRequest(request, error) {
   if (typeof request?.completionToken !== "string") {
     return;
   }
   try {
     translateNativeErrors(() =>
-      native.nativeResourceRequestClose(request.completionToken),
+      native.nativeResourceRequestComplete(
+        request.completionToken,
+        resourceProviderErrorResponse(
+          error ??
+            new Error("resource provider registration is no longer active"),
+        ),
+      ),
     );
   } catch {
-    // Replacement or runtime teardown may already have removed the request.
+    try {
+      native.nativeResourceRequestClose(request.completionToken);
+    } catch {
+      // Replacement or runtime teardown may already have removed the request.
+    }
   }
 }
 
@@ -1151,7 +1212,7 @@ function resourceProviderBridge(runtime, registration, callback) {
   return (error, request) => {
     const owner = runtime.deref();
     if (error || !registration.active || owner == null || owner.closed) {
-      closeQueuedResourceRequest(request);
+      rejectQueuedResourceRequest(request, error);
       return;
     }
     const handle = new ResourceRequestHandle(
@@ -1281,7 +1342,9 @@ class ResourceRequestHandle {
       completionToken,
       runtime,
     };
-    registerRuntimeResourceRequest(runtime, this.#registration);
+    if (runtime != null) {
+      registerRuntimeResourceRequest(runtime, this.#registration);
+    }
     resourceRequestFinalizer?.register(this, this.#registration, this);
     Object.preventExtensions(this);
   }
@@ -1338,6 +1401,28 @@ class ResourceRequestHandle {
     );
   }
 
+  transfer() {
+    assertHandleEnvironment(this);
+    if (this.#closed) {
+      throw new InvalidStateError(null, "ResourceRequestHandle is closed");
+    }
+    const transfer = createExclusiveTransfer(
+      "resourceRequest",
+      this.#completionToken,
+      native.nativeResourceRequestClose,
+    );
+    this.#markClosed();
+    return transfer;
+  }
+
+  static fromTransfer(transfer) {
+    return new ResourceRequestHandle(
+      CONSTRUCTION_TOKEN,
+      transferToken(transfer, "resourceRequest", "resource request"),
+      null,
+    );
+  }
+
   close() {
     assertHandleEnvironment(this);
     if (this.#closed) {
@@ -1357,7 +1442,9 @@ class ResourceRequestHandle {
   #markClosed() {
     if (!this.#closed) {
       this.#closed = true;
-      unregisterRuntimeResourceRequest(this.#runtime, this.#registration);
+      if (this.#runtime != null) {
+        unregisterRuntimeResourceRequest(this.#runtime, this.#registration);
+      }
       resourceRequestFinalizer?.unregister(this);
     }
   }
@@ -1599,6 +1686,11 @@ class RuntimeHandle {
     this.#mapsById.clear();
     const resourceRequests = runtimeResourceRequests.get(this);
     for (const registration of resourceRequests ?? []) {
+      try {
+        native.nativeResourceRequestClose(registration.completionToken);
+      } catch {
+        // Completion may have raced runtime teardown from another thread.
+      }
       registration.handle.deref()?._markClosedFromRuntime();
     }
     resourceRequests?.clear();
@@ -1885,11 +1977,13 @@ class RuntimeHandle {
     }
     const sourceMap =
       event.sourceType === "map" ? this.#mapForId(event.sourceId) : null;
-    if (event?.eventType === "map-style-loaded") {
+    if (
+      event?.eventType === "map-style-loaded" ||
+      event?.eventType === "map-loading-failed"
+    ) {
       sourceMap?._finishStyleReplacement();
     }
     event.sourceMap = sourceMap;
-    delete event.sourceId;
     const completed = event.payload?.offlineOperationCompleted;
     if (typeof completed?.operationId === "bigint") {
       const registration = [...this.#offlineOperations].find(
@@ -2260,7 +2354,7 @@ class RenderSessionHandle {
 
   getFeatureState(selector) {
     return translateNativeErrors(() =>
-      JSON.parse(liveNativeOf(this).getFeatureState(selector)),
+      parseJson(liveNativeOf(this).getFeatureState(selector)),
     );
   }
 
@@ -2280,7 +2374,7 @@ class RenderSessionHandle {
               options.filter == null ? null : stringifyJson(options.filter),
           };
     return translateNativeErrors(() =>
-      JSON.parse(
+      parseJson(
         liveNativeOf(this).queryRenderedFeatures(geometry, nativeOptions),
       ),
     );
@@ -2296,7 +2390,7 @@ class RenderSessionHandle {
               options.filter == null ? null : stringifyJson(options.filter),
           };
     return translateNativeErrors(() =>
-      JSON.parse(
+      parseJson(
         liveNativeOf(this).querySourceFeatures(sourceId, nativeOptions),
       ),
     );
@@ -2310,7 +2404,7 @@ class RenderSessionHandle {
     args = null,
   ) {
     return translateNativeErrors(() =>
-      JSON.parse(
+      parseJson(
         liveNativeOf(this).queryFeatureExtension(
           sourceId,
           stringifyJson(feature),
@@ -2511,11 +2605,11 @@ class MapHandle {
       throw new InvalidArgumentError(null, "runtime must be a RuntimeHandle");
     }
     this.#runtime = runtime;
-    const nativeOptions = {
-      ...options,
-      width: optionalUnsigned32(options?.width, "options.width"),
-      height: optionalUnsigned32(options?.height, "options.height"),
-    };
+    const checkedOptions = new MapOptions(options);
+    const nativeOptions = Object.assign({}, checkedOptions, {
+      width: optionalUnsigned32(checkedOptions.width, "options.width"),
+      height: optionalUnsigned32(checkedOptions.height, "options.height"),
+    });
     defineCheckedNative(
       this,
       translateNativeErrors(() =>
@@ -3306,7 +3400,7 @@ class MapHandle {
     const json = translateNativeErrors(() =>
       liveNativeOf(this).getStyleLayerJson(layerId),
     );
-    return json === null ? null : JSON.parse(json);
+    return json === null ? null : parseJson(json);
   }
 
   moveStyleLayer(layerId, beforeLayerId = null) {
@@ -3329,7 +3423,7 @@ class MapHandle {
     const json = translateNativeErrors(() =>
       liveNativeOf(this).getLayerPropertyJson(layerId, propertyName),
     );
-    return json === null ? null : JSON.parse(json);
+    return json === null ? null : parseJson(json);
   }
 
   setLayerFilter(layerId, filter) {
@@ -3345,7 +3439,7 @@ class MapHandle {
     const json = translateNativeErrors(() =>
       liveNativeOf(this).getLayerFilterJson(layerId),
     );
-    return json === null ? null : JSON.parse(json);
+    return json === null ? null : parseJson(json);
   }
 
   setStyleLight(light) {
@@ -3367,7 +3461,7 @@ class MapHandle {
     const json = translateNativeErrors(() =>
       liveNativeOf(this).getStyleLightPropertyJson(propertyName),
     );
-    return json === null ? null : JSON.parse(json);
+    return json === null ? null : parseJson(json);
   }
 
   setStyleJson(json) {
@@ -3395,13 +3489,15 @@ function stringifyJson(value) {
       if (
         item === undefined ||
         typeof item === "function" ||
-        typeof item === "symbol" ||
-        typeof item === "bigint"
+        typeof item === "symbol"
       ) {
         throw new InvalidArgumentError(
           null,
-          "JSON values must not contain undefined, functions, symbols, or bigints",
+          "JSON values must not contain undefined, functions, or symbols",
         );
+      }
+      if (typeof item === "bigint") {
+        return JSON.rawJSON(item.toString());
       }
       if (typeof item === "number" && !Number.isFinite(item)) {
         throw new InvalidArgumentError(null, "JSON numbers must be finite");
@@ -3430,13 +3526,15 @@ function validateStructuredJson(value, ancestors) {
   if (
     value === undefined ||
     typeof value === "function" ||
-    typeof value === "symbol" ||
-    typeof value === "bigint"
+    typeof value === "symbol"
   ) {
     throw new InvalidArgumentError(
       null,
-      "JSON values must not contain undefined, functions, symbols, or bigints",
+      "JSON values must not contain undefined, functions, or symbols",
     );
+  }
+  if (typeof value === "bigint") {
+    return;
   }
   if (typeof value === "number" && !Number.isFinite(value)) {
     throw new InvalidArgumentError(null, "JSON numbers must be finite");
@@ -3456,12 +3554,26 @@ function validateStructuredJson(value, ancestors) {
       "structured JSON values must not define toJSON",
     );
   }
+  if (Object.getOwnPropertySymbols(value).length !== 0) {
+    throw new InvalidArgumentError(
+      null,
+      "structured JSON values must not contain symbol-keyed members",
+    );
+  }
   if (ancestors.has(value)) {
     throw new InvalidArgumentError(null, "JSON values must not contain cycles");
   }
   ancestors.add(value);
   try {
     if (Array.isArray(value)) {
+      for (const key of Object.keys(value)) {
+        if (!/^(0|[1-9][0-9]*)$/.test(key) || Number(key) >= value.length) {
+          throw new InvalidArgumentError(
+            null,
+            "JSON arrays must not contain named members",
+          );
+        }
+      }
       for (let index = 0; index < value.length; index += 1) {
         if (!Object.hasOwn(value, index)) {
           throw new InvalidArgumentError(
@@ -3481,14 +3593,42 @@ function validateStructuredJson(value, ancestors) {
   }
 }
 
+function parseJson(json) {
+  return JSON.parse(json, (_key, value, context) => {
+    if (
+      typeof value === "number" &&
+      Number.isInteger(value) &&
+      !Number.isSafeInteger(value) &&
+      /^-?[0-9]+$/.test(context.source)
+    ) {
+      return BigInt(context.source);
+    }
+    return value;
+  });
+}
+
 function transferToken(transfer, kind, label) {
   if (
     transfer == null ||
     typeof transfer !== "object" ||
     transfer.kind !== kind ||
-    typeof transfer.token !== "string"
+    typeof transfer.token !== "string" ||
+    transfer.carrier == null
   ) {
     throw new InvalidArgumentError(null, `${label} transfer is invalid`);
+  }
+  try {
+    const carrier = structuredClone(transfer.carrier, {
+      transfer: [transfer.carrier],
+    });
+    carrier.postMessage("consumed");
+    carrier.close();
+  } catch (error) {
+    throw new InvalidArgumentError(
+      null,
+      `${label} transfer is invalid or already consumed`,
+      { cause: error },
+    );
   }
   return transfer.token;
 }
@@ -3498,15 +3638,28 @@ const TRANSFER_EXPIRY_MS = 5 * 60 * 1000;
 function createExpiringTransfer(kind, register, cancelNative) {
   const token = `${kind}:${randomUUID()}:${randomUUID()}`;
   translateNativeErrors(() => register(token));
+  return createExclusiveTransfer(kind, token, cancelNative);
+}
+
+function createExclusiveTransfer(kind, token, cancelNative) {
+  const { port1: carrier, port2: acknowledgement } = new MessageChannel();
   let active = true;
   const cancel = () => {
     if (!active) return;
     active = false;
+    acknowledgement.close();
     translateNativeErrors(() => cancelNative(token));
   };
   const expiry = setTimeout(cancel, TRANSFER_EXPIRY_MS);
   expiry.unref?.();
-  const transfer = { kind, token };
+  acknowledgement.once("message", () => {
+    if (!active) return;
+    active = false;
+    clearTimeout(expiry);
+    acknowledgement.close();
+  });
+  acknowledgement.unref();
+  const transfer = { kind, token, carrier };
   Object.defineProperty(transfer, "cancel", {
     enumerable: false,
     value() {
@@ -3675,6 +3828,7 @@ module.exports = {
   MetalOwnedTextureFrame,
   VulkanOwnedTextureFrame,
   OpenGLOwnedTextureFrame,
+  OpenGLTextureName,
   NativePointer,
   NativeBuffer,
   RuntimeOptions,
@@ -3727,6 +3881,7 @@ module.exports.RenderSessionHandle = RenderSessionHandle;
 module.exports.MetalOwnedTextureFrame = MetalOwnedTextureFrame;
 module.exports.VulkanOwnedTextureFrame = VulkanOwnedTextureFrame;
 module.exports.OpenGLOwnedTextureFrame = OpenGLOwnedTextureFrame;
+module.exports.OpenGLTextureName = OpenGLTextureName;
 module.exports.NativePointer = NativePointer;
 module.exports.NativeBuffer = NativeBuffer;
 module.exports.RuntimeOptions = RuntimeOptions;

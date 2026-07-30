@@ -267,6 +267,7 @@ declare const offlineStatus: import("@maplibre/native-ffi-node/offline").Offline
 runtime.offlineRegionSetDownloadState(1n, offlineStatus);
 const queriedFeature: QueriedFeature = { feature: { type: "Feature" } };
 const json: JsonValue = { ok: true };
+const wideJsonInteger: JsonValue = 18_446_744_073_709_551_615n;
 void camera;
 void descriptor;
 void geometry;
@@ -302,3 +303,4 @@ void invalidKeyedFeatureSelector;
 void unknownOfflineDownloadState;
 void queriedFeature;
 void json;
+void wideJsonInteger;

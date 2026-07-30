@@ -1,4 +1,6 @@
 /// <reference lib="esnext.disposable" />
+/// <reference types="node" />
+
 export declare const MaplibreStatus: Readonly<{
   invalidArgument: "invalid-argument";
   invalidState: "invalid-state";
@@ -107,6 +109,7 @@ export interface RuntimeEvent {
   rawEventType: number;
   sourceType: string;
   rawSourceType: number;
+  sourceId: bigint;
   sourceMap: MapHandle | null;
   code: number;
   cameraChangeMode?: "immediate" | "animated" | "unknown" | null;
@@ -660,11 +663,20 @@ export type ResourceProviderCallback = (
 
 export declare class ResourceRequestHandle {
   private constructor(nativeHandle: unknown);
+  static fromTransfer(transfer: ResourceRequestTransfer): ResourceRequestHandle;
   readonly closed: boolean;
   complete(response?: ResourceResponseInput): void;
   cancelled(): boolean;
+  transfer(): ResourceRequestTransfer;
   close(): void;
   [Symbol.dispose](): void;
+}
+
+export interface ResourceRequestTransfer {
+  readonly kind: "resourceRequest";
+  readonly token: string;
+  readonly carrier: import("node:worker_threads").MessagePort;
+  cancel?(): void;
 }
 
 export declare class RuntimeHandle {
@@ -741,6 +753,7 @@ export declare class WakeSourceHandle {
 export interface WakeSourceTransfer {
   readonly kind: "wakeSource";
   readonly token: string;
+  readonly carrier: import("node:worker_threads").MessagePort;
   cancel?(): void;
 }
 
@@ -1003,13 +1016,20 @@ export declare class OpenGLOwnedTextureFrame {
   readonly height: number;
   readonly scaleFactor: number;
   readonly frameId: bigint;
-  readonly texture: number;
+  readonly texture: OpenGLTextureName;
   readonly target: number;
   readonly internalFormat: number;
   readonly format: number;
   readonly type: number;
   close(): void;
   [Symbol.dispose](): void;
+}
+
+export declare class OpenGLTextureName {
+  private constructor(value: number);
+  readonly value: number;
+  readonly isNull: boolean;
+  toString(): string;
 }
 
 export type FeatureStateSelector =
@@ -1081,6 +1101,7 @@ export type FeatureExtensionResult =
 export interface MapAttachReferenceTransfer {
   readonly kind: "mapAttachReference";
   readonly token: string;
+  readonly carrier: import("node:worker_threads").MessagePort;
   cancel?(): void;
 }
 
@@ -1445,13 +1466,15 @@ export interface ScreenPoint {
 /**
  * JavaScript-native JSON value used by structured JSON and GeoJSON APIs.
  *
- * Object member order, duplicate names, and integer precision follow
- * JavaScript JSON semantics. Use `MapHandle.setStyleJson(json: string)` for a
- * raw style document that must pass through without wrapper parsing.
+ * Unsafe JSON integers are represented as `bigint` and serialize as JSON
+ * number tokens. Object member order and duplicate names follow JavaScript
+ * JSON semantics. Use `MapHandle.setStyleJson(json: string)` for a raw style
+ * document that must pass through without wrapper parsing.
  */
 export type JsonValue =
   | null
   | boolean
+  | bigint
   | number
   | string
   | JsonValue[]

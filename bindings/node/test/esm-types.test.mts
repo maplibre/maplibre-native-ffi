@@ -20,6 +20,7 @@ import { RuntimeHandle } from "@maplibre/native-ffi-node/runtime";
 
 const options: RuntimeOptionsInput = { maximumCacheSize: 1024n };
 const json: JsonValue = { enabled: true, maxZoom: 12, tags: ["esm"] };
+const wideJsonInteger: JsonValue = 18_446_744_073_709_551_615n;
 const image: PremultipliedRgba8ImageInput = {
   width: 1,
   height: 1,
@@ -42,5 +43,6 @@ void ResourceRequestHandle;
 void RuntimeHandle;
 void options;
 void json;
+void wideJsonInteger;
 void image;
 void geometry;

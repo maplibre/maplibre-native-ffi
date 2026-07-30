@@ -3,6 +3,7 @@ export {
   NativeBuffer,
   NativePointer,
   OpenGLOwnedTextureFrame,
+  OpenGLTextureName,
   RenderedFeatureQueryOptions,
   RenderSessionHandle,
   MapAttachReference,

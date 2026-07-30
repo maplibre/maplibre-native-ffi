@@ -7,6 +7,7 @@ exports.MapAttachReference = root.MapAttachReference;
 exports.MetalOwnedTextureFrame = root.MetalOwnedTextureFrame;
 exports.VulkanOwnedTextureFrame = root.VulkanOwnedTextureFrame;
 exports.OpenGLOwnedTextureFrame = root.OpenGLOwnedTextureFrame;
+exports.OpenGLTextureName = root.OpenGLTextureName;
 exports.NativePointer = root.NativePointer;
 exports.NativeBuffer = root.NativeBuffer;
 exports.RenderedFeatureQueryOptions = root.RenderedFeatureQueryOptions;

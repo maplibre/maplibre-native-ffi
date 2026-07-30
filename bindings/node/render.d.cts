@@ -4,6 +4,7 @@ export {
   MetalOwnedTextureFrame,
   VulkanOwnedTextureFrame,
   OpenGLOwnedTextureFrame,
+  OpenGLTextureName,
   NativePointer,
   NativeBuffer,
   RenderedFeatureQueryOptions,

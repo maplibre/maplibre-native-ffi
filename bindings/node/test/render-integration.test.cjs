@@ -6,6 +6,7 @@ const test = require("node:test");
 const { Worker } = require("node:worker_threads");
 
 const {
+  InvalidStateError,
   NativePointer,
   RuntimeHandle,
   supportedOpenGLContextProviders,
@@ -177,6 +178,8 @@ test("configured backend renders and reads an owned texture through public JS", 
   });
   let session;
   let frame;
+  /** @type {import("..").OpenGLTextureName | undefined} */
+  let scopedOpenGLTexture;
 
   try {
     const fixture = nativeFixture.descriptor();
@@ -213,11 +216,19 @@ test("configured backend renders and reads an owned texture through public JS", 
       assert.equal(frameDetails.imageView.isNull, false);
       assert.equal(frameDetails.device.isNull, false);
     } else {
-      assert.notEqual(frameDetails.texture, 0);
+      const texture =
+        /** @type {import("..").OpenGLTextureName} */ (frameDetails.texture);
+      scopedOpenGLTexture = texture;
+      assert.equal(texture.isNull, false);
+      assert.notEqual(texture.value, 0);
     }
     frame.close();
     frame.close();
     assert.equal(frame.closed, true);
+    const retainedOpenGLTexture = scopedOpenGLTexture;
+    if (retainedOpenGLTexture != null) {
+      assert.throws(() => retainedOpenGLTexture.value, InvalidStateError);
+    }
   } finally {
     frame?.close();
     session?.close();
@@ -315,6 +326,7 @@ test("a worker attaches and owns a render session through a transferred map refe
         width: WIDTH,
         height: HEIGHT,
       },
+      transferList: [transfer.carrier],
     },
   );
 

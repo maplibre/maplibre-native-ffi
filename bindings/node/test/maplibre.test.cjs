@@ -28,6 +28,7 @@ const {
   MaplibreStatus,
   MetalOwnedTextureFrame,
   OpenGLOwnedTextureFrame,
+  OpenGLTextureName,
   NativeBuffer,
   NativePointer,
   OfflineOperationHandle,
@@ -694,7 +695,7 @@ test("retired custom geometry sources discard queued callbacks", () => {
       setStyleUrl() {},
       setStyleJson() {},
       releaseDetachedCustomGeometrySources() {
-        return ["before", "late"];
+        return ["before", "late", "failure"];
       },
     },
   });
@@ -717,11 +718,52 @@ test("retired custom geometry sources discard queued callbacks", () => {
   assert.equal(beforeUrlFetches, 1);
   assert.equal(lateUrlFetches, 1);
 
+  let failureFetches = 0;
+  urlMap.addCustomGeometrySource("failure", {
+    fetchTile() {
+      failureFetches += 1;
+    },
+  });
+  urlMap.setStyleUrl("custom://failed-replacement");
+  urlFetchBridges[2](null, { z: 0, x: 0, y: 0 });
+  assert.equal(failureFetches, 1);
+
   urlMap._finishStyleReplacement();
   urlFetchBridges[0](null, { z: 0, x: 0, y: 0 });
   urlFetchBridges[1](null, { z: 0, x: 0, y: 0 });
   assert.equal(beforeUrlFetches, 1);
   assert.equal(lateUrlFetches, 1);
+
+  const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  nativeAddon.createNativeRuntimeHandle =
+    /** @type {any} */ (
+      () => ({
+        closed: false,
+        close() {},
+        pollEvent() {
+          return {
+            eventType: "map-loading-failed",
+            rawEventType: 0,
+            sourceType: "map",
+            rawSourceType: 1,
+            sourceId: 123n,
+            code: 0,
+            payloadKind: "none",
+            payload: { kind: "none", rawType: 0 },
+          };
+        },
+      })
+    );
+  try {
+    const runtime = new RuntimeHandle();
+    /** @type {any} */ (runtime)._registerMapIdentityForTesting(urlMap, 123n);
+    runtime.pollEvent();
+    urlFetchBridges[2](null, { z: 0, x: 0, y: 0 });
+    assert.equal(failureFetches, 1);
+    runtime.close();
+  } finally {
+    nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
+  }
 
   /** @type {Function[]} */
   const jsonFetchBridges = [];
@@ -1103,6 +1145,33 @@ test("texture frame scopes expose borrowed pointers only while active", () => {
 
   assert.equal(typeof VulkanOwnedTextureFrame, "function");
   assert.equal(typeof OpenGLOwnedTextureFrame, "function");
+  assert.equal(typeof OpenGLTextureName, "function");
+  const openGLFrame =
+    RenderSessionHandle.prototype.acquireOpenGLOwnedTextureFrame.call({
+      native: {
+        closed: false,
+        acquireOpenGLOwnedTextureFrame() {
+          return {
+            generation: 1n,
+            width: 2,
+            height: 3,
+            scaleFactor: 1,
+            frameId: 7n,
+            texture: 42,
+            target: 0x0de1,
+            internalFormat: 0x8058,
+            format: 0x1908,
+            type: 0x1401,
+          };
+        },
+        releaseOpenGLOwnedTextureFrame() {},
+      },
+    });
+  const textureName = openGLFrame.texture;
+  assert.equal(textureName instanceof OpenGLTextureName, true);
+  assert.equal(textureName.value, 42);
+  openGLFrame.close();
+  assert.throws(() => textureName.value, InvalidStateError);
   assert.throws(
     () =>
       RenderSessionHandle.prototype.acquireVulkanOwnedTextureFrame.call({
@@ -1282,8 +1351,7 @@ test("wake sources move to workers and release an unbounded pump", async () => {
   const ownedTransfer = wakeSource.transfer();
   assert.match(ownedTransfer.token, /^[^:]+:[0-9a-f-]{36}:[0-9a-f-]{36}$/);
   assert.equal(typeof ownedTransfer.cancel, "function");
-  const transfer = structuredClone(ownedTransfer);
-  assert.equal(transfer.cancel, undefined);
+  assert.throws(() => structuredClone(ownedTransfer), /transfer/i);
   assert.equal(wakeSource.closed, true);
   const worker = new Worker(
     `
@@ -1308,8 +1376,9 @@ test("wake sources move to workers and release an unbounded pump", async () => {
       eval: true,
       workerData: {
         packageRoot: path.join(__dirname, ".."),
-        transfer,
+        transfer: ownedTransfer,
       },
+      transferList: [ownedTransfer.carrier],
     },
   );
 
@@ -1330,7 +1399,7 @@ test("map attach references move between N-API environments exactly once", async
   const runtime = new RuntimeHandle();
   const map = runtime.createMap();
   const localReference = map.attachReference();
-  const transfer = structuredClone(localReference.transfer());
+  const transfer = localReference.transfer();
   assert.equal(localReference.closed, true);
   const worker = new Worker(
     `
@@ -1344,11 +1413,12 @@ test("map attach references move between N-API environments exactly once", async
         } catch {
           consumed = true;
         }
+        const transfer = reference.transfer();
         parentPort.postMessage({
           ok: reference instanceof MapAttachReference,
           consumed,
-          transfer: reference.transfer(),
-        });
+          transfer,
+        }, [transfer.carrier]);
       } catch (error) {
         parentPort.postMessage({ ok: false, message: error?.message });
       }
@@ -1356,6 +1426,7 @@ test("map attach references move between N-API environments exactly once", async
     {
       eval: true,
       workerData: { packageRoot: path.join(__dirname, ".."), transfer },
+      transferList: [transfer.carrier],
     },
   );
 
@@ -1615,7 +1686,7 @@ test("offline operation events expose copied typed payloads", async () => {
   }
 });
 
-test("map events expose proven public map identity without native handle ids", async () => {
+test("map events expose live wrappers and copied source identities", async () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
 
@@ -1628,11 +1699,72 @@ test("map events expose proven public map identity without native handle ids", a
     });
     assert.equal(event.sourceType, "map");
     assert.equal(event.sourceMap, map);
-    assert.equal("sourceId" in event, false);
+    assert.equal(typeof event.sourceId, "bigint");
   } finally {
     map.close();
     runtime.close();
   }
+});
+
+test("map events retain source identity without a live wrapper", () => {
+  const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  nativeAddon.createNativeRuntimeHandle =
+    /** @type {any} */ (
+      () => ({
+        closed: false,
+        close() {},
+        pollEvent() {
+          return {
+            eventType: "map-render-update-available",
+            rawEventType: 0,
+            sourceType: "map",
+            rawSourceType: 1,
+            sourceId: 999n,
+            code: 0,
+            payloadKind: "none",
+            payload: { kind: "none", rawType: 0 },
+          };
+        },
+      })
+    );
+  try {
+    const runtime = new RuntimeHandle();
+    const event = runtime.pollEvent();
+    assert.equal(event?.sourceMap, null);
+    assert.equal(event?.sourceId, 999n);
+    runtime.close();
+  } finally {
+    nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
+  }
+});
+
+test("structured JSON preserves integers outside the safe number range", () => {
+  let serializedState;
+  const fakeMap = {
+    native: {
+      closed: false,
+      /** @param {unknown} _selector @param {string} state */
+      setFeatureState(_selector, state) {
+        serializedState = state;
+      },
+      getFeatureState() {
+        return '{"cluster_id":18446744073709551615,"signed":-9007199254740993}';
+      },
+    },
+  };
+  const selector = { sourceId: "clusters" };
+
+  RenderSessionHandle.prototype.setFeatureState.call(fakeMap, selector, {
+    cluster_id: 18446744073709551615n,
+  });
+  assert.equal(serializedState, '{"cluster_id":18446744073709551615}');
+  assert.deepEqual(
+    RenderSessionHandle.prototype.getFeatureState.call(fakeMap, selector),
+    {
+      cluster_id: 18446744073709551615n,
+      signed: -9007199254740993n,
+    },
+  );
 });
 
 test("resource provider routes validate Node handoff shape", async () => {
@@ -2073,6 +2205,96 @@ test("resource provider routes validate Node handoff shape", async () => {
       InvalidStateError,
     );
     assert.equal(staleHandle.closed, true);
+
+    nativeAddon.nativeResourceRequestComplete =
+      /**
+       * @param {string} completionToken
+       * @param {any} response
+       */
+      (completionToken, response) => {
+        completions.push({ completionToken, response });
+      };
+    /** @type {Array<(error: Error | null, request: any) => void>} */
+    const queuedBridges = [];
+    const providerOwner = {
+      native: {
+        closed: false,
+        /**
+         * @param {unknown[]} _routes
+         * @param {(error: Error | null, request: any) => void} callback
+         */
+        setResourceProviderRoutes(_routes, callback) {
+          queuedBridges.push(callback);
+        },
+      },
+    };
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      providerOwner,
+      [{ urlPrefix: "custom://" }],
+      () => assert.fail("replaced provider callback must not run"),
+    );
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      providerOwner,
+      [{ urlPrefix: "replacement://" }],
+      () => {},
+    );
+    queuedBridges[0](
+      null,
+      fakeResourceProviderRequest("resource-request:queued", "custom://queued"),
+    );
+    assert.deepEqual(completions.at(-1), {
+      completionToken: "resource-request:queued",
+      response: {
+        status: "error",
+        errorReason: "other",
+        errorMessage: "resource provider registration is no longer active",
+      },
+    });
+
+    /** @type {ResourceRequestHandle | undefined} */
+    let transferableHandle;
+    RuntimeHandle.prototype.setResourceProviderRoutes.call(
+      {
+        native: {
+          /**
+           * @param {unknown[]} _routes
+           * @param {(error: Error | null, request: any) => void} callback
+           */
+          setResourceProviderRoutes(_routes, callback) {
+            callback(
+              null,
+              fakeResourceProviderRequest(
+                "resource-request:transfer",
+                "custom://transfer",
+              ),
+            );
+          },
+        },
+      },
+      [{ urlPrefix: "custom://" }],
+      (request) => {
+        transferableHandle = request.handle;
+      },
+    );
+    assert.ok(transferableHandle);
+    const transferable =
+      /** @type {ResourceRequestHandle} */ (transferableHandle);
+    const outgoing = transferable.transfer();
+    assert.equal(transferable.closed, true);
+    assert.throws(() => structuredClone(outgoing), /transfer/i);
+    const incoming = structuredClone(outgoing, {
+      transfer: [outgoing.carrier],
+    });
+    const imported = ResourceRequestHandle.fromTransfer(incoming);
+    assert.throws(
+      () => ResourceRequestHandle.fromTransfer(incoming),
+      InvalidArgumentError,
+    );
+    imported.complete({ bytes: new Uint8Array([9]) });
+    assert.deepEqual(completions.at(-1), {
+      completionToken: "resource-request:transfer",
+      response: { bytes: new Uint8Array([9]) },
+    });
   } finally {
     nativeAddon.nativeResourceRequestComplete = originalComplete;
     nativeAddon.nativeResourceRequestClose = originalClose;
@@ -2093,7 +2315,7 @@ test("replaced and closed providers discard queued requests", () => {
   const bridges = [];
   /** @type {string[]} */
   const closedTokens = [];
-  nativeAddon.nativeResourceRequestClose = (token) => {
+  nativeAddon.nativeResourceRequestClose = (/** @type {string} */ token) => {
     closedTokens.push(token);
   };
   nativeAddon.createNativeRuntimeHandle =
@@ -2145,6 +2367,9 @@ test("replaced and closed providers discard queued requests", () => {
 
 test("runtime teardown closes pending resource request wrappers", () => {
   const originalCreateRuntime = nativeAddon.createNativeRuntimeHandle;
+  const originalCloseRequest = nativeAddon.nativeResourceRequestClose;
+  /** @type {string[]} */
+  const closedRequests = [];
   /** @type {undefined | ((error: Error | null, request: any) => void)} */
   let providerBridge;
   nativeAddon.createNativeRuntimeHandle =
@@ -2161,6 +2386,11 @@ test("runtime teardown closes pending resource request wrappers", () => {
         },
       })
     );
+  nativeAddon.nativeResourceRequestClose = (
+    /** @type {string} */ completionToken,
+  ) => {
+    closedRequests.push(completionToken);
+  };
 
   try {
     const runtime = new RuntimeHandle();
@@ -2180,15 +2410,17 @@ test("runtime teardown closes pending resource request wrappers", () => {
       ),
     );
     assert.ok(requestHandle);
-    const pendingHandle = requestHandle;
+    const pendingHandle = /** @type {ResourceRequestHandle} */ (requestHandle);
     assert.equal(pendingHandle.closed, false);
 
     runtime.close();
 
     assert.equal(pendingHandle.closed, true);
+    assert.deepEqual(closedRequests, ["resource-request:runtime-close"]);
     assert.throws(() => pendingHandle.cancelled(), InvalidStateError);
   } finally {
     nativeAddon.createNativeRuntimeHandle = originalCreateRuntime;
+    nativeAddon.nativeResourceRequestClose = originalCloseRequest;
   }
 });
 
@@ -2261,6 +2493,14 @@ test("runtime handle supports options, resource transform, explicit close, and i
 
 test("map handle retains runtime parent and closes before runtime", () => {
   const runtime = new RuntimeHandle();
+  assert.throws(
+    () => runtime.createMap(/** @type {any} */ (1)),
+    InvalidArgumentError,
+  );
+  assert.throws(
+    () => runtime.createMap(/** @type {any} */ ("invalid")),
+    InvalidArgumentError,
+  );
   const map = runtime.createMap({ width: 32, height: 32, scaleFactor: 1 });
 
   assert.equal(map instanceof MapHandle, true);
@@ -2954,7 +3194,7 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
         }),
       /JSON numbers must be finite/,
     );
-    for (const invalidValue of [undefined, () => {}, Symbol("invalid"), 1n]) {
+    for (const invalidValue of [undefined, () => {}, Symbol("invalid")]) {
       assert.throws(
         () =>
           map.addStyleSourceJson(
@@ -2985,6 +3225,23 @@ test("style JSON helpers serialize JavaScript values and copy booleans", () => {
         InvalidArgumentError,
       );
     }
+    assert.throws(
+      () =>
+        map.addStyleSourceJson("symbol-key", {
+          type: "geojson",
+          data: { [Symbol("id")]: 1, type: "FeatureCollection", features: [] },
+        }),
+      /symbol-keyed/,
+    );
+    assert.throws(
+      () =>
+        map.addGeoJsonSourceData(
+          "non-plain-cluster-options",
+          { type: "FeatureCollection", features: [] },
+          { clusterProperties: /** @type {any} */ (new Date(0)) },
+        ),
+      InvalidArgumentError,
+    );
     map.addCustomGeometrySource("custom-geometry", {
       fetchTile() {},
       cancelTile() {},
