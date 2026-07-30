@@ -27,7 +27,7 @@ rm -rf build/pdoc
 mkdir -p build/pdoc
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --group docs --no-sync \
-  pdoc maplibre_native -d markdown -o build/pdoc
+  pdoc maplibre_native -o build/pdoc
 '''
 run_windows = '''
 rm -rf build/pdoc
@@ -36,7 +36,7 @@ native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   uv run --project . --group docs --no-sync \
-  pdoc maplibre_native -d markdown -o build/pdoc
+  pdoc maplibre_native -o build/pdoc
 '''
 
 [tasks.test]
