@@ -151,7 +151,9 @@ repository-wide formatting defaults.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
-`docs/public/reference/` before each docs build.
+`docs/public/reference/` before each docs build. After main CI succeeds, the
+Snapshots workflow installs the CI-produced host native package and deploys the
+site to GitHub Pages, so the publish path does not rebuild MapLibre Native.
 
 ## Tests And Examples
 
