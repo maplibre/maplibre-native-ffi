@@ -487,16 +487,22 @@ MLN_API mln_status mln_map_get_style_source_info(
 /**
  * Copies one style source attribution string into caller-owned memory.
  *
- * source_id is borrowed for the call. out_attribution may be null only when
- * attribution_capacity is 0. On success, out_attribution_size receives the byte
- * length of the attribution, excluding any null terminator. When out_found is
- * false or the source has no attribution, out_attribution_size receives 0.
+ * source_id is borrowed for the call. On success, out_attribution_size receives
+ * the byte length of the attribution, excluding any null terminator. When
+ * out_found is false or the source has no attribution, out_attribution_size
+ * receives 0.
+ *
+ * Passing null for out_attribution with a capacity of 0 is a size probe: it
+ * reports the required byte length and succeeds, so a caller can size a buffer
+ * without treating the result as a failure. With a non-null out_attribution, a
+ * capacity smaller than the required length still reports that length and
+ * returns MLN_STATUS_INVALID_ARGUMENT.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK on success, including a size probe.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, source_id is
  *   invalid or empty, out_attribution is null with non-zero capacity,
- *   attribution_capacity is too small for a present attribution,
+ *   attribution_capacity is too small for a non-null buffer,
  *   out_attribution_size is null, or out_found is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
@@ -911,19 +917,21 @@ MLN_API mln_status mln_map_get_style_image_info(
 /**
  * Copies one runtime style image as tightly packed premultiplied RGBA8 pixels.
  *
- * image_id is borrowed for the call. out_pixels may be null only when
- * pixel_capacity is 0. On success, out_byte_length receives the required byte
- * length. When out_found is false, out_byte_length receives 0. If
- * pixel_capacity is too small for a present image, out_byte_length still
- * receives the required byte length and the function returns
+ * image_id is borrowed for the call. On success, out_byte_length receives the
+ * required byte length. When out_found is false, out_byte_length receives 0.
+ *
+ * Passing null for out_pixels with a capacity of 0 is a size probe: it reports
+ * the required byte length and succeeds, so a caller can size a buffer without
+ * treating the result as a failure. With a non-null out_pixels, a capacity
+ * smaller than the required length still reports that length and returns
  * MLN_STATUS_INVALID_ARGUMENT.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK on success, including a size probe.
  * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, image_id is
  *   invalid or empty, out_pixels is null with non-zero capacity, pixel_capacity
- *   is too small for a present image, out_byte_length is null, or out_found is
- *   null.
+ *   is too small for a non-null buffer, out_byte_length is null, or out_found
+ *   is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.

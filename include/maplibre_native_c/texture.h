@@ -481,15 +481,19 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * caller-owned storage.
  *
  * The copied image is premultiplied RGBA8 in physical pixels. The function
- * fills out_info with the required byte length and image layout metadata. When
- * out_data is null or out_data_capacity is too small, out_info is still filled
- * and the function returns MLN_STATUS_INVALID_ARGUMENT.
+ * fills out_info with the required byte length and image layout metadata.
+ *
+ * Passing null for out_data with a capacity of 0 is a size probe: out_info is
+ * filled and the call succeeds, so a caller can size a buffer without treating
+ * the result as a failure. Otherwise out_info is still filled when out_data is
+ * null or out_data_capacity is too small, and the function returns
+ * MLN_STATUS_INVALID_ARGUMENT.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK on success, including a size probe.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_info is
- *   null, out_info->size is too small, out_data is null, or out_data_capacity
- *   is too small.
+ *   null, out_info->size is too small, out_data is null with non-zero capacity,
+ *   or out_data_capacity is too small for a non-null buffer.
  * - MLN_STATUS_INVALID_STATE when no rendered frame is available, the session
  *   is detached, or a frame is currently acquired.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session

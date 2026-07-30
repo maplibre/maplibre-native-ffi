@@ -4002,6 +4002,11 @@ auto map_copy_style_source_attribution(
     return MLN_STATUS_OK;
   }
   *out_attribution_size = attribution->size();
+  // A null buffer with zero capacity is a size probe, so it reports the length
+  // and succeeds rather than sharing a status with a missing source.
+  if (out_attribution == nullptr) {
+    return MLN_STATUS_OK;
+  }
   if (attribution_capacity < attribution->size()) {
     set_thread_error("attribution_capacity is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4878,6 +4883,11 @@ auto map_copy_style_image_premultiplied_rgba8(
 
   const auto& pixels = image->getImage();
   *out_byte_length = pixels.bytes();
+  // A null buffer with zero capacity is a size probe, so it reports the length
+  // and succeeds rather than sharing a status with a missing image.
+  if (out_pixels == nullptr) {
+    return MLN_STATUS_OK;
+  }
   if (pixel_capacity < pixels.bytes()) {
     set_thread_error("pixel_capacity is too small");
     return MLN_STATUS_INVALID_ARGUMENT;

@@ -99,6 +99,11 @@ auto texture_read_premultiplied_rgba8(
     .byte_length = byte_length
   };
 
+  // A null buffer with zero capacity is a size probe: out_info already carries
+  // the required byte length, so report it and succeed.
+  if (out_data == nullptr && out_data_capacity == 0) {
+    return MLN_STATUS_OK;
+  }
   if (out_data == nullptr || out_data_capacity < byte_length) {
     set_thread_error("out_data capacity is too small");
     return MLN_STATUS_INVALID_ARGUMENT;

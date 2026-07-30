@@ -650,6 +650,81 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// This verifies the copy-out family answers a null buffer with zero capacity as
+// a size probe, so a caller can size a buffer without reading it as a failure.
+static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK,
+    mln_map_set_style_json(
+      map,
+      "{\"version\":8,\"sources\":{\"vec\":{\"type\":\"vector\","
+      "\"attribution\":\"probe\","
+      "\"tiles\":[\"https://example.com/{z}/{x}/{y}.mvt\"]}},\"layers\":[]}"
+    )
+  );
+
+  // Source attribution reports its length and succeeds.
+  const mln_string_view source_id = MLN_STRING_LITERAL("vec");
+  size_t attribution_size = 0;
+  bool found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_source_attribution(
+                     map, source_id, NULL, 0, &attribution_size, &found
+                   )
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_size_t(5, attribution_size);
+
+  // A non-null buffer that is too small still reports the length and fails.
+  char too_small[2] = {0};
+  attribution_size = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_source_attribution(
+      map, source_id, too_small, sizeof(too_small), &attribution_size, &found
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(5, attribution_size);
+
+  // Image pixels report their byte length and succeed.
+  const uint8_t pixels[4] = {0};
+  mln_premultiplied_rgba8_image image = mln_premultiplied_rgba8_image_default();
+  image.width = 1;
+  image.height = 1;
+  image.stride = 4;
+  image.pixels = pixels;
+  image.byte_length = sizeof(pixels);
+  const mln_string_view image_id = MLN_STRING_LITERAL("dot");
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_image(map, image_id, &image, NULL)
+  );
+
+  size_t byte_length = 0;
+  found = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_copy_style_image_premultiplied_rgba8(
+                     map, image_id, NULL, 0, &byte_length, &found
+                   )
+  );
+  TEST_ASSERT_TRUE(found);
+  TEST_ASSERT_EQUAL_size_t(4, byte_length);
+
+  uint8_t small_pixels[2] = {0};
+  byte_length = 0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_copy_style_image_premultiplied_rgba8(
+      map, image_id, small_pixels, sizeof(small_pixels), &byte_length, &found
+    )
+  );
+  TEST_ASSERT_EQUAL_size_t(4, byte_length);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
@@ -660,4 +735,5 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(layer_text_accessors_report_required_capacity);
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
+  RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
 }
