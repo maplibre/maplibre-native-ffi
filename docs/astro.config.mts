@@ -66,6 +66,11 @@ export default defineConfig({
               link: "/reference/kotlin/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
+            {
+              label: "Dart API",
+              link: "/reference/dart/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {
