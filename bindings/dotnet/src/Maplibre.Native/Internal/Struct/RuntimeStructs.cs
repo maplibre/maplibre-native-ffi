@@ -18,7 +18,7 @@ internal static unsafe class RuntimeStructs
     internal static RuntimeEvent ReadEvent(
         in mln_runtime_event raw,
         RuntimeHandle? runtimeSource,
-        Func<nint, MapHandle?> mapSource
+        Func<ulong, MapHandle?> mapSource
     )
     {
         var sourceType = (RuntimeEventSourceType)raw.source_type;
@@ -28,7 +28,7 @@ internal static unsafe class RuntimeStructs
             sourceType,
             raw.source_type,
             sourceType == RuntimeEventSourceType.Runtime ? runtimeSource : null,
-            sourceType == RuntimeEventSourceType.Map ? mapSource((nint)raw.source) : null,
+            sourceType == RuntimeEventSourceType.Map ? mapSource(raw.source) : null,
             raw.code,
             raw.payload_type,
             ReadPayload(raw.payload_type, raw.payload, raw.payload_size),

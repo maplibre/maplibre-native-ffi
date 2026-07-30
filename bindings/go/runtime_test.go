@@ -34,11 +34,11 @@ func TestRuntimeCreationRejectsABIMismatchBeforeNativeCreateOrHandleStore(t *tes
 
 	runtime, err := createRuntimeWithStateFactory(
 		ExpectedCABIVersion+1,
-		func(out **nativeRuntime) int32 {
+		func(out *nativeRuntime) int32 {
 			createCalled = true
 			return 0
 		},
-		func(runtime *nativeRuntime) (*handle.State[nativeRuntime], error) {
+		func(runtime nativeRuntime) (*handle.State[nativeRuntime], error) {
 			storeCalled = true
 			return nil, nil
 		},

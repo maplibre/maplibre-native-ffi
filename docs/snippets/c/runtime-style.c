@@ -8,7 +8,7 @@ static mln_string_view sv(const char* text) {
   return (mln_string_view){.data = text, .size = strlen(text)};
 }
 
-void add_cities_layer(mln_map* map, const char* geojson_url) {
+void add_cities_layer(mln_map map, const char* geojson_url) {
   // Null options takes the defaults.
   mln_map_add_geojson_source_url(map, sv("cities"), sv(geojson_url), NULL);
 
@@ -50,7 +50,7 @@ void add_cities_layer(mln_map* map, const char* geojson_url) {
   mln_map_set_layer_property(map, sv("cities"), sv("circle-radius"), &radius);
 }
 
-void refresh_cities(mln_map* map, const char* new_url) {
+void refresh_cities(mln_map map, const char* new_url) {
   // The source already exists, so this is a set, not an add.
   mln_map_set_geojson_source_url(map, sv("cities"), sv(new_url));
 }

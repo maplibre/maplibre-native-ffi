@@ -7,6 +7,7 @@ import java.lang.invoke.MethodHandles
 import java.lang.invoke.MethodType
 import org.maplibre.nativeffi.internal.c.mln_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_resource_provider_callback
+import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceRequestHandle
@@ -29,7 +30,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
             Int::class.javaPrimitiveType,
             MemorySegment::class.java,
             MemorySegment::class.java,
-            MemorySegment::class.java,
+            Long::class.javaPrimitiveType,
           ),
         )
         .bindTo(this)
@@ -43,8 +44,9 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
   fun descriptor(): MemorySegment = descriptor
 
   @Suppress("UNUSED_PARAMETER")
-  fun invoke(userData: MemorySegment, request: MemorySegment, handle: MemorySegment): Int {
-    if (request == MemorySegment.NULL || handle == MemorySegment.NULL) return UNKNOWN_DECISION
+  fun invoke(userData: MemorySegment, request: MemorySegment, rawHandle: Long): Int {
+    if (request == MemorySegment.NULL || rawHandle == 0L) return UNKNOWN_DECISION
+    val handle = NativeResourceRequest(rawHandle)
     val lease = gate.enter() ?: return UNKNOWN_DECISION
     var requestHandle: ResourceRequestHandle? = null
     return try {

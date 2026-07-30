@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.map
 
-import cnames.structs.mln_map_projection
-import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -23,6 +21,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_coordina
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_geometry
 import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
+import org.maplibre.nativeffi.internal.lifecycle.NativeMapProjection
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
@@ -30,21 +30,24 @@ import org.maplibre.nativeffi.internal.struct.ValueStructs
 
 /** Owned standalone projection snapshot created from a map. */
 @OptIn(ExperimentalForeignApi::class)
-public actual class MapProjectionHandle internal constructor(handle: CPointer<mln_map_projection>) :
+public actual class MapProjectionHandle internal constructor(handle: NativeMapProjection) :
   AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
 
   public actual val camera: CameraOptions
     get() = memScoped {
       val outCamera = mln_camera_options_default().getPointer(this)
-      Status.check(mln_map_projection_get_camera(state.requireLive(), outCamera))
+      Status.check(mln_map_projection_get_camera(state.requireLive().rawHandleValue, outCamera))
       MapStructs.cameraOptions(outCamera.pointed)
     }
 
   public actual fun setCamera(camera: CameraOptions) {
     memScoped {
       Status.check(
-        mln_map_projection_set_camera(state.requireLive(), MapStructs.cameraOptions(camera, this))
+        mln_map_projection_set_camera(
+          state.requireLive().rawHandleValue,
+          MapStructs.cameraOptions(camera, this),
+        )
       )
     }
   }
@@ -54,7 +57,7 @@ public actual class MapProjectionHandle internal constructor(handle: CPointer<ml
     memScoped {
       Status.check(
         mln_map_projection_set_visible_coordinates(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           CoreStructs.latLngArray(coordinateSnapshot, this),
           coordinateSnapshot.size.toULong(),
           CoreStructs.edgeInsets(padding),
@@ -67,7 +70,7 @@ public actual class MapProjectionHandle internal constructor(handle: CPointer<ml
     memScoped {
       Status.check(
         mln_map_projection_set_visible_geometry(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           ValueStructs.geometry(geometry, this),
           CoreStructs.edgeInsets(padding),
         )
@@ -79,7 +82,7 @@ public actual class MapProjectionHandle internal constructor(handle: CPointer<ml
     val outPoint = alloc<mln_screen_point>()
     Status.check(
       mln_map_projection_pixel_for_lat_lng(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.latLng(coordinate),
         outPoint.ptr,
       )
@@ -91,7 +94,7 @@ public actual class MapProjectionHandle internal constructor(handle: CPointer<ml
     val outCoordinate = alloc<mln_lat_lng>()
     Status.check(
       mln_map_projection_lat_lng_for_pixel(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.screenPoint(point),
         outCoordinate.ptr,
       )
@@ -100,13 +103,13 @@ public actual class MapProjectionHandle internal constructor(handle: CPointer<ml
   }
 
   public actual override fun close() {
-    state.closeOnce(::mln_map_projection_destroy)
+    state.closeOnce { handle -> mln_map_projection_destroy(handle.rawHandleValue) }
   }
 
   public actual val isClosed: Boolean
     get() = state.isReleased()
 
-  internal fun nativeHandle(): CPointer<mln_map_projection> = state.requireLive()
+  internal fun nativeHandle(): NativeMapProjection = state.requireLive()
 
-  internal fun nativeAddress(): Long = state.address()
+  internal fun nativeHandleId(): Long = state.handleId()
 }

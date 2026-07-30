@@ -46,7 +46,7 @@ impl ResourceRequestHandle {
     }
 
     fn from_raw_with_fns(
-        handle: *mut sys::mln_resource_request_handle,
+        handle: sys::mln_resource_request_handle,
         fns: ResourceRequestHandleFns,
     ) -> Result<Self> {
         // SAFETY: handle is received from the resource-provider C callback and
@@ -125,7 +125,7 @@ impl ResourceProviderState {
     fn invoke(
         &self,
         request: *const sys::mln_resource_request,
-        handle: *mut sys::mln_resource_request_handle,
+        handle: sys::mln_resource_request_handle,
     ) -> u32 {
         let Some(raw_request) = ptr::NonNull::new(request.cast_mut()) else {
             return UNKNOWN_PROVIDER_DECISION;
@@ -153,7 +153,7 @@ impl ResourceProviderState {
 unsafe extern "C" fn resource_provider_trampoline(
     user_data: *mut c_void,
     request: *const sys::mln_resource_request,
-    handle: *mut sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request_handle,
 ) -> u32 {
     let Some(state) = ptr::NonNull::new(user_data.cast::<ResourceProviderState>()) else {
         return UNKNOWN_PROVIDER_DECISION;
@@ -280,7 +280,7 @@ mod tests {
     static COMPLETE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
 
     unsafe extern "C" fn fake_complete(
-        _handle: *mut sys::mln_resource_request_handle,
+        _handle: sys::mln_resource_request_handle,
         _response: *const sys::mln_resource_response,
     ) -> sys::mln_status {
         COMPLETE_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -288,7 +288,7 @@ mod tests {
     }
 
     unsafe extern "C" fn fake_cancelled(
-        _handle: *const sys::mln_resource_request_handle,
+        _handle: sys::mln_resource_request_handle,
         out_cancelled: *mut bool,
     ) -> sys::mln_status {
         CANCELLED_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -300,7 +300,7 @@ mod tests {
         sys::MLN_STATUS_OK
     }
 
-    unsafe extern "C" fn fake_release(_handle: *mut sys::mln_resource_request_handle) {
+    unsafe extern "C" fn fake_release(_handle: sys::mln_resource_request_handle) {
         RELEASE_COUNT.fetch_add(1, Ordering::SeqCst);
     }
 
@@ -320,8 +320,10 @@ mod tests {
 
     fn fake_handle() -> ResourceRequestHandle {
         reset_fake_handle_state();
+        // A synthetic request handle: it reaches only the fake functions above,
+        // never the C API, and the safe public API cannot build one.
         ResourceRequestHandle::from_raw_with_fns(
-            0x1234usize as *mut sys::mln_resource_request_handle,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
             fake_fns(),
         )
         .unwrap()
@@ -394,7 +396,7 @@ mod tests {
 
         let decision = state.invoke(
             &raw_request,
-            0x1234usize as *mut sys::mln_resource_request_handle,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
         );
 
         assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
@@ -418,7 +420,7 @@ mod tests {
 
         let decision = state.invoke(
             &raw_request,
-            0x1234usize as *mut sys::mln_resource_request_handle,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
         );
         let handle = receiver.recv().unwrap();
 
@@ -449,7 +451,7 @@ mod tests {
 
         let decision = state.invoke(
             &raw_request,
-            0x1234usize as *mut sys::mln_resource_request_handle,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
         );
 
         assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE);
@@ -613,7 +615,7 @@ mod tests {
 
         let decision = state.invoke(
             &raw_request,
-            0x1234usize as *mut sys::mln_resource_request_handle,
+            sys::mln_resource_request_handle(0x0c00_0000_0000_0034),
         );
 
         assert_eq!(decision, UNKNOWN_PROVIDER_DECISION);

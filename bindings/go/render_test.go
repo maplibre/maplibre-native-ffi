@@ -103,12 +103,12 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 }
 
 func TestMapCloseFailsWhileRenderSessionIsLive(t *testing.T) {
-	mapState, err := handle.New(&nativeMap{}, "MapHandle")
+	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, &nativeRenderSession{})
+	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
 	if err != nil {
 		t.Fatalf("newRenderSessionHandle(): %v", err)
 	}
@@ -121,11 +121,11 @@ func TestMapCloseFailsWhileRenderSessionIsLive(t *testing.T) {
 	}()
 	var mapDestroyCalls atomic.Int32
 	var sessionDestroyCalls atomic.Int32
-	destroyMapHandle = func(*nativeMap) int32 {
+	destroyMapHandle = func(nativeMap) int32 {
 		mapDestroyCalls.Add(1)
 		return 0
 	}
-	destroyRenderSessionHandle = func(*nativeRenderSession) int32 {
+	destroyRenderSessionHandle = func(nativeRenderSession) int32 {
 		sessionDestroyCalls.Add(1)
 		return 0
 	}
@@ -151,12 +151,12 @@ func TestMapCloseFailsWhileRenderSessionIsLive(t *testing.T) {
 }
 
 func TestMapCloseSucceedsAfterRenderSessionDetach(t *testing.T) {
-	mapState, err := handle.New(&nativeMap{}, "MapHandle")
+	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, &nativeRenderSession{})
+	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
 	if err != nil {
 		t.Fatalf("newRenderSessionHandle(): %v", err)
 	}
@@ -172,15 +172,15 @@ func TestMapCloseSucceedsAfterRenderSessionDetach(t *testing.T) {
 	var mapDestroyCalls atomic.Int32
 	var sessionDestroyCalls atomic.Int32
 	var detachCalls atomic.Int32
-	destroyMapHandle = func(*nativeMap) int32 {
+	destroyMapHandle = func(nativeMap) int32 {
 		mapDestroyCalls.Add(1)
 		return 0
 	}
-	destroyRenderSessionHandle = func(*nativeRenderSession) int32 {
+	destroyRenderSessionHandle = func(nativeRenderSession) int32 {
 		sessionDestroyCalls.Add(1)
 		return 0
 	}
-	detachRenderSessionHandle = func(*nativeRenderSession) int32 {
+	detachRenderSessionHandle = func(nativeRenderSession) int32 {
 		detachCalls.Add(1)
 		return 0
 	}
@@ -209,12 +209,12 @@ func TestMapCloseSucceedsAfterRenderSessionDetach(t *testing.T) {
 func newActiveFrameTestSession(t *testing.T) *RenderSessionHandle {
 	t.Helper()
 
-	mapState, err := handle.New(&nativeMap{}, "MapHandle")
+	mapState, err := handle.New(nativeMap(0x0200_0000_0000_002a), "MapHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
 	m := &MapHandle{state: mapState}
-	session, err := newRenderSessionHandle(m, &nativeRenderSession{})
+	session, err := newRenderSessionHandle(m, nativeRenderSession(0x0400_0000_0000_002a))
 	if err != nil {
 		t.Fatalf("newRenderSessionHandle(): %v", err)
 	}
@@ -222,8 +222,8 @@ func newActiveFrameTestSession(t *testing.T) *RenderSessionHandle {
 
 	oldDestroyMap := destroyMapHandle
 	oldDestroySession := destroyRenderSessionHandle
-	destroyMapHandle = func(*nativeMap) int32 { return 0 }
-	destroyRenderSessionHandle = func(*nativeRenderSession) int32 { return 0 }
+	destroyMapHandle = func(nativeMap) int32 { return 0 }
+	destroyRenderSessionHandle = func(nativeRenderSession) int32 { return 0 }
 	t.Cleanup(func() {
 		session.frame = false
 		if err := session.Close(); err != nil {

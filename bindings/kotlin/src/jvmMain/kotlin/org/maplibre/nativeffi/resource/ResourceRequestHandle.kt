@@ -1,14 +1,14 @@
 package org.maplibre.nativeffi.resource
 
-import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.internal.lifecycle.NativeResourceRequest
 import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned JVM FFM handle for a resource provider request. */
-public actual class ResourceRequestHandle internal constructor(private val handle: MemorySegment) :
-  AutoCloseable {
+public actual class ResourceRequestHandle
+internal constructor(private val handle: NativeResourceRequest) : AutoCloseable {
   private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handle))
 
   init {
@@ -72,7 +72,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
   }
 
   /** Native release that holds the handle segment alone, keeping the wrapper collectable. */
-  private class ReleaseNativeRequest(private val handle: MemorySegment) : () -> Unit {
+  private class ReleaseNativeRequest(private val handle: NativeResourceRequest) : () -> Unit {
     override fun invoke() {
       NativeAccess.releaseResourceRequest(handle)
     }

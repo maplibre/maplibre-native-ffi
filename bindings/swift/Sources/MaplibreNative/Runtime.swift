@@ -81,17 +81,26 @@ public enum RuntimeEventType: Sendable, Hashable {
   }
 }
 
+/// Identifies one map for the life of the process.
+///
+/// This is an identity value, not a handle: it grants no access to the map and
+/// cannot be built from an integer in the safe API. It is also distinct from
+/// ``NativePointer``, which borrows a backend-native address.
+public struct MapId: Hashable, Sendable {
+  /// The handle id the C API issued for this map.
+  public let value: UInt64
+}
+
 public enum RuntimeEventSource: Equatable, Sendable {
   case runtime
-  case map(NativePointer)
-  case unknown(sourceType: UInt32, source: NativePointer)
+  case map(MapId)
+  case unknown(sourceType: UInt32, source: UInt64)
 
-  static func fromNative(sourceType: UInt32, sourceAddress: UInt) -> Self {
-    let source = NativePointer(bitPattern: sourceAddress)
+  static func fromNative(sourceType: UInt32, sourceId: UInt64) -> Self {
     switch sourceType {
     case 0: return .runtime
-    case 1: return .map(source)
-    default: return .unknown(sourceType: sourceType, source: source)
+    case 1: return .map(MapId(value: sourceId))
+    default: return .unknown(sourceType: sourceType, source: sourceId)
     }
   }
 }
@@ -380,7 +389,7 @@ public struct RuntimeEvent: Equatable, Sendable {
     type = RuntimeEventType.fromNative(native.type)
     source = RuntimeEventSource.fromNative(
       sourceType: native.sourceType,
-      sourceAddress: native.sourceAddress
+      sourceId: native.sourceId
     )
     code = native.code
     message = native.message
@@ -389,17 +398,17 @@ public struct RuntimeEvent: Equatable, Sendable {
 }
 
 public final class RuntimeHandle {
-  private let handle: NativeHandleBox
+  private let handle: NativeHandleBox<NativeRuntimeHandle>
   private var resourceTransform: NativeResourceTransformState?
   private var resourceProvider: NativeResourceProviderState?
 
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
-    let pointer = try mapNativeFailure {
+    let runtime = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
         try NativeRuntime.create(nativeOptions)
       }
     }
-    handle = try NativeHandleBox(typeName: "RuntimeHandle", pointer: pointer)
+    handle = try NativeHandleBox(typeName: "RuntimeHandle", handle: runtime)
   }
 
   public var isClosed: Bool {
@@ -407,14 +416,14 @@ public final class RuntimeHandle {
   }
 
   public func close() throws {
-    try handle.closeOnce { pointer in
-      try checkStatus(mln_runtime_destroy(pointer))
+    try handle.closeOnce { handle in
+      try checkStatus(mln_runtime_destroy(handle.raw))
     }
     resourceTransform = nil
     resourceProvider = nil
   }
 
-  func requireLivePointer() throws -> OpaquePointer {
+  func requireLiveHandle() throws -> NativeRuntimeHandle {
     try handle.requireLive()
   }
 
@@ -457,7 +466,7 @@ public final class RuntimeHandle {
         timeoutMilliseconds = -1
       }
       try checkStatus(
-        mln_runtime_pump(handle.requireLive(), timeoutMilliseconds)
+        mln_runtime_pump(handle.requireLive().raw, timeoutMilliseconds)
       )
     }
   }
@@ -466,12 +475,12 @@ public final class RuntimeHandle {
   /// The returned source is usable from any thread, and the caller closes it.
   public func wakeSource() throws -> WakeSource {
     try mapNativeFailure {
-      var source: OpaquePointer?
+      var source = mln_wake_source()
       try checkStatus(mln_runtime_wake_source_acquire(
-        handle.requireLive(),
+        handle.requireLive().raw,
         &source
       ))
-      return try WakeSource(pointer: source)
+      return try WakeSource(handle: NativeWakeSourceHandle(raw: source))
     }
   }
 
@@ -504,7 +513,7 @@ public final class RuntimeHandle {
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
         try checkStatus(mln_runtime_set_resource_transform(
-          handle.requireLive(),
+          handle.requireLive().raw,
           descriptor
         ))
       }
@@ -515,7 +524,7 @@ public final class RuntimeHandle {
   public func clearResourceTransform() throws {
     try mapNativeFailure {
       try checkStatus(mln_runtime_clear_resource_transform(handle
-          .requireLive()))
+          .requireLive().raw))
     }
     resourceTransform = nil
   }
@@ -538,7 +547,7 @@ public final class RuntimeHandle {
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
         try checkStatus(mln_runtime_set_resource_provider(
-          handle.requireLive(),
+          handle.requireLive().raw,
           descriptor
         ))
       }
@@ -549,7 +558,7 @@ public final class RuntimeHandle {
   public func clearResourceProvider() throws {
     try mapNativeFailure {
       try checkStatus(mln_runtime_clear_resource_provider(handle
-          .requireLive()))
+          .requireLive().raw))
     }
     resourceProvider = nil
   }

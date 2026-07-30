@@ -122,7 +122,7 @@ public sealed unsafe class RuntimeEventTests
         var raw = RuntimeStructs.EmptyNativeEvent();
         raw.type = (uint)mln_runtime_event_type.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED;
         raw.source_type = (uint)mln_runtime_event_source_type.MLN_RUNTIME_EVENT_SOURCE_MAP;
-        raw.source = (void*)1234;
+        raw.source = SyntheticHandles.Map(1234).Value;
 
         var copied = RuntimeStructs.ReadEvent(raw, null, _ => null);
 

@@ -2,7 +2,7 @@
 
 #include "maplibre_native_c.h"
 
-struct mln_render_session;
+struct mln_render_session_object;
 
 namespace mln::core {
 
@@ -13,16 +13,16 @@ auto vulkan_surface_descriptor_default() noexcept
 auto opengl_surface_descriptor_default() noexcept
   -> mln_opengl_surface_descriptor;
 auto metal_surface_attach(
-  mln_map* map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status;
 auto vulkan_surface_attach(
-  mln_map* map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status;
 auto opengl_surface_attach(
-  mln_map* map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status;
 
 }  // namespace mln::core

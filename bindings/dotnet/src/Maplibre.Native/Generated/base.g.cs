@@ -21,42 +21,6 @@ namespace Maplibre.Native.Internal.C
         MLN_RENDER_BACKEND_FLAG_OPENGL = 1U << 2,
     }
 
-    internal partial struct mln_runtime
-    {
-    }
-
-    internal partial struct mln_map
-    {
-    }
-
-    internal partial struct mln_map_projection
-    {
-    }
-
-    internal partial struct mln_offline_region_snapshot
-    {
-    }
-
-    internal partial struct mln_offline_region_list
-    {
-    }
-
-    internal partial struct mln_json_snapshot
-    {
-    }
-
-    internal partial struct mln_resource_request_handle
-    {
-    }
-
-    internal partial struct mln_render_session
-    {
-    }
-
-    internal partial struct mln_wake_source
-    {
-    }
-
     internal static partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

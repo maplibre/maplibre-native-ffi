@@ -22,7 +22,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
       override fun call(
         userData: Pointer?,
         request: MaplibreNativeC.mln_resource_request?,
-        handle: MaplibreNativeC.mln_resource_request_handle?,
+        handle: Long,
       ): Int = invoke(request, handle)
     }
   private val provider = MaplibreNativeC.mln_resource_provider()
@@ -35,15 +35,12 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   fun descriptor(): MaplibreNativeC.mln_resource_provider = provider
 
-  fun invoke(
-    request: MaplibreNativeC.mln_resource_request?,
-    handle: MaplibreNativeC.mln_resource_request_handle?,
-  ): Int {
-    if (request == null || handle == null || handle.isNull) return UNKNOWN_DECISION
+  fun invoke(request: MaplibreNativeC.mln_resource_request?, handle: Long): Int {
+    if (request == null || handle == 0L) return UNKNOWN_DECISION
     val lease = gate.enter() ?: return UNKNOWN_DECISION
     var requestHandle: ResourceRequestHandle? = null
     return try {
-      requestHandle = ResourceRequestHandle(handle.address())
+      requestHandle = ResourceRequestHandle(handle)
       val decision = callback.handle(resourceRequest(request), requestHandle)
       requestHandle.finishProviderDecision(decision)
     } catch (_: Throwable) {

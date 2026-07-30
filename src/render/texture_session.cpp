@@ -23,24 +23,28 @@ auto texture_image_info_default() noexcept -> mln_texture_image_info {
   };
 }
 
-auto validate_texture(mln_render_session* texture) -> mln_status {
-  const auto status = validate_render_session(texture);
+auto validate_texture(
+  mln_render_session texture, mln_render_session_object*& out_texture
+) -> mln_status {
+  const auto status = validate_render_session(texture, out_texture);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (texture->kind != RenderSessionKind::Texture) {
+  if (out_texture->kind != RenderSessionKind::Texture) {
     set_thread_error("render session is not a texture session");
     return MLN_STATUS_UNSUPPORTED;
   }
   return MLN_STATUS_OK;
 }
 
-auto validate_live_attached_texture(mln_render_session* texture) -> mln_status {
-  const auto status = validate_texture(texture);
+auto validate_live_attached_texture(
+  mln_render_session texture, mln_render_session_object*& out_texture
+) -> mln_status {
+  const auto status = validate_texture(texture, out_texture);
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (!texture->attached || texture->texture.backend == nullptr) {
+  if (!out_texture->attached || out_texture->texture.backend == nullptr) {
     set_thread_error("render session is detached");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -48,10 +52,11 @@ auto validate_live_attached_texture(mln_render_session* texture) -> mln_status {
 }
 
 auto texture_read_premultiplied_rgba8(
-  mln_render_session* texture, uint8_t* out_data, size_t out_data_capacity,
+  mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info
 ) -> mln_status {
-  const auto status = validate_live_attached_texture(texture);
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_texture(texture, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
@@ -59,38 +64,37 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("out_info must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (texture->texture.acquired) {
+  if (live->texture.acquired) {
     set_thread_error("cannot read while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (texture->texture.mode != TextureSessionMode::Owned) {
+  if (live->texture.mode != TextureSessionMode::Owned) {
     set_thread_error("texture session does not support CPU readback");
     return MLN_STATUS_UNSUPPORTED;
   }
-  if (texture->rendered_generation != texture->generation) {
+  if (live->rendered_generation != live->generation) {
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (texture->physical_width > std::numeric_limits<uint32_t>::max() / 4) {
+  if (live->physical_width > std::numeric_limits<uint32_t>::max() / 4) {
     set_thread_error("texture readback stride is too large");
     return MLN_STATUS_INVALID_STATE;
   }
 
-  const auto stride = texture->physical_width * 4;
+  const auto stride = live->physical_width * 4;
   if (
-    texture->physical_height != 0 &&
-    stride > std::numeric_limits<size_t>::max() / texture->physical_height
+    live->physical_height != 0 &&
+    stride > std::numeric_limits<size_t>::max() / live->physical_height
   ) {
     set_thread_error("texture readback byte length is too large");
     return MLN_STATUS_INVALID_STATE;
   }
-  const auto byte_length =
-    static_cast<size_t>(stride) * texture->physical_height;
+  const auto byte_length = static_cast<size_t>(stride) * live->physical_height;
 
   *out_info = mln_texture_image_info{
     .size = sizeof(mln_texture_image_info),
-    .width = texture->physical_width,
-    .height = texture->physical_height,
+    .width = live->physical_width,
+    .height = live->physical_height,
     .stride = stride,
     .byte_length = byte_length
   };
@@ -100,21 +104,21 @@ auto texture_read_premultiplied_rgba8(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* renderer_backend = texture->texture.backend->renderer_backend();
+  auto* renderer_backend = live->texture.backend->renderer_backend();
   if (renderer_backend == nullptr) {
     set_thread_error("texture session renderer backend is not available");
     return MLN_STATUS_NATIVE_ERROR;
   }
-  auto current = ScopedCurrentScheduler{texture->scheduler};
+  auto current = ScopedCurrentScheduler{live->scheduler};
   auto guard = mbgl::gfx::BackendScope{*renderer_backend};
-  auto image = texture->texture.backend->headless_backend().readStillImage();
+  auto image = live->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {
     set_thread_error("texture readback did not produce an image");
     return MLN_STATUS_NATIVE_ERROR;
   }
   if (
-    image.size.width != texture->physical_width ||
-    image.size.height != texture->physical_height || image.stride() != stride ||
+    image.size.width != live->physical_width ||
+    image.size.height != live->physical_height || image.stride() != stride ||
     image.bytes() != byte_length
   ) {
     set_thread_error("texture readback image layout did not match the session");

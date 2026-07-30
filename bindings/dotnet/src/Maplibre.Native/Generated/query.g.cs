@@ -2,14 +2,6 @@ using System.Runtime.InteropServices;
 
 namespace Maplibre.Native.Internal.C
 {
-    internal partial struct mln_feature_query_result
-    {
-    }
-
-    internal partial struct mln_feature_extension_result
-    {
-    }
-
     [NativeTypeName("uint32_t")]
     internal enum mln_rendered_query_geometry_type : uint
     {
@@ -181,27 +173,27 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_rendered_query_geometry mln_rendered_query_geometry_line_string([NativeTypeName("const mln_screen_point *")] mln_screen_point* points, [NativeTypeName("size_t")] nuint point_count);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_rendered_features(mln_render_session* session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, mln_feature_query_result** out_result);
+        public static extern mln_status mln_render_session_query_rendered_features([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_rendered_query_geometry *")] mln_rendered_query_geometry* geometry, [NativeTypeName("const mln_rendered_feature_query_options *")] mln_rendered_feature_query_options* options, [NativeTypeName("mln_feature_query_result *")] MlnFeatureQueryResult* out_result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_source_features(mln_render_session* session, mln_string_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, mln_feature_query_result** out_result);
+        public static extern mln_status mln_render_session_query_source_features([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_string_view source_id, [NativeTypeName("const mln_source_feature_query_options *")] mln_source_feature_query_options* options, [NativeTypeName("mln_feature_query_result *")] MlnFeatureQueryResult* out_result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_render_session_query_feature_extensions(mln_render_session* session, mln_string_view source_id, [NativeTypeName("const mln_feature *")] mln_feature* feature, mln_string_view extension, mln_string_view extension_field, [NativeTypeName("const mln_json_value *")] mln_json_value* arguments, mln_feature_extension_result** out_result);
+        public static extern mln_status mln_render_session_query_feature_extensions([NativeTypeName("mln_render_session")] MlnRenderSession session, mln_string_view source_id, [NativeTypeName("const mln_feature *")] mln_feature* feature, mln_string_view extension, mln_string_view extension_field, [NativeTypeName("const mln_json_value *")] mln_json_value* arguments, [NativeTypeName("mln_feature_extension_result *")] MlnFeatureExtensionResult* out_result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_feature_query_result_count([NativeTypeName("const mln_feature_query_result *")] mln_feature_query_result* result, [NativeTypeName("size_t *")] nuint* out_count);
+        public static extern mln_status mln_feature_query_result_count([NativeTypeName("mln_feature_query_result")] MlnFeatureQueryResult result, [NativeTypeName("size_t *")] nuint* out_count);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_feature_query_result_get([NativeTypeName("const mln_feature_query_result *")] mln_feature_query_result* result, [NativeTypeName("size_t")] nuint index, mln_queried_feature* out_feature);
+        public static extern mln_status mln_feature_query_result_get([NativeTypeName("mln_feature_query_result")] MlnFeatureQueryResult result, [NativeTypeName("size_t")] nuint index, mln_queried_feature* out_feature);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_feature_query_result_destroy(mln_feature_query_result* result);
+        public static extern void mln_feature_query_result_destroy([NativeTypeName("mln_feature_query_result")] MlnFeatureQueryResult result);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern mln_status mln_feature_extension_result_get([NativeTypeName("const mln_feature_extension_result *")] mln_feature_extension_result* result, mln_feature_extension_result_info* out_info);
+        public static extern mln_status mln_feature_extension_result_get([NativeTypeName("mln_feature_extension_result")] MlnFeatureExtensionResult result, mln_feature_extension_result_info* out_info);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
-        public static extern void mln_feature_extension_result_destroy(mln_feature_extension_result* result);
+        public static extern void mln_feature_extension_result_destroy([NativeTypeName("mln_feature_extension_result")] MlnFeatureExtensionResult result);
     }
 }

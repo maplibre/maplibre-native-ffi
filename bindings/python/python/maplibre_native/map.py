@@ -525,7 +525,7 @@ class MapHandle(NativeHandleMixin):
             None if map_mode is None else map_mode.native_code,
             options.fast_pfor_enabled,
         )
-        self._native_address_value = int(self._native.address())
+        self._native_id_value = int(self._native.id())
         runtime._register_map(self)  # noqa: SLF001
 
     @classmethod
@@ -534,8 +534,8 @@ class MapHandle(NativeHandleMixin):
     ) -> "MapHandle":
         return cls(runtime, options, _create_key=_MAP_HANDLE_CREATE_KEY)
 
-    def _native_address(self) -> int:
-        return self._native_address_value
+    def _native_id(self) -> int:
+        return self._native_id_value
 
     def close(self) -> None:
         """Release this map handle exactly once.

@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
-using Maplibre.Native.Internal.Handle;
+using Maplibre.Native.Internal.Pointer;
 using Xunit;
 
 namespace Maplibre.Native.Tests;
@@ -21,8 +21,8 @@ public sealed unsafe class NativeHandleStateTests
         using var _ = Gate.EnterScope();
         destroyStatus = mln_status.MLN_STATUS_OK;
         destroyCount = 0;
-        var state = new NativeHandleState<mln_runtime>(
-            (mln_runtime*)1234,
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
             Destroy,
             "RuntimeHandle"
         );
@@ -41,8 +41,8 @@ public sealed unsafe class NativeHandleStateTests
         using var _ = Gate.EnterScope();
         destroyStatus = mln_status.MLN_STATUS_INVALID_STATE;
         destroyCount = 0;
-        var state = new NativeHandleState<mln_runtime>(
-            (mln_runtime*)1234,
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
             Destroy,
             "RuntimeHandle"
         );
@@ -67,8 +67,8 @@ public sealed unsafe class NativeHandleStateTests
         using var destroyStarted = new ManualResetEventSlim(false);
         using var allowDestroy = new ManualResetEventSlim(false);
         var destroyCount = 0;
-        var state = new NativeHandleState<mln_runtime>(
-            (mln_runtime*)1234,
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
             DestroyAfterRelease,
             "RuntimeHandle"
         );
@@ -76,7 +76,7 @@ public sealed unsafe class NativeHandleStateTests
         var close = Task.Run(state.Close);
         Assert.True(destroyStarted.Wait(TimeSpan.FromSeconds(5)));
 
-        var error = Assert.Throws<InvalidStateException>(() => _ = state.Pointer);
+        var error = Assert.Throws<InvalidStateException>(() => _ = state.Handle);
 
         Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Contains("closing", error.Message, StringComparison.OrdinalIgnoreCase);
@@ -87,9 +87,9 @@ public sealed unsafe class NativeHandleStateTests
         Assert.True(state.IsClosed);
         Assert.Equal(1, destroyCount);
 
-        mln_status DestroyAfterRelease(mln_runtime* handle)
+        mln_status DestroyAfterRelease(MlnRuntime handle)
         {
-            Assert.NotEqual((nint)0, (nint)handle);
+            Assert.False(handle.IsNull);
             destroyCount++;
             destroyStarted.Set();
             Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
@@ -104,8 +104,8 @@ public sealed unsafe class NativeHandleStateTests
         using var destroyStarted = new ManualResetEventSlim(false);
         using var allowDestroy = new ManualResetEventSlim(false);
         var destroyCount = 0;
-        var state = new NativeHandleState<mln_runtime>(
-            (mln_runtime*)1234,
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
             DestroyAfterRelease,
             "RuntimeHandle"
         );
@@ -124,9 +124,9 @@ public sealed unsafe class NativeHandleStateTests
         Assert.True(state.IsClosed);
         Assert.Equal(1, destroyCount);
 
-        mln_status DestroyAfterRelease(mln_runtime* handle)
+        mln_status DestroyAfterRelease(MlnRuntime handle)
         {
-            Assert.NotEqual((nint)0, (nint)handle);
+            Assert.False(handle.IsNull);
             destroyCount++;
             destroyStarted.Set();
             Assert.True(allowDestroy.Wait(TimeSpan.FromSeconds(5)));
@@ -143,8 +143,8 @@ public sealed unsafe class NativeHandleStateTests
         destroyCount = 0;
         var reports = new List<NativeLeakReport>();
         using var capture = NativeLeakReporter.CaptureForTest(reports.Add);
-        var state = new NativeHandleState<mln_runtime>(
-            (mln_runtime*)1234,
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
             Destroy,
             "RuntimeHandle"
         );
@@ -156,7 +156,7 @@ public sealed unsafe class NativeHandleStateTests
         var report = Assert.Single(reports);
         Assert.Equal(NativeLeakReportKind.DisposeFailed, report.Kind);
         Assert.Equal("RuntimeHandle", report.TypeName);
-        Assert.Equal((nint)1234, report.Address);
+        Assert.Equal(SyntheticHandles.Runtime(1234).Value, report.Handle);
         Assert.Equal(mln_status.MLN_STATUS_INVALID_STATE, report.Status);
 
         destroyStatus = mln_status.MLN_STATUS_OK;
@@ -181,7 +181,7 @@ public sealed unsafe class NativeHandleStateTests
         var report = Assert.Single(reports);
         Assert.Equal(NativeLeakReportKind.LeakedHandle, report.Kind);
         Assert.Equal("RuntimeHandle", report.TypeName);
-        Assert.Equal((nint)5678, report.Address);
+        Assert.Equal(SyntheticHandles.Runtime(5678).Value, report.Handle);
         Assert.Null(report.Status);
         Assert.Equal(0, destroyCount);
     }
@@ -189,12 +189,82 @@ public sealed unsafe class NativeHandleStateTests
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void CreateLeakedState()
     {
-        _ = new NativeHandleState<mln_runtime>((mln_runtime*)5678, Destroy, "RuntimeHandle");
+        _ = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(5678),
+            Destroy,
+            "RuntimeHandle"
+        );
     }
 
-    private static mln_status Destroy(mln_runtime* handle)
+    [BindingSpecTest("BND-197")]
+    [Fact]
+    public void CloseWaitsForAUseInFlightOnAnotherThread()
     {
-        Assert.NotEqual((nint)0, (nint)handle);
+        using var _ = Gate.EnterScope();
+        destroyStatus = mln_status.MLN_STATUS_OK;
+        destroyCount = 0;
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
+            Destroy,
+            "RuntimeHandle"
+        );
+
+        using var entered = new ManualResetEventSlim(false);
+        using var releaseUse = new ManualResetEventSlim(false);
+        using var closeReturned = new ManualResetEventSlim(false);
+        var destroysSeenByUse = -1;
+
+        var useThread = new Thread(() =>
+            state.WithLive(_ =>
+            {
+                entered.Set();
+                Assert.True(releaseUse.Wait(TimeSpan.FromSeconds(5)));
+                destroysSeenByUse = Volatile.Read(ref destroyCount);
+            })
+        );
+        useThread.Start();
+        Assert.True(entered.Wait(TimeSpan.FromSeconds(5)));
+
+        var closeThread = new Thread(() =>
+        {
+            state.Close();
+            closeReturned.Set();
+        });
+        closeThread.Start();
+
+        Assert.False(closeReturned.Wait(TimeSpan.FromMilliseconds(200)));
+        Assert.Equal(0, Volatile.Read(ref destroyCount));
+
+        releaseUse.Set();
+        Assert.True(closeReturned.Wait(TimeSpan.FromSeconds(5)));
+        Assert.True(useThread.Join(TimeSpan.FromSeconds(5)));
+
+        Assert.Equal(1, destroyCount);
+        Assert.Equal(0, destroysSeenByUse);
+        Assert.True(state.IsClosed);
+    }
+
+    [BindingSpecTest("BND-197")]
+    [Fact]
+    public void AUseStartingAfterCloseBeginsIsRefused()
+    {
+        using var _ = Gate.EnterScope();
+        destroyStatus = mln_status.MLN_STATUS_OK;
+        destroyCount = 0;
+        var state = new NativeHandleState<MlnRuntime>(
+            SyntheticHandles.Runtime(1234),
+            Destroy,
+            "RuntimeHandle"
+        );
+
+        state.Close();
+
+        Assert.Throws<InvalidStateException>(() => state.WithLive(_ => { }));
+    }
+
+    private static mln_status Destroy(MlnRuntime handle)
+    {
+        Assert.False(handle.IsNull);
         destroyCount++;
         return destroyStatus;
     }

@@ -143,7 +143,7 @@ struct NativeFeatureStateSelector: Equatable {
 }
 
 struct NativeFeatureQueryResultReader {
-  let handle: OpaquePointer
+  let handle: NativeFeatureQueryResultHandle
 
   func copyFeatures() throws -> [NativeQueriedFeature] {
     let count = try NativeQuery.featureQueryResultCount(handle)

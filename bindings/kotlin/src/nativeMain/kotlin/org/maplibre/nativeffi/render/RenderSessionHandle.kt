@@ -1,14 +1,10 @@
 package org.maplibre.nativeffi.render
 
-import cnames.structs.mln_feature_extension_result
-import cnames.structs.mln_feature_query_result
-import cnames.structs.mln_json_snapshot
-import cnames.structs.mln_render_session
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UByteVar
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.nativeHeap
@@ -54,6 +50,13 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_release_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_attach
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
+import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
+import org.maplibre.nativeffi.internal.lifecycle.asHandle
+import org.maplibre.nativeffi.internal.lifecycle.featureExtensionResultHandle
+import org.maplibre.nativeffi.internal.lifecycle.featureQueryResultHandle
+import org.maplibre.nativeffi.internal.lifecycle.jsonSnapshotHandle
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
+import org.maplibre.nativeffi.internal.lifecycle.renderSessionHandle
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.QueryStructs
@@ -71,8 +74,7 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 /** Owned native render session handle. Close it on the thread that attached it. */
 @OptIn(ExperimentalForeignApi::class)
 public actual class RenderSessionHandle
-private constructor(private val map: MapHandle, handle: CPointer<mln_render_session>) :
-  AutoCloseable {
+private constructor(private val map: MapHandle, handle: NativeRenderSession) : AutoCloseable {
   private val mapRetention = map.retainChild("RenderSessionHandle")
   private val state = HandleState("RenderSessionHandle", handle, map)
   private val activeFrame = ActiveFrameState()
@@ -82,7 +84,12 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     Status.requireArgument(width >= 0) { "width must be non-negative" }
     Status.requireArgument(height >= 0) { "height must be non-negative" }
     Status.check(
-      mln_render_session_resize(state.requireLive(), width.toUInt(), height.toUInt(), scaleFactor)
+      mln_render_session_resize(
+        state.requireLive().rawHandleValue,
+        width.toUInt(),
+        height.toUInt(),
+        scaleFactor,
+      )
     )
   }
 
@@ -90,29 +97,31 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     activeFrame.ensureInactive("render")
     val outRendered = alloc<BooleanVar>()
     outRendered.value = false
-    Status.check(mln_render_session_render_update(state.requireLive(), outRendered.ptr))
+    Status.check(
+      mln_render_session_render_update(state.requireLive().rawHandleValue, outRendered.ptr)
+    )
     outRendered.value
   }
 
   public actual fun detach() {
     activeFrame.ensureInactive("detach")
-    Status.check(mln_render_session_detach(state.requireLive()))
+    Status.check(mln_render_session_detach(state.requireLive().rawHandleValue))
     mapRetention.close()
   }
 
   public actual fun reduceMemoryUse() {
     activeFrame.ensureInactive("reduce memory use")
-    Status.check(mln_render_session_reduce_memory_use(state.requireLive()))
+    Status.check(mln_render_session_reduce_memory_use(state.requireLive().rawHandleValue))
   }
 
   public actual fun clearData() {
     activeFrame.ensureInactive("clear data")
-    Status.check(mln_render_session_clear_data(state.requireLive()))
+    Status.check(mln_render_session_clear_data(state.requireLive().rawHandleValue))
   }
 
   public actual fun dumpDebugLogs() {
     activeFrame.ensureInactive("dump debug logs")
-    Status.check(mln_render_session_dump_debug_logs(state.requireLive()))
+    Status.check(mln_render_session_dump_debug_logs(state.requireLive().rawHandleValue))
   }
 
   public actual fun setFeatureState(selector: FeatureStateSelector, value: JsonValue) {
@@ -120,7 +129,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     memScoped {
       Status.check(
         mln_render_session_set_feature_state(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           QueryStructs.featureStateSelector(selector, this),
           ValueStructs.jsonValue(value, this),
         )
@@ -130,16 +139,17 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
 
   public actual fun getFeatureState(selector: FeatureStateSelector): JsonValue = memScoped {
     activeFrame.ensureInactive("get feature state")
-    val outState = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
-    outState.value = null
+    val outState = alloc<ULongVar>()
+    outState.value = 0uL
     Status.check(
       mln_render_session_get_feature_state(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         QueryStructs.featureStateSelector(selector, this),
         outState.ptr,
       )
     )
-    ValueStructs.jsonSnapshotHandle(outState.value) ?: JsonValue.ObjectValue(emptyList())
+    ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outState.value))
+      ?: JsonValue.ObjectValue(emptyList())
   }
 
   public actual fun removeFeatureState(selector: FeatureStateSelector) {
@@ -147,7 +157,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     memScoped {
       Status.check(
         mln_render_session_remove_feature_state(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           QueryStructs.featureStateSelector(selector, this),
         )
       )
@@ -159,17 +169,19 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     options: RenderedFeatureQueryOptions?,
   ): List<QueriedFeature> = memScoped {
     activeFrame.ensureInactive("query rendered features")
-    val outResult = alloc<CPointerVarOf<CPointer<mln_feature_query_result>>>()
-    outResult.value = null
+    val outResult = alloc<ULongVar>()
+    outResult.value = 0uL
     Status.check(
       mln_render_session_query_rendered_features(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         QueryStructs.renderedQueryGeometry(geometry, this),
         QueryStructs.renderedFeatureQueryOptions(options, this),
         outResult.ptr,
       )
     )
-    QueryStructs.featureQueryResult(requireNotNull(outResult.value))
+    QueryStructs.featureQueryResult(
+      outResult.value.asHandle("mln_feature_query_result", ::featureQueryResultHandle)
+    )
   }
 
   public actual fun querySourceFeatures(
@@ -177,17 +189,19 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     options: SourceFeatureQueryOptions?,
   ): List<QueriedFeature> = memScoped {
     activeFrame.ensureInactive("query source features")
-    val outResult = alloc<CPointerVarOf<CPointer<mln_feature_query_result>>>()
-    outResult.value = null
+    val outResult = alloc<ULongVar>()
+    outResult.value = 0uL
     Status.check(
       mln_render_session_query_source_features(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         QueryStructs.sourceFeatureQueryOptions(options, this),
         outResult.ptr,
       )
     )
-    QueryStructs.featureQueryResult(requireNotNull(outResult.value))
+    QueryStructs.featureQueryResult(
+      outResult.value.asHandle("mln_feature_query_result", ::featureQueryResultHandle)
+    )
   }
 
   public actual fun queryFeatureExtension(
@@ -198,11 +212,11 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     arguments: JsonValue?,
   ): FeatureExtensionResult = memScoped {
     activeFrame.ensureInactive("query feature extension")
-    val outResult = alloc<CPointerVarOf<CPointer<mln_feature_extension_result>>>()
-    outResult.value = null
+    val outResult = alloc<ULongVar>()
+    outResult.value = 0uL
     Status.check(
       mln_render_session_query_feature_extensions(
-        state.requireLive(),
+        state.requireLive().rawHandleValue,
         CoreStructs.stringView(sourceId, this),
         ValueStructs.feature(feature, this),
         CoreStructs.stringView(extension, this),
@@ -211,13 +225,16 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         outResult.ptr,
       )
     )
-    QueryStructs.featureExtensionResult(requireNotNull(outResult.value))
+    QueryStructs.featureExtensionResult(
+      outResult.value.asHandle("mln_feature_extension_result", ::featureExtensionResultHandle)
+    )
   }
 
   public actual fun textureImageInfo(): TextureImageInfo = memScoped {
     activeFrame.ensureInactive("read texture data")
     val outInfo = mln_texture_image_info_default().getPointer(this)
-    val status = mln_texture_read_premultiplied_rgba8(state.requireLive(), null, 0UL, outInfo)
+    val status =
+      mln_texture_read_premultiplied_rgba8(state.requireLive().rawHandleValue, null, 0UL, outInfo)
     val info = RenderStructs.textureImageInfo(outInfo.pointed)
     if (status == 0 || (status == -1 && info.byteLength > 0L)) {
       info
@@ -233,7 +250,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     buffer.borrow { pointer, capacity ->
       Status.check(
         mln_texture_read_premultiplied_rgba8(
-          state.requireLive(),
+          state.requireLive().rawHandleValue,
           pointer?.reinterpret<UByteVar>(),
           capacity.toULong(),
           outInfo,
@@ -251,7 +268,9 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       activeFrame.beginAcquire()
       borrowStarted = true
       frame.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
-      Status.check(mln_metal_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
+      Status.check(
+        mln_metal_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+      )
       acquired = true
       val scope = FrameScope()
       return MetalOwnedTextureFrameHandle(
@@ -281,7 +300,9 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       activeFrame.beginAcquire()
       borrowStarted = true
       frame.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
-      Status.check(mln_vulkan_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
+      Status.check(
+        mln_vulkan_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+      )
       acquired = true
       val scope = FrameScope()
       return VulkanOwnedTextureFrameHandle(
@@ -311,7 +332,9 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       activeFrame.beginAcquire()
       borrowStarted = true
       frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
-      Status.check(mln_opengl_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
+      Status.check(
+        mln_opengl_owned_texture_acquire_frame(state.requireLive().rawHandleValue, frame.ptr)
+      )
       acquired = true
       val scope = FrameScope()
       return OpenGLOwnedTextureFrameHandle(
@@ -335,7 +358,9 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
 
   public actual override fun close() {
     activeFrame.ensureInactive("destroy")
-    state.closeOnce(::mln_render_session_destroy) { mapRetention.close() }
+    state.closeOnce({ handle -> mln_render_session_destroy(handle.rawHandleValue) }) {
+      mapRetention.close()
+    }
   }
 
   public actual val isClosed: Boolean
@@ -343,20 +368,20 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
 
   public actual fun map(): MapHandle = map
 
-  internal fun nativeHandle(): CPointer<mln_render_session> = state.requireLive()
+  internal fun nativeHandle(): NativeRenderSession = state.requireLive()
 
-  internal fun nativeAddress(): Long = state.address()
+  internal fun nativeHandleId(): Long = state.handleId()
 
   internal fun releaseMetalFrame(frame: CPointer<mln_metal_owned_texture_frame>) {
-    Status.check(mln_metal_owned_texture_release_frame(state.requireLive(), frame))
+    Status.check(mln_metal_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
   }
 
   internal fun releaseVulkanFrame(frame: CPointer<mln_vulkan_owned_texture_frame>) {
-    Status.check(mln_vulkan_owned_texture_release_frame(state.requireLive(), frame))
+    Status.check(mln_vulkan_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
   }
 
   internal fun releaseOpenGLFrame(frame: CPointer<mln_opengl_owned_texture_frame>) {
-    Status.check(mln_opengl_owned_texture_release_frame(state.requireLive(), frame))
+    Status.check(mln_opengl_owned_texture_release_frame(state.requireLive().rawHandleValue, frame))
   }
 
   internal fun finishFrameBorrow() {
@@ -433,144 +458,171 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       map: MapHandle,
       descriptor: MetalOwnedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_metal_owned_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.metalOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachMetalBorrowedTexture(
       map: MapHandle,
       descriptor: MetalBorrowedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_metal_borrowed_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.metalBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachVulkanOwnedTexture(
       map: MapHandle,
       descriptor: VulkanOwnedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_vulkan_owned_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachVulkanBorrowedTexture(
       map: MapHandle,
       descriptor: VulkanBorrowedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_vulkan_borrowed_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachOpenGLOwnedTexture(
       map: MapHandle,
       descriptor: OpenGLOwnedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_opengl_owned_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.openglOwnedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachOpenGLBorrowedTexture(
       map: MapHandle,
       descriptor: OpenGLBorrowedTextureDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_opengl_borrowed_texture_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachMetalSurface(
       map: MapHandle,
       descriptor: MetalSurfaceDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_metal_surface_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.metalSurfaceDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachVulkanSurface(
       map: MapHandle,
       descriptor: VulkanSurfaceDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_vulkan_surface_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
 
     internal fun attachOpenGLSurface(
       map: MapHandle,
       descriptor: OpenGLSurfaceDescriptor,
     ): RenderSessionHandle = memScoped {
-      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
-      outSession.value = null
+      val outSession = alloc<ULongVar>()
+      outSession.value = 0uL
       Status.check(
         mln_opengl_surface_attach(
-          map.nativeHandle(),
+          map.nativeHandle().rawHandleValue,
           RenderStructs.openglSurfaceDescriptor(descriptor, this),
           outSession.ptr,
         )
       )
-      RenderSessionHandle(map, requireNotNull(outSession.value))
+      RenderSessionHandle(
+        map,
+        outSession.value.asHandle("mln_render_session", ::renderSessionHandle),
+      )
     }
   }
 }

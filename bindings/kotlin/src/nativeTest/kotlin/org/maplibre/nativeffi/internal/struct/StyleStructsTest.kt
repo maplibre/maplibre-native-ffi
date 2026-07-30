@@ -4,13 +4,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -31,6 +29,8 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.SourceType
@@ -145,10 +145,10 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun styleIdListCopiesIdsAndDestroysNativeHandle() {
     var destroys = 0
     val ids = memScoped {
-      val list = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_style_id_list>()
+      val list = SyntheticHandles.styleIdList()
 
       StyleStructs.styleIdList(
-        list,
+        list.rawHandleValue,
         counter = { _, outCount ->
           outCount[0] = 1UL
           MaplibreStatus.OK.nativeCode
@@ -169,11 +169,11 @@ class StyleStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun styleIdListDestroysNativeHandleWhenCopyFails() {
     memScoped {
       var destroys = 0
-      val list = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_style_id_list>()
+      val list = SyntheticHandles.styleIdList()
 
       assertFailsWith<IllegalArgumentException> {
         StyleStructs.styleIdList(
-          list,
+          list.rawHandleValue,
           counter = { _, outCount ->
             outCount[0] = Int.MAX_VALUE.toULong() + 1UL
             MaplibreStatus.OK.nativeCode

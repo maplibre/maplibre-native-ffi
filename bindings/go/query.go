@@ -301,7 +301,7 @@ func (options *cSourceFeatureQueryOptions) free() {
 	}
 }
 
-func cFeatureQueryResultFeatures(result *C.mln_feature_query_result) ([]QueriedFeature, error) {
+func cFeatureQueryResultFeatures(result C.mln_feature_query_result) ([]QueriedFeature, error) {
 	defer C.mln_feature_query_result_destroy(result)
 	var count C.size_t
 	if err := checkNative(func() int32 { return int32(C.mln_feature_query_result_count(result, &count)) }); err != nil {
@@ -433,7 +433,7 @@ func cCoordinateSpanSlice(span C.mln_coordinate_span) []LatLng {
 	return out
 }
 
-func cFeatureExtensionResult(result *C.mln_feature_extension_result) (FeatureExtensionResult, error) {
+func cFeatureExtensionResult(result C.mln_feature_extension_result) (FeatureExtensionResult, error) {
 	defer C.mln_feature_extension_result_destroy(result)
 	raw := C.mln_feature_extension_result_info{size: C.uint32_t(unsafe.Sizeof(C.mln_feature_extension_result_info{}))}
 	if err := checkNative(func() int32 { return int32(C.mln_feature_extension_result_get(result, &raw)) }); err != nil {
@@ -485,7 +485,7 @@ func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelecto
 	}
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_set_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &rawState))
+			return int32(C.mln_render_session_set_feature_state(C.mln_render_session(ptr), &rawSelector.raw, &rawState))
 		})
 	})
 }
@@ -500,10 +500,10 @@ func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) 
 	defer session.state.KeepAlive()
 	rawSelector := newCFeatureStateSelector(selector)
 	defer rawSelector.free()
-	var snapshot *C.mln_json_snapshot
+	var snapshot C.mln_json_snapshot
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_get_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &snapshot))
+			return int32(C.mln_render_session_get_feature_state(C.mln_render_session(ptr), &rawSelector.raw, &snapshot))
 		})
 	}); err != nil {
 		return JSONValue{}, err
@@ -523,7 +523,7 @@ func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSele
 	defer rawSelector.free()
 	return session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_remove_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw))
+			return int32(C.mln_render_session_remove_feature_state(C.mln_render_session(ptr), &rawSelector.raw))
 		})
 	})
 }
@@ -543,10 +543,10 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result *C.mln_feature_query_result
+	var result C.mln_feature_query_result
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), rawGeometry.ptr(), rawOptions.ptr(), &result))
+			return int32(C.mln_render_session_query_rendered_features(C.mln_render_session(ptr), rawGeometry.ptr(), rawOptions.ptr(), &result))
 		})
 	}); err != nil {
 		return nil, err
@@ -569,10 +569,10 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
 	defer rawOptions.free()
-	var result *C.mln_feature_query_result
+	var result C.mln_feature_query_result
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
-			return int32(C.mln_render_session_query_source_features((*C.mln_render_session)(unsafe.Pointer(ptr)), sourceView.raw(), rawOptions.ptr(), &result))
+			return int32(C.mln_render_session_query_source_features(C.mln_render_session(ptr), sourceView.raw(), rawOptions.ptr(), &result))
 		})
 	}); err != nil {
 		return nil, err
@@ -617,11 +617,11 @@ func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feat
 		}
 		rawArguments = &value
 	}
-	var result *C.mln_feature_extension_result
+	var result C.mln_feature_extension_result
 	if err := session.withNoAcquiredFrame(func() error {
 		return checkNative(func() int32 {
 			return int32(C.mln_render_session_query_feature_extensions(
-				(*C.mln_render_session)(unsafe.Pointer(ptr)),
+				C.mln_render_session(ptr),
 				sourceView.raw(),
 				rawFeature,
 				extensionView.raw(),

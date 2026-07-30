@@ -8,7 +8,7 @@ static mln_string_view sv(const char* text) {
   return (mln_string_view){.data = text, .size = strlen(text)};
 }
 
-void query_at_point(mln_render_session* session, double x, double y) {
+void query_at_point(mln_render_session session, double x, double y) {
   const mln_rendered_query_geometry geometry =
     mln_rendered_query_geometry_point((mln_screen_point){.x = x, .y = y});
 
@@ -21,7 +21,7 @@ void query_at_point(mln_render_session* session, double x, double y) {
   options.layer_ids = layers;
   options.layer_id_count = 1;
 
-  mln_feature_query_result* result = NULL;
+  mln_feature_query_result result = MLN_HANDLE_NULL;
   const mln_status queried = mln_render_session_query_rendered_features(
     session, &geometry, &options, &result
   );

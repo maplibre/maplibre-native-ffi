@@ -8,7 +8,7 @@
 // Reports the operation's own status, which is separate from the status that
 // starting it returned.
 static mln_status await_operation(
-  mln_runtime* runtime, mln_offline_operation_id operation_id
+  mln_runtime runtime, mln_offline_operation_id operation_id
 ) {
   for (;;) {
     mln_runtime_pump(runtime, 100);
@@ -35,7 +35,7 @@ static mln_status await_operation(
 
 // Returns the new region ID, or zero.
 mln_offline_region_id create_region(
-  mln_runtime* runtime, const mln_offline_region_definition* definition,
+  mln_runtime runtime, const mln_offline_region_definition* definition,
   const char* metadata
 ) {
   mln_offline_operation_id create_id = 0;
@@ -48,11 +48,11 @@ mln_offline_region_id create_region(
     return 0;
   }
 
-  mln_offline_region_snapshot* region = NULL;
+  mln_offline_region_snapshot region = MLN_HANDLE_NULL;
   if (await_operation(runtime, create_id) == MLN_STATUS_OK) {
     mln_runtime_offline_region_create_take_result(runtime, create_id, &region);
   }
-  if (region == NULL) {
+  if (region == MLN_HANDLE_NULL) {
     // An untaken operation stays live until you discard it.
     mln_runtime_offline_operation_discard(runtime, create_id);
     return 0;
@@ -66,7 +66,7 @@ mln_offline_region_id create_region(
 
 // Setting the download state produces no result, so discard the operation once
 // it completes. Marking the region observed follows the same shape.
-bool start_download(mln_runtime* runtime, mln_offline_region_id region_id) {
+bool start_download(mln_runtime runtime, mln_offline_region_id region_id) {
   mln_offline_operation_id download_id = 0;
   if (
     mln_runtime_offline_region_set_download_state_start(

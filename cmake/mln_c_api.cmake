@@ -101,6 +101,7 @@ function(mln_configure_c_api_implementation target)
       ${PROJECT_SOURCE_DIR}/src/c_api/version.cpp
       ${PROJECT_SOURCE_DIR}/src/diagnostics/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/geojson/geojson.cpp
+      ${PROJECT_SOURCE_DIR}/src/handles/handle_table.cpp
       ${PROJECT_SOURCE_DIR}/src/logging/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/map/map.cpp
       ${PROJECT_SOURCE_DIR}/src/render/render_session_common.cpp

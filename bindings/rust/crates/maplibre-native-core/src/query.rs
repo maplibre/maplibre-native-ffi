@@ -1,6 +1,5 @@
 use std::mem;
 use std::ptr;
-use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
@@ -424,13 +423,13 @@ pub enum FeatureExtensionResult {
 /// caller and returned by the matching C API. This function takes ownership of
 /// that handle and releases it before returning, including on copy errors.
 pub unsafe fn copy_feature_query_result(
-    ptr: NonNull<sys::mln_feature_query_result>,
+    handle: sys::mln_feature_query_result,
 ) -> Result<Vec<QueriedFeature>> {
-    // SAFETY: ptr is an owned query result returned by the C API and released by the guard.
-    let result = unsafe { crate::handle::feature_query_result(ptr.as_ptr()) }?;
+    // SAFETY: handle is an owned query result returned by the C API and released by the guard.
+    let result = unsafe { crate::handle::feature_query_result(handle) }?;
     let mut count = 0;
     // SAFETY: result is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_feature_query_result_count(result.as_ptr(), &mut count) })?;
+    crate::check(unsafe { sys::mln_feature_query_result_count(result.handle(), &mut count) })?;
     let mut features = Vec::with_capacity(count);
     for index in 0..count {
         let mut raw = sys::mln_queried_feature {
@@ -444,7 +443,7 @@ pub unsafe fn copy_feature_query_result(
         // SAFETY: result is live, index is within count reported by native,
         // and raw points to initialized writable storage with size set.
         crate::check(unsafe {
-            sys::mln_feature_query_result_get(result.as_ptr(), index, &mut raw)
+            sys::mln_feature_query_result_get(result.handle(), index, &mut raw)
         })?;
         // SAFETY: raw now contains result-owned views valid until result drops;
         // this copies all nested data before the next iteration/drop.
@@ -496,17 +495,17 @@ unsafe fn copy_queried_feature(raw: &sys::mln_queried_feature) -> Result<Queried
 /// the caller and returned by the matching C API. This function takes ownership
 /// of that handle and releases it before returning, including on copy errors.
 pub unsafe fn copy_feature_extension_result(
-    ptr: NonNull<sys::mln_feature_extension_result>,
+    handle: sys::mln_feature_extension_result,
 ) -> Result<FeatureExtensionResult> {
-    // SAFETY: ptr is an owned extension result returned by the C API and released by the guard.
-    let result = unsafe { crate::handle::feature_extension_result(ptr.as_ptr()) }?;
+    // SAFETY: handle is an owned extension result returned by the C API and released by the guard.
+    let result = unsafe { crate::handle::feature_extension_result(handle) }?;
     let mut info = sys::mln_feature_extension_result_info {
         size: mem::size_of::<sys::mln_feature_extension_result_info>() as u32,
         type_: 0,
         data: sys::mln_feature_extension_result_info__bindgen_ty_1 { value: ptr::null() },
     };
     // SAFETY: result is live and info points to initialized writable storage.
-    crate::check(unsafe { sys::mln_feature_extension_result_get(result.as_ptr(), &mut info) })?;
+    crate::check(unsafe { sys::mln_feature_extension_result_get(result.handle(), &mut info) })?;
     match info.type_ {
         sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE => {
             // SAFETY: Active union member is selected by type_. Native returned

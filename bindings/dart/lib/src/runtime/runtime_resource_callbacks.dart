@@ -145,19 +145,19 @@ void _dropQueuedResourceProviderRequest(Pointer<Void> rawRequest) {
     final request = rawRequest
         .cast<raw.mln_adapter_queued_resource_request>()
         .ref;
-    final handle = ResourceRequestHandle._(request.handle);
-    if (!handle.isReleased) {
-      try {
-        handle.complete(
-          ResourceResponse(
-            status: ResourceResponseStatus.error,
-            errorReason: ResourceErrorReason.other,
-            errorMessage: 'Dart resource provider callback was retired',
-          ),
-        );
-      } catch (_) {
-        handle.close();
-      }
+    final handle = ResourceRequestHandle._(
+      NativeResourceRequest(request.handle),
+    );
+    try {
+      handle.complete(
+        ResourceResponse(
+          status: ResourceResponseStatus.error,
+          errorReason: ResourceErrorReason.other,
+          errorMessage: 'Dart resource provider callback was retired',
+        ),
+      );
+    } catch (_) {
+      handle.close();
     }
   } finally {
     _c.adapterResourceProviderRequestDestroy(rawRequest);
@@ -172,22 +172,22 @@ void _invokeQueuedResourceProvider(
     final request = rawRequest
         .cast<raw.mln_adapter_queued_resource_request>()
         .ref;
-    final handle = ResourceRequestHandle._(request.handle);
+    final handle = ResourceRequestHandle._(
+      NativeResourceRequest(request.handle),
+    );
     try {
       callback(_copyResourceRequest(request), handle);
     } catch (_) {
-      if (!handle.isReleased) {
-        try {
-          handle.complete(
-            ResourceResponse(
-              status: ResourceResponseStatus.error,
-              errorReason: ResourceErrorReason.other,
-              errorMessage: 'Dart resource provider callback threw',
-            ),
-          );
-        } catch (_) {
-          handle.close();
-        }
+      try {
+        handle.complete(
+          ResourceResponse(
+            status: ResourceResponseStatus.error,
+            errorReason: ResourceErrorReason.other,
+            errorMessage: 'Dart resource provider callback threw',
+          ),
+        );
+      } catch (_) {
+        handle.close();
       }
     }
   } finally {

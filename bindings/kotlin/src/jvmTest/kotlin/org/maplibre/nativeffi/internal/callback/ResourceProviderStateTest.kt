@@ -6,6 +6,7 @@ import java.lang.foreign.ValueLayout
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceLoadingMethod
 import org.maplibre.nativeffi.resource.ResourcePriority
@@ -28,7 +29,7 @@ class ResourceProviderStateTest {
       .use { state ->
         Arena.ofConfined().use { arena ->
           val request = resourceRequest(arena)
-          val fakeHandle = arena.allocate(8)
+          val fakeHandle = SyntheticHandles.resourceRequest().raw
 
           assertEquals(
             ResourceProviderDecision.PASS_THROUGH.nativeValue,
@@ -62,7 +63,11 @@ class ResourceProviderStateTest {
         Arena.ofConfined().use { arena ->
           assertEquals(
             UNKNOWN_DECISION,
-            state.invoke(MemorySegment.NULL, resourceRequest(arena), arena.allocate(8)),
+            state.invoke(
+              MemorySegment.NULL,
+              resourceRequest(arena),
+              SyntheticHandles.resourceRequest().raw,
+            ),
           )
         }
       }

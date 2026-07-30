@@ -1,15 +1,55 @@
 use std::cell::Cell;
 use std::marker::PhantomData;
-use std::ptr::NonNull;
+use std::num::NonZeroU64;
 use std::sync::Mutex;
 
 use maplibre_native_sys as sys;
 
 use crate::error::Result;
-use crate::ptr::non_null_mut;
 
-pub type StatusDestroyFn<T> = unsafe extern "C" fn(*mut T) -> sys::mln_status;
-pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(*mut T);
+pub type StatusDestroyFn<T> = unsafe extern "C" fn(T) -> sys::mln_status;
+pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(T);
+
+/// A C handle type: a transparent newtype over the 64-bit id the C API issues.
+///
+/// `bindgen` generates one newtype per handle so a map cannot be passed where a
+/// runtime is expected. This trait is what lets the shared handle state hold any
+/// of them without giving up that distinction.
+pub trait NativeHandle: Copy {
+    fn to_raw(self) -> u64;
+    fn from_raw(raw: u64) -> Self;
+}
+
+macro_rules! native_handle {
+    ($($handle:ty),* $(,)?) => {
+        $(
+            impl NativeHandle for $handle {
+                fn to_raw(self) -> u64 {
+                    self.0
+                }
+
+                fn from_raw(raw: u64) -> Self {
+                    Self(raw)
+                }
+            }
+        )*
+    };
+}
+
+native_handle!(
+    sys::mln_runtime,
+    sys::mln_map,
+    sys::mln_map_projection,
+    sys::mln_render_session,
+    sys::mln_wake_source,
+    sys::mln_resource_request_handle,
+    sys::mln_offline_region_snapshot,
+    sys::mln_offline_region_list,
+    sys::mln_json_snapshot,
+    sys::mln_style_id_list,
+    sys::mln_feature_query_result,
+    sys::mln_feature_extension_result,
+);
 
 /// A native handle a best-effort release could not destroy.
 ///
@@ -20,8 +60,10 @@ pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(*mut T);
 pub struct NativeHandleLeak {
     /// The native type name, such as `mln_map`.
     pub type_name: &'static str,
-    /// The native address that was not destroyed.
-    pub address: usize,
+    /// The handle id that was not destroyed. An id names one object for the
+    /// life of the process, so it is greppable against the log line that
+    /// created it.
+    pub id: u64,
 }
 
 type LeakReporter = Box<dyn Fn(NativeHandleLeak) + Send + Sync>;
@@ -66,65 +108,53 @@ pub fn report_leak(leak: NativeHandleLeak) {
 /// finalizer dispatch.
 #[derive(Debug)]
 pub struct NativeHandleState<T> {
-    address: Cell<Option<usize>>,
+    id: Cell<Option<NonZeroU64>>,
     type_name: &'static str,
     _typed_handle: PhantomData<fn() -> T>,
 }
 
-impl<T> NativeHandleState<T> {
-    /// Takes ownership of a native handle pointer.
+impl<T: NativeHandle> NativeHandleState<T> {
+    /// Takes ownership of a native handle.
     ///
     /// # Safety
     ///
-    /// `ptr` must be a non-null owned live handle of the matching native type.
-    /// The caller must later close the state with the matching C API destroy
-    /// function or intentionally report the pointer as leaked.
-    pub unsafe fn from_raw(ptr: NonNull<T>, type_name: &'static str) -> Self {
-        Self {
-            address: Cell::new(Some(ptr.as_ptr() as usize)),
+    /// `handle` must be a live handle of the matching native type owned by the
+    /// caller. The caller must later close the state with the matching C API
+    /// destroy function or intentionally report the handle as leaked.
+    pub unsafe fn from_handle(handle: T, type_name: &'static str) -> Result<Self> {
+        let Some(id) = NonZeroU64::new(handle.to_raw()) else {
+            return Err(crate::ptr::null_handle_error(type_name));
+        };
+        Ok(Self {
+            id: Cell::new(Some(id)),
             type_name,
             _typed_handle: PhantomData,
-        }
+        })
     }
 
-    /// Takes ownership of a native handle pointer after validating non-nullness.
-    ///
-    /// # Safety
-    ///
-    /// `ptr` must be an owned live handle of the matching native type when it is
-    /// non-null. The caller must later close the state with the matching C API
-    /// destroy function or intentionally report the pointer as leaked.
-    pub unsafe fn from_raw_ptr(ptr: *mut T, type_name: &'static str) -> Result<Self> {
-        let ptr = non_null_mut(ptr, type_name)?;
-        // SAFETY: The caller promises ptr is an owned live handle, and
-        // non_null_mut validated that it is non-null.
-        Ok(unsafe { Self::from_raw(ptr, type_name) })
+    /// The live handle, or the null handle once closed.
+    pub fn handle(&self) -> T {
+        T::from_raw(self.id.get().map_or(0, NonZeroU64::get))
     }
 
-    pub fn as_ptr(&self) -> *mut T {
-        self.address
-            .get()
-            .map_or(std::ptr::null_mut(), |address| address as *mut T)
+    pub fn live_handle(&self) -> Option<T> {
+        self.id.get().map(|id| T::from_raw(id.get()))
     }
 
-    pub fn address(&self) -> Option<usize> {
-        self.address.get()
+    pub fn id(&self) -> Option<u64> {
+        self.id.get().map(NonZeroU64::get)
     }
 
     pub fn mark_closed(&self) {
-        self.address.set(None);
+        self.id.set(None);
     }
 
-    pub fn restore_address_for_retry(&self, address: usize) {
-        self.address.set(Some(address));
-    }
-
-    pub fn as_non_null(&self) -> Option<NonNull<T>> {
-        NonNull::new(self.as_ptr())
+    pub fn restore_handle_for_retry(&self, handle: T) {
+        self.id.set(NonZeroU64::new(handle.to_raw()));
     }
 
     pub fn is_closed(&self) -> bool {
-        self.address.get().is_none()
+        self.id.get().is_none()
     }
 
     pub fn type_name(&self) -> &'static str {
@@ -141,13 +171,13 @@ impl<T> NativeHandleState<T> {
     /// `destroy` must be the matching C API destroy function for this handle
     /// type. It must not take ownership when it returns a non-OK status.
     pub unsafe fn close_status(&self, destroy: StatusDestroyFn<T>) -> Result<()> {
-        let Some(ptr) = self.as_non_null() else {
+        let Some(handle) = self.live_handle() else {
             return Ok(());
         };
 
-        // SAFETY: The caller promises destroy matches the live handle pointer.
-        crate::check(unsafe { destroy(ptr.as_ptr()) })?;
-        self.address.set(None);
+        // SAFETY: The caller promises destroy matches this live handle's type.
+        crate::check(unsafe { destroy(handle) })?;
+        self.id.set(None);
         Ok(())
     }
 
@@ -158,13 +188,13 @@ impl<T> NativeHandleState<T> {
     /// `destroy` must be the matching C API destroy function for this handle
     /// type and must release the handle exactly once.
     pub unsafe fn close_infallible(&self, destroy: InfallibleDestroyFn<T>) {
-        let Some(ptr) = self.as_non_null() else {
+        let Some(handle) = self.live_handle() else {
             return;
         };
 
-        self.address.set(None);
-        // SAFETY: The caller promises destroy matches the live handle pointer.
-        unsafe { destroy(ptr.as_ptr()) };
+        self.id.set(None);
+        // SAFETY: The caller promises destroy matches this live handle's type.
+        unsafe { destroy(handle) };
     }
 
     /// Marks the handle as intentionally leaked and returns its address for
@@ -174,20 +204,20 @@ impl<T> NativeHandleState<T> {
     /// caller deliberately avoids destroying thread-affine native state, such as
     /// a GC finalizer running on an arbitrary host thread. It consumes logical
     /// ownership of the handle state: future close calls become no-ops.
-    pub fn leak_for_report(&self) -> Option<usize> {
-        let address = self.address.get()?;
-        self.address.set(None);
-        Some(address)
+    pub fn leak_for_report(&self) -> Option<u64> {
+        let id = self.id.get()?;
+        self.id.set(None);
+        Some(id.get())
     }
 }
 
 #[derive(Debug)]
-struct NativeHandle<T> {
+struct NativeGuardState<T: NativeHandle> {
     state: NativeHandleState<T>,
     destroy: InfallibleDestroyFn<T>,
 }
 
-impl<T> NativeHandle<T> {
+impl<T: NativeHandle> NativeGuardState<T> {
     /// Takes ownership of a native handle pointer.
     ///
     /// # Safety
@@ -195,26 +225,20 @@ impl<T> NativeHandle<T> {
     /// `ptr` must be a non-null owned live handle of the matching native type.
     /// `destroy` must be the C API function that releases exactly that handle
     /// type and accepts null as a no-op.
-    unsafe fn from_raw(
-        ptr: *mut T,
+    unsafe fn from_handle(
+        handle: T,
         destroy: InfallibleDestroyFn<T>,
         type_name: &'static str,
     ) -> Result<Self> {
-        // SAFETY: The caller promises ptr is a non-null owned handle of the
+        // SAFETY: The caller promises handle is an owned live handle of the
         // matching native type; this constructor pairs it with the matching
         // infallible destroy function.
-        let state = unsafe { NativeHandleState::from_raw_ptr(ptr, type_name) }?;
+        let state = unsafe { NativeHandleState::from_handle(handle, type_name) }?;
         Ok(Self { state, destroy })
     }
 
-    fn as_ptr(&self) -> *mut T {
-        self.state.as_ptr()
-    }
-
-    fn as_non_null(&self) -> NonNull<T> {
-        self.state
-            .as_non_null()
-            .expect("native result handle guard is unexpectedly closed")
+    fn handle(&self) -> T {
+        self.state.handle()
     }
 
     fn close(self) {
@@ -222,9 +246,9 @@ impl<T> NativeHandle<T> {
     }
 }
 
-impl<T> Drop for NativeHandle<T> {
+impl<T: NativeHandle> Drop for NativeGuardState<T> {
     fn drop(&mut self) {
-        // SAFETY: NativeHandle binds the owned pointer to the matching
+        // SAFETY: NativeGuardState binds the owned handle to the matching
         // infallible destroy function at construction.
         unsafe { self.state.close_infallible(self.destroy) };
     }
@@ -234,16 +258,12 @@ macro_rules! native_guard {
     ($guard:ident, $native:ty, $destroy:path, $type_name:literal, $constructor:ident) => {
         #[derive(Debug)]
         pub struct $guard {
-            inner: NativeHandle<$native>,
+            inner: NativeGuardState<$native>,
         }
 
         impl $guard {
-            pub fn as_ptr(&self) -> *mut $native {
-                self.inner.as_ptr()
-            }
-
-            pub fn as_non_null(&self) -> NonNull<$native> {
-                self.inner.as_non_null()
+            pub fn handle(&self) -> $native {
+                self.inner.handle()
             }
 
             pub fn close(self) {
@@ -255,12 +275,12 @@ macro_rules! native_guard {
         ///
         /// # Safety
         ///
-        /// `ptr` must be a non-null live handle owned by the caller.
-        pub unsafe fn $constructor(ptr: *mut $native) -> Result<$guard> {
-            // SAFETY: The caller promises ptr is a non-null owned handle of the
+        /// `handle` must be a live handle owned by the caller.
+        pub unsafe fn $constructor(handle: $native) -> Result<$guard> {
+            // SAFETY: The caller promises handle is an owned live handle of the
             // matching native type; this constructor pairs it with the matching
             // destroy function.
-            let inner = unsafe { NativeHandle::from_raw(ptr, $destroy, $type_name) }?;
+            let inner = unsafe { NativeGuardState::from_handle(handle, $destroy, $type_name) }?;
             Ok($guard { inner })
         }
     };
@@ -311,25 +331,45 @@ native_guard!(
 
 #[cfg(test)]
 mod tests {
-    use std::ptr;
     use std::sync::Mutex;
     use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
     use super::*;
+
+    /// A synthetic handle type for close-once tests.
+    ///
+    /// The safe public API cannot express a handle built from an integer, so
+    /// these tests reach past it deliberately. Nothing here crosses into the C
+    /// API: the destroy functions below only count calls.
+    #[repr(transparent)]
+    #[derive(Debug, Clone, Copy)]
+    struct TestHandle(u64);
+
+    impl NativeHandle for TestHandle {
+        fn to_raw(self) -> u64 {
+            self.0
+        }
+
+        fn from_raw(raw: u64) -> Self {
+            Self(raw)
+        }
+    }
+
+    const TEST_HANDLE: TestHandle = TestHandle(0x0d00_0000_0000_002a);
 
     static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
     static STATUS_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
     static DESTROY_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
     static DESTROY_COUNT_LOCK: Mutex<()> = Mutex::new(());
 
-    unsafe extern "C" fn count_destroy(ptr: *mut u8) {
-        if !ptr.is_null() {
+    unsafe extern "C" fn count_destroy(handle: TestHandle) {
+        if handle.0 != 0 {
             DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
         }
     }
 
-    unsafe extern "C" fn count_status_destroy(ptr: *mut u8) -> sys::mln_status {
-        if !ptr.is_null() {
+    unsafe extern "C" fn count_status_destroy(handle: TestHandle) -> sys::mln_status {
+        if handle.0 != 0 {
             STATUS_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
         }
         DESTROY_STATUS.load(Ordering::SeqCst)
@@ -339,20 +379,18 @@ mod tests {
 
     #[test]
     fn native_handle_state_is_send_for_bridge_storage() {
-        assert_send::<NativeHandleState<u8>>();
+        assert_send::<NativeHandleState<TestHandle>>();
     }
 
     #[test]
     fn native_handle_destroys_owned_pointer_on_drop() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-
         {
             let handle =
-                unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }
+                unsafe { NativeGuardState::from_handle(TEST_HANDLE, count_destroy, "test_handle") }
                     .unwrap();
-            assert_eq!(handle.as_ptr().cast_const(), ptr::addr_of!(value));
+            assert_eq!(handle.handle().0, TEST_HANDLE.0);
         }
 
         assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
@@ -362,10 +400,9 @@ mod tests {
     fn native_handle_close_destroys_owned_pointer_once() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-
         let handle =
-            unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }.unwrap();
+            unsafe { NativeGuardState::from_handle(TEST_HANDLE, count_destroy, "test_handle") }
+                .unwrap();
         handle.close();
 
         assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
@@ -378,13 +415,11 @@ mod tests {
     fn native_handle_drop_releases_owned_pointer_after_copy_error() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-
         let error = {
             let handle =
-                unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }
+                unsafe { NativeGuardState::from_handle(TEST_HANDLE, count_destroy, "test_handle") }
                     .unwrap();
-            assert_eq!(handle.as_ptr().cast_const(), ptr::addr_of!(value));
+            assert_eq!(handle.handle().0, TEST_HANDLE.0);
             let result: crate::Result<()> = Err(crate::Error::invalid_argument("copy failed"));
             result
         }
@@ -395,10 +430,10 @@ mod tests {
     }
 
     #[test]
-    fn native_handle_rejects_null() {
+    fn native_handle_rejects_the_null_handle() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         let error =
-            unsafe { NativeHandle::from_raw(ptr::null_mut::<u8>(), count_destroy, "test_handle") }
+            unsafe { NativeGuardState::from_handle(TestHandle(0), count_destroy, "test_handle") }
                 .unwrap_err();
 
         assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
@@ -409,17 +444,15 @@ mod tests {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         STATUS_DESTROY_COUNT.store(0, Ordering::SeqCst);
         DESTROY_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
-        let mut value = 1u8;
-        let ptr = NonNull::from(&mut value);
-        // SAFETY: ptr points to live test storage, and the fake destroy only
-        // records calls without taking ownership.
-        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+        // SAFETY: the fake destroy below only records calls and never
+        // dereferences the handle.
+        let state = unsafe { NativeHandleState::from_handle(TEST_HANDLE, "test_handle") }.unwrap();
 
         // SAFETY: count_status_destroy is the matching fake destroy function
         // for this test handle and does not take ownership on failure.
         let error = unsafe { state.close_status(count_status_destroy) }.unwrap_err();
         assert_eq!(error.kind(), crate::error::ErrorKind::InvalidState);
-        assert_eq!(state.as_ptr().cast_const(), ptr::addr_of!(value));
+        assert_eq!(state.handle().0, TEST_HANDLE.0);
 
         DESTROY_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
         // SAFETY: count_status_destroy is the matching fake destroy function
@@ -437,11 +470,9 @@ mod tests {
     fn native_handle_state_closes_infallible_once() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-        let ptr = NonNull::from(&mut value);
         // SAFETY: ptr points to live test storage, and count_destroy only
         // records calls.
-        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+        let state = unsafe { NativeHandleState::from_handle(TEST_HANDLE, "test_handle") }.unwrap();
 
         // SAFETY: count_destroy is the matching fake destroy function for this
         // test handle.
@@ -458,13 +489,11 @@ mod tests {
     fn native_handle_state_reports_leak_without_destroying() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-        let ptr = NonNull::from(&mut value);
-        // SAFETY: ptr points to live test storage. The test intentionally uses
-        // leak_for_report instead of a destroy function.
-        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+        // SAFETY: the test intentionally uses leak_for_report instead of a
+        // destroy function, so nothing here reaches native code.
+        let state = unsafe { NativeHandleState::from_handle(TEST_HANDLE, "test_handle") }.unwrap();
 
-        assert_eq!(state.leak_for_report(), Some(ptr::addr_of!(value) as usize));
+        assert_eq!(state.leak_for_report(), Some(TEST_HANDLE.0));
         assert_eq!(state.leak_for_report(), None);
         // SAFETY: close after leak_for_report is a no-op and the same matching
         // fake destroy function is still used.

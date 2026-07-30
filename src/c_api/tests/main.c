@@ -23,6 +23,7 @@ void tearDown(void) {
 int main(void) {
   UNITY_BEGIN();
   run_core_abi_tests();
+  run_handles_abi_tests();
   run_map_options_abi_tests();
   run_render_backend_abi_tests();
   run_owned_texture_abi_tests();

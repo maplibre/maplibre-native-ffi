@@ -6,14 +6,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -42,6 +40,7 @@ import org.maplibre.nativeffi.internal.c.mln_feature
 import org.maplibre.nativeffi.internal.c.mln_geometry
 import org.maplibre.nativeffi.internal.c.mln_json_member
 import org.maplibre.nativeffi.internal.c.mln_json_value
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
@@ -57,7 +56,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureQueryResultCopiesFeaturePropertiesSourceLayerStateAndUnknownIds() {
     var destroys = 0
     val features = memScoped {
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_query_result>()
+      val result = SyntheticHandles.featureQueryResult()
       val geometry = alloc<mln_geometry>()
       geometry.size = sizeOf<mln_geometry>().toUInt()
       geometry.type = MLN_GEOMETRY_TYPE_EMPTY
@@ -124,7 +123,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureQueryResultDestroysNativeHandleWhenCopyFails() {
     memScoped {
       var destroys = 0
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_query_result>()
+      val result = SyntheticHandles.featureQueryResult()
       val geometry = alloc<mln_geometry>()
       geometry.size = sizeOf<mln_geometry>().toUInt()
       geometry.type = MLN_GEOMETRY_TYPE_EMPTY
@@ -154,7 +153,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureExtensionResultCopiesValueAndDestroysHandle() {
     memScoped {
       var destroys = 0
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_extension_result>()
+      val result = SyntheticHandles.featureExtensionResult()
       val value = alloc<mln_json_value>()
       value.size = sizeOf<mln_json_value>().toUInt()
       value.type = MLN_JSON_VALUE_TYPE_BOOL
@@ -180,7 +179,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureExtensionResultCopiesFeatureCollectionAndDestroysHandle() {
     memScoped {
       var destroys = 0
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_extension_result>()
+      val result = SyntheticHandles.featureExtensionResult()
       val feature = alloc<mln_feature>()
       val geometry = alloc<mln_geometry>()
       geometry.size = sizeOf<mln_geometry>().toUInt()
@@ -218,7 +217,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureExtensionResultCopiesUnknownTypeAndDestroysHandle() {
     memScoped {
       var destroys = 0
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_extension_result>()
+      val result = SyntheticHandles.featureExtensionResult()
 
       val value =
         QueryStructs.featureExtensionResult(
@@ -239,7 +238,7 @@ class QueryStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun featureExtensionResultDestroysNativeHandleWhenCopyFails() {
     memScoped {
       var destroys = 0
-      val result = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_feature_extension_result>()
+      val result = SyntheticHandles.featureExtensionResult()
 
       assertFailsWith<IllegalArgumentException> {
         QueryStructs.featureExtensionResult(

@@ -26,16 +26,20 @@ internal sealed unsafe class ResourceProviderState : IDisposable
 
     internal bool IsHandleAllocatedForTest => handle != 0;
 
+    // A handle carrying the resource-request kind byte, so anything that
+    // reports it reads as an obviously synthetic handle of the right kind.
+    private static MlnResourceRequest SyntheticRequestForTest => new(0x0C00_0000_0000_0001);
+
     internal uint HandleForTest(mln_resource_request* request)
     {
-        return Invoke(this, request, (mln_resource_request_handle*)1);
+        return Invoke(this, request, SyntheticRequestForTest);
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     private static uint OnRequest(
         void* userData,
         mln_resource_request* request,
-        mln_resource_request_handle* requestHandle
+        MlnResourceRequest requestHandle
     )
     {
         try
@@ -52,10 +56,10 @@ internal sealed unsafe class ResourceProviderState : IDisposable
     private static uint Invoke(
         ResourceProviderState? state,
         mln_resource_request* request,
-        mln_resource_request_handle* requestHandle
+        MlnResourceRequest requestHandle
     )
     {
-        if (state is null || request is null || requestHandle is null)
+        if (state is null || request is null || requestHandle.IsNull)
         {
             return uint.MaxValue;
         }
