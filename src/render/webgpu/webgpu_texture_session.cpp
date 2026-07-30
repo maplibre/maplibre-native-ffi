@@ -28,12 +28,8 @@ namespace {
 constexpr auto webgpu_owned_color_format = WGPUTextureFormat_RGBA8Unorm;
 
 auto validate_webgpu_texture(
-  const mln_webgpu_borrowed_texture_descriptor& descriptor,
-  mbgl::Size physical_size
+  WGPUTexture texture, WGPUTextureFormat format, mbgl::Size physical_size
 ) -> mln_status {
-  auto* const texture = static_cast<WGPUTexture>(descriptor.texture);
-  const auto format = static_cast<WGPUTextureFormat>(descriptor.format);
-
   if (
     wgpuTextureGetWidth(texture) != physical_size.width ||
     wgpuTextureGetHeight(texture) != physical_size.height ||
@@ -182,6 +178,42 @@ class WebGPUTextureBackend final : public mbgl::webgpu::RendererBackend,
   auto device() const -> void* { return device_; }
   auto color_format() const -> wgpu::TextureFormat {
     return static_cast<wgpu::TextureFormat>(color_format_);
+  }
+
+  auto setBorrowedTarget(const mln_webgpu_borrowed_texture_target& target)
+    -> mln_status {
+    if (owns_color_texture_) {
+      mln::core::set_thread_error(
+        "WebGPU texture target is owned by the session"
+      );
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    const auto texture_status = validate_webgpu_texture(
+      static_cast<WGPUTexture>(target.texture), color_format_, getSize()
+    );
+    if (texture_status != MLN_STATUS_OK) {
+      return texture_status;
+    }
+
+    auto* const next_texture = static_cast<WGPUTexture>(target.texture);
+    auto* const next_view = static_cast<WGPUTextureView>(target.texture_view);
+    wgpuTextureAddRef(next_texture);
+    wgpuTextureViewAddRef(next_view);
+    releaseColorTexture();
+    texture_ = next_texture;
+    color_view_ = next_view;
+    return MLN_STATUS_OK;
+  }
+
+  auto clearBorrowedTarget() -> mln_status {
+    if (owns_color_texture_) {
+      mln::core::set_thread_error(
+        "WebGPU texture target is owned by the session"
+      );
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    releaseColorTexture();
+    return MLN_STATUS_OK;
   }
 
  protected:
@@ -410,6 +442,16 @@ class WebGPUTextureSessionBackend final
     return MLN_STATUS_OK;
   }
 
+  auto set_webgpu_borrowed_target(
+    const mln_webgpu_borrowed_texture_target& target
+  ) -> mln_status override {
+    return backend_.setBorrowedTarget(target);
+  }
+
+  auto clear_webgpu_borrowed_target() -> mln_status override {
+    return backend_.clearBorrowedTarget();
+  }
+
  private:
   WebGPUTextureBackend backend_;
 };
@@ -519,8 +561,10 @@ auto webgpu_borrowed_texture_attach(
 
   const auto physical_size =
     mbgl::Size{descriptor->physical_width, descriptor->physical_height};
-  const auto texture_status =
-    validate_webgpu_texture(*descriptor, physical_size);
+  const auto texture_status = validate_webgpu_texture(
+    static_cast<WGPUTexture>(descriptor->texture),
+    static_cast<WGPUTextureFormat>(descriptor->format), physical_size
+  );
   if (texture_status != MLN_STATUS_OK) {
     return texture_status;
   }
@@ -534,6 +578,7 @@ auto webgpu_borrowed_texture_attach(
     );
     session->texture.api_kind = TextureSessionApi::WebGPU;
     session->texture.mode = TextureSessionMode::Borrowed;
+    session->texture.borrowed_target_available = true;
     session->texture.backend =
       std::make_unique<WebGPUTextureSessionBackend>(*descriptor, physical_size);
     return attach_render_session(

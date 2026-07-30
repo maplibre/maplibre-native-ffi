@@ -31,6 +31,8 @@ auto validate_webgpu_owned_texture_descriptor(
 auto validate_webgpu_borrowed_texture_descriptor(
   const mln_webgpu_borrowed_texture_descriptor* descriptor
 ) -> mln_status;
+auto webgpu_borrowed_texture_target_default() noexcept
+  -> mln_webgpu_borrowed_texture_target;
 auto metal_owned_texture_attach(
   mln_map map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session* out_session
@@ -63,6 +65,11 @@ auto webgpu_borrowed_texture_attach(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   mln_render_session* out_session
 ) -> mln_status;
+auto webgpu_borrowed_texture_set_target(
+  mln_render_session session, const mln_webgpu_borrowed_texture_target* target
+) -> mln_status;
+auto webgpu_borrowed_texture_clear_target(mln_render_session session)
+  -> mln_status;
 auto texture_read_premultiplied_rgba8(
   mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info

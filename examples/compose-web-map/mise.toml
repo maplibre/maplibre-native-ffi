@@ -1,0 +1,28 @@
+[env]
+# Kotlin/Wasm uses Yarn 1 internally while the repository itself uses pnpm.
+SKIP_YARN_COREPACK_CHECK = "1"
+
+[tasks.build]
+description = "Build the Compose Web MapLibre WebGPU compositing prototype."
+dir = "{{config_root}}/../.."
+tools = { emsdk = "4.0.10" }
+run = '''
+set -euo pipefail
+cmake --workflow --preset browser-wasm32-webgpu
+./gradlew \
+  -Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g' \
+  -Pkotlin.daemon.jvmargs=-Xmx4g \
+  :examples:compose-web-map:wasmJsBrowserDevelopmentWebpack
+'''
+
+[tasks.run]
+description = "Run the Compose Web MapLibre WebGPU compositing prototype."
+run = '''
+set -euo pipefail
+mise run build
+exec ../../gradlew \
+  -Dorg.gradle.jvmargs='-Xmx4g -XX:MaxMetaspaceSize=1g' \
+  -Pkotlin.daemon.jvmargs=-Xmx4g \
+  :examples:compose-web-map:wasmJsBrowserDevelopmentRun \
+  --continuous
+'''

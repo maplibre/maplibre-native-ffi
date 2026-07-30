@@ -100,6 +100,15 @@ class TextureSessionBackend {
     (void)out_frame;
     return MLN_STATUS_UNSUPPORTED;
   }
+  virtual auto set_webgpu_borrowed_target(
+    const mln_webgpu_borrowed_texture_target& target
+  ) -> mln_status {
+    (void)target;
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  virtual auto clear_webgpu_borrowed_target() -> mln_status {
+    return MLN_STATUS_UNSUPPORTED;
+  }
 };
 
 // The scheduler mbgl sees as current while a render session renders.
@@ -232,6 +241,7 @@ struct RenderTextureState {
   TextureSessionFrameKind acquired_frame_kind = TextureSessionFrameKind::None;
   TextureSessionApi api_kind = TextureSessionApi::Generic;
   TextureSessionMode mode = TextureSessionMode::Owned;
+  bool borrowed_target_available = false;
   void* rendered_native_texture = nullptr;
   void* acquired_native_texture = nullptr;
 };

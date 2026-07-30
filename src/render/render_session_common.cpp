@@ -201,6 +201,15 @@ auto webgpu_borrowed_texture_descriptor_default() noexcept
   };
 }
 
+auto webgpu_borrowed_texture_target_default() noexcept
+  -> mln_webgpu_borrowed_texture_target {
+  return mln_webgpu_borrowed_texture_target{
+    .size = sizeof(mln_webgpu_borrowed_texture_target),
+    .texture = nullptr,
+    .texture_view = nullptr,
+  };
+}
+
 auto opengl_surface_descriptor_default() noexcept
   -> mln_opengl_surface_descriptor {
   return mln_opengl_surface_descriptor{
@@ -1161,6 +1170,15 @@ auto render_session_render_update(
   *out_rendered = false;
   if (live->kind == RenderSessionKind::Texture && live->texture.acquired) {
     set_thread_error("cannot render while a texture frame is acquired");
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (
+    live->kind == RenderSessionKind::Texture &&
+    live->texture.api_kind == TextureSessionApi::WebGPU &&
+    live->texture.mode == TextureSessionMode::Borrowed &&
+    !live->texture.borrowed_target_available
+  ) {
+    set_thread_error("WebGPU borrowed texture target is not set");
     return MLN_STATUS_INVALID_STATE;
   }
 

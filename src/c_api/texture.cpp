@@ -48,6 +48,11 @@ auto mln_webgpu_borrowed_texture_descriptor_default(void) noexcept
   return mln::core::webgpu_borrowed_texture_descriptor_default();
 }
 
+auto mln_webgpu_borrowed_texture_target_default(void) noexcept
+  -> mln_webgpu_borrowed_texture_target {
+  return mln::core::webgpu_borrowed_texture_target_default();
+}
+
 auto mln_texture_image_info_default(void) noexcept -> mln_texture_image_info {
   return mln::core::texture_image_info_default();
 }
@@ -148,6 +153,22 @@ auto mln_webgpu_borrowed_texture_attach(
     return mln::core::webgpu_borrowed_texture_attach(
       map, descriptor, out_session
     );
+  });
+}
+
+auto mln_webgpu_borrowed_texture_set_target(
+  mln_render_session session, const mln_webgpu_borrowed_texture_target* target
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_borrowed_texture_set_target(session, target);
+  });
+}
+
+auto mln_webgpu_borrowed_texture_clear_target(
+  mln_render_session session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::webgpu_borrowed_texture_clear_target(session);
   });
 }
 

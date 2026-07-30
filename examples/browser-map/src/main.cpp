@@ -6,6 +6,7 @@
 #include <memory>
 
 #include <emscripten.h>
+#include <webgpu/webgpu.h>
 
 #include "maplibre_native_c.h"
 
@@ -28,14 +29,23 @@ struct InitialCamera {
   double pitch;
 };
 
+enum class TextureMode : uint8_t { Owned, FrameScopedBorrowed };
+
 class App {
  public:
   App(
     Viewport viewport, InitialCamera camera, void* webgpuDevice,
-    void* webgpuQueue, mln_status& outStatus
+    void* webgpuQueue, TextureMode textureMode, void* initialTexture,
+    void* initialTextureView, uint32_t initialTextureFormat,
+    mln_status& outStatus
   )
-      : viewport_(viewport) {
-    outStatus = initialize(camera, webgpuDevice, webgpuQueue);
+      : viewport_(viewport),
+        textureMode_(textureMode),
+        webgpuDevice_(webgpuDevice),
+        webgpuQueue_(webgpuQueue) {
+    outStatus = initialize(
+      camera, initialTexture, initialTextureView, initialTextureFormat
+    );
   }
 
   ~App() {
@@ -86,6 +96,21 @@ class App {
   }
 
   auto resize(Viewport viewport) -> bool {
+    if (textureMode_ == TextureMode::FrameScopedBorrowed) {
+      if (session_ != MLN_HANDLE_NULL) {
+        if (!check(
+              "destroy borrowed render session",
+              mln_render_session_destroy(session_)
+            )) {
+          return false;
+        }
+        session_ = MLN_HANDLE_NULL;
+      }
+      viewport_ = viewport;
+      logViewport();
+      requestRender();
+      return true;
+    }
     if (!releaseOwnedTextureFrame()) {
       return false;
     }
@@ -101,6 +126,37 @@ class App {
     logViewport();
     requestRender();
     return true;
+  }
+
+  auto setBorrowedTarget(
+    void* texture, void* textureView, uint32_t textureFormat
+  ) -> bool {
+    if (textureMode_ != TextureMode::FrameScopedBorrowed) {
+      return false;
+    }
+    if (session_ == MLN_HANDLE_NULL) {
+      return attachBorrowedTarget(texture, textureView, textureFormat);
+    }
+    auto target = mln_webgpu_borrowed_texture_target_default();
+    target.texture = texture;
+    target.texture_view = textureView;
+    return check(
+      "set WebGPU borrowed texture target",
+      mln_webgpu_borrowed_texture_set_target(session_, &target)
+    );
+  }
+
+  auto clearBorrowedTarget() -> bool {
+    if (
+      textureMode_ != TextureMode::FrameScopedBorrowed ||
+      session_ == MLN_HANDLE_NULL
+    ) {
+      return false;
+    }
+    return check(
+      "clear WebGPU borrowed texture target",
+      mln_webgpu_borrowed_texture_clear_target(session_)
+    );
   }
 
   auto acquireOwnedTexture() -> uintptr_t {
@@ -221,8 +277,10 @@ class App {
     double pitch;
   };
 
-  auto initialize(InitialCamera camera, void* webgpuDevice, void* webgpuQueue)
-    -> mln_status {
+  auto initialize(
+    InitialCamera camera, void* initialTexture, void* initialTextureView,
+    uint32_t initialTextureFormat
+  ) -> mln_status {
     if (!validViewport(viewport_)) {
       std::fprintf(stderr, "browser map init failed: invalid viewport\n");
       return MLN_STATUS_INVALID_ARGUMENT;
@@ -230,12 +288,21 @@ class App {
 
     const auto backends = mln_supported_render_backend_mask();
     std::fprintf(stderr, "supported render backends: 0x%x\n", backends);
-    std::fprintf(stderr, "render target: owned-texture\n");
-    std::fprintf(
-      stderr,
-      "render target status: samples MapLibre-owned texture frames into the "
-      "host swapchain\n"
-    );
+    if (textureMode_ == TextureMode::FrameScopedBorrowed) {
+      std::fprintf(stderr, "render target: frame-scoped-borrowed-texture\n");
+      std::fprintf(
+        stderr,
+        "render target status: renders directly into host-provided WebGPU "
+        "targets\n"
+      );
+    } else {
+      std::fprintf(stderr, "render target: owned-texture\n");
+      std::fprintf(
+        stderr,
+        "render target status: samples MapLibre-owned texture frames into "
+        "the host swapchain\n"
+      );
+    }
     std::fprintf(
       stderr,
       "Controls:\n"
@@ -295,20 +362,51 @@ class App {
       return status;
     }
 
-    auto descriptor = mln_webgpu_owned_texture_descriptor_default();
-    descriptor.extent.width = viewport_.width;
-    descriptor.extent.height = viewport_.height;
-    descriptor.extent.scale_factor = viewport_.scaleFactor;
-    descriptor.context.device = webgpuDevice;
-    descriptor.context.queue = webgpuQueue;
-    status = mln_webgpu_owned_texture_attach(map_, &descriptor, &session_);
-    if (status != MLN_STATUS_OK) {
-      logError("attach WebGPU owned texture", status);
-      return status;
+    if (textureMode_ == TextureMode::FrameScopedBorrowed) {
+      if (!attachBorrowedTarget(
+            initialTexture, initialTextureView, initialTextureFormat
+          )) {
+        return MLN_STATUS_NATIVE_ERROR;
+      }
+    } else {
+      auto descriptor = mln_webgpu_owned_texture_descriptor_default();
+      descriptor.extent.width = viewport_.width;
+      descriptor.extent.height = viewport_.height;
+      descriptor.extent.scale_factor = viewport_.scaleFactor;
+      descriptor.context.device = webgpuDevice_;
+      descriptor.context.queue = webgpuQueue_;
+      status = mln_webgpu_owned_texture_attach(map_, &descriptor, &session_);
+      if (status != MLN_STATUS_OK) {
+        logError("attach WebGPU owned texture", status);
+        return status;
+      }
     }
 
     renderPending_ = true;
     return MLN_STATUS_OK;
+  }
+
+  auto attachBorrowedTarget(
+    void* texture, void* textureView, uint32_t textureFormat
+  ) -> bool {
+    auto descriptor = mln_webgpu_borrowed_texture_descriptor_default();
+    descriptor.extent.width = viewport_.width;
+    descriptor.extent.height = viewport_.height;
+    descriptor.extent.scale_factor = viewport_.scaleFactor;
+    descriptor.physical_width =
+      static_cast<uint32_t>(std::ceil(viewport_.width * viewport_.scaleFactor));
+    descriptor.physical_height = static_cast<uint32_t>(
+      std::ceil(viewport_.height * viewport_.scaleFactor)
+    );
+    descriptor.context.device = webgpuDevice_;
+    descriptor.context.queue = webgpuQueue_;
+    descriptor.texture = texture;
+    descriptor.texture_view = textureView;
+    descriptor.format = textureFormat;
+    return check(
+      "attach WebGPU borrowed texture",
+      mln_webgpu_borrowed_texture_attach(map_, &descriptor, &session_)
+    );
   }
 
   auto drainEvents() -> bool {
@@ -482,6 +580,9 @@ class App {
   }
 
   Viewport viewport_;
+  TextureMode textureMode_ = TextureMode::Owned;
+  void* webgpuDevice_ = nullptr;
+  void* webgpuQueue_ = nullptr;
   mln_runtime runtime_ = MLN_HANDLE_NULL;
   mln_map map_ = MLN_HANDLE_NULL;
   mln_render_session session_ = MLN_HANDLE_NULL;
@@ -497,6 +598,15 @@ auto withApp(bool defaultValue, auto action) -> bool {
     return defaultValue;
   }
   return action(*app);
+}
+
+void releaseImportedWebGpuTarget(void* texture, void* textureView) {
+  if (textureView != nullptr) {
+    wgpuTextureViewRelease(static_cast<WGPUTextureView>(textureView));
+  }
+  if (texture != nullptr) {
+    wgpuTextureRelease(static_cast<WGPUTexture>(texture));
+  }
 }
 
 }  // namespace
@@ -523,13 +633,80 @@ EMSCRIPTEN_KEEPALIVE auto mln_browser_map_init(
       .bearing = bearing,
       .pitch = pitch,
     },
-    webgpuDevice, webgpuQueue, status
+    webgpuDevice, webgpuQueue, TextureMode::Owned, nullptr, nullptr, 0, status
   );
   if (status != MLN_STATUS_OK) {
     return 1;
   }
   app = std::move(nextApp);
   return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_init_borrowed(
+  uint32_t logicalWidth, uint32_t logicalHeight, double scaleFactor,
+  double longitude, double latitude, double zoom, double bearing, double pitch,
+  void* webgpuDevice, void* webgpuQueue, void* texture, void* textureView,
+  uint32_t textureFormat
+) -> int {
+  app.reset();
+  auto status = MLN_STATUS_OK;
+  auto nextApp = std::make_unique<App>(
+    Viewport{
+      .width = logicalWidth,
+      .height = logicalHeight,
+      .scaleFactor = scaleFactor,
+    },
+    InitialCamera{
+      .longitude = longitude,
+      .latitude = latitude,
+      .zoom = zoom,
+      .bearing = bearing,
+      .pitch = pitch,
+    },
+    webgpuDevice, webgpuQueue, TextureMode::FrameScopedBorrowed, texture,
+    textureView, textureFormat, status
+  );
+  if (status != MLN_STATUS_OK) {
+    return 1;
+  }
+  app = std::move(nextApp);
+  return 0;
+}
+
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_set_borrowed_texture_target(
+  void* texture, void* textureView, uint32_t textureFormat
+) -> int {
+  const auto succeeded = withApp(false, [&](App& current) {
+    return current.setBorrowedTarget(texture, textureView, textureFormat);
+  });
+  return succeeded ? 0 : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_clear_borrowed_texture_target()
+  -> int {
+  return withApp(
+           false, [](App& current) { return current.clearBorrowedTarget(); }
+         )
+           ? 0
+           : 1;
+}
+
+EMSCRIPTEN_KEEPALIVE void mln_browser_map_release_borrowed_texture_import(
+  void* texture, void* textureView
+) {
+  releaseImportedWebGpuTarget(texture, textureView);
+}
+
+EMSCRIPTEN_KEEPALIVE auto mln_browser_map_webgpu_texture_format(uint32_t format)
+  -> uint32_t {
+  switch (format) {
+    case 0:
+      return static_cast<uint32_t>(WGPUTextureFormat_RGBA8Unorm);
+    case 1:
+      return static_cast<uint32_t>(WGPUTextureFormat_BGRA8Unorm);
+    default:
+      return static_cast<uint32_t>(WGPUTextureFormat_Undefined);
+  }
 }
 
 EMSCRIPTEN_KEEPALIVE auto mln_browser_map_render_frame() -> int {

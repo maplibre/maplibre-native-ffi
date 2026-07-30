@@ -247,6 +247,20 @@ typedef struct mln_webgpu_borrowed_texture_descriptor {
   uint32_t format;
 } mln_webgpu_borrowed_texture_descriptor;
 
+/** A frame-scoped target for an attached WebGPU borrowed-texture session. */
+typedef struct mln_webgpu_borrowed_texture_target {
+  uint32_t size;
+  /**
+   * Borrowed WGPUTexture created by the device used to attach the session.
+   *
+   * The texture must match the attached target's physical dimensions, format,
+   * and usage requirements.
+   */
+  void* texture;
+  /** Borrowed 2D WGPUTextureView for texture. */
+  void* texture_view;
+} mln_webgpu_borrowed_texture_target;
+
 /** WebGPU frame acquired from a session-owned texture target. */
 typedef struct mln_webgpu_owned_texture_frame {
   uint32_t size;
@@ -355,6 +369,12 @@ mln_webgpu_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_webgpu_borrowed_texture_descriptor
 mln_webgpu_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns WebGPU borrowed-texture target defaults for this C API version.
+ */
+MLN_API mln_webgpu_borrowed_texture_target
+mln_webgpu_borrowed_texture_target_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns texture image info defaults for this C API version.
@@ -612,6 +632,48 @@ MLN_API mln_status mln_webgpu_owned_texture_attach(
 MLN_API mln_status mln_webgpu_borrowed_texture_attach(
   mln_map map, const mln_webgpu_borrowed_texture_descriptor* descriptor,
   mln_render_session* out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Replaces the target of an attached WebGPU borrowed-texture session.
+ *
+ * This supports hosts whose renderable WebGPU texture is frame-scoped, such as
+ * Canvas2D transferToGPUTexture(). The replacement texture and view must be
+ * created by the device used to attach the session and must match the original
+ * physical dimensions and format. The session retains both handles until they
+ * are replaced, cleared, detached, or destroyed.
+ *
+ * Call this before mln_render_session_render_update(). Keep the target out of
+ * concurrent use until mln_webgpu_borrowed_texture_clear_target() returns.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session or target is invalid, target has
+ *   an invalid size, either native handle is null, or the texture shape,
+ *   format, or usage does not match the attached session.
+ * - MLN_STATUS_INVALID_STATE when the session is detached.
+ * - MLN_STATUS_UNSUPPORTED when the session is not a WebGPU borrowed-texture
+ *   session or this build does not support WebGPU.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_webgpu_borrowed_texture_set_target(
+  mln_render_session session, const mln_webgpu_borrowed_texture_target* target
+) MLN_NOEXCEPT;
+
+/**
+ * Releases the current target of an attached WebGPU borrowed-texture session.
+ *
+ * Clear a frame-scoped target before returning it to its owner. Rendering while
+ * no target is set returns MLN_STATUS_INVALID_STATE. Calling this repeatedly is
+ * allowed.
+ *
+ * Returns the same session, backend, and thread status categories as
+ * mln_webgpu_borrowed_texture_set_target().
+ */
+MLN_API mln_status mln_webgpu_borrowed_texture_clear_target(
+  mln_render_session session
 ) MLN_NOEXCEPT;
 
 /**

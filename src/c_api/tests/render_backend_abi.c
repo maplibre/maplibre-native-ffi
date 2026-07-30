@@ -73,6 +73,12 @@ static void webgpu_texture_descriptors_validate_on_host_backends(void) {
   TEST_ASSERT_EQUAL_UINT32(256, borrowed.physical_width);
   TEST_ASSERT_EQUAL_UINT32(256, borrowed.physical_height);
 
+  mln_webgpu_borrowed_texture_target target =
+    mln_webgpu_borrowed_texture_target_default();
+  TEST_ASSERT_EQUAL_UINT32(sizeof(target), target.size);
+  TEST_ASSERT_NULL(target.texture);
+  TEST_ASSERT_NULL(target.texture_view);
+
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_render_session session = MLN_HANDLE_NULL;

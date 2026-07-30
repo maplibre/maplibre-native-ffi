@@ -112,6 +112,69 @@ auto validate_webgpu_borrowed_texture_descriptor(
   return MLN_STATUS_OK;
 }
 
+auto webgpu_borrowed_texture_set_target(
+  mln_render_session session, const mln_webgpu_borrowed_texture_target* target
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_texture(session, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    live->texture.api_kind != TextureSessionApi::WebGPU ||
+    live->texture.mode != TextureSessionMode::Borrowed
+  ) {
+    set_thread_error("render session is not a WebGPU borrowed-texture session");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  if (
+    target == nullptr ||
+    target->size < sizeof(mln_webgpu_borrowed_texture_target)
+  ) {
+    set_thread_error("target must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (target->texture == nullptr || target->texture_view == nullptr) {
+    set_thread_error("WebGPU texture and texture_view must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto replace_status =
+    live->texture.backend->set_webgpu_borrowed_target(*target);
+  if (replace_status == MLN_STATUS_OK) {
+    live->texture.borrowed_target_available = true;
+    live->texture.rendered_native_texture = nullptr;
+  }
+  return replace_status;
+}
+
+auto webgpu_borrowed_texture_clear_target(mln_render_session session)
+  -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_texture(session, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    live->texture.api_kind != TextureSessionApi::WebGPU ||
+    live->texture.mode != TextureSessionMode::Borrowed
+  ) {
+    set_thread_error("render session is not a WebGPU borrowed-texture session");
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  if (!live->texture.borrowed_target_available) {
+    return MLN_STATUS_OK;
+  }
+
+  const auto clear_status =
+    live->texture.backend->clear_webgpu_borrowed_target();
+  if (clear_status == MLN_STATUS_OK) {
+    live->texture.borrowed_target_available = false;
+    live->texture.rendered_native_texture = nullptr;
+  }
+  return clear_status;
+}
+
 auto texture_read_premultiplied_rgba8(
   mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info
