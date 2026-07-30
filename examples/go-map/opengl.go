@@ -36,9 +36,10 @@ type openGLWGLPlatform struct {
 }
 
 type openGLEGLPlatform struct {
-	display unsafe.Pointer
-	config  unsafe.Pointer
-	surface unsafe.Pointer
+	display       unsafe.Pointer
+	windowConfig  unsafe.Pointer
+	pbufferConfig unsafe.Pointer
+	surface       unsafe.Pointer
 }
 
 func usesEGL() bool {
@@ -93,8 +94,14 @@ func platformOpenGLContext(window *sdl.Window, context sdl.GLContext) (openGLPla
 	if err != nil {
 		return openGLPlatform{}, fmt.Errorf("SDL_EGL_GetWindowSurface failed: %w", err)
 	}
+	pbufferConfig := eglPbufferConfig(unsafe.Pointer(display), unsafe.Pointer(config))
 	_ = context
-	return openGLPlatform{egl: &openGLEGLPlatform{display: unsafe.Pointer(display), config: unsafe.Pointer(config), surface: unsafe.Pointer(surface)}}, nil
+	return openGLPlatform{egl: &openGLEGLPlatform{
+		display:       unsafe.Pointer(display),
+		windowConfig:  unsafe.Pointer(config),
+		pbufferConfig: pbufferConfig,
+		surface:       unsafe.Pointer(surface),
+	}}, nil
 }
 
 func (ctx *openGLContext) MakeCurrent() error {
@@ -121,20 +128,27 @@ func (ctx *openGLContext) Close() error {
 	return err
 }
 
-func (ctx *openGLContext) descriptor() maplibre.OpenGLContextDescriptor {
+func (ctx *openGLContext) descriptor(texture bool) (maplibre.OpenGLContextDescriptor, error) {
 	if ctx.platform.wgl != nil {
 		return maplibre.OpenGLContextDescriptor{WGL: &maplibre.WGLContextDescriptor{
 			DeviceContext:  nativePointer(ctx.platform.wgl.deviceContext),
 			ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
 			GetProcAddress: 0,
-		}}
+		}}, nil
+	}
+	config := ctx.platform.egl.windowConfig
+	if texture {
+		config = ctx.platform.egl.pbufferConfig
+		if config == nil {
+			return maplibre.OpenGLContextDescriptor{}, errors.New("no EGL config compatible with the current context supports pbuffer surfaces")
+		}
 	}
 	return maplibre.OpenGLContextDescriptor{EGL: &maplibre.EGLContextDescriptor{
 		Display:        nativePointer(ctx.platform.egl.display),
-		Config:         nativePointer(ctx.platform.egl.config),
+		Config:         nativePointer(config),
 		ShareContext:   nativePointer(unsafe.Pointer(ctx.context)),
 		GetProcAddress: 0,
-	}}
+	}}, nil
 }
 
 func (ctx *openGLContext) surface() maplibre.NativePointer {
@@ -280,7 +294,12 @@ func newOpenGLOwnedTextureTarget(context *openGLContext, v viewport, m *maplibre
 		return nil, err
 	}
 	target := &openGLOwnedTextureTarget{compositor: compositor}
-	session, err := m.AttachOpenGLOwnedTexture(maplibre.OpenGLOwnedTextureDescriptor{Extent: v.extent(), Context: compositor.context.descriptor()})
+	descriptor, err := compositor.context.descriptor(true)
+	if err != nil {
+		_ = target.Close()
+		return nil, err
+	}
+	session, err := m.AttachOpenGLOwnedTexture(maplibre.OpenGLOwnedTextureDescriptor{Extent: v.extent(), Context: descriptor})
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL texture attach failed: %w", err)
@@ -360,11 +379,16 @@ func newOpenGLBorrowedTextureTarget(context *openGLContext, v viewport, m *mapli
 		return nil, err
 	}
 	target.texture = texture
+	descriptor, err := compositor.context.descriptor(true)
+	if err != nil {
+		_ = target.Close()
+		return nil, err
+	}
 	session, err := m.AttachOpenGLBorrowedTexture(maplibre.OpenGLBorrowedTextureDescriptor{
 		Extent:         v.extent(),
 		PhysicalWidth:  v.physicalWidth,
 		PhysicalHeight: v.physicalHeight,
-		Context:        compositor.context.descriptor(),
+		Context:        descriptor,
 		Texture:        texture,
 		Target:         glTexture2D,
 	})
@@ -446,7 +470,11 @@ func newOpenGLSurfaceTarget(context *openGLContext, v viewport, m *maplibre.MapH
 		return nil, fmt.Errorf("OpenGL surface refresh failed: %w", err)
 	}
 	target := &openGLSurfaceTarget{context: context}
-	session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{Extent: v.extent(), Context: context.descriptor(), Surface: context.surface()})
+	descriptor, err := context.descriptor(false)
+	if err != nil {
+		return nil, err
+	}
+	session, err := m.AttachOpenGLSurface(maplibre.OpenGLSurfaceDescriptor{Extent: v.extent(), Context: descriptor, Surface: context.surface()})
 	if err != nil {
 		_ = target.Close()
 		return nil, fmt.Errorf("OpenGL surface attach failed: %w", err)

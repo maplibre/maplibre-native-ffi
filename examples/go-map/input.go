@@ -34,7 +34,7 @@ func logControls() {
   0: reset pitch and bearing`)
 }
 
-func (input *inputController) handleEvent(event *sdl.Event, commands chan<- cameraCommand, v viewport) bool {
+func (input *inputController) handleEvent(event *sdl.Event, commands chan cameraCommand, v viewport) bool {
 	switch event.Type() {
 	case sdl.EventMouseButtonDown:
 		return input.handleMouseButtonDown(event.MouseButton(), commands, v)
@@ -51,7 +51,7 @@ func (input *inputController) handleEvent(event *sdl.Event, commands chan<- came
 	}
 }
 
-func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands chan<- cameraCommand, v viewport) bool {
+func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent, commands chan cameraCommand, v viewport) bool {
 	if event == nil {
 		return false
 	}
@@ -62,9 +62,8 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	if mode == dragNone {
 		return false
 	}
-	commands <- cameraCommand{kind: commandCancelTransitions}
 	input.dragMode = mode
-	return true
+	return enqueueCameraCommand(commands, cameraCommand{kind: commandCancelTransitions})
 }
 
 func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, v viewport) bool {
@@ -78,7 +77,7 @@ func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, v
 	return false
 }
 
-func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands chan<- cameraCommand, v viewport) bool {
+func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands chan cameraCommand, v viewport) bool {
 	if event == nil || input.dragMode == dragNone {
 		return false
 	}
@@ -93,24 +92,24 @@ func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, com
 
 	switch input.dragMode {
 	case dragPan:
-		commands <- cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy}
+		return enqueueCameraCommand(commands, cameraCommand{kind: commandMoveBy, deltaX: dx, deltaY: dy})
 	case dragRotate:
-		commands <- cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5}
-		commands <- cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5}
+		bearingQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandAdjustBearing, deltaX: dx * 0.5})
+		pitchQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandPitchBy, deltaY: dy * 0.5})
+		return bearingQueued || pitchQueued
 	}
-	return true
+	return false
 }
 
-func handleMouseWheel(event *sdl.MouseWheelEvent, commands chan<- cameraCommand, v viewport) bool {
+func handleMouseWheel(event *sdl.MouseWheelEvent, commands chan cameraCommand, v viewport) bool {
 	if event == nil || event.Y == 0 {
 		return false
 	}
 	anchor := logicalPoint(float64(event.MouseX), float64(event.MouseY), v)
-	commands <- cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor}
-	return true
+	return enqueueCameraCommand(commands, cameraCommand{kind: commandScaleBy, scale: math.Pow(2, float64(event.Y)*0.25), anchor: anchor})
 }
 
-func handleKeyDown(event *sdl.KeyboardEvent, commands chan<- cameraCommand, v viewport) bool {
+func handleKeyDown(event *sdl.KeyboardEvent, commands chan cameraCommand, v viewport) bool {
 	if event == nil {
 		return false
 	}
@@ -149,8 +148,26 @@ func handleKeyDown(event *sdl.KeyboardEvent, commands chan<- cameraCommand, v vi
 	default:
 		return false
 	}
-	commands <- command
-	return true
+	return enqueueCameraCommand(commands, command)
+}
+
+func enqueueCameraCommand(commands chan cameraCommand, command cameraCommand) bool {
+	select {
+	case commands <- command:
+		return true
+	default:
+	}
+
+	select {
+	case <-commands:
+	default:
+	}
+	select {
+	case commands <- command:
+		return true
+	default:
+		return false
+	}
 }
 
 func dragModeForButton(button byte) dragMode {

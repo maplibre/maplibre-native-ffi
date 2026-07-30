@@ -3,6 +3,7 @@ package main
 /*
 #cgo pkg-config: sdl3
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_egl.h>
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -151,6 +152,59 @@ static const char *mln_go_map_gl_load(void) {
   return NULL;
 }
 
+static SDL_EGLConfig mln_go_map_egl_pbuffer_config(SDL_EGLDisplay display, SDL_EGLConfig current) {
+  PFNEGLGETCONFIGATTRIBPROC get_config_attrib =
+      (PFNEGLGETCONFIGATTRIBPROC)SDL_EGL_GetProcAddress("eglGetConfigAttrib");
+  PFNEGLCHOOSECONFIGPROC choose_config =
+      (PFNEGLCHOOSECONFIGPROC)SDL_EGL_GetProcAddress("eglChooseConfig");
+  if (!get_config_attrib || !choose_config) {
+    return NULL;
+  }
+
+  EGLint surface_type = 0;
+  if (!get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_SURFACE_TYPE, &surface_type)) {
+    return NULL;
+  }
+  if ((surface_type & EGL_PBUFFER_BIT) != 0) {
+    return current;
+  }
+
+  EGLint renderable_type = 0;
+  EGLint red_size = 0;
+  EGLint green_size = 0;
+  EGLint blue_size = 0;
+  EGLint alpha_size = 0;
+  EGLint depth_size = 0;
+  EGLint stencil_size = 0;
+  if (!get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_RENDERABLE_TYPE, &renderable_type) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_RED_SIZE, &red_size) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_GREEN_SIZE, &green_size) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_BLUE_SIZE, &blue_size) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_ALPHA_SIZE, &alpha_size) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_DEPTH_SIZE, &depth_size) ||
+      !get_config_attrib((EGLDisplay)display, (EGLConfig)current, EGL_STENCIL_SIZE, &stencil_size)) {
+    return NULL;
+  }
+
+  const EGLint attributes[] = {
+      EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
+      EGL_RENDERABLE_TYPE, renderable_type,
+      EGL_RED_SIZE, red_size,
+      EGL_GREEN_SIZE, green_size,
+      EGL_BLUE_SIZE, blue_size,
+      EGL_ALPHA_SIZE, alpha_size,
+      EGL_DEPTH_SIZE, depth_size,
+      EGL_STENCIL_SIZE, stencil_size,
+      EGL_NONE,
+  };
+  EGLConfig config = NULL;
+  EGLint count = 0;
+  if (!choose_config((EGLDisplay)display, attributes, &config, 1, &count) || count == 0) {
+    return NULL;
+  }
+  return (SDL_EGLConfig)config;
+}
+
 static void wrap_glActiveTexture(GLenum texture) { pglActiveTexture(texture); }
 static void wrap_glAttachShader(GLuint program, GLuint shader) { pglAttachShader(program, shader); }
 static void wrap_glBindFramebuffer(GLenum target, GLuint framebuffer) { pglBindFramebuffer(target, framebuffer); }
@@ -196,6 +250,10 @@ func glLoad() error {
 		return fmt.Errorf("SDL_GL_GetProcAddress failed for %s", C.GoString(missing))
 	}
 	return nil
+}
+
+func eglPbufferConfig(display, current unsafe.Pointer) unsafe.Pointer {
+	return unsafe.Pointer(C.mln_go_map_egl_pbuffer_config(C.SDL_EGLDisplay(display), C.SDL_EGLConfig(current)))
 }
 
 func glActiveTexture(texture uint32) { C.wrap_glActiveTexture(C.GLenum(texture)) }
