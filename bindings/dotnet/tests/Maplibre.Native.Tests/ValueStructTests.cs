@@ -79,7 +79,7 @@ public sealed unsafe class ValueStructTests
             );
 
             Assert.Throws<InvalidOperationException>(() =>
-                ValueStructs.ReadJsonSnapshot((mln_json_snapshot*)1234)
+                ValueStructs.ReadJsonSnapshot(SyntheticHandles.JsonSnapshot(1234))
             );
         }
         finally

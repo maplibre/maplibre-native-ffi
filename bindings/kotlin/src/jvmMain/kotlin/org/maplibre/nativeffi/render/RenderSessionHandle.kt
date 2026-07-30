@@ -4,6 +4,7 @@ import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.lifecycle.HandleLeakCleaner
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
+import org.maplibre.nativeffi.internal.lifecycle.NativeRenderSession
 import org.maplibre.nativeffi.internal.loader.NativeAccess
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
@@ -17,10 +18,10 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 
 /** Owned JVM FFM render session handle. Close it on the thread that attached it. */
 public actual class RenderSessionHandle
-internal constructor(private val map: MapHandle, private val handle: MemorySegment) :
+internal constructor(private val map: MapHandle, private val handle: NativeRenderSession) :
   AutoCloseable {
   private val mapRetention = map.retainChild("RenderSessionHandle")
-  private val core = HandleStateCore("RenderSessionHandle", handle.address(), map)
+  private val core = HandleStateCore("RenderSessionHandle", handle.raw, map)
 
   init {
     HandleLeakCleaner.register(this, core.leakReport)
@@ -208,7 +209,7 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     )
   }
 
-  internal fun nativeAddress(): Long = handle.address()
+  internal fun nativeHandleId(): Long = handle.raw
 
   internal fun releaseMetalFrame(frame: java.lang.foreign.MemorySegment) {
     NativeAccess.releaseMetalOwnedTextureFrame(requireLiveHandle(), frame)
@@ -226,7 +227,7 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
     activeFrame.endBorrow()
   }
 
-  private fun requireLiveHandle(): MemorySegment {
+  private fun requireLiveHandle(): NativeRenderSession {
     core.requireLive()
     return handle
   }

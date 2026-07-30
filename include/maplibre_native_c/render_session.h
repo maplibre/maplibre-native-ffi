@@ -54,7 +54,7 @@ extern "C" {
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_resize(
-  mln_render_session* session, uint32_t width, uint32_t height,
+  mln_render_session session, uint32_t width, uint32_t height,
   double scale_factor
 ) MLN_NOEXCEPT;
 
@@ -95,7 +95,7 @@ MLN_API mln_status mln_render_session_resize(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_render_update(
-  mln_render_session* session, bool* out_rendered
+  mln_render_session session, bool* out_rendered
 ) MLN_NOEXCEPT;
 
 /**
@@ -115,7 +115,7 @@ MLN_API mln_status mln_render_session_render_update(
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_render_session_detach(mln_render_session* session) MLN_NOEXCEPT;
+mln_render_session_detach(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Destroys a render session handle.
@@ -131,7 +131,7 @@ mln_render_session_detach(mln_render_session* session) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_render_session_destroy(mln_render_session* session) MLN_NOEXCEPT;
+mln_render_session_destroy(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Asks the session renderer to release cached resources where possible.
@@ -147,7 +147,7 @@ mln_render_session_destroy(mln_render_session* session) MLN_NOEXCEPT;
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_render_session_reduce_memory_use(mln_render_session* session) MLN_NOEXCEPT;
+mln_render_session_reduce_memory_use(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Clears renderer data for the session.
@@ -163,7 +163,7 @@ mln_render_session_reduce_memory_use(mln_render_session* session) MLN_NOEXCEPT;
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_render_session_clear_data(mln_render_session* session) MLN_NOEXCEPT;
+mln_render_session_clear_data(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Dumps renderer debug logs for the session through MapLibre Native logging.
@@ -179,7 +179,7 @@ mln_render_session_clear_data(mln_render_session* session) MLN_NOEXCEPT;
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status
-mln_render_session_dump_debug_logs(mln_render_session* session) MLN_NOEXCEPT;
+mln_render_session_dump_debug_logs(mln_render_session session) MLN_NOEXCEPT;
 
 /**
  * Sets per-feature state on a render source for this render session.
@@ -204,7 +204,7 @@ mln_render_session_dump_debug_logs(mln_render_session* session) MLN_NOEXCEPT;
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_set_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
+  mln_render_session session, const mln_feature_state_selector* selector,
   const mln_json_value* state
 ) MLN_NOEXCEPT;
 
@@ -231,8 +231,8 @@ MLN_API mln_status mln_render_session_set_feature_state(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_get_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector,
-  mln_json_snapshot** out_state
+  mln_render_session session, const mln_feature_state_selector* selector,
+  mln_json_snapshot* out_state
 ) MLN_NOEXCEPT;
 
 /**
@@ -257,7 +257,7 @@ MLN_API mln_status mln_render_session_get_feature_state(
  *   backend, or when an internal exception is converted to status.
  */
 MLN_API mln_status mln_render_session_remove_feature_state(
-  mln_render_session* session, const mln_feature_state_selector* selector
+  mln_render_session session, const mln_feature_state_selector* selector
 ) MLN_NOEXCEPT;
 
 /**
@@ -268,18 +268,19 @@ MLN_API mln_status mln_render_session_remove_feature_state(
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when snapshot is null or not live, or out_value
- *   is null.
+ * - MLN_STATUS_INVALID_ARGUMENT when snapshot does not name a live snapshot, or
+ *   out_value is null.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_json_snapshot_get(
-  const mln_json_snapshot* snapshot, const mln_json_value** out_value
+  mln_json_snapshot snapshot, const mln_json_value** out_value
 ) MLN_NOEXCEPT;
 
-/** Destroys a JSON snapshot handle. Null is accepted as a no-op. */
-MLN_API void mln_json_snapshot_destroy(
-  mln_json_snapshot* snapshot
-) MLN_NOEXCEPT;
+/**
+ * Destroys a JSON snapshot handle. MLN_HANDLE_NULL is accepted as a no-op, as
+ * is a handle this call already retired.
+ */
+MLN_API void mln_json_snapshot_destroy(mln_json_snapshot snapshot) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

@@ -203,7 +203,7 @@ public sealed unsafe class QueryStructTests
         );
 
         Assert.Throws<InvalidOperationException>(() =>
-            QueryStructs.ReadFeatureQueryResult((mln_feature_query_result*)1234)
+            QueryStructs.ReadFeatureQueryResult(SyntheticHandles.FeatureQueryResult(1234))
         );
 
         Assert.Equal(1, destroyCalls);

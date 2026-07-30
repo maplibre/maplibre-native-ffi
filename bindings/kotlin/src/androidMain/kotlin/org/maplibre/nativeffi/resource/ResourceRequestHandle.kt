@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.resource
 
 import org.bytedeco.javacpp.BytePointer
-import org.bytedeco.javacpp.Pointer
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.javacpp.JavaCppSupport
 import org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC
@@ -9,12 +8,12 @@ import org.maplibre.nativeffi.internal.lifecycle.UnreachableActions
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Owned Android JNI handle for a resource provider request. */
-public actual class ResourceRequestHandle internal constructor(private val handleAddress: Long) :
+public actual class ResourceRequestHandle internal constructor(private val handleId: Long) :
   AutoCloseable {
-  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleAddress))
+  private val core = ResourceRequestHandleCore(ReleaseNativeRequest(handleId))
 
   init {
-    require(handleAddress != 0L) { "Resource request handle is null" }
+    require(handleId != 0L) { "Resource request handle is null" }
     UnreachableActions.register(this, CloseWhenUnreachableAction(core))
   }
 
@@ -25,10 +24,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
       val nativeStatus =
         NativeResourceResponseScope(response).use { nativeResponse ->
           reachedNative = true
-          MaplibreNativeC.mln_resource_request_complete(
-            resourceRequestHandle(handleAddress),
-            nativeResponse.response,
-          )
+          MaplibreNativeC.mln_resource_request_complete(handleId, nativeResponse.response)
         }
       val nativeFailure =
         if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
@@ -48,12 +44,7 @@ public actual class ResourceRequestHandle internal constructor(private val handl
 
   public actual fun isCancelled(): Boolean = core.withLiveHandle {
     val outCancelled = booleanArrayOf(false)
-    Status.check(
-      MaplibreNativeC.mln_resource_request_cancelled(
-        resourceRequestHandle(handleAddress),
-        outCancelled,
-      )
-    )
+    Status.check(MaplibreNativeC.mln_resource_request_cancelled(handleId, outCancelled))
     outCancelled[0]
   }
 
@@ -147,22 +138,13 @@ public actual class ResourceRequestHandle internal constructor(private val handl
   }
 
   /** Native release that holds the handle address alone, keeping the wrapper collectable. */
-  private class ReleaseNativeRequest(private val handleAddress: Long) : () -> Unit {
+  private class ReleaseNativeRequest(private val handleId: Long) : () -> Unit {
     override fun invoke() {
-      MaplibreNativeC.mln_resource_request_release(resourceRequestHandle(handleAddress))
+      MaplibreNativeC.mln_resource_request_release(handleId)
     }
   }
 
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1
-  }
-}
-
-private fun resourceRequestHandle(address: Long): MaplibreNativeC.mln_resource_request_handle =
-  MaplibreNativeC.mln_resource_request_handle(AddressPointer(address))
-
-private class AddressPointer(address: Long) : Pointer(null as Pointer?) {
-  init {
-    this.address = address
   }
 }

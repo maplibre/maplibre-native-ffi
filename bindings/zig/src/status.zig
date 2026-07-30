@@ -97,17 +97,17 @@ test "diagnostic store copies thread-local native message" {
     var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
     defer store.deinit();
 
-    try std.testing.expectError(error.InvalidArgument, checkStatus(c.mln_runtime_destroy(null), &store));
+    try std.testing.expectError(error.InvalidArgument, checkStatus(c.mln_runtime_destroy(0), &store));
     const first = store.get().?;
     try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), first.raw_status);
     try std.testing.expect(first.message.len > 0);
     const copied = try std.testing.allocator.dupe(u8, first.message);
     defer std.testing.allocator.free(copied);
 
-    var runtime: ?*c.mln_runtime = null;
+    var runtime: c.mln_runtime = 0;
     var options = c.mln_runtime_options_default();
     try checkStatus(c.mln_runtime_create(&options, &runtime), null);
-    defer if (runtime) |handle| checkStatus(c.mln_runtime_destroy(handle), null) catch @panic("runtime destroy failed");
+    defer checkStatus(c.mln_runtime_destroy(runtime), null) catch @panic("runtime destroy failed");
 
     try std.testing.expectEqualStrings(copied, store.get().?.message);
 }

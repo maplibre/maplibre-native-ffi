@@ -353,7 +353,8 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(releases.value() == 0)
     #expect(leaks.value() == [NativeHandleLeak(
       typeName: "MetalOwnedTextureFrameHandle",
-      address: 0x1234
+      handle: 0,
+      detail: "texture 0x1234"
     )])
   }
 }

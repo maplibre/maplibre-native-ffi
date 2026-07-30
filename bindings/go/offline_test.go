@@ -308,7 +308,7 @@ func TestOfflineOperationDiscardIsIdempotentAfterSuccess(t *testing.T) {
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		calls++
 		return 0
 	})
@@ -331,7 +331,7 @@ func TestOfflineOperationDiscardFailureLeavesHandleRetryable(t *testing.T) {
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	statuses := []int32{-2, 0, 0}
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		status := statuses[0]
 		statuses = statuses[1:]
 		return status
@@ -351,11 +351,11 @@ func TestOfflineOperationBlocksRuntimeCloseUntilReleased(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		return 0
 	})
 	defer restore()
-	restoreRuntimeDestroy := replaceRuntimeDestroyForTest(func(ptr *nativeRuntime) int32 {
+	restoreRuntimeDestroy := replaceRuntimeDestroyForTest(func(nativeRuntime) int32 {
 		return 0
 	})
 	defer restoreRuntimeDestroy()
@@ -379,7 +379,7 @@ func TestOfflineOperationDiscardSerializesConcurrentCalls(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	var calls atomic.Int32
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		if calls.Add(1) == 1 {
 			close(entered)
 			<-release
@@ -421,7 +421,7 @@ func TestOfflineOperationTakeRejectsNoResultOperationWithoutDiscarding(t *testin
 	defer closeFakeRuntimeHandle(t, runtime)
 
 	var calls int
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		calls++
 		return 0
 	})
@@ -443,7 +443,7 @@ func TestOfflineOperationTakePreConsumeMismatchRemainsRetryable(t *testing.T) {
 	runtime := newFakeRuntimeHandle(t)
 	defer closeFakeRuntimeHandle(t, runtime)
 
-	restore := replaceOfflineOperationDiscardForTest(func(ptr *nativeRuntime, id uint64) int32 {
+	restore := replaceOfflineOperationDiscardForTest(func(ptr nativeRuntime, id uint64) int32 {
 		return 0
 	})
 	defer restore()
@@ -472,7 +472,7 @@ func TestStartOfflineOperationRejectsZeroID(t *testing.T) {
 
 func newFakeRuntimeHandle(t *testing.T) *RuntimeHandle {
 	t.Helper()
-	state, err := handle.New(&nativeRuntime{}, "RuntimeHandle")
+	state, err := handle.New(nativeRuntime(0x0100_0000_0000_002a), "RuntimeHandle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -481,12 +481,12 @@ func newFakeRuntimeHandle(t *testing.T) *RuntimeHandle {
 
 func closeFakeRuntimeHandle(t *testing.T, runtime *RuntimeHandle) {
 	t.Helper()
-	if status := runtime.state.Close(func(ptr *nativeRuntime) int32 { return 0 }); status != 0 {
+	if status := runtime.state.Close(func(nativeRuntime) int32 { return 0 }); status != 0 {
 		t.Fatalf("fake runtime close status = %d, want 0", status)
 	}
 }
 
-func replaceOfflineOperationDiscardForTest(discard func(*nativeRuntime, uint64) int32) func() {
+func replaceOfflineOperationDiscardForTest(discard func(nativeRuntime, uint64) int32) func() {
 	previous := offlineOperationDiscard
 	offlineOperationDiscard = discard
 	return func() {
@@ -494,7 +494,7 @@ func replaceOfflineOperationDiscardForTest(discard func(*nativeRuntime, uint64) 
 	}
 }
 
-func replaceRuntimeDestroyForTest(destroy func(*nativeRuntime) int32) func() {
+func replaceRuntimeDestroyForTest(destroy func(nativeRuntime) int32) func() {
 	previous := destroyRuntimeHandle
 	destroyRuntimeHandle = destroy
 	return func() {

@@ -1,0 +1,53 @@
+/// A handle the C API issued.
+///
+/// The C API spells every handle as one integer type, so each kind gets its own
+/// extension type here to keep the kinds distinct at compile time. The value
+/// names one object for the life of the process, carries no ownership, and is
+/// safe to copy, compare, hash, and send between isolates. Zero is the null
+/// handle.
+///
+/// These are distinct from [NativePointer], which borrows a backend-native
+/// address such as a Metal texture or a Vulkan device.
+extension type const NativeHandle(int raw) implements Object {
+  /// Whether this is the null handle.
+  bool get isNull => raw == 0;
+}
+
+/// Runtime handle id.
+extension type const NativeRuntime(int raw) implements NativeHandle {}
+
+/// Map handle id.
+extension type const NativeMap(int raw) implements NativeHandle {}
+
+/// Map projection handle id.
+extension type const NativeMapProjection(int raw) implements NativeHandle {}
+
+/// Render session handle id.
+extension type const NativeRenderSession(int raw) implements NativeHandle {}
+
+/// Offline region snapshot handle id.
+extension type const NativeOfflineRegionSnapshot(int raw)
+    implements NativeHandle {}
+
+/// Offline region list handle id.
+extension type const NativeOfflineRegionList(int raw) implements NativeHandle {}
+
+/// JSON snapshot handle id.
+extension type const NativeJsonSnapshot(int raw) implements NativeHandle {}
+
+/// Style id list handle id.
+extension type const NativeStyleIdList(int raw) implements NativeHandle {}
+
+/// Feature query result handle id.
+extension type const NativeFeatureQueryResult(int raw)
+    implements NativeHandle {}
+
+/// Feature extension result handle id.
+extension type const NativeFeatureExtensionResult(int raw)
+    implements NativeHandle {}
+
+/// Wake source handle id.
+extension type const NativeWakeSource(int raw) implements NativeHandle {}
+
+/// Resource request handle id.
+extension type const NativeResourceRequest(int raw) implements NativeHandle {}

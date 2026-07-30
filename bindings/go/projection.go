@@ -6,12 +6,10 @@ package maplibre
 import "C"
 
 import (
-	"unsafe"
-
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 )
 
-type nativeProjection struct{}
+type nativeProjection uint64
 
 // MapProjectionHandle owns a standalone projection snapshot.
 type MapProjectionHandle struct {
@@ -28,12 +26,12 @@ func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	defer release()
 	defer m.state.KeepAlive()
 
-	var projection *nativeProjection
+	var projection nativeProjection
 	if err := checkNative(func() int32 {
-		var raw *C.mln_map_projection
-		status := int32(C.mln_map_projection_create((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+		var raw C.mln_map_projection
+		status := int32(C.mln_map_projection_create(C.mln_map(ptr), &raw))
 		if status == int32(C.MLN_STATUS_OK) {
-			projection = (*nativeProjection)(unsafe.Pointer(raw))
+			projection = nativeProjection(raw)
 		}
 		return status
 	}); err != nil {
@@ -46,15 +44,15 @@ func (m *MapHandle) NewProjection() (*MapProjectionHandle, error) {
 	return &MapProjectionHandle{state: state}, nil
 }
 
-func (projection *MapProjectionHandle) ptr() (*nativeProjection, func(), error) {
+func (projection *MapProjectionHandle) ptr() (nativeProjection, func(), error) {
 	if projection == nil || projection.state == nil {
-		return nil, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
+		return 0, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
 	borrow, live := projection.state.Borrow()
 	if !live {
-		return nil, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
+		return 0, nil, newBindingError(ErrInvalidArgument, "MapProjectionHandle is closed")
 	}
-	return borrow.Ptr(), borrow.Release, nil
+	return borrow.Handle(), borrow.Release, nil
 }
 
 // Close destroys this projection helper. A successful close makes later calls
@@ -65,8 +63,8 @@ func (projection *MapProjectionHandle) Close() error {
 		return newBindingError(ErrInvalidArgument, "MapProjectionHandle is nil")
 	}
 	return checkNative(func() int32 {
-		return projection.state.Close(func(ptr *nativeProjection) int32 {
-			return int32(C.mln_map_projection_destroy((*C.mln_map_projection)(unsafe.Pointer(ptr))))
+		return projection.state.Close(func(native nativeProjection) int32 {
+			return int32(C.mln_map_projection_destroy(C.mln_map_projection(native)))
 		})
 	})
 }
@@ -82,7 +80,7 @@ func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
 
 	var camera C.mln_camera_options = C.mln_camera_options_default()
 	if err := checkNative(func() int32 {
-		return int32(C.mln_map_projection_get_camera((*C.mln_map_projection)(unsafe.Pointer(ptr)), &camera))
+		return int32(C.mln_map_projection_get_camera(C.mln_map_projection(ptr), &camera))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
@@ -100,7 +98,7 @@ func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
 
 	rawCamera := cCameraOptions(camera)
 	return checkNative(func() int32 {
-		return int32(C.mln_map_projection_set_camera((*C.mln_map_projection)(unsafe.Pointer(ptr)), &rawCamera))
+		return int32(C.mln_map_projection_set_camera(C.mln_map_projection(ptr), &rawCamera))
 	})
 }
 
@@ -121,7 +119,7 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_projection_set_visible_coordinates(
-			(*C.mln_map_projection)(unsafe.Pointer(ptr)),
+			C.mln_map_projection(ptr),
 			rawCoordinatesPtr,
 			C.size_t(len(rawCoordinates)),
 			cEdgeInsets(padding),
@@ -146,7 +144,7 @@ func (projection *MapProjectionHandle) SetVisibleGeometry(geometry Geometry, pad
 	}
 	return checkNative(func() int32 {
 		return int32(C.mln_map_projection_set_visible_geometry(
-			(*C.mln_map_projection)(unsafe.Pointer(ptr)),
+			C.mln_map_projection(ptr),
 			rawGeometry,
 			cEdgeInsets(padding),
 		))
@@ -165,7 +163,7 @@ func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (Screen
 	var point C.mln_screen_point
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_projection_pixel_for_lat_lng(
-			(*C.mln_map_projection)(unsafe.Pointer(ptr)),
+			C.mln_map_projection(ptr),
 			cLatLng(coordinate),
 			&point,
 		))
@@ -187,7 +185,7 @@ func (projection *MapProjectionHandle) LatLngForPixel(point ScreenPoint) (LatLng
 	var coordinate C.mln_lat_lng
 	if err := checkNative(func() int32 {
 		return int32(C.mln_map_projection_lat_lng_for_pixel(
-			(*C.mln_map_projection)(unsafe.Pointer(ptr)),
+			C.mln_map_projection(ptr),
 			cScreenPoint(point),
 			&coordinate,
 		))

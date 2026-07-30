@@ -66,11 +66,11 @@ public struct MapOptions: Equatable, Sendable {
 
 public final class MapHandle {
   private static let registryLock = NSLock()
-  private nonisolated(unsafe) static var registry: [UInt: WeakMapHandle] = [:]
+  private nonisolated(unsafe) static var registry: [UInt64: WeakMapHandle] = [:]
 
   private let runtime: RuntimeHandle
-  private let handle: NativeHandleBox
-  private let nativeAddress: UInt
+  private let handle: NativeHandleBox<NativeMapHandle>
+  private let mapId: MapId
   private var styleURLReplacementPending = false
   private var customGeometrySourceCallbacks: [
     String: NativeCustomGeometrySourceCallbacks
@@ -78,22 +78,22 @@ public final class MapHandle {
     [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
-    let pointer = try mapNativeFailure {
+    let native = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
         try NativeMap.create(
-          runtime: runtime.requireLivePointer(),
+          runtime: runtime.requireLiveHandle(),
           options: nativeOptions
         )
       }
     }
     self.runtime = runtime
-    nativeAddress = UInt(bitPattern: pointer)
-    handle = try NativeHandleBox(typeName: "MapHandle", pointer: pointer)
+    mapId = MapId(value: native.raw)
+    handle = try NativeHandleBox(typeName: "MapHandle", handle: native)
     Self.register(self)
   }
 
   deinit {
-    Self.unregister(nativeAddress)
+    Self.unregister(mapId)
     if !handle.isClosed {
       abandonNativeOwnedCustomGeometrySourceCallbacks()
     }
@@ -107,10 +107,10 @@ public final class MapHandle {
     guard case let .map(source) = event.source else {
       return false
     }
-    return source.addressBitPattern == nativeAddress
+    return source == mapId
   }
 
-  func requireLivePointer() throws -> OpaquePointer {
+  func requireLiveHandle() throws -> NativeMapHandle {
     try handle.requireLive()
   }
 
@@ -125,19 +125,19 @@ public final class MapHandle {
   /// stays on the runtime owner thread.
   public func attachRef() throws -> MapAttachRef {
     // Resolve once so a closed map fails here rather than at the first attach.
-    _ = try requireLivePointer()
+    _ = try requireLiveHandle()
     return MapAttachRef(handle: handle)
   }
 
   private static func register(_ map: MapHandle) {
     registryLock.withLock {
-      registry[map.nativeAddress] = WeakMapHandle(map)
+      registry[map.mapId.value] = WeakMapHandle(map)
     }
   }
 
-  private static func unregister(_ nativeAddress: UInt) {
+  private static func unregister(_ mapId: MapId) {
     registryLock.withLock {
-      _ = registry.removeValue(forKey: nativeAddress)
+      _ = registry.removeValue(forKey: mapId.value)
     }
   }
 
@@ -147,7 +147,7 @@ public final class MapHandle {
     else { return }
 
     let map = registryLock
-      .withLock { registry[source.addressBitPattern]?.value }
+      .withLock { registry[source.value]?.value }
     map?.releaseCallbacksForLoadedStyleURLIfNeeded()
   }
 
@@ -195,10 +195,10 @@ public final class MapHandle {
   }
 
   public func close() throws {
-    try handle.closeOnce { pointer in
-      try checkStatus(mln_map_destroy(pointer))
+    try handle.closeOnce { handle in
+      try checkStatus(mln_map_destroy(handle.raw))
     }
-    Self.unregister(nativeAddress)
+    Self.unregister(mapId)
     resetCallbackRetentionState()
   }
 
@@ -215,7 +215,7 @@ public final class MapHandle {
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(url) { url in
-        try checkStatus(mln_map_set_style_url(handle.requireLive(), url))
+        try checkStatus(mln_map_set_style_url(handle.requireLive().raw, url))
       }
       retainCallbacksUntilPendingStyleURLLoads()
     }
@@ -233,7 +233,7 @@ public final class MapHandle {
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
       try NativeString.withCString(json) { json in
-        try checkStatus(mln_map_set_style_json(handle.requireLive(), json))
+        try checkStatus(mln_map_set_style_json(handle.requireLive().raw, json))
       }
       resetCallbackRetentionState()
     }
@@ -241,13 +241,13 @@ public final class MapHandle {
 
   public func requestRepaint() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_request_repaint(handle.requireLive()))
+      try checkStatus(mln_map_request_repaint(handle.requireLive().raw))
     }
   }
 
   public func requestStillImage() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_request_still_image(handle.requireLive()))
+      try checkStatus(mln_map_request_still_image(handle.requireLive().raw))
     }
   }
 
@@ -261,7 +261,7 @@ public final class MapHandle {
   public func jump(to camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try checkStatus(mln_map_jump_to(handle.requireLive(), nativeCamera))
+        try checkStatus(mln_map_jump_to(handle.requireLive().raw, nativeCamera))
       }
     }
   }
@@ -275,7 +275,7 @@ public final class MapHandle {
         try (animation?.nativeInput ?? NativeAnimationOptionsInput())
           .withOptionalNativeOptions { nativeAnimation in
             try checkStatus(mln_map_ease_to(
-              handle.requireLive(),
+              handle.requireLive().raw,
               nativeCamera,
               nativeAnimation
             ))
@@ -286,7 +286,7 @@ public final class MapHandle {
 
   public func moveBy(deltaX: Double, deltaY: Double) throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_move_by(handle.requireLive(), deltaX, deltaY))
+      try checkStatus(mln_map_move_by(handle.requireLive().raw, deltaX, deltaY))
     }
   }
 
@@ -298,7 +298,7 @@ public final class MapHandle {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
         try checkStatus(mln_map_move_by_animated(
-          handle.requireLive(),
+          handle.requireLive().raw,
           deltaX,
           deltaY,
           nativeAnimation
@@ -312,13 +312,13 @@ public final class MapHandle {
       if var nativeAnchor = anchor?.nativeInput.native {
         try withUnsafePointer(to: &nativeAnchor) { anchor in
           try checkStatus(mln_map_scale_by(
-            handle.requireLive(),
+            handle.requireLive().raw,
             scale,
             anchor
           ))
         }
       } else {
-        try checkStatus(mln_map_scale_by(handle.requireLive(), scale, nil))
+        try checkStatus(mln_map_scale_by(handle.requireLive().raw, scale, nil))
       }
     }
   }
@@ -333,7 +333,7 @@ public final class MapHandle {
         if var nativeAnchor = anchor?.nativeInput.native {
           try withUnsafePointer(to: &nativeAnchor) { anchor in
             try checkStatus(mln_map_scale_by_animated(
-              handle.requireLive(),
+              handle.requireLive().raw,
               scale,
               anchor,
               nativeAnimation
@@ -341,7 +341,7 @@ public final class MapHandle {
           }
         } else {
           try checkStatus(mln_map_scale_by_animated(
-            handle.requireLive(),
+            handle.requireLive().raw,
             scale,
             nil,
             nativeAnimation
@@ -353,7 +353,7 @@ public final class MapHandle {
 
   public func cancelTransitions() throws {
     try mapNativeFailure {
-      try checkStatus(mln_map_cancel_transitions(handle.requireLive()))
+      try checkStatus(mln_map_cancel_transitions(handle.requireLive().raw))
     }
   }
 }

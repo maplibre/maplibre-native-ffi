@@ -15,31 +15,33 @@ const (
 	testStatusWrongThread int32 = -3
 )
 
-type testNativeHandle struct {
-	value int
-}
+// A synthetic handle type for close-once tests. It reaches only the fake
+// destroy functions below, never the C API, and the safe public API cannot
+// build one.
+type testNativeHandle uint64
 
-func TestStateRejectsNilPointer(t *testing.T) {
-	state, err := New[testNativeHandle](nil, "test_handle")
+const testHandle testNativeHandle = 0x0200_0000_0000_002a
+
+func TestStateRejectsTheNullHandle(t *testing.T) {
+	state, err := New[testNativeHandle](0, "test_handle")
 	if err == nil {
-		t.Fatal("New(nil) succeeded")
+		t.Fatal("New(0) succeeded")
 	}
 	if state != nil {
-		t.Fatalf("New(nil) state = %#v, want nil", state)
+		t.Fatalf("New(0) state = %#v, want nil", state)
 	}
 }
 
 func TestStateCloseIsIdempotentAfterSuccess(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var calls atomic.Int32
-	destroy := func(ptr *testNativeHandle) int32 {
-		if ptr != native {
-			t.Fatalf("destroy pointer = %p, want %p", ptr, native)
+	destroy := func(handle testNativeHandle) int32 {
+		if handle != testHandle {
+			t.Fatalf("destroy handle = %#x, want %#x", handle, testHandle)
 		}
 		calls.Add(1)
 		return testStatusOK
@@ -60,14 +62,13 @@ func TestStateCloseIsIdempotentAfterSuccess(t *testing.T) {
 }
 
 func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	var calls atomic.Int32
-	destroy := func(*testNativeHandle) int32 {
+	destroy := func(testNativeHandle) int32 {
 		if calls.Add(1) == 1 {
 			return testStatusWrongThread
 		}
@@ -77,8 +78,8 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	if status := state.Close(destroy); status != testStatusWrongThread {
 		t.Fatalf("first Close status = %d, want wrong-thread", status)
 	}
-	if ptr, live := state.Ptr(); !live || ptr != native {
-		t.Fatalf("Ptr() = %p, %v; want live native pointer", ptr, live)
+	if handle, live := state.Handle(); !live || handle != testHandle {
+		t.Fatalf("Handle() = %#x, %v; want the live handle", handle, live)
 	}
 	if status := state.Close(destroy); status != testStatusOK {
 		t.Fatalf("second Close status = %d, want OK", status)
@@ -88,9 +89,9 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 }
 
+// BND-197.
 func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,16 +100,16 @@ func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
 	if !live {
 		t.Fatal("Borrow() failed for live state")
 	}
-	if ptr := borrow.Ptr(); ptr != native {
-		t.Fatalf("borrow Ptr() = %p, want %p", ptr, native)
+	if handle := borrow.Handle(); handle != testHandle {
+		t.Fatalf("borrow Handle() = %#x, want %#x", handle, testHandle)
 	}
 
 	destroyCalled := make(chan struct{})
 	closeDone := make(chan int32)
 	go func() {
-		closeDone <- state.Close(func(ptr *testNativeHandle) int32 {
-			if ptr != native {
-				t.Errorf("destroy pointer = %p, want %p", ptr, native)
+		closeDone <- state.Close(func(handle testNativeHandle) int32 {
+			if handle != testHandle {
+				t.Errorf("destroy handle = %#x, want %#x", handle, testHandle)
 			}
 			close(destroyCalled)
 			return testStatusOK
@@ -148,28 +149,26 @@ func TestStateCloseWaitsForActiveBorrowBeforeDestroy(t *testing.T) {
 }
 
 func TestStateFailedCloseAllowsBorrowRetry(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if status := state.Close(func(*testNativeHandle) int32 { return testStatusWrongThread }); status != testStatusWrongThread {
+	if status := state.Close(func(testNativeHandle) int32 { return testStatusWrongThread }); status != testStatusWrongThread {
 		t.Fatalf("Close status = %d, want wrong-thread", status)
 	}
 	borrow, live := state.Borrow()
 	if !live {
 		t.Fatal("Borrow() failed after failed close")
 	}
-	if ptr := borrow.Ptr(); ptr != native {
-		t.Fatalf("borrow Ptr() = %p, want %p", ptr, native)
+	if handle := borrow.Handle(); handle != testHandle {
+		t.Fatalf("borrow Handle() = %#x, want %#x", handle, testHandle)
 	}
 	borrow.Release()
 }
 
 func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -183,7 +182,7 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			if status := state.Close(func(*testNativeHandle) int32 {
+			if status := state.Close(func(testNativeHandle) int32 {
 				calls.Add(1)
 				return testStatusOK
 			}); status != testStatusOK {
@@ -200,14 +199,13 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 }
 
 func TestStateCloseFailsWithLiveChildrenAndRetries(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	child := state.AddChild()
-	if status := state.Close(func(*testNativeHandle) int32 {
+	if status := state.Close(func(testNativeHandle) int32 {
 		t.Fatal("destroy called while child is live")
 		return testStatusOK
 	}, testStatusWrongThread); status != testStatusWrongThread {
@@ -220,14 +218,15 @@ func TestStateCloseFailsWithLiveChildrenAndRetries(t *testing.T) {
 	}
 
 	child.Release()
-	if status := state.Close(func(*testNativeHandle) int32 { return testStatusOK }, testStatusWrongThread); status != testStatusOK {
+	if status := state.Close(func(testNativeHandle) int32 { return testStatusOK }, testStatusWrongThread); status != testStatusOK {
 		t.Fatalf("Close after child release status = %d, want OK", status)
 	}
 }
 
 func TestStateKeepsParentsReachable(t *testing.T) {
-	parent := &testNativeHandle{value: 7}
-	native := &testNativeHandle{value: 1}
+	const parentHandle testNativeHandle = 0x0100_0000_0000_0007
+	parent := parentHandle
+	native := testHandle
 	state, err := New(native, "test_handle", parent)
 	if err != nil {
 		t.Fatal(err)
@@ -240,8 +239,7 @@ func TestStateKeepsParentsReachable(t *testing.T) {
 }
 
 func TestStateLeakReportDoesNotDestroyHandle(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,18 +258,17 @@ func TestStateLeakReportDoesNotDestroyHandle(t *testing.T) {
 	if got := buf.String(); !strings.Contains(got, "maplibre: leaked test_handle") {
 		t.Fatalf("leak report = %q, want leaked test_handle", got)
 	}
-	if ptr, live := state.Ptr(); !live || ptr != native {
-		t.Fatalf("Ptr() after leak report = %p, %v; want live native pointer", ptr, live)
+	if handle, live := state.Handle(); !live || handle != testHandle {
+		t.Fatalf("Handle() after leak report = %#x, %v; want the live handle", handle, live)
 	}
 }
 
 func TestStateLeakReportIgnoresClosedHandle(t *testing.T) {
-	native := &testNativeHandle{value: 1}
-	state, err := New(native, "test_handle")
+	state, err := New(testHandle, "test_handle")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status := state.Close(func(*testNativeHandle) int32 { return testStatusOK }); status != testStatusOK {
+	if status := state.Close(func(testNativeHandle) int32 { return testStatusOK }); status != testStatusOK {
 		t.Fatalf("Close status = %d, want OK", status)
 	}
 

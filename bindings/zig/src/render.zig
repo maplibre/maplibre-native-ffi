@@ -8,7 +8,6 @@ const runtime_module = @import("runtime.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-const NativeRenderSession = opaque {};
 const MetalOwnedTextureFrameStorage = struct { raw: c.mln_metal_owned_texture_frame };
 const OpenGLOwnedTextureFrameStorage = struct { raw: c.mln_opengl_owned_texture_frame };
 const VulkanOwnedTextureFrameStorage = struct { raw: c.mln_vulkan_owned_texture_frame };
@@ -26,7 +25,6 @@ const RenderSessionFrameState = struct {
 };
 
 const RenderSessionState = struct {
-    native: ?*NativeRenderSession,
     /// The map this session is registered against, cleared once the
     /// registration is released by a successful detach or close.
     map_handle: ?map_module.MapHandle,
@@ -42,11 +40,6 @@ const RenderSessionState = struct {
     closing: bool = false,
 };
 
-const RenderSessionRegistrySlot = struct {
-    state: ?*RenderSessionState,
-    generation: u64,
-};
-
 const OwnedTextureFrameKind = enum {
     metal,
     vulkan,
@@ -55,7 +48,7 @@ const OwnedTextureFrameKind = enum {
 
 const OwnedTextureFrameState = struct {
     kind: OwnedTextureFrameKind,
-    session_native: ?*NativeRenderSession,
+    session_native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: ?*RenderSessionFrameState,
     generation: u64,
@@ -70,7 +63,7 @@ const OwnedTextureFrameRegistrySlot = struct {
 
 const RenderSessionLease = struct {
     state: *RenderSessionState,
-    native: *c.mln_render_session,
+    native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: *RenderSessionFrameState,
 
@@ -81,14 +74,14 @@ const RenderSessionLease = struct {
 
 const RenderSessionClose = struct {
     state: *RenderSessionState,
-    native: *c.mln_render_session,
+    native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: *RenderSessionFrameState,
 };
 
 const OwnedTextureFrameLease = struct {
     state: *OwnedTextureFrameState,
-    session_native: *c.mln_render_session,
+    session_native: c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     frame_state: *RenderSessionFrameState,
     generation: u64,
@@ -98,16 +91,19 @@ const OwnedTextureFrameLease = struct {
     }
 };
 
+// The C API issues each session a generational handle and rejects a released
+// one, so this holds only the state this binding owns on top of it. The owned
+// texture frame tables below keep their own generations: a frame is a binding
+// concept with no C handle behind it.
 var render_session_registry_lock = std.atomic.Value(bool).init(false);
-var render_session_registry: std.ArrayList(RenderSessionRegistrySlot) = .empty;
-var render_session_free_list: std.ArrayList(usize) = .empty;
+var render_session_registry: std.AutoHashMapUnmanaged(c.mln_render_session, *RenderSessionState) = .empty;
 
 var owned_texture_frame_registry_lock = std.atomic.Value(bool).init(false);
 var owned_texture_frame_registry: std.ArrayList(OwnedTextureFrameRegistrySlot) = .empty;
 var owned_texture_frame_free_list: std.ArrayList(usize) = .empty;
 var fail_next_owned_texture_frame_wrapper_allocation_for_testing = std.atomic.Value(bool).init(false);
 
-const FeatureQueryResultDestroyFn = *const fn (?*c.mln_feature_query_result) callconv(.c) void;
+const FeatureQueryResultDestroyFn = *const fn (c.mln_feature_query_result) callconv(.c) void;
 var feature_query_result_destroy_for_testing: FeatureQueryResultDestroyFn = c.mln_feature_query_result_destroy;
 var feature_query_result_destroy_count_for_testing = std.atomic.Value(usize).init(0);
 
@@ -431,7 +427,7 @@ pub const OpenGLOwnedTextureFrameInfo = struct {
     type: u32,
 };
 
-pub const RenderSessionHandle = enum(u128) {
+pub const RenderSessionHandle = enum(c.mln_render_session) {
     _,
 
     /// Resizes this attached render session.
@@ -536,7 +532,7 @@ pub const RenderSessionHandle = enum(u128) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
-        var snapshot: ?*c.mln_json_snapshot = null;
+        var snapshot: c.mln_json_snapshot = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
@@ -545,7 +541,7 @@ pub const RenderSessionHandle = enum(u128) {
         );
         defer c.mln_json_snapshot_destroy(snapshot);
         var raw: ?*const c.mln_json_value = null;
-        try status.checkStatus(c.mln_json_snapshot_get(snapshot.?, &raw), lease.diagnostic_store);
+        try status.checkStatus(c.mln_json_snapshot_get(snapshot, &raw), lease.diagnostic_store);
         return try values.ownedJsonValueFromNative(allocator, raw.?);
     }
 
@@ -575,7 +571,7 @@ pub const RenderSessionHandle = enum(u128) {
         defer temp.deinit();
         var raw_geometry = try renderedQueryGeometryToNative(&temp, geometry);
         var raw_options = if (options) |query_options| try renderedFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: ?*c.mln_feature_query_result = null;
+        var result: c.mln_feature_query_result = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
@@ -583,7 +579,7 @@ pub const RenderSessionHandle = enum(u128) {
             lease.diagnostic_store,
         );
         defer destroyFeatureQueryResult(result);
-        return try copyFeatureQueryResult(allocator, result.?, lease.diagnostic_store);
+        return try copyFeatureQueryResult(allocator, result, lease.diagnostic_store);
     }
 
     pub fn querySourceFeatures(
@@ -596,7 +592,7 @@ pub const RenderSessionHandle = enum(u128) {
         defer temp.deinit();
         const raw_source_id = try temp.stringView(source_id);
         var raw_options = if (options) |query_options| try sourceFeatureQueryOptionsToNative(&temp, query_options) else undefined;
-        var result: ?*c.mln_feature_query_result = null;
+        var result: c.mln_feature_query_result = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
@@ -604,7 +600,7 @@ pub const RenderSessionHandle = enum(u128) {
             lease.diagnostic_store,
         );
         defer destroyFeatureQueryResult(result);
-        return try copyFeatureQueryResult(allocator, result.?, lease.diagnostic_store);
+        return try copyFeatureQueryResult(allocator, result, lease.diagnostic_store);
     }
 
     /// Queries a feature extension from the latest render session state.
@@ -632,7 +628,7 @@ pub const RenderSessionHandle = enum(u128) {
         const raw_extension = try temp.stringView(extension);
         const raw_extension_field = try temp.stringView(extension_field);
         const raw_arguments = if (arguments) |value| try temp.jsonValue(value) else null;
-        var result: ?*c.mln_feature_extension_result = null;
+        var result: c.mln_feature_extension_result = 0;
         const lease = try renderSessionLease(self.*);
         defer lease.release();
         try status.checkStatus(
@@ -640,7 +636,7 @@ pub const RenderSessionHandle = enum(u128) {
             lease.diagnostic_store,
         );
         defer c.mln_feature_extension_result_destroy(result);
-        return try copyFeatureExtensionResult(allocator, result.?, lease.diagnostic_store);
+        return try copyFeatureExtensionResult(allocator, result, lease.diagnostic_store);
     }
 
     pub fn readPremultipliedRgba8Into(self: *RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
@@ -682,7 +678,7 @@ pub const RenderSessionHandle = enum(u128) {
         }
         return try newOwnedTextureFrameHandle(MetalOwnedTextureFrameHandle, .{
             .kind = .metal,
-            .session_native = @ptrCast(lease.native),
+            .session_native = lease.native,
             .diagnostic_store = lease.diagnostic_store,
             .frame_state = session_frame_state,
             .generation = session_frame_state.metal_frame_generation,
@@ -719,7 +715,7 @@ pub const RenderSessionHandle = enum(u128) {
         }
         return try newOwnedTextureFrameHandle(VulkanOwnedTextureFrameHandle, .{
             .kind = .vulkan,
-            .session_native = @ptrCast(lease.native),
+            .session_native = lease.native,
             .diagnostic_store = lease.diagnostic_store,
             .frame_state = session_frame_state,
             .generation = session_frame_state.vulkan_frame_generation,
@@ -756,7 +752,7 @@ pub const RenderSessionHandle = enum(u128) {
         }
         return try newOwnedTextureFrameHandle(OpenGLOwnedTextureFrameHandle, .{
             .kind = .opengl,
-            .session_native = @ptrCast(lease.native),
+            .session_native = lease.native,
             .diagnostic_store = lease.diagnostic_store,
             .frame_state = session_frame_state,
             .generation = session_frame_state.opengl_frame_generation,
@@ -1008,21 +1004,19 @@ fn attach(
     comptime attachFn: anytype,
     descriptor: anytype,
 ) status.Error!RenderSessionHandle {
-    var session: ?*c.mln_render_session = null;
+    var session: c.mln_render_session = 0;
     const registration = try map_module.registerRenderSession(map);
     errdefer map_module.unregisterRenderSession(map.*);
     try status.checkStatus(
         attachFn(registration.native, descriptor, &session),
         registration.diagnostic_store,
     );
-    errdefer {
-        if (session) |handle| _ = c.mln_render_session_destroy(handle);
-    }
-    return try newRenderSession(session.?, map.*, registration.diagnostic_store);
+    errdefer _ = c.mln_render_session_destroy(session);
+    return try newRenderSession(session, map.*, registration.diagnostic_store);
 }
 
 fn newRenderSession(
-    session: *c.mln_render_session,
+    session: c.mln_render_session,
     map_handle: map_module.MapHandle,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) std.mem.Allocator.Error!RenderSessionHandle {
@@ -1044,63 +1038,37 @@ fn newRenderSession(
 
     const session_state = try std.heap.smp_allocator.create(RenderSessionState);
     session_state.* = .{
-        .native = @ptrCast(session),
         .map_handle = map_handle,
         .diagnostic_store = session_store,
         .frame_state = session_frame_state,
     };
     errdefer std.heap.smp_allocator.destroy(session_state);
 
-    return try registerRenderSessionState(session_state);
+    return try registerRenderSessionState(session, session_state);
 }
 
-fn registerRenderSessionState(session_state: *RenderSessionState) std.mem.Allocator.Error!RenderSessionHandle {
+fn registerRenderSessionState(
+    session: c.mln_render_session,
+    session_state: *RenderSessionState,
+) std.mem.Allocator.Error!RenderSessionHandle {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    if (render_session_free_list.items.len > 0) {
-        const slot_index = render_session_free_list.pop().?;
-        render_session_registry.items[slot_index].state = session_state;
-        render_session_registry.items[slot_index].generation = runtime_module.nextHandleGeneration();
-        return renderSessionHandle(slot_index + 1, render_session_registry.items[slot_index].generation);
-    }
-
-    const generation = runtime_module.nextHandleGeneration();
-    try render_session_free_list.ensureTotalCapacity(std.heap.smp_allocator, render_session_registry.items.len + 1);
-    try render_session_registry.append(std.heap.smp_allocator, .{ .state = session_state, .generation = generation });
-    return renderSessionHandle(render_session_registry.items.len, generation);
-}
-
-fn renderSessionHandle(index: usize, generation: u64) RenderSessionHandle {
-    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
-}
-
-fn renderSessionHandleIndex(handle: RenderSessionHandle) ?usize {
-    const index = @intFromEnum(handle) & std.math.maxInt(u64);
-    if (index == 0 or index > std.math.maxInt(usize)) return null;
-    return @intCast(index);
-}
-
-fn renderSessionHandleGeneration(handle: RenderSessionHandle) u64 {
-    return @intCast(@intFromEnum(handle) >> 64);
+    try render_session_registry.put(std.heap.smp_allocator, session, session_state);
+    return @enumFromInt(session);
 }
 
 fn renderSessionLease(handle: RenderSessionHandle) status.BindingError!RenderSessionLease {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const index = renderSessionHandleIndex(handle) orelse return error.ClosedHandle;
-    if (index > render_session_registry.items.len) return error.ClosedHandle;
-    const slot = render_session_registry.items[index - 1];
-    if (slot.generation != renderSessionHandleGeneration(handle)) return error.ClosedHandle;
-    const session_state = slot.state orelse return error.ClosedHandle;
+    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return error.ClosedHandle;
     if (session_state.closing) return error.ActiveBorrow;
-    const session: *c.mln_render_session = @ptrCast(session_state.native orelse return error.ClosedHandle);
     const session_frame_state = session_state.frame_state orelse return error.ClosedHandle;
     _ = session_state.active_leases.fetchAdd(1, .seq_cst);
     return .{
         .state = session_state,
-        .native = session,
+        .native = @intFromEnum(handle),
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
     };
@@ -1110,21 +1078,15 @@ fn beginRenderSessionClose(handle: RenderSessionHandle) status.BindingError!?Ren
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const index = renderSessionHandleIndex(handle) orelse return null;
-    if (index > render_session_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &render_session_registry.items[slot_index];
-    if (slot.generation != renderSessionHandleGeneration(handle)) return null;
-    const session_state = slot.state orelse return null;
+    const session_state = render_session_registry.get(@intFromEnum(handle)) orelse return null;
     if (session_state.closing) return error.ActiveBorrow;
     if (session_state.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
     const session_frame_state = session_state.frame_state orelse return null;
     if (session_frame_state.metal_frame_active or session_frame_state.opengl_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
-    const session: *c.mln_render_session = @ptrCast(session_state.native orelse return null);
     session_state.closing = true;
     return .{
         .state = session_state,
-        .native = session,
+        .native = @intFromEnum(handle),
         .diagnostic_store = session_state.diagnostic_store,
         .frame_state = session_frame_state,
     };
@@ -1153,18 +1115,9 @@ fn finishRenderSessionClose(handle: RenderSessionHandle) ?*RenderSessionState {
     lockRenderSessionRegistry();
     defer unlockRenderSessionRegistry();
 
-    const index = renderSessionHandleIndex(handle) orelse return null;
-    if (index > render_session_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &render_session_registry.items[slot_index];
-    if (slot.generation != renderSessionHandleGeneration(handle)) return null;
-    const session_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = runtime_module.nextHandleGeneration();
-    session_state.native = null;
-    session_state.frame_state = null;
-    render_session_free_list.appendAssumeCapacity(slot_index);
-    return session_state;
+    const entry = render_session_registry.fetchRemove(@intFromEnum(handle)) orelse return null;
+    entry.value.frame_state = null;
+    return entry.value;
 }
 
 fn lockRenderSessionRegistry() void {
@@ -1189,11 +1142,11 @@ pub fn failNextOwnedTextureFrameWrapperAllocationForTesting() void {
     fail_next_owned_texture_frame_wrapper_allocation_for_testing.store(true, .seq_cst);
 }
 
-fn destroyFeatureQueryResult(result: ?*c.mln_feature_query_result) void {
+fn destroyFeatureQueryResult(result: c.mln_feature_query_result) void {
     feature_query_result_destroy_for_testing(result);
 }
 
-fn countingFeatureQueryResultDestroy(result: ?*c.mln_feature_query_result) callconv(.c) void {
+fn countingFeatureQueryResultDestroy(result: c.mln_feature_query_result) callconv(.c) void {
     _ = feature_query_result_destroy_count_for_testing.fetchAdd(1, .seq_cst);
     c.mln_feature_query_result_destroy(result);
 }
@@ -1254,7 +1207,8 @@ fn ownedTextureFrameLease(handle: anytype, kind: OwnedTextureFrameKind) status.B
     const frame_state_handle = slot.state orelse return error.ClosedHandle;
     if (frame_state_handle.kind != kind) return error.ClosedHandle;
     if (frame_state_handle.closing) return error.ActiveBorrow;
-    const session_native: *c.mln_render_session = @ptrCast(frame_state_handle.session_native orelse return error.ClosedHandle);
+    if (frame_state_handle.session_native == 0) return error.ClosedHandle;
+    const session_native: c.mln_render_session = frame_state_handle.session_native;
     const session_frame_state = frame_state_handle.frame_state orelse return error.ClosedHandle;
     _ = frame_state_handle.active_leases.fetchAdd(1, .seq_cst);
     return .{
@@ -1279,7 +1233,8 @@ fn beginOwnedTextureFrameClose(handle: anytype, kind: OwnedTextureFrameKind) sta
     if (frame_state_handle.kind != kind) return null;
     if (frame_state_handle.closing) return error.ActiveBorrow;
     if (frame_state_handle.active_leases.load(.seq_cst) != 0) return error.ActiveBorrow;
-    const session_native: *c.mln_render_session = @ptrCast(frame_state_handle.session_native orelse return null);
+    if (frame_state_handle.session_native == 0) return null;
+    const session_native: c.mln_render_session = frame_state_handle.session_native;
     const session_frame_state = frame_state_handle.frame_state orelse return null;
     frame_state_handle.closing = true;
     return .{
@@ -1311,7 +1266,7 @@ fn unregisterOwnedTextureFrameState(handle: anytype) ?*OwnedTextureFrameState {
     const frame_state_handle = slot.state orelse return null;
     slot.state = null;
     slot.generation = runtime_module.nextHandleGeneration();
-    frame_state_handle.session_native = null;
+    frame_state_handle.session_native = 0;
     frame_state_handle.frame_state = null;
     owned_texture_frame_free_list.appendAssumeCapacity(slot_index);
     return frame_state_handle;
@@ -1448,7 +1403,7 @@ fn featureStateSelectorToNative(
 
 fn copyFeatureQueryResult(
     allocator: std.mem.Allocator,
-    result: *c.mln_feature_query_result,
+    result: c.mln_feature_query_result,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!FeatureQueryResult {
     var count: usize = 0;
@@ -1502,7 +1457,7 @@ fn copyQueriedFeature(allocator: std.mem.Allocator, raw: *const c.mln_queried_fe
 
 fn copyFeatureExtensionResult(
     allocator: std.mem.Allocator,
-    result: *c.mln_feature_extension_result,
+    result: c.mln_feature_extension_result,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) status.Error!FeatureExtensionResult {
     var info = c.mln_feature_extension_result_info{

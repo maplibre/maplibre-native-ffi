@@ -5,6 +5,7 @@ import 'package:ffi/ffi.dart';
 
 import '../loader/native_library.dart';
 import '../status/status.dart';
+import 'native_handles.dart';
 
 final DynamicLibrary _library = openMaplibreNativeCLibrary();
 
@@ -12,10 +13,10 @@ final NativeFinalizer _leakReporter = NativeFinalizer(
   _library.lookup<NativeFinalizerFunction>('mln_adapter_handle_leak_report'),
 );
 
-final Pointer<Void> Function(Pointer<Char>, Pointer<Void>) _createLeakToken =
-    _library.lookupFunction<
-      Pointer<Void> Function(Pointer<Char>, Pointer<Void>),
-      Pointer<Void> Function(Pointer<Char>, Pointer<Void>)
+final Pointer<Void> Function(Pointer<Char>, int) _createLeakToken = _library
+    .lookupFunction<
+      Pointer<Void> Function(Pointer<Char>, Uint64),
+      Pointer<Void> Function(Pointer<Char>, int)
     >('mln_adapter_handle_leak_token_create');
 
 /// Opaque token for the calling native thread, stable for its life. Looked up
@@ -31,10 +32,10 @@ final void Function(Pointer<Void>) _destroyLeakToken = _library
 /// Attaches the binding's non-owning native-handle leak diagnostic to [owner].
 final class NativeLeakReporter {
   /// Creates a live leak report token.
-  NativeLeakReporter(Finalizable owner, String typeName, Pointer<Void> handle) {
+  NativeLeakReporter(Finalizable owner, String typeName, NativeHandle handle) {
     final nativeTypeName = typeName.toNativeUtf8().cast<Char>();
     try {
-      final token = _createLeakToken(nativeTypeName, handle);
+      final token = _createLeakToken(nativeTypeName, handle.raw);
       if (token == nullptr) {
         return;
       }
@@ -60,26 +61,27 @@ final class NativeLeakReporter {
   }
 }
 
-/// Close-once state for an owned native handle pointer.
-final class NativeHandleState<T extends NativeType> implements Finalizable {
-  /// Creates state for a live native handle pointer.
+/// Close-once state for an owned native handle.
+final class NativeHandleState<H extends NativeHandle> implements Finalizable {
+  /// Creates state for a live native handle.
   NativeHandleState(
-    this._pointer,
+    this._handle,
     this.typeName, {
     int? ownerIsolateHash,
     int? ownerThreadToken,
     bool leakReporting = true,
   }) : _ownerIsolateHash = ownerIsolateHash ?? Isolate.current.hashCode,
        _ownerThreadToken = ownerThreadToken ?? _threadToken() {
-    if (_pointer == nullptr) {
-      throwInvalidArgument('$typeName pointer must not be null');
+    if (_handle.isNull) {
+      throwInvalidArgument('$typeName handle must not be the null handle');
     }
     if (leakReporting) {
-      _attachLeakReporter(_pointer!.cast<Void>());
+      _attachLeakReporter(_handle);
     }
   }
 
-  Pointer<T>? _pointer;
+  final H _handle;
+  bool _closed = false;
   final int _ownerIsolateHash;
 
   /// The native thread this handle was created on. The C API keys its
@@ -93,32 +95,30 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
   final String typeName;
 
   /// Whether this binding object has released its native handle.
-  bool get isClosed => _pointer == null;
+  bool get isClosed => _closed;
 
-  /// Address of the live pointer without owner-isolate validation.
-  int? get pointerAddress => _pointer?.address;
+  /// The issued handle id without owner-isolate validation.
+  int get handleId => _handle.raw;
 
-  /// Returns the live pointer, or throws when the handle is closed.
-  Pointer<T> get pointer {
+  /// Returns the live handle, or throws when it is closed.
+  H get handle {
     _checkOwnerIsolate();
-    final pointer = _pointer;
-    if (pointer == null) {
+    if (_closed) {
       throwInvalidArgument('$typeName is closed');
     }
-    return pointer;
+    return _handle;
   }
 
   /// Releases the native handle with [destroy] exactly once after success.
-  void close(int Function(Pointer<T>) destroy, String Function() diagnostic) {
+  void close(int Function(H) destroy, String Function() diagnostic) {
     _checkOwnerIsolate();
-    final pointer = _pointer;
-    if (pointer == null) {
+    if (_closed) {
       return;
     }
 
-    final status = destroy(pointer);
+    final status = destroy(_handle);
     checkNativeStatus(status, diagnostic);
-    _pointer = null;
+    _closed = true;
     _detachLeakReporter();
   }
 
@@ -140,10 +140,10 @@ final class NativeHandleState<T extends NativeType> implements Finalizable {
     }
   }
 
-  void _attachLeakReporter(Pointer<Void> pointer) {
+  void _attachLeakReporter(NativeHandle handle) {
     final nativeTypeName = typeName.toNativeUtf8().cast<Char>();
     try {
-      final token = _createLeakToken(nativeTypeName, pointer);
+      final token = _createLeakToken(nativeTypeName, handle.raw);
       if (token == nullptr) {
         return;
       }

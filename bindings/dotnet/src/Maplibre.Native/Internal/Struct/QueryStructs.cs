@@ -9,17 +9,17 @@ using Maplibre.Native.Query;
 namespace Maplibre.Native.Internal.Struct;
 
 internal unsafe delegate mln_status FeatureQueryResultCount(
-    mln_feature_query_result* result,
+    MlnFeatureQueryResult result,
     nuint* outCount
 );
 
 internal unsafe delegate mln_status FeatureQueryResultGet(
-    mln_feature_query_result* result,
+    MlnFeatureQueryResult result,
     nuint index,
     mln_queried_feature* outFeature
 );
 
-internal unsafe delegate void FeatureQueryResultDestroy(mln_feature_query_result* result);
+internal unsafe delegate void FeatureQueryResultDestroy(MlnFeatureQueryResult result);
 
 internal sealed unsafe class NativeRenderedQueryGeometry : IDisposable
 {
@@ -274,10 +274,10 @@ internal static unsafe class QueryStructs
     private static FeatureQueryResultDestroy? featureQueryResultDestroyForTest;
 
     internal static IReadOnlyList<QueriedFeature> ReadFeatureQueryResult(
-        mln_feature_query_result* result
+        MlnFeatureQueryResult result
     )
     {
-        if (result is null)
+        if (result.IsNull)
         {
             return [];
         }
@@ -340,10 +340,10 @@ internal static unsafe class QueryStructs
     }
 
     internal static FeatureExtensionResult ReadFeatureExtensionResult(
-        mln_feature_extension_result* result
+        MlnFeatureExtensionResult result
     )
     {
-        if (result is null)
+        if (result.IsNull)
         {
             return new FeatureExtensionResult.Unknown(0);
         }

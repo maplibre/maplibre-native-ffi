@@ -211,7 +211,7 @@ private func loadProbeStyle(
   request.size = UInt32(MemoryLayout<mln_resource_request>.size)
   let decision = state.invokeForTesting(
     request: request,
-    handle: OpaquePointer(bitPattern: 0x9)
+    rawHandle: SyntheticHandles.resourceRequest(0x9).raw
   )
 
   #expect(decision == UInt32.max)
@@ -227,7 +227,7 @@ private func loadProbeStyle(
     release: { _ in counters.released() }
   )
   let state = try NativeResourceRequestHandleState(
-    pointer: OpaquePointer(bitPattern: 0x5),
+    handle: SyntheticHandles.resourceRequest(0x5),
     functions: functions
   )
 
@@ -266,7 +266,7 @@ private func loadProbeStyle(
     release: { _ in counters.released() }
   )
   let state = try NativeResourceRequestHandleState(
-    pointer: OpaquePointer(bitPattern: 0x5),
+    handle: SyntheticHandles.resourceRequest(0x5),
     functions: functions
   )
 
@@ -314,7 +314,7 @@ private func loadProbeStyle(
     release: { _ in counters.released() }
   )
   let state = try NativeResourceRequestHandleState(
-    pointer: OpaquePointer(bitPattern: 0x6),
+    handle: SyntheticHandles.resourceRequest(0x6),
     functions: functions
   )
   _ = state
@@ -408,7 +408,7 @@ private func loadProbeStyle(
           request.prior_data_size = priorData.count
           return state.invokeForTesting(
             request: request,
-            handle: OpaquePointer(bitPattern: 0x4)
+            rawHandle: SyntheticHandles.resourceRequest(0x4).raw
           )
         }
       }
@@ -440,7 +440,7 @@ private func loadProbeStyle(
       request.url = url
       return state.invokeForTesting(
         request: request,
-        handle: OpaquePointer(bitPattern: 0x7)
+        rawHandle: SyntheticHandles.resourceRequest(0x7).raw
       )
     }
 
@@ -484,7 +484,7 @@ private func loadProbeStyle(
       request.url = url
       return state.invokeForTesting(
         request: request,
-        handle: OpaquePointer(bitPattern: 0x8)
+        rawHandle: SyntheticHandles.resourceRequest(0x8).raw
       )
     }
 

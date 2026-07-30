@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.runtime
 
-import cnames.structs.mln_runtime
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
@@ -25,7 +24,6 @@ import kotlinx.cinterop.cstr
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.staticCFunction
@@ -39,6 +37,8 @@ import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
@@ -78,7 +78,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     memScoped {
       var destroys = 0
       val runtime =
-        RuntimeHandle(alloc<ByteVar>().ptr.reinterpret<mln_runtime>()) {
+        RuntimeHandle(SyntheticHandles.runtime()) {
           destroys += 1
           MaplibreStatus.OK.nativeCode
         }
@@ -674,17 +674,16 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
           height = 128
         },
       )
-    val address = map.nativeAddress()
+    val mapId = map.nativeHandleId()
     map.close()
     try {
       var copiedEvent: RuntimeEvent? = null
       memScoped {
-        val staleSource = alloc<ByteVar>()
         val event = alloc<mln_runtime_event>()
         event.size = sizeOf<mln_runtime_event>().toUInt()
         event.type = RuntimeEventType.MAP_STYLE_LOADED.nativeValue.toUInt()
         event.source_type = RuntimeEventSourceType.MAP.nativeValue.toUInt()
-        event.source = staleSource.ptr
+        event.source = SyntheticHandles.map().rawHandleValue
         event.code = 0
         event.payload_type = 0U
         event.payload = null
@@ -705,21 +704,21 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         runtime.applyEventSideEffectsForTesting(
           RuntimeEventType.MAP_STYLE_LOADED,
           RuntimeEventSourceType.MAP,
-          address,
+          mapId,
         )
       )
       assertNull(
         runtime.applyEventSideEffectsForTesting(
           RuntimeEventType.MAP_STYLE_LOADED,
           RuntimeEventSourceType.MAP,
-          address + 4096,
+          mapId + 4096,
         )
       )
       assertNull(
         runtime.applyEventSideEffectsForTesting(
           RuntimeEventType.MAP_STYLE_LOADED,
           RuntimeEventSourceType.RUNTIME,
-          address,
+          mapId,
         )
       )
     } finally {
@@ -742,7 +741,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         event.size = sizeOf<mln_runtime_event>().toUInt()
         event.type = 900U
         event.source_type = 901U
-        event.source = null
+        event.source = 0uL
         event.code = 902
         event.payload_type = 903U
         event.payload = payload

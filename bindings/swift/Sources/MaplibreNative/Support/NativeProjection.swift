@@ -1,28 +1,32 @@
 internal import CMaplibreNativeC
 
 enum NativeProjection {
-  static func create(_ map: OpaquePointer) throws -> OpaquePointer {
+  static func create(_ map: NativeMapHandle) throws
+    -> NativeMapProjectionHandle
+  {
     try NativeHandleFactory
       .create(
         nullDiagnostic: "mln_map_projection_create returned a null projection"
-      ) { projection in
-        try checkStatus(mln_map_projection_create(map, projection))
+      ) { outHandle in
+        try checkStatus(mln_map_projection_create(map.raw, outHandle))
       }
   }
 
-  static func camera(_ projection: OpaquePointer) throws -> mln_camera_options {
+  static func camera(_ projection: NativeMapProjectionHandle) throws
+    -> mln_camera_options
+  {
     var camera = mln_camera_options_default()
-    try checkStatus(mln_map_projection_get_camera(projection, &camera))
+    try checkStatus(mln_map_projection_get_camera(projection.raw, &camera))
     return camera
   }
 
   static func pixelForLatLng(
-    _ projection: OpaquePointer,
+    _ projection: NativeMapProjectionHandle,
     coordinate: mln_lat_lng
   ) throws -> mln_screen_point {
     let output = try NativeMemory.withTemporary(mln_screen_point()) { point in
       try checkStatus(mln_map_projection_pixel_for_lat_lng(
-        projection,
+        projection.raw,
         coordinate,
         point
       ))
@@ -31,12 +35,12 @@ enum NativeProjection {
   }
 
   static func latLngForPixel(
-    _ projection: OpaquePointer,
+    _ projection: NativeMapProjectionHandle,
     point: mln_screen_point
   ) throws -> mln_lat_lng {
     let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
       try checkStatus(mln_map_projection_lat_lng_for_pixel(
-        projection,
+        projection.raw,
         point,
         coordinate
       ))

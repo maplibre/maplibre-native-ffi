@@ -1,8 +1,8 @@
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
-using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Internal.Memory;
+using Maplibre.Native.Internal.Pointer;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Offline;
@@ -11,17 +11,17 @@ using Maplibre.Native.Resource;
 namespace Maplibre.Native.Runtime;
 
 internal unsafe delegate mln_status RuntimeSetResourceProvider(
-    mln_runtime* runtime,
+    MlnRuntime runtime,
     mln_resource_provider* provider
 );
 
 internal unsafe delegate mln_status RuntimeSetResourceTransform(
-    mln_runtime* runtime,
+    MlnRuntime runtime,
     mln_resource_transform* transform
 );
 
 internal unsafe delegate mln_status RuntimeTakeOfflineRegionStatusResult(
-    mln_runtime* runtime,
+    MlnRuntime runtime,
     ulong operationId,
     mln_offline_region_status* outStatus
 );
@@ -56,14 +56,14 @@ public sealed unsafe class RuntimeHandle : IDisposable
 
     private readonly Lock callbackGate = new();
     private readonly Lock mapGate = new();
-    private readonly Dictionary<nint, WeakReference<Map.MapHandle>> liveMaps = [];
-    private readonly NativeHandleState<mln_runtime> state;
+    private readonly Dictionary<ulong, WeakReference<Map.MapHandle>> liveMaps = [];
+    private readonly NativeHandleState<MlnRuntime> state;
     private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
 
-    private RuntimeHandle(mln_runtime* handle)
+    private RuntimeHandle(MlnRuntime handle)
     {
-        state = new NativeHandleState<mln_runtime>(
+        state = new NativeHandleState<MlnRuntime>(
             handle,
             static handle => NativeMethods.mln_runtime_destroy(handle),
             nameof(RuntimeHandle)
@@ -77,13 +77,13 @@ public sealed unsafe class RuntimeHandle : IDisposable
         NativeLibraryLoader.EnsureLoaded();
         using var nativeOptions = options.ToNative();
         var value = nativeOptions.Value;
-        mln_runtime* runtime = null;
+        MlnRuntime runtime = default;
 
         NativeStatus.Check(NativeMethods.mln_runtime_create(&value, &runtime));
         return new RuntimeHandle(runtime);
     }
 
-    internal mln_runtime* Pointer => state.Pointer;
+    internal MlnRuntime Handle => state.Handle;
 
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
@@ -97,7 +97,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
             try
             {
                 var descriptor = replacement.Descriptor;
-                NativeStatus.Check(SetResourceProviderNative(Pointer, &descriptor));
+                NativeStatus.Check(SetResourceProviderNative(Handle, &descriptor));
                 var previous = resourceProviderState;
                 resourceProviderState = replacement;
                 previous?.Dispose();
@@ -119,7 +119,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
             try
             {
                 var descriptor = replacement.Descriptor;
-                NativeStatus.Check(SetResourceTransformNative(Pointer, &descriptor));
+                NativeStatus.Check(SetResourceTransformNative(Handle, &descriptor));
                 var previous = resourceTransformState;
                 resourceTransformState = replacement;
                 previous?.Dispose();
@@ -193,7 +193,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         lock (callbackGate)
         {
-            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_provider(Pointer));
+            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_provider(Handle));
             var previous = resourceProviderState;
             resourceProviderState = null;
             previous?.Dispose();
@@ -205,7 +205,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         lock (callbackGate)
         {
-            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_transform(Pointer));
+            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_transform(Handle));
             var previous = resourceTransformState;
             resourceTransformState = null;
             previous?.Dispose();
@@ -218,7 +218,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(
             NativeMethods.mln_runtime_run_ambient_cache_operation_start(
-                Pointer,
+                Handle,
                 (uint)operation,
                 &operationId
             )
@@ -244,7 +244,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_runtime_offline_region_create_start(
-                    Pointer,
+                    Handle,
                     &definitionValue,
                     metadata.Length == 0 ? null : metadataPointer,
                     (nuint)metadata.Length,
@@ -264,7 +264,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         ulong operationId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_get_start(Pointer, id, &operationId)
+            NativeMethods.mln_runtime_offline_region_get_start(Handle, id, &operationId)
         );
         return OfflineOperation(
             operationId,
@@ -278,7 +278,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         ulong operationId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_regions_list_start(Pointer, &operationId)
+            NativeMethods.mln_runtime_offline_regions_list_start(Handle, &operationId)
         );
         return OfflineOperation(
             operationId,
@@ -295,7 +295,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_regions_merge_database_start(
-                Pointer,
+                Handle,
                 nativePath.Pointer,
                 &operationId
             )
@@ -316,7 +316,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             NativeStatus.Check(
                 NativeMethods.mln_runtime_offline_region_update_metadata_start(
-                    Pointer,
+                    Handle,
                     id,
                     metadata.Length == 0 ? null : metadataPointer,
                     (nuint)metadata.Length,
@@ -336,7 +336,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         ulong operationId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_get_status_start(Pointer, id, &operationId)
+            NativeMethods.mln_runtime_offline_region_get_status_start(Handle, id, &operationId)
         );
         return OfflineOperation(
             operationId,
@@ -351,7 +351,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_set_observed_start(
-                Pointer,
+                Handle,
                 id,
                 observed ? (byte)1 : (byte)0,
                 &operationId
@@ -373,7 +373,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_set_download_state_start(
-                Pointer,
+                Handle,
                 id,
                 (uint)downloadState,
                 &operationId
@@ -391,7 +391,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         ulong operationId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_invalidate_start(Pointer, id, &operationId)
+            NativeMethods.mln_runtime_offline_region_invalidate_start(Handle, id, &operationId)
         );
         return OfflineOperation(
             operationId,
@@ -405,7 +405,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         ulong operationId = 0;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_delete_start(Pointer, id, &operationId)
+            NativeMethods.mln_runtime_offline_region_delete_start(Handle, id, &operationId)
         );
         return OfflineOperation(
             operationId,
@@ -422,10 +422,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
             OfflineOperationKind.RegionCreate,
             OfflineOperationResultKind.Region
         );
-        mln_offline_region_snapshot* snapshot = null;
+        MlnOfflineRegionSnapshot snapshot = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_create_take_result(
-                Pointer,
+                Handle,
                 operationId,
                 &snapshot
             )
@@ -442,11 +442,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
             OfflineOperationKind.RegionGet,
             OfflineOperationResultKind.OptionalRegion
         );
-        mln_offline_region_snapshot* snapshot = null;
+        MlnOfflineRegionSnapshot snapshot = default;
         bool found = false;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_get_take_result(
-                Pointer,
+                Handle,
                 operationId,
                 &snapshot,
                 &found
@@ -466,9 +466,9 @@ public sealed unsafe class RuntimeHandle : IDisposable
             OfflineOperationKind.RegionsList,
             OfflineOperationResultKind.RegionList
         );
-        mln_offline_region_list* list = null;
+        MlnOfflineRegionList list = default;
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_regions_list_take_result(Pointer, operationId, &list)
+            NativeMethods.mln_runtime_offline_regions_list_take_result(Handle, operationId, &list)
         );
         operation.MarkConsumed();
         return OfflineStructs.ReadList(list);
@@ -484,10 +484,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
             OfflineOperationKind.RegionsMergeDatabase,
             OfflineOperationResultKind.RegionList
         );
-        mln_offline_region_list* list = null;
+        MlnOfflineRegionList list = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_regions_merge_database_take_result(
-                Pointer,
+                Handle,
                 operationId,
                 &list
             )
@@ -504,10 +504,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
             OfflineOperationKind.RegionUpdateMetadata,
             OfflineOperationResultKind.Region
         );
-        mln_offline_region_snapshot* snapshot = null;
+        MlnOfflineRegionSnapshot snapshot = default;
         NativeStatus.Check(
             NativeMethods.mln_runtime_offline_region_update_metadata_take_result(
-                Pointer,
+                Handle,
                 operationId,
                 &snapshot
             )
@@ -528,7 +528,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             size = (uint)sizeof(mln_offline_region_status),
         };
-        NativeStatus.Check(TakeOfflineRegionStatusNative(Pointer, operationId, &status));
+        NativeStatus.Check(TakeOfflineRegionStatusNative(Handle, operationId, &status));
         operation.MarkConsumed();
         return OfflineStructs.ReadStatus(status);
     }
@@ -542,10 +542,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
 
         var operationId = operation.RequireLive(this);
-        mln_runtime* runtime;
+        MlnRuntime runtime;
         try
         {
-            runtime = Pointer;
+            runtime = Handle;
         }
         catch (Error.InvalidStateException) when (IsClosed)
         {
@@ -571,7 +571,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         lock (mapGate)
         {
-            liveMaps[map.NativeAddress] = new WeakReference<Map.MapHandle>(map);
+            liveMaps[map.NativeId] = new WeakReference<Map.MapHandle>(map);
         }
     }
 
@@ -580,27 +580,20 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         lock (mapGate)
         {
-            if (
-                liveMaps.TryGetValue(map.NativeAddress, out var reference)
-                && reference.TryGetTarget(out var target)
-                && ReferenceEquals(target, map)
-            )
-            {
-                liveMaps.Remove(map.NativeAddress);
-            }
+            liveMaps.Remove(map.NativeId);
         }
     }
 
-    private Map.MapHandle? MapFor(nint address)
+    private Map.MapHandle? MapFor(ulong id)
     {
-        if (address == 0)
+        if (id == 0)
         {
             return null;
         }
 
         lock (mapGate)
         {
-            if (!liveMaps.TryGetValue(address, out var reference))
+            if (!liveMaps.TryGetValue(id, out var reference))
             {
                 return null;
             }
@@ -610,7 +603,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 return map;
             }
 
-            liveMaps.Remove(address);
+            liveMaps.Remove(id);
             return null;
         }
     }
@@ -648,7 +641,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public void Pump(TimeSpan timeout)
     {
         var timeoutMilliseconds = timeout < TimeSpan.Zero ? -1L : (long)timeout.TotalMilliseconds;
-        NativeStatus.Check(NativeMethods.mln_runtime_pump(Pointer, timeoutMilliseconds));
+        NativeStatus.Check(NativeMethods.mln_runtime_pump(Handle, timeoutMilliseconds));
     }
 
     /// <summary>
@@ -657,8 +650,8 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// </summary>
     public WakeSource AcquireWakeSource()
     {
-        mln_wake_source* source = null;
-        NativeStatus.Check(NativeMethods.mln_runtime_wake_source_acquire(Pointer, &source));
+        MlnWakeSource source = default;
+        NativeStatus.Check(NativeMethods.mln_runtime_wake_source_acquire(Handle, &source));
         return new WakeSource(source);
     }
 
@@ -679,7 +672,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         var raw = RuntimeStructs.EmptyNativeEvent();
         var hasEvent = false;
-        NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Pointer, &raw, &hasEvent));
+        NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Handle, &raw, &hasEvent));
         if (!hasEvent)
         {
             return null;
