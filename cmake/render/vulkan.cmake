@@ -7,6 +7,16 @@ function(mln_configure_render_dependencies target)
   mln_add_license(${target} "${MLN_SOURCE_DIR}/vendor/glslang/LICENSE.txt"
                   "glslang.txt")
 
+  # glslang builds with the SPIR-V optimizer off, so no separately licensed
+  # SPIRV-Tools code reaches the artifacts and the notices above cover the whole
+  # shader toolchain. Turning the optimizer on means registering that notice
+  # too.
+  if(TARGET SPIRV-Tools-opt)
+    message(
+      FATAL_ERROR
+        "glslang now links SPIRV-Tools; register its license notice and add the archives here")
+  endif()
+
   get_target_property(MLN_FFI_VULKAN_INCLUDE_DIRS mbgl-vendor-vulkan-headers
                       INTERFACE_INCLUDE_DIRECTORIES)
   set_target_properties(
@@ -14,7 +24,7 @@ function(mln_configure_render_dependencies target)
     PROPERTIES
       MLN_FFI_INCLUDE_DIRS "${MLN_FFI_VULKAN_INCLUDE_DIRS}"
       MLN_FFI_STATIC_ARCHIVES
-      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen;SPIRV-Tools;SPIRV-Tools-opt")
+      "glslang;SPIRV;glslang-default-resource-limits;OSDependent;MachineIndependent;GenericCodeGen")
 
   # The loader belongs to the test harness, which drives Vulkan directly the way
   # a host does. The library resolves it at runtime, so build-host loader paths
