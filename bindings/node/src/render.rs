@@ -529,7 +529,7 @@ impl NativeRenderSessionHandle {
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.ensure_no_frame_acquired()?;
         core::check(unsafe {
-            sys::mln_render_session_resize(self.state.as_ptr(), width, height, scale_factor)
+            sys::mln_render_session_resize(self.state.handle(), width, height, scale_factor)
         })
         .map_err(error::from_core)
     }
@@ -539,7 +539,7 @@ impl NativeRenderSessionHandle {
         self.ensure_no_frame_acquired()?;
         let mut rendered = false;
         core::check(unsafe {
-            sys::mln_render_session_render_update(self.state.as_ptr(), &mut rendered)
+            sys::mln_render_session_render_update(self.state.handle(), &mut rendered)
         })
         .map_err(error::from_core)?;
         Ok(rendered)
@@ -548,28 +548,28 @@ impl NativeRenderSessionHandle {
     #[napi]
     pub fn detach(&self) -> Result<()> {
         self.ensure_no_frame_acquired()?;
-        core::check(unsafe { sys::mln_render_session_detach(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_render_session_detach(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "reduceMemoryUse")]
     pub fn reduce_memory_use(&self) -> Result<()> {
         self.ensure_no_frame_acquired()?;
-        core::check(unsafe { sys::mln_render_session_reduce_memory_use(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_render_session_reduce_memory_use(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "clearData")]
     pub fn clear_data(&self) -> Result<()> {
         self.ensure_no_frame_acquired()?;
-        core::check(unsafe { sys::mln_render_session_clear_data(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_render_session_clear_data(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "dumpDebugLogs")]
     pub fn dump_debug_logs(&self) -> Result<()> {
         self.ensure_no_frame_acquired()?;
-        core::check(unsafe { sys::mln_render_session_dump_debug_logs(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_render_session_dump_debug_logs(self.state.handle()) })
             .map_err(error::from_core)
     }
 
@@ -587,7 +587,7 @@ impl NativeRenderSessionHandle {
             core::json::json_value_try_to_native(&state).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_render_session_set_feature_state(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_selector.as_ptr(),
                 native_state.as_ref(),
             )
@@ -600,18 +600,16 @@ impl NativeRenderSessionHandle {
         self.ensure_no_frame_acquired()?;
         let selector = selector.into_core()?;
         let native_selector = core::query::feature_state_selector_to_native(&selector);
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_json_snapshot(0);
         core::check(unsafe {
             sys::mln_render_session_get_feature_state(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_selector.as_ptr(),
                 &mut snapshot,
             )
         })
         .map_err(error::from_core)?;
-        let snapshot = std::ptr::NonNull::new(snapshot)
-            .ok_or_else(|| error::invalid_argument("feature state snapshot result was null"))?;
-        let value = unsafe { core::json::copy_json_snapshot(Some(snapshot)) }
+        let value = unsafe { core::json::copy_json_snapshot(snapshot) }
             .map_err(error::from_core)?
             .unwrap_or(core::JsonValue::Null);
         json_value_to_string(value)
@@ -624,7 +622,7 @@ impl NativeRenderSessionHandle {
         let native_selector = core::query::feature_state_selector_to_native(&selector);
         core::check(unsafe {
             sys::mln_render_session_remove_feature_state(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_selector.as_ptr(),
             )
         })
@@ -643,10 +641,10 @@ impl NativeRenderSessionHandle {
         let options = options.unwrap_or_default().into_core()?;
         let native_options = core::query::rendered_feature_query_options_to_native(&options)
             .map_err(error::from_core)?;
-        let mut result = std::ptr::null_mut();
+        let mut result = sys::mln_feature_query_result(0);
         core::check(unsafe {
             sys::mln_render_session_query_rendered_features(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_geometry.as_ptr(),
                 native_options.as_ptr(),
                 &mut result,
@@ -667,10 +665,10 @@ impl NativeRenderSessionHandle {
         let options = options.unwrap_or_default().into_core()?;
         let native_options = core::query::source_feature_query_options_to_native(&options)
             .map_err(error::from_core)?;
-        let mut result = std::ptr::null_mut();
+        let mut result = sys::mln_feature_query_result(0);
         core::check(unsafe {
             sys::mln_render_session_query_source_features(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 native_options.as_ptr(),
                 &mut result,
@@ -705,10 +703,10 @@ impl NativeRenderSessionHandle {
         let native_arguments_ptr = native_arguments
             .as_ref()
             .map_or(std::ptr::null(), |arguments| arguments.as_ref());
-        let mut result = std::ptr::null_mut();
+        let mut result = sys::mln_feature_extension_result(0);
         core::check(unsafe {
             sys::mln_render_session_query_feature_extensions(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 native_feature.as_ref(),
                 extension.raw(),
@@ -736,7 +734,7 @@ impl NativeRenderSessionHandle {
             pixel_format: 0,
         };
         core::check(unsafe {
-            sys::mln_metal_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+            sys::mln_metal_owned_texture_acquire_frame(self.state.handle(), &mut frame)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(true);
@@ -751,7 +749,7 @@ impl NativeRenderSessionHandle {
         self.ensure_frame_acquired()?;
         let frame = frame.into_native()?;
         core::check(unsafe {
-            sys::mln_metal_owned_texture_release_frame(self.state.as_ptr(), &frame)
+            sys::mln_metal_owned_texture_release_frame(self.state.handle(), &frame)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(false);
@@ -775,7 +773,7 @@ impl NativeRenderSessionHandle {
             layout: 0,
         };
         core::check(unsafe {
-            sys::mln_vulkan_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+            sys::mln_vulkan_owned_texture_acquire_frame(self.state.handle(), &mut frame)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(true);
@@ -790,7 +788,7 @@ impl NativeRenderSessionHandle {
         self.ensure_frame_acquired()?;
         let frame = frame.into_native()?;
         core::check(unsafe {
-            sys::mln_vulkan_owned_texture_release_frame(self.state.as_ptr(), &frame)
+            sys::mln_vulkan_owned_texture_release_frame(self.state.handle(), &frame)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(false);
@@ -814,7 +812,7 @@ impl NativeRenderSessionHandle {
             type_: 0,
         };
         core::check(unsafe {
-            sys::mln_opengl_owned_texture_acquire_frame(self.state.as_ptr(), &mut frame)
+            sys::mln_opengl_owned_texture_acquire_frame(self.state.handle(), &mut frame)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(true);
@@ -829,7 +827,7 @@ impl NativeRenderSessionHandle {
         self.ensure_frame_acquired()?;
         let raw = frame.into_native()?;
         core::check(unsafe {
-            sys::mln_opengl_owned_texture_release_frame(self.state.as_ptr(), &raw)
+            sys::mln_opengl_owned_texture_release_frame(self.state.handle(), &raw)
         })
         .map_err(error::from_core)?;
         self.frame_acquired.set(false);
@@ -842,7 +840,7 @@ impl NativeRenderSessionHandle {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         let first_status = unsafe {
             sys::mln_texture_read_premultiplied_rgba8(
-                self.state.as_ptr(),
+                self.state.handle(),
                 std::ptr::null_mut(),
                 0,
                 &mut info,
@@ -854,7 +852,7 @@ impl NativeRenderSessionHandle {
         let mut pixels = vec![0; info.byte_length];
         core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(
-                self.state.as_ptr(),
+                self.state.handle(),
                 pixels.as_mut_ptr(),
                 pixels.len(),
                 &mut info,
@@ -877,7 +875,7 @@ impl NativeRenderSessionHandle {
         let pixels = unsafe { pixels.as_mut() };
         core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(
-                self.state.as_ptr(),
+                self.state.handle(),
                 pixels.as_mut_ptr(),
                 pixels.len(),
                 &mut info,
@@ -1207,11 +1205,7 @@ fn feature_from_geojson_string(value: String) -> Result<core::Feature> {
     }
 }
 
-fn feature_extension_result_to_string(
-    result: *mut sys::mln_feature_extension_result,
-) -> Result<String> {
-    let result = std::ptr::NonNull::new(result)
-        .ok_or_else(|| error::invalid_argument("feature extension result was null"))?;
+fn feature_extension_result_to_string(result: sys::mln_feature_extension_result) -> Result<String> {
     let result =
         unsafe { core::query::copy_feature_extension_result(result) }.map_err(error::from_core)?;
     let value = match result {
@@ -1241,9 +1235,7 @@ fn feature_extension_result_to_string(
     })
 }
 
-fn queried_features_to_string(result: *mut sys::mln_feature_query_result) -> Result<String> {
-    let result = std::ptr::NonNull::new(result)
-        .ok_or_else(|| error::invalid_argument("feature query result was null"))?;
+fn queried_features_to_string(result: sys::mln_feature_query_result) -> Result<String> {
     let features =
         unsafe { core::query::copy_feature_query_result(result) }.map_err(error::from_core)?;
     let value =
@@ -1342,30 +1334,36 @@ fn coordinates_to_serde(coordinates: Vec<core::LatLng>) -> serde_json::Value {
 }
 
 trait MapAttachTarget {
-    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T>;
+    fn with_live<T>(&self, attach: impl FnOnce(sys::mln_map) -> T) -> Result<T>;
 }
 
 impl MapAttachTarget for NativeMapHandle {
-    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+    fn with_live<T>(&self, attach: impl FnOnce(sys::mln_map) -> T) -> Result<T> {
         self.with_live_for_attach(attach)
     }
 }
 
 impl MapAttachTarget for NativeMapAttachReference {
-    fn with_live<T>(&self, attach: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
+    fn with_live<T>(&self, attach: impl FnOnce(sys::mln_map) -> T) -> Result<T> {
         self.with_live(attach)
     }
 }
 
 fn attach_render_session(
     map: &impl MapAttachTarget,
-    attach: impl FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
+    attach: impl FnOnce(sys::mln_map, *mut sys::mln_render_session) -> sys::mln_status,
 ) -> Result<NativeRenderSessionHandle> {
-    let mut session = std::ptr::null_mut();
-    let status = map.with_live(|map| attach(map, &mut session))?;
+    let mut out = core::ptr::OutHandle::<sys::mln_render_session>::new();
+    let status = map.with_live(|map| attach(map, out.as_mut_ptr()))?;
     core::check(status).map_err(error::from_core)?;
-    let state = unsafe { NativeHandleState::from_raw_ptr(session, "RenderSessionHandle") }
-        .map_err(error::from_core)?;
+    let state = unsafe {
+        NativeHandleState::from_handle(
+            out.into_live("RenderSessionHandle")
+                .map_err(error::from_core)?,
+            "RenderSessionHandle",
+        )
+    }
+    .map_err(error::from_core)?;
     Ok(NativeRenderSessionHandle {
         state,
         frame_acquired: Cell::new(false),

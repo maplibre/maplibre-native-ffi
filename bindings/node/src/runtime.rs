@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::{CStr, CString, c_void};
 use std::os::raw::c_char;
 use std::panic::{AssertUnwindSafe, catch_unwind};
-use std::ptr::NonNull;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, Weak};
 
@@ -79,7 +78,7 @@ pub struct RuntimeEvent {
     pub raw_event_type: u32,
     pub source_type: String,
     pub raw_source_type: u32,
-    pub source_address: BigInt,
+    pub source_id: BigInt,
     pub code: i32,
     pub camera_change_mode: Option<String>,
     pub raw_camera_change_mode: Option<u32>,
@@ -299,39 +298,34 @@ pub struct NativeWakeSourceHandle {
 }
 
 struct SharedWakeSource {
-    address: Mutex<Option<usize>>,
+    handle: Mutex<Option<sys::mln_wake_source>>,
 }
 
 impl SharedWakeSource {
-    fn new(source: NonNull<sys::mln_wake_source>) -> Self {
+    fn new(source: sys::mln_wake_source) -> Self {
         Self {
-            address: Mutex::new(Some(source.as_ptr() as usize)),
+            handle: Mutex::new(Some(source)),
         }
     }
 
     fn signal(&self) -> Result<()> {
-        let address = self
-            .address
+        let handle = self
+            .handle
             .lock()
             .map_err(|_| error::invalid_state("wake source state lock is poisoned"))?
             .ok_or_else(|| error::invalid_state("WakeSourceHandle is closed"))?;
-        core::check(unsafe { sys::mln_wake_source_signal(address as *mut _) })
-            .map_err(error::from_core)
+        core::check(unsafe { sys::mln_wake_source_signal(handle) }).map_err(error::from_core)
     }
 
     fn close(&self) {
-        let address = self
-            .address
-            .lock()
-            .ok()
-            .and_then(|mut address| address.take());
-        if let Some(address) = address {
-            unsafe { sys::mln_wake_source_destroy(address as *mut _) };
+        let handle = self.handle.lock().ok().and_then(|mut handle| handle.take());
+        if let Some(handle) = handle {
+            unsafe { sys::mln_wake_source_destroy(handle) };
         }
     }
 
     fn is_closed(&self) -> bool {
-        self.address
+        self.handle
             .lock()
             .map(|address| address.is_none())
             .unwrap_or(true)
@@ -442,12 +436,17 @@ pub fn create_native_runtime_handle(
     let options = options.unwrap_or_default().into_core()?;
     let native_options =
         core::runtime::runtime_options_to_native(&options).map_err(error::from_core)?;
-    let mut runtime = std::ptr::null_mut();
+    let mut out = core::ptr::OutHandle::<sys::mln_runtime>::new();
 
-    core::check(unsafe { sys::mln_runtime_create(&native_options.to_raw(), &mut runtime) })
+    core::check(unsafe { sys::mln_runtime_create(&native_options.to_raw(), out.as_mut_ptr()) })
         .map_err(error::from_core)?;
-    let state = unsafe { NativeHandleState::from_raw_ptr(runtime, "RuntimeHandle") }
-        .map_err(error::from_core)?;
+    let state = unsafe {
+        NativeHandleState::from_handle(
+            out.into_live("RuntimeHandle").map_err(error::from_core)?,
+            "RuntimeHandle",
+        )
+    }
+    .map_err(error::from_core)?;
     Ok(NativeRuntimeHandle {
         state,
         resource_transform: Mutex::new(None),
@@ -521,19 +520,20 @@ impl NativeRuntimeHandle {
                 "timeoutMs must be -1 for an unbounded park or a non-negative integer",
             ));
         }
-        core::check(unsafe { sys::mln_runtime_pump(self.state.as_ptr(), timeout_ms) })
+        core::check(unsafe { sys::mln_runtime_pump(self.state.handle(), timeout_ms) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "acquireWakeSource")]
     pub fn acquire_wake_source(&self) -> Result<NativeWakeSourceHandle> {
-        let mut source = std::ptr::null_mut();
+        let mut out = core::ptr::OutHandle::<sys::mln_wake_source>::new();
         core::check(unsafe {
-            sys::mln_runtime_wake_source_acquire(self.state.as_ptr(), &mut source)
+            sys::mln_runtime_wake_source_acquire(self.state.handle(), out.as_mut_ptr())
         })
         .map_err(error::from_core)?;
-        let source = NonNull::new(source)
-            .ok_or_else(|| error::invalid_state("native wake source is null"))?;
+        let source = out
+            .into_live("WakeSourceHandle")
+            .map_err(error::from_core)?;
         Ok(NativeWakeSourceHandle {
             source: Mutex::new(Some(Arc::new(SharedWakeSource::new(source)))),
         })
@@ -567,7 +567,7 @@ impl NativeRuntimeHandle {
             .lock()
             .map_err(|_| error::invalid_argument("resource provider state lock is poisoned"))?;
         core::check(unsafe {
-            sys::mln_runtime_set_resource_provider(self.state.as_ptr(), &descriptor)
+            sys::mln_runtime_set_resource_provider(self.state.handle(), &descriptor)
         })
         .map_err(error::from_core)?;
         if let Some(replaced) = provider_slot.replace(provider) {
@@ -578,7 +578,7 @@ impl NativeRuntimeHandle {
 
     #[napi(js_name = "clearResourceProvider")]
     pub fn clear_resource_provider(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_runtime_clear_resource_provider(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_runtime_clear_resource_provider(self.state.handle()) })
             .map_err(error::from_core)?;
         let replaced = self
             .resource_provider
@@ -611,7 +611,7 @@ impl NativeRuntimeHandle {
             .lock()
             .map_err(|_| error::invalid_argument("resource transform state lock is poisoned"))?;
         core::check(unsafe {
-            sys::mln_runtime_set_resource_transform(self.state.as_ptr(), &descriptor)
+            sys::mln_runtime_set_resource_transform(self.state.handle(), &descriptor)
         })
         .map_err(error::from_core)?;
         *transform_slot = Some(transform);
@@ -620,7 +620,7 @@ impl NativeRuntimeHandle {
 
     #[napi(js_name = "clearResourceTransform")]
     pub fn clear_resource_transform(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_runtime_clear_resource_transform(self.state.handle()) })
             .map_err(error::from_core)?;
         let mut transform = self
             .resource_transform
@@ -636,7 +636,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_run_ambient_cache_operation_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 operation,
                 &mut operation_id,
             )
@@ -649,7 +649,7 @@ impl NativeRuntimeHandle {
     pub fn offline_regions_list(&self) -> Result<OfflineOperationStart> {
         let mut operation_id = 0;
         core::check(unsafe {
-            sys::mln_runtime_offline_regions_list_start(self.state.as_ptr(), &mut operation_id)
+            sys::mln_runtime_offline_regions_list_start(self.state.handle(), &mut operation_id)
         })
         .map_err(error::from_core)?;
         Ok(offline_operation_start(operation_id))
@@ -660,7 +660,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_get_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 &mut operation_id,
             )
@@ -675,7 +675,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 path.as_ptr(),
                 &mut operation_id,
             )
@@ -696,7 +696,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 core::runtime::metadata_ptr(&metadata),
                 metadata.len(),
@@ -712,7 +712,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_get_status_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 &mut operation_id,
             )
@@ -730,7 +730,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_set_observed_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 observed,
                 &mut operation_id,
@@ -753,7 +753,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_set_download_state_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 state,
                 &mut operation_id,
@@ -768,7 +768,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_invalidate_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 &mut operation_id,
             )
@@ -782,7 +782,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_delete_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_i64(region_id, "regionId")?,
                 &mut operation_id,
             )
@@ -807,7 +807,7 @@ impl NativeRuntimeHandle {
         let mut operation_id = 0;
         core::check(unsafe {
             sys::mln_runtime_offline_region_create_start(
-                self.state.as_ptr(),
+                self.state.handle(),
                 &raw_definition,
                 core::runtime::metadata_ptr(&metadata),
                 metadata.len(),
@@ -823,10 +823,10 @@ impl NativeRuntimeHandle {
         &self,
         operation_id: BigInt,
     ) -> Result<OfflineRegionInfoValue> {
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_offline_region_snapshot(0);
         core::check(unsafe {
             sys::mln_runtime_offline_region_create_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut snapshot,
             )
@@ -840,11 +840,11 @@ impl NativeRuntimeHandle {
         &self,
         operation_id: BigInt,
     ) -> Result<Option<OfflineRegionInfoValue>> {
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_offline_region_snapshot(0);
         let mut found = false;
         core::check(unsafe {
             sys::mln_runtime_offline_region_get_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut snapshot,
                 &mut found,
@@ -865,10 +865,10 @@ impl NativeRuntimeHandle {
         &self,
         operation_id: BigInt,
     ) -> Result<Vec<OfflineRegionInfoValue>> {
-        let mut list = std::ptr::null_mut();
+        let mut list = sys::mln_offline_region_list(0);
         core::check(unsafe {
             sys::mln_runtime_offline_regions_list_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut list,
             )
@@ -882,10 +882,10 @@ impl NativeRuntimeHandle {
         &self,
         operation_id: BigInt,
     ) -> Result<Vec<OfflineRegionInfoValue>> {
-        let mut list = std::ptr::null_mut();
+        let mut list = sys::mln_offline_region_list(0);
         core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut list,
             )
@@ -899,10 +899,10 @@ impl NativeRuntimeHandle {
         &self,
         operation_id: BigInt,
     ) -> Result<OfflineRegionInfoValue> {
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_offline_region_snapshot(0);
         core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut snapshot,
             )
@@ -919,7 +919,7 @@ impl NativeRuntimeHandle {
         let mut raw_status = core::events::empty_offline_region_status_native();
         core::check(unsafe {
             sys::mln_runtime_offline_region_get_status_take_result(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
                 &mut raw_status,
             )
@@ -932,7 +932,7 @@ impl NativeRuntimeHandle {
     pub fn discard_offline_operation(&self, operation_id: BigInt) -> Result<()> {
         core::check(unsafe {
             sys::mln_runtime_offline_operation_discard(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bigint_to_u64(operation_id, "operationId")?,
             )
         })
@@ -944,7 +944,7 @@ impl NativeRuntimeHandle {
         let mut raw = core::events::empty_runtime_event();
         let mut has_event = false;
         core::check(unsafe {
-            sys::mln_runtime_poll_event(self.state.as_ptr(), &mut raw, &mut has_event)
+            sys::mln_runtime_poll_event(self.state.handle(), &mut raw, &mut has_event)
         })
         .map_err(error::from_core)?;
         if !has_event {
@@ -960,7 +960,7 @@ impl NativeRuntimeHandle {
 unsafe extern "C" fn resource_provider_trampoline(
     user_data: *mut c_void,
     request: *const sys::mln_resource_request,
-    handle: *mut sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request_handle,
 ) -> u32 {
     catch_unwind(AssertUnwindSafe(|| unsafe {
         resource_provider_trampoline_inner(user_data, request, handle)
@@ -971,9 +971,9 @@ unsafe extern "C" fn resource_provider_trampoline(
 unsafe fn resource_provider_trampoline_inner(
     user_data: *mut c_void,
     request: *const sys::mln_resource_request,
-    handle: *mut sys::mln_resource_request_handle,
+    handle: sys::mln_resource_request_handle,
 ) -> u32 {
-    if user_data.is_null() || request.is_null() || handle.is_null() {
+    if user_data.is_null() || request.is_null() || handle.0 == 0 {
         return core::resource::UNKNOWN_PROVIDER_DECISION;
     }
     let provider_ptr = user_data as *const ResourceProviderState;
@@ -1105,7 +1105,7 @@ impl RuntimeEvent {
             raw_event_type,
             source_type: runtime_event_source_type_name(event.source.source_type).to_owned(),
             raw_source_type: event.source.source_type,
-            source_address: BigInt::from(event.source.source_address as u64),
+            source_id: BigInt::from(event.source.source_id),
             code: event.code,
             camera_change_mode: camera_change_mode
                 .map(|mode| camera_change_mode_name(mode).to_owned()),
@@ -1738,8 +1738,8 @@ fn runtime_event_type_name(event_type: core::RuntimeEventType) -> &'static str {
 }
 
 impl NativeRuntimeHandle {
-    pub(crate) fn as_ptr(&self) -> *mut sys::mln_runtime {
-        self.state.as_ptr()
+    pub(crate) fn handle(&self) -> sys::mln_runtime {
+        self.state.handle()
     }
 
     fn release_resource_callback_state(&self) {
@@ -1837,20 +1837,16 @@ impl RuntimeOptions {
 }
 
 fn copy_offline_region_snapshot_value(
-    snapshot: *mut sys::mln_offline_region_snapshot,
+    snapshot: sys::mln_offline_region_snapshot,
 ) -> Result<OfflineRegionInfoValue> {
-    let snapshot = NonNull::new(snapshot)
-        .ok_or_else(|| error::invalid_argument("offline region snapshot result was null"))?;
     let info = unsafe { core::runtime::copy_offline_region_snapshot(snapshot) }
         .map_err(error::from_core)?;
     offline_region_info_to_value(info)
 }
 
 fn copy_offline_region_list_value(
-    list: *mut sys::mln_offline_region_list,
+    list: sys::mln_offline_region_list,
 ) -> Result<Vec<OfflineRegionInfoValue>> {
-    let list = NonNull::new(list)
-        .ok_or_else(|| error::invalid_argument("offline region list result was null"))?;
     let regions =
         unsafe { core::runtime::copy_offline_region_list(list) }.map_err(error::from_core)?;
     regions

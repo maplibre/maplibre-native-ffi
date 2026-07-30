@@ -542,7 +542,7 @@ class NativePointer {
 const HANDLE_ENVIRONMENT = Symbol("handleEnvironment");
 const ENVIRONMENT_TOKEN = Object.freeze({});
 const NATIVE_HANDLES = new WeakMap();
-const MAP_NATIVE_ADDRESSES = new WeakMap();
+const MAP_NATIVE_IDS = new WeakMap();
 
 function recordHandleEnvironment(handle) {
   Object.defineProperty(handle, HANDLE_ENVIRONMENT, {
@@ -1541,7 +1541,7 @@ class WakeSourceHandle {
 }
 
 class RuntimeHandle {
-  #mapsByAddress = new Map();
+  #mapsById = new Map();
   #offlineOperations = new Set();
 
   constructor(options) {
@@ -1596,7 +1596,7 @@ class RuntimeHandle {
       providerRegistration.active = false;
       runtimeResourceProviderRegistrations.delete(this);
     }
-    this.#mapsByAddress.clear();
+    this.#mapsById.clear();
     const resourceRequests = runtimeResourceRequests.get(this);
     for (const registration of resourceRequests ?? []) {
       registration.handle.deref()?._markClosedFromRuntime();
@@ -1884,14 +1884,12 @@ class RuntimeHandle {
       return null;
     }
     const sourceMap =
-      event.sourceType === "map"
-        ? this.#mapForAddress(event.sourceAddress)
-        : null;
+      event.sourceType === "map" ? this.#mapForId(event.sourceId) : null;
     if (event?.eventType === "map-style-loaded") {
       sourceMap?._finishStyleReplacement();
     }
     event.sourceMap = sourceMap;
-    delete event.sourceAddress;
+    delete event.sourceId;
     const completed = event.payload?.offlineOperationCompleted;
     if (typeof completed?.operationId === "bigint") {
       const registration = [...this.#offlineOperations].find(
@@ -1905,38 +1903,38 @@ class RuntimeHandle {
 
   _registerMap(map) {
     assertHandleEnvironment(this);
-    const nativeAddress = MAP_NATIVE_ADDRESSES.get(map);
-    if (nativeAddress != null) {
-      this.#mapsByAddress.set(nativeAddress, new WeakRef(map));
+    const nativeId = MAP_NATIVE_IDS.get(map);
+    if (nativeId != null) {
+      this.#mapsById.set(nativeId, new WeakRef(map));
     }
   }
 
-  _registerMapIdentityForTesting(map, nativeAddress) {
+  _registerMapIdentityForTesting(map, nativeId) {
     if (process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS !== "1") {
       throw new InvalidStateError(null, "test seams are disabled");
     }
-    this.#mapsByAddress.set(nativeAddress, new WeakRef(map));
+    this.#mapsById.set(nativeId, new WeakRef(map));
   }
 
-  _mapForAddressForTesting(nativeAddress) {
+  _mapForIdForTesting(nativeId) {
     if (process.env.MAPLIBRE_NATIVE_FFI_NODE_TEST_SEAMS !== "1") {
       throw new InvalidStateError(null, "test seams are disabled");
     }
-    return this.#mapForAddress(nativeAddress);
+    return this.#mapForId(nativeId);
   }
 
   _unregisterMap(map) {
     assertHandleEnvironment(this);
-    const nativeAddress = MAP_NATIVE_ADDRESSES.get(map);
-    if (nativeAddress != null) {
-      this.#mapsByAddress.delete(nativeAddress);
+    const nativeId = MAP_NATIVE_IDS.get(map);
+    if (nativeId != null) {
+      this.#mapsById.delete(nativeId);
     }
   }
 
-  #mapForAddress(nativeAddress) {
-    const map = this.#mapsByAddress.get(nativeAddress)?.deref() ?? null;
+  #mapForId(nativeId) {
+    const map = this.#mapsById.get(nativeId)?.deref() ?? null;
     if (map == null) {
-      this.#mapsByAddress.delete(nativeAddress);
+      this.#mapsById.delete(nativeId);
     }
     return map;
   }
@@ -2524,7 +2522,7 @@ class MapHandle {
         native.createNativeMapHandle(liveNativeOf(runtime), nativeOptions),
       ),
     );
-    MAP_NATIVE_ADDRESSES.set(this, nativeOf(this).nativeAddress);
+    MAP_NATIVE_IDS.set(this, nativeOf(this).nativeId);
     runtime._registerMap(this);
   }
 

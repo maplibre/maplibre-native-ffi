@@ -45,12 +45,12 @@ pub struct LogRecord {
 #[napi(object)]
 pub struct NativeLeakReport {
     pub handle_type: String,
-    pub address: BigInt,
+    pub id: BigInt,
 }
 
 struct NativeLeakReportEntry {
     handle_type: String,
-    address: usize,
+    id: u64,
 }
 
 static LOG_CALLBACK: OnceLock<Mutex<Option<Arc<LogCallbackState>>>> = OnceLock::new();
@@ -213,7 +213,7 @@ pub fn native_take_leak_reports() -> Result<Vec<NativeLeakReport>> {
         .drain(..)
         .map(|report| NativeLeakReport {
             handle_type: report.handle_type,
-            address: BigInt::from(report.address as u64),
+            id: BigInt::from(report.id),
         })
         .collect();
     Ok(reports)
@@ -268,11 +268,11 @@ extern "C" fn log_trampoline(
     u32::from(matches!(result, Ok(napi::Status::Ok)))
 }
 
-pub(crate) fn report_native_handle_leak(handle_type: &str, address: usize) {
+pub(crate) fn report_native_handle_leak(handle_type: &str, id: u64) {
     if let Ok(mut reports) = native_leak_reports().lock() {
         reports.push(NativeLeakReportEntry {
             handle_type: handle_type.to_owned(),
-            address,
+            id,
         });
     }
 }

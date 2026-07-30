@@ -84,7 +84,7 @@ export type NetworkStatusValue =
 
 export interface NativeLeakReport {
   handleType: string;
-  address: bigint;
+  id: bigint;
 }
 
 export interface RuntimeOptionsInput {

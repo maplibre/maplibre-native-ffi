@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     ffi::{CString, c_void},
     panic::{AssertUnwindSafe, catch_unwind},
-    ptr::NonNull,
     sync::{
         Arc, Condvar, Mutex, OnceLock, RwLock,
         atomic::{AtomicUsize, Ordering},
@@ -247,38 +246,32 @@ pub struct StyleImage {
 #[napi(js_name = "NativeMapHandle")]
 pub struct NativeMapHandle {
     state: NativeHandleState<sys::mln_map>,
-    address: Arc<MapAddress>,
+    shared_handle: Arc<SharedMapHandle>,
     custom_geometry_sources: Mutex<HashMap<String, CustomGeometrySourceRegistration>>,
 }
 
-pub(crate) struct MapAddress(RwLock<Option<NonNull<sys::mln_map>>>);
+pub(crate) struct SharedMapHandle(RwLock<Option<sys::mln_map>>);
 
-// SAFETY: the pointer is read only while holding the RwLock and is handed to
-// C's synchronized map registry. Map close takes the write lock, so allocation
-// reuse cannot race a cross-thread attach.
-unsafe impl Send for MapAddress {}
-unsafe impl Sync for MapAddress {}
-
-impl MapAddress {
-    fn new(ptr: NonNull<sys::mln_map>) -> Self {
-        Self(RwLock::new(Some(ptr)))
+impl SharedMapHandle {
+    fn new(handle: sys::mln_map) -> Self {
+        Self(RwLock::new(Some(handle)))
     }
 
-    pub(crate) fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Option<T> {
-        let address = self
+    pub(crate) fn with_live<T>(&self, use_handle: impl FnOnce(sys::mln_map) -> T) -> Option<T> {
+        let handle = self
             .0
             .read()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        (*address).map(|address| use_ptr(address.as_ptr()))
+        (*handle).map(use_handle)
     }
 
     fn retire_with(&self, close: impl FnOnce() -> Result<()>) -> Result<()> {
-        let mut address = self
+        let mut handle = self
             .0
             .write()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         close()?;
-        *address = None;
+        *handle = None;
         Ok(())
     }
 
@@ -297,20 +290,21 @@ impl MapAddress {
     }
 }
 
-static MAP_ATTACH_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<MapAddress>>>> = OnceLock::new();
+static MAP_ATTACH_TRANSFERS: OnceLock<Mutex<HashMap<String, Arc<SharedMapHandle>>>> =
+    OnceLock::new();
 
 #[napi(js_name = "NativeMapAttachReference")]
 pub struct NativeMapAttachReference {
-    address: Mutex<Option<Arc<MapAddress>>>,
+    shared_handle: Mutex<Option<Arc<SharedMapHandle>>>,
 }
 
 #[napi]
 impl NativeMapAttachReference {
     #[napi(getter)]
     pub fn closed(&self) -> bool {
-        self.address
+        self.shared_handle
             .lock()
-            .map(|address| address.as_ref().is_none_or(|address| address.is_retired()))
+            .map(|handle| handle.as_ref().is_none_or(|handle| handle.is_retired()))
             .unwrap_or(true)
     }
 
@@ -331,27 +325,27 @@ impl NativeMapAttachReference {
                 ))
             },
         )?;
-        let address = self
-            .address
+        let shared_handle = self
+            .shared_handle
             .lock()
             .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
             .take()
             .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
-        transfers.insert(token.clone(), address);
+        transfers.insert(token.clone(), shared_handle);
         Ok(())
     }
 }
 
 impl NativeMapAttachReference {
-    pub(crate) fn with_live<T>(&self, use_ptr: impl FnOnce(*mut sys::mln_map) -> T) -> Result<T> {
-        let address = self
-            .address
+    pub(crate) fn with_live<T>(&self, use_handle: impl FnOnce(sys::mln_map) -> T) -> Result<T> {
+        let shared_handle = self
+            .shared_handle
             .lock()
             .map_err(|_| error::invalid_state("map attach reference lock is poisoned"))?
             .clone()
             .ok_or_else(|| error::invalid_state("MapAttachReference is closed"))?;
-        address
-            .with_live(use_ptr)
+        shared_handle
+            .with_live(use_handle)
             .ok_or_else(|| error::invalid_state("MapHandle is closed"))
     }
 }
@@ -360,13 +354,13 @@ impl NativeMapAttachReference {
 pub fn native_map_attach_reference_from_transfer(
     token: String,
 ) -> Result<NativeMapAttachReference> {
-    let address = map_attach_transfers()
+    let shared_handle = map_attach_transfers()
         .lock()
         .map_err(|_| error::invalid_state("map attach transfer registry lock is poisoned"))?
         .remove(&token)
         .ok_or_else(|| error::invalid_state("map attach transfer token is invalid or consumed"))?;
     Ok(NativeMapAttachReference {
-        address: Mutex::new(Some(address)),
+        shared_handle: Mutex::new(Some(shared_handle)),
     })
 }
 
@@ -377,7 +371,7 @@ pub fn native_map_attach_transfer_cancel(token: String) {
     }
 }
 
-fn map_attach_transfers() -> &'static Mutex<HashMap<String, Arc<MapAddress>>> {
+fn map_attach_transfers() -> &'static Mutex<HashMap<String, Arc<SharedMapHandle>>> {
     MAP_ATTACH_TRANSFERS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
@@ -389,37 +383,40 @@ pub fn create_native_map_handle(
     let options = options.unwrap_or_default().into_core()?;
     let native_options =
         core::options::map_options_to_native(&options).map_err(error::from_core)?;
-    let mut map = std::ptr::null_mut();
+    let mut out = core::ptr::OutHandle::<sys::mln_map>::new();
 
-    core::check(unsafe { sys::mln_map_create(runtime.as_ptr(), &native_options, &mut map) })
-        .map_err(error::from_core)?;
-    let pointer = NonNull::new(map).ok_or_else(|| error::invalid_state("native map is null"))?;
-    let state = unsafe { NativeHandleState::from_raw(pointer, "MapHandle") };
+    core::check(unsafe {
+        sys::mln_map_create(runtime.handle(), &native_options, out.as_mut_ptr())
+    })
+    .map_err(error::from_core)?;
+    let map = out.into_live("MapHandle").map_err(error::from_core)?;
+    let state =
+        unsafe { NativeHandleState::from_handle(map, "MapHandle") }.map_err(error::from_core)?;
     Ok(NativeMapHandle {
         state,
-        address: Arc::new(MapAddress::new(pointer)),
+        shared_handle: Arc::new(SharedMapHandle::new(map)),
         custom_geometry_sources: Mutex::new(HashMap::new()),
     })
 }
 
 #[napi]
 impl NativeMapHandle {
-    pub(crate) fn as_ptr(&self) -> *mut sys::mln_map {
-        self.state.as_ptr()
+    pub(crate) fn handle(&self) -> sys::mln_map {
+        self.state.handle()
     }
 
     pub(crate) fn with_live_for_attach<T>(
         &self,
-        attach: impl FnOnce(*mut sys::mln_map) -> T,
+        attach: impl FnOnce(sys::mln_map) -> T,
     ) -> Result<T> {
-        self.address
+        self.shared_handle
             .with_live(attach)
             .ok_or_else(|| error::invalid_state("MapHandle is closed"))
     }
 
     #[napi]
     pub fn close(&self) -> Result<()> {
-        self.address.retire_with(|| {
+        self.shared_handle.retire_with(|| {
             unsafe { self.state.close_status(sys::mln_map_destroy) }.map_err(error::from_core)
         })?;
         self.clear_all_custom_geometry_source_state();
@@ -431,45 +428,45 @@ impl NativeMapHandle {
         self.state.is_closed()
     }
 
-    #[napi(getter, js_name = "nativeAddress")]
-    pub fn native_address(&self) -> BigInt {
-        BigInt::from(self.state.as_ptr() as usize as u64)
+    #[napi(getter, js_name = "nativeId")]
+    pub fn native_id(&self) -> BigInt {
+        BigInt::from(self.state.id().unwrap_or_default())
     }
 
     #[napi(js_name = "createAttachReference")]
     pub fn create_attach_reference(&self) -> Result<NativeMapAttachReference> {
-        let address = self
-            .address
-            .with_live(|_| Arc::clone(&self.address))
+        let shared_handle = self
+            .shared_handle
+            .with_live(|_| Arc::clone(&self.shared_handle))
             .ok_or_else(|| error::invalid_state("MapHandle is closed"))?;
         Ok(NativeMapAttachReference {
-            address: Mutex::new(Some(address)),
+            shared_handle: Mutex::new(Some(shared_handle)),
         })
     }
 
     #[napi(js_name = "requestRepaint")]
     pub fn request_repaint(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_map_request_repaint(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_map_request_repaint(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "requestStillImage")]
     pub fn request_still_image(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_map_request_still_image(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_map_request_still_image(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "isFullyLoaded")]
     pub fn is_fully_loaded(&self) -> Result<bool> {
         let mut loaded = false;
-        core::check(unsafe { sys::mln_map_is_fully_loaded(self.state.as_ptr(), &mut loaded) })
+        core::check(unsafe { sys::mln_map_is_fully_loaded(self.state.handle(), &mut loaded) })
             .map_err(error::from_core)?;
         Ok(loaded)
     }
 
     #[napi(js_name = "dumpDebugLogs")]
     pub fn dump_debug_logs(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_map_dump_debug_logs(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_map_dump_debug_logs(self.state.handle()) })
             .map_err(error::from_core)
     }
 
@@ -477,7 +474,7 @@ impl NativeMapHandle {
     pub fn rendering_stats_view_enabled(&self) -> Result<bool> {
         let mut enabled = false;
         core::check(unsafe {
-            sys::mln_map_get_rendering_stats_view_enabled(self.state.as_ptr(), &mut enabled)
+            sys::mln_map_get_rendering_stats_view_enabled(self.state.handle(), &mut enabled)
         })
         .map_err(error::from_core)?;
         Ok(enabled)
@@ -486,14 +483,14 @@ impl NativeMapHandle {
     #[napi(setter, js_name = "renderingStatsViewEnabled")]
     pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
         core::check(unsafe {
-            sys::mln_map_set_rendering_stats_view_enabled(self.state.as_ptr(), enabled)
+            sys::mln_map_set_rendering_stats_view_enabled(self.state.handle(), enabled)
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "moveBy")]
     pub fn move_by(&self, delta_x: f64, delta_y: f64) -> Result<()> {
-        core::check(unsafe { sys::mln_map_move_by(self.state.as_ptr(), delta_x, delta_y) })
+        core::check(unsafe { sys::mln_map_move_by(self.state.handle(), delta_x, delta_y) })
             .map_err(error::from_core)
     }
 
@@ -503,7 +500,7 @@ impl NativeMapHandle {
         let anchor_ptr = anchor.as_ref().map_or(std::ptr::null(), |anchor| {
             anchor as *const sys::mln_screen_point
         });
-        core::check(unsafe { sys::mln_map_scale_by(self.state.as_ptr(), scale, anchor_ptr) })
+        core::check(unsafe { sys::mln_map_scale_by(self.state.handle(), scale, anchor_ptr) })
             .map_err(error::from_core)
     }
 
@@ -511,7 +508,7 @@ impl NativeMapHandle {
     pub fn rotate_by(&self, first: ScreenPoint, second: ScreenPoint) -> Result<()> {
         core::check(unsafe {
             sys::mln_map_rotate_by(
-                self.state.as_ptr(),
+                self.state.handle(),
                 first.into_native(),
                 second.into_native(),
             )
@@ -521,7 +518,7 @@ impl NativeMapHandle {
 
     #[napi(js_name = "pitchBy")]
     pub fn pitch_by(&self, pitch: f64) -> Result<()> {
-        core::check(unsafe { sys::mln_map_pitch_by(self.state.as_ptr(), pitch) })
+        core::check(unsafe { sys::mln_map_pitch_by(self.state.handle(), pitch) })
             .map_err(error::from_core)
     }
 
@@ -537,7 +534,7 @@ impl NativeMapHandle {
             animation as *const sys::mln_animation_options
         });
         core::check(unsafe {
-            sys::mln_map_move_by_animated(self.state.as_ptr(), delta_x, delta_y, animation_ptr)
+            sys::mln_map_move_by_animated(self.state.handle(), delta_x, delta_y, animation_ptr)
         })
         .map_err(error::from_core)
     }
@@ -558,7 +555,7 @@ impl NativeMapHandle {
             animation as *const sys::mln_animation_options
         });
         core::check(unsafe {
-            sys::mln_map_scale_by_animated(self.state.as_ptr(), scale, anchor_ptr, animation_ptr)
+            sys::mln_map_scale_by_animated(self.state.handle(), scale, anchor_ptr, animation_ptr)
         })
         .map_err(error::from_core)
     }
@@ -576,7 +573,7 @@ impl NativeMapHandle {
         });
         core::check(unsafe {
             sys::mln_map_rotate_by_animated(
-                self.state.as_ptr(),
+                self.state.handle(),
                 first.into_native(),
                 second.into_native(),
                 animation_ptr,
@@ -592,21 +589,21 @@ impl NativeMapHandle {
             animation as *const sys::mln_animation_options
         });
         core::check(unsafe {
-            sys::mln_map_pitch_by_animated(self.state.as_ptr(), pitch, animation_ptr)
+            sys::mln_map_pitch_by_animated(self.state.handle(), pitch, animation_ptr)
         })
         .map_err(error::from_core)
     }
 
     #[napi(js_name = "cancelTransitions")]
     pub fn cancel_transitions(&self) -> Result<()> {
-        core::check(unsafe { sys::mln_map_cancel_transitions(self.state.as_ptr()) })
+        core::check(unsafe { sys::mln_map_cancel_transitions(self.state.handle()) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "getViewportOptions")]
     pub fn get_viewport_options(&self) -> Result<MapViewportOptions> {
         let mut raw = unsafe { sys::mln_map_viewport_options_default() };
-        core::check(unsafe { sys::mln_map_get_viewport_options(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_viewport_options(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(MapViewportOptions::from_core(
             core::options::map_viewport_options_from_native(raw),
@@ -616,14 +613,14 @@ impl NativeMapHandle {
     #[napi(js_name = "setViewportOptions")]
     pub fn set_viewport_options(&self, options: MapViewportOptions) -> Result<()> {
         let options = core::options::map_viewport_options_to_native(&options.into_core()?);
-        core::check(unsafe { sys::mln_map_set_viewport_options(self.state.as_ptr(), &options) })
+        core::check(unsafe { sys::mln_map_set_viewport_options(self.state.handle(), &options) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "getTileOptions")]
     pub fn get_tile_options(&self) -> Result<MapTileOptions> {
         let mut raw = unsafe { sys::mln_map_tile_options_default() };
-        core::check(unsafe { sys::mln_map_get_tile_options(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_tile_options(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(MapTileOptions::from_core(
             core::options::map_tile_options_from_native(raw),
@@ -633,14 +630,14 @@ impl NativeMapHandle {
     #[napi(js_name = "setTileOptions")]
     pub fn set_tile_options(&self, options: MapTileOptions) -> Result<()> {
         let options = core::options::map_tile_options_to_native(&options.into_core()?);
-        core::check(unsafe { sys::mln_map_set_tile_options(self.state.as_ptr(), &options) })
+        core::check(unsafe { sys::mln_map_set_tile_options(self.state.handle(), &options) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "getBounds")]
     pub fn get_bounds(&self) -> Result<BoundOptions> {
         let mut raw = unsafe { sys::mln_bound_options_default() };
-        core::check(unsafe { sys::mln_map_get_bounds(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_bounds(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(BoundOptions::from_core(
             core::camera::bound_options_from_native(raw),
@@ -650,7 +647,7 @@ impl NativeMapHandle {
     #[napi(js_name = "setBounds")]
     pub fn set_bounds(&self, options: BoundOptions) -> Result<()> {
         let options = core::camera::bound_options_to_native(&options.into_core()?);
-        core::check(unsafe { sys::mln_map_set_bounds(self.state.as_ptr(), &options) })
+        core::check(unsafe { sys::mln_map_set_bounds(self.state.handle(), &options) })
             .map_err(error::from_core)
     }
 
@@ -661,7 +658,7 @@ impl NativeMapHandle {
         let mut pixel_ratio = 0.0;
         core::check(unsafe {
             sys::mln_map_get_size(
-                self.state.as_ptr(),
+                self.state.handle(),
                 &mut width,
                 &mut height,
                 &mut pixel_ratio,
@@ -678,7 +675,7 @@ impl NativeMapHandle {
     #[napi(js_name = "getFreeCameraOptions")]
     pub fn get_free_camera_options(&self) -> Result<FreeCameraOptions> {
         let mut raw = unsafe { sys::mln_free_camera_options_default() };
-        core::check(unsafe { sys::mln_map_get_free_camera_options(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_free_camera_options(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(FreeCameraOptions::from_core(
             core::camera::free_camera_options_from_native(raw),
@@ -688,14 +685,14 @@ impl NativeMapHandle {
     #[napi(js_name = "setFreeCameraOptions")]
     pub fn set_free_camera_options(&self, options: FreeCameraOptions) -> Result<()> {
         let options = core::camera::free_camera_options_to_native(&options.into_core());
-        core::check(unsafe { sys::mln_map_set_free_camera_options(self.state.as_ptr(), &options) })
+        core::check(unsafe { sys::mln_map_set_free_camera_options(self.state.handle(), &options) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "getProjectionMode")]
     pub fn get_projection_mode(&self) -> Result<ProjectionMode> {
         let mut raw = unsafe { sys::mln_projection_mode_default() };
-        core::check(unsafe { sys::mln_map_get_projection_mode(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_projection_mode(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(ProjectionMode::from_core(
             core::camera::projection_mode_from_native(raw),
@@ -705,14 +702,14 @@ impl NativeMapHandle {
     #[napi(js_name = "setProjectionMode")]
     pub fn set_projection_mode(&self, mode: ProjectionMode) -> Result<()> {
         let mode = core::camera::projection_mode_to_native(&mode.into_core());
-        core::check(unsafe { sys::mln_map_set_projection_mode(self.state.as_ptr(), &mode) })
+        core::check(unsafe { sys::mln_map_set_projection_mode(self.state.handle(), &mode) })
             .map_err(error::from_core)
     }
 
     #[napi(js_name = "getCamera")]
     pub fn get_camera(&self) -> Result<CameraOptions> {
         let mut raw = unsafe { sys::mln_camera_options_default() };
-        core::check(unsafe { sys::mln_map_get_camera(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_get_camera(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(CameraOptions::from_core(
             core::camera::camera_options_from_native(raw),
@@ -722,7 +719,7 @@ impl NativeMapHandle {
     #[napi(js_name = "jumpTo")]
     pub fn jump_to(&self, camera: CameraOptions) -> Result<()> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
-        core::check(unsafe { sys::mln_map_jump_to(self.state.as_ptr(), &camera) })
+        core::check(unsafe { sys::mln_map_jump_to(self.state.handle(), &camera) })
             .map_err(error::from_core)
     }
 
@@ -737,7 +734,7 @@ impl NativeMapHandle {
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
-        core::check(unsafe { sys::mln_map_ease_to(self.state.as_ptr(), &camera, animation_ptr) })
+        core::check(unsafe { sys::mln_map_ease_to(self.state.handle(), &camera, animation_ptr) })
             .map_err(error::from_core)
     }
 
@@ -748,7 +745,7 @@ impl NativeMapHandle {
         let animation_ptr = animation.as_ref().map_or(std::ptr::null(), |animation| {
             animation as *const sys::mln_animation_options
         });
-        core::check(unsafe { sys::mln_map_fly_to(self.state.as_ptr(), &camera, animation_ptr) })
+        core::check(unsafe { sys::mln_map_fly_to(self.state.handle(), &camera, animation_ptr) })
             .map_err(error::from_core)
     }
 
@@ -768,7 +765,7 @@ impl NativeMapHandle {
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_lat_lng_bounds(
-                self.state.as_ptr(),
+                self.state.handle(),
                 bounds,
                 fit_options_ptr,
                 &mut raw_camera,
@@ -796,7 +793,7 @@ impl NativeMapHandle {
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_lat_lngs(
-                self.state.as_ptr(),
+                self.state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 fit_options_ptr,
@@ -827,7 +824,7 @@ impl NativeMapHandle {
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
         core::check(unsafe {
             sys::mln_map_camera_for_geometry(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_geometry.as_ref(),
                 fit_options_ptr,
                 &mut raw_camera,
@@ -853,7 +850,7 @@ impl NativeMapHandle {
             },
         };
         core::check(unsafe {
-            sys::mln_map_lat_lng_bounds_for_camera(self.state.as_ptr(), &camera, &mut raw_bounds)
+            sys::mln_map_lat_lng_bounds_for_camera(self.state.handle(), &camera, &mut raw_bounds)
         })
         .map_err(error::from_core)?;
         Ok(LatLngBounds::from_core(
@@ -879,7 +876,7 @@ impl NativeMapHandle {
         };
         core::check(unsafe {
             sys::mln_map_lat_lng_bounds_for_camera_unwrapped(
-                self.state.as_ptr(),
+                self.state.handle(),
                 &camera,
                 &mut raw_bounds,
             )
@@ -895,7 +892,7 @@ impl NativeMapHandle {
         let mut raw_point = sys::mln_screen_point { x: 0.0, y: 0.0 };
         core::check(unsafe {
             sys::mln_map_pixel_for_lat_lng(
-                self.state.as_ptr(),
+                self.state.handle(),
                 coordinate.into_native(),
                 &mut raw_point,
             )
@@ -912,7 +909,7 @@ impl NativeMapHandle {
         };
         core::check(unsafe {
             sys::mln_map_lat_lng_for_pixel(
-                self.state.as_ptr(),
+                self.state.handle(),
                 point.into_native(),
                 &mut raw_coordinate,
             )
@@ -927,7 +924,7 @@ impl NativeMapHandle {
         let mut points = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; coordinates.len()];
         core::check(unsafe {
             sys::mln_map_pixels_for_lat_lngs(
-                self.state.as_ptr(),
+                self.state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 points.as_mut_ptr(),
@@ -949,7 +946,7 @@ impl NativeMapHandle {
         ];
         core::check(unsafe {
             sys::mln_map_lat_lngs_for_pixels(
-                self.state.as_ptr(),
+                self.state.handle(),
                 points.as_ptr(),
                 points.len(),
                 coordinates.as_mut_ptr(),
@@ -962,14 +959,14 @@ impl NativeMapHandle {
     #[napi(js_name = "getDebugOptionsRaw")]
     pub fn get_debug_options_raw(&self) -> Result<u32> {
         let mut options = 0;
-        core::check(unsafe { sys::mln_map_get_debug_options(self.state.as_ptr(), &mut options) })
+        core::check(unsafe { sys::mln_map_get_debug_options(self.state.handle(), &mut options) })
             .map_err(error::from_core)?;
         Ok(options)
     }
 
     #[napi(js_name = "setDebugOptionsRaw")]
     pub fn set_debug_options_raw(&self, options: u32) -> Result<()> {
-        core::check(unsafe { sys::mln_map_set_debug_options(self.state.as_ptr(), options) })
+        core::check(unsafe { sys::mln_map_set_debug_options(self.state.handle(), options) })
             .map_err(error::from_core)
     }
 
@@ -981,7 +978,7 @@ impl NativeMapHandle {
             core::json::json_value_try_to_native(&source_json).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_map_add_style_source_json(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 native_source_json.as_ptr(),
             )
@@ -994,7 +991,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         let mut exists = false;
         core::check(unsafe {
-            sys::mln_map_style_source_exists(self.state.as_ptr(), source_id.raw(), &mut exists)
+            sys::mln_map_style_source_exists(self.state.handle(), source_id.raw(), &mut exists)
         })
         .map_err(error::from_core)?;
         Ok(exists)
@@ -1006,7 +1003,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         let mut removed = false;
         core::check(unsafe {
-            sys::mln_map_remove_style_source(self.state.as_ptr(), source_id.raw(), &mut removed)
+            sys::mln_map_remove_style_source(self.state.handle(), source_id.raw(), &mut removed)
         })
         .map_err(error::from_core)?;
         if removed {
@@ -1020,8 +1017,8 @@ impl NativeMapHandle {
 
     #[napi(js_name = "listStyleSourceIds")]
     pub fn list_style_source_ids(&self) -> Result<Vec<String>> {
-        let mut list = std::ptr::null_mut();
-        core::check(unsafe { sys::mln_map_list_style_source_ids(self.state.as_ptr(), &mut list) })
+        let mut list = sys::mln_style_id_list(0);
+        core::check(unsafe { sys::mln_map_list_style_source_ids(self.state.handle(), &mut list) })
             .map_err(error::from_core)?;
         copy_style_id_list(list).map_err(error::from_core)
     }
@@ -1033,7 +1030,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_style_source_type(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 &mut raw_type,
                 &mut found,
@@ -1057,7 +1054,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_style_source_info(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id_view.raw(),
                 &mut raw_info,
                 &mut found,
@@ -1068,7 +1065,7 @@ impl NativeMapHandle {
             return Ok(None);
         }
         let attribution = copy_style_source_attribution(
-            self.state.as_ptr(),
+            self.state.handle(),
             source_id_view.raw(),
             raw_info.has_attribution,
             raw_info.attribution_size,
@@ -1105,7 +1102,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_geojson_source_url(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 url.raw(),
                 options_ptr,
@@ -1135,7 +1132,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_geojson_source_data(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 native_data.as_ptr(),
                 options_ptr,
@@ -1149,7 +1146,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
         core::check(unsafe {
-            sys::mln_map_set_geojson_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_set_geojson_source_url(self.state.handle(), source_id.raw(), url.raw())
         })
         .map_err(error::from_core)
     }
@@ -1161,7 +1158,7 @@ impl NativeMapHandle {
         let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_map_set_geojson_source_data(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 native_data.as_ptr(),
             )
@@ -1187,7 +1184,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_vector_source_url(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 url.raw(),
                 options_ptr,
@@ -1214,7 +1211,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_source_url(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 url.raw(),
                 options_ptr,
@@ -1241,7 +1238,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_dem_source_url(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 url.raw(),
                 options_ptr,
@@ -1268,7 +1265,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_vector_source_tiles(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
@@ -1296,7 +1293,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_source_tiles(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
@@ -1324,7 +1321,7 @@ impl NativeMapHandle {
             .map_or(std::ptr::null(), |options| options.as_ptr());
         core::check(unsafe {
             sys::mln_map_add_raster_dem_source_tiles(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 tiles.as_ptr(),
                 tiles.len(),
@@ -1352,7 +1349,7 @@ impl NativeMapHandle {
         let options = custom_geometry_source_options_to_native(options.unwrap_or_default(), &state);
         core::check(unsafe {
             sys::mln_map_add_custom_geometry_source(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id_view.raw(),
                 &options,
             )
@@ -1377,7 +1374,7 @@ impl NativeMapHandle {
         let native_data = core::geojson::geojson_try_to_native(&data).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_map_set_custom_geometry_source_tile_data(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 tile_id.into_native(),
                 native_data.as_ptr(),
@@ -1395,7 +1392,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         core::check(unsafe {
             sys::mln_map_invalidate_custom_geometry_source_tile(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 tile_id.into_native(),
             )
@@ -1413,7 +1410,7 @@ impl NativeMapHandle {
         let bounds = core::values::lat_lng_bounds_to_native(bounds.into_core());
         core::check(unsafe {
             sys::mln_map_invalidate_custom_geometry_source_region(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 bounds,
             )
@@ -1448,7 +1445,7 @@ impl NativeMapHandle {
         }
         core::check(unsafe {
             sys::mln_map_set_style_image(
-                self.state.as_ptr(),
+                self.state.handle(),
                 image_id.raw(),
                 &raw_image,
                 &native_options,
@@ -1462,7 +1459,7 @@ impl NativeMapHandle {
         let image_id = core::string::string_view(&image_id);
         let mut exists = false;
         core::check(unsafe {
-            sys::mln_map_style_image_exists(self.state.as_ptr(), image_id.raw(), &mut exists)
+            sys::mln_map_style_image_exists(self.state.handle(), image_id.raw(), &mut exists)
         })
         .map_err(error::from_core)?;
         Ok(exists)
@@ -1473,7 +1470,7 @@ impl NativeMapHandle {
         let image_id = core::string::string_view(&image_id);
         let mut removed = false;
         core::check(unsafe {
-            sys::mln_map_remove_style_image(self.state.as_ptr(), image_id.raw(), &mut removed)
+            sys::mln_map_remove_style_image(self.state.handle(), image_id.raw(), &mut removed)
         })
         .map_err(error::from_core)?;
         Ok(removed)
@@ -1486,7 +1483,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_style_image_info(
-                self.state.as_ptr(),
+                self.state.handle(),
                 image_id.raw(),
                 &mut raw_info,
                 &mut found,
@@ -1506,7 +1503,7 @@ impl NativeMapHandle {
         let mut info_found = false;
         core::check(unsafe {
             sys::mln_map_get_style_image_info(
-                self.state.as_ptr(),
+                self.state.handle(),
                 image_id.raw(),
                 &mut raw_info,
                 &mut info_found,
@@ -1522,7 +1519,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_copy_style_image_premultiplied_rgba8(
-                self.state.as_ptr(),
+                self.state.handle(),
                 image_id.raw(),
                 pixels.as_mut_ptr(),
                 pixels.len(),
@@ -1558,7 +1555,7 @@ impl NativeMapHandle {
         let url = core::string::string_view(&url);
         core::check(unsafe {
             sys::mln_map_add_image_source_url(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -1580,7 +1577,7 @@ impl NativeMapHandle {
         let image = premultiplied_rgba8_image_from_input(&image);
         core::check(unsafe {
             sys::mln_map_add_image_source_image(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -1595,7 +1592,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         let url = core::string::string_view(&url);
         core::check(unsafe {
-            sys::mln_map_set_image_source_url(self.state.as_ptr(), source_id.raw(), url.raw())
+            sys::mln_map_set_image_source_url(self.state.handle(), source_id.raw(), url.raw())
         })
         .map_err(error::from_core)
     }
@@ -1609,7 +1606,7 @@ impl NativeMapHandle {
         let source_id = core::string::string_view(&source_id);
         let image = premultiplied_rgba8_image_from_input(&image);
         core::check(unsafe {
-            sys::mln_map_set_image_source_image(self.state.as_ptr(), source_id.raw(), &image)
+            sys::mln_map_set_image_source_image(self.state.handle(), source_id.raw(), &image)
         })
         .map_err(error::from_core)
     }
@@ -1624,7 +1621,7 @@ impl NativeMapHandle {
         let coordinates = lat_lngs_to_native(coordinates);
         core::check(unsafe {
             sys::mln_map_set_image_source_coordinates(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 coordinates.as_ptr(),
                 coordinates.len(),
@@ -1647,7 +1644,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_image_source_coordinates(
-                self.state.as_ptr(),
+                self.state.handle(),
                 source_id.raw(),
                 coordinates.as_mut_ptr(),
                 coordinates.len(),
@@ -1678,7 +1675,7 @@ impl NativeMapHandle {
         let before_layer_id = core::string::string_view(&before_layer_id);
         core::check(unsafe {
             sys::mln_map_add_hillshade_layer(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
@@ -1700,7 +1697,7 @@ impl NativeMapHandle {
         let before_layer_id = core::string::string_view(&before_layer_id);
         core::check(unsafe {
             sys::mln_map_add_color_relief_layer(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 source_id.raw(),
                 before_layer_id.raw(),
@@ -1720,7 +1717,7 @@ impl NativeMapHandle {
         let before_layer_id = core::string::string_view(&before_layer_id);
         core::check(unsafe {
             sys::mln_map_add_location_indicator_layer(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 before_layer_id.raw(),
             )
@@ -1738,7 +1735,7 @@ impl NativeMapHandle {
         let layer_id = core::string::string_view(&layer_id);
         core::check(unsafe {
             sys::mln_map_set_location_indicator_location(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 coordinate.into_native(),
                 altitude,
@@ -1752,7 +1749,7 @@ impl NativeMapHandle {
         let layer_id = core::string::string_view(&layer_id);
         core::check(unsafe {
             sys::mln_map_set_location_indicator_bearing(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 bearing,
             )
@@ -1769,7 +1766,7 @@ impl NativeMapHandle {
         let layer_id = core::string::string_view(&layer_id);
         core::check(unsafe {
             sys::mln_map_set_location_indicator_accuracy_radius(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 radius,
             )
@@ -1788,7 +1785,7 @@ impl NativeMapHandle {
         let image_id = core::string::string_view(&image_id);
         core::check(unsafe {
             sys::mln_map_set_location_indicator_image_name(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 location_indicator_image_kind_from_string(&image_kind)?,
                 image_id.raw(),
@@ -1810,7 +1807,7 @@ impl NativeMapHandle {
         let before_layer_id = core::string::string_view(&before_layer_id);
         core::check(unsafe {
             sys::mln_map_add_style_layer_json(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_layer_json.as_ptr(),
                 before_layer_id.raw(),
             )
@@ -1823,7 +1820,7 @@ impl NativeMapHandle {
         let layer_id = core::string::string_view(&layer_id);
         let mut exists = false;
         core::check(unsafe {
-            sys::mln_map_style_layer_exists(self.state.as_ptr(), layer_id.raw(), &mut exists)
+            sys::mln_map_style_layer_exists(self.state.handle(), layer_id.raw(), &mut exists)
         })
         .map_err(error::from_core)?;
         Ok(exists)
@@ -1834,7 +1831,7 @@ impl NativeMapHandle {
         let layer_id = core::string::string_view(&layer_id);
         let mut removed = false;
         core::check(unsafe {
-            sys::mln_map_remove_style_layer(self.state.as_ptr(), layer_id.raw(), &mut removed)
+            sys::mln_map_remove_style_layer(self.state.handle(), layer_id.raw(), &mut removed)
         })
         .map_err(error::from_core)?;
         Ok(removed)
@@ -1842,8 +1839,8 @@ impl NativeMapHandle {
 
     #[napi(js_name = "listStyleLayerIds")]
     pub fn list_style_layer_ids(&self) -> Result<Vec<String>> {
-        let mut list = std::ptr::null_mut();
-        core::check(unsafe { sys::mln_map_list_style_layer_ids(self.state.as_ptr(), &mut list) })
+        let mut list = sys::mln_style_id_list(0);
+        core::check(unsafe { sys::mln_map_list_style_layer_ids(self.state.handle(), &mut list) })
             .map_err(error::from_core)?;
         copy_style_id_list(list).map_err(error::from_core)
     }
@@ -1858,7 +1855,7 @@ impl NativeMapHandle {
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_style_layer_type(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 &mut raw_type,
                 &mut found,
@@ -1877,11 +1874,11 @@ impl NativeMapHandle {
     #[napi(js_name = "getStyleLayerJson")]
     pub fn get_style_layer_json(&self, layer_id: String) -> Result<Option<String>> {
         let layer_id = core::string::string_view(&layer_id);
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_json_snapshot(0);
         let mut found = false;
         core::check(unsafe {
             sys::mln_map_get_style_layer_json(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 &mut snapshot,
                 &mut found,
@@ -1905,7 +1902,7 @@ impl NativeMapHandle {
         let before_layer_id = core::string::string_view(&before_layer_id);
         core::check(unsafe {
             sys::mln_map_move_style_layer(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 before_layer_id.raw(),
             )
@@ -1927,7 +1924,7 @@ impl NativeMapHandle {
             core::json::json_value_try_to_native(&value).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_map_set_layer_property(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 property_name.raw(),
                 native_value.as_ptr(),
@@ -1944,10 +1941,10 @@ impl NativeMapHandle {
     ) -> Result<Option<String>> {
         let layer_id = core::string::string_view(&layer_id);
         let property_name = core::string::string_view(&property_name);
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_json_snapshot(0);
         core::check(unsafe {
             sys::mln_map_get_layer_property(
-                self.state.as_ptr(),
+                self.state.handle(),
                 layer_id.raw(),
                 property_name.raw(),
                 &mut snapshot,
@@ -1974,7 +1971,7 @@ impl NativeMapHandle {
             .as_ref()
             .map_or(std::ptr::null(), |filter| filter.as_ptr());
         core::check(unsafe {
-            sys::mln_map_set_layer_filter(self.state.as_ptr(), layer_id.raw(), filter_ptr)
+            sys::mln_map_set_layer_filter(self.state.handle(), layer_id.raw(), filter_ptr)
         })
         .map_err(error::from_core)
     }
@@ -1982,9 +1979,9 @@ impl NativeMapHandle {
     #[napi(js_name = "getLayerFilterJson")]
     pub fn get_layer_filter_json(&self, layer_id: String) -> Result<Option<String>> {
         let layer_id = core::string::string_view(&layer_id);
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_json_snapshot(0);
         core::check(unsafe {
-            sys::mln_map_get_layer_filter(self.state.as_ptr(), layer_id.raw(), &mut snapshot)
+            sys::mln_map_get_layer_filter(self.state.handle(), layer_id.raw(), &mut snapshot)
         })
         .map_err(error::from_core)?;
         json_snapshot_to_string(snapshot)
@@ -1996,7 +1993,7 @@ impl NativeMapHandle {
         let native_light =
             core::json::json_value_try_to_native(&light).map_err(error::from_core)?;
         core::check(unsafe {
-            sys::mln_map_set_style_light_json(self.state.as_ptr(), native_light.as_ptr())
+            sys::mln_map_set_style_light_json(self.state.handle(), native_light.as_ptr())
         })
         .map_err(error::from_core)
     }
@@ -2013,7 +2010,7 @@ impl NativeMapHandle {
             core::json::json_value_try_to_native(&value).map_err(error::from_core)?;
         core::check(unsafe {
             sys::mln_map_set_style_light_property(
-                self.state.as_ptr(),
+                self.state.handle(),
                 property_name.raw(),
                 native_value.as_ptr(),
             )
@@ -2024,10 +2021,10 @@ impl NativeMapHandle {
     #[napi(js_name = "getStyleLightPropertyJson")]
     pub fn get_style_light_property_json(&self, property_name: String) -> Result<Option<String>> {
         let property_name = core::string::string_view(&property_name);
-        let mut snapshot = std::ptr::null_mut();
+        let mut snapshot = sys::mln_json_snapshot(0);
         core::check(unsafe {
             sys::mln_map_get_style_light_property(
-                self.state.as_ptr(),
+                self.state.handle(),
                 property_name.raw(),
                 &mut snapshot,
             )
@@ -2039,7 +2036,7 @@ impl NativeMapHandle {
     #[napi(js_name = "setStyleJson")]
     pub fn set_style_json(&self, json: String) -> Result<()> {
         let json = c_string(json, "style JSON")?;
-        core::check(unsafe { sys::mln_map_set_style_json(self.state.as_ptr(), json.as_ptr()) })
+        core::check(unsafe { sys::mln_map_set_style_json(self.state.handle(), json.as_ptr()) })
             .map_err(error::from_core)?;
         self.clear_all_custom_geometry_source_state();
         Ok(())
@@ -2048,7 +2045,7 @@ impl NativeMapHandle {
     #[napi(js_name = "setStyleUrl")]
     pub fn set_style_url(&self, url: String) -> Result<()> {
         let url = c_string(url, "style URL")?;
-        core::check(unsafe { sys::mln_map_set_style_url(self.state.as_ptr(), url.as_ptr()) })
+        core::check(unsafe { sys::mln_map_set_style_url(self.state.handle(), url.as_ptr()) })
             .map_err(error::from_core)?;
         Ok(())
     }
@@ -2066,7 +2063,7 @@ impl NativeMapHandle {
             let mut found = false;
             let status = unsafe {
                 sys::mln_map_get_style_source_type(
-                    self.state.as_ptr(),
+                    self.state.handle(),
                     source_id_view.raw(),
                     &mut source_type,
                     &mut found,
@@ -2101,7 +2098,7 @@ impl NativeMapHandle {
 impl Drop for NativeMapHandle {
     fn drop(&mut self) {
         if let Some(address) = self.state.leak_for_report() {
-            self.address.retire();
+            self.shared_handle.retire();
             crate::maplibre::report_native_handle_leak(self.state.type_name(), address);
             if let Ok(mut sources) = self.custom_geometry_sources.lock() {
                 for (_, source) in sources.drain() {
@@ -3054,14 +3051,13 @@ fn screen_points_to_native(points: Vec<ScreenPoint>) -> Vec<sys::mln_screen_poin
     points.into_iter().map(ScreenPoint::into_native).collect()
 }
 
-fn json_snapshot_to_string(snapshot: *mut sys::mln_json_snapshot) -> Result<Option<String>> {
-    let value = unsafe { core::json::copy_json_snapshot(std::ptr::NonNull::new(snapshot)) }
-        .map_err(error::from_core)?;
+fn json_snapshot_to_string(snapshot: sys::mln_json_snapshot) -> Result<Option<String>> {
+    let value = unsafe { core::json::copy_json_snapshot(snapshot) }.map_err(error::from_core)?;
     value.map(json_value_to_string).transpose()
 }
 
 fn copy_style_source_attribution(
-    map: *mut sys::mln_map,
+    map: sys::mln_map,
     source_id: sys::mln_string_view,
     has_attribution: bool,
     attribution_size: usize,
@@ -3094,28 +3090,10 @@ fn copy_style_source_attribution(
     })
 }
 
-fn copy_style_id_list(list: *mut sys::mln_style_id_list) -> core::Result<Vec<String>> {
-    struct StyleIdListGuard(*mut sys::mln_style_id_list);
-
-    impl Drop for StyleIdListGuard {
-        fn drop(&mut self) {
-            unsafe { sys::mln_style_id_list_destroy(self.0) };
-        }
-    }
-
-    let list = StyleIdListGuard(list);
-    let mut count = 0;
-    core::check(unsafe { sys::mln_style_id_list_count(list.0, &mut count) })?;
-    let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw_id = sys::mln_string_view {
-            data: std::ptr::null(),
-            size: 0,
-        };
-        core::check(unsafe { sys::mln_style_id_list_get(list.0, index, &mut raw_id) })?;
-        ids.push(unsafe { core::string::copy_string_view(raw_id) }?);
-    }
-    Ok(ids)
+fn copy_style_id_list(list: sys::mln_style_id_list) -> core::Result<Vec<String>> {
+    // SAFETY: list is an owned handle returned by the immediately preceding C
+    // call. The core copier releases it on both success and failure.
+    unsafe { core::style::copy_style_id_list(list) }
 }
 
 fn style_source_type_name(raw_type: u32) -> &'static str {

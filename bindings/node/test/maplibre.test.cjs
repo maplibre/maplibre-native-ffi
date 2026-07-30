@@ -903,7 +903,7 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
       let map = { identity: "map wrapper" };
       const reference = new WeakRef(map);
       runtime._registerMapIdentityForTesting(map, 123n);
-      assert.equal(runtime._mapForAddressForTesting(123n), map);
+      assert.equal(runtime._mapForIdForTesting(123n), map);
       map = undefined;
       let collected = false;
       for (let attempt = 0; attempt < 100 && !collected; attempt += 1) {
@@ -914,7 +914,7 @@ test("runtime event lookup does not retain abandoned map wrappers", () => {
         await new Promise((resolve) => setImmediate(resolve));
       }
       assert.equal(collected, true);
-      assert.equal(runtime._mapForAddressForTesting(123n), null);
+      assert.equal(runtime._mapForIdForTesting(123n), null);
       runtime.close();
     }
 
@@ -1615,7 +1615,7 @@ test("offline operation events expose copied typed payloads", async () => {
   }
 });
 
-test("map events expose proven public map identity without native addresses", async () => {
+test("map events expose proven public map identity without native handle ids", async () => {
   const runtime = new RuntimeHandle();
   const map = runtime.createMap({ width: 16, height: 16 });
 
@@ -1628,7 +1628,7 @@ test("map events expose proven public map identity without native addresses", as
     });
     assert.equal(event.sourceType, "map");
     assert.equal(event.sourceMap, map);
-    assert.equal("sourceAddress" in event, false);
+    assert.equal("sourceId" in event, false);
   } finally {
     map.close();
     runtime.close();

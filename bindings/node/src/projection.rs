@@ -18,11 +18,17 @@ pub struct NativeMapProjectionHandle {
 pub fn create_native_map_projection_handle(
     map: &NativeMapHandle,
 ) -> Result<NativeMapProjectionHandle> {
-    let mut projection = std::ptr::null_mut();
-    core::check(unsafe { sys::mln_map_projection_create(map.as_ptr(), &mut projection) })
+    let mut out = core::ptr::OutHandle::<sys::mln_map_projection>::new();
+    core::check(unsafe { sys::mln_map_projection_create(map.handle(), out.as_mut_ptr()) })
         .map_err(error::from_core)?;
-    let state = unsafe { NativeHandleState::from_raw_ptr(projection, "MapProjectionHandle") }
-        .map_err(error::from_core)?;
+    let state = unsafe {
+        NativeHandleState::from_handle(
+            out.into_live("MapProjectionHandle")
+                .map_err(error::from_core)?,
+            "MapProjectionHandle",
+        )
+    }
+    .map_err(error::from_core)?;
     Ok(NativeMapProjectionHandle { state })
 }
 
@@ -42,7 +48,7 @@ impl NativeMapProjectionHandle {
     #[napi(js_name = "getCamera")]
     pub fn get_camera(&self) -> Result<CameraOptions> {
         let mut raw = unsafe { sys::mln_camera_options_default() };
-        core::check(unsafe { sys::mln_map_projection_get_camera(self.state.as_ptr(), &mut raw) })
+        core::check(unsafe { sys::mln_map_projection_get_camera(self.state.handle(), &mut raw) })
             .map_err(error::from_core)?;
         Ok(CameraOptions::from_core(
             core::camera::camera_options_from_native(raw),
@@ -52,7 +58,7 @@ impl NativeMapProjectionHandle {
     #[napi(js_name = "setCamera")]
     pub fn set_camera(&self, camera: CameraOptions) -> Result<()> {
         let camera = core::camera::camera_options_to_native(&camera.into_core());
-        core::check(unsafe { sys::mln_map_projection_set_camera(self.state.as_ptr(), &camera) })
+        core::check(unsafe { sys::mln_map_projection_set_camera(self.state.handle(), &camera) })
             .map_err(error::from_core)
     }
 
@@ -69,7 +75,7 @@ impl NativeMapProjectionHandle {
         let padding = core::values::edge_insets_to_native(padding.into_core());
         core::check(unsafe {
             sys::mln_map_projection_set_visible_coordinates(
-                self.state.as_ptr(),
+                self.state.handle(),
                 coordinates.as_ptr(),
                 coordinates.len(),
                 padding,
@@ -86,7 +92,7 @@ impl NativeMapProjectionHandle {
         let padding = core::values::edge_insets_to_native(padding.into_core());
         core::check(unsafe {
             sys::mln_map_projection_set_visible_geometry(
-                self.state.as_ptr(),
+                self.state.handle(),
                 native_geometry.as_ref(),
                 padding,
             )
@@ -99,7 +105,7 @@ impl NativeMapProjectionHandle {
         let mut raw_point = sys::mln_screen_point { x: 0.0, y: 0.0 };
         core::check(unsafe {
             sys::mln_map_projection_pixel_for_lat_lng(
-                self.state.as_ptr(),
+                self.state.handle(),
                 coordinate.into_native(),
                 &mut raw_point,
             )
@@ -116,7 +122,7 @@ impl NativeMapProjectionHandle {
         };
         core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
-                self.state.as_ptr(),
+                self.state.handle(),
                 point.into_native(),
                 &mut raw_coordinate,
             )
