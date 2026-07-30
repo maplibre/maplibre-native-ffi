@@ -108,3 +108,74 @@ private func quiesce(_ runtime: RuntimeHandle) throws {
   try source.close()
   try runtime.close()
 }
+
+/// BND-197. The wake source is the one handle a host may use and release from
+/// different threads, so `NativeHandleState` has to order the two.
+@Test func closeWaitsForAUseInFlightOnAnotherThread() throws {
+  let state = try NativeHandleState(
+    typeName: "TestHandle",
+    handle: SyntheticHandles.wakeSource(1)
+  )
+  let entered = DispatchSemaphore(value: 0)
+  let releaseUse = DispatchSemaphore(value: 0)
+  let closeReturned = DispatchSemaphore(value: 0)
+  let destroys = DestroyCounter()
+
+  let useThread = Thread {
+    try? state.withLive { _ in
+      entered.signal()
+      releaseUse.wait()
+      #expect(
+        destroys.value() == 0,
+        "the use should never observe a destroyed handle"
+      )
+    }
+  }
+  useThread.start()
+  #expect(entered.wait(timeout: .now() + 5) == .success)
+
+  let closeThread = Thread {
+    try? state.closeOnce { _ in destroys.increment() }
+    closeReturned.signal()
+  }
+  closeThread.start()
+
+  #expect(
+    closeReturned.wait(timeout: .now() + 0.2) == .timedOut,
+    "close should wait for the use"
+  )
+  #expect(destroys.value() == 0)
+
+  releaseUse.signal()
+  #expect(closeReturned.wait(timeout: .now() + 5) == .success)
+  #expect(destroys.value() == 1)
+  #expect(state.isClosed)
+}
+
+/// BND-197. A use that starts once close has begun is turned away by the
+/// wrapper
+/// rather than reaching native with a retired id.
+@Test func aUseStartingAfterCloseBeginsIsRefused() throws {
+  let state = try NativeHandleState(
+    typeName: "TestHandle",
+    handle: SyntheticHandles.wakeSource(2)
+  )
+  try state.closeOnce { _ in }
+
+  #expect(throws: NativeStatusFailure.self) {
+    try state.withLive { _ in }
+  }
+}
+
+private final class DestroyCounter: @unchecked Sendable {
+  private let lock = NSLock()
+  private var count = 0
+
+  func increment() {
+    lock.withLock { count += 1 }
+  }
+
+  func value() -> Int {
+    lock.withLock { count }
+  }
+}

@@ -12,15 +12,15 @@ public struct ProjectedMeters: Equatable, Sendable {
 }
 
 public final class MapProjectionHandle {
-  private let handle: NativeHandleBox
+  private let handle: NativeHandleBox<NativeMapProjectionHandle>
 
   public init(map: MapHandle) throws {
-    let pointer = try mapNativeFailure {
-      try NativeProjection.create(map.requireLivePointer())
+    let projection = try mapNativeFailure {
+      try NativeProjection.create(map.requireLiveHandle())
     }
     handle = try NativeHandleBox(
       typeName: "MapProjectionHandle",
-      pointer: pointer
+      handle: projection
     )
   }
 
@@ -29,8 +29,8 @@ public final class MapProjectionHandle {
   }
 
   public func close() throws {
-    try handle.closeOnce { pointer in
-      try checkStatus(mln_map_projection_destroy(pointer))
+    try handle.closeOnce { projection in
+      try checkStatus(mln_map_projection_destroy(projection.raw))
     }
   }
 
@@ -45,7 +45,7 @@ public final class MapProjectionHandle {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
         try checkStatus(mln_map_projection_set_camera(
-          handle.requireLive(),
+          handle.requireLive().raw,
           nativeCamera
         ))
       }
@@ -68,7 +68,7 @@ public final class MapProjectionHandle {
             .invalidArgument("visible coordinates cannot be empty")
         }
         try checkStatus(mln_map_projection_set_visible_coordinates(
-          handle.requireLive(),
+          handle.requireLive().raw,
           baseAddress,
           buffer.count,
           padding.nativeInput.native
@@ -84,7 +84,7 @@ public final class MapProjectionHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try checkStatus(mln_map_projection_set_visible_geometry(
-        handle.requireLive(),
+        handle.requireLive().raw,
         arena.allocateGeometry(geometry.nativeGeometry),
         padding.nativeInput.native
       ))

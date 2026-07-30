@@ -3,14 +3,12 @@ package org.maplibre.nativeffi.internal.struct
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.error.InvalidArgumentException
@@ -32,6 +30,7 @@ import org.maplibre.nativeffi.internal.c.mln_feature
 import org.maplibre.nativeffi.internal.c.mln_geometry
 import org.maplibre.nativeffi.internal.c.mln_json_member
 import org.maplibre.nativeffi.internal.c.mln_json_value
+import org.maplibre.nativeffi.internal.lifecycle.SyntheticHandles
 import org.maplibre.nativeffi.json.JsonValue
 
 @OptIn(ExperimentalForeignApi::class)
@@ -181,12 +180,12 @@ class ValueStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun jsonSnapshotHandleCopiesValueAndDestroysNativeHandle() {
     memScoped {
       var destroys = 0
-      val snapshot = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_json_snapshot>()
+      val snapshot = SyntheticHandles.jsonSnapshot()
       val native = alloc<mln_json_value>()
       native.type = org.maplibre.nativeffi.internal.c.MLN_JSON_VALUE_TYPE_NULL
 
       val value =
-        ValueStructs.jsonSnapshotHandle(
+        ValueStructs.readJsonSnapshot(
           snapshot,
           getter = { _, outValue ->
             outValue[0] = native.ptr
@@ -213,14 +212,14 @@ class ValueStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   fun jsonSnapshotHandleDestroysNativeHandleWhenCopyFails() {
     memScoped {
       var destroys = 0
-      val snapshot = alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_json_snapshot>()
+      val snapshot = SyntheticHandles.jsonSnapshot()
       val native = alloc<mln_json_value>()
       native.type = MLN_JSON_VALUE_TYPE_OBJECT
       native.data.object_value.members = null
       native.data.object_value.member_count = Int.MAX_VALUE.toULong() + 1UL
 
       assertFailsWith<IllegalArgumentException> {
-        ValueStructs.jsonSnapshotHandle(
+        ValueStructs.readJsonSnapshot(
           snapshot,
           getter = { _, outValue ->
             outValue[0] = native.ptr

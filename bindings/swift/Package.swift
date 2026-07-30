@@ -9,6 +9,7 @@ let testDependencies: [Target.Dependency] = [
 
 let testSourceFiles = [
   "MaplibreNativeTests/CameraAdvancedTests.swift",
+  "MaplibreNativeTests/HandleIdentityTests.swift",
   "MaplibreNativeTests/LoggingTests.swift",
   "MaplibreNativeTests/MapHandleTests.swift",
   "MaplibreNativeTests/MaplibreTests.swift",
@@ -20,6 +21,7 @@ let testSourceFiles = [
   "MaplibreNativeTests/RuntimeTests.swift",
   "MaplibreNativeTests/StyleTests.swift",
   "MaplibreNativeTests/SupportHelperTests.swift",
+  "MaplibreNativeTests/SyntheticHandles.swift",
   "MaplibreNativeTests/ValueTests.swift",
   "MaplibreNativeTests/WakeSourceTests.swift",
 ]

@@ -10,12 +10,12 @@
 // This verifies undersized query geometry, unknown masks, and invalid string
 // views hidden by binding values.
 static void feature_query_validation_rejects_raw_descriptor_shapes(void) {
-  mln_runtime* runtime = mln_test_create_runtime();
-  mln_map* map = mln_test_create_map(runtime);
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_feature_query_result* result = NULL;
+  mln_feature_query_result result = MLN_HANDLE_NULL;
   mln_rendered_query_geometry geometry = mln_rendered_query_geometry_point(
     (mln_screen_point){.x = 256.0, .y = 256.0}
   );

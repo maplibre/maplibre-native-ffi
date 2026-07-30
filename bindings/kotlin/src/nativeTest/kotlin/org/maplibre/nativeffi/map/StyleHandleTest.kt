@@ -20,6 +20,7 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
+import org.maplibre.nativeffi.internal.lifecycle.rawHandleValue
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.json.JsonValue
@@ -181,7 +182,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         val outRemoved = alloc<BooleanVar>()
         Status.check(
           mln_map_remove_style_source(
-            map.nativeHandle(),
+            map.nativeHandle().rawHandleValue,
             CoreStructs.stringView("custom", this),
             outRemoved.ptr,
           )
@@ -193,7 +194,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         runtime.applyEventSideEffectsForTesting(
           RuntimeEventType.MAP_STYLE_LOADED,
           RuntimeEventSourceType.MAP,
-          map.nativeAddress(),
+          map.nativeHandleId(),
         )
 
       assertEquals(map, mapSource)
@@ -231,7 +232,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         val outRemoved = alloc<BooleanVar>()
         Status.check(
           mln_map_remove_style_source(
-            map.nativeHandle(),
+            map.nativeHandle().rawHandleValue,
             CoreStructs.stringView("custom", this),
             outRemoved.ptr,
           )
@@ -287,7 +288,7 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
         runtime.applyEventSideEffectsForTesting(
           RuntimeEventType.MAP_STYLE_LOADED,
           RuntimeEventSourceType.MAP,
-          map.nativeAddress(),
+          map.nativeHandleId(),
         )
 
       assertEquals(map, mapSource)

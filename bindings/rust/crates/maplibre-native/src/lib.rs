@@ -289,9 +289,10 @@ mod tests {
     assert_not_impl_any!(DetachedRenderSessionHandle: Send, Sync);
     // The one map value that crosses threads. A render session is owned by the
     // thread that attaches it, so the thread driving a render loop needs a way
-    // to name a map owned elsewhere. It is transferable and not shareable.
-    assert_impl_all!(MapAttachRef: Send);
-    assert_not_impl_any!(MapAttachRef: Sync);
+    // to name a map owned elsewhere. It is a copied handle id, so both come
+    // from the ordinary derive rather than an unsafe assertion; the C API
+    // accepts one session per map and rejects a released handle.
+    assert_impl_all!(MapAttachRef: Send, Sync);
 
     #[test]
     // Spec coverage: BND-103.

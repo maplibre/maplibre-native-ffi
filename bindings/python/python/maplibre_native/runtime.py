@@ -295,13 +295,13 @@ class RuntimeEvent:
     ) -> "RuntimeEvent":
         """Build a copied Python event from a private native event dictionary."""
         source_type = RuntimeEventSourceType(raw["source_type"])
-        source_address = raw["source_address"]
+        source_id = raw["source_id"]
         return cls(
             event_type=RuntimeEventType(raw["event_type"]),
             source=RuntimeEventSource(
                 source_type=source_type,
                 map_handle=(
-                    runtime._map_for_source_address(source_address)  # noqa: SLF001
+                    runtime._map_for_source_id(source_id)  # noqa: SLF001
                     if runtime is not None and source_type == RuntimeEventSourceType.MAP
                     else None
                 ),
@@ -385,18 +385,18 @@ class RuntimeHandle(NativeHandleMixin):
         self._offline_operations.discard(operation)
 
     def _register_map(self, map_handle: MapHandle) -> None:
-        self._maps[map_handle._native_address()] = weakref.ref(map_handle)  # noqa: SLF001
+        self._maps[map_handle._native_id()] = weakref.ref(map_handle)  # noqa: SLF001
 
     def _unregister_map(self, map_handle: MapHandle) -> None:
-        self._maps.pop(map_handle._native_address(), None)  # noqa: SLF001
+        self._maps.pop(map_handle._native_id(), None)  # noqa: SLF001
 
-    def _map_for_source_address(self, source_address: int) -> MapHandle | None:
-        source = self._maps.get(source_address)
+    def _map_for_source_id(self, source_id: int) -> MapHandle | None:
+        source = self._maps.get(source_id)
         if source is None:
             return None
         map_handle = source()
         if map_handle is None or map_handle.closed:
-            self._maps.pop(source_address, None)
+            self._maps.pop(source_id, None)
             return None
         return map_handle
 

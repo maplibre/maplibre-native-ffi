@@ -334,10 +334,11 @@ auto validate_opengl_descriptor(const mln_opengl_surface_descriptor* descriptor)
 namespace mln::core {
 
 auto metal_surface_attach(
-  mln_map* map, const mln_metal_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_metal_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -360,7 +361,7 @@ auto metal_surface_attach(
     return physical_status;
   }
 
-  auto session = std::make_unique<mln_render_session>();
+  auto session = std::make_shared<mln_render_session_object>();
   session->map = map;
   set_session_extent(*session, descriptor->extent);
   session->surface.backend = std::make_unique<MetalSurfaceSessionBackend>(
@@ -379,10 +380,11 @@ auto metal_surface_attach(
 }
 
 auto vulkan_surface_attach(
-  mln_map* map, const mln_vulkan_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_vulkan_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }
@@ -409,10 +411,11 @@ auto vulkan_surface_attach(
 }
 
 auto opengl_surface_attach(
-  mln_map* map, const mln_opengl_surface_descriptor* descriptor,
-  mln_render_session** out_session
+  mln_map map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session* out_session
 ) -> mln_status {
-  const auto map_status = validate_map_live(map);
+  MapObject* live_map = nullptr;
+  const auto map_status = validate_map_live(map, live_map);
   if (map_status != MLN_STATUS_OK) {
     return map_status;
   }

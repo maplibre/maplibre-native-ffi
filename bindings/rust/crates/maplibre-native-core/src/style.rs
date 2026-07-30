@@ -1,6 +1,5 @@
 use std::ffi::c_void;
 use std::ptr;
-use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
@@ -457,14 +456,12 @@ impl StyleImageOptionsNativeExt for StyleImageOptions {
 /// `ptr` must point to a live `mln_style_id_list` handle owned by the caller
 /// and returned by the matching C API. This function takes ownership of that
 /// handle and releases it before returning, including on copy errors.
-pub unsafe fn copy_style_id_list(
-    ptr: NonNull<sys::mln_style_id_list>,
-) -> crate::Result<Vec<String>> {
-    // SAFETY: ptr is an owned style ID list returned by the C API and released by the guard.
-    let list = unsafe { crate::handle::style_id_list(ptr.as_ptr()) }?;
+pub unsafe fn copy_style_id_list(handle: sys::mln_style_id_list) -> crate::Result<Vec<String>> {
+    // SAFETY: handle is an owned style ID list returned by the C API and released by the guard.
+    let list = unsafe { crate::handle::style_id_list(handle) }?;
     let mut count = 0;
     // SAFETY: list is live and count points to writable storage.
-    crate::check(unsafe { sys::mln_style_id_list_count(list.as_ptr(), &mut count) })?;
+    crate::check(unsafe { sys::mln_style_id_list_count(list.handle(), &mut count) })?;
 
     let mut ids = Vec::with_capacity(count);
     for index in 0..count {
@@ -473,7 +470,7 @@ pub unsafe fn copy_style_id_list(
             size: 0,
         };
         // SAFETY: list is live, index is less than count, and view points to writable storage.
-        crate::check(unsafe { sys::mln_style_id_list_get(list.as_ptr(), index, &mut view) })?;
+        crate::check(unsafe { sys::mln_style_id_list_get(list.handle(), index, &mut view) })?;
         // SAFETY: The C API returns a view into list-owned storage that remains valid here.
         ids.push(unsafe { crate::string::copy_string_view(view) }?);
     }
