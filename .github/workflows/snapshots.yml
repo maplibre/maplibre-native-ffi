@@ -17,9 +17,6 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # GitHub Pages publishes here rather than from a parallel push workflow so the
-  # docs job can install the CI-produced host native package instead of rebuilding
-  # MapLibre Native for Rust API docs.
   docs-pages:
     name: Docs Pages
     runs-on: ubuntu-latest
