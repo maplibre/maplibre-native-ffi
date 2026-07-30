@@ -497,6 +497,35 @@ checksum = "sha256:318893aff6b9efd60f70470f5827b9577ae20a805cf9732d5612862a78508
 url = "https://github.com/EmbarkStudios/cargo-about/releases/download/0.9.1/cargo-about-0.9.1-x86_64-pc-windows-msvc.tar.gz"
 url_api = "https://api.github.com/repos/EmbarkStudios/cargo-about/releases/assets/461986502"
 
+[[tools."github:abhinav/doc2go"]]
+version = "0.12.2"
+backend = "github:abhinav/doc2go"
+
+[tools."github:abhinav/doc2go"."platforms.linux-arm64"]
+checksum = "sha256:944aed2106ad9abeae3938d941996ae93779434e11219c2788c2f071e2d1c1fc"
+url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584123"
+
+[tools."github:abhinav/doc2go"."platforms.linux-x64"]
+checksum = "sha256:29d6206b43ed323f144c91f6e888542c17ae4bb451b2ddfa2e5f7e99e8abccf6"
+url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584154"
+
+[tools."github:abhinav/doc2go"."platforms.macos-arm64"]
+checksum = "sha256:d33f93b0d0d3202df860675fec6456e5b62d7b435a1499963e78ab8cf5f4304f"
+url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584162"
+
+[tools."github:abhinav/doc2go"."platforms.windows-arm64"]
+checksum = "sha256:ceb3f246c2e02609ed595b3f4097787741f2fdbbd688fe6a388721872866081e"
+url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-windows-arm64.tar.gz"
+url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584159"
+
+[tools."github:abhinav/doc2go"."platforms.windows-x64"]
+checksum = "sha256:0c395ccfbdbfaf7f0f6459729284c30fb18391a9e7a95c2b64573fd2edd1c8b7"
+url = "https://github.com/abhinav/doc2go/releases/download/v0.12.2/doc2go-windows-amd64.tar.gz"
+url_api = "https://api.github.com/repos/abhinav/doc2go/releases/assets/422584158"
+
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
 backend = "github:sargunv/jvl"

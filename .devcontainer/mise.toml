@@ -13,6 +13,7 @@
 "core:java" = "{{vars.java_version}}"
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
 "core:zig" = { version = "{{vars.zig_version}}", os = ["linux", "macos", "windows/x64"] }
+"github:abhinav/doc2go" = "{{vars.doc2go_version}}"
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 # END generated tools
 

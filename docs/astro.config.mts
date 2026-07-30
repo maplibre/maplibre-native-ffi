@@ -71,6 +71,11 @@ export default defineConfig({
               link: "/reference/dart/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
+            {
+              label: "Go API",
+              link: "/reference/go/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {
