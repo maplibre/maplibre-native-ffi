@@ -2183,14 +2183,15 @@ final class MapHandle {
   void setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
-    StyleImageOptions options = const StyleImageOptions(),
+    StyleImageOptions? options,
   }) {
+    final resolvedOptions = options ?? StyleImageOptions();
     withNativeArena((arena) {
       final nativeId = nativeStringView(imageId, arena);
       final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
       final nativeOptions = arena<raw.mln_style_image_options>();
-      nativeOptions.ref = _styleImageOptionsToNative(options, arena);
+      nativeOptions.ref = _styleImageOptionsToNative(resolvedOptions, arena);
       _check(
         _c.raw.mln_map_set_style_image(
           _handle.raw,

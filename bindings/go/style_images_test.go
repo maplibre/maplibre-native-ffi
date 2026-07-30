@@ -102,6 +102,29 @@ func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
 	}
 }
 
+func TestStyleImageOptionsCloneKeepsStretchPresence(t *testing.T) {
+	options := StyleImageOptions{StretchX: []ImageStretch{}, StretchY: nil}
+	cloned := options.Clone()
+
+	// A present empty slice and an absent one stay distinguishable across a clone.
+	if cloned.StretchX == nil {
+		t.Fatalf("cloned StretchX = nil, want a present empty slice")
+	}
+	if cloned.StretchY != nil {
+		t.Fatalf("cloned StretchY = %v, want nil", cloned.StretchY)
+	}
+	if !options.Equal(cloned) {
+		t.Fatalf("clone %+v is not equal to its source %+v", cloned, options)
+	}
+
+	source := StyleImageOptions{StretchX: []ImageStretch{{From: 0, To: 1}}}
+	independent := source.Clone()
+	source.StretchX[0] = ImageStretch{From: 5, To: 6}
+	if independent.StretchX[0] != (ImageStretch{From: 0, To: 1}) {
+		t.Fatalf("clone StretchX = %v, want the values at clone time", independent.StretchX)
+	}
+}
+
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	lockOSThreadForTest(t)
 

@@ -528,6 +528,31 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
     mln_map_set_style_image(map, image_id, &image, &options)
   );
 
+  // Intervals that run out of order or overlap their predecessor are rejected.
+  const mln_image_stretch unordered[] = {
+    {.from = 2.0F, .to = 3.0F}, {.from = 0.0F, .to = 1.0F}
+  };
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+  options.stretch_x = unordered;
+  options.stretch_x_count = 2;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
+  const mln_image_stretch overlapping[] = {
+    {.from = 0.0F, .to = 2.0F}, {.from = 1.0F, .to = 3.0F}
+  };
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+  options.stretch_y = overlapping;
+  options.stretch_y_count = 2;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
   options = mln_style_image_options_default();
   options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
   options.stretch_y = NULL;

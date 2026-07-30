@@ -1119,6 +1119,9 @@ public sealed unsafe class MapHandle : IDisposable
     private static IReadOnlyList<ImageStretch> ToStretches(mln_image_stretch[] raw) =>
         Array.ConvertAll(raw, stretch => new ImageStretch(stretch.from, stretch.to));
 
+    private static IReadOnlyList<ImageStretch>? NullIfEmpty(IReadOnlyList<ImageStretch>? values) =>
+        values is null || values.Count == 0 ? null : values;
+
     /// <summary>Copies a style image as premultiplied RGBA8 pixels when it exists.</summary>
     public StyleImage? CopyStyleImagePremultipliedRgba8(string imageId)
     {
@@ -1163,12 +1166,24 @@ public sealed unsafe class MapHandle : IDisposable
             Array.Resize(ref bytes, checked((int)byteLength));
         }
 
+        // Native storage keeps no empty-versus-absent distinction for stretches, so an image
+        // without intervals reports them as absent.
+        var stretches = StyleImageStretches(imageId);
         return new StyleImage(
             new PremultipliedRgba8Image(
                 bytes,
                 new TextureImageInfo(info.Width, info.Height, info.Stride, (ulong)byteLength)
             ),
-            new StyleImageOptions { PixelRatio = info.PixelRatio, Sdf = info.Sdf }
+            new StyleImageOptions
+            {
+                PixelRatio = info.PixelRatio,
+                Sdf = info.Sdf,
+                StretchX = NullIfEmpty(stretches?.StretchX),
+                StretchY = NullIfEmpty(stretches?.StretchY),
+                Content = info.Content,
+                TextFitWidth = info.TextFitWidth,
+                TextFitHeight = info.TextFitHeight,
+            }
         );
     }
 

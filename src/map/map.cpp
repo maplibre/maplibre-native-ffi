@@ -1099,6 +1099,12 @@ auto validate_style_image_options(const mln_style_image_options* options)
         mln::core::set_thread_error(message.c_str());
         return MLN_STATUS_INVALID_ARGUMENT;
       }
+      if (index != 0 && stretch.from < stretches[index - 1].to) {
+        auto message =
+          std::string{name} + " intervals must increase and must not overlap";
+        mln::core::set_thread_error(message.c_str());
+        return MLN_STATUS_INVALID_ARGUMENT;
+      }
     }
   }
   if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_CONTENT)) {

@@ -111,7 +111,9 @@ image. Pixels are premultiplied RGBA8 with an explicit stride. Options carry
 
 For a nine-patch sprite, set `stretch_x` and `stretch_y` to the intervals that
 may scale, in image pixels. Pixels outside those intervals keep their size, so a
-rounded button border stays crisp while its middle stretches. `content` sets the
+rounded button border stays crisp while its middle stretches. The intervals along
+one axis run in increasing order without overlapping, and `set_style_image`
+rejects any that break that shape. `content` sets the
 box a symbol's label sits inside, and `text_fit_width` and `text_fit_height`
 choose how the image resizes around that label for `icon-text-fit`.
 

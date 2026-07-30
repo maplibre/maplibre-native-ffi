@@ -127,6 +127,14 @@ public sealed class StyleImageTests
         Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], stretches.Value.StretchY);
         Assert.Null(map.StyleImageStretches("missing"));
 
+        var copied = map.CopyStyleImagePremultipliedRgba8("patch");
+        Assert.NotNull(copied);
+        Assert.Equal([new ImageStretch(0, 1)], copied.Options.StretchX);
+        Assert.Equal([new ImageStretch(0, 1), new ImageStretch(1, 2)], copied.Options.StretchY);
+        Assert.Equal(new ImageContent(0.5f, 0.5f, 1.5f, 1.5f), copied.Options.Content);
+        Assert.Null(copied.Options.TextFitWidth);
+        Assert.Equal(StyleImageTextFit.Proportional, copied.Options.TextFitHeight);
+
         // A backwards interval is rejected by C.
         Assert.Throws<InvalidArgumentException>(() =>
             map.SetStyleImage(

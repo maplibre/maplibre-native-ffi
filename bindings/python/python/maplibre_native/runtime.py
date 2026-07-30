@@ -10,6 +10,7 @@ from typing import Any
 import weakref
 
 from . import _native
+from .errors import InvalidArgumentError
 from .resource import ResourceProviderCallback, ResourceTransformCallback
 
 
@@ -460,6 +461,13 @@ class RuntimeHandle(NativeHandleMixin):
         MapLibre evicts ambient resources to fit the new budget, so lowering it
         discards cached resources. Offline regions are unaffected.
         """
+        if not 0 <= size < 2**64:
+            # PyO3 extracts this as `u64` and raises a bare OverflowError before
+            # the binding's error conversion runs, so range-check it here to keep
+            # invalid binding-owned input on the documented error shape.
+            raise InvalidArgumentError(
+                f"maximum ambient cache size must fit in 64 unsigned bits, not {size}"
+            )
         return self._offline_operation(
             self._native.set_maximum_ambient_cache_size_start,
             size,

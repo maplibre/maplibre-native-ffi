@@ -578,10 +578,15 @@ void main() {
       map.setStyleImage(
         'patch',
         image,
-        options: const StyleImageOptions(
-          stretchX: [ImageStretch(0, 1)],
-          stretchY: [ImageStretch(0, 1), ImageStretch(1, 2)],
-          content: ImageContent(left: 0.5, top: 0.5, right: 1.5, bottom: 1.5),
+        options: StyleImageOptions(
+          stretchX: const [ImageStretch(0, 1)],
+          stretchY: const [ImageStretch(0, 1), ImageStretch(1, 2)],
+          content: const ImageContent(
+            left: 0.5,
+            top: 0.5,
+            right: 1.5,
+            bottom: 1.5,
+          ),
           textFitHeight: StyleImageTextFit.proportional,
         ),
       );
@@ -609,10 +614,16 @@ void main() {
         () => map.setStyleImage(
           'bad',
           image,
-          options: const StyleImageOptions(stretchX: [ImageStretch(2, 1)]),
+          options: StyleImageOptions(stretchX: const [ImageStretch(2, 1)]),
         ),
         throwsA(isA<InvalidArgumentException>()),
       );
+
+      // Options snapshot the caller's lists, so later mutation cannot reach them.
+      final callerStretches = [const ImageStretch(0, 1)];
+      final snapshotted = StyleImageOptions(stretchX: callerStretches);
+      callerStretches.add(const ImageStretch(1, 2));
+      expect(snapshotted.stretchX, [const ImageStretch(0, 1)]);
     } finally {
       map.close();
       runtime.close();
@@ -869,7 +880,7 @@ void main() {
         stride: 4,
         bytes: Uint8List.fromList([255, 0, 0, 255]),
       ),
-      options: const StyleImageOptions(pixelRatio: 2, sdf: true),
+      options: StyleImageOptions(pixelRatio: 2, sdf: true),
     );
     expect(map.styleImageExists('dart-image'), isTrue);
     final styleImageInfo = map.getStyleImageInfo('dart-image');

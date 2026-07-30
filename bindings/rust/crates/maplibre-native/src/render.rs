@@ -1352,16 +1352,10 @@ impl RenderSessionHandle {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         // SAFETY: session is live. Passing a null buffer with zero capacity is
         // the documented metadata probe path; out_info points to initialized storage.
-        let status = unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, std::ptr::null_mut(), 0, &mut info)
-        };
-        if status == sys::MLN_STATUS_OK
-            || (status == sys::MLN_STATUS_INVALID_ARGUMENT && info.byte_length > 0)
-        {
-            Ok(maplibre_core::values::texture_image_info_from_native(&info))
-        } else {
-            Err(crate::Error::from_status(status))
-        }
+        })?;
+        Ok(maplibre_core::values::texture_image_info_from_native(&info))
     }
 
     /// Reads the most recently rendered texture frame as premultiplied RGBA8.

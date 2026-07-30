@@ -1,4 +1,5 @@
 using Maplibre.Native.Geo;
+using Maplibre.Native.Internal;
 using Maplibre.Native.Json;
 using Maplibre.Native.Render;
 
@@ -167,14 +168,25 @@ public sealed record StyleImageOptions
     public float? PixelRatio { get; set; }
     public bool? Sdf { get; set; }
 
+    private IReadOnlyList<ImageStretch>? stretchX;
+    private IReadOnlyList<ImageStretch>? stretchY;
+
     /// <summary>
     /// Horizontally stretchable intervals. A present empty list stays distinguishable from an
-    /// absent one.
+    /// absent one. Assignment stores a snapshot the caller cannot mutate.
     /// </summary>
-    public IReadOnlyList<ImageStretch>? StretchX { get; set; }
+    public IReadOnlyList<ImageStretch>? StretchX
+    {
+        get => stretchX;
+        set => stretchX = ValueEquality.SnapshotOrNull(value);
+    }
 
-    /// <summary>Vertically stretchable intervals.</summary>
-    public IReadOnlyList<ImageStretch>? StretchY { get; set; }
+    /// <summary>Vertically stretchable intervals. Assignment stores a snapshot.</summary>
+    public IReadOnlyList<ImageStretch>? StretchY
+    {
+        get => stretchY;
+        set => stretchY = ValueEquality.SnapshotOrNull(value);
+    }
 
     /// <summary>Content box used when <c>icon-text-fit</c> applies.</summary>
     public ImageContent? Content { get; set; }

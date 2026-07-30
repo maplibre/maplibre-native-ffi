@@ -2566,6 +2566,13 @@ def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
         operation.close()
         assert operation.closed
 
+        # An out-of-range size stays on the binding's documented error family
+        # instead of leaking the extension module's OverflowError.
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_maximum_ambient_cache_size(-1)
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_maximum_ambient_cache_size(2**64)
+
 
 def test_offline_values_wrap_runtime_event_payload_shape() -> None:
     bounds = geo.LatLngBounds(geo.LatLng(1.0, 2.0), geo.LatLng(3.0, 4.0))

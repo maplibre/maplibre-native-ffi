@@ -69,8 +69,10 @@ typedef enum mln_style_raster_dem_encoding : uint32_t {
  * One stretchable interval along an image axis, in image pixels.
  *
  * MapLibre scales only the stretchable intervals when it resizes the image, so
- * the pixels outside them keep their size. Intervals run in increasing order
- * and do not overlap.
+ * the pixels outside them keep their size. An interval runs from a lower `from`
+ * to a higher `to`, and the intervals along one axis run in increasing order
+ * without overlapping. mln_map_set_style_image() rejects intervals that break
+ * that shape.
  */
 typedef struct mln_image_stretch {
   float from;

@@ -401,15 +401,19 @@ final class StyleImageTextFit {
 /// Style image options.
 final class StyleImageOptions {
   /// Creates style image options.
-  const StyleImageOptions({
+  ///
+  /// The stretch lists are copied into unmodifiable storage, so later caller
+  /// mutation leaves these options unchanged.
+  StyleImageOptions({
     this.pixelRatio,
     this.sdf,
-    this.stretchX,
-    this.stretchY,
+    List<ImageStretch>? stretchX,
+    List<ImageStretch>? stretchY,
     this.content,
     this.textFitWidth,
     this.textFitHeight,
-  });
+  }) : stretchX = stretchX == null ? null : List.unmodifiable(stretchX),
+       stretchY = stretchY == null ? null : List.unmodifiable(stretchY);
 
   /// Optional pixel ratio.
   final double? pixelRatio;

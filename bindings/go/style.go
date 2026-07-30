@@ -555,15 +555,22 @@ func (options StyleImageOptions) Clone() StyleImageOptions {
 	cloned := options
 	cloned.PixelRatio = clonePointer(options.PixelRatio)
 	cloned.SDF = clonePointer(options.SDF)
-	if options.StretchX != nil {
-		cloned.StretchX = append([]ImageStretch(nil), options.StretchX...)
-	}
-	if options.StretchY != nil {
-		cloned.StretchY = append([]ImageStretch(nil), options.StretchY...)
-	}
+	cloned.StretchX = cloneStretches(options.StretchX)
+	cloned.StretchY = cloneStretches(options.StretchY)
 	cloned.Content = clonePointer(options.Content)
 	cloned.TextFitWidth = clonePointer(options.TextFitWidth)
 	cloned.TextFitHeight = clonePointer(options.TextFitHeight)
+	return cloned
+}
+
+// cloneStretches copies a stretch slice, keeping a present empty slice distinguishable
+// from an absent one.
+func cloneStretches(stretches []ImageStretch) []ImageStretch {
+	if stretches == nil {
+		return nil
+	}
+	cloned := make([]ImageStretch, len(stretches))
+	copy(cloned, stretches)
 	return cloned
 }
 
@@ -634,7 +641,7 @@ func allocCStretches(stretches []ImageStretch) unsafe.Pointer {
 	}
 	size := C.size_t(len(stretches)) * C.size_t(unsafe.Sizeof(C.mln_image_stretch{}))
 	allocation := C.malloc(size)
-	raw := (*[1 << 20]C.mln_image_stretch)(allocation)
+	raw := unsafe.Slice((*C.mln_image_stretch)(allocation), len(stretches))
 	for index, stretch := range stretches {
 		raw[index].from = C.float(stretch.From)
 		raw[index].to = C.float(stretch.To)
