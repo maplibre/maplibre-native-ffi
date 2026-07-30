@@ -2,6 +2,11 @@
 
 [CCode (cprefix = "mln_", lower_case_cprefix = "mln_", cheader_filename = "maplibre_native_c/base.h,maplibre_native_c/diagnostics.h,maplibre_native_c/logging.h,maplibre_native_c/runtime.h,maplibre_native_c/map.h,maplibre_native_c/camera.h,maplibre_native_c/style.h,maplibre_native_c/query.h,maplibre_native_c/render_target.h,maplibre_native_c/texture.h,maplibre_native_c/surface.h,maplibre_native_c/render_session.h,maplibre_native_c/projection.h,maplibre_native_c/android.h")]
 namespace MaplibreNative.Raw {
+    [SimpleType]
+    [CCode (cname = "bool", has_type_id = false)]
+    public struct CBool : uint8 {
+    }
+
     [CCode (cname = "mln_status", cprefix = "MLN_STATUS_", has_type_id = false)]
     public enum Status {
         OK,
@@ -563,53 +568,53 @@ namespace MaplibreNative.Raw {
         TIMING
     }
 
-    [Compact]
-    [CCode (cname = "mln_runtime", free_function = "")]
-    public class Runtime {}
+    [SimpleType]
+    [CCode (cname = "mln_runtime", has_type_id = false)]
+    public struct Runtime : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_wake_source", free_function = "")]
-    public class WakeSource {}
+    [SimpleType]
+    [CCode (cname = "mln_wake_source", has_type_id = false)]
+    public struct WakeSource : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_map", free_function = "")]
-    public class Map {}
+    [SimpleType]
+    [CCode (cname = "mln_map", has_type_id = false)]
+    public struct Map : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_render_session", free_function = "")]
-    public class RenderSession {}
+    [SimpleType]
+    [CCode (cname = "mln_render_session", has_type_id = false)]
+    public struct RenderSession : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_map_projection", free_function = "")]
-    public class MapProjection {}
+    [SimpleType]
+    [CCode (cname = "mln_map_projection", has_type_id = false)]
+    public struct MapProjection : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_style_id_list", free_function = "")]
-    public class StyleIdList {}
+    [SimpleType]
+    [CCode (cname = "mln_style_id_list", has_type_id = false)]
+    public struct StyleIdList : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_feature_query_result", free_function = "")]
-    public class FeatureQueryResult {}
+    [SimpleType]
+    [CCode (cname = "mln_feature_query_result", has_type_id = false)]
+    public struct FeatureQueryResult : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_feature_extension_result", free_function = "")]
-    public class FeatureExtensionResult {}
+    [SimpleType]
+    [CCode (cname = "mln_feature_extension_result", has_type_id = false)]
+    public struct FeatureExtensionResult : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_offline_region_snapshot", free_function = "")]
-    public class OfflineRegionSnapshot {}
+    [SimpleType]
+    [CCode (cname = "mln_offline_region_snapshot", has_type_id = false)]
+    public struct OfflineRegionSnapshot : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_offline_region_list", free_function = "")]
-    public class OfflineRegionList {}
+    [SimpleType]
+    [CCode (cname = "mln_offline_region_list", has_type_id = false)]
+    public struct OfflineRegionList : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_json_snapshot", free_function = "")]
-    public class JsonSnapshot {}
+    [SimpleType]
+    [CCode (cname = "mln_json_snapshot", has_type_id = false)]
+    public struct JsonSnapshot : uint64 {}
 
-    [Compact]
-    [CCode (cname = "mln_resource_request_handle", free_function = "")]
-    public class ResourceRequestHandle {}
+    [SimpleType]
+    [CCode (cname = "mln_resource_request_handle", has_type_id = false)]
+    public struct ResourceRequestHandle : uint64 {}
 
     [SimpleType]
     [CCode (cname = "mln_runtime_options", has_type_id = false)]
@@ -1526,7 +1531,7 @@ namespace MaplibreNative.Raw {
     }
 
     [CCode (cname = "mln_resource_provider_callback", has_target = false)]
-    public delegate uint32 ResourceProviderCallback (void* user_data, ResourceRequest* request, ResourceRequestHandle handle);
+    public delegate uint32 ResourceProviderCallback (void* user_data, [CCode (type = "const mln_resource_request*")] ResourceRequest* request, ResourceRequestHandle handle);
 
     [CCode (cname = "mln_resource_provider", has_type_id = false)]
     public struct ResourceProvider {
@@ -1540,7 +1545,7 @@ namespace MaplibreNative.Raw {
         public uint32 size;
         public uint32 type;
         public uint32 source_type;
-        public void* source;
+        public uint64 source;
         public int32 code;
         public uint32 payload_type;
         public void* payload;
@@ -1595,10 +1600,13 @@ namespace MaplibreNative.Raw {
     public static Status resource_request_complete (ResourceRequestHandle handle, ResourceResponse* response);
 
     [CCode (cname = "mln_resource_request_cancelled")]
-    public static Status resource_request_cancelled (ResourceRequestHandle handle, out bool out_cancelled);
+    public static Status resource_request_cancelled (ResourceRequestHandle handle, out CBool out_cancelled);
 
     [CCode (cname = "mln_resource_request_release")]
     public static void resource_request_release (ResourceRequestHandle handle);
+
+    [CCode (cname = "mln_resource_request_wait_until_retired")]
+    public static Status resource_request_wait_until_retired (ResourceRequestHandle handle);
 
     [CCode (cname = "mln_resource_transform_response_set_url")]
     public static Status resource_transform_response_set_url (ResourceTransformResponse* response, string? url, size_t url_size);
@@ -1619,7 +1627,7 @@ namespace MaplibreNative.Raw {
     public static void wake_source_destroy (WakeSource source);
 
     [CCode (cname = "mln_runtime_poll_event")]
-    public static Status runtime_poll_event (Runtime runtime, RuntimeEvent* out_event, out bool out_has_event);
+    public static Status runtime_poll_event (Runtime runtime, RuntimeEvent* out_event, out CBool out_has_event);
 
     [CCode (cname = "mln_runtime_set_resource_transform")]
     public static Status runtime_set_resource_transform (Runtime runtime, ResourceTransform* transform);
@@ -1664,19 +1672,19 @@ namespace MaplibreNative.Raw {
     public static Status runtime_offline_region_delete_start (Runtime runtime, OfflineRegionId region_id, out OfflineOperationId out_operation_id);
 
     [CCode (cname = "mln_runtime_offline_region_create_take_result")]
-    public static Status runtime_offline_region_create_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot? out_region);
+    public static Status runtime_offline_region_create_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot out_region);
 
     [CCode (cname = "mln_runtime_offline_region_get_take_result")]
-    public static Status runtime_offline_region_get_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot? out_region, out bool out_found);
+    public static Status runtime_offline_region_get_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot out_region, out CBool out_found);
 
     [CCode (cname = "mln_runtime_offline_regions_list_take_result")]
-    public static Status runtime_offline_regions_list_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionList? out_regions);
+    public static Status runtime_offline_regions_list_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionList out_regions);
 
     [CCode (cname = "mln_runtime_offline_regions_merge_database_take_result")]
-    public static Status runtime_offline_regions_merge_database_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionList? out_regions);
+    public static Status runtime_offline_regions_merge_database_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionList out_regions);
 
     [CCode (cname = "mln_runtime_offline_region_update_metadata_take_result")]
-    public static Status runtime_offline_region_update_metadata_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot? out_region);
+    public static Status runtime_offline_region_update_metadata_take_result (Runtime runtime, OfflineOperationId operation_id, out OfflineRegionSnapshot out_region);
 
     [CCode (cname = "mln_runtime_offline_region_get_status_take_result")]
     public static Status runtime_offline_region_get_status_take_result (Runtime runtime, OfflineOperationId operation_id, OfflineRegionStatus* out_status);
@@ -1736,10 +1744,10 @@ namespace MaplibreNative.Raw {
     public static Status map_set_rendering_stats_view_enabled (Map map, bool enabled);
 
     [CCode (cname = "mln_map_get_rendering_stats_view_enabled")]
-    public static Status map_get_rendering_stats_view_enabled (Map map, out bool out_enabled);
+    public static Status map_get_rendering_stats_view_enabled (Map map, out CBool out_enabled);
 
     [CCode (cname = "mln_map_is_fully_loaded")]
-    public static Status map_is_fully_loaded (Map map, out bool out_loaded);
+    public static Status map_is_fully_loaded (Map map, out CBool out_loaded);
 
     [CCode (cname = "mln_map_dump_debug_logs")]
     public static Status map_dump_debug_logs (Map map);
@@ -1931,19 +1939,19 @@ namespace MaplibreNative.Raw {
     public static Status map_invalidate_custom_geometry_source_region (Map map, StringView source_id, LatLngBounds bounds);
 
     [CCode (cname = "mln_map_remove_style_source")]
-    public static Status map_remove_style_source (Map map, StringView source_id, out bool out_removed);
+    public static Status map_remove_style_source (Map map, StringView source_id, out CBool out_removed);
 
     [CCode (cname = "mln_map_style_source_exists")]
-    public static Status map_style_source_exists (Map map, StringView source_id, out bool out_exists);
+    public static Status map_style_source_exists (Map map, StringView source_id, out CBool out_exists);
 
     [CCode (cname = "mln_map_get_style_source_type")]
-    public static Status map_get_style_source_type (Map map, StringView source_id, out uint32 out_source_type, out bool out_found);
+    public static Status map_get_style_source_type (Map map, StringView source_id, out uint32 out_source_type, out CBool out_found);
 
     [CCode (cname = "mln_map_get_style_source_info")]
-    public static Status map_get_style_source_info (Map map, StringView source_id, StyleSourceInfo* out_info, out bool out_found);
+    public static Status map_get_style_source_info (Map map, StringView source_id, StyleSourceInfo* out_info, out CBool out_found);
 
     [CCode (cname = "mln_map_copy_style_source_attribution")]
-    public static Status map_copy_style_source_attribution (Map map, StringView source_id, char* out_attribution, size_t attribution_capacity, out size_t out_attribution_size, out bool out_found);
+    public static Status map_copy_style_source_attribution (Map map, StringView source_id, char* out_attribution, size_t attribution_capacity, out size_t out_attribution_size, out CBool out_found);
 
     [CCode (cname = "mln_map_list_style_source_ids")]
     public static Status map_list_style_source_ids (Map map, out StyleIdList out_source_ids);
@@ -1973,13 +1981,13 @@ namespace MaplibreNative.Raw {
     public static Status map_add_style_layer_json (Map map, JsonValue* layer_json, StringView before_layer_id);
 
     [CCode (cname = "mln_map_remove_style_layer")]
-    public static Status map_remove_style_layer (Map map, StringView layer_id, out bool out_removed);
+    public static Status map_remove_style_layer (Map map, StringView layer_id, out CBool out_removed);
 
     [CCode (cname = "mln_map_style_layer_exists")]
-    public static Status map_style_layer_exists (Map map, StringView layer_id, out bool out_exists);
+    public static Status map_style_layer_exists (Map map, StringView layer_id, out CBool out_exists);
 
     [CCode (cname = "mln_map_get_style_layer_type")]
-    public static Status map_get_style_layer_type (Map map, StringView layer_id, out StringView out_layer_type, out bool out_found);
+    public static Status map_get_style_layer_type (Map map, StringView layer_id, out StringView out_layer_type, out CBool out_found);
 
     [CCode (cname = "mln_map_list_style_layer_ids")]
     public static Status map_list_style_layer_ids (Map map, out StyleIdList out_layer_ids);
@@ -1988,7 +1996,7 @@ namespace MaplibreNative.Raw {
     public static Status map_move_style_layer (Map map, StringView layer_id, StringView before_layer_id);
 
     [CCode (cname = "mln_map_get_style_layer_json")]
-    public static Status map_get_style_layer_json (Map map, StringView layer_id, out JsonSnapshot out_layer, out bool out_found);
+    public static Status map_get_style_layer_json (Map map, StringView layer_id, out JsonSnapshot out_layer, out CBool out_found);
 
     [CCode (cname = "mln_map_set_style_light_json")]
     public static Status map_set_style_light_json (Map map, JsonValue* light_json);
@@ -2015,16 +2023,16 @@ namespace MaplibreNative.Raw {
     public static Status map_set_style_image (Map map, StringView image_id, PremultipliedRgba8Image* image, StyleImageOptions* options);
 
     [CCode (cname = "mln_map_remove_style_image")]
-    public static Status map_remove_style_image (Map map, StringView image_id, out bool out_removed);
+    public static Status map_remove_style_image (Map map, StringView image_id, out CBool out_removed);
 
     [CCode (cname = "mln_map_style_image_exists")]
-    public static Status map_style_image_exists (Map map, StringView image_id, out bool out_exists);
+    public static Status map_style_image_exists (Map map, StringView image_id, out CBool out_exists);
 
     [CCode (cname = "mln_map_get_style_image_info")]
-    public static Status map_get_style_image_info (Map map, StringView image_id, StyleImageInfo* out_info, out bool out_found);
+    public static Status map_get_style_image_info (Map map, StringView image_id, StyleImageInfo* out_info, out CBool out_found);
 
     [CCode (cname = "mln_map_copy_style_image_premultiplied_rgba8")]
-    public static Status map_copy_style_image_premultiplied_rgba8 (Map map, StringView image_id, uint8* out_pixels, size_t pixel_capacity, out size_t out_byte_length, out bool out_found);
+    public static Status map_copy_style_image_premultiplied_rgba8 (Map map, StringView image_id, uint8* out_pixels, size_t pixel_capacity, out size_t out_byte_length, out CBool out_found);
 
     [CCode (cname = "mln_map_add_image_source_url")]
     public static Status map_add_image_source_url (Map map, StringView source_id, LatLng* coordinates, size_t coordinate_count, StringView url);
@@ -2042,7 +2050,7 @@ namespace MaplibreNative.Raw {
     public static Status map_set_image_source_coordinates (Map map, StringView source_id, LatLng* coordinates, size_t coordinate_count);
 
     [CCode (cname = "mln_map_get_image_source_coordinates")]
-    public static Status map_get_image_source_coordinates (Map map, StringView source_id, LatLng* out_coordinates, size_t coordinate_capacity, out size_t out_coordinate_count, out bool out_found);
+    public static Status map_get_image_source_coordinates (Map map, StringView source_id, LatLng* out_coordinates, size_t coordinate_capacity, out size_t out_coordinate_count, out CBool out_found);
 
     [CCode (cname = "mln_rendered_feature_query_options_default")]
     public static RenderedFeatureQueryOptions rendered_feature_query_options_default ();
@@ -2078,7 +2086,7 @@ namespace MaplibreNative.Raw {
     public static Status render_session_remove_feature_state (RenderSession session, FeatureStateSelector* selector);
 
     [CCode (cname = "mln_json_snapshot_get")]
-    public static Status json_snapshot_get (JsonSnapshot snapshot, out JsonValue* out_value);
+    public static Status json_snapshot_get (JsonSnapshot snapshot, [CCode (type = "const mln_json_value**")] out JsonValue* out_value);
 
     [CCode (cname = "mln_json_snapshot_destroy")]
     public static void json_snapshot_destroy (JsonSnapshot snapshot);
@@ -2165,7 +2173,7 @@ namespace MaplibreNative.Raw {
     public static Status render_session_resize (RenderSession session, uint32 width, uint32 height, double scale_factor);
 
     [CCode (cname = "mln_render_session_render_update")]
-    public static Status render_session_render_update (RenderSession session, out bool out_rendered);
+    public static Status render_session_render_update (RenderSession session, out CBool out_rendered);
 
     [CCode (cname = "mln_render_session_detach")]
     public static Status render_session_detach (RenderSession session);

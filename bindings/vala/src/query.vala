@@ -51,23 +51,23 @@ namespace MaplibreNative {
     }
 
     internal class FeatureExtensionResultHandle {
-        private Raw.FeatureExtensionResult? native;
+        private Raw.FeatureExtensionResult native = (Raw.FeatureExtensionResult) 0;
 
-        public bool closed { get { return native == null; } }
+        public bool closed { get { return (uint64) native == 0; } }
 
-        internal FeatureExtensionResultHandle (owned Raw.FeatureExtensionResult native) {
-            this.native = (owned) native;
+        internal FeatureExtensionResultHandle (Raw.FeatureExtensionResult native) {
+            this.native = native;
         }
 
         ~FeatureExtensionResultHandle () {
-            if (native != null) {
+            if ((uint64) native != 0) {
                 Raw.feature_extension_result_destroy (native);
-                native = null;
+                native = (Raw.FeatureExtensionResult) 0;
             }
         }
 
-        private unowned Raw.FeatureExtensionResult require_live () throws Error {
-            if (native == null) {
+        private Raw.FeatureExtensionResult require_live () throws Error {
+            if ((uint64) native == 0) {
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature extension result handle is closed");
             }
@@ -81,8 +81,8 @@ namespace MaplibreNative {
             return FeatureExtensionResult.from_native (info);
         }
 
-        internal static FeatureExtensionResult copy_from_native (owned Raw.FeatureExtensionResult native) throws Error {
-            var handle = new FeatureExtensionResultHandle ((owned) native);
+        internal static FeatureExtensionResult copy_from_native (Raw.FeatureExtensionResult native) throws Error {
+            var handle = new FeatureExtensionResultHandle (native);
             try {
                 return handle.get ();
             } finally {
@@ -91,12 +91,12 @@ namespace MaplibreNative {
         }
 
         public void close () {
-            if (native == null) {
+            if ((uint64) native == 0) {
                 return;
             }
-            unowned Raw.FeatureExtensionResult closing = native;
+            Raw.FeatureExtensionResult closing = native;
             Raw.feature_extension_result_destroy (closing);
-            native = null;
+            native = (Raw.FeatureExtensionResult) 0;
         }
     }
 
@@ -133,7 +133,7 @@ namespace MaplibreNative {
             for (var i = 0; i < points.length; i++) {
                 native_points[i] = points[i].to_native ();
             }
-            return new RenderedQueryGeometry (Raw.rendered_query_geometry_line_string (native_points, native_points.length), (owned) native_points);
+            return new RenderedQueryGeometry (Raw.rendered_query_geometry_line_string (native_points, native_points.length), native_points);
         }
 
         public RenderedQueryGeometry copy () {
@@ -424,23 +424,23 @@ namespace MaplibreNative {
     }
 
     internal class FeatureQueryResultHandle {
-        private Raw.FeatureQueryResult? native;
+        private Raw.FeatureQueryResult native = (Raw.FeatureQueryResult) 0;
 
-        public bool closed { get { return native == null; } }
+        public bool closed { get { return (uint64) native == 0; } }
 
-        internal FeatureQueryResultHandle (owned Raw.FeatureQueryResult native) {
-            this.native = (owned) native;
+        internal FeatureQueryResultHandle (Raw.FeatureQueryResult native) {
+            this.native = native;
         }
 
         ~FeatureQueryResultHandle () {
-            if (native != null) {
+            if ((uint64) native != 0) {
                 Raw.feature_query_result_destroy (native);
-                native = null;
+                native = (Raw.FeatureQueryResult) 0;
             }
         }
 
-        internal unowned Raw.FeatureQueryResult require_live () throws Error {
-            if (native == null) {
+        internal Raw.FeatureQueryResult require_live () throws Error {
+            if ((uint64) native == 0) {
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("feature query result handle is closed");
             }
@@ -448,12 +448,12 @@ namespace MaplibreNative {
         }
 
         public void close () {
-            if (native == null) {
+            if ((uint64) native == 0) {
                 return;
             }
-            unowned Raw.FeatureQueryResult closing = native;
+            Raw.FeatureQueryResult closing = native;
             Raw.feature_query_result_destroy (closing);
-            native = null;
+            native = (Raw.FeatureQueryResult) 0;
         }
 
         public size_t count () throws Error {
@@ -478,8 +478,8 @@ namespace MaplibreNative {
             return features;
         }
 
-        internal static QueriedFeature[] copy_from_native (owned Raw.FeatureQueryResult native) throws Error {
-            var handle = new FeatureQueryResultHandle ((owned) native);
+        internal static QueriedFeature[] copy_from_native (Raw.FeatureQueryResult native) throws Error {
+            var handle = new FeatureQueryResultHandle (native);
             try {
                 return handle.to_array ();
             } finally {

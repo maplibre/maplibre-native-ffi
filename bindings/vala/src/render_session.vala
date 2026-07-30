@@ -1,7 +1,7 @@
 namespace MaplibreNative {
     internal class RenderSessionNativeLease {
         private RenderSessionHandle owner;
-        public unowned Raw.RenderSession native { get; private set; }
+        public Raw.RenderSession native { get; private set; }
 
         internal RenderSessionNativeLease (RenderSessionHandle owner, Raw.RenderSession native) {
             this.owner = owner;
@@ -15,7 +15,7 @@ namespace MaplibreNative {
 
     public class RenderSessionHandle {
         private MapHandle map;
-        private Raw.RenderSession? native;
+        private Raw.RenderSession native = (Raw.RenderSession) 0;
         private bool frame_acquired;
         private bool detached;
         private Mutex state_mutex;
@@ -27,7 +27,7 @@ namespace MaplibreNative {
         public bool closed {
             get {
                 state_mutex.lock ();
-                var value = native == null;
+                var value = (uint64) native == 0;
                 state_mutex.unlock ();
                 return value;
             }
@@ -41,15 +41,15 @@ namespace MaplibreNative {
             }
         }
 
-        internal RenderSessionHandle (MapHandle map, owned Raw.RenderSession native) {
+        internal RenderSessionHandle (MapHandle map, Raw.RenderSession native) {
             this.map = map;
-            this.native = (owned) native;
+            this.native = native;
             owner_thread = Thread.self<void*> ();
         }
 
         ~RenderSessionHandle () {
             state_mutex.lock ();
-            var leaked = native != null;
+            var leaked = (uint64) native != 0;
             state_mutex.unlock ();
             if (leaked) {
                 warning ("RenderSessionHandle finalized while live; call close() on the owner thread");
@@ -59,7 +59,7 @@ namespace MaplibreNative {
         internal RenderSessionNativeLease require_live () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null || releasing) {
+            if ((uint64) native == 0 || releasing) {
                 state_mutex.unlock ();
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
@@ -82,7 +82,7 @@ namespace MaplibreNative {
         internal void begin_frame_borrow () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null || releasing) {
+            if ((uint64) native == 0 || releasing) {
                 state_mutex.unlock ();
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
@@ -105,7 +105,7 @@ namespace MaplibreNative {
         private RenderSessionNativeLease require_available () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null || releasing) {
+            if ((uint64) native == 0 || releasing) {
                 state_mutex.unlock ();
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("render session handle is closed");
@@ -124,7 +124,7 @@ namespace MaplibreNative {
         public void close () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null) {
+            if ((uint64) native == 0) {
                 state_mutex.unlock ();
                 return;
             }
@@ -142,14 +142,14 @@ namespace MaplibreNative {
             while (active_native_leases > 0) {
                 idle.wait (state_mutex);
             }
-            unowned Raw.RenderSession closing = native;
+            Raw.RenderSession closing = native;
             state_mutex.unlock ();
 
             var status = Raw.render_session_destroy (closing);
 
             state_mutex.lock ();
             if (status == Raw.Status.OK) {
-                native = null;
+                native = (Raw.RenderSession) 0;
             }
             releasing = false;
             idle.broadcast ();
@@ -170,10 +170,10 @@ namespace MaplibreNative {
         }
 
         public bool render_update () throws Error {
-            bool rendered;
+            Raw.CBool rendered;
             var lease = require_available ();
             check_status (Raw.render_session_render_update (lease.native, out rendered));
-            return rendered;
+            return bool_from_raw (rendered);
         }
 
         public void detach () throws Error {
@@ -220,10 +220,10 @@ namespace MaplibreNative {
                 native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
-            Raw.FeatureQueryResult result;
+            Raw.FeatureQueryResult result = (Raw.FeatureQueryResult) 0;
             var lease = require_available ();
             check_status (Raw.render_session_query_rendered_features (lease.native, &native_geometry, options_ptr, out result));
-            return FeatureQueryResultHandle.copy_from_native ((owned) result);
+            return FeatureQueryResultHandle.copy_from_native (result);
         }
 
         public QueriedFeature[] query_source_features (string source_id, SourceFeatureQueryOptions? options = null) throws Error {
@@ -239,10 +239,10 @@ namespace MaplibreNative {
                 native_options = options_storage.to_native ();
                 options_ptr = &native_options;
             }
-            Raw.FeatureQueryResult result;
+            Raw.FeatureQueryResult result = (Raw.FeatureQueryResult) 0;
             var lease = require_available ();
             check_status (Raw.render_session_query_source_features (lease.native, source_id.to_native (), options_ptr, out result));
-            return FeatureQueryResultHandle.copy_from_native ((owned) result);
+            return FeatureQueryResultHandle.copy_from_native (result);
         }
 
         public FeatureExtensionResult query_feature_extensions (string source_id, Feature feature, string extension, string extension_field, JsonValue? arguments = null) throws Error {
@@ -266,10 +266,10 @@ namespace MaplibreNative {
                 native_arguments = arguments_storage.to_native ();
                 arguments_ptr = &native_arguments;
             }
-            Raw.FeatureExtensionResult result;
+            Raw.FeatureExtensionResult result = (Raw.FeatureExtensionResult) 0;
             var lease = require_available ();
             check_status (Raw.render_session_query_feature_extensions (lease.native, source_id.to_native (), &native_feature, extension.to_native (), extension_field.to_native (), arguments_ptr, out result));
-            return FeatureExtensionResultHandle.copy_from_native ((owned) result);
+            return FeatureExtensionResultHandle.copy_from_native (result);
         }
 
         public void set_feature_state (FeatureStateSelector selector, JsonValue state) throws Error {
@@ -284,7 +284,7 @@ namespace MaplibreNative {
         public JsonValue get_feature_state (FeatureStateSelector selector) throws Error {
             var selector_storage = selector.copy ();
             Raw.FeatureStateSelector native_selector = selector_storage.to_native ();
-            Raw.JsonSnapshot snapshot;
+            Raw.JsonSnapshot snapshot = (Raw.JsonSnapshot) 0;
             var lease = require_available ();
             check_status (Raw.render_session_get_feature_state (lease.native, &native_selector, out snapshot));
             try {

@@ -1,7 +1,7 @@
 namespace MaplibreNative {
     internal class MapProjectionNativeLease {
         private MapProjectionHandle owner;
-        public unowned Raw.MapProjection native { get; private set; }
+        public Raw.MapProjection native { get; private set; }
 
         internal MapProjectionNativeLease (MapProjectionHandle owner, Raw.MapProjection native) {
             this.owner = owner;
@@ -26,7 +26,7 @@ namespace MaplibreNative {
     }
 
     public class MapProjectionHandle {
-        private Raw.MapProjection? native;
+        private Raw.MapProjection native = (Raw.MapProjection) 0;
         private Mutex state_mutex;
         private Cond idle;
         private bool releasing;
@@ -36,20 +36,20 @@ namespace MaplibreNative {
         public bool closed {
             get {
                 state_mutex.lock ();
-                var value = native == null;
+                var value = (uint64) native == 0;
                 state_mutex.unlock ();
                 return value;
             }
         }
 
-        internal MapProjectionHandle (owned Raw.MapProjection native) {
-            this.native = (owned) native;
+        internal MapProjectionHandle (Raw.MapProjection native) {
+            this.native = native;
             owner_thread = Thread.self<void*> ();
         }
 
         ~MapProjectionHandle () {
             state_mutex.lock ();
-            var leaked = native != null;
+            var leaked = (uint64) native != 0;
             state_mutex.unlock ();
             if (leaked) {
                 warning ("MapProjectionHandle finalized while live; call close() on the owner thread");
@@ -58,7 +58,7 @@ namespace MaplibreNative {
 
         internal MapProjectionNativeLease require_live () throws Error {
             state_mutex.lock ();
-            if (native == null || releasing) {
+            if ((uint64) native == 0 || releasing) {
                 state_mutex.unlock ();
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map projection handle is closed");
@@ -81,7 +81,7 @@ namespace MaplibreNative {
         public void close () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null) {
+            if ((uint64) native == 0) {
                 state_mutex.unlock ();
                 return;
             }
@@ -94,14 +94,14 @@ namespace MaplibreNative {
             while (active_native_leases > 0) {
                 idle.wait (state_mutex);
             }
-            unowned Raw.MapProjection closing = native;
+            Raw.MapProjection closing = native;
             state_mutex.unlock ();
 
             var status = Raw.map_projection_destroy (closing);
 
             state_mutex.lock ();
             if (status == Raw.Status.OK) {
-                native = null;
+                native = (Raw.MapProjection) 0;
             }
             releasing = false;
             idle.broadcast ();

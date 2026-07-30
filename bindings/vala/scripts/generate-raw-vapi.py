@@ -55,6 +55,7 @@ ENUM_DECLARATION = re.compile(
     re.DOTALL,
 )
 PRIMITIVE_C_TYPES = {
+    "CBool": "bool",
     "bool": "bool",
     "char": "char",
     "double": "double",
@@ -149,9 +150,14 @@ def vapi_function_signatures(
         parameter_text = parts.group(2).strip()
         if parameter_text:
             for parameter in parameter_text.split(","):
+                parameter = re.sub(
+                    r"^\[CCode \([^\]]+\)\]\s*",
+                    "",
+                    parameter.strip(),
+                )
                 parameter_parts = re.fullmatch(
                     r"(?:(out|ref)\s+)?(.+?)\s+\w+",
-                    parameter.strip(),
+                    parameter,
                 )
                 if parameter_parts is None:
                     raise SystemExit(
@@ -182,9 +188,14 @@ def vapi_delegate_signatures(
         parameters: list[str] = []
         if parameter_text.strip():
             for parameter in parameter_text.split(","):
+                parameter = re.sub(
+                    r"^\[CCode \([^\]]+\)\]\s*",
+                    "",
+                    parameter.strip(),
+                )
                 parameter_parts = re.fullmatch(
                     r"(?:(out|ref)\s+)?(.+?)\s+\w+",
-                    parameter.strip(),
+                    parameter,
                 )
                 if parameter_parts is None:
                     raise SystemExit(

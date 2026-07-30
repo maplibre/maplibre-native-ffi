@@ -338,7 +338,7 @@ namespace MaplibreNative {
 
     private class MapNativeLease {
         private MapHandle owner;
-        public unowned Raw.Map native { get; private set; }
+        public Raw.Map native { get; private set; }
 
         internal MapNativeLease (MapHandle owner, Raw.Map native) {
             this.owner = owner;
@@ -352,7 +352,7 @@ namespace MaplibreNative {
 
     public class MapHandle {
         private RuntimeHandle runtime;
-        private Raw.Map? native;
+        private Raw.Map native = (Raw.Map) 0;
         private CustomGeometrySourceRegistration[] custom_geometry_sources = new CustomGeometrySourceRegistration[0];
         private Mutex state_mutex;
         private Cond idle;
@@ -363,7 +363,7 @@ namespace MaplibreNative {
         public bool closed {
             get {
                 state_mutex.lock ();
-                var value = native == null;
+                var value = (uint64) native == 0;
                 state_mutex.unlock ();
                 return value;
             }
@@ -373,10 +373,10 @@ namespace MaplibreNative {
             this.runtime = runtime;
             var options_snapshot = (options ?? new MapOptions ()).copy ();
             var native_options = options_snapshot.to_native ();
-            Raw.Map created;
+            Raw.Map created = (Raw.Map) 0;
             var runtime_lease = runtime.require_live ();
             check_status (Raw.map_create (runtime_lease.native, &native_options, out created));
-            native = (owned) created;
+            native = created;
             owner_thread = Thread.self<void*> ();
             runtime.register_map (this);
         }
@@ -391,7 +391,7 @@ namespace MaplibreNative {
 
         ~MapHandle () {
             state_mutex.lock ();
-            var leaked = native != null;
+            var leaked = (uint64) native != 0;
             if (leaked) {
                 retain_leaked_custom_geometry_sources (custom_geometry_sources);
             }
@@ -403,7 +403,7 @@ namespace MaplibreNative {
 
         internal MapNativeLease require_live () throws Error {
             state_mutex.lock ();
-            if (native == null || releasing) {
+            if ((uint64) native == 0 || releasing) {
                 state_mutex.unlock ();
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("map handle is closed");
@@ -423,9 +423,9 @@ namespace MaplibreNative {
             state_mutex.unlock ();
         }
 
-        internal bool matches_native_source (void* source) {
+        internal bool matches_native_source (uint64 source) {
             state_mutex.lock ();
-            var matches = native != null && !releasing && (void*) native == source;
+            var matches = (uint64) native != 0 && !releasing && (uint64) native == source;
             state_mutex.unlock ();
             return matches;
         }
@@ -482,13 +482,14 @@ namespace MaplibreNative {
             uint retained_count = 0;
             for (var index = 0; index < custom_geometry_sources.length; index++) {
                 uint32 source_type;
-                bool found;
+                Raw.CBool raw_found;
                 check_status (Raw.map_get_style_source_type (
                     lease.native,
                     custom_geometry_sources[index].source_id.to_native (),
                     out source_type,
-                    out found
+                    out raw_found
                 ));
+                var found = bool_from_raw (raw_found);
                 retained_flags[index] = found && source_type == (uint32) Raw.StyleSourceType.CUSTOM_VECTOR;
                 if (retained_flags[index]) {
                     retained_count++;
@@ -510,7 +511,7 @@ namespace MaplibreNative {
         public void close () throws Error {
             ensure_owner_thread ();
             state_mutex.lock ();
-            if (native == null) {
+            if ((uint64) native == 0) {
                 state_mutex.unlock ();
                 return;
             }
@@ -523,14 +524,14 @@ namespace MaplibreNative {
             while (active_native_leases > 0) {
                 idle.wait (state_mutex);
             }
-            unowned Raw.Map closing = native;
+            Raw.Map closing = native;
             state_mutex.unlock ();
 
             var status = Raw.map_destroy (closing);
 
             state_mutex.lock ();
             if (status == Raw.Status.OK) {
-                native = null;
+                native = (Raw.Map) 0;
             }
             releasing = false;
             idle.broadcast ();
@@ -579,15 +580,15 @@ namespace MaplibreNative {
         }
 
         public bool get_rendering_stats_view_enabled () throws Error {
-            bool enabled;
+            Raw.CBool enabled;
             check_status (Raw.map_get_rendering_stats_view_enabled (require_live ().native, out enabled));
-            return enabled;
+            return bool_from_raw (enabled);
         }
 
         public bool is_fully_loaded () throws Error {
-            bool loaded;
+            Raw.CBool loaded;
             check_status (Raw.map_is_fully_loaded (require_live ().native, out loaded));
-            return loaded;
+            return bool_from_raw (loaded);
         }
 
         public void dump_debug_logs () throws Error {
@@ -868,81 +869,81 @@ namespace MaplibreNative {
         }
 
         public MapProjectionHandle create_projection () throws Error {
-            Raw.MapProjection projection;
+            Raw.MapProjection projection = (Raw.MapProjection) 0;
             check_status (Raw.map_projection_create (require_live ().native, out projection));
-            return new MapProjectionHandle ((owned) projection);
+            return new MapProjectionHandle (projection);
         }
 
         public RenderSessionHandle attach_metal_owned_texture (MetalOwnedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.metal_owned_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_metal_borrowed_texture (MetalBorrowedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.metal_borrowed_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_vulkan_owned_texture (VulkanOwnedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.vulkan_owned_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_vulkan_borrowed_texture (VulkanBorrowedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.vulkan_borrowed_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_opengl_owned_texture (OpenGLOwnedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.opengl_owned_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_opengl_borrowed_texture (OpenGLBorrowedTextureDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.opengl_borrowed_texture_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_metal_surface (MetalSurfaceDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.metal_surface_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_vulkan_surface (VulkanSurfaceDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.vulkan_surface_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public RenderSessionHandle attach_opengl_surface (OpenGLSurfaceDescriptor descriptor) throws Error {
             var descriptor_storage = descriptor.copy ();
             var native_descriptor = descriptor_storage.to_native ();
-            Raw.RenderSession session;
+            Raw.RenderSession session = (Raw.RenderSession) 0;
             check_status (Raw.opengl_surface_attach (require_live ().native, &native_descriptor, out session));
-            return new RenderSessionHandle (this, (owned) session);
+            return new RenderSessionHandle (this, session);
         }
 
         public void add_geojson_source_url (string source_id, string url, GeoJsonSourceOptions? options = null) throws Error {
@@ -1177,8 +1178,9 @@ namespace MaplibreNative {
         }
 
         public bool remove_style_source_utf8 (Utf8String source_id) throws Error {
-            bool removed;
-            check_status (Raw.map_remove_style_source (require_live ().native, source_id.to_native (), out removed));
+            Raw.CBool raw_removed;
+            check_status (Raw.map_remove_style_source (require_live ().native, source_id.to_native (), out raw_removed));
+            var removed = bool_from_raw (raw_removed);
             if (removed) {
                 release_custom_geometry_source (source_id);
             }
@@ -1190,9 +1192,9 @@ namespace MaplibreNative {
         }
 
         public bool style_source_exists_utf8 (Utf8String source_id) throws Error {
-            bool exists;
+            Raw.CBool exists;
             check_status (Raw.map_style_source_exists (require_live ().native, source_id.to_native (), out exists));
-            return exists;
+            return bool_from_raw (exists);
         }
 
         public StyleSourceType? get_style_source_type (string source_id) throws Error {
@@ -1201,8 +1203,9 @@ namespace MaplibreNative {
 
         public StyleSourceType? get_style_source_type_utf8 (Utf8String source_id) throws Error {
             uint32 source_type;
-            bool found;
-            check_status (Raw.map_get_style_source_type (require_live ().native, source_id.to_native (), out source_type, out found));
+            Raw.CBool raw_found;
+            check_status (Raw.map_get_style_source_type (require_live ().native, source_id.to_native (), out source_type, out raw_found));
+            var found = bool_from_raw (raw_found);
             if (!found) {
                 return null;
             }
@@ -1216,9 +1219,9 @@ namespace MaplibreNative {
         public StyleSourceInfo? get_style_source_info_utf8 (Utf8String source_id) throws Error {
             Raw.StyleSourceInfo info = {};
             info.size = (uint32) sizeof (Raw.StyleSourceInfo);
-            bool found;
+            Raw.CBool found;
             check_status (Raw.map_get_style_source_info (require_live ().native, source_id.to_native (), &info, out found));
-            return found ? new StyleSourceInfo (info) : null;
+            return bool_from_raw (found) ? new StyleSourceInfo (info) : null;
         }
 
         public string? copy_style_source_attribution (string source_id) throws Error {
@@ -1233,8 +1236,9 @@ namespace MaplibreNative {
             }
             uint8[] bytes = new uint8[info.attribution_byte_length + 1];
             size_t attribution_size;
-            bool found;
-            check_status (Raw.map_copy_style_source_attribution (require_live ().native, source_id.to_native (), (char*) bytes, bytes.length, out attribution_size, out found));
+            Raw.CBool raw_found;
+            check_status (Raw.map_copy_style_source_attribution (require_live ().native, source_id.to_native (), (char*) bytes, bytes.length, out attribution_size, out raw_found));
+            var found = bool_from_raw (raw_found);
             if (!found) {
                 return null;
             }
@@ -1246,9 +1250,9 @@ namespace MaplibreNative {
         }
 
         public StringList list_style_source_ids () throws Error {
-            Raw.StyleIdList list;
+            Raw.StyleIdList list = (Raw.StyleIdList) 0;
             check_status (Raw.map_list_style_source_ids (require_live ().native, out list));
-            return copy_style_id_list ((owned) list);
+            return copy_style_id_list (list);
         }
 
         public void add_hillshade_layer (string layer_id, string source_id, string before_layer_id = "") throws Error {
@@ -1326,9 +1330,9 @@ namespace MaplibreNative {
         }
 
         public bool remove_style_layer_utf8 (Utf8String layer_id) throws Error {
-            bool removed;
+            Raw.CBool removed;
             check_status (Raw.map_remove_style_layer (require_live ().native, layer_id.to_native (), out removed));
-            return removed;
+            return bool_from_raw (removed);
         }
 
         public bool style_layer_exists (string layer_id) throws Error {
@@ -1336,9 +1340,9 @@ namespace MaplibreNative {
         }
 
         public bool style_layer_exists_utf8 (Utf8String layer_id) throws Error {
-            bool exists;
+            Raw.CBool exists;
             check_status (Raw.map_style_layer_exists (require_live ().native, layer_id.to_native (), out exists));
-            return exists;
+            return bool_from_raw (exists);
         }
 
         public string? get_style_layer_type (string layer_id) throws Error {
@@ -1348,15 +1352,15 @@ namespace MaplibreNative {
 
         public Utf8String? get_style_layer_type_utf8 (Utf8String layer_id) throws Error {
             Raw.StringView layer_type;
-            bool found;
+            Raw.CBool found;
             check_status (Raw.map_get_style_layer_type (require_live ().native, layer_id.to_native (), out layer_type, out found));
-            return found ? new Utf8String.from_bytes (copy_string_view_bytes (layer_type)) : null;
+            return bool_from_raw (found) ? new Utf8String.from_bytes (copy_string_view_bytes (layer_type)) : null;
         }
 
         public StringList list_style_layer_ids () throws Error {
-            Raw.StyleIdList list;
+            Raw.StyleIdList list = (Raw.StyleIdList) 0;
             check_status (Raw.map_list_style_layer_ids (require_live ().native, out list));
-            return copy_style_id_list ((owned) list);
+            return copy_style_id_list (list);
         }
 
         public void move_style_layer (string layer_id, string before_layer_id = "") throws Error {
@@ -1373,20 +1377,21 @@ namespace MaplibreNative {
         }
 
         public JsonValue? get_style_layer_json_utf8 (Utf8String layer_id) throws Error {
-            Raw.JsonSnapshot? snapshot;
-            bool found;
-            check_status (Raw.map_get_style_layer_json (require_live ().native, layer_id.to_native (), out snapshot, out found));
+            Raw.JsonSnapshot snapshot = (Raw.JsonSnapshot) 0;
+            Raw.CBool raw_found;
+            check_status (Raw.map_get_style_layer_json (require_live ().native, layer_id.to_native (), out snapshot, out raw_found));
+            var found = bool_from_raw (raw_found);
             if (!found) {
-                if (snapshot != null) {
-                    Raw.json_snapshot_destroy ((owned) snapshot);
+                if ((uint64) snapshot != 0) {
+                    Raw.json_snapshot_destroy (snapshot);
                 }
                 return null;
             }
-            if (snapshot == null) {
+            if ((uint64) snapshot == 0) {
                 clear_unknown_status ();
                 throw new Error.INVALID_STATE ("style layer JSON getter returned no snapshot for a found layer");
             }
-            return copy_json_snapshot ((owned) snapshot);
+            return copy_json_snapshot (snapshot);
         }
 
         public void set_style_light_json (JsonValue light_json) throws Error {
@@ -1410,9 +1415,9 @@ namespace MaplibreNative {
         }
 
         public JsonValue? get_style_light_property_utf8 (Utf8String property_name) throws Error {
-            Raw.JsonSnapshot? snapshot;
+            Raw.JsonSnapshot snapshot = (Raw.JsonSnapshot) 0;
             check_status (Raw.map_get_style_light_property (require_live ().native, property_name.to_native (), out snapshot));
-            return copy_json_snapshot ((owned) snapshot);
+            return copy_json_snapshot (snapshot);
         }
 
         public void set_layer_property (string layer_id, string property_name, JsonValue value) throws Error {
@@ -1430,9 +1435,9 @@ namespace MaplibreNative {
         }
 
         public JsonValue? get_layer_property_utf8 (Utf8String layer_id, Utf8String property_name) throws Error {
-            Raw.JsonSnapshot? snapshot;
+            Raw.JsonSnapshot snapshot = (Raw.JsonSnapshot) 0;
             check_status (Raw.map_get_layer_property (require_live ().native, layer_id.to_native (), property_name.to_native (), out snapshot));
-            return copy_json_snapshot ((owned) snapshot);
+            return copy_json_snapshot (snapshot);
         }
 
         public void set_layer_filter (string layer_id, JsonValue? filter = null) throws Error {
@@ -1456,9 +1461,9 @@ namespace MaplibreNative {
         }
 
         public JsonValue? get_layer_filter_utf8 (Utf8String layer_id) throws Error {
-            Raw.JsonSnapshot? snapshot;
+            Raw.JsonSnapshot snapshot = (Raw.JsonSnapshot) 0;
             check_status (Raw.map_get_layer_filter (require_live ().native, layer_id.to_native (), out snapshot));
-            var filter = copy_json_snapshot ((owned) snapshot);
+            var filter = copy_json_snapshot (snapshot);
             return filter != null && filter.value_type == JsonValueType.NULL ? null : filter;
         }
 
@@ -1477,9 +1482,9 @@ namespace MaplibreNative {
         }
 
         public bool remove_style_image_utf8 (Utf8String image_id) throws Error {
-            bool removed;
+            Raw.CBool removed;
             check_status (Raw.map_remove_style_image (require_live ().native, image_id.to_native (), out removed));
-            return removed;
+            return bool_from_raw (removed);
         }
 
         public bool style_image_exists (string image_id) throws Error {
@@ -1487,9 +1492,9 @@ namespace MaplibreNative {
         }
 
         public bool style_image_exists_utf8 (Utf8String image_id) throws Error {
-            bool exists;
+            Raw.CBool exists;
             check_status (Raw.map_style_image_exists (require_live ().native, image_id.to_native (), out exists));
-            return exists;
+            return bool_from_raw (exists);
         }
 
         public StyleImageInfo? get_style_image_info (string image_id) throws Error {
@@ -1498,9 +1503,9 @@ namespace MaplibreNative {
 
         public StyleImageInfo? get_style_image_info_utf8 (Utf8String image_id) throws Error {
             Raw.StyleImageInfo info = Raw.style_image_info_default ();
-            bool found;
+            Raw.CBool found;
             check_status (Raw.map_get_style_image_info (require_live ().native, image_id.to_native (), &info, out found));
-            return found ? new StyleImageInfo (info) : null;
+            return bool_from_raw (found) ? new StyleImageInfo (info) : null;
         }
 
         public uint8[]? copy_style_image_premultiplied_rgba8 (string image_id) throws Error {
@@ -1514,9 +1519,9 @@ namespace MaplibreNative {
             }
             uint8[] pixels = new uint8[info.byte_length];
             size_t byte_length;
-            bool found;
+            Raw.CBool found;
             check_status (Raw.map_copy_style_image_premultiplied_rgba8 (require_live ().native, image_id.to_native (), pixels, pixels.length, out byte_length, out found));
-            return found ? pixels : null;
+            return bool_from_raw (found) ? pixels : null;
         }
 
         public void add_image_source_url (string source_id, LatLng[] coordinates, string url) throws Error {
@@ -1571,8 +1576,9 @@ namespace MaplibreNative {
         public LatLng[]? get_image_source_coordinates_utf8 (Utf8String source_id) throws Error {
             Raw.LatLng[] native_coordinates = new Raw.LatLng[4];
             size_t coordinate_count;
-            bool found;
-            check_status (Raw.map_get_image_source_coordinates (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, out coordinate_count, out found));
+            Raw.CBool raw_found;
+            check_status (Raw.map_get_image_source_coordinates (require_live ().native, source_id.to_native (), native_coordinates, native_coordinates.length, out coordinate_count, out raw_found));
+            var found = bool_from_raw (raw_found);
             if (!found) {
                 return null;
             }

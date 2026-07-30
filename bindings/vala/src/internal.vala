@@ -1,4 +1,8 @@
 namespace MaplibreNative {
+    internal bool bool_from_raw (Raw.CBool value) {
+        return (uint8) value != 0;
+    }
+
     private static Private? unknown_status_data;
     private static Mutex unknown_status_init_mutex;
 
@@ -170,7 +174,7 @@ namespace MaplibreNative {
         return new Utf8String.from_bytes (copy_sized_bytes ((uint8*) data, size, field_name));
     }
 
-    internal StringList copy_style_id_list (owned Raw.StyleIdList list) throws Error {
+    internal StringList copy_style_id_list (Raw.StyleIdList list) throws Error {
         try {
             size_t count;
             check_status (Raw.style_id_list_count (list, out count));
@@ -186,8 +190,8 @@ namespace MaplibreNative {
         }
     }
 
-    internal JsonValue? copy_json_snapshot (owned Raw.JsonSnapshot? snapshot) throws Error {
-        if (snapshot == null) {
+    internal JsonValue? copy_json_snapshot (Raw.JsonSnapshot snapshot) throws Error {
+        if ((uint64) snapshot == 0) {
             return null;
         }
         try {

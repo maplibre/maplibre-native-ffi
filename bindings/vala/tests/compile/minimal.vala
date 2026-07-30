@@ -133,6 +133,10 @@ void inspect_runtime_event_payload(MaplibreNative.RuntimeEvent event) {
   if (event.camera_change_mode != null) {
     event.camera_change_mode.to_string();
   }
+  if (event.source_id != null) {
+    assert(event.source_id.equal(event.source_id.copy()));
+    event.source_id.hash().to_string();
+  }
   if (event.render_frame != null) {
     event.render_frame.mode.to_string();
     event.render_frame.stats.frame_count.to_string();
@@ -202,7 +206,7 @@ void exercise_runtime_close_race() throws MaplibreNative.Error {
         state_changed.wait(state_mutex);
       }
       state_mutex.unlock();
-      assert(lease.native != null);
+      assert((uint64) lease.native != 0);
     } catch (MaplibreNative.Error error) {
       holder_failed = true;
     }
@@ -218,7 +222,7 @@ void exercise_runtime_close_race() throws MaplibreNative.Error {
     while (true) {
       try {
         var lease = runtime.require_live();
-        assert(lease.native != null);
+        assert((uint64) lease.native != 0);
       } catch (MaplibreNative.Error.INVALID_STATE error) {
         state_mutex.lock();
         close_rejected_new_call = true;
@@ -341,7 +345,7 @@ void exercise_projection_wrong_thread_close(MaplibreNative.MapProjectionHandle p
 
 void exercise_optional_offline_snapshot_validation() throws MaplibreNative.Error {
   try {
-    MaplibreNative.validate_optional_offline_region_snapshot(true, null);
+    MaplibreNative.validate_optional_offline_region_snapshot(true, (MaplibreNative.Raw.OfflineRegionSnapshot) 0);
     assert_not_reached();
   } catch (MaplibreNative.Error.INVALID_STATE error) {
     assert(error.message == "offline region get result has inconsistent found flag and snapshot");
@@ -384,7 +388,7 @@ void exercise_projection_close_race(MaplibreNative.MapProjectionHandle projectio
         state_changed.wait(state_mutex);
       }
       state_mutex.unlock();
-      assert(lease.native != null);
+      assert((uint64) lease.native != 0);
     } catch (MaplibreNative.Error error) {
       holder_failed = true;
     }
@@ -400,7 +404,7 @@ void exercise_projection_close_race(MaplibreNative.MapProjectionHandle projectio
     while (true) {
       try {
         var lease = projection.require_live();
-        assert(lease.native != null);
+        assert((uint64) lease.native != 0);
       } catch (MaplibreNative.Error.INVALID_STATE error) {
         state_mutex.lock();
         close_rejected_new_call = true;
@@ -645,6 +649,16 @@ void exercise_defensive_byte_snapshots(MaplibreNative.RuntimeHandle runtime) thr
   event_data[0] = 9;
   assert(event.payload_bytes[0] == 4);
   assert(event.equal(event_copy));
+
+  native_event.source_type = (uint32) MaplibreNative.RuntimeEventSourceType.MAP;
+  native_event.source = 42;
+  var sourced_event = new MaplibreNative.RuntimeEvent(runtime, native_event);
+  assert(sourced_event.source_id != null);
+  assert(sourced_event.source_id.equal(sourced_event.copy().source_id));
+  assert(sourced_event.source_id.hash() == sourced_event.copy().source_id.hash());
+  assert(sourced_event.source_map == null);
+  native_event.source_type = (uint32) MaplibreNative.RuntimeEventSourceType.RUNTIME;
+  native_event.source = 0;
 
   MaplibreNative.Raw.RuntimeEventCameraTransitionFinished transition = {};
   transition.size = (uint32) sizeof(MaplibreNative.Raw.RuntimeEventCameraTransitionFinished);
