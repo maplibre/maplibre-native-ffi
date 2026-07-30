@@ -50,7 +50,7 @@ func runRuntimeLoop(v viewport, commands <-chan cameraCommand, published chan<- 
 			shared.fail(fmt.Errorf("runtime pump failed: %w", err))
 			break
 		}
-		renderRequested, err := drainEvents(state.runtime)
+		renderRequested, err := drainEvents(state.runtime, state.mapID)
 		if err != nil {
 			shared.fail(err)
 			break
@@ -70,6 +70,7 @@ func runRuntimeLoop(v viewport, commands <-chan cameraCommand, published chan<- 
 type runtimeMapState struct {
 	runtime *maplibre.RuntimeHandle
 	mapRef  *maplibre.MapHandle
+	mapID   maplibre.MapID
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -85,6 +86,12 @@ func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
 		return nil, fmt.Errorf("map create failed: %w", err)
 	}
 	state.mapRef = mapHandle
+	mapID, err := mapHandle.ID()
+	if err != nil {
+		_ = state.Close()
+		return nil, fmt.Errorf("map identity read failed: %w", err)
+	}
+	state.mapID = mapID
 
 	if err := mapHandle.SetStyleURL("https://tiles.openfreemap.org/styles/bright"); err != nil {
 		_ = state.Close()
@@ -194,7 +201,7 @@ func (state *runtimeMapState) adjustPitch(delta float64, animation *maplibre.Ani
 	return state.mapRef.EaseTo(maplibre.CameraOptions{}.WithPitch(clamp(pitch, 0, 60)), animation)
 }
 
-func drainEvents(runtimeHandle *maplibre.RuntimeHandle) (bool, error) {
+func drainEvents(runtimeHandle *maplibre.RuntimeHandle, mapID maplibre.MapID) (bool, error) {
 	renderRequested := false
 	for {
 		event, err := runtimeHandle.PollEvent()
@@ -204,7 +211,7 @@ func drainEvents(runtimeHandle *maplibre.RuntimeHandle) (bool, error) {
 		if event == nil {
 			return renderRequested, nil
 		}
-		if event.SourceType != maplibre.RuntimeEventSourceMap {
+		if event.Source.Type != maplibre.RuntimeEventSourceMap || event.Source.MapID != mapID {
 			continue
 		}
 		switch event.Type {

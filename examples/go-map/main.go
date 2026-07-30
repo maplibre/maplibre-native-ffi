@@ -146,7 +146,6 @@ func run(mode renderTargetMode) (result error) {
 	logControls()
 
 	running := true
-	renderPending := true
 	input := inputController{}
 	handleEvent := func(event *sdl.Event) error {
 		switch event.Type() {
@@ -156,13 +155,12 @@ func run(mode renderTargetMode) (result error) {
 			view = currentViewport(window)
 			view.log("resized viewport")
 			if view.empty() {
-				renderPending = false
 				return nil
 			}
 			if err := state.resize(view, mode); err != nil {
 				return err
 			}
-			renderPending = true
+			shared.requestRender()
 		default:
 			if view.empty() {
 				return nil
@@ -172,7 +170,6 @@ func run(mode renderTargetMode) (result error) {
 					return fmt.Errorf("wake runtime loop failed: %w", err)
 				}
 				shared.requestRender()
-				renderPending = true
 			}
 		}
 		return nil
@@ -190,14 +187,12 @@ func run(mode renderTargetMode) (result error) {
 			}
 		}
 
-		renderPending = renderPending || shared.consumeRenderRequest()
-		if renderPending && !view.empty() && running {
+		if shared.consumeRenderRequest() && !view.empty() && running {
 			rendered, err := state.renderUpdate()
 			if err != nil {
 				return err
 			}
 			if rendered {
-				renderPending = false
 				didWork = true
 			} else {
 				shared.requestRender()
