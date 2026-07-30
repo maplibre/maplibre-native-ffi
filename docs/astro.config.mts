@@ -71,6 +71,11 @@ export default defineConfig({
               link: "/reference/dart/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
+            {
+              label: "Swift API",
+              link: "/reference/swift/documentation/maplibrenative/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {

@@ -45,6 +45,14 @@ mkdir -p public/reference
 cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
 '''
 
+[tasks."api:swift"]
+depends = ["//bindings/swift:api"]
+run = '''
+rm -rf public/reference/swift
+mkdir -p public/reference
+cp -a ../bindings/swift/build/docc/. public/reference/swift/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
@@ -52,6 +60,7 @@ run = [
   { task = "api:zig" },
   { task = "api:kotlin" },
   { task = "api:dart" },
+  { task = "api:swift" },
 ]
 
 [tasks.install]
