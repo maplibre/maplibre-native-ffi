@@ -37,12 +37,21 @@ mkdir -p public/reference
 cp -a ../bindings/kotlin/build/dokka/html/. public/reference/kotlin/
 '''
 
+[tasks."api:dart"]
+depends = ["//bindings/dart:api"]
+run = '''
+rm -rf public/reference/dart
+mkdir -p public/reference
+cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
   { task = "api:rust" },
   { task = "api:zig" },
   { task = "api:kotlin" },
+  { task = "api:dart" },
 ]
 
 [tasks.install]
