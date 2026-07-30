@@ -61,6 +61,14 @@ mkdir -p public/reference
 cp -a ../bindings/dotnet/build/docfx/. public/reference/dotnet/
 '''
 
+[tasks."api:go"]
+depends = ["//bindings/go:api"]
+run = '''
+rm -rf public/reference/go
+mkdir -p public/reference
+cp -a ../bindings/go/build/doc2go/. public/reference/go/
+'''
+
 [tasks."api:swift"]
 depends = ["//bindings/swift:api"]
 run = '''
@@ -78,6 +86,7 @@ run = [
   { task = "api:dart" },
   { task = "api:python" },
   { task = "api:dotnet" },
+  { task = "api:go" },
   { task = "api:swift" },
 ]
 
