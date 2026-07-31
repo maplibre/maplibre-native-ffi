@@ -2053,9 +2053,14 @@ auto milliseconds_from_duration(mbgl::Duration duration) -> double {
   return std::chrono::duration_cast<DoubleMilliseconds>(duration).count();
 }
 
+// The bound is exclusive because mbgl::Duration::max() has no exact double
+// representation: converting it to milliseconds rounds to a value whose reverse
+// conversion lands one tick past the largest representable count, which wraps
+// to the most negative duration. Every double below that rounded maximum
+// converts back inside the range, so stopping short of it is enough.
 auto is_native_duration_ms(double milliseconds) -> bool {
   return std::isfinite(milliseconds) && milliseconds >= 0.0 &&
-         milliseconds <= max_native_duration_ms();
+         milliseconds < max_native_duration_ms();
 }
 
 auto validate_animation_options(const mln_animation_options* animation)

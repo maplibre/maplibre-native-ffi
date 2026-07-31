@@ -145,8 +145,9 @@ MapLibre Native's own 300 ms default governs the symbol placement cross-fade. A
 continuous-mode map applies that same default to the pattern cross-fade across
 integer zoom levels; a still-mode map fades those patterns instantly instead.
 With no delay, transitions start immediately. A still-mode map ignores both
-fields for paint property transitions, though a property carrying its own
-style-spec transition still animates there.
+fields for paint property transitions, and renders each still image at a fixed
+time point, so a property change reaches its final value in the next still image
+whatever they hold.
 
 Setting duration and delay replaces the whole configuration rather than merging
 into what the style declared, so read the current options first when you mean to

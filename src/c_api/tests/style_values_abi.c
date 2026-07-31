@@ -837,6 +837,52 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
     mln_map_get_style_transition_options(map, &short_out)
   );
 
+  // The largest accepted duration must survive conversion into native ticks.
+  // The native maximum has no exact double representation, so accepting the
+  // rounded maximum used to wrap it to the most negative duration and read back
+  // negative. Bisect for the ceiling rather than naming it, because it follows
+  // from the native duration type rather than from this API.
+  mln_style_transition_options probe = mln_style_transition_options_default();
+  probe.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  double accepted = 1.0;
+  double rejected = 2.0;
+  // Double until one is rejected, so the bisection below starts from a bracket
+  // it can close whatever duration type the platform uses. A non-finite bound
+  // is rejected too, so this terminates.
+  for (int step = 0; step < 4096; step++) {
+    probe.duration_ms = rejected;
+    if (mln_map_set_style_transition_options(map, &probe) != MLN_STATUS_OK) {
+      break;
+    }
+    accepted = rejected;
+    rejected *= 2.0;
+  }
+  for (int step = 0; step < 4096; step++) {
+    const double midpoint = accepted + ((rejected - accepted) / 2.0);
+    if (midpoint <= accepted || midpoint >= rejected) {
+      break;
+    }
+    probe.duration_ms = midpoint;
+    if (mln_map_set_style_transition_options(map, &probe) == MLN_STATUS_OK) {
+      accepted = midpoint;
+    } else {
+      rejected = midpoint;
+    }
+  }
+  probe.duration_ms = accepted;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &probe)
+  );
+  mln_style_transition_options ceiling = mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &ceiling)
+  );
+  TEST_ASSERT_TRUE(ceiling.duration_ms >= 0.0);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
   mln_style_transition_options unchanged =
     mln_style_transition_options_default();
   TEST_ASSERT_EQUAL_INT(

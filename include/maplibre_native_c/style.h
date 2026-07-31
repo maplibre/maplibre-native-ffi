@@ -367,8 +367,9 @@ typedef struct mln_style_transition_options {
    * levels, while a still-mode map fades those patterns instantly instead.
    *
    * A still-mode map ignores this field and delay_ms for paint property
-   * transitions. A property carrying its own style-spec transition still
-   * animates there, because that one is not global.
+   * transitions, and renders each still image at a fixed time point, so a
+   * property change reaches its final value in the next still image whatever
+   * this holds.
    */
   double duration_ms;
   /**
