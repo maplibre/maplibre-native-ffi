@@ -278,8 +278,11 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   // getDefaultRenderable() does once the resource is gone.
   void set_borrowed_texture(uint32_t texture, mbgl::Size new_size) {
     borrowed_texture_ = texture;
-    // Deleting the framebuffer is a GL call like any other.
-    auto guard = mbgl::gfx::BackendScope{*this};
+    // setSize() drops the renderable unconditionally, which is what rebuilds
+    // the framebuffer against the new texture even when the size is unchanged.
+    // No context is made current for it: the framebuffer and renderbuffer names
+    // it owns go to the context's abandoned lists and are deleted on the next
+    // render, the same way an owned-texture resize releases them.
     setSize(new_size);
   }
 
@@ -623,6 +626,13 @@ auto opengl_borrowed_texture_set_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_opengl_borrowed_texture_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -638,9 +648,9 @@ auto opengl_borrowed_texture_set_target(
     session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
     [descriptor](
-      mln_render_session_object& live, RetargetOutcome& outcome
+      mln_render_session_object& target_session, RetargetOutcome& outcome
     ) -> mln_status {
-      return live.texture.backend->set_opengl_borrowed_target(
+      return target_session.texture.backend->set_opengl_borrowed_target(
         *descriptor, outcome
       );
     }

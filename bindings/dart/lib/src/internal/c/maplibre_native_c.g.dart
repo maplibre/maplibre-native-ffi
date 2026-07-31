@@ -5124,6 +5124,75 @@ class MaplibreNativeC {
         )
       >();
 
+  mln_status mln_metal_surface_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_metal_surface_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_metal_surface_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_metal_surface_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_metal_surface_descriptor>,
+          )
+        >
+      >('mln_metal_surface_set_target');
+  late final _mln_metal_surface_set_target = _mln_metal_surface_set_targetPtr
+      .asFunction<
+        int Function(int, ffi.Pointer<mln_metal_surface_descriptor>)
+      >();
+
+  mln_status mln_vulkan_surface_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_vulkan_surface_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_vulkan_surface_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_vulkan_surface_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_vulkan_surface_descriptor>,
+          )
+        >
+      >('mln_vulkan_surface_set_target');
+  late final _mln_vulkan_surface_set_target = _mln_vulkan_surface_set_targetPtr
+      .asFunction<
+        int Function(int, ffi.Pointer<mln_vulkan_surface_descriptor>)
+      >();
+
+  mln_status mln_opengl_surface_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_opengl_surface_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_opengl_surface_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_opengl_surface_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_opengl_surface_descriptor>,
+          )
+        >
+      >('mln_opengl_surface_set_target');
+  late final _mln_opengl_surface_set_target = _mln_opengl_surface_set_targetPtr
+      .asFunction<
+        int Function(int, ffi.Pointer<mln_opengl_surface_descriptor>)
+      >();
+
   mln_metal_owned_texture_descriptor
   mln_metal_owned_texture_descriptor_default() {
     return _mln_metal_owned_texture_descriptor_default();
@@ -5391,6 +5460,87 @@ class MaplibreNativeC {
               int,
               ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
               ffi.Pointer<mln_render_session>,
+            )
+          >();
+
+  mln_status mln_metal_borrowed_texture_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_metal_borrowed_texture_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_metal_borrowed_texture_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_metal_borrowed_texture_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+          )
+        >
+      >('mln_metal_borrowed_texture_set_target');
+  late final _mln_metal_borrowed_texture_set_target =
+      _mln_metal_borrowed_texture_set_targetPtr
+          .asFunction<
+            int Function(
+              int,
+              ffi.Pointer<mln_metal_borrowed_texture_descriptor>,
+            )
+          >();
+
+  mln_status mln_vulkan_borrowed_texture_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_vulkan_borrowed_texture_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_vulkan_borrowed_texture_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_vulkan_borrowed_texture_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+          )
+        >
+      >('mln_vulkan_borrowed_texture_set_target');
+  late final _mln_vulkan_borrowed_texture_set_target =
+      _mln_vulkan_borrowed_texture_set_targetPtr
+          .asFunction<
+            int Function(
+              int,
+              ffi.Pointer<mln_vulkan_borrowed_texture_descriptor>,
+            )
+          >();
+
+  mln_status mln_opengl_borrowed_texture_set_target(
+    Dartmln_render_session session,
+    ffi.Pointer<mln_opengl_borrowed_texture_descriptor> descriptor,
+  ) {
+    return mln_status.fromValue(
+      _mln_opengl_borrowed_texture_set_target(session, descriptor),
+    );
+  }
+
+  late final _mln_opengl_borrowed_texture_set_targetPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(
+            mln_render_session,
+            ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
+          )
+        >
+      >('mln_opengl_borrowed_texture_set_target');
+  late final _mln_opengl_borrowed_texture_set_target =
+      _mln_opengl_borrowed_texture_set_targetPtr
+          .asFunction<
+            int Function(
+              int,
+              ffi.Pointer<mln_opengl_borrowed_texture_descriptor>,
             )
           >();
 

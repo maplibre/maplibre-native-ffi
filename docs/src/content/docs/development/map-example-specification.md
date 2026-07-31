@@ -578,8 +578,10 @@ table:
   [Graphics API](#graphics-api)).
 - `render_update` presents through the surface render target directly.
 - `drawTexture` MUST NOT be called for this mode.
-- On resize, call session `resize` and rebuild host presentation; reattach when
-  the host toolkit supplies a new surface handle.
+- On resize, call session `resize` and rebuild host presentation. When the host
+  toolkit supplies a new surface handle for the same graphics context, call
+  `set_target` with it; reattach only when the context itself changed or was
+  lost.
 
 ### Compositor shaders
 
@@ -607,8 +609,10 @@ that pass.
   resources for texture modes, and session extent in place.
 - When it returns `true`, recreate the texture and call `set_target`; otherwise
   resize the graphics context and active render target in place. Either way the
-  session and its renderer stay live, so the map keeps its tiles and atlases
-  across the change.
+  session stays live. Its renderer stays live too, so the map keeps its tiles
+  and atlases, except where the C API documents a rebuild: a scale factor change
+  on either path, and a replacement target whose format or layouts differ from
+  the outgoing one's.
 - Reserve [reattach](#reattach) for a target the live session cannot take: a new
   graphics context or device, or a context that was lost.
 - Set the render request after any resize.

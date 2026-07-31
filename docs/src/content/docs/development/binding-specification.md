@@ -646,9 +646,9 @@ The public handle exposes:
 a host builds a replacement target the way it built the first one. It is exposed
 per backend and target kind, matching the C API's `mln_*_surface_set_target()`
 and `mln_*_borrowed_texture_set_target()` functions, and it is bound to the
-thread that attached the session like every other session operation. Bindings do
-not compare the descriptor's graphics context against the session's; the C API
-rejects a mismatch.
+thread that attached the session like every other session operation. The C API
+rejects a descriptor whose graphics context differs from the session's, so
+bindings pass the descriptor through.
 
 ### Texture frames
 
@@ -860,7 +860,7 @@ When the binding routes provider requests through
 | BND-164 | `render_update` reports no-update-available as a false result without closing the session.                                                                |
 | BND-165 | Resize updates extent through the public render session API.                                                                                              |
 | BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                  |
-| BND-176 | `set_target` on a session whose target the session owns reports unsupported, and on a session of another backend reports unsupported.                     |
+| BND-176 | `set_target` reports unsupported for a target kind the session does not have, covering a session-owned texture and a mismatched surface/texture pairing.  |
 | BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
 | BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
 | BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |

@@ -492,8 +492,10 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  *
  * The caller owns the replacement, keeps it valid until the next replacement,
  * detach, or destroy, and synchronizes any use outside this session, exactly as
- * for mln_metal_borrowed_texture_attach(). The texture handed over is released
- * by this session on return and is the caller's to free.
+ * for mln_metal_borrowed_texture_attach(). The session never retained the
+ * outgoing texture and never releases it. Keep that texture valid for the
+ * duration of this call, after which the session holds no reference to it and
+ * the caller is free to release it.
  *
  * The new extent applies exactly as mln_render_session_resize() applies one,
  * including how the next mln_render_session_render_update() waits for the map
@@ -558,7 +560,7 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * See mln_metal_borrowed_texture_set_target() for what replacing a target
  * preserves and when a host reaches for it. descriptor->context must name the
  * context provider data the session attached with, so the session's own context
- * — and every object the renderer holds in it — stays current across the
+ * and every object the renderer holds in it, stays current across the
  * change. The replacement belongs to that context or one in the same share
  * group, and the host context must be current on the calling thread.
  *

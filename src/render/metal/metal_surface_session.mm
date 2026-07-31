@@ -347,6 +347,13 @@ auto metal_surface_attach(
 auto metal_surface_set_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
@@ -354,9 +361,11 @@ auto metal_surface_set_target(
   return surface_session_set_target(
     session, descriptor->extent,
     [descriptor](
-      mln_render_session_object& live, RetargetOutcome& outcome
+      mln_render_session_object& target_session, RetargetOutcome& outcome
     ) -> mln_status {
-      return live.surface.backend->set_metal_target(*descriptor, outcome);
+      return target_session.surface.backend->set_metal_target(
+        *descriptor, outcome
+      );
     }
   );
 }

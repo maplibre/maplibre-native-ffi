@@ -460,9 +460,11 @@ public final class RenderSessionHandle {
   /// holds at most one attached session, so close before attaching the
   /// replacement.
   ///
-  /// Resizing discards the session renderer, so renderer-held state such as
-  /// feature state does not survive. Map state such as camera, style, and
-  /// sources lives on the map and survives both resize and reattach.
+  /// The session keeps its renderer across a resize, so renderer-held state
+  /// such as feature state carries over. A scale factor change is the
+  /// exception: a renderer compiles its shaders for one pixel ratio, so that
+  /// resize starts a new one with renderer-held state empty. Map state such as
+  /// camera, style, and sources lives on the map and survives either way.
   public func resize(width: UInt32, height: UInt32,
                      scaleFactor: Double) throws
   {

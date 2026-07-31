@@ -1078,7 +1078,8 @@ auto render_session_resize(
     live->texture.mode == TextureSessionMode::Borrowed
   ) {
     set_thread_error(
-      "borrowed texture sessions cannot be resized; attach a new target"
+      "a caller-owned texture is sized by its owner; hand over a replacement "
+      "with the borrowed-texture set_target function for this backend"
     );
     return MLN_STATUS_UNSUPPORTED;
   }
@@ -1135,56 +1136,81 @@ auto unsupported_retarget(const char* message) -> mln_status {
   return MLN_STATUS_UNSUPPORTED;
 }
 
+auto validate_render_session_retarget(
+  mln_render_session session, RetargetTargetKind kind,
+  mln_render_session_object*& out_session
+) -> mln_status {
+  const auto status =
+    validate_live_attached_render_session(session, out_session);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  if (kind == RetargetTargetKind::Surface) {
+    if (out_session->kind != RenderSessionKind::Surface) {
+      return unsupported_retarget(
+        "session does not render through a native surface"
+      );
+    }
+    return MLN_STATUS_OK;
+  }
+
+  if (out_session->kind != RenderSessionKind::Texture) {
+    return unsupported_retarget(
+      "session does not render into a caller-owned texture"
+    );
+  }
+  if (out_session->texture.acquired) {
+    set_thread_error(
+      "cannot replace the render target while a texture frame is acquired"
+    );
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (out_session->texture.mode != TextureSessionMode::Borrowed) {
+    return unsupported_retarget(
+      "a session-owned texture is sized and replaced by its session; resize it "
+      "instead"
+    );
+  }
+  return MLN_STATUS_OK;
+}
+
 auto render_session_set_target(
   mln_render_session session, RetargetTargetKind kind,
   const mln_render_target_extent& extent, uint32_t physical_width,
   uint32_t physical_height, const RenderTargetReplacer& replace
 ) -> mln_status {
   mln_render_session_object* live = nullptr;
-  const auto status = validate_live_attached_render_session(session, live);
+  const auto status = validate_render_session_retarget(session, kind, live);
   if (status != MLN_STATUS_OK) {
     return status;
   }
 
-  if (kind == RetargetTargetKind::Surface) {
-    if (live->kind != RenderSessionKind::Surface) {
-      return unsupported_retarget(
-        "session does not render through a native surface"
-      );
-    }
-  } else {
-    if (live->kind != RenderSessionKind::Texture) {
-      return unsupported_retarget(
-        "session does not render into a caller-owned texture"
-      );
-    }
-    if (live->texture.acquired) {
-      set_thread_error(
-        "cannot replace the render target while a texture frame is acquired"
-      );
-      return MLN_STATUS_INVALID_STATE;
-    }
-    if (live->texture.mode != TextureSessionMode::Borrowed) {
-      return unsupported_retarget(
-        "a session-owned texture is sized and replaced by its session; resize "
-        "it instead"
-      );
-    }
-  }
-
   auto outcome = RetargetOutcome::RendererPreserved;
-  const auto replace_status = replace(*live, outcome);
+  const auto replace_status = [&]() -> mln_status {
+    try {
+      return replace(*live, outcome);
+    } catch (...) {
+      // The backend threw partway through swapping targets, so whatever the
+      // renderer caches against may already be gone. Retire it before the
+      // exception carries on to the C boundary, so the session cannot come back
+      // from MLN_STATUS_NATIVE_ERROR still holding pipelines built against a
+      // target that no longer exists.
+      live->renderer.reset();
+      throw;
+    }
+  }();
+  // Backends validate before they touch anything, so a reported failure leaves
+  // the target and the renderer as they were.
   if (replace_status != MLN_STATUS_OK) {
     return replace_status;
   }
 
-  const auto size_status =
-    map_post_set_size(live->map, extent.width, extent.height);
-  if (size_status != MLN_STATUS_OK) {
-    return size_status;
-  }
-  warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
-
+  // Land the session's own bookkeeping before anything that can fail again.
+  // Everything past this point describes the target the backend now holds, so a
+  // later failure leaves a session that is merely waiting for the map to catch
+  // up, which is the same state an ordinary resize passes through.
+  //
   // The same bargain a resize strikes: the renderer carries the tile pyramid,
   // glyph and image atlases, symbol placement, and feature state over to the
   // new target. It starts over only when its shaders no longer match the pixel
@@ -1207,6 +1233,13 @@ auto render_session_set_target(
     live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   }
   ++live->generation;
+
+  const auto size_status =
+    map_post_set_size(live->map, extent.width, extent.height);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
+  warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
   return MLN_STATUS_OK;
 }
 

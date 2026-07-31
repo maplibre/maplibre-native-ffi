@@ -253,6 +253,15 @@ namespace Maplibre.Native.Internal.C
         public static extern mln_status mln_opengl_borrowed_texture_attach([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_opengl_borrowed_texture_descriptor *")] mln_opengl_borrowed_texture_descriptor* descriptor, [NativeTypeName("mln_render_session *")] MlnRenderSession* out_session);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_metal_borrowed_texture_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_metal_borrowed_texture_descriptor *")] mln_metal_borrowed_texture_descriptor* descriptor);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_vulkan_borrowed_texture_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_vulkan_borrowed_texture_descriptor *")] mln_vulkan_borrowed_texture_descriptor* descriptor);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_opengl_borrowed_texture_set_target([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("const mln_opengl_borrowed_texture_descriptor *")] mln_opengl_borrowed_texture_descriptor* descriptor);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_texture_read_premultiplied_rgba8([NativeTypeName("mln_render_session")] MlnRenderSession session, [NativeTypeName("uint8_t *")] byte* out_data, [NativeTypeName("size_t")] nuint out_data_capacity, mln_texture_image_info* out_info);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]

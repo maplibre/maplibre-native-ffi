@@ -356,9 +356,10 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// Resizes this attached render session. Surface and owned-texture sessions resize in place.
     /// Borrowed texture targets are sized by their owner and throw an unsupported-feature error:
     /// dispose this session, recreate the texture, and attach a new session. A map holds at most
-    /// one attached session, so dispose before attaching the replacement. Resizing discards the
-    /// session renderer, so renderer-held state such as feature state does not survive; map state
-    /// such as camera, style, and sources survives both resize and reattach.
+    /// one attached session, so dispose before attaching the replacement. The session keeps its
+    /// renderer across a resize, so renderer-held state such as feature state carries over; a scale
+    /// factor change is the exception, starting a new renderer with that state empty. Map state such
+    /// as camera, style, and sources survives either way.
     /// </summary>
     public void Resize(uint width, uint height, double scaleFactor)
     {

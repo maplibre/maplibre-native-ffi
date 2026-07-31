@@ -227,6 +227,15 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     // the render pass survived: initSwapchain() picks a color format from the
     // new surface, and setColorFormat() drops the pass when that format
     // differs, taking mbgl's pipeline cache with it.
+    //
+    // The answer comes from comparing the color format by value rather than
+    // comparing VkRenderPass handles across the rebuild. A destroyed handle is
+    // free to come back with the same value from the next create call, and
+    // mbgl's pipeline cache is a bare hash map over that value with no equality
+    // check behind it, so a recycled handle would hand the new pass every
+    // pipeline built for the old one. Color format is the only input to
+    // initRenderPass() that a replacement surface can change; the depth format
+    // follows from the physical device, which does not change here.
     auto set_surface(VkSurfaceKHR surface_, mbgl::Size size) -> bool {
       backend.getDevice()->waitIdle(backend.getDispatcher());
       swapchainFramebuffers.clear();
@@ -246,9 +255,9 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       borrowed_surface = surface_;
       createPlatformSurface();
 
-      const VkRenderPass previous_pass = renderPass.get();
+      const auto previous_format = colorFormat;
       init(size.width, size.height);
-      return renderPass.get() == previous_pass;
+      return colorFormat == previous_format;
     }
 
    private:
@@ -494,6 +503,13 @@ auto vulkan_surface_attach(
 auto vulkan_surface_set_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
@@ -501,9 +517,11 @@ auto vulkan_surface_set_target(
   return surface_session_set_target(
     session, descriptor->extent,
     [descriptor](
-      mln_render_session_object& live, RetargetOutcome& outcome
+      mln_render_session_object& target_session, RetargetOutcome& outcome
     ) -> mln_status {
-      return live.surface.backend->set_vulkan_target(*descriptor, outcome);
+      return target_session.surface.backend->set_vulkan_target(
+        *descriptor, outcome
+      );
     }
   );
 }

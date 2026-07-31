@@ -183,11 +183,17 @@ auto metal_borrowed_texture_set_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status = validate_metal_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("Metal texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -195,11 +201,17 @@ auto metal_borrowed_texture_set_target(
 auto metal_surface_set_target(
   mln_render_session session, const mln_metal_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("Metal surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -314,12 +326,18 @@ auto vulkan_borrowed_texture_set_target(
   mln_render_session session,
   const mln_vulkan_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_vulkan_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("Vulkan texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -327,11 +345,17 @@ auto vulkan_borrowed_texture_set_target(
 auto vulkan_surface_set_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("Vulkan surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -447,12 +471,18 @@ auto opengl_borrowed_texture_set_target(
   mln_render_session session,
   const mln_opengl_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_opengl_borrowed_texture_descriptor(descriptor, false);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("OpenGL texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
@@ -460,12 +490,18 @@ auto opengl_borrowed_texture_set_target(
 auto opengl_surface_set_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_opengl_surface_descriptor(descriptor, false);
   if (descriptor_status != MLN_STATUS_OK) {
     return descriptor_status;
   }
-  static_cast<void>(session);
   set_thread_error("OpenGL surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }

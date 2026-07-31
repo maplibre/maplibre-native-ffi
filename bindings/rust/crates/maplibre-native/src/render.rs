@@ -1257,9 +1257,11 @@ impl RenderSessionHandle {
     /// session. A map holds at most one attached session, so close before
     /// attaching the replacement.
     ///
-    /// Resizing discards the session renderer, so renderer-held state such as
-    /// feature state does not survive. Map state such as camera, style, and
-    /// sources lives on the map and survives both resize and reattach.
+    /// The session keeps its renderer across a resize, so renderer-held state
+    /// such as feature state carries over. A scale factor change is the
+    /// exception: a renderer compiles its shaders for one pixel ratio, so that
+    /// resize starts a new one with renderer-held state empty. Map state such as
+    /// camera, style, and sources lives on the map and survives either way.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.native()?;

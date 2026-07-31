@@ -523,6 +523,19 @@ auto render_session_resize(
 
 enum class RetargetTargetKind : uint8_t { Surface, BorrowedTexture };
 
+// Checks that a session can take a replacement target of this kind, before any
+// descriptor is looked at.
+//
+// Entry points call this first so a retired handle, a foreign thread, or a
+// session of the wrong kind reports what it is, rather than whatever the
+// descriptor happened to be missing. This runs even in builds whose answer is
+// "that backend is not compiled in", so the status a caller gets does not
+// depend on which failure the build happens to notice first.
+auto validate_render_session_retarget(
+  mln_render_session session, RetargetTargetKind kind,
+  mln_render_session_object*& out_session
+) -> mln_status;
+
 // Hands a validated descriptor to the session's backend.
 using RenderTargetReplacer =
   std::function<mln_status(mln_render_session_object&, RetargetOutcome&)>;

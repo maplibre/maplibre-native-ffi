@@ -104,7 +104,11 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   // next render. That deliberately never reaches for the outgoing surface,
   // which a host may already have destroyed — the case this exists for.
   void set_surface(const mln_opengl_surface_descriptor& descriptor) {
-    descriptor_ = descriptor;
+    // The surface alone. The context descriptor stays as it was at attach: this
+    // session's own GL context was created from it, WGL context creation still
+    // reads its device_context, and context identity is what the caller was
+    // told cannot change here.
+    descriptor_.surface = descriptor.surface;
     size = mbgl::Size{
       mln::core::physical_dimension(
         descriptor.extent.width, descriptor.extent.scale_factor
@@ -374,6 +378,13 @@ auto opengl_surface_attach(
 auto opengl_surface_set_target(
   mln_render_session session, const mln_opengl_surface_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::Surface, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_opengl_surface_descriptor(descriptor, true);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -382,9 +393,11 @@ auto opengl_surface_set_target(
   return surface_session_set_target(
     session, descriptor->extent,
     [descriptor](
-      mln_render_session_object& live, RetargetOutcome& outcome
+      mln_render_session_object& target_session, RetargetOutcome& outcome
     ) -> mln_status {
-      return live.surface.backend->set_opengl_target(*descriptor, outcome);
+      return target_session.surface.backend->set_opengl_target(
+        *descriptor, outcome
+      );
     }
   );
 }

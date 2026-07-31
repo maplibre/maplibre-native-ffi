@@ -1,12 +1,14 @@
 // Raw C ABI coverage: what a render session keeps when its target changes.
 //
 // The session renderer is not reachable through the C API, so these tests probe
-// it through mln_render_session_clear_data(), which reports
+// for its existence through mln_render_session_dump_debug_logs(), which reports
 // MLN_STATUS_INVALID_STATE while no renderer exists and MLN_STATUS_OK once one
-// does. That makes "the renderer survived" and "the renderer was rebuilt"
-// directly observable, which is the whole contract under test: a surviving
-// renderer is what carries the tile pyramid, atlases, symbol placement, and
-// feature state across a resize instead of rebuilding them cold.
+// does. That is a probe for the renderer's identity only, not for its contents:
+// it says whether a resize kept the renderer, which is the precondition for the
+// tile pyramid, atlases, symbol placement, and feature state surviving with it.
+// It is chosen over the other renderer-requiring entry points because it leaves
+// the renderer alone, where clear_data() would empty the very state a later
+// assertion might want to look at.
 
 #include <stdbool.h>
 
@@ -35,9 +37,16 @@ static bool render_until_frame(
   return false;
 }
 
-// Whether the session currently holds a renderer.
+// Whether the session currently holds a renderer. Distinguishes the missing
+// renderer from a backend failure, which reports NATIVE_ERROR, so a broken
+// backend cannot read as a retired renderer.
 static bool has_renderer(mln_render_session session) {
-  return mln_render_session_clear_data(session) == MLN_STATUS_OK;
+  const mln_status status = mln_render_session_dump_debug_logs(session);
+  if (status == MLN_STATUS_INVALID_STATE) {
+    return false;
+  }
+  TEST_ASSERT_EQUAL_INT(MLN_STATUS_OK, status);
+  return true;
 }
 
 // A resize changes the size of the target and nothing the renderer caches
@@ -98,45 +107,60 @@ static void scale_factor_change_rebuilds_the_session_renderer(void) {
 }
 
 // A session-owned texture is allocated and sized by its session, so following a
-// host resize means resizing rather than handing over a new target. The
-// caller-owned entry points say so instead of quietly doing nothing.
+// host resize means resizing rather than handing over a new target.
+//
+// The session is checked before the descriptor, which is what makes this
+// reachable: the descriptors here are defaults that no backend would accept, so
+// a validation order that looked at them first would report a malformed
+// descriptor and never reach the question being asked.
 static void set_target_rejects_a_session_owned_texture(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
   mln_test_render_fixture fixture = {0};
   TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
 
-  mln_metal_borrowed_texture_descriptor metal =
+  const mln_metal_borrowed_texture_descriptor metal =
     mln_metal_borrowed_texture_descriptor_default();
-  metal.extent.width = 64;
-  metal.extent.height = 64;
-  metal.physical_width = 64;
-  metal.physical_height = 64;
-  TEST_ASSERT_NOT_EQUAL_INT(
-    MLN_STATUS_OK,
+  const mln_vulkan_borrowed_texture_descriptor vulkan =
+    mln_vulkan_borrowed_texture_descriptor_default();
+  const mln_opengl_borrowed_texture_descriptor opengl =
+    mln_opengl_borrowed_texture_descriptor_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
     mln_metal_borrowed_texture_set_target(fixture.session, &metal)
   );
-
-  mln_vulkan_borrowed_texture_descriptor vulkan =
-    mln_vulkan_borrowed_texture_descriptor_default();
-  vulkan.extent.width = 64;
-  vulkan.extent.height = 64;
-  vulkan.physical_width = 64;
-  vulkan.physical_height = 64;
-  TEST_ASSERT_NOT_EQUAL_INT(
-    MLN_STATUS_OK,
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
     mln_vulkan_borrowed_texture_set_target(fixture.session, &vulkan)
   );
-
-  mln_opengl_borrowed_texture_descriptor opengl =
-    mln_opengl_borrowed_texture_descriptor_default();
-  opengl.extent.width = 64;
-  opengl.extent.height = 64;
-  opengl.physical_width = 64;
-  opengl.physical_height = 64;
-  TEST_ASSERT_NOT_EQUAL_INT(
-    MLN_STATUS_OK,
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
     mln_opengl_borrowed_texture_set_target(fixture.session, &opengl)
+  );
+
+  // A surface descriptor names a target this session does not have at all.
+  const mln_metal_surface_descriptor metal_surface =
+    mln_metal_surface_descriptor_default();
+  const mln_vulkan_surface_descriptor vulkan_surface =
+    mln_vulkan_surface_descriptor_default();
+  const mln_opengl_surface_descriptor opengl_surface =
+    mln_opengl_surface_descriptor_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_metal_surface_set_target(fixture.session, &metal_surface)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_vulkan_surface_set_target(fixture.session, &vulkan_surface)
+  );
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_UNSUPPORTED,
+    mln_opengl_surface_set_target(fixture.session, &opengl_surface)
+  );
+
+  // Every rejection left the session usable.
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_render_session_resize(fixture.session, 32, 32, 1.0)
   );
 
   mln_test_render_fixture_destroy(&fixture);
@@ -144,39 +168,36 @@ static void set_target_rejects_a_session_owned_texture(void) {
   mln_test_destroy_runtime(runtime);
 }
 
-// Null handles and descriptors are rejected before any of this reaches a
-// backend, so a host that loses track of a session gets a status rather than a
-// crash.
-static void set_target_rejects_null_raw_arguments(void) {
-  mln_metal_surface_descriptor metal_surface =
+// A retired session handle is reported as such whatever the descriptor says,
+// which is what lets a host tell a lost session apart from a build that lacks
+// the backend it asked for.
+static void set_target_rejects_a_stale_session(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+  mln_test_render_fixture fixture = {0};
+  TEST_ASSERT_TRUE(mln_test_render_fixture_create(map, &fixture));
+  const mln_render_session stale_session = fixture.session;
+  mln_test_render_fixture_destroy(&fixture);
+
+  const mln_metal_surface_descriptor metal_surface =
     mln_metal_surface_descriptor_default();
+  const mln_opengl_borrowed_texture_descriptor opengl_texture =
+    mln_opengl_borrowed_texture_descriptor_default();
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_metal_surface_set_target(MLN_HANDLE_NULL, NULL)
-  );
-  TEST_ASSERT_NOT_EQUAL_INT(
-    MLN_STATUS_OK, mln_metal_surface_set_target(MLN_HANDLE_NULL, &metal_surface)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_surface_set_target(MLN_HANDLE_NULL, NULL)
+    mln_metal_surface_set_target(stale_session, &metal_surface)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_surface_set_target(MLN_HANDLE_NULL, NULL)
+    mln_opengl_borrowed_texture_set_target(stale_session, &opengl_texture)
   );
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
-    mln_metal_borrowed_texture_set_target(MLN_HANDLE_NULL, NULL)
+    mln_metal_surface_set_target(MLN_HANDLE_NULL, &metal_surface)
   );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_vulkan_borrowed_texture_set_target(MLN_HANDLE_NULL, NULL)
-  );
-  TEST_ASSERT_EQUAL_INT(
-    MLN_STATUS_INVALID_ARGUMENT,
-    mln_opengl_borrowed_texture_set_target(MLN_HANDLE_NULL, NULL)
-  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
 }
 
 void run_render_target_lifecycle_abi_tests(void) {
@@ -184,5 +205,5 @@ void run_render_target_lifecycle_abi_tests(void) {
   RUN_TEST(resize_keeps_the_session_renderer);
   RUN_TEST(scale_factor_change_rebuilds_the_session_renderer);
   RUN_TEST(set_target_rejects_a_session_owned_texture);
-  RUN_TEST(set_target_rejects_null_raw_arguments);
+  RUN_TEST(set_target_rejects_a_stale_session);
 }

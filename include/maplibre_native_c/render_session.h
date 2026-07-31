@@ -27,7 +27,8 @@ extern "C" {
  * borrowed texture targets return MLN_STATUS_UNSUPPORTED because the texture is
  * sized by its owner; a host that reallocates one hands the replacement over
  * with the mln_*_borrowed_texture_set_target() function for its backend, which
- * keeps the session and its renderer. See texture.h.
+ * keeps the session alive and, under the conditions stated there, its renderer.
+ * See texture.h.
  *
  * The session renderer survives a resize, carrying the tile pyramid, glyph and
  * image atlases, symbol placement, and feature state set through

@@ -220,7 +220,8 @@ MetalTextureBackend::MetalTextureBackend(
 )
     : mbgl::mtl::RendererBackend(mbgl::gfx::ContextMode::Unique),
       mbgl::gfx::HeadlessBackend(size),
-      borrowed_texture_(borrowed_texture) {
+      borrowed_texture_(borrowed_texture),
+      borrowed_pixel_format_(borrowed_texture->pixelFormat()) {
   device = NS::RetainPtr(borrowed_texture->device());
   commandQueue = NS::TransferPtr(device->newCommandQueue());
 }
@@ -269,9 +270,12 @@ auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
 auto MetalTextureBackend::set_borrowed_texture(
   MTL::Texture* texture, mbgl::Size new_size
 ) -> bool {
-  const auto previous_format = borrowed_texture_ != nullptr
-                                 ? borrowed_texture_->pixelFormat()
-                                 : texture->pixelFormat();
+  // Against the format recorded when this session took the outgoing texture,
+  // not against the outgoing texture itself. The session never retained it, and
+  // a host replacing a texture it just released would otherwise have its
+  // renderer verdict decided by freed memory.
+  const auto previous_format = borrowed_pixel_format_;
+  borrowed_pixel_format_ = texture->pixelFormat();
   borrowed_texture_ = texture;
   size = new_size;
   // Drop the renderable rather than patch it: its depth and stencil textures
@@ -282,7 +286,7 @@ auto MetalTextureBackend::set_borrowed_texture(
     auto guard = mbgl::gfx::BackendScope{*this};
     resource.reset();
   }
-  return texture->pixelFormat() == previous_format;
+  return borrowed_pixel_format_ == previous_format;
 }
 
 }  // namespace mln::core

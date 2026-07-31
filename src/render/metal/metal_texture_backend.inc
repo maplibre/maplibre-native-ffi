@@ -39,6 +39,10 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
 
  private:
   MTL::Texture* borrowed_texture_ = nullptr;
+  // The format of borrowed_texture_, recorded when this session took it, so a
+  // replacement is measured against a value rather than against a texture the
+  // host may already have released.
+  MTL::PixelFormat borrowed_pixel_format_ = MTL::PixelFormatInvalid;
 };
 
 }  // namespace mln::core

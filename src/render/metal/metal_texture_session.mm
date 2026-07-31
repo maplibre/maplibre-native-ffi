@@ -301,6 +301,13 @@ auto metal_borrowed_texture_set_target(
   mln_render_session session,
   const mln_metal_borrowed_texture_descriptor* descriptor
 ) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto session_status = validate_render_session_retarget(
+    session, RetargetTargetKind::BorrowedTexture, live
+  );
+  if (session_status != MLN_STATUS_OK) {
+    return session_status;
+  }
   const auto descriptor_status =
     validate_metal_borrowed_texture_descriptor(descriptor);
   if (descriptor_status != MLN_STATUS_OK) {
@@ -310,9 +317,9 @@ auto metal_borrowed_texture_set_target(
     session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
     [descriptor](
-      mln_render_session_object& live, RetargetOutcome& outcome
+      mln_render_session_object& target_session, RetargetOutcome& outcome
     ) -> mln_status {
-      return live.texture.backend->set_metal_borrowed_target(
+      return target_session.texture.backend->set_metal_borrowed_target(
         *descriptor, outcome
       );
     }

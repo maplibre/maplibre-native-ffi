@@ -207,6 +207,13 @@ MLN_API mln_status mln_metal_surface_set_target(
  * physical device, device, and graphics queue the session attached with, and
  * the new descriptor->surface must be presentable from that queue family.
  *
+ * The outgoing VkSurfaceKHR must still be valid when this is called. The
+ * session holds a swapchain built from it, and Vulkan requires every swapchain
+ * to be destroyed before its surface, which this does. A host that has to
+ * release its surface first destroys the session with
+ * mln_render_session_destroy() instead and attaches again afterward. Metal and
+ * OpenGL carry no such requirement; see mln_opengl_surface_set_target().
+ *
  * A replacement surface whose swapchain reports a different color format needs
  * a new render pass, which mbgl keys its pipeline cache on, so the renderer is
  * rebuilt in that case. Matching formats keep it.
@@ -232,10 +239,16 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  *
  * See mln_metal_surface_set_target() for what replacing a surface preserves and
  * when a host reaches for it. descriptor->context must name the context
- * provider data the session attached with, so the session's own context — and
- * every object the renderer holds in it — stays current across the change. The
+ * provider data the session attached with, so the session's own context, and
+ * every object the renderer holds in it, stays current across the change. The
  * new surface is made current on the next render, which lets a host replace a
  * surface it has already destroyed.
+ *
+ * Because nothing is made current here, a surface this call accepts can still
+ * turn out to be unusable. An HDC whose pixel format does not match the
+ * session's context, or an EGLSurface from another display, is reported by the
+ * next mln_render_session_render_update() as MLN_STATUS_NATIVE_ERROR rather
+ * than by this function.
  *
  * A lost OpenGL context is a different matter: nothing in it survives, and the
  * session is destroyed and attached again.

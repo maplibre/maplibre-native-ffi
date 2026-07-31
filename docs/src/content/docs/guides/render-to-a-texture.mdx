@@ -62,12 +62,15 @@ resizing, detaching, destroying, and a second acquire all return
 
 A borrowed texture skips all of that, since the texture was yours to begin with.
 You allocate it and keep it valid until the session detaches. The session
-renders into it when you call `render_update()`, and offers no acquire or
-readback. It offers no resize either, because you own the texture's size: to
-follow a resize, allocate a new texture and hand it over with
+renders into it when you call `render_update()`, and offers acquire, readback,
+and resize only for the session-owned mode. You own the texture's size, so to
+follow a resize you allocate a new texture and hand it over with
 `mln_<backend>_borrowed_texture_set_target()`. The session keeps its renderer
-across that, so the map does not go cold every time the window changes size.
-Destroying and re-attaching stays the path for a new graphics context.
+across that, so the map keeps its tiles and atlases every time the window
+changes size. It starts a new renderer when the scale factor changes, or when
+the replacement's format or layouts differ from the outgoing one's, since
+pipelines are built against those. Destroying and re-attaching stays the path
+for a new graphics context.
 
 How much synchronization you owe depends on the backend. An OpenGL session
 finishes its render before `render_update()` returns, so you can sample the
