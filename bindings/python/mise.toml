@@ -22,21 +22,49 @@ uv pip install --python "$MISE_MONOREPO_ROOT/.venv" --reinstall --no-index --fin
 description = "Generate pdoc HTML API reference for the Python binding."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = ":_install-extension", args = ["{{usage.preset}}"] }]
+# Pass public submodules explicitly: package __all__ is a reexport list, so
+# pdoc's walker would otherwise omit camera/geo/style/offline/etc. pages.
 run = '''
 rm -rf build/pdoc
 mkdir -p build/pdoc
+modules="$(
+  MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
+    uv run --project . --group docs --no-sync python -c '
+import maplibre_native
+import pkgutil
+
+names = ["maplibre_native"]
+for module in pkgutil.iter_modules(maplibre_native.__path__):
+  if not module.name.startswith("_"):
+    names.append(f"maplibre_native.{module.name}")
+print(" ".join(names))
+'
+)"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$MISE_MONOREPO_ROOT/build/$usage_preset/install" \
   uv run --project . --group docs --no-sync \
-  pdoc maplibre_native -o build/pdoc
+  pdoc $modules -o build/pdoc
 '''
 run_windows = '''
 rm -rf build/pdoc
 mkdir -p build/pdoc
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+modules="$(
+  MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
+    uv run --project . --group docs --no-sync python -c '
+import maplibre_native
+import pkgutil
+
+names = ["maplibre_native"]
+for module in pkgutil.iter_modules(maplibre_native.__path__):
+  if not module.name.startswith("_"):
+    names.append(f"maplibre_native.{module.name}")
+print(" ".join(names))
+'
+)"
 MAPLIBRE_NATIVE_C_INSTALL_DIR="$native_install_dir" \
   uv run --project . --group docs --no-sync \
-  pdoc maplibre_native -o build/pdoc
+  pdoc $modules -o build/pdoc
 '''
 
 [tasks.test]
