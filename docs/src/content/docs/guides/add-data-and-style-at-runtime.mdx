@@ -135,14 +135,20 @@ and the repaint follows.
 
 `set_style_transition_options` sets the style's global transition behavior:
 `duration`, `delay`, and whether symbol placement changes cross-fade. These are
-separate from camera animation options, which time camera moves, and from the
-per-property transitions a style declares.
+separate from camera animation options, which time camera moves. A paint
+property's own style-spec transition, such as `fill-color-transition`, overrides
+them for that property; they apply to every property that declares none.
 
-Duration and delay are optional. Omitting one clears the style-wide override,
-which leaves MapLibre Native on its own default: 300 ms for a continuous-mode
-map and zero for a still-mode one. Setting duration and delay together replaces
-the whole configuration rather than merging into what the style declared, so
-read the current options first when you mean to change one field.
+Duration and delay are optional, and omitting one clears the style-wide
+override. With no duration, paint property changes apply instantly, while
+MapLibre Native's own 300 ms default still governs the symbol placement
+cross-fade and the pattern cross-fade across integer zoom levels. With no delay,
+transitions start immediately. A still-mode map ignores both fields for paint
+property transitions whatever they hold.
+
+Setting duration and delay replaces the whole configuration rather than merging
+into what the style declared, so read the current options first when you mean to
+change one field.
 
 Loading a style replaces these options with the ones that style declares, so
 apply an override after the style loads. The style parser fills in a 300 ms

@@ -347,7 +347,11 @@ typedef struct mln_style_image_info {
  *
  * These control how the style animates paint property changes and whether
  * symbol placement changes cross-fade. They are distinct from camera animation
- * options and from the per-property transitions a style declares.
+ * options, which time camera moves.
+ *
+ * A paint property's own style-spec transition, such as
+ * "fill-color-transition", overrides these for that property. These apply to
+ * every property that declares none.
  */
 typedef struct mln_style_transition_options {
   uint32_t size;
@@ -356,9 +360,13 @@ typedef struct mln_style_transition_options {
    * Transition duration in milliseconds. Must be finite and non-negative.
    * Values that would overflow MapLibre Native's internal duration are invalid.
    *
-   * When this field is omitted, MapLibre Native falls back to its own default,
-   * which is 300 milliseconds for a continuous-mode map and zero for a
-   * still-mode one.
+   * When this field is omitted, paint property changes apply instantly.
+   * MapLibre Native's own 300 millisecond default still governs the symbol
+   * placement cross-fade that enable_placement_transitions gates, along with
+   * the pattern cross-fade across integer zoom levels.
+   *
+   * A still-mode map ignores this field and delay_ms for paint property
+   * transitions, applying every change instantly whatever they hold.
    */
   double duration_ms;
   /**
@@ -374,7 +382,8 @@ typedef struct mln_style_transition_options {
    * Unlike duration and delay this value is always present, so clearing it
    * makes symbol placement changes apply to the next rendered frame. Hosts that
    * move symbol-backed features at pointer frequency clear it for the duration
-   * of the interaction so the rendered symbol keeps up.
+   * of the interaction so the rendered symbol keeps up. It applies in every map
+   * mode.
    *
    * A style carries no equivalent, so loading a style leaves this enabled.
    */

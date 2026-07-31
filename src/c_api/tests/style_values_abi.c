@@ -767,6 +767,19 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   mln_runtime runtime = mln_test_create_runtime();
   mln_map map = mln_test_create_map(runtime);
 
+  // Every rejection below must leave this applied configuration untouched, so
+  // a setter that validated one field after committing another would fail here
+  // rather than silently half-applying.
+  mln_style_transition_options applied = mln_style_transition_options_default();
+  applied.fields =
+    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  applied.duration_ms = 42.0;
+  applied.delay_ms = 7.0;
+  applied.enable_placement_transitions = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_transition_options(map, NULL)
   );
@@ -816,6 +829,16 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_get_style_transition_options(map, &short_out)
   );
+
+  mln_style_transition_options unchanged =
+    mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &unchanged)
+  );
+  TEST_ASSERT_EQUAL_UINT32(applied.fields, unchanged.fields);
+  TEST_ASSERT_EQUAL_DOUBLE(applied.duration_ms, unchanged.duration_ms);
+  TEST_ASSERT_EQUAL_DOUBLE(applied.delay_ms, unchanged.delay_ms);
+  TEST_ASSERT_FALSE(unchanged.enable_placement_transitions);
 
   mln_test_destroy_map(map);
   mln_test_destroy_runtime(runtime);
