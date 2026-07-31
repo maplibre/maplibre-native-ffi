@@ -67,10 +67,14 @@ and resize only for the session-owned mode. You own the texture's size, so to
 follow a resize you allocate a new texture and hand it over with
 `mln_<backend>_borrowed_texture_set_target()`. The session keeps its renderer
 across that, so the map keeps its tiles and atlases every time the window
-changes size. It starts a new renderer when the scale factor changes, or when
-the replacement's format or layouts differ from the outgoing one's, since
-pipelines are built against those. Destroying and re-attaching stays the path
-for a new graphics context.
+changes size. A scale factor change is the exception, starting a new renderer
+for the new pixel ratio.
+
+Hand over a replacement with the same format and layouts the session attached
+with. Pipelines are built against those, so a target that differs comes back as
+`MLN_STATUS_UNSUPPORTED` with the session still rendering into the texture it
+has. Destroying and re-attaching is what changes them, and what a new graphics
+context needs.
 
 How much synchronization you owe depends on the backend. An OpenGL session
 finishes its render before `render_update()` returns, so you can sample the

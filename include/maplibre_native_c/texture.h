@@ -509,6 +509,11 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * the session still rendering into the texture it has. Destroying the session
  * and attaching again is what changes the format.
  *
+ *
+ * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
+ * failed, which cannot be unwound. Destroy the session with
+ * mln_render_session_destroy() and attach again; every other status leaves the
+ * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
@@ -541,6 +546,11 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  * with the session still rendering into the image it has, and destroying the
  * session and attaching again is what changes them.
  *
+ *
+ * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
+ * failed, which cannot be unwound. Destroy the session with
+ * mln_render_session_destroy() and attach again; every other status leaves the
+ * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
@@ -571,6 +581,11 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * change. The replacement belongs to that context or one in the same share
  * group, and the host context must be current on the calling thread.
  *
+ *
+ * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
+ * failed, which cannot be unwound. Destroy the session with
+ * mln_render_session_destroy() and attach again; every other status leaves the
+ * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is

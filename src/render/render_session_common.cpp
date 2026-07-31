@@ -1199,6 +1199,12 @@ auto render_session_set_target(
       // exception carries on to the C boundary, so the session cannot come back
       // from MLN_STATUS_NATIVE_ERROR still holding pipelines built against a
       // target that no longer exists.
+      //
+      // Backends report the failures they can see coming — a mismatched target,
+      // a query they could not answer — so reaching here means a swap was
+      // already under way. It cannot be unwound: a Vulkan swapchain is gone
+      // before its replacement is built. The session is left for the host to
+      // destroy, which the headers say.
       live->renderer.reset();
       throw;
     }

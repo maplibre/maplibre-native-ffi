@@ -354,16 +354,23 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
         descriptor.extent.height, descriptor.extent.scale_factor
       )
     };
-    descriptor_.surface = descriptor.surface;
-    mbgl::vulkan::Renderable::setSize(new_size);
     // Nothing has been built yet, so the lazy path already takes the new
     // surface: the wrapper is created against descriptor_ on first use.
     if (!resource) {
+      descriptor_.surface = descriptor.surface;
+      mbgl::vulkan::Renderable::setSize(new_size);
       return;
     }
+    // The resource first, then this backend's own view of the target. Building
+    // a swapchain can throw, and recording the surface before that would leave
+    // the backend naming a target it does not have. The resource cannot be
+    // unwound either way once it starts — its old swapchain is gone by then —
+    // which is why a throw from here leaves the session for destruction.
     getResource<VulkanSurfaceRenderableResource>().set_surface(
       static_cast<VkSurfaceKHR>(descriptor.surface), new_size
     );
+    descriptor_.surface = descriptor.surface;
+    mbgl::vulkan::Renderable::setSize(new_size);
     adopt_swapchain_extent();
   }
 
@@ -493,7 +500,17 @@ class VulkanSurfaceSessionBackend final
     if (handles_status != MLN_STATUS_OK) {
       return handles_status;
     }
-    if (!backend_.matches_surface(descriptor)) {
+    auto matches = false;
+    try {
+      matches = backend_.matches_surface(descriptor);
+    } catch (const std::exception& exception) {
+      // Reported rather than thrown: nothing has been touched yet, and letting
+      // it escape would put the session through the mid-swap recovery path and
+      // cost it a renderer it could have kept.
+      mln::core::set_thread_error(exception);
+      return MLN_STATUS_NATIVE_ERROR;
+    }
+    if (!matches) {
       return mln::core::unsupported_retarget(
         "Vulkan surface target must report the color format and surface "
         "transform support this session compiled its render pass and shaders "

@@ -71,11 +71,11 @@ class MetalTextureSessionBackend final
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    if (!backend_.has_borrowed_pixel_format(texture->pixelFormat())) {
+    if (!backend_.matches_borrowed_texture(texture)) {
       return mln::core::unsupported_retarget(
-        "Metal texture target must have the pixel format this session's render "
-        "pipeline states were built for; destroy the session and attach again "
-        "to change it"
+        "Metal texture target must have the pixel format and sample count this "
+        "session's render pipeline states were built for; destroy the session "
+        "and attach again to change either"
       );
     }
     backend_.set_borrowed_texture(

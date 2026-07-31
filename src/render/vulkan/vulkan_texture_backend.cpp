@@ -414,18 +414,22 @@ auto VulkanTextureBackend::matches_borrowed_target(
 void VulkanTextureBackend::set_borrowed_target(
   const mln_vulkan_borrowed_texture_descriptor& descriptor
 ) {
-  borrowed_descriptor_ = descriptor;
   const auto new_size =
     mbgl::Size{descriptor.physical_width, descriptor.physical_height};
   // Nothing is built yet, so the lazy path already takes the new image.
   if (!resource) {
+    borrowed_descriptor_ = descriptor;
     setSize(new_size);
     return;
   }
-  size = new_size;
+  // The resource first, then this backend's own view of the target, so a
+  // framebuffer that fails to build cannot leave the backend naming an image it
+  // is not rendering into.
   getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
   );
+  borrowed_descriptor_ = descriptor;
+  size = new_size;
 }
 
 void VulkanTextureBackend::resize(mbgl::Size new_size) {
