@@ -163,9 +163,9 @@ its hash differs from the one recorded at its last publish, so a change confined
 to another binding leaves the Kotlin modules alone. The recorded hashes live in
 `snapshots.json` on the orphan `snapshot-state` branch, alongside the commit,
 timestamp, and run URL of each publish, and only components that published
-successfully are recorded, so a failure is retried the next day. Run the
-workflow manually through `workflow_dispatch` to republish sooner, selecting
-components and forcing an unchanged component to publish.
+successfully are recorded, so a failure is retried the next day. Dispatch the
+workflow manually to publish sooner: `all` applies the same gate immediately,
+and naming one component republishes it whether or not its inputs changed.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

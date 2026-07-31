@@ -9,12 +9,15 @@ on:
   workflow_dispatch:
     inputs:
       components:
-        description: "Comma list of components to publish, or 'all'"
+        description: What to publish
+        type: choice
         default: all
-      force:
-        description: "Publish even when the inputs are unchanged"
-        type: boolean
-        default: false
+        # One entry per `[components.*]` table in ci/snapshots.toml.
+        options:
+          - all
+          - native
+          - kotlin
+          - docs
 
 permissions:
   contents: read
@@ -85,6 +88,9 @@ jobs:
         with:
           cache: false
           install_args: python
+      # `all`, and every scheduled run, applies the gate. Naming one component
+      # publishes it whether or not its inputs changed, since republishing an
+      # unchanged component is the only reason to name one by hand.
       - name: Plan the publish
         id: plan
         env:
@@ -92,7 +98,7 @@ jobs:
         run: >-
           mise run --no-deps ci:snapshot-state plan
           --components "${{ inputs.components || 'all' }}"
-          --force "${{ inputs.force || 'false' }}"
+          --force "${{ inputs.components != '' && inputs.components != 'all' }}"
 
   docs-pages:
     name: Docs Pages
