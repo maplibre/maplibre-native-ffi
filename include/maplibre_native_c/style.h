@@ -146,6 +146,7 @@ typedef enum mln_style_image_option_field : uint32_t {
 typedef enum mln_style_transition_option_field : uint32_t {
   MLN_STYLE_TRANSITION_OPTION_DURATION = 1U << 0U,
   MLN_STYLE_TRANSITION_OPTION_DELAY = 1U << 1U,
+  MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2U,
 } mln_style_transition_option_field;
 
 /** Location indicator image-name properties. */
@@ -380,15 +381,20 @@ typedef struct mln_style_transition_options {
    */
   double delay_ms;
   /**
-   * Whether symbol placement changes cross-fade. Defaults to true.
+   * Whether symbol placement changes cross-fade.
    *
-   * Unlike duration and delay this value is always present, so clearing it
-   * makes symbol placement changes apply to the next rendered frame. Hosts that
-   * move symbol-backed features at pointer frequency clear it for the duration
-   * of the interaction so the rendered symbol keeps up. It applies in every map
-   * mode.
+   * Clearing this makes symbol placement changes apply to the next rendered
+   * frame. Hosts that move symbol-backed features at pointer frequency clear it
+   * for the duration of the interaction so the rendered symbol keeps up. It
+   * applies in every map mode.
    *
-   * A style carries no equivalent, so loading a style leaves this enabled.
+   * When this field is omitted, the cross-fade stays on, which is MapLibre
+   * Native's own default. The field carries a mask bit even though MapLibre
+   * Native has no unset state for it, because false is a meaningful value that
+   * differs from that default, so a caller that omits the field has to stay
+   * distinguishable from one that clears it.
+   *
+   * A style carries no equivalent, so loading a style leaves the cross-fade on.
    */
   bool enable_placement_transitions;
 } mln_style_transition_options;
@@ -1534,12 +1540,17 @@ MLN_API mln_status mln_map_set_style_transition_options(
  * Duration and delay report through their field-mask bits, because MapLibre
  * Native leaves either one unset until a style or a host sets it.
  *
- * A map that has loaded no style yet reports both fields unset. Once a style
- * loads, what it declares decides: MapLibre Native's style parser fills in a
- * 300 millisecond duration for a style carrying no "transition" member at all,
- * but a style carrying one reports only the members that object names, so a
- * style whose transition declares a delay alone reports no duration. Read the
+ * A map that has loaded no style yet reports duration and delay unset. Once a
+ * style loads, what it declares decides: MapLibre Native's style parser fills
+ * in a 300 millisecond duration for a style carrying no "transition" member at
+ * all, but a style carrying one reports only the members that object names, so
+ * a style whose transition declares a delay alone reports no duration. Read the
  * field-mask bits rather than assuming a loaded style sets either.
+ *
+ * MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS is always set on
+ * return, because MapLibre Native always holds a value for that field. Its mask
+ * bit distinguishes omitted from cleared on the way in, and reports nothing on
+ * the way out.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

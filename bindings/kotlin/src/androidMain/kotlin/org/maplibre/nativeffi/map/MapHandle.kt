@@ -3082,7 +3082,10 @@ private class StyleTransitionOptionsScope(value: StyleTransitionOptions) : AutoC
 
   init {
     var fields = 0
-    options.enable_placement_transitions(value.enablePlacementTransitions)
+    value.enablePlacementTransitions?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      options.enable_placement_transitions(it)
+    }
     value.durationMs?.let {
       fields = fields or MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_DURATION
       options.duration_ms(it)
@@ -3116,7 +3119,14 @@ private fun styleTransitionOptions(
       } else {
         null
       }
-    enablePlacementTransitions = options.enable_placement_transitions()
+    enablePlacementTransitions =
+      if (
+        fields and MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0
+      ) {
+        options.enable_placement_transitions()
+      } else {
+        null
+      }
   }
 
 private fun allocStretches(stretches: List<ImageStretch>?): MaplibreNativeC.mln_image_stretch? {

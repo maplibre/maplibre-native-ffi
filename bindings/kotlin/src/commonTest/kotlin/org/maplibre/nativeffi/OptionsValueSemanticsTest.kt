@@ -384,6 +384,7 @@ class OptionsValueSemanticsTest {
         StyleTransitionOptions().apply {
           durationMs = 300.0
           delayMs = 0.0
+          enablePlacementTransitions = false
         }
       },
       copyOf = { it.copy() },
@@ -392,7 +393,8 @@ class OptionsValueSemanticsTest {
           { durationMs = 500.0 },
           // A present zero stays distinguishable from an absent field.
           { delayMs = null },
-          { enablePlacementTransitions = false },
+          // A present false stays distinguishable from an absent field.
+          { enablePlacementTransitions = null },
         ),
     )
   }

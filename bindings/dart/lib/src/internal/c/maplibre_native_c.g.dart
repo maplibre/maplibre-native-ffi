@@ -8234,7 +8234,8 @@ enum mln_style_image_option_field {
 
 enum mln_style_transition_option_field {
   MLN_STYLE_TRANSITION_OPTION_DURATION(1),
-  MLN_STYLE_TRANSITION_OPTION_DELAY(2);
+  MLN_STYLE_TRANSITION_OPTION_DELAY(2),
+  MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS(4);
 
   final int value;
   const mln_style_transition_option_field(this.value);
@@ -8243,6 +8244,7 @@ enum mln_style_transition_option_field {
       switch (value) {
         1 => MLN_STYLE_TRANSITION_OPTION_DURATION,
         2 => MLN_STYLE_TRANSITION_OPTION_DELAY,
+        4 => MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS,
         _ => throw ArgumentError(
           'Unknown value for mln_style_transition_option_field: $value',
         ),

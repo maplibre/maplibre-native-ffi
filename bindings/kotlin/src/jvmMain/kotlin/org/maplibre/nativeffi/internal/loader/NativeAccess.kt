@@ -4325,11 +4325,14 @@ internal object NativeAccess {
   private fun styleTransitionOptions(arena: Arena, value: StyleTransitionOptions): MemorySegment {
     val segment = styleTransitionOptionsDefault(arena)
     var fields = 0
-    segment.set(
-      ValueLayout.JAVA_BOOLEAN,
-      STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
-      value.enablePlacementTransitions,
-    )
+    value.enablePlacementTransitions?.let {
+      fields = fields or STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      segment.set(
+        ValueLayout.JAVA_BOOLEAN,
+        STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
+        it,
+      )
+    }
     value.durationMs?.let {
       fields = fields or STYLE_TRANSITION_OPTION_DURATION
       segment.set(ValueLayout.JAVA_DOUBLE, STYLE_TRANSITION_OPTIONS_DURATION_MS_OFFSET, it)
@@ -4358,10 +4361,14 @@ internal object NativeAccess {
           null
         }
       enablePlacementTransitions =
-        segment.get(
-          ValueLayout.JAVA_BOOLEAN,
-          STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
-        )
+        if (fields and STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0) {
+          segment.get(
+            ValueLayout.JAVA_BOOLEAN,
+            STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
+          )
+        } else {
+          null
+        }
     }
   }
 
@@ -5904,6 +5911,7 @@ internal object NativeAccess {
 
   private const val STYLE_TRANSITION_OPTION_DURATION: Int = 1 shl 0
   private const val STYLE_TRANSITION_OPTION_DELAY: Int = 1 shl 1
+  private const val STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS: Int = 1 shl 2
 
   private val STYLE_TRANSITION_OPTIONS_SIZE: Long = mln_style_transition_options.sizeof()
   private val STYLE_TRANSITION_OPTIONS_SIZE_OFFSET: Long =

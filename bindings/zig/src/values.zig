@@ -332,13 +332,14 @@ pub const StyleTransitionOptions = struct {
     /// Transition delay in milliseconds. Absent falls back to the delay the style declares for
     /// each transitioning property.
     delay_ms: ?f64 = null,
-    /// Whether symbol placement changes cross-fade.
+    /// Whether symbol placement changes cross-fade. Absent leaves the cross-fade on, which is
+    /// MapLibre Native's own default.
     ///
-    /// Unlike duration and delay this value is always present, so clearing it makes symbol
-    /// placement changes apply to the next rendered frame. Hosts that move symbol-backed features
-    /// at pointer frequency clear it for the duration of the interaction so the rendered symbol
-    /// keeps up.
-    enable_placement_transitions: bool = true,
+    /// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
+    /// move symbol-backed features at pointer frequency clear it for the duration of the
+    /// interaction so the rendered symbol keeps up. Reading the options always reports it,
+    /// because MapLibre Native always holds a value for it.
+    enable_placement_transitions: ?bool = null,
 };
 
 pub const StyleImageInfo = struct {
@@ -1249,7 +1250,10 @@ pub fn styleImageOptionsToNative(
 
 pub fn styleTransitionOptionsToNative(value: StyleTransitionOptions) c.mln_style_transition_options {
     var raw = c.mln_style_transition_options_default();
-    raw.enable_placement_transitions = value.enable_placement_transitions;
+    if (value.enable_placement_transitions) |enable| {
+        raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+        raw.enable_placement_transitions = enable;
+    }
     if (value.duration_ms) |duration_ms| {
         raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_DURATION;
         raw.duration_ms = duration_ms;
@@ -1265,7 +1269,7 @@ pub fn styleTransitionOptionsFromNative(raw: c.mln_style_transition_options) Sty
     return .{
         .duration_ms = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_DURATION != 0) raw.duration_ms else null,
         .delay_ms = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_DELAY != 0) raw.delay_ms else null,
-        .enable_placement_transitions = raw.enable_placement_transitions,
+        .enable_placement_transitions = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0) raw.enable_placement_transitions else null,
     };
 }
 

@@ -412,7 +412,7 @@ test "style transition options round trip through the C API" {
     const declared = try map.getStyleTransitionOptions();
     try testing.expectEqual(@as(?f64, 750.0), declared.duration_ms);
     try testing.expectEqual(@as(?f64, 100.0), declared.delay_ms);
-    try testing.expect(declared.enable_placement_transitions);
+    try testing.expectEqual(@as(?bool, true), declared.enable_placement_transitions);
 
     // A present zero stays distinguishable from an absent field, and an absent field clears what
     // the style declared rather than merging into it.
@@ -422,6 +422,13 @@ test "style transition options round trip through the C API" {
     };
     try map.setStyleTransitionOptions(options);
     try testing.expectEqual(options, try map.getStyleTransitionOptions());
+
+    // Omitting the flag leaves the cross-fade on rather than clearing it.
+    try map.setStyleTransitionOptions(.{ .duration_ms = 250.0 });
+    try testing.expectEqual(
+        @as(?bool, true),
+        (try map.getStyleTransitionOptions()).enable_placement_transitions,
+    );
 
     // Loading a style replaces the override with what that style declares.
     try map.setStyleJson(testing.allocator, transition_style_json);

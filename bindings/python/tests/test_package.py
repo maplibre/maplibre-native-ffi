@@ -1382,11 +1382,12 @@ def test_style_transition_options_round_trip_public_api() -> None:
     )
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:
-            # A map with no style yet reports nothing set.
-            assert (
-                map_handle.get_style_transition_options()
-                == style.StyleTransitionOptions()
-            )
+            # A map with no style yet reports no duration or delay. The
+            # placement flag always reports, because native always holds one.
+            empty = map_handle.get_style_transition_options()
+            assert empty.duration_ms is None
+            assert empty.delay_ms is None
+            assert empty.enable_placement_transitions is True
 
             # The style parser fills in its own 300ms duration for a style that
             # declares no transition.
@@ -1399,7 +1400,7 @@ def test_style_transition_options_round_trip_public_api() -> None:
             declared = map_handle.get_style_transition_options()
             assert declared.duration_ms == 750.0
             assert declared.delay_ms == 100.0
-            assert declared.enable_placement_transitions
+            assert declared.enable_placement_transitions is True
 
             # A present zero stays distinguishable from an absent field, and an
             # absent field clears what the style declared rather than merging.
@@ -1409,6 +1410,15 @@ def test_style_transition_options_round_trip_public_api() -> None:
             )
             map_handle.set_style_transition_options(options)
             assert map_handle.get_style_transition_options() == options
+
+            # Omitting the flag leaves the cross-fade on rather than clearing it.
+            map_handle.set_style_transition_options(
+                style.StyleTransitionOptions(duration_ms=250.0)
+            )
+            assert (
+                map_handle.get_style_transition_options().enable_placement_transitions
+                is True
+            )
 
             # Loading a style replaces the override with what that style declares.
             map_handle.set_style_json(transition_style_json)

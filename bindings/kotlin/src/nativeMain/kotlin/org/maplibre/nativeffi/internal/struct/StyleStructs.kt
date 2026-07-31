@@ -43,6 +43,7 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_DELAY
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_DURATION
+import org.maplibre.nativeffi.internal.c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options_default
@@ -153,7 +154,10 @@ internal object StyleStructs {
   ): CPointer<mln_style_transition_options> {
     val native = scope.alloc<mln_style_transition_options>()
     mln_style_transition_options_default().place(native.ptr)
-    native.enable_placement_transitions = value.enablePlacementTransitions
+    value.enablePlacementTransitions?.let {
+      native.fields = native.fields or MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      native.enable_placement_transitions = it
+    }
     value.durationMs?.let {
       native.fields = native.fields or MLN_STYLE_TRANSITION_OPTION_DURATION
       native.duration_ms = it
@@ -171,7 +175,10 @@ internal object StyleStructs {
         if (value.fields and MLN_STYLE_TRANSITION_OPTION_DURATION != 0u) value.duration_ms else null
       delayMs =
         if (value.fields and MLN_STYLE_TRANSITION_OPTION_DELAY != 0u) value.delay_ms else null
-      enablePlacementTransitions = value.enable_placement_transitions
+      enablePlacementTransitions =
+        if (value.fields and MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0u)
+          value.enable_placement_transitions
+        else null
     }
 
   private fun imageStretchArray(

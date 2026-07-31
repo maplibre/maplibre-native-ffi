@@ -89,8 +89,12 @@ public sealed class StyleLayerTests
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
 
-        // A map with no style yet reports nothing set.
-        Assert.Equal(new StyleTransitionOptions(), map.GetStyleTransitionOptions());
+        // A map with no style yet reports no duration or delay. The placement flag always
+        // reports, because MapLibre Native always holds a value for it.
+        var empty = map.GetStyleTransitionOptions();
+        Assert.Null(empty.Duration);
+        Assert.Null(empty.Delay);
+        Assert.True(empty.EnablePlacementTransitions);
 
         // The style parser fills in its own 300ms duration for a style that declares no
         // transition.

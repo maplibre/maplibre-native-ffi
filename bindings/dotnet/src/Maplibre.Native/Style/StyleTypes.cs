@@ -272,14 +272,17 @@ public sealed record StyleTransitionOptions
     /// </summary>
     public double? Delay { get; set; }
 
-    /// <summary>Whether symbol placement changes cross-fade.</summary>
+    /// <summary>
+    /// Whether symbol placement changes cross-fade. Null leaves the cross-fade on, which is
+    /// MapLibre Native's own default.
+    /// </summary>
     /// <remarks>
-    /// Unlike duration and delay this value is always present, so clearing it makes symbol
-    /// placement changes apply to the next rendered frame. Hosts that move symbol-backed features
-    /// at pointer frequency clear it for the duration of the interaction so the rendered symbol
-    /// keeps up.
+    /// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
+    /// move symbol-backed features at pointer frequency clear it for the duration of the
+    /// interaction so the rendered symbol keeps up. Reading the options always reports it, because
+    /// MapLibre Native always holds a value for it.
     /// </remarks>
-    public bool EnablePlacementTransitions { get; set; } = true;
+    public bool? EnablePlacementTransitions { get; set; }
 }
 
 public delegate void CustomGeometrySourceCallback(CanonicalTileId tileId);

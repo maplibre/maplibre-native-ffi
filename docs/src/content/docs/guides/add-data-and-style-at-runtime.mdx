@@ -161,8 +161,13 @@ object names. A style whose transition declares a delay alone therefore reports
 no duration, so check whether a field is present rather than assuming a loaded
 style sets it.
 
-Placement transitions are always present and start enabled. Clearing them makes
+Placement transitions are optional like the other two, and omitting them leaves
+the cross-fade on, which is MapLibre Native's own default. Clearing them makes
 symbol placement changes apply to the next rendered frame instead of fading in.
 A host dragging a symbol-backed feature does that for the duration of the drag,
 because the cross-fade otherwise leaves the rendered symbol trailing the pointer.
 Restore it when the drag ends.
+
+MapLibre Native has no unset state for that flag, so it carries a presence
+signal only to keep an omitted field distinguishable from a cleared one on the
+way in. Reading the options always reports it.

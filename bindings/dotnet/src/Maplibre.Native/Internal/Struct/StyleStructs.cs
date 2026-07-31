@@ -264,7 +264,12 @@ internal static class StyleStructs
     {
         ArgumentNullException.ThrowIfNull(options);
         var native = NativeMethods.mln_style_transition_options_default();
-        native.enable_placement_transitions = (byte)(options.EnablePlacementTransitions ? 1 : 0);
+        if (options.EnablePlacementTransitions is { } enablePlacementTransitions)
+        {
+            native.fields |= (uint)
+                mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+            native.enable_placement_transitions = (byte)(enablePlacementTransitions ? 1 : 0);
+        }
         if (options.Duration is { } duration)
         {
             native.fields |= (uint)
@@ -297,7 +302,14 @@ internal static class StyleStructs
                 ) != 0
                     ? options.delay_ms
                     : null,
-            EnablePlacementTransitions = options.enable_placement_transitions != 0,
+            EnablePlacementTransitions =
+                (
+                    options.fields
+                    & (uint)
+                        mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+                ) != 0
+                    ? options.enable_placement_transitions != 0
+                    : null,
         };
 
     internal static StyleImageInfo FromNative(mln_style_image_info info) =>

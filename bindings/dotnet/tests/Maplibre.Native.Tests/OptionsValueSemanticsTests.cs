@@ -342,11 +342,18 @@ public sealed class OptionsValueSemanticsTests
     public void StyleTransitionOptionsComparesByPropertyValue()
     {
         AssertValueSemantics(
-            () => new StyleTransitionOptions { Duration = 300, Delay = 0 },
+            () =>
+                new StyleTransitionOptions
+                {
+                    Duration = 300,
+                    Delay = 0,
+                    EnablePlacementTransitions = false,
+                },
             options => options.Duration = 500,
             // A present zero stays distinguishable from an absent property.
             options => options.Delay = null,
-            options => options.EnablePlacementTransitions = false
+            // A present false stays distinguishable from an absent property.
+            options => options.EnablePlacementTransitions = null
         );
     }
 

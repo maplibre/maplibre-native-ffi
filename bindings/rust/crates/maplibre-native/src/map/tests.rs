@@ -729,11 +729,12 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    // A map with no style yet reports nothing set.
-    assert_eq!(
-        map.style_transition_options().unwrap(),
-        StyleTransitionOptions::default()
-    );
+    // A map with no style yet reports no duration or delay. The placement flag
+    // always reports, because MapLibre Native always holds a value for it.
+    let empty = map.style_transition_options().unwrap();
+    assert_eq!(empty.duration_ms, None);
+    assert_eq!(empty.delay_ms, None);
+    assert_eq!(empty.enable_placement_transitions, Some(true));
 
     // The style parser fills in its own 300ms duration for a style that
     // carries no transition member at all.
@@ -754,20 +755,32 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     let declared = map.style_transition_options().unwrap();
     assert_eq!(declared.duration_ms, Some(750.0));
     assert_eq!(declared.delay_ms, Some(100.0));
-    assert!(declared.enable_placement_transitions);
+    assert_eq!(declared.enable_placement_transitions, Some(true));
 
     // A present zero stays distinguishable from an omitted field, and omitting
     // a field clears what the style declared rather than merging into it.
     let mut options = StyleTransitionOptions::default();
     options.duration_ms = Some(0.0);
-    options.enable_placement_transitions = false;
+    options.enable_placement_transitions = Some(false);
     map.set_style_transition_options(&options).unwrap();
 
     let applied = map.style_transition_options().unwrap();
     assert_eq!(applied, options);
     assert_eq!(applied.duration_ms, Some(0.0));
     assert_eq!(applied.delay_ms, None);
-    assert!(!applied.enable_placement_transitions);
+    assert_eq!(applied.enable_placement_transitions, Some(false));
+
+    // Omitting the flag leaves the cross-fade on rather than clearing it, so an
+    // omitted field stays distinguishable from the cleared one just applied.
+    let mut duration_only = StyleTransitionOptions::default();
+    duration_only.duration_ms = Some(250.0);
+    map.set_style_transition_options(&duration_only).unwrap();
+    assert_eq!(
+        map.style_transition_options()
+            .unwrap()
+            .enable_placement_transitions,
+        Some(true)
+    );
 
     // Loading a style replaces the override with what that style declares.
     map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();

@@ -448,7 +448,7 @@ final class StyleTransitionOptions {
   const StyleTransitionOptions({
     this.durationMs,
     this.delayMs,
-    this.enablePlacementTransitions = true,
+    this.enablePlacementTransitions,
   });
 
   /// Transition duration in milliseconds. Absent falls back to the duration the
@@ -459,13 +459,15 @@ final class StyleTransitionOptions {
   /// declares for each transitioning property.
   final double? delayMs;
 
-  /// Whether symbol placement changes cross-fade.
+  /// Whether symbol placement changes cross-fade. Absent leaves the cross-fade
+  /// on, which is MapLibre Native's own default.
   ///
-  /// Unlike duration and delay this value is always present, so clearing it
-  /// makes symbol placement changes apply to the next rendered frame. Hosts
-  /// that move symbol-backed features at pointer frequency clear it for the
-  /// duration of the interaction so the rendered symbol keeps up.
-  final bool enablePlacementTransitions;
+  /// Clearing it makes symbol placement changes apply to the next rendered
+  /// frame. Hosts that move symbol-backed features at pointer frequency clear
+  /// it for the duration of the interaction so the rendered symbol keeps up.
+  /// Reading the options always reports it, because MapLibre Native always
+  /// holds a value for it.
+  final bool? enablePlacementTransitions;
 
   @override
   bool operator ==(Object other) =>

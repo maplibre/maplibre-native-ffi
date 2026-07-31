@@ -368,7 +368,7 @@ class _MapHandle:
         self,
         duration_ms: float | None,
         delay_ms: float | None,
-        enable_placement_transitions: bool,
+        enable_placement_transitions: bool | None,
     ) -> None: ...
     def get_style_transition_options(self) -> _WireDict: ...
     def set_layer_property(

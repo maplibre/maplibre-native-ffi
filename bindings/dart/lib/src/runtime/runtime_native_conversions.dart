@@ -103,7 +103,14 @@ raw.mln_style_transition_options _styleTransitionOptionsToNative(
   StyleTransitionOptions options,
 ) {
   final result = _c.raw.mln_style_transition_options_default();
-  result.enable_placement_transitions = options.enablePlacementTransitions;
+  final enablePlacementTransitions = options.enablePlacementTransitions;
+  if (enablePlacementTransitions != null) {
+    result.fields |= raw
+        .mln_style_transition_option_field
+        .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+        .value;
+    result.enable_placement_transitions = enablePlacementTransitions;
+  }
   final durationMs = options.durationMs;
   if (durationMs != null) {
     result.fields |= raw
@@ -140,10 +147,19 @@ StyleTransitionOptions _styleTransitionOptionsFromNative(
               .MLN_STYLE_TRANSITION_OPTION_DELAY
               .value !=
       0;
+  final hasPlacement =
+      options.fields &
+          raw
+              .mln_style_transition_option_field
+              .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+              .value !=
+      0;
   return StyleTransitionOptions(
     durationMs: hasDuration ? options.duration_ms : null,
     delayMs: hasDelay ? options.delay_ms : null,
-    enablePlacementTransitions: options.enable_placement_transitions,
+    enablePlacementTransitions: hasPlacement
+        ? options.enable_placement_transitions
+        : null,
   );
 }
 

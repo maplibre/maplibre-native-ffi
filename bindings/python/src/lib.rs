@@ -2781,7 +2781,7 @@ impl MapHandle {
         &self,
         duration_ms: Option<f64>,
         delay_ms: Option<f64>,
-        enable_placement_transitions: bool,
+        enable_placement_transitions: Option<bool>,
     ) -> PyResult<()> {
         let state = self.state();
         let mut options = maplibre_core::StyleTransitionOptions::default();

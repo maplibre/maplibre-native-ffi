@@ -422,9 +422,12 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
-	// The zero value means what the C default means, so a bare literal compares equal.
-	if !defaults.Equal(StyleTransitionOptions{}) {
-		t.Fatalf("StyleTransitionOptions() = %#v, want the C API defaults", defaults)
+	// The placement flag always reports, because native always holds a value for it.
+	if defaults.DurationMS != nil || defaults.DelayMS != nil {
+		t.Fatalf("StyleTransitionOptions() = %#v, want no duration or delay", defaults)
+	}
+	if defaults.EnablePlacementTransitions == nil || !*defaults.EnablePlacementTransitions {
+		t.Fatalf("StyleTransitionOptions() = %#v, want the cross-fade on", defaults)
 	}
 
 	// The style parser fills in its own 300ms duration for a style that declares no transition.
@@ -456,14 +459,15 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if declared.DelayMS == nil || *declared.DelayMS != 100 {
 		t.Fatalf("declared DelayMS = %v, want 100", declared.DelayMS)
 	}
-	if declared.DisablePlacementTransitions {
-		t.Fatal("declared DisablePlacementTransitions = true, want false")
+	if declared.EnablePlacementTransitions == nil || !*declared.EnablePlacementTransitions {
+		t.Fatal("declared EnablePlacementTransitions = false, want true")
 	}
 
 	// A present zero stays distinguishable from an absent field, and an absent field clears
 	// what the style declared rather than merging into it.
 	zero := 0.0
-	options := StyleTransitionOptions{DurationMS: &zero, DisablePlacementTransitions: true}
+	disabled := false
+	options := StyleTransitionOptions{DurationMS: &zero, EnablePlacementTransitions: &disabled}
 	if err := m.SetStyleTransitionOptions(options); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
@@ -485,7 +489,7 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
-	if kept.DisablePlacementTransitions {
+	if kept.EnablePlacementTransitions == nil || !*kept.EnablePlacementTransitions {
 		t.Fatal("a duration-only literal disabled the placement cross-fade")
 	}
 

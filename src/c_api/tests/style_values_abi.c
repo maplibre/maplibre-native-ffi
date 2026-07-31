@@ -771,11 +771,36 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   // a setter that validated one field after committing another would fail here
   // rather than silently half-applying.
   mln_style_transition_options applied = mln_style_transition_options_default();
-  applied.fields =
-    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  applied.fields = MLN_STYLE_TRANSITION_OPTION_DURATION |
+                   MLN_STYLE_TRANSITION_OPTION_DELAY |
+                   MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   applied.duration_ms = 42.0;
   applied.delay_ms = 7.0;
   applied.enable_placement_transitions = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
+  // Omitting the placement bit leaves the cross-fade on rather than carrying
+  // the struct's zero value through, so an omitted field stays distinguishable
+  // from the cleared one applied just above. The getter always reports the bit.
+  mln_style_transition_options omitted = mln_style_transition_options_default();
+  omitted.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  omitted.duration_ms = 5.0;
+  omitted.enable_placement_transitions = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &omitted)
+  );
+  mln_style_transition_options kept = mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &kept)
+  );
+  TEST_ASSERT_TRUE(
+    (kept.fields & MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
+    0U
+  );
+  TEST_ASSERT_TRUE(kept.enable_placement_transitions);
+
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
   );

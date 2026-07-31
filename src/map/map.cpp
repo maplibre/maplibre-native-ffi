@@ -5857,7 +5857,8 @@ auto map_set_style_transition_options(
 
   constexpr auto known_fields =
     static_cast<uint32_t>(MLN_STYLE_TRANSITION_OPTION_DURATION) |
-    MLN_STYLE_TRANSITION_OPTION_DELAY;
+    MLN_STYLE_TRANSITION_OPTION_DELAY |
+    MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   if ((options->fields & ~known_fields) != 0U) {
     set_thread_error(
       "mln_style_transition_options.fields contains unknown bits"
@@ -5865,8 +5866,14 @@ auto map_set_style_transition_options(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  // The native default is already on, so an omitted field leaves it alone.
   auto native = mbgl::style::TransitionOptions{};
-  native.enablePlacementTransitions = options->enable_placement_transitions;
+  if (
+    (options->fields &
+     MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) != 0U
+  ) {
+    native.enablePlacementTransitions = options->enable_placement_transitions;
+  }
   if ((options->fields & MLN_STYLE_TRANSITION_OPTION_DURATION) != 0U) {
     if (!is_native_duration_ms(options->duration_ms)) {
       set_thread_error(
@@ -5908,6 +5915,8 @@ auto map_get_style_transition_options(
 
   const auto native = live->map->getStyle().getTransitionOptions();
   auto result = style_transition_options_default();
+  // MapLibre Native always holds this one, so it always reports as present.
+  result.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
   result.enable_placement_transitions = native.enablePlacementTransitions;
   if (native.duration) {
     result.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION;

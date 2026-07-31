@@ -504,7 +504,7 @@ pub fn style_image_options_to_native(options: &StyleImageOptions) -> NativeStyle
 /// These control how the style animates paint property changes and whether
 /// symbol placement changes cross-fade. They are distinct from camera animation
 /// options and from the per-property transitions a style declares.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 #[non_exhaustive]
 pub struct StyleTransitionOptions {
     /// Transition duration in milliseconds. `None` falls back to the duration
@@ -513,22 +513,16 @@ pub struct StyleTransitionOptions {
     /// Transition delay in milliseconds. `None` falls back to the delay the
     /// style declares for each transitioning property.
     pub delay_ms: Option<f64>,
-    /// Whether symbol placement changes cross-fade.
+    /// Whether symbol placement changes cross-fade. `None` leaves the
+    /// cross-fade on, which is MapLibre Native's own default.
     ///
-    /// Unlike duration and delay this value is always present, so clearing it
-    /// makes symbol placement changes apply to the next rendered frame. Hosts
-    /// that move symbol-backed features at pointer frequency clear it for the
-    /// duration of the interaction so the rendered symbol keeps up.
-    pub enable_placement_transitions: bool,
-}
-
-impl Default for StyleTransitionOptions {
-    fn default() -> Self {
-        // SAFETY: This C helper returns a plain value with no preconditions.
-        style_transition_options_from_native(&unsafe {
-            sys::mln_style_transition_options_default()
-        })
-    }
+    /// Clearing it makes symbol placement changes apply to the next rendered
+    /// frame. Hosts that move symbol-backed features at pointer frequency clear
+    /// it for the duration of the interaction so the rendered symbol keeps up.
+    ///
+    /// Reading the options always reports this, because MapLibre Native always
+    /// holds a value for it.
+    pub enable_placement_transitions: Option<bool>,
 }
 
 pub fn style_transition_options_to_native(
@@ -536,7 +530,10 @@ pub fn style_transition_options_to_native(
 ) -> sys::mln_style_transition_options {
     // SAFETY: This C helper returns a plain value with no preconditions.
     let mut raw = unsafe { sys::mln_style_transition_options_default() };
-    raw.enable_placement_transitions = options.enable_placement_transitions;
+    if let Some(value) = options.enable_placement_transitions {
+        raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+        raw.enable_placement_transitions = value;
+    }
     if let Some(value) = options.duration_ms {
         raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DURATION;
         raw.duration_ms = value;
@@ -556,7 +553,10 @@ pub fn style_transition_options_from_native(
             .then_some(raw.duration_ms),
         delay_ms: (raw.fields & sys::MLN_STYLE_TRANSITION_OPTION_DELAY != 0)
             .then_some(raw.delay_ms),
-        enable_placement_transitions: raw.enable_placement_transitions,
+        enable_placement_transitions: (raw.fields
+            & sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+            != 0)
+            .then_some(raw.enable_placement_transitions),
     }
 }
 

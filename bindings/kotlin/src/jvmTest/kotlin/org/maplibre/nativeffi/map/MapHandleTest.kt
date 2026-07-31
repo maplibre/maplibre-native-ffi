@@ -114,8 +114,12 @@ class MapHandleTest {
           },
         )
         .use { map ->
-          // A map with no style yet reports nothing set.
-          assertEquals(StyleTransitionOptions(), map.styleTransitionOptions())
+          // A map with no style yet reports no duration or delay. The placement flag always
+          // reports, because MapLibre Native always holds a value for it.
+          val empty = map.styleTransitionOptions()
+          assertNull(empty.durationMs)
+          assertNull(empty.delayMs)
+          assertEquals(true, empty.enablePlacementTransitions)
 
           // The style parser fills in its own 300ms duration for a style that declares no
           // transition.
@@ -128,7 +132,7 @@ class MapHandleTest {
           val declared = map.styleTransitionOptions()
           assertEquals(750.0, declared.durationMs)
           assertEquals(100.0, declared.delayMs)
-          assertTrue(declared.enablePlacementTransitions)
+          assertEquals(true, declared.enablePlacementTransitions)
 
           // A present zero stays distinguishable from an absent field, and an absent field
           // clears what the style declared rather than merging into it.
@@ -139,6 +143,10 @@ class MapHandleTest {
             }
           map.setStyleTransitionOptions(options)
           assertEquals(options, map.styleTransitionOptions())
+
+          // Omitting the flag leaves the cross-fade on rather than clearing it.
+          map.setStyleTransitionOptions(StyleTransitionOptions().apply { durationMs = 250.0 })
+          assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
 
           // Loading a style replaces the override with what that style declares.
           map.setStyleJson(transitionStyleJson)

@@ -422,9 +422,9 @@ func TestStyleTransitionOptionsEqualComparesFieldValues(t *testing.T) {
 		"StyleTransitionOptions",
 		func() StyleTransitionOptions {
 			return StyleTransitionOptions{
-				DurationMS:                  optionPtr(300.0),
-				DelayMS:                     optionPtr(0.0),
-				DisablePlacementTransitions: true,
+				DurationMS:                 optionPtr(300.0),
+				DelayMS:                    optionPtr(0.0),
+				EnablePlacementTransitions: optionPtr(false),
 			}
 		},
 		StyleTransitionOptions.Equal,
@@ -432,7 +432,8 @@ func TestStyleTransitionOptionsEqualComparesFieldValues(t *testing.T) {
 			func(o *StyleTransitionOptions) { o.DurationMS = optionPtr(500.0) },
 			// A present zero stays distinguishable from an absent field.
 			func(o *StyleTransitionOptions) { o.DelayMS = nil },
-			func(o *StyleTransitionOptions) { o.DisablePlacementTransitions = false },
+			// A present false stays distinguishable from an absent field.
+			func(o *StyleTransitionOptions) { o.EnablePlacementTransitions = nil },
 		},
 	)
 

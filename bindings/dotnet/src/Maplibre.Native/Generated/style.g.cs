@@ -129,6 +129,7 @@ namespace Maplibre.Native.Internal.C
     {
         MLN_STYLE_TRANSITION_OPTION_DURATION = 1U << 0,
         MLN_STYLE_TRANSITION_OPTION_DELAY = 1U << 1,
+        MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2,
     }
 
     [NativeTypeName("uint32_t")]

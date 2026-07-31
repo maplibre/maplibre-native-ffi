@@ -682,8 +682,12 @@ void main() {
     final runtime = RuntimeHandle.create();
     final map = runtime.createMap();
     try {
-      // A map with no style yet reports nothing set.
-      expect(map.getStyleTransitionOptions(), const StyleTransitionOptions());
+      // A map with no style yet reports no duration or delay. The placement
+      // flag always reports, because native always holds a value for it.
+      final empty = map.getStyleTransitionOptions();
+      expect(empty.durationMs, isNull);
+      expect(empty.delayMs, isNull);
+      expect(empty.enablePlacementTransitions, isTrue);
 
       // The style parser fills in its own 300ms duration for a style that
       // declares no transition.
@@ -707,6 +711,15 @@ void main() {
       map.setStyleTransitionOptions(options);
       expect(map.getStyleTransitionOptions(), options);
       expect(map.getStyleTransitionOptions().hashCode, options.hashCode);
+
+      // Omitting the flag leaves the cross-fade on rather than clearing it.
+      map.setStyleTransitionOptions(
+        const StyleTransitionOptions(durationMs: 250),
+      );
+      expect(
+        map.getStyleTransitionOptions().enablePlacementTransitions,
+        isTrue,
+      );
 
       // Loading a style replaces the override with what that style declares.
       map.setStyleJson(transitionStyleJson);

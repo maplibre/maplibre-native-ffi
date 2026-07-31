@@ -621,8 +621,12 @@ import Testing
   )
   defer { try? map.close() }
 
-  // A map with no style yet reports nothing set.
-  #expect(try map.styleTransitionOptions() == StyleTransitionOptions())
+  // A map with no style yet reports no duration or delay. The placement flag
+  // always reports, because MapLibre Native always holds a value for it.
+  let empty = try map.styleTransitionOptions()
+  #expect(empty.durationMilliseconds == nil)
+  #expect(empty.delayMilliseconds == nil)
+  #expect(empty.enablePlacementTransitions == true)
 
   // The style parser fills in its own 300ms duration for a style that declares
   // no transition.
@@ -637,7 +641,7 @@ import Testing
   let declared = try map.styleTransitionOptions()
   #expect(declared.durationMilliseconds == 750)
   #expect(declared.delayMilliseconds == 100)
-  #expect(declared.enablePlacementTransitions)
+  #expect(declared.enablePlacementTransitions == true)
 
   // A present zero stays distinguishable from an absent field, and an absent
   // field clears what the style declared rather than merging into it.
@@ -647,6 +651,12 @@ import Testing
   )
   try map.setStyleTransitionOptions(options)
   #expect(try map.styleTransitionOptions() == options)
+
+  // Omitting the flag leaves the cross-fade on rather than clearing it.
+  try map.setStyleTransitionOptions(
+    StyleTransitionOptions(durationMilliseconds: 250)
+  )
+  #expect(try map.styleTransitionOptions().enablePlacementTransitions == true)
 
   // Loading a style replaces the override with what that style declares.
   try map.setStyleJSON(transitionStyleJSON)
