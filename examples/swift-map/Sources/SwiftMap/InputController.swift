@@ -71,10 +71,12 @@ final class InputController {
     at location: CGPoint,
     commands: Channels
   ) {
-    lastLocation = location
     // A drag already owns the pointer, so a second button joins it rather than
-    // starting a drag of its own.
+    // starting a drag of its own. Its position leaves the live drag's baseline
+    // alone, so the next delta still measures from where the owning button
+    // last was.
     guard dragMode == .none else { return }
+    lastLocation = location
     dragMode = mode
     dragButton = button
     // Queued ahead of the drag's own commands, so the transition stops before
@@ -94,8 +96,8 @@ final class InputController {
     at location: CGPoint,
     commands: Channels
   ) {
-    lastLocation = location
     guard dragButton == button else { return }
+    lastLocation = location
     dragMode = .none
     dragButton = .none
     commands.push(.setGestureInProgress(false))

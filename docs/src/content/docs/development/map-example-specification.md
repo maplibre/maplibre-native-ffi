@@ -841,8 +841,9 @@ Implementations MUST provide the following touch interactions:
 
 On any gesture begin, cancel in-flight camera transitions before applying
 deltas, and set the map's gesture-in-progress state. Clear that state when the
-gesture ends, including when the platform cancels it, and hold it across a
-touch-count change that keeps one gesture running. Double-tap is a discrete
+gesture ends, including when the platform cancels it. Gestures that run
+concurrently share one state, so a gesture ending while another is still live
+leaves it set, and the last one to end clears it. Double-tap is a discrete
 animated command and leaves the state clear.
 
 Input handlers return whether the camera changed so the render loop can set the

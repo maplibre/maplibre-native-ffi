@@ -56,16 +56,18 @@ pub const Controller = struct {
         commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
     ) Result {
-        const cursor = logicalPoint(button.x, button.y, current_viewport);
-        self.last_x = cursor.x;
-        self.last_y = cursor.y;
-
         // A drag already owns the pointer, so a second button joins it rather
-        // than starting a drag of its own.
+        // than starting a drag of its own. Its position leaves the live drag's
+        // baseline alone, so the next delta still measures from where the
+        // owning button last was.
         if (self.drag_mode != .none) return .{ .handled = true };
 
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
+
+        const cursor = logicalPoint(button.x, button.y, current_viewport);
+        self.last_x = cursor.x;
+        self.last_y = cursor.y;
 
         // Queued ahead of the drag's own commands, so the transition stops
         // before the first delta lands.
