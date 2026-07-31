@@ -190,6 +190,7 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.Native.Style.StyleImageOptions",
             "Maplibre.Native.Style.StyleImageTextFit",
             "Maplibre.Native.Style.StyleLayerVisibility",
+            "Maplibre.Native.Style.StyleTransitionOptions",
             "Maplibre.Native.Style.TileScheme",
             "Maplibre.Native.Style.TileSourceOptions",
             "Maplibre.Native.Style.VectorTileEncoding",

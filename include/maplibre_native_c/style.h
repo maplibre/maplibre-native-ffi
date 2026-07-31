@@ -142,6 +142,13 @@ typedef enum mln_style_image_option_field : uint32_t {
   MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT = 1U << 6U,
 } mln_style_image_option_field;
 
+/** Field mask values for mln_style_transition_options. */
+typedef enum mln_style_transition_option_field : uint32_t {
+  MLN_STYLE_TRANSITION_OPTION_DURATION = 1U << 0U,
+  MLN_STYLE_TRANSITION_OPTION_DELAY = 1U << 1U,
+  MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2U,
+} mln_style_transition_option_field;
+
 /** Location indicator image-name properties. */
 typedef enum mln_location_indicator_image_kind : uint32_t {
   MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0,
@@ -336,6 +343,62 @@ typedef struct mln_style_image_info {
   bool has_text_fit_height;
 } mln_style_image_info;
 
+/**
+ * Global style transition options.
+ *
+ * These control how the style animates paint property changes and whether
+ * symbol placement changes cross-fade. They are distinct from camera animation
+ * options, which time camera moves.
+ *
+ * A paint property's own style-spec transition, such as
+ * "fill-color-transition", overrides these for that property. These apply to
+ * every property that declares none.
+ */
+typedef struct mln_style_transition_options {
+  uint32_t size;
+  uint32_t fields;
+  /**
+   * Transition duration in milliseconds. Must be finite and non-negative.
+   * Values that would overflow MapLibre Native's internal duration are invalid.
+   *
+   * When this field is omitted, paint property changes apply instantly, and
+   * MapLibre Native's own 300 millisecond default governs the symbol placement
+   * cross-fade that enable_placement_transitions gates. A continuous-mode map
+   * applies that same default to the pattern cross-fade across integer zoom
+   * levels, while a still-mode map fades those patterns instantly instead.
+   *
+   * A still-mode map ignores this field and delay_ms for paint property
+   * transitions, and renders each still image at a fixed time point, so a
+   * property that takes its transition from these reaches its final value in
+   * the next still image whatever they hold.
+   */
+  double duration_ms;
+  /**
+   * Transition delay in milliseconds. Must be finite and non-negative. Values
+   * that would overflow MapLibre Native's internal duration are invalid.
+   *
+   * When this field is omitted, transitions start without delay.
+   */
+  double delay_ms;
+  /**
+   * Whether symbol placement changes cross-fade.
+   *
+   * Clearing this makes symbol placement changes apply to the next rendered
+   * frame. Hosts that move symbol-backed features at pointer frequency clear it
+   * for the duration of the interaction so the rendered symbol keeps up. It
+   * applies in every map mode.
+   *
+   * When this field is omitted, the cross-fade stays on, which is MapLibre
+   * Native's own default. The field carries a mask bit even though MapLibre
+   * Native has no unset state for it, because false is a meaningful value that
+   * differs from that default, so a caller that omits the field has to stay
+   * distinguishable from one that clears it.
+   *
+   * A style carries no equivalent, so loading a style leaves the cross-fade on.
+   */
+  bool enable_placement_transitions;
+} mln_style_transition_options;
+
 /** Returns default tile source options. */
 MLN_API mln_style_tile_source_options
 mln_style_tile_source_options_default(void) MLN_NOEXCEPT;
@@ -358,6 +421,10 @@ mln_style_image_options_default(void) MLN_NOEXCEPT;
 
 /** Returns default runtime style image metadata. */
 MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;
+
+/** Returns default global style transition options. */
+MLN_API mln_style_transition_options
+mln_style_transition_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Gets the number of IDs in a style ID list handle.
@@ -1439,6 +1506,62 @@ MLN_API mln_status mln_map_set_style_light_property(
  */
 MLN_API mln_status mln_map_get_style_light_property(
   mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+) MLN_NOEXCEPT;
+
+/**
+ * Sets the style's global transition options.
+ *
+ * options is borrowed for the call and copied into MapLibre Native before
+ * return. Omitted duration and delay fields clear the style-wide override, so
+ * this call replaces the whole transition configuration rather than merging
+ * into it.
+ *
+ * Loading a style replaces these options with the ones that style declares, so
+ * a host that overrides them applies the override after the style loads.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, options is null
+ *   or undersized, options->fields contains unknown bits, or an enabled
+ *   duration or delay is negative, non-finite, or out of the native duration
+ *   range.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_set_style_transition_options(
+  mln_map map, const mln_style_transition_options* options
+) MLN_NOEXCEPT;
+
+/**
+ * Reads the style's global transition options.
+ *
+ * On success, *out_options receives the last-known transition configuration.
+ * Duration and delay report through their field-mask bits, because MapLibre
+ * Native leaves either one unset until a style or a host sets it.
+ *
+ * A map that has loaded no style yet reports duration and delay unset. Once a
+ * style loads, what it declares decides: MapLibre Native's style parser fills
+ * in a 300 millisecond duration for a style carrying no "transition" member at
+ * all, but a style carrying one reports only the members that object names, so
+ * a style whose transition declares a delay alone reports no duration. Read the
+ * field-mask bits rather than assuming a loaded style sets either.
+ *
+ * MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS is always set on
+ * return, because MapLibre Native always holds a value for that field. Its mask
+ * bit distinguishes omitted from cleared on the way in, and reports nothing on
+ * the way out.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, or out_options is
+ *   null or undersized.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_map_get_style_transition_options(
+  mln_map map, mln_style_transition_options* out_options
 ) MLN_NOEXCEPT;
 
 /**

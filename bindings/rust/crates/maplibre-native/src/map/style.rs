@@ -8,7 +8,8 @@ pub(crate) use maplibre_core::style::{
 pub use maplibre_core::{
     GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
     RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
-    StyleImageTextFit, StyleLayerVisibility, TileScheme, TileSourceOptions, VectorTileEncoding,
+    StyleImageTextFit, StyleLayerVisibility, StyleTransitionOptions, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::const_ptr_or_null;
@@ -995,6 +996,31 @@ impl super::MapHandle {
         // SAFETY: On success, the C API returns either null or an owned JSON
         // snapshot handle for this call; core copies and releases it.
         unsafe { maplibre_core::json::copy_json_snapshot(out.get()) }
+    }
+
+    /// Sets the style's global transition options.
+    ///
+    /// Omitted duration and delay clear the style-wide override, so this call
+    /// replaces the whole transition configuration rather than merging into it.
+    /// Loading a style replaces these options with the ones that style
+    /// declares, so apply an override after the style loads.
+    pub fn set_style_transition_options(&self, options: &StyleTransitionOptions) -> Result<()> {
+        let map = self.inner.native()?;
+        let raw = maplibre_core::style::style_transition_options_to_native(options);
+        // SAFETY: map is live and raw is a fully initialized options struct
+        // borrowed for this call.
+        maplibre_core::check(unsafe { sys::mln_map_set_style_transition_options(map, &raw) })
+    }
+
+    /// Reads the style's global transition options.
+    pub fn style_transition_options(&self) -> Result<StyleTransitionOptions> {
+        let map = self.inner.native()?;
+        let mut raw = maplibre_core::style::empty_style_transition_options();
+        // SAFETY: map is live and raw has its ABI size initialized.
+        maplibre_core::check(unsafe { sys::mln_map_get_style_transition_options(map, &mut raw) })?;
+        Ok(maplibre_core::style::style_transition_options_from_native(
+            &raw,
+        ))
     }
 
     /// Sets one layer style property.

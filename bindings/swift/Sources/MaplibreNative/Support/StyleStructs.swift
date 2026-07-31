@@ -332,6 +332,53 @@ struct NativeStyleImageOptions: Equatable {
   }
 }
 
+struct NativeStyleTransitionOptions: Equatable {
+  let durationMilliseconds: Double?
+  let delayMilliseconds: Double?
+  let enablePlacementTransitions: Bool?
+
+  init(
+    durationMilliseconds: Double? = nil,
+    delayMilliseconds: Double? = nil,
+    enablePlacementTransitions: Bool? = nil
+  ) {
+    self.durationMilliseconds = durationMilliseconds
+    self.delayMilliseconds = delayMilliseconds
+    self.enablePlacementTransitions = enablePlacementTransitions
+  }
+
+  init(_ raw: mln_style_transition_options) {
+    durationMilliseconds = raw.fields
+      & MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue != 0 ? raw
+      .duration_ms : nil
+    delayMilliseconds = raw.fields
+      & MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue != 0 ? raw.delay_ms : nil
+    enablePlacementTransitions = raw.fields
+      & MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      .rawValue != 0 ? raw.enable_placement_transitions : nil
+  }
+
+  func withNativeOptions<Result>(
+    _ body: (UnsafePointer<mln_style_transition_options>) throws -> Result
+  ) rethrows -> Result {
+    var options = mln_style_transition_options_default()
+    if let enablePlacementTransitions {
+      options.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+        .rawValue
+      options.enable_placement_transitions = enablePlacementTransitions
+    }
+    if let durationMilliseconds {
+      options.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION.rawValue
+      options.duration_ms = durationMilliseconds
+    }
+    if let delayMilliseconds {
+      options.fields |= MLN_STYLE_TRANSITION_OPTION_DELAY.rawValue
+      options.delay_ms = delayMilliseconds
+    }
+    return try withUnsafePointer(to: &options, body)
+  }
+}
+
 private final class NativeCustomGeometrySourceCallbackBox: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 

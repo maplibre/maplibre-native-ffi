@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -56,6 +57,7 @@
 #include <mbgl/style/sources/vector_source.hpp>
 #include <mbgl/style/style.hpp>
 #include <mbgl/style/style_property.hpp>
+#include <mbgl/style/transition_options.hpp>
 #include <mbgl/style/types.hpp>
 #include <mbgl/tile/tile_id.hpp>
 #include <mbgl/tile/tile_operation.hpp>
@@ -2035,10 +2037,43 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto max_animation_duration_ms() -> double {
-  using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
+using DoubleMilliseconds = std::chrono::duration<double, std::milli>;
+
+auto max_native_duration_ms() -> double {
   return std::chrono::duration_cast<DoubleMilliseconds>(mbgl::Duration::max())
     .count();
+}
+
+auto duration_from_milliseconds(double milliseconds) -> mbgl::Duration {
+  return std::chrono::duration_cast<mbgl::Duration>(
+    DoubleMilliseconds{milliseconds}
+  );
+}
+
+auto milliseconds_from_duration(mbgl::Duration duration) -> double {
+  return std::chrono::duration_cast<DoubleMilliseconds>(duration).count();
+}
+
+// The bound is exclusive because mbgl::Duration::max() has no exact double
+// representation. In nanoseconds it converts to 9223372036854.775391 ms, whose
+// reverse conversion computes 2^63 ticks: one past the largest representable
+// count, which makes the conversion to the tick type undefined and in practice
+// yields the most negative duration. The next double below it computes
+// 9223372036854773760 ticks, so stopping short of the rounded maximum keeps
+// every accepted value convertible.
+//
+// That margin follows from this representation rather than from anything
+// std::chrono guarantees, because duration_cast picks its own common
+// representation and ratio order. Pin the representation instead of assuming
+// the margin survives another one.
+static_assert(
+  std::is_same_v<mbgl::Duration, std::chrono::nanoseconds>,
+  "the accepted duration bound is derived from a nanosecond mbgl::Duration"
+);
+
+auto is_native_duration_ms(double milliseconds) -> bool {
+  return std::isfinite(milliseconds) && milliseconds >= 0.0 &&
+         milliseconds < max_native_duration_ms();
 }
 
 auto validate_animation_options(const mln_animation_options* animation)
@@ -2063,8 +2098,7 @@ auto validate_animation_options(const mln_animation_options* animation)
   }
   if (
     (animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U &&
-    (!std::isfinite(animation->duration_ms) || animation->duration_ms < 0.0 ||
-     animation->duration_ms > max_animation_duration_ms())
+    !is_native_duration_ms(animation->duration_ms)
   ) {
     mln::core::set_thread_error(
       "animation duration_ms must fit the native duration range"
@@ -2692,9 +2726,7 @@ auto to_native_animation(
     };
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U) {
-    result.duration = std::chrono::duration_cast<mbgl::Duration>(
-      std::chrono::duration<double, std::milli>{animation->duration_ms}
-    );
+    result.duration = duration_from_milliseconds(animation->duration_ms);
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_VELOCITY) != 0U) {
     result.velocity = animation->velocity;
@@ -3403,6 +3435,17 @@ auto style_image_info_default() noexcept -> mln_style_image_info {
     .has_content = false,
     .has_text_fit_width = false,
     .has_text_fit_height = false
+  };
+}
+
+auto style_transition_options_default() noexcept
+  -> mln_style_transition_options {
+  return mln_style_transition_options{
+    .size = sizeof(mln_style_transition_options),
+    .fields = 0,
+    .duration_ms = 0.0,
+    .delay_ms = 0.0,
+    .enable_placement_transitions = true
   };
 }
 
@@ -5795,6 +5838,96 @@ auto map_get_style_light_property(
     return MLN_STATUS_OK;
   }
   return json_snapshot_create(property.getValue(), out_value);
+}
+
+auto map_set_style_transition_options(
+  mln_map map, const mln_style_transition_options* options
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    options == nullptr || options->size < sizeof(mln_style_transition_options)
+  ) {
+    set_thread_error("options must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  constexpr auto known_fields =
+    static_cast<uint32_t>(MLN_STYLE_TRANSITION_OPTION_DURATION) |
+    MLN_STYLE_TRANSITION_OPTION_DELAY |
+    MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+  if ((options->fields & ~known_fields) != 0U) {
+    set_thread_error(
+      "mln_style_transition_options.fields contains unknown bits"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  // The native default is already on, so an omitted field leaves it alone.
+  auto native = mbgl::style::TransitionOptions{};
+  if (
+    (options->fields &
+     MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) != 0U
+  ) {
+    native.enablePlacementTransitions = options->enable_placement_transitions;
+  }
+  if ((options->fields & MLN_STYLE_TRANSITION_OPTION_DURATION) != 0U) {
+    if (!is_native_duration_ms(options->duration_ms)) {
+      set_thread_error(
+        "transition duration_ms must fit the native duration range"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    native.duration = duration_from_milliseconds(options->duration_ms);
+  }
+  if ((options->fields & MLN_STYLE_TRANSITION_OPTION_DELAY) != 0U) {
+    if (!is_native_duration_ms(options->delay_ms)) {
+      set_thread_error(
+        "transition delay_ms must fit the native duration range"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    native.delay = duration_from_milliseconds(options->delay_ms);
+  }
+
+  live->map->getStyle().setTransitionOptions(native);
+  return MLN_STATUS_OK;
+}
+
+auto map_get_style_transition_options(
+  mln_map map, mln_style_transition_options* out_options
+) -> mln_status {
+  MapObject* live = nullptr;
+  const auto status = validate_map(map, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_options == nullptr ||
+    out_options->size < sizeof(mln_style_transition_options)
+  ) {
+    set_thread_error("out_options must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  const auto native = live->map->getStyle().getTransitionOptions();
+  auto result = style_transition_options_default();
+  // MapLibre Native always holds this one, so it always reports as present.
+  result.fields |= MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+  result.enable_placement_transitions = native.enablePlacementTransitions;
+  if (native.duration) {
+    result.fields |= MLN_STYLE_TRANSITION_OPTION_DURATION;
+    result.duration_ms = milliseconds_from_duration(*native.duration);
+  }
+  if (native.delay) {
+    result.fields |= MLN_STYLE_TRANSITION_OPTION_DELAY;
+    result.delay_ms = milliseconds_from_duration(*native.delay);
+  }
+  *out_options = result;
+  return MLN_STATUS_OK;
 }
 
 auto map_set_layer_property(

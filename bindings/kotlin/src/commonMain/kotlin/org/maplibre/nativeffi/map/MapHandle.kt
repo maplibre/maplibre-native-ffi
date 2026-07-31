@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned map handle. Platform actuals own the native map carrier. */
@@ -199,6 +200,18 @@ public expect class MapHandle : AutoCloseable {
   public fun setStyleLightProperty(propertyName: String, value: JsonValue)
 
   public fun styleLightProperty(propertyName: String): JsonValue?
+
+  /**
+   * Sets the style's global transition options.
+   *
+   * Null duration and delay clear the style-wide override, so this call replaces the whole
+   * transition configuration rather than merging into it. Loading a style replaces these options
+   * with the ones that style declares, so apply an override after the style loads.
+   */
+  public fun setStyleTransitionOptions(options: StyleTransitionOptions)
+
+  /** Returns the style's global transition options. */
+  public fun styleTransitionOptions(): StyleTransitionOptions
 
   public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue)
 

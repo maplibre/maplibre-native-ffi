@@ -12,6 +12,10 @@ use crate::{
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
+const STYLE_WITH_TRANSITION_JSON: &str =
+    r#"{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}"#;
+const STYLE_WITH_DELAY_ONLY_TRANSITION_JSON: &str =
+    r#"{"version":8,"transition":{"delay":100},"sources":{},"layers":[]}"#;
 
 #[test]
 // Spec coverage: BND-105.
@@ -717,6 +721,79 @@ fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: Runt
         std::thread::sleep(Duration::from_millis(1));
     }
     panic!("timed out waiting for {event_type:?}");
+}
+
+#[test]
+// Spec coverage: BND-060, BND-061, BND-070, and BND-105.
+fn style_transition_options_round_trip_through_the_real_c_api() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // A map with no style yet reports no duration or delay. The placement flag
+    // always reports, because MapLibre Native always holds a value for it.
+    let empty = map.style_transition_options().unwrap();
+    assert_eq!(empty.duration_ms, None);
+    assert_eq!(empty.delay_ms, None);
+    assert_eq!(empty.enable_placement_transitions, Some(true));
+
+    // The style parser fills in its own 300ms duration for a style that
+    // carries no transition member at all.
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    let parsed = map.style_transition_options().unwrap();
+    assert_eq!(parsed.duration_ms, Some(300.0));
+    assert_eq!(parsed.delay_ms, None);
+
+    // A style that carries a transition member reports only what that member
+    // names, so a delay-only transition replaces that default with no duration.
+    map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON)
+        .unwrap();
+    let delay_only = map.style_transition_options().unwrap();
+    assert_eq!(delay_only.duration_ms, None);
+    assert_eq!(delay_only.delay_ms, Some(100.0));
+
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    let declared = map.style_transition_options().unwrap();
+    assert_eq!(declared.duration_ms, Some(750.0));
+    assert_eq!(declared.delay_ms, Some(100.0));
+    assert_eq!(declared.enable_placement_transitions, Some(true));
+
+    // A present zero stays distinguishable from an omitted field, and omitting
+    // a field clears what the style declared rather than merging into it.
+    let mut options = StyleTransitionOptions::default();
+    options.duration_ms = Some(0.0);
+    options.enable_placement_transitions = Some(false);
+    map.set_style_transition_options(&options).unwrap();
+
+    let applied = map.style_transition_options().unwrap();
+    assert_eq!(applied, options);
+    assert_eq!(applied.duration_ms, Some(0.0));
+    assert_eq!(applied.delay_ms, None);
+    assert_eq!(applied.enable_placement_transitions, Some(false));
+
+    // Omitting the flag leaves the cross-fade on rather than clearing it, so an
+    // omitted field stays distinguishable from the cleared one just applied.
+    let mut duration_only = StyleTransitionOptions::default();
+    duration_only.duration_ms = Some(250.0);
+    map.set_style_transition_options(&duration_only).unwrap();
+    assert_eq!(
+        map.style_transition_options()
+            .unwrap()
+            .enable_placement_transitions,
+        Some(true)
+    );
+
+    // Loading a style replaces the override with what that style declares.
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    assert_eq!(map.style_transition_options().unwrap(), declared);
+
+    let mut negative = StyleTransitionOptions::default();
+    negative.delay_ms = Some(-1.0);
+    let error = map.set_style_transition_options(&negative).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.diagnostic().contains("delay_ms"));
+
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]

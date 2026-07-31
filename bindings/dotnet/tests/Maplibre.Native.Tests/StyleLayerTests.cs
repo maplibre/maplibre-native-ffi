@@ -78,4 +78,53 @@ public sealed class StyleLayerTests
         );
         Assert.Throws<InvalidArgumentException>(() => map.GetLayerMinZoom("missing"));
     }
+
+    [BindingSpecTest("BND-061")]
+    [Fact]
+    public void StyleTransitionOptionsRoundTripThroughNativeMap()
+    {
+        const string transitionStyleJson =
+            "{\"version\":8,\"transition\":{\"duration\":750,\"delay\":100},"
+            + "\"sources\":{},\"layers\":[]}";
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
+
+        // A map with no style yet reports no duration or delay. The placement flag always
+        // reports, because MapLibre Native always holds a value for it.
+        var empty = map.GetStyleTransitionOptions();
+        Assert.Null(empty.Duration);
+        Assert.Null(empty.Delay);
+        Assert.True(empty.EnablePlacementTransitions);
+
+        // The style parser fills in its own 300ms duration for a style that declares no
+        // transition.
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        var parsed = map.GetStyleTransitionOptions();
+        Assert.Equal(300, parsed.Duration);
+        Assert.Null(parsed.Delay);
+
+        map.SetStyleJson(transitionStyleJson);
+        var declared = map.GetStyleTransitionOptions();
+        Assert.Equal(750, declared.Duration);
+        Assert.Equal(100, declared.Delay);
+        Assert.True(declared.EnablePlacementTransitions);
+
+        // A present zero stays distinguishable from an absent field, and an absent field clears
+        // what the style declared rather than merging into it.
+        var options = new StyleTransitionOptions
+        {
+            Duration = 0,
+            EnablePlacementTransitions = false,
+        };
+        map.SetStyleTransitionOptions(options);
+        Assert.Equal(options, map.GetStyleTransitionOptions());
+
+        // Loading a style replaces the override with what that style declares.
+        map.SetStyleJson(transitionStyleJson);
+        Assert.Equal(declared, map.GetStyleTransitionOptions());
+
+        Assert.Throws<InvalidArgumentException>(() =>
+            map.SetStyleTransitionOptions(new StyleTransitionOptions { Delay = -1 })
+        );
+    }
 }

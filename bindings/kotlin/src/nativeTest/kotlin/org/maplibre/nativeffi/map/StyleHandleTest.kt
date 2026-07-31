@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -36,6 +37,7 @@ import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
@@ -354,6 +356,65 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     }
   }
 
+  @Test
+  fun styleTransitionOptionsRoundTripThroughNativeStyle() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
+    try {
+      // A map with no style yet reports no duration or delay. The placement flag always
+      // reports, because MapLibre Native always holds a value for it.
+      val empty = map.styleTransitionOptions()
+      assertNull(empty.durationMs)
+      assertNull(empty.delayMs)
+      assertEquals(true, empty.enablePlacementTransitions)
+
+      // The style parser fills in its own 300ms duration for a style that declares no
+      // transition.
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      val parsed = map.styleTransitionOptions()
+      assertEquals(300.0, parsed.durationMs)
+      assertNull(parsed.delayMs)
+
+      map.setStyleJson(TRANSITION_STYLE_JSON)
+      val declared = map.styleTransitionOptions()
+      assertEquals(750.0, declared.durationMs)
+      assertEquals(100.0, declared.delayMs)
+      assertEquals(true, declared.enablePlacementTransitions)
+
+      // A present zero stays distinguishable from an absent field, and an absent field clears
+      // what the style declared rather than merging into it.
+      val options =
+        StyleTransitionOptions().apply {
+          durationMs = 0.0
+          enablePlacementTransitions = false
+        }
+      map.setStyleTransitionOptions(options)
+      assertEquals(options, map.styleTransitionOptions())
+
+      // Omitting the flag leaves the cross-fade on rather than clearing it.
+      map.setStyleTransitionOptions(StyleTransitionOptions().apply { durationMs = 250.0 })
+      assertEquals(true, map.styleTransitionOptions().enablePlacementTransitions)
+
+      // Loading a style replaces the override with what that style declares.
+      map.setStyleJson(TRANSITION_STYLE_JSON)
+      assertEquals(declared, map.styleTransitionOptions())
+
+      assertFailsWith<InvalidArgumentException> {
+        map.setStyleTransitionOptions(StyleTransitionOptions().apply { delayMs = -1.0 })
+      }
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   // BND-101, BND-105, BND-069: style loading and workflows use copied public values.
 
   @Test
@@ -653,5 +714,11 @@ class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       map.close()
       runtime.close()
     }
+  }
+
+  private companion object {
+    const val TRANSITION_STYLE_JSON =
+      "{\"version\":8,\"transition\":{\"duration\":750,\"delay\":100}," +
+        "\"sources\":{},\"layers\":[]}"
   }
 }

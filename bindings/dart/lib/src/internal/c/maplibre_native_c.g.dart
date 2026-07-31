@@ -3016,6 +3016,18 @@ class MaplibreNativeC {
   late final _mln_style_image_info_default = _mln_style_image_info_defaultPtr
       .asFunction<mln_style_image_info Function()>();
 
+  mln_style_transition_options mln_style_transition_options_default() {
+    return _mln_style_transition_options_default();
+  }
+
+  late final _mln_style_transition_options_defaultPtr =
+      _lookup<ffi.NativeFunction<mln_style_transition_options Function()>>(
+        'mln_style_transition_options_default',
+      );
+  late final _mln_style_transition_options_default =
+      _mln_style_transition_options_defaultPtr
+          .asFunction<mln_style_transition_options Function()>();
+
   mln_status mln_style_id_list_count(
     Dartmln_style_id_list list,
     ffi.Pointer<ffi.Size> out_count,
@@ -4529,6 +4541,48 @@ class MaplibreNativeC {
       _mln_map_get_style_light_propertyPtr
           .asFunction<
             int Function(int, mln_string_view, ffi.Pointer<mln_json_snapshot>)
+          >();
+
+  mln_status mln_map_set_style_transition_options(
+    Dartmln_map map,
+    ffi.Pointer<mln_style_transition_options> options,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_set_style_transition_options(map, options),
+    );
+  }
+
+  late final _mln_map_set_style_transition_optionsPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_transition_options>)
+        >
+      >('mln_map_set_style_transition_options');
+  late final _mln_map_set_style_transition_options =
+      _mln_map_set_style_transition_optionsPtr
+          .asFunction<
+            int Function(int, ffi.Pointer<mln_style_transition_options>)
+          >();
+
+  mln_status mln_map_get_style_transition_options(
+    Dartmln_map map,
+    ffi.Pointer<mln_style_transition_options> out_options,
+  ) {
+    return mln_status.fromValue(
+      _mln_map_get_style_transition_options(map, out_options),
+    );
+  }
+
+  late final _mln_map_get_style_transition_optionsPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int32 Function(mln_map, ffi.Pointer<mln_style_transition_options>)
+        >
+      >('mln_map_get_style_transition_options');
+  late final _mln_map_get_style_transition_options =
+      _mln_map_get_style_transition_optionsPtr
+          .asFunction<
+            int Function(int, ffi.Pointer<mln_style_transition_options>)
           >();
 
   mln_status mln_map_set_layer_property(
@@ -8180,6 +8234,25 @@ enum mln_style_image_option_field {
   };
 }
 
+enum mln_style_transition_option_field {
+  MLN_STYLE_TRANSITION_OPTION_DURATION(1),
+  MLN_STYLE_TRANSITION_OPTION_DELAY(2),
+  MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS(4);
+
+  final int value;
+  const mln_style_transition_option_field(this.value);
+
+  static mln_style_transition_option_field fromValue(int value) =>
+      switch (value) {
+        1 => MLN_STYLE_TRANSITION_OPTION_DURATION,
+        2 => MLN_STYLE_TRANSITION_OPTION_DELAY,
+        4 => MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS,
+        _ => throw ArgumentError(
+          'Unknown value for mln_style_transition_option_field: $value',
+        ),
+      };
+}
+
 enum mln_location_indicator_image_kind {
   MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP(0),
   MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING(1),
@@ -8448,6 +8521,23 @@ final class mln_style_image_info extends ffi.Struct {
 
   @ffi.Bool()
   external bool has_text_fit_height;
+}
+
+final class mln_style_transition_options extends ffi.Struct {
+  @ffi.Uint32()
+  external int size;
+
+  @ffi.Uint32()
+  external int fields;
+
+  @ffi.Double()
+  external double duration_ms;
+
+  @ffi.Double()
+  external double delay_ms;
+
+  @ffi.Bool()
+  external bool enable_placement_transitions;
 }
 
 final class mln_metal_surface_descriptor extends ffi.Struct {

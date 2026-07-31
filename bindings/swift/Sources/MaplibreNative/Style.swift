@@ -313,6 +313,53 @@ public struct StyleImage: Equatable, Sendable {
   public let pixels: [UInt8]
 }
 
+/// The style's global transition options.
+///
+/// These control how the style animates paint property changes and whether
+/// symbol placement changes cross-fade. They are distinct from camera animation
+/// options and from the per-property transitions a style declares.
+public struct StyleTransitionOptions: Equatable, Sendable {
+  /// Transition duration in milliseconds. `nil` falls back to the duration the
+  /// style declares for each transitioning property.
+  public var durationMilliseconds: Double?
+  /// Transition delay in milliseconds. `nil` falls back to the delay the style
+  /// declares for each transitioning property.
+  public var delayMilliseconds: Double?
+  /// Whether symbol placement changes cross-fade. `nil` leaves the cross-fade
+  /// on, which is MapLibre Native's own default.
+  ///
+  /// Clearing it makes symbol placement changes apply to the next rendered
+  /// frame. Hosts that move symbol-backed features at pointer frequency clear
+  /// it for the duration of the interaction so the rendered symbol keeps up.
+  /// Reading the options always reports it, because MapLibre Native always
+  /// holds a value for it.
+  public var enablePlacementTransitions: Bool?
+
+  public init(
+    durationMilliseconds: Double? = nil,
+    delayMilliseconds: Double? = nil,
+    enablePlacementTransitions: Bool? = nil
+  ) {
+    self.durationMilliseconds = durationMilliseconds
+    self.delayMilliseconds = delayMilliseconds
+    self.enablePlacementTransitions = enablePlacementTransitions
+  }
+
+  init(native: NativeStyleTransitionOptions) {
+    durationMilliseconds = native.durationMilliseconds
+    delayMilliseconds = native.delayMilliseconds
+    enablePlacementTransitions = native.enablePlacementTransitions
+  }
+
+  var nativeOptions: NativeStyleTransitionOptions {
+    NativeStyleTransitionOptions(
+      durationMilliseconds: durationMilliseconds,
+      delayMilliseconds: delayMilliseconds,
+      enablePlacementTransitions: enablePlacementTransitions
+    )
+  }
+}
+
 public struct StyleSourceInfo: Equatable, Sendable {
   public let type: StyleSourceType
   public let idSize: Int
@@ -1129,6 +1176,30 @@ public extension MapHandle {
         requireLiveHandle(),
         propertyName: arena.view(propertyName)
       ).map(JSONValue.init(native:))
+    }
+  }
+
+  /// Sets the style's global transition options.
+  ///
+  /// Absent duration and delay clear the style-wide override, so this call
+  /// replaces the whole transition configuration rather than merging into it.
+  /// Loading a style replaces these options with the ones that style declares,
+  /// so apply an override after the style loads.
+  func setStyleTransitionOptions(_ options: StyleTransitionOptions) throws {
+    try mapNativeFailure {
+      try NativeStyle.setTransitionOptions(
+        requireLiveHandle(),
+        options: options.nativeOptions
+      )
+    }
+  }
+
+  /// Reads the style's global transition options.
+  func styleTransitionOptions() throws -> StyleTransitionOptions {
+    try mapNativeFailure {
+      try StyleTransitionOptions(
+        native: NativeStyle.transitionOptions(requireLiveHandle())
+      )
     }
   }
 

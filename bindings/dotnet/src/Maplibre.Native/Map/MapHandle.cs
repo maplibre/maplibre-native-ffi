@@ -1564,6 +1564,26 @@ public sealed unsafe class MapHandle : IDisposable
         return ValueStructs.ReadJsonSnapshot(snapshot);
     }
 
+    /// <summary>Sets the style's global transition options.</summary>
+    /// <remarks>
+    /// Null duration and delay clear the style-wide override, so this call replaces the whole
+    /// transition configuration rather than merging into it. Loading a style replaces these
+    /// options with the ones that style declares, so apply an override after the style loads.
+    /// </remarks>
+    public void SetStyleTransitionOptions(StyleTransitionOptions options)
+    {
+        var native = StyleStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_style_transition_options(Handle, &native));
+    }
+
+    /// <summary>Gets the style's global transition options.</summary>
+    public StyleTransitionOptions GetStyleTransitionOptions()
+    {
+        var native = NativeMethods.mln_style_transition_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_style_transition_options(Handle, &native));
+        return StyleStructs.FromNative(native);
+    }
+
     /// <summary>Sets one layer property from a JSON-like value.</summary>
     public void SetLayerProperty(string layerId, string propertyName, JsonValue value)
     {

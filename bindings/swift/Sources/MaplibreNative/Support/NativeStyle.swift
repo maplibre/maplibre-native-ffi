@@ -109,6 +109,23 @@ enum NativeStyle {
     }.value
   }
 
+  static func setTransitionOptions(
+    _ map: NativeMapHandle,
+    options: NativeStyleTransitionOptions
+  ) throws {
+    try options.withNativeOptions { native in
+      try checkStatus(mln_map_set_style_transition_options(map.raw, native))
+    }
+  }
+
+  static func transitionOptions(_ map: NativeMapHandle) throws
+    -> NativeStyleTransitionOptions
+  {
+    var options = mln_style_transition_options_default()
+    try checkStatus(mln_map_get_style_transition_options(map.raw, &options))
+    return NativeStyleTransitionOptions(options)
+  }
+
   static func imageExists(_ map: NativeMapHandle,
                           imageId: mln_string_view) throws -> Bool
   {

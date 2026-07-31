@@ -1375,6 +1375,61 @@ def test_nine_patch_style_image_round_trips_public_api() -> None:
                 )
 
 
+def test_style_transition_options_round_trip_public_api() -> None:
+    transition_style_json = (
+        '{"version":8,"transition":{"duration":750,"delay":100},'
+        '"sources":{},"layers":[]}'
+    )
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            # A map with no style yet reports no duration or delay. The
+            # placement flag always reports, because native always holds one.
+            empty = map_handle.get_style_transition_options()
+            assert empty.duration_ms is None
+            assert empty.delay_ms is None
+            assert empty.enable_placement_transitions is True
+
+            # The style parser fills in its own 300ms duration for a style that
+            # declares no transition.
+            map_handle.set_style_json(_EMPTY_STYLE_JSON)
+            parsed = map_handle.get_style_transition_options()
+            assert parsed.duration_ms == 300.0
+            assert parsed.delay_ms is None
+
+            map_handle.set_style_json(transition_style_json)
+            declared = map_handle.get_style_transition_options()
+            assert declared.duration_ms == 750.0
+            assert declared.delay_ms == 100.0
+            assert declared.enable_placement_transitions is True
+
+            # A present zero stays distinguishable from an absent field, and an
+            # absent field clears what the style declared rather than merging.
+            options = style.StyleTransitionOptions(
+                duration_ms=0.0,
+                enable_placement_transitions=False,
+            )
+            map_handle.set_style_transition_options(options)
+            assert map_handle.get_style_transition_options() == options
+
+            # Omitting the flag leaves the cross-fade on rather than clearing it.
+            map_handle.set_style_transition_options(
+                style.StyleTransitionOptions(duration_ms=250.0)
+            )
+            assert (
+                map_handle.get_style_transition_options().enable_placement_transitions
+                is True
+            )
+
+            # Loading a style replaces the override with what that style declares.
+            map_handle.set_style_json(transition_style_json)
+            assert map_handle.get_style_transition_options() == declared
+
+            with pytest.raises(mln.InvalidArgumentError, match="delay_ms"):
+                map_handle.set_style_transition_options(
+                    style.StyleTransitionOptions(delay_ms=-1.0)
+                )
+
+
 def test_layer_base_accessors_round_trip_public_api() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:

@@ -392,3 +392,50 @@ test "style JSON descriptors reject invalid values" {
         map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .string = "not a radius" }),
     );
 }
+
+const transition_style_json =
+    \\{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}
+;
+
+test "style transition options round trip through the C API" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    // The style parser fills in its own 300ms duration for a style that declares no transition.
+    const parsed = try map.getStyleTransitionOptions();
+    try testing.expectEqual(@as(?f64, 300.0), parsed.duration_ms);
+    try testing.expectEqual(@as(?f64, null), parsed.delay_ms);
+
+    try map.setStyleJson(testing.allocator, transition_style_json);
+    const declared = try map.getStyleTransitionOptions();
+    try testing.expectEqual(@as(?f64, 750.0), declared.duration_ms);
+    try testing.expectEqual(@as(?f64, 100.0), declared.delay_ms);
+    try testing.expectEqual(@as(?bool, true), declared.enable_placement_transitions);
+
+    // A present zero stays distinguishable from an absent field, and an absent field clears what
+    // the style declared rather than merging into it.
+    const options = maplibre.StyleTransitionOptions{
+        .duration_ms = 0.0,
+        .enable_placement_transitions = false,
+    };
+    try map.setStyleTransitionOptions(options);
+    try testing.expectEqual(options, try map.getStyleTransitionOptions());
+
+    // Omitting the flag leaves the cross-fade on rather than clearing it.
+    try map.setStyleTransitionOptions(.{ .duration_ms = 250.0 });
+    try testing.expectEqual(
+        @as(?bool, true),
+        (try map.getStyleTransitionOptions()).enable_placement_transitions,
+    );
+
+    // Loading a style replaces the override with what that style declares.
+    try map.setStyleJson(testing.allocator, transition_style_json);
+    try testing.expectEqual(declared, try map.getStyleTransitionOptions());
+
+    try testing.expectError(
+        error.InvalidArgument,
+        map.setStyleTransitionOptions(.{ .delay_ms = -1.0 }),
+    );
+}

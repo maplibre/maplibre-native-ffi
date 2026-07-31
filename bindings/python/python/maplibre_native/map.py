@@ -53,6 +53,7 @@ from .style import (
     StyleLayerVisibility,
     StyleSourceInfo,
     StyleSourceType,
+    StyleTransitionOptions,
     TileSourceOptions,
 )
 
@@ -921,6 +922,26 @@ class MapHandle(NativeHandleMixin):
     def get_style_light_property(self, property_name: str) -> JsonValue | None:
         """Return one style light property as a style-spec JSON value."""
         return self._native.get_style_light_property(property_name)
+
+    def set_style_transition_options(self, options: StyleTransitionOptions) -> None:
+        """Set the style's global transition options.
+
+        Absent duration and delay clear the style-wide override, so this call
+        replaces the whole transition configuration rather than merging into it.
+        Loading a style replaces these options with the ones that style
+        declares, so apply an override after the style loads.
+        """
+        self._native.set_style_transition_options(
+            options.duration_ms,
+            options.delay_ms,
+            options.enable_placement_transitions,
+        )
+
+    def get_style_transition_options(self) -> StyleTransitionOptions:
+        """Return the style's global transition options."""
+        return StyleTransitionOptions._from_native(
+            self._native.get_style_transition_options()
+        )
 
     def set_layer_property(
         self,

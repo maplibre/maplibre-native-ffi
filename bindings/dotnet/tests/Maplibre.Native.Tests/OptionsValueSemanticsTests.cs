@@ -339,6 +339,26 @@ public sealed class OptionsValueSemanticsTests
 
     [BindingSpecTest("BND-070")]
     [Fact]
+    public void StyleTransitionOptionsComparesByPropertyValue()
+    {
+        AssertValueSemantics(
+            () =>
+                new StyleTransitionOptions
+                {
+                    Duration = 300,
+                    Delay = 0,
+                    EnablePlacementTransitions = false,
+                },
+            options => options.Duration = 500,
+            // A present zero stays distinguishable from an absent property.
+            options => options.Delay = null,
+            // A present false stays distinguishable from an absent property.
+            options => options.EnablePlacementTransitions = null
+        );
+    }
+
+    [BindingSpecTest("BND-070")]
+    [Fact]
     public void QueryOptionsCompareLayerIdsElementByElement()
     {
         AssertValueSemantics(

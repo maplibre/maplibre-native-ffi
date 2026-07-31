@@ -499,6 +499,72 @@ pub fn style_image_options_to_native(options: &StyleImageOptions) -> NativeStyle
     NativeStyleImageOptions::new(options)
 }
 
+/// The style's global transition options.
+///
+/// These control how the style animates paint property changes and whether
+/// symbol placement changes cross-fade. They are distinct from camera animation
+/// options and from the per-property transitions a style declares.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+#[non_exhaustive]
+pub struct StyleTransitionOptions {
+    /// Transition duration in milliseconds. `None` falls back to the duration
+    /// the style declares for each transitioning property.
+    pub duration_ms: Option<f64>,
+    /// Transition delay in milliseconds. `None` falls back to the delay the
+    /// style declares for each transitioning property.
+    pub delay_ms: Option<f64>,
+    /// Whether symbol placement changes cross-fade. `None` leaves the
+    /// cross-fade on, which is MapLibre Native's own default.
+    ///
+    /// Clearing it makes symbol placement changes apply to the next rendered
+    /// frame. Hosts that move symbol-backed features at pointer frequency clear
+    /// it for the duration of the interaction so the rendered symbol keeps up.
+    ///
+    /// Reading the options always reports this, because MapLibre Native always
+    /// holds a value for it.
+    pub enable_placement_transitions: Option<bool>,
+}
+
+pub fn style_transition_options_to_native(
+    options: &StyleTransitionOptions,
+) -> sys::mln_style_transition_options {
+    // SAFETY: This C helper returns a plain value with no preconditions.
+    let mut raw = unsafe { sys::mln_style_transition_options_default() };
+    if let Some(value) = options.enable_placement_transitions {
+        raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+        raw.enable_placement_transitions = value;
+    }
+    if let Some(value) = options.duration_ms {
+        raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DURATION;
+        raw.duration_ms = value;
+    }
+    if let Some(value) = options.delay_ms {
+        raw.fields |= sys::MLN_STYLE_TRANSITION_OPTION_DELAY;
+        raw.delay_ms = value;
+    }
+    raw
+}
+
+pub fn style_transition_options_from_native(
+    raw: &sys::mln_style_transition_options,
+) -> StyleTransitionOptions {
+    StyleTransitionOptions {
+        duration_ms: (raw.fields & sys::MLN_STYLE_TRANSITION_OPTION_DURATION != 0)
+            .then_some(raw.duration_ms),
+        delay_ms: (raw.fields & sys::MLN_STYLE_TRANSITION_OPTION_DELAY != 0)
+            .then_some(raw.delay_ms),
+        enable_placement_transitions: (raw.fields
+            & sys::MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+            != 0)
+            .then_some(raw.enable_placement_transitions),
+    }
+}
+
+pub fn empty_style_transition_options() -> sys::mln_style_transition_options {
+    // SAFETY: This C helper returns a plain value with no preconditions.
+    unsafe { sys::mln_style_transition_options_default() }
+}
+
 pub fn empty_style_image_info() -> sys::mln_style_image_info {
     sys::mln_style_image_info {
         size: std::mem::size_of::<sys::mln_style_image_info>() as u32,

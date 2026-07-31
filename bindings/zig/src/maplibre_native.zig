@@ -163,6 +163,7 @@ pub const OwnedStyleGeoJsonSourceOptions = values.OwnedStyleGeoJsonSourceOptions
 pub const PremultipliedRgba8Image = values.PremultipliedRgba8Image;
 pub const StyleImageOptions = values.StyleImageOptions;
 pub const StyleImageInfo = values.StyleImageInfo;
+pub const StyleTransitionOptions = values.StyleTransitionOptions;
 pub const OwnedStyleImage = values.OwnedStyleImage;
 pub const LocationIndicatorImageKind = values.LocationIndicatorImageKind;
 pub const JsonValue = values.JsonValue;

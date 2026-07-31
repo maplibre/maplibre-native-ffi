@@ -99,6 +99,70 @@ Pointer<raw.mln_image_stretch> _nativeStretches(
   return array;
 }
 
+raw.mln_style_transition_options _styleTransitionOptionsToNative(
+  StyleTransitionOptions options,
+) {
+  final result = _c.raw.mln_style_transition_options_default();
+  final enablePlacementTransitions = options.enablePlacementTransitions;
+  if (enablePlacementTransitions != null) {
+    result.fields |= raw
+        .mln_style_transition_option_field
+        .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+        .value;
+    result.enable_placement_transitions = enablePlacementTransitions;
+  }
+  final durationMs = options.durationMs;
+  if (durationMs != null) {
+    result.fields |= raw
+        .mln_style_transition_option_field
+        .MLN_STYLE_TRANSITION_OPTION_DURATION
+        .value;
+    result.duration_ms = durationMs;
+  }
+  final delayMs = options.delayMs;
+  if (delayMs != null) {
+    result.fields |= raw
+        .mln_style_transition_option_field
+        .MLN_STYLE_TRANSITION_OPTION_DELAY
+        .value;
+    result.delay_ms = delayMs;
+  }
+  return result;
+}
+
+StyleTransitionOptions _styleTransitionOptionsFromNative(
+  raw.mln_style_transition_options options,
+) {
+  final hasDuration =
+      options.fields &
+          raw
+              .mln_style_transition_option_field
+              .MLN_STYLE_TRANSITION_OPTION_DURATION
+              .value !=
+      0;
+  final hasDelay =
+      options.fields &
+          raw
+              .mln_style_transition_option_field
+              .MLN_STYLE_TRANSITION_OPTION_DELAY
+              .value !=
+      0;
+  final hasPlacement =
+      options.fields &
+          raw
+              .mln_style_transition_option_field
+              .MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+              .value !=
+      0;
+  return StyleTransitionOptions(
+    durationMs: hasDuration ? options.duration_ms : null,
+    delayMs: hasDelay ? options.delay_ms : null,
+    enablePlacementTransitions: hasPlacement
+        ? options.enable_placement_transitions
+        : null,
+  );
+}
+
 StyleImageInfo _styleImageInfoFromNative(raw.mln_style_image_info info) {
   return StyleImageInfo(
     width: info.width,

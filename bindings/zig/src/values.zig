@@ -320,6 +320,28 @@ pub const StyleImageOptions = struct {
     text_fit_height: ?StyleImageTextFit = null,
 };
 
+/// The style's global transition options.
+///
+/// These control how the style animates paint property changes and whether symbol placement
+/// changes cross-fade. They are distinct from camera animation options and from the per-property
+/// transitions a style declares.
+pub const StyleTransitionOptions = struct {
+    /// Transition duration in milliseconds. Absent falls back to the duration the style declares
+    /// for each transitioning property.
+    duration_ms: ?f64 = null,
+    /// Transition delay in milliseconds. Absent falls back to the delay the style declares for
+    /// each transitioning property.
+    delay_ms: ?f64 = null,
+    /// Whether symbol placement changes cross-fade. Absent leaves the cross-fade on, which is
+    /// MapLibre Native's own default.
+    ///
+    /// Clearing it makes symbol placement changes apply to the next rendered frame. Hosts that
+    /// move symbol-backed features at pointer frequency clear it for the duration of the
+    /// interaction so the rendered symbol keeps up. Reading the options always reports it,
+    /// because MapLibre Native always holds a value for it.
+    enable_placement_transitions: ?bool = null,
+};
+
 pub const StyleImageInfo = struct {
     width: u32,
     height: u32,
@@ -1224,6 +1246,31 @@ pub fn styleImageOptionsToNative(
         raw.text_fit_height = fit.toRaw();
     }
     return raw;
+}
+
+pub fn styleTransitionOptionsToNative(value: StyleTransitionOptions) c.mln_style_transition_options {
+    var raw = c.mln_style_transition_options_default();
+    if (value.enable_placement_transitions) |enable| {
+        raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+        raw.enable_placement_transitions = enable;
+    }
+    if (value.duration_ms) |duration_ms| {
+        raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_DURATION;
+        raw.duration_ms = duration_ms;
+    }
+    if (value.delay_ms) |delay_ms| {
+        raw.fields |= c.MLN_STYLE_TRANSITION_OPTION_DELAY;
+        raw.delay_ms = delay_ms;
+    }
+    return raw;
+}
+
+pub fn styleTransitionOptionsFromNative(raw: c.mln_style_transition_options) StyleTransitionOptions {
+    return .{
+        .duration_ms = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_DURATION != 0) raw.duration_ms else null,
+        .delay_ms = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_DELAY != 0) raw.delay_ms else null,
+        .enable_placement_transitions = if (raw.fields & c.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0) raw.enable_placement_transitions else null,
+    };
 }
 
 pub fn styleImageInfoFromNative(raw: c.mln_style_image_info) StyleImageInfo {

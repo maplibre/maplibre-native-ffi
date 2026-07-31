@@ -73,6 +73,11 @@ auto mln_style_image_info_default(void) noexcept -> mln_style_image_info {
   return mln::core::style_image_info_default();
 }
 
+auto mln_style_transition_options_default(void) noexcept
+  -> mln_style_transition_options {
+  return mln::core::style_transition_options_default();
+}
+
 auto mln_map_create(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) noexcept -> mln_status {
@@ -620,6 +625,22 @@ auto mln_map_get_style_light_property(
     return mln::core::map_get_style_light_property(
       map, property_name, out_value
     );
+  });
+}
+
+auto mln_map_set_style_transition_options(
+  mln_map map, const mln_style_transition_options* options
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_set_style_transition_options(map, options);
+  });
+}
+
+auto mln_map_get_style_transition_options(
+  mln_map map, mln_style_transition_options* out_options
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::map_get_style_transition_options(map, out_options);
   });
 }
 

@@ -2777,6 +2777,44 @@ impl MapHandle {
         json_snapshot_to_py(py, out.get())
     }
 
+    fn set_style_transition_options(
+        &self,
+        duration_ms: Option<f64>,
+        delay_ms: Option<f64>,
+        enable_placement_transitions: Option<bool>,
+    ) -> PyResult<()> {
+        let state = self.state();
+        let mut options = maplibre_core::StyleTransitionOptions::default();
+        options.duration_ms = duration_ms;
+        options.delay_ms = delay_ms;
+        options.enable_placement_transitions = enable_placement_transitions;
+        let options = maplibre_core::style::style_transition_options_to_native(&options);
+        // SAFETY: The C API validates the map pointer and options struct.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_style_transition_options(state.handle(), &options)
+        })
+        .map_err(map_error)
+    }
+
+    fn get_style_transition_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        let state = self.state();
+        let mut options = maplibre_core::style::empty_style_transition_options();
+        // SAFETY: The C API validates the map pointer and out-options pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_get_style_transition_options(state.handle(), &mut options)
+        })
+        .map_err(map_error)?;
+        let options = maplibre_core::style::style_transition_options_from_native(&options);
+        let dict = PyDict::new(py);
+        dict.set_item("duration_ms", options.duration_ms)?;
+        dict.set_item("delay_ms", options.delay_ms)?;
+        dict.set_item(
+            "enable_placement_transitions",
+            options.enable_placement_transitions,
+        )?;
+        Ok(dict.into_any().unbind())
+    }
+
     fn set_layer_property(
         &self,
         layer_id: String,

@@ -709,6 +709,32 @@ pub const MapHandle = enum(c.mln_map) {
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
+    /// Sets the style's global transition options.
+    ///
+    /// Absent duration and delay clear the style-wide override, so this call replaces the whole
+    /// transition configuration rather than merging into it. Loading a style replaces these
+    /// options with the ones that style declares, so apply an override after the style loads.
+    pub fn setStyleTransitionOptions(
+        self: *MapHandle,
+        options: values.StyleTransitionOptions,
+    ) status.Error!void {
+        const raw = values.styleTransitionOptionsToNative(options);
+        try status.checkStatus(
+            c.mln_map_set_style_transition_options(try native(self), &raw),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Reads the style's global transition options.
+    pub fn getStyleTransitionOptions(self: *MapHandle) status.Error!values.StyleTransitionOptions {
+        var raw = c.mln_style_transition_options_default();
+        try status.checkStatus(
+            c.mln_map_get_style_transition_options(try native(self), &raw),
+            diagnosticStore(self),
+        );
+        return values.styleTransitionOptionsFromNative(raw);
+    }
+
     pub fn addVectorSourceUrl(
         self: *MapHandle,
         allocator: std.mem.Allocator,

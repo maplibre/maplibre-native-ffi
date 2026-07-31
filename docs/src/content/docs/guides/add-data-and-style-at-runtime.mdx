@@ -130,3 +130,44 @@ and the repaint follows.
 `set_style_light_json` replaces the whole light object.
 `set_style_light_property` sets one of `anchor`, `color`, `intensity`, or
 `position`. Light steers fill-extrusion shading.
+
+## Transitions
+
+`set_style_transition_options` sets the style's global transition behavior:
+`duration`, `delay`, and whether symbol placement changes cross-fade. These are
+separate from camera animation options, which time camera moves. A paint
+property's own style-spec transition, such as `fill-color-transition`, overrides
+them for that property; they apply to every property that declares none.
+
+Duration and delay are optional, and omitting one clears the style-wide
+override. With no duration, paint property changes apply instantly, and
+MapLibre Native's own 300 ms default governs the symbol placement cross-fade. A
+continuous-mode map applies that same default to the pattern cross-fade across
+integer zoom levels; a still-mode map fades those patterns instantly instead.
+With no delay, transitions start immediately. A still-mode map ignores both
+fields for paint property transitions, and renders each still image at a fixed
+time point, so a property that takes its transition from these reaches its final
+value in the next still image whatever they hold.
+
+Setting duration and delay replaces the whole configuration rather than merging
+into what the style declared, so read the current options first when you mean to
+change one field.
+
+Loading a style replaces these options with the ones that style declares, so
+apply an override after the style loads. What you read back afterwards depends
+on the style: one with no `transition` member at all gets the parser's 300 ms
+duration, while one carrying a `transition` object reports only the members that
+object names. A style whose transition declares a delay alone therefore reports
+no duration, so check whether a field is present rather than assuming a loaded
+style sets it.
+
+Placement transitions are optional like the other two, and omitting them leaves
+the cross-fade on, which is MapLibre Native's own default. Clearing them makes
+symbol placement changes apply to the next rendered frame instead of fading in.
+A host dragging a symbol-backed feature does that for the duration of the drag,
+because the cross-fade otherwise leaves the rendered symbol trailing the pointer.
+Restore it when the drag ends.
+
+MapLibre Native has no unset state for that flag, so it carries a presence
+signal only to keep an omitted field distinguishable from a cleared one on the
+way in. Reading the options always reports it.

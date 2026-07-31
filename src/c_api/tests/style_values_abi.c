@@ -761,6 +761,173 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Bindings always emit a full struct header and reject non-finite durations
+// before the call, so only raw C callers reach these rejections.
+static void style_transition_options_reject_unsafe_raw_headers(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  // Every rejection below must leave this applied configuration untouched, so
+  // a setter that validated one field after committing another would fail here
+  // rather than silently half-applying.
+  mln_style_transition_options applied = mln_style_transition_options_default();
+  applied.fields = MLN_STYLE_TRANSITION_OPTION_DURATION |
+                   MLN_STYLE_TRANSITION_OPTION_DELAY |
+                   MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS;
+  applied.duration_ms = 42.0;
+  applied.delay_ms = 7.0;
+  applied.enable_placement_transitions = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
+  // Omitting the placement bit leaves the cross-fade on rather than carrying
+  // the struct's zero value through, so an omitted field stays distinguishable
+  // from the cleared one applied just above. The getter always reports the bit.
+  mln_style_transition_options omitted = mln_style_transition_options_default();
+  omitted.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  omitted.duration_ms = 5.0;
+  omitted.enable_placement_transitions = false;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &omitted)
+  );
+  mln_style_transition_options kept = mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &kept)
+  );
+  TEST_ASSERT_TRUE(
+    (kept.fields & MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS) !=
+    0U
+  );
+  TEST_ASSERT_TRUE(kept.enable_placement_transitions);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_transition_options(map, NULL)
+  );
+
+  mln_style_transition_options short_size =
+    mln_style_transition_options_default();
+  short_size.size = (uint32_t)(sizeof(mln_style_transition_options) - 1);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &short_size)
+  );
+
+  mln_style_transition_options unknown_field =
+    mln_style_transition_options_default();
+  unknown_field.fields = 1U << 20U;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &unknown_field)
+  );
+
+  // Each rejected duration carries a valid delay and vice versa, so a setter
+  // that committed one field before validating the other would leave the
+  // baseline half-overwritten whichever order it validated in.
+  mln_style_transition_options infinite_duration =
+    mln_style_transition_options_default();
+  infinite_duration.fields =
+    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  infinite_duration.duration_ms = INFINITY;
+  infinite_duration.delay_ms = 99.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &infinite_duration)
+  );
+
+  mln_style_transition_options negative_delay =
+    mln_style_transition_options_default();
+  negative_delay.fields =
+    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  negative_delay.duration_ms = 99.0;
+  negative_delay.delay_ms = -1.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &negative_delay)
+  );
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_style_transition_options(map, NULL)
+  );
+
+  mln_style_transition_options short_out =
+    mln_style_transition_options_default();
+  short_out.size = (uint32_t)(sizeof(mln_style_transition_options) - 1);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_style_transition_options(map, &short_out)
+  );
+
+  // The largest accepted duration must survive conversion into native ticks.
+  // The native maximum has no exact double representation, so accepting the
+  // rounded maximum used to wrap it to the most negative duration and read back
+  // negative. Bisect for the ceiling rather than naming it, because it follows
+  // from the native duration type rather than from this API.
+  mln_style_transition_options probe = mln_style_transition_options_default();
+  probe.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  // Zero is the one duration this API always accepts, so the search starts from
+  // a bracket it proved rather than assumed.
+  double accepted = 0.0;
+  double rejected = 1.0;
+  probe.duration_ms = accepted;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &probe)
+  );
+  // Double until one is rejected, so the bisection below starts from a bracket
+  // it can close whatever duration type the platform uses. A non-finite bound
+  // is rejected too, so this terminates.
+  for (int step = 0; step < 4096; step++) {
+    probe.duration_ms = rejected;
+    if (mln_map_set_style_transition_options(map, &probe) != MLN_STATUS_OK) {
+      break;
+    }
+    accepted = rejected;
+    rejected *= 2.0;
+  }
+  for (int step = 0; step < 4096; step++) {
+    const double midpoint = accepted + ((rejected - accepted) / 2.0);
+    if (midpoint <= accepted || midpoint >= rejected) {
+      break;
+    }
+    probe.duration_ms = midpoint;
+    if (mln_map_set_style_transition_options(map, &probe) == MLN_STATUS_OK) {
+      accepted = midpoint;
+    } else {
+      rejected = midpoint;
+    }
+  }
+  probe.duration_ms = accepted;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &probe)
+  );
+  mln_style_transition_options ceiling = mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &ceiling)
+  );
+  TEST_ASSERT_TRUE(ceiling.duration_ms >= 0.0);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &applied)
+  );
+
+  mln_style_transition_options unchanged =
+    mln_style_transition_options_default();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_get_style_transition_options(map, &unchanged)
+  );
+  TEST_ASSERT_EQUAL_UINT32(applied.fields, unchanged.fields);
+  TEST_ASSERT_EQUAL_DOUBLE(applied.duration_ms, unchanged.duration_ms);
+  TEST_ASSERT_EQUAL_DOUBLE(applied.delay_ms, unchanged.delay_ms);
+  TEST_ASSERT_FALSE(unchanged.enable_placement_transitions);
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
@@ -772,4 +939,5 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
+  RUN_TEST(style_transition_options_reject_unsafe_raw_headers);
 }

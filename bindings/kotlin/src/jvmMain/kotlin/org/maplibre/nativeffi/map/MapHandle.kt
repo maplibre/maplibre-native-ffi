@@ -38,6 +38,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned JVM FFM map handle. */
@@ -364,6 +365,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
   public actual fun styleLightProperty(propertyName: String): JsonValue? {
     NativeAccess.ensureLoaded()
     return NativeAccess.styleLightProperty(requireLiveHandle(), propertyName)
+  }
+
+  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
+    NativeAccess.ensureLoaded()
+    NativeAccess.setStyleTransitionOptions(requireLiveHandle(), options)
+  }
+
+  public actual fun styleTransitionOptions(): StyleTransitionOptions {
+    NativeAccess.ensureLoaded()
+    return NativeAccess.styleTransitionOptions(requireLiveHandle())
   }
 
   public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {

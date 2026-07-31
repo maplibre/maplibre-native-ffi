@@ -55,6 +55,7 @@ import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.StyleLayerVisibility
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned Android JNI map handle. */
@@ -861,6 +862,28 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
         )
         return jsonSnapshot(outSnapshot)
       }
+    }
+  }
+
+  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
+    NativeAccess.ensureLoaded()
+    StyleTransitionOptionsScope(options).use { nativeOptions ->
+      Status.check(
+        MaplibreNativeC.mln_map_set_style_transition_options(
+          requireLiveHandle(),
+          nativeOptions.options,
+        )
+      )
+    }
+  }
+
+  public actual fun styleTransitionOptions(): StyleTransitionOptions {
+    NativeAccess.ensureLoaded()
+    MaplibreNativeC.mln_style_transition_options_default().use { outOptions ->
+      Status.check(
+        MaplibreNativeC.mln_map_get_style_transition_options(requireLiveHandle(), outOptions)
+      )
+      return styleTransitionOptions(outOptions)
     }
   }
 
@@ -3052,6 +3075,59 @@ private class StyleImageOptionsScope(value: StyleImageOptions) : AutoCloseable {
     options.close()
   }
 }
+
+private class StyleTransitionOptionsScope(value: StyleTransitionOptions) : AutoCloseable {
+  val options: MaplibreNativeC.mln_style_transition_options =
+    MaplibreNativeC.mln_style_transition_options_default()
+
+  init {
+    var fields = 0
+    value.enablePlacementTransitions?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS
+      options.enable_placement_transitions(it)
+    }
+    value.durationMs?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_DURATION
+      options.duration_ms(it)
+    }
+    value.delayMs?.let {
+      fields = fields or MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_DELAY
+      options.delay_ms(it)
+    }
+    options.fields(fields)
+  }
+
+  override fun close() {
+    options.close()
+  }
+}
+
+private fun styleTransitionOptions(
+  options: MaplibreNativeC.mln_style_transition_options
+): StyleTransitionOptions =
+  StyleTransitionOptions().apply {
+    val fields = options.fields()
+    durationMs =
+      if (fields and MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_DURATION != 0) {
+        options.duration_ms()
+      } else {
+        null
+      }
+    delayMs =
+      if (fields and MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_DELAY != 0) {
+        options.delay_ms()
+      } else {
+        null
+      }
+    enablePlacementTransitions =
+      if (
+        fields and MaplibreNativeC.MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS != 0
+      ) {
+        options.enable_placement_transitions()
+      } else {
+        null
+      }
+  }
 
 private fun allocStretches(stretches: List<ImageStretch>?): MaplibreNativeC.mln_image_stretch? {
   if (stretches.isNullOrEmpty()) return null

@@ -125,6 +125,14 @@ namespace Maplibre.Native.Internal.C
     }
 
     [NativeTypeName("uint32_t")]
+    internal enum mln_style_transition_option_field : uint
+    {
+        MLN_STYLE_TRANSITION_OPTION_DURATION = 1U << 0,
+        MLN_STYLE_TRANSITION_OPTION_DELAY = 1U << 1,
+        MLN_STYLE_TRANSITION_OPTION_ENABLE_PLACEMENT_TRANSITIONS = 1U << 2,
+    }
+
+    [NativeTypeName("uint32_t")]
     internal enum mln_location_indicator_image_kind : uint
     {
         MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP = 0,
@@ -371,6 +379,22 @@ namespace Maplibre.Native.Internal.C
         public byte has_text_fit_height;
     }
 
+    internal partial struct mln_style_transition_options
+    {
+        [NativeTypeName("uint32_t")]
+        public uint size;
+
+        [NativeTypeName("uint32_t")]
+        public uint fields;
+
+        public double duration_ms;
+
+        public double delay_ms;
+
+        [NativeTypeName("bool")]
+        public byte enable_placement_transitions;
+    }
+
     internal static unsafe partial class NativeMethods
     {
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
@@ -390,6 +414,9 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_style_image_info mln_style_image_info_default();
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_style_transition_options mln_style_transition_options_default();
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_style_id_list_count([NativeTypeName("mln_style_id_list")] MlnStyleIdList list, [NativeTypeName("size_t *")] nuint* out_count);
@@ -549,6 +576,12 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_get_style_light_property([NativeTypeName("mln_map")] MlnMap map, mln_string_view property_name, [NativeTypeName("mln_json_snapshot *")] MlnJsonSnapshot* out_value);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_set_style_transition_options([NativeTypeName("mln_map")] MlnMap map, [NativeTypeName("const mln_style_transition_options *")] mln_style_transition_options* options);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_map_get_style_transition_options([NativeTypeName("mln_map")] MlnMap map, mln_style_transition_options* out_options);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_map_set_layer_property([NativeTypeName("mln_map")] MlnMap map, mln_string_view layer_id, mln_string_view property_name, [NativeTypeName("const mln_json_value *")] mln_json_value* value);
