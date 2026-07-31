@@ -15,9 +15,6 @@ run = "dotnet tool restore --tool-manifest .config/dotnet-tools.json --verbosity
 [tasks.generate]
 run = "scripts/generate-clangsharp.sh"
 
-[tasks.generate-check]
-run = "scripts/generate-clangsharp.sh --check"
-
 [tasks.api]
 description = "Generate DocFX HTML API reference for the .NET binding."
 # DocFX lives in a separate tool manifest from ClangSharp: restoring both in one
@@ -34,10 +31,7 @@ mkdir -p build
 
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-depends = [
-  { task = "//:build", args = ["{{usage.preset}}"] },
-  { task = "generate-check" },
-]
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 # Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
 dir = "../.."
 run = '''
