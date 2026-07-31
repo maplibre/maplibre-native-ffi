@@ -1,0 +1,32 @@
+{
+  "metadata": [
+    {
+      "src": [
+        { "files": ["src/Maplibre.Native/Maplibre.Native.csproj"], "src": ".." }
+      ],
+      "dest": "../build/docfx-api",
+      "filter": "filterConfig.yml",
+      "properties": {
+        "TargetFramework": "net10.0",
+        "GenerateDocumentationFile": "true",
+        "NoWarn": "1591;0649"
+      }
+    }
+  ],
+  "build": {
+    "content": [
+      { "files": ["**/*.yml"], "src": "../build/docfx-api", "dest": "api" },
+      { "files": ["index.md"] }
+    ],
+    "dest": "../build/docfx",
+    "globalMetadata": {
+      "_appTitle": "Maplibre.Native",
+      "_enableSearch": true,
+      "_disableContribution": true
+    },
+    "template": ["default", "modern"],
+    "sitemap": {
+      "baseUrl": "https://maplibre.org/maplibre-native-ffi/reference/dotnet/"
+    }
+  }
+}
