@@ -49,7 +49,10 @@ internal sealed interface CameraCommand {
  * loop either, and only a stalled runtime loop grows it at all.
  */
 internal class CommandQueue {
-  private val items = ArrayDeque<CameraCommand>()
+  // The pending deque is swapped out on every drain, so the lock is its own object rather than the
+  // deque a caller happens to be holding.
+  private val lock = Any()
+  private var pending = ArrayDeque<CameraCommand>()
 
   /**
    * Released by [push] so a queued command reaches the runtime loop without waiting out its parking
@@ -59,17 +62,21 @@ internal class CommandQueue {
   @Volatile var onEnqueue: (() -> Unit)? = null
 
   fun push(command: CameraCommand) {
-    synchronized(items) { items.addLast(command) }
+    synchronized(lock) { pending.addLast(command) }
     onEnqueue?.invoke()
   }
 
-  fun drain(): List<CameraCommand> =
-    synchronized(items) {
-      if (items.isEmpty()) {
-        emptyList()
-      } else {
-        ArrayList(items).also { items.clear() }
-      }
+  /**
+   * Runtime loop: hands the pending deque over and takes [out] in exchange, so the two ping-pong
+   * and the locked section stays O(1). A render loop pushing during a drain waits on the swap, not
+   * on the size of the backlog.
+   */
+  fun drain(out: ArrayDeque<CameraCommand>): ArrayDeque<CameraCommand> =
+    synchronized(lock) {
+      val drained = pending
+      out.clear()
+      pending = out
+      drained
     }
 }
 
