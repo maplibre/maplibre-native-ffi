@@ -146,6 +146,8 @@ func (state *runtimeMapState) applyCommand(command cameraCommand) error {
 	switch command.kind {
 	case commandCancelTransitions:
 		err = m.CancelTransitions()
+	case commandSetGestureInProgress:
+		err = m.SetGestureInProgress(command.inProgress)
 	case commandMoveBy:
 		err = m.MoveBy(maplibre.ScreenPoint{X: command.deltaX, Y: command.deltaY})
 	case commandMoveByAnimated:

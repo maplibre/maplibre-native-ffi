@@ -1,5 +1,9 @@
 [tools]
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+# The Swift toolchain's libFoundationXML.so links libxml2.so.2, which SwiftPM
+# loads. Distros from Ubuntu 26.04 on ship only libxml2.so.16, so carry the
+# .so.2 ABI ourselves and put it on the loader path in the tasks below.
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]
@@ -8,6 +12,11 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build "${swift_args[@]}"
@@ -21,6 +30,11 @@ arg "[render-target]" default="owned-texture" {
 }
 '''
 run = '''
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
   "{{ usage.render_target }}"
 '''
@@ -39,6 +53,11 @@ depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
@@ -51,6 +70,11 @@ depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 {% if os() == "linux" %}
 MLN_FFI_XTOOL_BUILD=1 xtool.AppImage dev build
 {% elif os() == "macos" %}
@@ -68,6 +92,11 @@ run = '''
 {% if os() == "linux" %}
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 export MLN_FFI_XTOOL_BUILD=1
 exec xtool.AppImage dev run --usb
 {% else %}
