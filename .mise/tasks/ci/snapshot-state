@@ -150,6 +150,29 @@ def command_hash(arguments: argparse.Namespace) -> int:
     return 0
 
 
+def published_hash(component: Component, commit: str | None) -> str | None:
+    """The component's digest at the commit it last published from.
+
+    None when it has never published, and None again when today's rules leave
+    that commit unclassified. Deleting the last path a rule named forces that
+    rule out for `ci:check-snapshot-scopes` to pass, which leaves the earlier
+    tree unreadable; republishing is both the safe answer and the right one,
+    since a deleted input is a change worth publishing.
+    """
+    if commit is None:
+        return None
+    try:
+        return component_hash(component, entries(ROOT, commit))
+    except UncoveredPaths as uncovered:
+        sample = ", ".join(sorted(uncovered.paths)[:3])
+        print(
+            f"warning: {component.name}: {commit[:9]} holds paths this scope no "
+            f"longer classifies ({sample}), so it republishes",
+            file=sys.stderr,
+        )
+        return None
+
+
 def command_plan(arguments: argparse.Namespace) -> int:
     components = load(ROOT)
     selected = _selection(components, arguments.components)
@@ -159,12 +182,7 @@ def command_plan(arguments: argparse.Namespace) -> int:
     for name, component in components.items():
         digest = component_hash(component, found)
         previous = published_commit(name)
-        # A missing state tag means this component has never published.
-        published = (
-            None
-            if previous is None
-            else component_hash(component, entries(ROOT, previous))
-        )
+        published = published_hash(component, previous)
         changed = published != digest
         report[name] = {
             "hash": digest,
