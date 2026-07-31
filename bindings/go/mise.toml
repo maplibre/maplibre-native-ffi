@@ -1,6 +1,7 @@
 [tools]
 "core:go" = "{{vars.go_version}}"
 "aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
+"github:abhinav/doc2go" = "{{vars.doc2go_version}}"
 
 [tasks._gofumpt-check]
 description = "List Go files that require gofumpt."
@@ -15,6 +16,35 @@ hide = true
 raw_args = true
 dir = "../.."
 run = "gofumpt -w"
+
+[tasks.api]
+description = "Generate doc2go HTML API reference for the Go binding."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+rm -rf build/doc2go
+mkdir -p build
+# Document the public maplibre package only; omit ./... so internal/
+# packages are not published under the docs site.
+PKG_CONFIG_PATH="$MISE_MONOREPO_ROOT/build/$usage_preset/install/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
+  doc2go \
+    -out build/doc2go \
+    -home github.com/maplibre/maplibre-native-ffi/bindings/go \
+    -pagefind=false \
+    .
+'''
+run_windows = '''
+rm -rf build/doc2go
+mkdir -p build
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PATH="$(cygpath -u "$native_install_dir/bin")${PATH:+:${PATH}}"
+PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}" \
+  doc2go \
+    -out build/doc2go \
+    -home github.com/maplibre/maplibre-native-ffi/bindings/go \
+    -pagefind=false \
+    .
+'''
 
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'

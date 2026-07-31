@@ -82,6 +82,11 @@ export default defineConfig({
               attrs: { target: "_blank", rel: "noopener noreferrer" },
             },
             {
+              label: "Go API",
+              link: "/reference/go/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
+            {
               label: "Swift API",
               link: "/reference/swift/documentation/maplibrenative/",
               attrs: { target: "_blank", rel: "noopener noreferrer" },
