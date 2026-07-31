@@ -349,8 +349,8 @@ test "location indicator helpers set focused properties" {
     defer location.deinit(testing.allocator);
     const location_values = location.array;
     try testing.expectEqual(@as(usize, 3), location_values.len);
-    try testing.expectApproxEqAbs(@as(f64, -122.4194), location_values[0].double, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 37.7749), location_values[1].double, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 37.7749), location_values[0].double, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, -122.4194), location_values[1].double, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 12.0), location_values[2].double, 0.000001);
 
     try map.setLocationIndicatorBearing(testing.allocator, "location", 45.0);

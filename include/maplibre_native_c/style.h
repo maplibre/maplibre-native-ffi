@@ -1177,7 +1177,8 @@ MLN_API mln_status mln_map_add_location_indicator_layer(
  * Sets a location indicator layer location.
  *
  * coordinate uses normal C API latitude/longitude order. The underlying style
- * property is written as [longitude, latitude, altitude].
+ * property is written as [latitude, longitude, altitude], matching the order
+ * the renderer reads it back in.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
