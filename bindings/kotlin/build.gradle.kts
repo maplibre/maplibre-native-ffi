@@ -76,6 +76,9 @@ kotlin {
       consumerKeepRules.file(
         "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-rustls.pro"
       )
+      consumerKeepRules.file(
+        "src/androidMain/resources/META-INF/proguard/maplibre-native-ffi-javacpp.pro"
+      )
       consumerKeepRules.publish = true
     }
 

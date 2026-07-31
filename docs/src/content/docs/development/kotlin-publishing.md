@@ -119,6 +119,12 @@ also consume the upstream helper without duplicate classes. The target includes
 the helper's consumer R8 rule and upstream licenses. Consumers of the Kotlin
 publication do not add a Rustls-specific Maven dependency.
 
+The Android target also publishes a consumer R8 rule for JavaCPP. JavaCPP reads
+the generated presets class reflectively and derives the JNI library name from a
+live stack trace, so both survive minification only when R8 leaves the presets
+package and the JavaCPP runtime package alone. Apps that minify get these rules
+from the publication and add none of their own.
+
 ### JVM
 
 The runtime module name selects the render backend. A classifier on the JVM
