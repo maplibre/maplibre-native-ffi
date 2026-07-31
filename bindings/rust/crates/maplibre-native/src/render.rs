@@ -1253,9 +1253,9 @@ impl RenderSessionHandle {
     ///
     /// Surface and owned-texture sessions resize in place. Borrowed texture
     /// targets are sized by their owner and report an unsupported-feature
-    /// error: close this session, recreate the texture, and attach a new
-    /// session. A map holds at most one attached session, so close before
-    /// attaching the replacement.
+    /// error: allocate a texture at the new size and hand it over with the
+    /// `set_*_borrowed_texture_target` method for the backend, which keeps this
+    /// session.
     ///
     /// The session keeps its renderer across a resize, so renderer-held state
     /// such as feature state carries over. A scale factor change is the
@@ -1269,6 +1269,131 @@ impl RenderSessionHandle {
         maplibre_core::check(unsafe {
             sys::mln_render_session_resize(session, width, height, scale_factor)
         })
+    }
+
+    /// Presents this attached surface session through a new surface.
+    ///
+    /// A host surface can be destroyed and recreated while the map goes on
+    /// living, which is what Android rotation, a Flutter `SurfaceProducer`
+    /// lifecycle change, and a window resize that reallocates all look like
+    /// from here. Replacing the surface in place keeps this session's renderer,
+    /// and with it the tile pyramid, glyph and image atlases, symbol placement,
+    /// and feature state.
+    ///
+    /// The descriptor names the same graphics context this session attached
+    /// with, and its extent applies as a resize does. A target on a different
+    /// context, or one this session's compiled state cannot serve, reports an
+    /// unsupported-feature error with this session still rendering into the
+    /// surface it has; close it and attach again to take that one.
+    pub fn set_metal_surface_target(&self, descriptor: &MetalSurfaceDescriptor) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_metal_surface_set_target(session, raw) }
+        })
+    }
+
+    /// Presents this attached surface session through a new surface.
+    ///
+    /// See [`RenderSessionHandle::set_metal_surface_target`] for what replacing
+    /// a surface preserves. The outgoing `VkSurfaceKHR` must still be valid:
+    /// this session holds a swapchain built from it, and Vulkan destroys every
+    /// swapchain before its surface.
+    pub fn set_vulkan_surface_target(&self, descriptor: &VulkanSurfaceDescriptor) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_vulkan_surface_set_target(session, raw) }
+        })
+    }
+
+    /// Presents this attached surface session through a new surface.
+    ///
+    /// See [`RenderSessionHandle::set_metal_surface_target`] for what replacing
+    /// a surface preserves. The new surface is made current on the next render,
+    /// so a host may hand over a replacement for one it has already destroyed.
+    /// A surface accepted here can still prove unusable, which the next
+    /// `render_update` reports rather than this call.
+    pub fn set_opengl_surface_target(&self, descriptor: &OpenGLSurfaceDescriptor) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_opengl_surface_set_target(session, raw) }
+        })
+    }
+
+    /// Renders this attached texture session into a new caller-owned texture.
+    ///
+    /// A caller-owned texture is sized by its owner, so a host that follows a
+    /// resize reallocates rather than resizing and [`RenderSessionHandle::resize`]
+    /// reports an unsupported-feature error. Handing the replacement over here
+    /// keeps this session's renderer instead, so the map does not go cold on
+    /// every resize.
+    ///
+    /// The replacement belongs to the device this session attached with and
+    /// carries the pixel format it attached with; one that does not reports an
+    /// unsupported-feature error with this session still rendering into the
+    /// texture it has. The caller owns the replacement and keeps it valid until
+    /// the next replacement, detach, or close. This session never retained the
+    /// outgoing texture and never releases it, but reads from it during this
+    /// call, so keep it valid until the call returns.
+    pub fn set_metal_borrowed_texture_target(
+        &self,
+        descriptor: &MetalBorrowedTextureDescriptor,
+    ) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_metal_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    /// Renders this attached texture session into a new caller-owned image.
+    ///
+    /// See [`RenderSessionHandle::set_metal_borrowed_texture_target`] for what
+    /// replacing a target preserves. The replacement carries the format and
+    /// both layouts this session attached with, since its render pass was built
+    /// around them.
+    pub fn set_vulkan_borrowed_texture_target(
+        &self,
+        descriptor: &VulkanBorrowedTextureDescriptor,
+    ) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_vulkan_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    /// Renders this attached texture session into a new caller-owned texture.
+    ///
+    /// See [`RenderSessionHandle::set_metal_borrowed_texture_target`] for what
+    /// replacing a target preserves. The replacement belongs to the context
+    /// this session attached with, or one in its share group, and the host
+    /// context must be current on this thread.
+    pub fn set_opengl_borrowed_texture_target(
+        &self,
+        descriptor: &OpenGLBorrowedTextureDescriptor,
+    ) -> Result<()> {
+        self.set_target(descriptor.to_native(), |session, raw| {
+            // SAFETY: session is a live render session handle owned by this
+            // wrapper, and raw is a materialized descriptor valid for this call.
+            unsafe { sys::mln_opengl_borrowed_texture_set_target(session, raw) }
+        })
+    }
+
+    /// Shared body for the `set_*_target` methods.
+    ///
+    /// The native descriptor is materialized by the caller and lives for the
+    /// duration of `set_target`, which is all the C API borrows it for.
+    fn set_target<D>(
+        &self,
+        raw: D,
+        set_target: impl FnOnce(sys::mln_render_session, &D) -> sys::mln_status,
+    ) -> Result<()> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.native()?;
+        maplibre_core::check(set_target(session, &raw))
     }
 
     /// Processes the latest map render update for this render target.

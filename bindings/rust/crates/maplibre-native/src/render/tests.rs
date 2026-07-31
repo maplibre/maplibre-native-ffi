@@ -901,6 +901,20 @@ struct OpenGLBorrowedTexture {
 impl OpenGLBorrowedTexture {
     fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let context = OpenGLTestContext::new(width, height)?;
+        let texture = Self::create_texture(&context, width, height)?;
+        Ok(Self {
+            context,
+            texture: Some(texture),
+            width,
+            height,
+        })
+    }
+
+    fn create_texture(
+        context: &OpenGLTestContext,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<glow::NativeTexture, Box<dyn StdError>> {
         context.make_current()?;
         let texture = unsafe {
             let texture = context.gl.create_texture()?;
@@ -930,12 +944,39 @@ impl OpenGLBorrowedTexture {
             texture
         };
         context.check_gl_error("create borrowed texture")?;
-        Ok(Self {
-            context,
-            texture: Some(texture),
-            width,
-            height,
-        })
+        Ok(texture)
+    }
+
+    /// Allocates a replacement in this helper's own context, the way a host that
+    /// reallocates on resize does. The outgoing texture stays live so the caller
+    /// can hand the replacement over before releasing it.
+    fn allocate_replacement(
+        &self,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<glow::NativeTexture, Box<dyn StdError>> {
+        Self::create_texture(&self.context, width, height)
+    }
+
+    /// Tracks a replacement the session has taken and releases the outgoing one.
+    fn adopt(
+        &mut self,
+        texture: glow::NativeTexture,
+        width: u32,
+        height: u32,
+    ) -> std::result::Result<(), Box<dyn StdError>> {
+        let previous = self.texture.replace(texture);
+        self.width = width;
+        self.height = height;
+        if let Some(previous) = previous {
+            self.context.make_current()?;
+            unsafe {
+                self.context.gl.delete_texture(previous);
+            }
+            self.context
+                .check_gl_error("delete replaced borrowed texture")?;
+        }
+        Ok(())
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
@@ -1575,6 +1616,149 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
     session.close().unwrap();
     let pixels_after_close = texture.read_rgba().unwrap();
     assert!(pixels_after_close.iter().any(|byte| *byte != 0));
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-175.
+fn set_target_hands_a_live_session_a_new_borrowed_texture() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
+
+    let initial_extent = RenderTargetExtent::new(128, 128, 1.0);
+    let (mut texture, session) =
+        create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), initial_extent)
+            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    assert!(session.render_update().unwrap());
+
+    // A caller-owned texture is sized by its owner, so resizing is not the way
+    // to follow a host that changed size.
+    let resized_extent = RenderTargetExtent::new(96, 64, 1.0);
+    let resize_error = session
+        .resize(
+            resized_extent.width,
+            resized_extent.height,
+            resized_extent.scale_factor,
+        )
+        .unwrap_err();
+    assert_eq!(resize_error.kind(), ErrorKind::Unsupported);
+
+    let (physical_width, physical_height) = resized_extent.physical_size().unwrap();
+    let replacement = texture
+        .allocate_replacement(physical_width, physical_height)
+        .unwrap();
+    session
+        .set_opengl_borrowed_texture_target(&OpenGLBorrowedTextureDescriptor::new(
+            resized_extent.clone(),
+            physical_width,
+            physical_height,
+            texture.descriptor(),
+            replacement.0.get(),
+            glow::TEXTURE_2D,
+        ))
+        .unwrap();
+    texture
+        .adopt(replacement, physical_width, physical_height)
+        .unwrap();
+
+    // The session stayed live across the replacement and renders into the
+    // texture it was just given, once the map has caught up to the new size.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    let mut rendered_into_replacement = false;
+    while Instant::now() < deadline && !rendered_into_replacement {
+        let _ = runtime.pump(Some(Duration::ZERO));
+        while let Ok(Some(_)) = runtime.poll_event() {}
+        if session.render_update().unwrap() {
+            rendered_into_replacement = texture.read_rgba().unwrap().iter().any(|byte| *byte != 0);
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(
+        rendered_into_replacement,
+        "the session should render into the texture it was handed"
+    );
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_session_owned_texture() {
+    if !has_test_owned_texture_session_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (_context, session) =
+        create_owned_texture_session(&map.attach_ref().unwrap(), extent.clone())
+            .expect("Metal or Vulkan owned texture test session should attach when supported");
+
+    // A session-owned texture is sized and replaced by its session. The session
+    // is checked before the descriptor, so this reports the target kind rather
+    // than the placeholder handle below, which is never dereferenced.
+    let error = session
+        .set_metal_borrowed_texture_target(&MetalBorrowedTextureDescriptor::new(
+            extent,
+            64,
+            64,
+            // SAFETY: Test passes an opaque non-null address that the rejected
+            // call never dereferences.
+            unsafe { NativePointer::from_address(0x1) },
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    // The rejection left the session usable.
+    assert!(session.render_update().is_ok());
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-176.
+fn set_target_reports_unsupported_for_a_target_kind_the_session_does_not_have() {
+    if !has_opengl_test_context_backend() {
+        return;
+    }
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+
+    let extent = RenderTargetExtent::new(64, 64, 1.0);
+    let (texture, session) =
+        create_opengl_borrowed_texture_session(&map.attach_ref().unwrap(), extent.clone())
+            .expect("OpenGL borrowed texture test session should attach when OpenGL is supported");
+
+    // A surface descriptor names a target this session does not have.
+    let error = session
+        .set_opengl_surface_target(&OpenGLSurfaceDescriptor::new(
+            extent.clone(),
+            texture.descriptor(),
+            // SAFETY: Test passes an opaque non-null address that the rejected
+            // call never dereferences.
+            unsafe { NativePointer::from_address(0x1) },
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    // The rejected call left the session usable.
+    assert!(session.render_update().is_ok());
+
+    session.close().unwrap();
     map.close().unwrap();
     runtime.close().unwrap();
 }
