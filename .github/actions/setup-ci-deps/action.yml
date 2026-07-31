@@ -325,9 +325,15 @@ runs:
       id: toolchain-key
       shell: bash
       run: |
+        gradle_key=""
+        if [[ "${RUNNER_OS}" == "Windows" &&
+              "${RUNNER_ARCH}" == "ARM64" &&
+              "${{ inputs.gradle }}" == "true" ]]; then
+          gradle_key="-gradle-zulu17.68.17.0"
+        fi
         prefix="toolchains-v1-${{ runner.os }}-${{ runner.arch }}-${ImageOS:-unknown}"
         echo "prefix=${prefix}" >> "$GITHUB_OUTPUT"
-        echo "key=${prefix}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
+        echo "key=${prefix}${gradle_key}-${{ hashFiles('mise.toml', 'mise.lock', 'mise.linux.toml', 'mise.macos.toml', 'mise.windows.toml', '.devcontainer/mise.toml', 'bindings/*/mise.toml', 'examples/*/mise.toml', 'docs/mise.toml') }}" >> "$GITHUB_OUTPUT"
 
     - name: Restore toolchains
       id: toolchains
@@ -447,6 +453,40 @@ runs:
           }
         }
         exit 1
+
+    # JDK-8371740 affects JDK 21 through 25 and can make Gradle miss
+    # completed concurrent work at shutdown. Keep the project and application
+    # toolchain on JDK 25, but run Gradle itself on JDK 17 for Windows ARM64.
+    # The build logic targets that runtime only in this CI environment.
+    # GRADLE_OPTS avoids changing JAVA_HOME or PATH, which mise tasks use to
+    # expose the project JDK 25 toolchain.
+    - name: Use Java 17 for Gradle on Windows ARM64
+      if: ${{ runner.os == 'Windows' && runner.arch == 'ARM64' && inputs.gradle == 'true' }}
+      shell: pwsh
+      run: |
+        $env:MISE_NO_HOOKS = "1"
+        $gradleJavaVersion = "zulu-17.68.17.0"
+        mise install "java@$gradleJavaVersion"
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+
+        $gradleJavaHome = mise where "java@$gradleJavaVersion"
+        if ($LASTEXITCODE -ne 0) {
+          exit $LASTEXITCODE
+        }
+        $gradleJavaHome = $gradleJavaHome -replace '\\', '/'
+        $gradleJava = Join-Path $gradleJavaHome "bin/java.exe"
+        if (-not (Test-Path $gradleJava)) {
+          throw "Gradle Java executable not found at $gradleJava"
+        }
+
+        $gradleOptions = "-Dorg.gradle.java.home=$gradleJavaHome"
+        if ($env:GRADLE_OPTS) {
+          $gradleOptions = "$env:GRADLE_OPTS $gradleOptions"
+        }
+        "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
+        "ORG_GRADLE_PROJECT_maplibreBuildJvmRelease=17" >> $env:GITHUB_ENV
 
     # Every job restores; one job per runner label saves. Otherwise a miss has
     # every job archive the toolchain tree for one of them to win the key, and
