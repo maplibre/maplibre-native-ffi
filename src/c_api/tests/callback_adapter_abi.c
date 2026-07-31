@@ -6,6 +6,7 @@
 // The adapter decides a route before it reads the handle, so these drive the
 // callback directly with a synthesized request rather than through a loader.
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,9 +25,17 @@ static const char normalized_url[] =
 static const mln_resource_request_handle unissued_handle = 1;
 
 static size_t queued_requests;
+// The record's strings die with the record, so the listener records what it
+// saw rather than pointers into it.
+static bool last_requested_url_null;
+static bool last_requested_url_empty;
 
 static void count_queued_request(void* request) {
+  const mln_adapter_queued_resource_request* record = request;
   queued_requests += 1;
+  last_requested_url_null = record->requested_url == NULL;
+  last_requested_url_empty =
+    !last_requested_url_null && record->requested_url[0] == '\0';
   mln_adapter_resource_provider_request_destroy(request);
 }
 
@@ -117,7 +126,8 @@ static void queued_provider_routes_reject_raw_invalid_route_descriptors(void) {
 // This verifies a request whose requested URL is absent, which the loader does
 // not produce and a binding cannot synthesize. An empty prefix over the URL
 // that is present still claims the request, while the same prefix over the
-// absent URL matches nothing.
+// absent URL matches nothing. A claimed record reports the absent URL as the
+// empty string, so a listener reads it without a null check.
 static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
   mln_resource_request request = style_request();
   request.requested_url = NULL;
@@ -130,6 +140,8 @@ static void queued_provider_routes_tolerate_raw_absent_request_urls(void) {
     },
     &request
   );
+  TEST_ASSERT_FALSE(last_requested_url_null);
+  TEST_ASSERT_TRUE(last_requested_url_empty);
   assert_passes_through(
     (mln_adapter_queued_resource_provider_route){
       .kind = MLN_ADAPTER_RESOURCE_KIND_ANY,

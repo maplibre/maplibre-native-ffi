@@ -169,9 +169,15 @@ typedef struct mln_adapter_queued_resource_provider {
 typedef struct mln_adapter_queued_resource_request {
   void* owner;
   mln_resource_request_handle handle;
-  /** Copy of mln_resource_request.requested_url. */
+  /**
+   * Copy of mln_resource_request.requested_url, or the empty string when the
+   * request carried none. Never null, unlike prior_etag.
+   */
   const char* requested_url;
-  /** Copy of mln_resource_request.resolved_url. */
+  /**
+   * Copy of mln_resource_request.resolved_url, or the empty string when the
+   * request carried none. Never null, unlike prior_etag.
+   */
   const char* resolved_url;
   uint32_t kind;
   uint32_t loading_method;
