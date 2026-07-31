@@ -172,7 +172,7 @@ void main() {
       runtime.setResourceProviderRules([
         ResourceProviderRule(
           kind: ResourceKind.style,
-          url: styleUrl,
+          requestedUrl: styleUrl,
           response: ResourceResponse(
             status: ResourceResponseStatus.ok,
             bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
@@ -204,7 +204,7 @@ void main() {
         routes: const [
           ResourceProviderRoute(
             kind: ResourceKind.style,
-            url: 'custom://different-style.json',
+            requestedUrl: 'custom://different-style.json',
           ),
         ],
         callback: (_, handle) {
@@ -237,11 +237,14 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (request, handle) {
           requests.add(request);
-          expect(request.url, styleUrl);
+          expect(request.requestedUrl, styleUrl);
           expect(request.kind, ResourceKind.style);
           expect(handle.cancelled(), isFalse);
           expect(
@@ -274,6 +277,48 @@ void main() {
     expect(await completion, isTrue);
   });
 
+  // BND-155: a configured URI-scheme alias reaches the provider as the alias,
+  // alongside the URL the built-in network path would have fetched.
+  test('queued resource provider sees scheme alias and resolved URL', () async {
+    const aliasUrl = 'maplibre://maps/style';
+    final runtime = RuntimeHandle.create();
+    final requests = <ResourceRequest>[];
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: aliasUrl,
+          ),
+        ],
+        callback: (request, handle) {
+          requests.add(request);
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+            ),
+          );
+          handle.close();
+        },
+      ),
+    );
+
+    final map = runtime.createMap();
+    map.setStyleUrl(aliasUrl);
+    await _pumpUntil(runtime, () => requests.isNotEmpty);
+
+    expect(requests.first.requestedUrl, aliasUrl);
+    expect(
+      requests.first.resolvedUrl,
+      'https://demotiles.maplibre.org/style.json',
+    );
+
+    map.close();
+    runtime.close();
+  });
+
   test('cancelled transferred requests complete terminally', () async {
     const styleUrl = 'custom://dart-provider-cancelled.json';
     final runtime = RuntimeHandle.create();
@@ -282,7 +327,10 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -319,7 +367,10 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -366,7 +417,10 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           token = handle;
@@ -414,7 +468,10 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (_, _) {
           calls += 1;
@@ -442,7 +499,10 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
+          ResourceProviderRoute(
+            kind: ResourceKind.style,
+            requestedUrl: styleUrl,
+          ),
         ],
         callback: (_, handle) {
           handle.close();
@@ -715,7 +775,7 @@ void main() {
     expect(
       () => runtime.setResourceProviderRules([
         ResourceProviderRule(
-          url: 'https://example.com/provider\u0000truncated',
+          requestedUrl: 'https://example.com/provider\u0000truncated',
           response: ResourceResponse(status: ResourceResponseStatus.ok),
         ),
       ]),
@@ -724,7 +784,7 @@ void main() {
     expect(
       () => runtime.setResourceProviderRules([
         ResourceProviderRule(
-          url: 'https://example.com/provider-error-message',
+          requestedUrl: 'https://example.com/provider-error-message',
           response: ResourceResponse(
             status: ResourceResponseStatus.error,
             errorMessage: 'bad\u0000message',
@@ -736,7 +796,7 @@ void main() {
     expect(
       () => runtime.setResourceProviderRules([
         ResourceProviderRule(
-          url: 'https://example.com/provider-etag',
+          requestedUrl: 'https://example.com/provider-etag',
           response: ResourceResponse(
             status: ResourceResponseStatus.ok,
             etag: 'etag\u0000tail',
@@ -749,7 +809,9 @@ void main() {
       () => runtime.setResourceProvider(
         ResourceProvider(
           routes: const [
-            ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
+            ResourceProviderRoute(
+              requestedUrl: 'https://example.com/provider\u0000x',
+            ),
           ],
           callback: (_, _) {},
         ),
@@ -771,7 +833,7 @@ void main() {
     runtime.setResourceProviderRules([
       ResourceProviderRule(
         kind: ResourceKind.style,
-        url: 'https://example.com/provider-style.json',
+        requestedUrl: 'https://example.com/provider-style.json',
         response: ResourceResponse(
           status: ResourceResponseStatus.ok,
           bytes: Uint8List.fromList([123]),
@@ -783,7 +845,7 @@ void main() {
         routes: const [
           ResourceProviderRoute(
             kind: ResourceKind.style,
-            url: 'https://example.com/provider-style.json',
+            requestedUrl: 'https://example.com/provider-style.json',
           ),
         ],
         callback: (request, handle) {

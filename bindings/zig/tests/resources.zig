@@ -651,7 +651,7 @@ fn customStyleProvider(
 ) maplibre.ResourceProviderDecision {
     const state: *ProviderState = @ptrCast(@alignCast(context.?));
     _ = state.calls.fetchAdd(1, .seq_cst);
-    if (!std.mem.eql(u8, request.url, "custom://style.json")) return .pass_through;
+    if (!std.mem.eql(u8, request.requested_url, "custom://style.json")) return .pass_through;
 
     state.saw_style.store(std.meta.eql(request.kind, maplibre.ResourceKind.style), .seq_cst);
     state.saw_all_loading.store(std.meta.eql(request.loading_method, maplibre.ResourceLoadingMethod.all), .seq_cst);
@@ -719,7 +719,7 @@ fn pmtilesRangeProvider(
     const state: *PmtilesRangeProviderState = @ptrCast(@alignCast(context.?));
     const handle = maybe_handle orelse return .pass_through;
 
-    if (std.mem.eql(u8, request.url, pmtiles_style_url)) {
+    if (std.mem.eql(u8, request.requested_url, pmtiles_style_url)) {
         state.markStyle(request);
         handle.complete(.{ .bytes = pmtiles_style_json }) catch {
             handle.release();
@@ -729,7 +729,7 @@ fn pmtilesRangeProvider(
         return .handle;
     }
 
-    if (std.mem.eql(u8, request.url, pmtiles_archive_url)) {
+    if (std.mem.eql(u8, request.requested_url, pmtiles_archive_url)) {
         state.markPmtilesRequest(request);
         handle.complete(.{
             .status = .@"error",
@@ -793,6 +793,53 @@ test "custom URL style loads through resource provider" {
     try testing.expect(state.saw_online_usage.load(.seq_cst));
     try testing.expect(state.saw_permanent_storage.load(.seq_cst));
     try testing.expect(state.saw_no_range.load(.seq_cst));
+}
+
+const AliasProviderState = struct {
+    resolved_url: [256]u8 = undefined,
+    resolved_url_len: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+};
+
+// Serves the default tile server's `maplibre:` scheme alias and records the
+// resolved URL the built-in network path would have fetched.
+fn aliasStyleProvider(
+    context: ?*anyopaque,
+    request: maplibre.ResourceRequest,
+    maybe_handle: ?maplibre.ResourceRequestHandle,
+) maplibre.ResourceProviderDecision {
+    const state: *AliasProviderState = @ptrCast(@alignCast(context.?));
+    if (!std.mem.eql(u8, request.requested_url, "maplibre://maps/style")) return .pass_through;
+    const handle = maybe_handle orelse return .pass_through;
+    if (request.resolved_url.len <= state.resolved_url.len) {
+        @memcpy(state.resolved_url[0..request.resolved_url.len], request.resolved_url);
+        state.resolved_url_len.store(request.resolved_url.len, .seq_cst);
+    }
+    handle.complete(.{ .bytes = support.style_json }) catch {
+        handle.release();
+        return .pass_through;
+    };
+    handle.release();
+    return .handle;
+}
+
+test "resource provider sees scheme alias and its resolved URL" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var state = AliasProviderState{};
+    try runtime.setResourceProvider(.{ .handler = aliasStyleProvider, .context = &state });
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, "maplibre://maps/style");
+    try waitForStyleLoaded(&runtime);
+
+    const len = state.resolved_url_len.load(.seq_cst);
+    try testing.expectEqualStrings(
+        "https://demotiles.maplibre.org/style.json",
+        state.resolved_url[0..len],
+    );
 }
 
 const CountingProviderState = struct {
@@ -1148,7 +1195,7 @@ fn delayedStyleProvider(
     request: maplibre.ResourceRequest,
     maybe_handle: ?maplibre.ResourceRequestHandle,
 ) maplibre.ResourceProviderDecision {
-    if (!std.mem.startsWith(u8, request.url, "custom://delayed-style")) return .pass_through;
+    if (!std.mem.startsWith(u8, request.requested_url, "custom://delayed-style")) return .pass_through;
     const handle = maybe_handle orelse return .pass_through;
     const state: *AsyncProviderState = @ptrCast(@alignCast(context.?));
     state.store(request, handle);
@@ -1325,7 +1372,7 @@ fn errorStyleProvider(
     request: maplibre.ResourceRequest,
     maybe_handle: ?maplibre.ResourceRequestHandle,
 ) maplibre.ResourceProviderDecision {
-    if (!std.mem.eql(u8, request.url, "custom://error-style.json")) return .pass_through;
+    if (!std.mem.eql(u8, request.requested_url, "custom://error-style.json")) return .pass_through;
     const handle = maybe_handle orelse return .pass_through;
     handle.complete(.{
         .status = .@"error",

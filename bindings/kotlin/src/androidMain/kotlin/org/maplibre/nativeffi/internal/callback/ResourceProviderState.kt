@@ -61,7 +61,8 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
 
   private fun resourceRequest(request: MaplibreNativeC.mln_resource_request): ResourceRequest =
     ResourceRequest(
-      JavaCppSupport.cString(request.url()),
+      JavaCppSupport.cString(request.requested_url()),
+      JavaCppSupport.cString(request.resolved_url()),
       ResourceKind.fromNative(request.kind()),
       ResourceLoadingMethod.fromNative(request.loading_method()),
       ResourcePriority.fromNative(request.priority()),

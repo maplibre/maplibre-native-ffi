@@ -134,7 +134,10 @@ public struct ByteRange: Equatable, Sendable {
 }
 
 public struct ResourceRequest: Equatable, Sendable {
-  public let url: String
+  /// URL entering the network layer, preserving configured scheme aliases.
+  public let requestedUrl: String
+  /// URL to fetch, after tile server normalization.
+  public let resolvedUrl: String
   public let kind: ResourceKind
   public let loadingMethod: ResourceLoadingMethod
   public let priority: ResourcePriority
@@ -147,7 +150,8 @@ public struct ResourceRequest: Equatable, Sendable {
   public let priorData: Data
 
   init(native: NativeResourceRequest) {
-    url = native.url
+    requestedUrl = native.requestedUrl
+    resolvedUrl = native.resolvedUrl
     kind = ResourceKind.fromNative(native.kind)
     loadingMethod = ResourceLoadingMethod.fromNative(native.loadingMethod)
     priority = ResourcePriority.fromNative(native.priority)

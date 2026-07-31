@@ -942,7 +942,8 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	if err := checkNative(func() int32 {
 		state, status := callback.SetResourceProvider(uint64(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
 			decision := provider(ResourceRequest{
-				URL:                 request.URL,
+				RequestedURL:        request.RequestedURL,
+				ResolvedURL:         request.ResolvedURL,
 				Kind:                ResourceKind(request.Kind),
 				RawKind:             request.Kind,
 				LoadingMethod:       ResourceLoadingMethod(request.LoadingMethod),

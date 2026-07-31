@@ -438,6 +438,12 @@ Resource transform invocation follows this operation:
 Resource providers decide whether a request passes through to the native
 provider or is handled by the binding.
 
+A request carries two URLs, and a binding exposes both under names that keep
+them distinguishable. The requested URL preserves configured URI-scheme aliases
+and custom schemes, and is the request's logical, cache-facing identity. The
+resolved URL is what a provider fetches, and equals the requested URL when no
+configured alias applies.
+
 Resource provider invocation follows this operation:
 
 1. For pass-through requests, return pass-through without retaining the native
@@ -818,6 +824,7 @@ the other isolate, which makes its id stale rather than live.
 | BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
 | BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
 | BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
+| BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.          |
 
 ### Rendering
 

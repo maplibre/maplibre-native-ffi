@@ -506,7 +506,29 @@ typedef struct mln_resource_transform {
 
 typedef struct mln_resource_request {
   uint32_t size;
-  const char* url;
+  /**
+   * URL entering the network layer, before tile server normalization.
+   *
+   * It preserves configured URI scheme aliases such as maplibre: and custom
+   * schemes, and it is the logical, cache-facing identity of the request.
+   * Tile coordinates, glyph ranges, and sprite suffixes are already
+   * substituted.
+   */
+  const char* requested_url;
+  /**
+   * URL to fetch, after resource-kind normalization against the runtime's
+   * tile server options and API key.
+   *
+   * It matches requested_url when no configured alias applies. Providers that
+   * replace the built-in network stack fetch this URL.
+   *
+   * It also matches requested_url when normalization rejects the URL, which a
+   * tile server that requires an API key does for a canonical URL when no key
+   * is configured. Native loading fails such a request outright, so keeping the
+   * request reachable lets a provider serve it instead. A provider that only
+   * fetches over HTTP checks the scheme before it does.
+   */
+  const char* resolved_url;
   uint32_t kind;
   uint32_t loading_method;
   uint32_t priority;

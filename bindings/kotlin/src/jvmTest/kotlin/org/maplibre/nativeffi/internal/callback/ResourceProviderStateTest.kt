@@ -43,7 +43,8 @@ class ResourceProviderStateTest {
     assertEquals(ResourcePriority(902), copied?.priority)
     assertEquals(ResourceUsage(903), copied?.usage)
     assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
-    assertEquals("https://example.com/tile.pbf", copied?.url)
+    assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
+    assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
     assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
     assertEquals(123L, copied?.priorModifiedUnixMs)
     assertEquals(456L, copied?.priorExpiresUnixMs)
@@ -82,7 +83,12 @@ class ResourceProviderStateTest {
 
     request.set(
       ValueLayout.ADDRESS,
-      RESOURCE_REQUEST_URL_OFFSET,
+      RESOURCE_REQUEST_REQUESTED_URL_OFFSET,
+      arena.allocateFrom("maplibre://tiles/2/1/1.pbf"),
+    )
+    request.set(
+      ValueLayout.ADDRESS,
+      RESOURCE_REQUEST_RESOLVED_URL_OFFSET,
       arena.allocateFrom("https://example.com/tile.pbf"),
     )
     request.set(ValueLayout.JAVA_INT, RESOURCE_REQUEST_KIND_OFFSET, 900)
@@ -106,22 +112,23 @@ class ResourceProviderStateTest {
   private companion object {
     private const val UNKNOWN_DECISION: Int = -1
 
-    private const val RESOURCE_REQUEST_SIZE: Long = 112
-    private const val RESOURCE_REQUEST_URL_OFFSET: Long = 8
-    private const val RESOURCE_REQUEST_KIND_OFFSET: Long = 16
-    private const val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long = 20
-    private const val RESOURCE_REQUEST_PRIORITY_OFFSET: Long = 24
-    private const val RESOURCE_REQUEST_USAGE_OFFSET: Long = 28
-    private const val RESOURCE_REQUEST_STORAGE_POLICY_OFFSET: Long = 32
-    private const val RESOURCE_REQUEST_HAS_RANGE_OFFSET: Long = 36
-    private const val RESOURCE_REQUEST_RANGE_START_OFFSET: Long = 40
-    private const val RESOURCE_REQUEST_RANGE_END_OFFSET: Long = 48
-    private const val RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET: Long = 56
-    private const val RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET: Long = 64
-    private const val RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET: Long = 72
-    private const val RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET: Long = 80
-    private const val RESOURCE_REQUEST_PRIOR_ETAG_OFFSET: Long = 88
-    private const val RESOURCE_REQUEST_PRIOR_DATA_OFFSET: Long = 96
-    private const val RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET: Long = 104
+    private const val RESOURCE_REQUEST_SIZE: Long = 120
+    private const val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long = 8
+    private const val RESOURCE_REQUEST_RESOLVED_URL_OFFSET: Long = 16
+    private const val RESOURCE_REQUEST_KIND_OFFSET: Long = 24
+    private const val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long = 28
+    private const val RESOURCE_REQUEST_PRIORITY_OFFSET: Long = 32
+    private const val RESOURCE_REQUEST_USAGE_OFFSET: Long = 36
+    private const val RESOURCE_REQUEST_STORAGE_POLICY_OFFSET: Long = 40
+    private const val RESOURCE_REQUEST_HAS_RANGE_OFFSET: Long = 44
+    private const val RESOURCE_REQUEST_RANGE_START_OFFSET: Long = 48
+    private const val RESOURCE_REQUEST_RANGE_END_OFFSET: Long = 56
+    private const val RESOURCE_REQUEST_HAS_PRIOR_MODIFIED_OFFSET: Long = 64
+    private const val RESOURCE_REQUEST_PRIOR_MODIFIED_OFFSET: Long = 72
+    private const val RESOURCE_REQUEST_HAS_PRIOR_EXPIRES_OFFSET: Long = 80
+    private const val RESOURCE_REQUEST_PRIOR_EXPIRES_OFFSET: Long = 88
+    private const val RESOURCE_REQUEST_PRIOR_ETAG_OFFSET: Long = 96
+    private const val RESOURCE_REQUEST_PRIOR_DATA_OFFSET: Long = 104
+    private const val RESOURCE_REQUEST_PRIOR_DATA_SIZE_OFFSET: Long = 112
   }
 }

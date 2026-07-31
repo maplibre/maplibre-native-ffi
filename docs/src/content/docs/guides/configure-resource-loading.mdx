@@ -61,6 +61,19 @@ before your provider sees them. Every other scheme reaches the provider,
 including invented ones like `custom://style.json`, which become failed HTTP
 requests if you pass them through. Serving those is what the provider is for.
 
+Each request carries two URLs. `requested_url` is what entered the network
+layer, so it keeps configured URI-scheme aliases such as `maplibre://` and is
+the request's logical, cache-facing identity — match your routing on it.
+`resolved_url` is the same request after MapLibre's per-kind tile server
+normalization, so `maplibre://maps/style` arrives as
+`https://demotiles.maplibre.org/style.json` under the default tile server
+options. Fetch `resolved_url`. The two are identical when no configured alias
+applies, and also when normalization rejects the URL — a tile server that
+requires an API key does that for a canonical URL when no key is configured.
+Native loading fails such a request outright, so the provider still gets a
+chance at it. Check the scheme before you fetch if your provider only speaks
+HTTP.
+
 <Aside>
   The runtime stores the provider callback and its `user_data` by reference and
   can invoke them until the runtime is destroyed. Keep both alive that long.

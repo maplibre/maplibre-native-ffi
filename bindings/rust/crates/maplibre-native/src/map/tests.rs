@@ -675,7 +675,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     runtime
         .set_resource_provider(|request, handle| {
-            if request.url == "custom://style.json" {
+            if request.requested_url == "custom://style.json" {
                 assert_eq!(request.kind, ResourceKind::Style);
                 handle
                     .complete(ResourceResponse::ok(VALID_STYLE_JSON.as_bytes().to_vec()))

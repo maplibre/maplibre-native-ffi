@@ -2790,7 +2790,8 @@ def test_geojson_values_preserve_geometry_and_properties() -> None:
 def test_resource_values_preserve_native_shape() -> None:
     request = resource.ResourceRequest._from_native(
         {
-            "url": "https://example.test/tile.pbf",
+            "requested_url": "maplibre://tiles/2/1/1.pbf",
+            "resolved_url": "https://example.test/tile.pbf",
             "kind": resource.ResourceKind.TILE.native_code,
             "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
             "priority": resource.ResourcePriority.LOW,
@@ -2810,6 +2811,8 @@ def test_resource_values_preserve_native_shape() -> None:
     )
 
     assert request.kind == resource.ResourceKind.TILE
+    assert request.requested_url == "maplibre://tiles/2/1/1.pbf"
+    assert request.resolved_url == "https://example.test/tile.pbf"
     assert request.range == resource.ByteRange(5, 10)
     assert request.prior_data == b"old"
     assert response._to_native()["status"] == resource.ResourceResponseStatus.ERROR
@@ -2836,7 +2839,7 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        assert request.url == "https://example.test/tile.pbf"
+        assert request.requested_url == "https://example.test/tile.pbf"
         assert handle.closed is False
         return resource.ResourceProviderDecision.PASS_THROUGH
 
@@ -2844,7 +2847,8 @@ def test_resource_provider_adapter_pass_through_closes_temporary_handle() -> Non
     adapted = resource._adapt_resource_provider_callback(provider)  # noqa: SLF001
 
     raw_request = {
-        "url": "https://example.test/tile.pbf",
+        "requested_url": "https://example.test/tile.pbf",
+        "resolved_url": "https://example.test/tile.pbf",
         "kind": resource.ResourceKind.TILE.native_code,
         "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
         "priority": resource.ResourcePriority.LOW,
@@ -2885,13 +2889,14 @@ def test_resource_provider_adapter_closes_temporary_handle_on_exception() -> Non
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        assert request.url == "https://example.test/tile.pbf"
+        assert request.requested_url == "https://example.test/tile.pbf"
         assert handle.closed is False
         msg = "contained provider failure"
         raise RuntimeError(msg)
 
     raw_request = {
-        "url": "https://example.test/tile.pbf",
+        "requested_url": "https://example.test/tile.pbf",
+        "resolved_url": "https://example.test/tile.pbf",
         "kind": resource.ResourceKind.TILE.native_code,
         "loading_method": resource.ResourceLoadingMethod.NETWORK_ONLY,
         "priority": resource.ResourcePriority.LOW,
@@ -3154,7 +3159,7 @@ def test_resource_provider_replacement_and_clear_retire_previous_callback() -> N
             request: resource.ResourceRequest,
             handle: resource.ResourceRequestHandle,
         ) -> resource.ResourceProviderDecision:
-            seen.append(request.url)
+            seen.append(request.requested_url)
             return resource.ResourceProviderDecision.PASS_THROUGH
 
         return provider
@@ -3206,6 +3211,29 @@ def test_resource_provider_replacement_and_clear_retire_previous_callback() -> N
             runtime.clear_resource_provider()
 
 
+def test_resource_provider_sees_scheme_alias_and_its_resolved_url() -> None:
+    """BND-155: a configured URI-scheme alias arrives alongside its fetch URL."""
+    resolved_urls: list[str] = []
+
+    def provider(
+        request: resource.ResourceRequest,
+        handle: resource.ResourceRequestHandle,
+    ) -> resource.ResourceProviderDecision:
+        if request.requested_url != "maplibre://maps/style":
+            return resource.ResourceProviderDecision.PASS_THROUGH
+        resolved_urls.append(request.resolved_url)
+        handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
+        return resource.ResourceProviderDecision.HANDLE
+
+    with mln.RuntimeHandle() as runtime:
+        runtime.set_resource_provider(provider, max_pending_callbacks=4)
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_url("maplibre://maps/style")
+            _wait_for_runtime_event(runtime, mln.RuntimeEventType.MAP_STYLE_LOADED)
+
+    assert resolved_urls == ["https://demotiles.maplibre.org/style.json"]
+
+
 def test_resource_provider_inline_completion_overrides_pass_through_return() -> None:
     completions = 0
 
@@ -3214,7 +3242,7 @@ def test_resource_provider_inline_completion_overrides_pass_through_return() -> 
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
         nonlocal completions
-        if request.url != "custom://inline-style.json":
+        if request.requested_url != "custom://inline-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handle.complete(resource.ResourceResponse(bytes=_EMPTY_STYLE_BYTES))
         completions += 1
@@ -3239,7 +3267,7 @@ def test_resource_provider_deferred_completion_loads_style_with_copied_request()
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if not request.url.startswith("custom://deferred-style"):
+        if not request.requested_url.startswith("custom://deferred-style"):
             return resource.ResourceProviderDecision.PASS_THROUGH
         requests.append(request)
         handles.append(handle)
@@ -3284,7 +3312,7 @@ def test_resource_provider_can_complete_request_from_another_thread() -> None:
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if request.url != "custom://cross-thread-style.json":
+        if request.requested_url != "custom://cross-thread-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handles.append(handle)
         return resource.ResourceProviderDecision.HANDLE
@@ -3315,7 +3343,7 @@ def test_resource_provider_error_response_reports_loading_failure_event() -> Non
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if request.url != "custom://error-style.json":
+        if request.requested_url != "custom://error-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handle.complete(
             resource.ResourceResponse(
@@ -3345,7 +3373,7 @@ def test_resource_provider_error_response_reports_offline_response_error_event(
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if request.url != "custom://offline-error-style.json":
+        if request.requested_url != "custom://offline-error-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handle.complete(
             resource.ResourceResponse(
@@ -3415,7 +3443,7 @@ def test_resource_request_cancellation_makes_late_completion_terminal() -> None:
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if request.url != "custom://cancelled-style.json":
+        if request.requested_url != "custom://cancelled-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handles.append(handle)
         return resource.ResourceProviderDecision.HANDLE
@@ -3452,7 +3480,7 @@ def test_released_resource_request_handle_stays_stale_after_later_request() -> N
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if not request.url.startswith("custom://stale-style"):
+        if not request.requested_url.startswith("custom://stale-style"):
             return resource.ResourceProviderDecision.PASS_THROUGH
         handles.append(handle)
         return resource.ResourceProviderDecision.HANDLE
@@ -3486,7 +3514,7 @@ def test_resource_request_release_race_with_cancellation_checks_closes_cleanly()
         request: resource.ResourceRequest,
         handle: resource.ResourceRequestHandle,
     ) -> resource.ResourceProviderDecision:
-        if request.url != "custom://release-race-style.json":
+        if request.requested_url != "custom://release-race-style.json":
             return resource.ResourceProviderDecision.PASS_THROUGH
         handles.append(handle)
         return resource.ResourceProviderDecision.HANDLE

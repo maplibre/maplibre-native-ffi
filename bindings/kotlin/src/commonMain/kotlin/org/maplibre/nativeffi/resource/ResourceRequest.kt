@@ -2,7 +2,10 @@ package org.maplibre.nativeffi.resource
 
 /** Copied network resource request passed to a runtime resource provider. */
 public class ResourceRequest(
-  public val url: String,
+  /** URL entering the network layer, preserving configured scheme aliases. */
+  public val requestedUrl: String,
+  /** URL to fetch, after tile server normalization. */
+  public val resolvedUrl: String,
   public val kind: ResourceKind,
   public val loadingMethod: ResourceLoadingMethod,
   public val priority: ResourcePriority,

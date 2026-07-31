@@ -26,7 +26,10 @@ pub struct ByteRange {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub struct ResourceRequest {
-    pub url: String,
+    /// URL entering the network layer, preserving configured scheme aliases.
+    pub requested_url: String,
+    /// URL to fetch, after tile server normalization.
+    pub resolved_url: String,
     pub kind: ResourceKind,
     pub raw_kind: u32,
     pub loading_method: ResourceLoadingMethod,
@@ -73,7 +76,9 @@ pub unsafe fn copy_resource_request(raw: &sys::mln_resource_request) -> Result<R
 
     Ok(ResourceRequest {
         // SAFETY: The caller promised raw points to callback-duration storage.
-        url: unsafe { crate::string::copy_c_string(raw.url) }?,
+        requested_url: unsafe { crate::string::copy_c_string(raw.requested_url) }?,
+        // SAFETY: The caller promised raw points to callback-duration storage.
+        resolved_url: unsafe { crate::string::copy_c_string(raw.resolved_url) }?,
         kind: resource_kind_from_raw(raw.kind),
         raw_kind: raw.kind,
         loading_method: resource_loading_method_from_raw(raw.loading_method),
@@ -624,12 +629,14 @@ mod tests {
 
     #[test]
     fn resource_request_copies_nested_storage() {
-        let mut url = CString::new("https://example.test/tile").unwrap();
+        let mut requested_url = CString::new("maplibre://tiles/2/1/1.pbf").unwrap();
+        let mut resolved_url = CString::new("https://example.test/tile").unwrap();
         let mut etag = CString::new("abc").unwrap();
         let mut prior_data = [1_u8, 2, 3];
         let raw = sys::mln_resource_request {
             size: std::mem::size_of::<sys::mln_resource_request>() as u32,
-            url: url.as_ptr(),
+            requested_url: requested_url.as_ptr(),
+            resolved_url: resolved_url.as_ptr(),
             kind: sys::MLN_RESOURCE_KIND_TILE,
             loading_method: sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
             priority: sys::MLN_RESOURCE_PRIORITY_LOW,
@@ -649,13 +656,16 @@ mod tests {
 
         // SAFETY: raw points to live local backing storage for this call.
         let copied = unsafe { copy_resource_request(&raw) }.unwrap();
-        url = CString::new("https://changed.test").unwrap();
+        requested_url = CString::new("maplibre://changed").unwrap();
+        resolved_url = CString::new("https://changed.test").unwrap();
         etag = CString::new("changed").unwrap();
         prior_data.fill(9);
 
-        assert_eq!(url.as_bytes(), b"https://changed.test");
+        assert_eq!(requested_url.as_bytes(), b"maplibre://changed");
+        assert_eq!(resolved_url.as_bytes(), b"https://changed.test");
         assert_eq!(etag.as_bytes(), b"changed");
-        assert_eq!(copied.url, "https://example.test/tile");
+        assert_eq!(copied.requested_url, "maplibre://tiles/2/1/1.pbf");
+        assert_eq!(copied.resolved_url, "https://example.test/tile");
         assert_eq!(copied.prior_etag.as_deref(), Some("abc"));
         assert_eq!(copied.prior_data, vec![1, 2, 3]);
         assert_eq!(copied.range, Some(ByteRange { start: 5, end: 10 }));
@@ -667,7 +677,8 @@ mod tests {
         let url = CString::new("https://example.test/tile").unwrap();
         let raw = sys::mln_resource_request {
             size: std::mem::size_of::<sys::mln_resource_request>() as u32,
-            url: url.as_ptr(),
+            requested_url: url.as_ptr(),
+            resolved_url: url.as_ptr(),
             kind: sys::MLN_RESOURCE_KIND_TILE,
             loading_method: sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
             priority: sys::MLN_RESOURCE_PRIORITY_LOW,

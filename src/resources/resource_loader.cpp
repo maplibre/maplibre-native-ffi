@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -19,6 +20,7 @@
 #include <mbgl/storage/response.hpp>
 #include <mbgl/util/async_request.hpp>
 #include <mbgl/util/client_options.hpp>
+#include <mbgl/util/mapbox.hpp>
 #include <mbgl/util/tile_server_options.hpp>
 
 #include "resources/resource_loader.hpp"
@@ -141,6 +143,51 @@ auto resource_kind_to_abi(mbgl::Resource::Kind kind) -> uint32_t {
   }
 }
 
+// Mirrors the per-kind normalization mbgl::OnlineFileSource applies before it
+// fetches, so a provider that replaces the network stack sees the same URL the
+// built-in path would have requested. Unknown and image resources carry no
+// canonical form, so they stay as requested. Normalization that rejects the URL
+// falls back to it as well, which keeps a provider reachable for requests the
+// native path refuses outright, such as a canonical source URL on a tile server
+// that requires an API key none was configured for.
+auto resolve_resource_url(
+  const mbgl::ResourceOptions& resource_options, const mbgl::Resource& resource
+) -> std::string {
+  const auto& options = resource_options.tileServerOptions();
+  const auto& api_key = resource_options.apiKey();
+  try {
+    switch (resource.kind) {
+      case mbgl::Resource::Kind::Style:
+        return mbgl::util::mapbox::normalizeStyleURL(
+          options, resource.url, api_key
+        );
+      case mbgl::Resource::Kind::Source:
+        return mbgl::util::mapbox::normalizeSourceURL(
+          options, resource.url, api_key
+        );
+      case mbgl::Resource::Kind::Glyphs:
+        return mbgl::util::mapbox::normalizeGlyphsURL(
+          options, resource.url, api_key
+        );
+      case mbgl::Resource::Kind::SpriteImage:
+      case mbgl::Resource::Kind::SpriteJSON:
+        return mbgl::util::mapbox::normalizeSpriteURL(
+          options, resource.url, api_key
+        );
+      case mbgl::Resource::Kind::Tile:
+        return mbgl::util::mapbox::normalizeTileURL(
+          options, resource.url, api_key
+        );
+      case mbgl::Resource::Kind::Unknown:
+      case mbgl::Resource::Kind::Image:
+      default:
+        return resource.url;
+    }
+  } catch (...) {
+    return resource.url;
+  }
+}
+
 auto make_resource_transform(void* platform_context)
   -> mbgl::ResourceTransform {
   if (platform_context == nullptr) {
@@ -179,23 +226,27 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
             resource_options, client_options
           )
         ) {
-    apply_resource_transform();
+    apply_resource_transform(resource_options_.platformContext());
   }
 
   auto request(const mbgl::Resource& resource, Callback callback)
     -> std::unique_ptr<mbgl::AsyncRequest> override {
+    // One snapshot serves every option read below, the way the online source
+    // takes one under its own lock per request.
+    const auto options = resource_options_snapshot();
     auto provider_declined = false;
     if (can_request_network(resource)) {
       // Keep the lease through the synchronous callback, then release it
       // before falling through to native loading: the native source may invoke
       // a transform that needs the runtime registry lock during teardown.
       const auto provider = acquire_resource_provider_for_platform_context(
-        resource_options_.platformContext()
+        options.platformContext()
       );
       if (provider.has_value()) {
         provider_declined = true;
         auto request = request_custom_resource(
-          resource, provider->callback(), provider->user_data(), callback
+          resource, resolve_resource_url(options, resource),
+          provider->callback(), provider->user_data(), callback
         );
         if (request != nullptr) {
           return request;
@@ -205,7 +256,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     if (!native_->canRequest(resource)) {
       return nullptr;
     }
-    const auto unsupported = unsupported_network_scheme(resource.url);
+    const auto unsupported = unsupported_network_scheme(options, resource.url);
     if (unsupported.has_value()) {
       return respond_immediately(
         unsupported_scheme_response(
@@ -220,7 +271,7 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   [[nodiscard]] auto canRequest(const mbgl::Resource& resource) const
     -> bool override {
     const auto provider = acquire_resource_provider_for_platform_context(
-      resource_options_.platformContext()
+      resource_options_snapshot().platformContext()
     );
     return (can_request_network(resource) && provider.has_value()) ||
            native_->canRequest(resource);
@@ -246,13 +297,17 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
   void setResourceOptions(mbgl::ResourceOptions options) override {
-    resource_options_ = options.clone();
+    auto platform_context = options.platformContext();
+    {
+      const std::scoped_lock lock(resource_options_mutex_);
+      resource_options_ = options.clone();
+    }
     native_->setResourceOptions(std::move(options));
-    apply_resource_transform();
+    apply_resource_transform(platform_context);
   }
 
   auto getResourceOptions() -> mbgl::ResourceOptions override {
-    return resource_options_.clone();
+    return resource_options_snapshot();
   }
 
   void setClientOptions(mbgl::ClientOptions options) override {
@@ -265,17 +320,26 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
  private:
+  // Hands out an options snapshot so option reads never race a replacement.
+  // The mutex guards nothing but this member and is released before any other
+  // lock is taken, which keeps it out of every lock-ordering edge this file
+  // already has with mbgl and the runtime registry.
+  [[nodiscard]] auto resource_options_snapshot() const
+    -> mbgl::ResourceOptions {
+    const std::scoped_lock lock(resource_options_mutex_);
+    return resource_options_.clone();
+  }
+
   // Reports the scheme of a URL the online source is unable to serve. The
   // resource loader routes file, asset, mbtiles, and pmtiles URLs to their own
   // sources ahead of the network, so anything left here reaches an HTTP
   // client. A registered resource transform rewrites URLs inside the online
   // source, so it keeps every scheme available.
-  [[nodiscard]] auto unsupported_network_scheme(const std::string& url) const
-    -> std::optional<std::string_view> {
+  [[nodiscard]] static auto unsupported_network_scheme(
+    const mbgl::ResourceOptions& options, const std::string& url
+  ) -> std::optional<std::string_view> {
     if (
-      has_resource_transform_for_platform_context(
-        resource_options_.platformContext()
-      )
+      has_resource_transform_for_platform_context(options.platformContext())
     ) {
       return std::nullopt;
     }
@@ -291,19 +355,18 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     }
     // Tile server options name a canonical scheme the online source expands
     // into its configured base URL.
-    const auto alias = resource_options_.tileServerOptions().uriSchemeAlias();
+    const auto alias = options.tileServerOptions().uriSchemeAlias();
     if (!alias.empty() && equals_ignoring_case(*scheme, alias)) {
       return std::nullopt;
     }
     return scheme;
   }
 
-  void apply_resource_transform() {
-    native_->setResourceTransform(
-      make_resource_transform(resource_options_.platformContext())
-    );
+  void apply_resource_transform(void* platform_context) {
+    native_->setResourceTransform(make_resource_transform(platform_context));
   }
 
+  mutable std::mutex resource_options_mutex_;
   mbgl::ResourceOptions resource_options_;
   mbgl::ClientOptions client_options_;
   std::unique_ptr<mbgl::FileSource> native_;

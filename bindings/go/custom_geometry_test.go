@@ -104,7 +104,7 @@ func TestCustomGeometrySourceStateReleasesAfterStyleURLReplacement(t *testing.T)
 		t.Fatalf("NewRuntime(): %v", err)
 	}
 	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
-		if request.URL != "custom://style.json" {
+		if request.RequestedURL != "custom://style.json" {
 			return ResourceProviderDecisionPassThrough
 		}
 		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyle)}); err != nil {

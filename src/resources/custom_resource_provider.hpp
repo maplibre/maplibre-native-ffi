@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 
 #include <mbgl/storage/file_source.hpp>
 #include <mbgl/storage/resource.hpp>
@@ -10,8 +11,10 @@
 
 namespace mln::core {
 
+// resolved_url carries the tile server normalization the online source would
+// have applied, which the provider sees alongside the request URL.
 auto request_custom_resource(
-  const mbgl::Resource& resource,
+  const mbgl::Resource& resource, std::string resolved_url,
   mln_resource_provider_callback provider_callback, void* user_data,
   mbgl::FileSource::Callback file_source_callback
 ) -> std::unique_ptr<mbgl::AsyncRequest>;

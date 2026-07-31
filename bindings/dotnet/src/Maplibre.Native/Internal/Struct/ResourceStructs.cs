@@ -16,7 +16,8 @@ internal static unsafe class ResourceStructs
 
         return new ResourceRequest(
             (ResourceKind)request->kind,
-            CopyUtf8(request->url),
+            CopyUtf8(request->requested_url),
+            CopyUtf8(request->resolved_url),
             (ResourceLoadingMethod)request->loading_method,
             (ResourcePriority)request->priority,
             (ResourceUsage)request->usage,

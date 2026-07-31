@@ -980,8 +980,8 @@ impl Drop for WakeSource {
 mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use super::*;
@@ -1488,7 +1488,7 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime
             .set_resource_provider(move |request, handle| {
-                if request.url != "custom://style.json" {
+                if request.requested_url != "custom://style.json" {
                     return ResourceProviderDecision::PassThrough;
                 }
                 handle
@@ -1766,7 +1766,7 @@ mod tests {
         let callback_calls = Arc::clone(&calls);
         runtime
             .set_resource_provider(move |request, handle| {
-                if request.url != "custom://style.json" {
+                if request.requested_url != "custom://style.json" {
                     return ResourceProviderDecision::PassThrough;
                 }
                 callback_calls.fetch_add(1, Ordering::SeqCst);
@@ -1793,13 +1793,49 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-155.
+    fn resource_provider_sees_scheme_alias_and_its_resolved_url() {
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let resolved = Arc::new(Mutex::new(None));
+        let callback_resolved = Arc::clone(&resolved);
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.requested_url != "maplibre://maps/style" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                *callback_resolved.lock().unwrap() = Some(request.resolved_url.clone());
+                handle
+                    .complete(ResourceResponse::ok(
+                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                    ))
+                    .unwrap();
+                ResourceProviderDecision::Handle
+            })
+            .unwrap();
+
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+        map.set_style_url("maplibre://maps/style").unwrap();
+
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        assert_eq!(
+            resolved.lock().unwrap().as_deref(),
+            Some("https://demotiles.maplibre.org/style.json")
+        );
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
     // Spec coverage: BND-144 and BND-145.
     fn resource_provider_completes_style_request_from_another_thread() {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         let (sender, receiver) = std::sync::mpsc::channel();
         runtime
             .set_resource_provider(move |request, handle| {
-                if request.url == "custom://async-style.json" {
+                if request.requested_url == "custom://async-style.json" {
                     sender.send(handle).unwrap();
                     ResourceProviderDecision::Handle
                 } else {
@@ -1838,7 +1874,7 @@ mod tests {
         let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
         runtime
             .set_resource_provider(move |request, handle| {
-                if request.url == "custom://broken-style.json" {
+                if request.requested_url == "custom://broken-style.json" {
                     handle
                         .complete(ResourceResponse::error(
                             ResourceErrorReason::Other,

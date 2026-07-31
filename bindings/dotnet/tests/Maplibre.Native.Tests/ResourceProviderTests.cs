@@ -32,16 +32,19 @@ public sealed unsafe class ResourceProviderTests
             }
         );
 
-        var url = Encoding.UTF8.GetBytes("https://example.test/tile\0");
+        var requestedUrl = Encoding.UTF8.GetBytes("maplibre://tiles/2/1/1.pbf\0");
+        var resolvedUrl = Encoding.UTF8.GetBytes("https://example.test/tile\0");
         var etag = Encoding.UTF8.GetBytes("etag-1\0");
         var priorData = new byte[] { 1, 2, 3 };
-        fixed (byte* urlPointer = url)
+        fixed (byte* requestedUrlPointer = requestedUrl)
+        fixed (byte* resolvedUrlPointer = resolvedUrl)
         fixed (byte* etagPointer = etag)
         fixed (byte* priorDataPointer = priorData)
         {
             var request = new mln_resource_request
             {
-                url = (sbyte*)urlPointer,
+                requested_url = (sbyte*)requestedUrlPointer,
+                resolved_url = (sbyte*)resolvedUrlPointer,
                 kind = (uint)ResourceKind.Tile,
                 loading_method = (uint)ResourceLoadingMethod.NetworkOnly,
                 priority = (uint)ResourcePriority.Low,
@@ -66,7 +69,8 @@ public sealed unsafe class ResourceProviderTests
 
         Assert.NotNull(copiedRequest);
         Assert.Equal(ResourceKind.Tile, copiedRequest.Kind);
-        Assert.Equal("https://example.test/tile", copiedRequest.Url);
+        Assert.Equal("maplibre://tiles/2/1/1.pbf", copiedRequest.RequestedUrl);
+        Assert.Equal("https://example.test/tile", copiedRequest.ResolvedUrl);
         Assert.Equal(ResourceLoadingMethod.NetworkOnly, copiedRequest.LoadingMethod);
         Assert.Equal(ResourcePriority.Low, copiedRequest.Priority);
         Assert.Equal(ResourceUsage.Offline, copiedRequest.Usage);
@@ -88,6 +92,7 @@ public sealed unsafe class ResourceProviderTests
         var source = new byte[] { 1, 2, 3 };
         var request = new ResourceRequest(
             ResourceKind.Tile,
+            "https://example.test/tile",
             "https://example.test/tile",
             ResourceLoadingMethod.All,
             ResourcePriority.Regular,
@@ -279,7 +284,11 @@ public sealed unsafe class ResourceProviderTests
         var url = Encoding.UTF8.GetBytes("https://example.test/style.json\0");
         fixed (byte* urlPointer = url)
         {
-            var request = new mln_resource_request { url = (sbyte*)urlPointer };
+            var request = new mln_resource_request
+            {
+                requested_url = (sbyte*)urlPointer,
+                resolved_url = (sbyte*)urlPointer,
+            };
             Assert.Equal(uint.MaxValue, state.HandleForTest(&request));
         }
     }
@@ -381,6 +390,34 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal(secondCallsAfterClear, Volatile.Read(ref secondCalls));
     }
 
+    [BindingSpecTest("BND-155")]
+    [Fact]
+    public void ResourceProviderSeesSchemeAliasAndItsResolvedUrl()
+    {
+        const string AliasUrl = "maplibre://maps/style";
+        string? resolvedUrl = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (request, handle) =>
+            {
+                if (request.RequestedUrl != AliasUrl)
+                {
+                    return ResourceProviderDecision.PassThrough;
+                }
+
+                resolvedUrl = request.ResolvedUrl;
+                handle.Complete(StyleResponse());
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(AliasUrl);
+        RuntimeEventTestHelpers.WaitForMapEvent(runtime, map, RuntimeEventType.MapStyleLoaded);
+
+        Assert.Equal("https://demotiles.maplibre.org/style.json", resolvedUrl);
+    }
+
     [BindingSpecTest("BND-101", "BND-143", "BND-150")]
     [Fact]
     public void InlineHandledResourceProviderCompletionLoadsStyleAndClosesRequest()
@@ -390,7 +427,7 @@ public sealed unsafe class ResourceProviderTests
         runtime.SetResourceProvider(
             (request, handle) =>
             {
-                Assert.Equal(StyleUrl, request.Url);
+                Assert.Equal(StyleUrl, request.RequestedUrl);
                 handled = handle;
                 handle.Complete(StyleResponse());
                 return ResourceProviderDecision.Handle;
@@ -420,7 +457,7 @@ public sealed unsafe class ResourceProviderTests
         runtime.SetResourceProvider(
             (request, handle) =>
             {
-                Assert.Equal(StyleUrl, request.Url);
+                Assert.Equal(StyleUrl, request.RequestedUrl);
                 handled = handle;
                 providerCalled.Set();
                 return ResourceProviderDecision.Handle;

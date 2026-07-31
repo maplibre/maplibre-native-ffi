@@ -106,6 +106,56 @@ func TestRuntimeResourceProviderInstallsReplacesAndClears(t *testing.T) {
 	}
 }
 
+// BND-155: a style URL using the default tile server's maplibre: scheme alias
+// reaches the provider as the alias, alongside the HTTPS URL the built-in
+// network path would have fetched.
+func TestResourceProviderSeesSchemeAliasAndItsResolvedURL(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	const emptyStyle = `{"version":8,"sources":{},"layers":[]}`
+	var resolvedURL atomic.Value
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	if err := runtime.SetResourceProvider(func(request ResourceRequest, handle *ResourceRequestHandle) ResourceProviderDecision {
+		if request.RequestedURL != "maplibre://maps/style" {
+			return ResourceProviderDecisionPassThrough
+		}
+		resolvedURL.Store(request.ResolvedURL)
+		if err := handle.Complete(ResourceResponse{Status: ResourceResponseStatusOK, Bytes: []byte(emptyStyle)}); err != nil {
+			return ResourceProviderDecisionPassThrough
+		}
+		return ResourceProviderDecisionHandle
+	}); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleURL("maplibre://maps/style"); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+	waitForRuntimeEvent(t, runtime, RuntimeEventMapStyleLoaded)
+
+	if got := resolvedURL.Load(); got != "https://demotiles.maplibre.org/style.json" {
+		t.Fatalf("resolved URL = %v, want https://demotiles.maplibre.org/style.json", got)
+	}
+}
+
 func TestResourceResponseRejectsEmbeddedNULStrings(t *testing.T) {
 	if err := validateResourceResponse(ResourceResponse{ErrorMessage: "bad\x00tail"}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ErrorMessage embedded NUL error = %v, want ErrInvalidArgument", err)
