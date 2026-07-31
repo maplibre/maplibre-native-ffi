@@ -1212,7 +1212,17 @@ void main() {
     expect(map.removeStyleSource('dart-raster-dem-tiles-source'), isTrue);
     map.addLocationIndicatorLayer('dart-location-layer');
     expect(map.getStyleLayerType('dart-location-layer'), 'location-indicator');
-    map.setLocationIndicatorLocation('dart-location-layer', const LatLng(0, 0));
+    map.setLocationIndicatorLocation(
+      'dart-location-layer',
+      const LatLng(37.7749, -122.4194),
+    );
+    final location =
+        map.getLayerProperty('dart-location-layer', 'location') as JsonArray;
+    expect(location.values.map((value) => (value as JsonDouble).value), [
+      closeTo(37.7749, 1e-6),
+      closeTo(-122.4194, 1e-6),
+      closeTo(0, 1e-6),
+    ]);
     map.setLocationIndicatorBearing('dart-location-layer', 0);
     map.setLocationIndicatorAccuracyRadius('dart-location-layer', 1);
     map.setLocationIndicatorImageName(

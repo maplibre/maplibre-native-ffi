@@ -5341,16 +5341,18 @@ auto map_set_location_indicator_location(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
+  // The style property is [latitude, longitude, altitude]; the renderer reads
+  // it back as LatLng{values[0], values[1]}.
   auto values = std::array<mln_json_value, 3>{
     mln_json_value{
       .size = sizeof(mln_json_value),
       .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-      .data = {.double_value = coordinate.longitude}
+      .data = {.double_value = coordinate.latitude}
     },
     mln_json_value{
       .size = sizeof(mln_json_value),
       .type = MLN_JSON_VALUE_TYPE_DOUBLE,
-      .data = {.double_value = coordinate.latitude}
+      .data = {.double_value = coordinate.longitude}
     },
     mln_json_value{
       .size = sizeof(mln_json_value),
