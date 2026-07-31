@@ -100,14 +100,40 @@ typedef struct mln_adapter_resource_provider_rules {
 } mln_adapter_resource_provider_rules;
 
 /**
+ * How a queued provider route compares its url against a request.
+ *
+ * MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX compares the url against the start of
+ * the request URL instead of the whole request URL.
+ * MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL selects
+ * mln_resource_request.requested_url as the compared URL instead of
+ * mln_resource_request.resolved_url. Setting both matches a requested-URL
+ * prefix.
+ */
+typedef enum mln_adapter_resource_route_flags : uint32_t {
+  MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE = 0U,
+  MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX = 1U << 0U,
+  MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL = 1U << 1U,
+} mln_adapter_resource_route_flags;
+
+/**
  * One route a queued provider claims.
  *
- * A route matches mln_resource_request.requested_url. The requested_url pointer
- * is borrowed and must outlive the provider.
+ * The kind field matches mln_resource_kind values, or
+ * MLN_ADAPTER_RESOURCE_KIND_ANY for every kind. The flags field is a bitwise OR
+ * of mln_adapter_resource_route_flags values choosing which URL the route
+ * compares and whether it compares a prefix; with no flags the route matches
+ * mln_resource_request.resolved_url exactly.
+ *
+ * The url field is a literal comparison value. Comparison is case-sensitive and
+ * applies no glob expansion, regular expressions, URL parsing, or
+ * normalization, so an empty prefix matches every URL. A null url or an unknown
+ * flag bit makes the route match nothing. The url pointer is borrowed and must
+ * outlive the provider.
  */
 typedef struct mln_adapter_queued_resource_provider_route {
   uint32_t kind;
-  const char* requested_url;
+  uint32_t flags;
+  const char* url;
 } mln_adapter_queued_resource_provider_route;
 
 /**
@@ -281,8 +307,9 @@ MLN_API uint32_t mln_adapter_resource_provider_rules_callback(
  * The user_data pointer is an mln_adapter_queued_resource_provider. A request
  * matching one of the provider's routes is copied and handed to the listener,
  * and reports MLN_RESOURCE_PROVIDER_DECISION_HANDLE. Other requests pass
- * through. A request that cannot be copied is completed with an error response
- * rather than left outstanding.
+ * through unchanged and continue through the native loader. A request that
+ * cannot be copied is completed with an error response rather than left
+ * outstanding.
  */
 MLN_API uint32_t mln_adapter_queued_resource_provider_callback(
   void* user_data, const mln_resource_request* request,

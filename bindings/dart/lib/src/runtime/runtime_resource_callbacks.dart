@@ -77,10 +77,30 @@ final class _ResourceProviderRulesState {
   }
 }
 
+int _resourceRouteFlags(ResourceProviderRoute route) {
+  var flags = raw
+      .mln_adapter_resource_route_flags
+      .MLN_ADAPTER_RESOURCE_ROUTE_FLAGS_NONE
+      .value;
+  if (route.matchPrefix) {
+    flags |= raw
+        .mln_adapter_resource_route_flags
+        .MLN_ADAPTER_RESOURCE_ROUTE_MATCH_PREFIX
+        .value;
+  }
+  if (route.useRequestedUrl) {
+    flags |= raw
+        .mln_adapter_resource_route_flags
+        .MLN_ADAPTER_RESOURCE_ROUTE_USE_REQUESTED_URL
+        .value;
+  }
+  return flags;
+}
+
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
   _ResourceProviderCallbackState(ResourceProvider provider) {
     for (final route in provider.routes) {
-      _checkNativeCString(route.requestedUrl);
+      _checkNativeCString(route.url);
     }
     callback =
         NativeCallable<
@@ -108,9 +128,8 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       final route = provider.routes[index];
       pointer.ref.routes[index].kind =
           route.kind?.rawValue ?? _resourceKindWildcard;
-      pointer.ref.routes[index].requested_url = _nativeOwnedCString(
-        route.requestedUrl,
-      );
+      pointer.ref.routes[index].flags = _resourceRouteFlags(route);
+      pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
     }
     pointer.ref.listener = callback.nativeFunction;
   }
@@ -134,7 +153,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
   void closeResources() {
     final routes = pointer.ref.routes;
     for (var index = 0; index < pointer.ref.route_count; index += 1) {
-      calloc.free(routes[index].requested_url);
+      calloc.free(routes[index].url);
     }
     if (routes != nullptr) {
       calloc.free(routes);

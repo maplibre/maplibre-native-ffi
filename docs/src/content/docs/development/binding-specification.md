@@ -826,6 +826,16 @@ the other isolate, which makes its id stale rather than live.
 | BND-154 | Resource provider can be replaced while maps are live and can be cleared, and a cleared provider stops receiving requests.                          |
 | BND-155 | A request for a configured URI-scheme alias exposes the alias as the requested URL and the tile-server-normalized URL as the resolved URL.          |
 
+#### Queued provider routes
+
+When the binding routes provider requests through
+`mln_adapter_queued_resource_provider`, include:
+
+| ID      | Test                                                                                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| BND-156 | A prefix route claims every request URL that starts with its value, and a request URL outside that prefix passes through to native loading.                                                |
+| BND-157 | A route comparing the requested URL claims a request for a configured URI-scheme alias, and a route comparing the resolved URL claims that same request by its tile-server-normalized URL. |
+
 ### Rendering
 
 | ID      | Test                                                                                                                                                      |

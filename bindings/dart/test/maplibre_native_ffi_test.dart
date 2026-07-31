@@ -204,7 +204,7 @@ void main() {
         routes: const [
           ResourceProviderRoute(
             kind: ResourceKind.style,
-            requestedUrl: 'custom://different-style.json',
+            url: 'custom://different-style.json',
           ),
         ],
         callback: (_, handle) {
@@ -237,10 +237,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (request, handle) {
           requests.add(request);
@@ -289,7 +286,8 @@ void main() {
         routes: const [
           ResourceProviderRoute(
             kind: ResourceKind.style,
-            requestedUrl: aliasUrl,
+            url: aliasUrl,
+            useRequestedUrl: true,
           ),
         ],
         callback: (request, handle) {
@@ -319,6 +317,104 @@ void main() {
     runtime.close();
   });
 
+  // BND-156: a prefix route claims a URL family whose members are known only
+  // when they are requested.
+  test('queued resource provider prefix routes claim a URL family', () async {
+    const prefix = 'custom://dart-provider-prefix/';
+    final runtime = RuntimeHandle.create();
+    final claimed = <String>[];
+
+    runtime.setResourceProvider(
+      ResourceProvider(
+        routes: const [ResourceProviderRoute(url: prefix, matchPrefix: true)],
+        callback: (request, handle) {
+          claimed.add(request.resolvedUrl);
+          handle.complete(
+            ResourceResponse(
+              status: ResourceResponseStatus.ok,
+              bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+            ),
+          );
+          handle.close();
+        },
+      ),
+    );
+
+    final map = runtime.createMap();
+    map.setStyleUrl('${prefix}unenumerated/style.json');
+    await _pumpUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapStyleLoaded,
+    );
+
+    // The prefix is start-anchored, so a URL that merely contains it stays with
+    // native loading.
+    map.setStyleUrl('custom://elsewhere/${prefix}style.json');
+    await _pumpUntilEvent(
+      runtime,
+      (candidate) => candidate.eventType == RuntimeEventType.mapLoadingFailed,
+    );
+
+    expect(claimed, ['${prefix}unenumerated/style.json']);
+
+    map.close();
+    runtime.close();
+  });
+
+  // BND-157: a route picks which of the request's two URLs it compares, so a
+  // configured URI-scheme alias is reachable by the alias and by the URL the
+  // built-in network path would have fetched.
+  test(
+    'queued resource provider routes pick requested or resolved URL',
+    () async {
+      const aliasUrl = 'maplibre://maps/style';
+      const normalizedUrl = 'https://demotiles.maplibre.org/style.json';
+
+      Future<ResourceRequest> claimedBy(ResourceProviderRoute route) async {
+        final runtime = RuntimeHandle.create();
+        final requests = <ResourceRequest>[];
+        runtime.setResourceProvider(
+          ResourceProvider(
+            routes: [route],
+            callback: (request, handle) {
+              requests.add(request);
+              handle.complete(
+                ResourceResponse(
+                  status: ResourceResponseStatus.ok,
+                  bytes: Uint8List.fromList(_emptyStyleJson.codeUnits),
+                ),
+              );
+              handle.close();
+            },
+          ),
+        );
+        final map = runtime.createMap();
+        map.setStyleUrl(aliasUrl);
+        await _pumpUntil(runtime, () => requests.isNotEmpty);
+        map.close();
+        runtime.close();
+        return requests.single;
+      }
+
+      final byResolved = await claimedBy(
+        const ResourceProviderRoute(
+          kind: ResourceKind.style,
+          url: normalizedUrl,
+        ),
+      );
+      expect(byResolved.requestedUrl, aliasUrl);
+
+      final byRequested = await claimedBy(
+        const ResourceProviderRoute(
+          kind: ResourceKind.style,
+          url: aliasUrl,
+          useRequestedUrl: true,
+        ),
+      );
+      expect(byRequested.resolvedUrl, normalizedUrl);
+    },
+  );
+
   test('cancelled transferred requests complete terminally', () async {
     const styleUrl = 'custom://dart-provider-cancelled.json';
     final runtime = RuntimeHandle.create();
@@ -327,10 +423,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
           token = handle;
@@ -367,10 +460,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
           token = handle;
@@ -417,10 +507,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
           token = handle;
@@ -468,10 +555,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, _) {
           calls += 1;
@@ -499,10 +583,7 @@ void main() {
     runtime.setResourceProvider(
       ResourceProvider(
         routes: const [
-          ResourceProviderRoute(
-            kind: ResourceKind.style,
-            requestedUrl: styleUrl,
-          ),
+          ResourceProviderRoute(kind: ResourceKind.style, url: styleUrl),
         ],
         callback: (_, handle) {
           handle.close();
@@ -809,9 +890,7 @@ void main() {
       () => runtime.setResourceProvider(
         ResourceProvider(
           routes: const [
-            ResourceProviderRoute(
-              requestedUrl: 'https://example.com/provider\u0000x',
-            ),
+            ResourceProviderRoute(url: 'https://example.com/provider\u0000x'),
           ],
           callback: (_, _) {},
         ),
@@ -845,7 +924,7 @@ void main() {
         routes: const [
           ResourceProviderRoute(
             kind: ResourceKind.style,
-            requestedUrl: 'https://example.com/provider-style.json',
+            url: 'https://example.com/provider-style.json',
           ),
         ],
         callback: (request, handle) {
