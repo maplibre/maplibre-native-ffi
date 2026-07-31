@@ -85,6 +85,13 @@ private func drainCameraEvents(_ runtime: RuntimeHandle) throws
     animation: AnimationOptions(durationMilliseconds: 1)
   )
 
+  #expect(try map.isGestureInProgress() == false)
+  try map.setGestureInProgress(true)
+  try map.moveBy(deltaX: 8, deltaY: -4)
+  #expect(try map.isGestureInProgress() == true)
+  try map.setGestureInProgress(false)
+  #expect(try map.isGestureInProgress() == false)
+
   try map.close()
   #expect(map.isClosed)
 }

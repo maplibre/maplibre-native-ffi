@@ -61,6 +61,9 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       when (event.actionMasked) {
         MotionEvent.ACTION_DOWN -> {
           enqueue(CameraCommand.CancelTransitions)
+          // The deltas that follow belong to one live gesture, so the map hears about the gesture
+          // rather than a stream of unrelated camera commands.
+          enqueue(CameraCommand.SetGestureInProgress(true))
           beginPan(event)
         }
         MotionEvent.ACTION_POINTER_DOWN ->
@@ -174,7 +177,14 @@ internal class InputController(context: Context, private val enqueue: (CameraCom
       }
     }
 
+    /**
+     * Every path that ends a gesture, including `ACTION_CANCEL`, runs through here, so the mark the
+     * gesture set is always paired with a clear.
+     */
     private fun reset() {
+      if (mode != Mode.NONE) {
+        enqueue(CameraCommand.SetGestureInProgress(false))
+      }
       mode = Mode.NONE
       primaryPointerId = MotionEvent.INVALID_POINTER_ID
       twoFingerBaseline = null

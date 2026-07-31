@@ -18,6 +18,8 @@ import org.maplibre.nativeffi.runtime.WakeSource
 internal sealed interface CameraCommand {
   data object CancelTransitions : CameraCommand
 
+  data class SetGestureInProgress(val inProgress: Boolean) : CameraCommand
+
   data class MoveBy(val dx: Double, val dy: Double) : CameraCommand
 
   data class MoveByAnimated(val dx: Double, val dy: Double, val durationMs: Double) : CameraCommand

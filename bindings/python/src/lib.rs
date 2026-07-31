@@ -1962,6 +1962,26 @@ impl MapHandle {
             .map_err(map_error)
     }
 
+    fn set_gesture_in_progress(&self, in_progress: bool) -> PyResult<()> {
+        let state = self.state();
+        // SAFETY: The C API validates the map pointer and owner-thread affinity.
+        maplibre_core::check(unsafe {
+            sys::mln_map_set_gesture_in_progress(state.handle(), in_progress)
+        })
+        .map_err(map_error)
+    }
+
+    fn is_gesture_in_progress(&self) -> PyResult<bool> {
+        let state = self.state();
+        let mut in_progress = false;
+        // SAFETY: The C API validates the map pointer and out pointer.
+        maplibre_core::check(unsafe {
+            sys::mln_map_is_gesture_in_progress(state.handle(), &mut in_progress)
+        })
+        .map_err(map_error)?;
+        Ok(in_progress)
+    }
+
     fn get_free_camera_options(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let state = self.state();
         // SAFETY: Default constructor takes no arguments and initializes size.

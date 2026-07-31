@@ -1,5 +1,9 @@
 [tools]
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+# Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
+# libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
+# explains why; the tasks below source it.
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
 
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
@@ -8,6 +12,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 rm -rf build/docc
 mkdir -p build
 swift package --scratch-path ".build/$usage_preset" \
@@ -25,6 +30,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNative "${swift_args[@]}"
@@ -36,6 +42,7 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift test \
   --scratch-path ".build/$usage_preset" \
   -Xlinker -rpath \

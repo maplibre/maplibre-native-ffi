@@ -160,6 +160,10 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer {
     enqueue(CameraCommand.CancelTransitions)
   }
 
+  fun setGestureInProgress(inProgress: Boolean) {
+    enqueue(CameraCommand.SetGestureInProgress(inProgress))
+  }
+
   private fun enqueue(command: CameraCommand) {
     commands.enqueue(command)
     requestRender()

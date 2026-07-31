@@ -179,6 +179,7 @@ internal class MapRuntimeLoop(private val initialViewport: Viewport) : AutoClose
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
       CameraCommand.CancelTransitions -> map.cancelTransitions()
+      is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.deltaX, command.deltaY)
       is CameraCommand.ScaleBy -> map.scaleBy(command.scale, command.anchor)
       is CameraCommand.AdjustBearing -> {

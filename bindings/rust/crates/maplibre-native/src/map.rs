@@ -538,6 +538,30 @@ impl MapHandle {
         maplibre_core::check(unsafe { sys::mln_map_cancel_transitions(map) })
     }
 
+    /// Marks whether a host-driven gesture is in progress.
+    ///
+    /// A host that decodes its own pointer gestures sets this to `true` when a
+    /// gesture starts and back to `false` when it ends, so the camera commands
+    /// issued in between belong to one live gesture. The flag stays set until
+    /// the host clears it, so pair every `true` with a `false`.
+    pub fn set_gesture_in_progress(&self, in_progress: bool) -> Result<()> {
+        let map = self.inner.native()?;
+        // SAFETY: map is live and in_progress is passed by value.
+        maplibre_core::check(unsafe { sys::mln_map_set_gesture_in_progress(map, in_progress) })
+    }
+
+    /// Reads whether a host-driven gesture is currently in progress.
+    pub fn is_gesture_in_progress(&self) -> Result<bool> {
+        let map = self.inner.native()?;
+        let mut in_progress = false;
+        // SAFETY: map is live and out_in_progress points to writable bool
+        // storage.
+        maplibre_core::check(unsafe {
+            sys::mln_map_is_gesture_in_progress(map, &mut in_progress)
+        })?;
+        Ok(in_progress)
+    }
+
     /// Computes a camera that fits geographic bounds in the current viewport.
     pub fn camera_for_lat_lng_bounds(
         &self,

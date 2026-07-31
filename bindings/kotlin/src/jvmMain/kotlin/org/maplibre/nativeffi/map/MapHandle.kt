@@ -591,6 +591,16 @@ private constructor(private val runtime: RuntimeHandle, private val handle: Nati
     NativeAccess.cancelTransitions(requireLiveHandle())
   }
 
+  public actual var isGestureInProgress: Boolean
+    get() {
+      NativeAccess.ensureLoaded()
+      return NativeAccess.isGestureInProgress(requireLiveHandle())
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      NativeAccess.setGestureInProgress(requireLiveHandle(), value)
+    }
+
   public actual fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,

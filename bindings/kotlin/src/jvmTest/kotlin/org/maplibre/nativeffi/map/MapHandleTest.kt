@@ -659,6 +659,13 @@ class MapHandleTest {
       map.pitchByAnimated(0.0, null)
       map.cancelTransitions()
 
+      assertFalse(map.isGestureInProgress)
+      map.isGestureInProgress = true
+      map.moveBy(8.0, -4.0)
+      assertTrue(map.isGestureInProgress)
+      map.isGestureInProgress = false
+      assertFalse(map.isGestureInProgress)
+
       val fit =
         CameraFitOptions().apply {
           padding = EdgeInsets.ZERO

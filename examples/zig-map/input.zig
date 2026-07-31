@@ -28,6 +28,9 @@ pub const Result = struct {
 /// coordinates here, where the viewport lives.
 pub const Controller = struct {
     drag_mode: DragMode = .none,
+    /// The button that started the live drag. A drag belongs to one button, so
+    /// a second button pressed during it neither restarts it nor ends it early.
+    drag_button: u8 = 0,
     last_x: f64 = 0,
     last_y: f64 = 0,
 
@@ -39,7 +42,7 @@ pub const Controller = struct {
     ) Result {
         return switch (event.type) {
             c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, commands, current_viewport),
-            c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button),
+            c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button, commands),
             c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, commands, current_viewport),
             c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, commands, current_viewport),
             c.SDL_EVENT_KEY_DOWN => handleKeyDown(event.key, commands, current_viewport),
@@ -53,28 +56,54 @@ pub const Controller = struct {
         commands: *channel.CommandQueue,
         current_viewport: types.Viewport,
     ) Result {
-        const cursor = logicalPoint(button.x, button.y, current_viewport);
-        self.last_x = cursor.x;
-        self.last_y = cursor.y;
+        // A drag already owns the pointer, so a second button joins it rather
+        // than starting a drag of its own. Its position leaves the live drag's
+        // baseline alone, so the next delta still measures from where the
+        // owning button last was.
+        if (self.drag_mode != .none) return .{ .handled = true };
 
         const mode = dragModeForButton(button.button);
         if (mode == .none) return .{};
 
+        const cursor = logicalPoint(button.x, button.y, current_viewport);
+        self.last_x = cursor.x;
+        self.last_y = cursor.y;
+
         // Queued ahead of the drag's own commands, so the transition stops
         // before the first delta lands.
         commands.push(.cancel_transitions);
+        // The deltas that follow belong to one live gesture, so the map hears
+        // about the gesture rather than a stream of unrelated camera commands.
+        commands.push(.{ .set_gesture_in_progress = .{ .in_progress = true } });
         self.drag_mode = mode;
+        self.drag_button = button.button;
         return .{ .handled = true };
     }
 
-    fn handleMouseButtonUp(self: *Controller, button: c.SDL_MouseButtonEvent) Result {
+    fn handleMouseButtonUp(
+        self: *Controller,
+        button: c.SDL_MouseButtonEvent,
+        commands: *channel.CommandQueue,
+    ) Result {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) {
             return .{};
         }
-        self.drag_mode = .none;
+        // Releasing a button that joined the drag leaves the drag running, so
+        // the drag ends once, when the button that started it comes up.
+        if (button.button != self.drag_button) return .{ .handled = true };
+        self.endDrag(commands);
         self.last_x = button.x;
         self.last_y = button.y;
         return .{ .handled = true };
+    }
+
+    /// Every path that ends a drag runs through here, so the gesture mark the
+    /// drag set is always paired with a clear.
+    fn endDrag(self: *Controller, commands: *channel.CommandQueue) void {
+        if (self.drag_mode == .none) return;
+        self.drag_mode = .none;
+        self.drag_button = 0;
+        commands.push(.{ .set_gesture_in_progress = .{ .in_progress = false } });
     }
 
     fn handleMouseMotion(

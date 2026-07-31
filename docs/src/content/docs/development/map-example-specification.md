@@ -757,7 +757,10 @@ Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
 immediate `move_by` / `jump_to` / `pitch_by`.
 
 On pointer down that starts a drag, cancel in-flight camera transitions before
-applying deltas.
+applying deltas, and set the map's gesture-in-progress state. Clear that state
+when the drag ends, and hold it for the whole drag when a second button goes
+down and up during one. Keyboard interactions are discrete commands and leave
+the state clear.
 
 Input handlers return whether the camera changed so the render loop can set the
 render request.
@@ -837,7 +840,11 @@ Implementations MUST provide the following touch interactions:
 | Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                                        |
 
 On any gesture begin, cancel in-flight camera transitions before applying
-deltas.
+deltas, and set the map's gesture-in-progress state. Clear that state when the
+gesture ends, including when the platform cancels it. Gestures that run
+concurrently share one state, so a gesture ending while another is still live
+leaves it set, and the last one to end clears it. Double-tap is a discrete
+animated command and leaves the state clear.
 
 Input handlers return whether the camera changed so the render loop can set the
 render request.

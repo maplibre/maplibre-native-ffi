@@ -1349,6 +1349,20 @@ private constructor(private val runtime: RuntimeHandle, private val handleId: Lo
     Status.check(MaplibreNativeC.mln_map_cancel_transitions(requireLiveHandle()))
   }
 
+  public actual var isGestureInProgress: Boolean
+    get() {
+      NativeAccess.ensureLoaded()
+      val outInProgress = booleanArrayOf(false)
+      Status.check(
+        MaplibreNativeC.mln_map_is_gesture_in_progress(requireLiveHandle(), outInProgress)
+      )
+      return outInProgress[0]
+    }
+    set(value) {
+      NativeAccess.ensureLoaded()
+      Status.check(MaplibreNativeC.mln_map_set_gesture_in_progress(requireLiveHandle(), value))
+    }
+
   public actual fun cameraForLatLngBounds(
     bounds: LatLngBounds,
     fitOptions: CameraFitOptions?,

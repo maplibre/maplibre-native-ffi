@@ -17,12 +17,14 @@ type cameraCommand struct {
 	scale      float64
 	anchor     maplibre.ScreenPoint
 	durationMS float64
+	inProgress bool
 }
 
 type cameraCommandKind int
 
 const (
 	commandCancelTransitions cameraCommandKind = iota
+	commandSetGestureInProgress
 	commandMoveBy
 	commandMoveByAnimated
 	commandScaleBy

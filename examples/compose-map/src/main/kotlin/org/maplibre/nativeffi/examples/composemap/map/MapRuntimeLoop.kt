@@ -149,6 +149,7 @@ internal class MapRuntimeLoop(
   private fun apply(map: MapHandle, command: CameraCommand) {
     when (command) {
       CameraCommand.CancelTransitions -> map.cancelTransitions()
+      is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.deltaX, command.deltaY)
       is CameraCommand.MoveByAnimated ->
         map.moveByAnimated(command.deltaX, command.deltaY, KEYBOARD_ANIMATION)

@@ -161,6 +161,9 @@ impl MapState {
         let map = &self.map;
         match command {
             CameraCommand::CancelTransitions => map.cancel_transitions(),
+            CameraCommand::SetGestureInProgress { in_progress } => {
+                map.set_gesture_in_progress(in_progress)
+            }
             CameraCommand::MoveBy { dx, dy } => map.move_by(dx, dy),
             CameraCommand::MoveByAnimated {
                 dx,

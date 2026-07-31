@@ -18,6 +18,8 @@ internal abstract record CameraCommand;
 
 internal sealed record CancelTransitionsCommand : CameraCommand;
 
+internal sealed record SetGestureInProgressCommand(bool InProgress) : CameraCommand;
+
 internal sealed record MoveByCommand(double DeltaX, double DeltaY, AnimationOptions? Animation)
     : CameraCommand;
 

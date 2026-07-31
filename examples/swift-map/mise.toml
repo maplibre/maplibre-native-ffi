@@ -1,5 +1,9 @@
 [tools]
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+# Carries the libxml2.so.2 the Swift toolchain links, for distros that ship only
+# libxml2.so.16. .mise/bin/swift-libxml2-env.sh puts it on the loader path and
+# explains why; the tasks below source it.
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
 "github:xtool-org/xtool" = { version = "{{vars.xtool_version}}", os = ["linux"] }
 
 [tasks.build]
@@ -8,6 +12,7 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift_args=(--product swift-map --scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build "${swift_args[@]}"
@@ -21,6 +26,7 @@ arg "[render-target]" default="owned-texture" {
 }
 '''
 run = '''
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 exec ".build/{{vars.host_native_preset}}/debug/swift-map" \
   "{{ usage.render_target }}"
 '''
@@ -39,6 +45,7 @@ depends = [{ task = "//:build", args = ["ios-simulator-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-simulator-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 swift build \
   --product swift-map-ios \
   --scratch-path .build/ios-simulator \
@@ -51,6 +58,7 @@ depends = [{ task = "//:build", args = ["ios-arm64-metal"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 {% if os() == "linux" %}
 MLN_FFI_XTOOL_BUILD=1 xtool.AppImage dev build
 {% elif os() == "macos" %}
@@ -68,6 +76,7 @@ run = '''
 {% if os() == "linux" %}
 native_install_dir="$MISE_MONOREPO_ROOT/build/ios-arm64-metal/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+source "$MISE_MONOREPO_ROOT/.mise/bin/swift-libxml2-env.sh"
 export MLN_FFI_XTOOL_BUILD=1
 exec xtool.AppImage dev run --usb
 {% else %}

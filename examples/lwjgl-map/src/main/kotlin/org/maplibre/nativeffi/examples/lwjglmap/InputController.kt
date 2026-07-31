@@ -79,6 +79,7 @@ internal class InputController(
 
   private fun onMouse(button: Int, action: Int, mods: Int) {
     ctrlDown = (mods and GLFW_MOD_CONTROL) != 0
+    val wasDragging = dragging
     when (button) {
       GLFW_MOUSE_BUTTON_LEFT ->
         leftDown =
@@ -93,7 +94,15 @@ internal class InputController(
       // lands.
       commands.push(CameraCommand.CancelTransitions)
     }
+    // The deltas in between belong to one live gesture, so the map hears about the gesture rather
+    // than a stream of unrelated camera commands.
+    if (dragging != wasDragging) {
+      commands.push(CameraCommand.SetGestureInProgress(dragging))
+    }
   }
+
+  private val dragging: Boolean
+    get() = leftDown || rightDown
 
   private fun onScroll(yOffset: Double) {
     // GLFW reports OS-adjusted scroll deltas; use them directly so trackpads with natural

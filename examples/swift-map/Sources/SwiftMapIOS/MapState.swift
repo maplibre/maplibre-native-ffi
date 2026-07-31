@@ -149,6 +149,8 @@ final class MapState {
     switch command {
     case .cancelTransitions:
       try map.cancelTransitions()
+    case let .setGestureInProgress(inProgress):
+      try map.setGestureInProgress(inProgress)
     case let .moveBy(dx, dy):
       try map.moveBy(deltaX: dx, deltaY: dy)
     case let .scaleBy(scale, anchor):

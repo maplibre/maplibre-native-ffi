@@ -48,6 +48,7 @@ private constructor(private val runtime: RuntimeHandle, val map: MapHandle) : Au
   private fun apply(command: CameraCommand) {
     when (command) {
       is CameraCommand.CancelTransitions -> map.cancelTransitions()
+      is CameraCommand.SetGestureInProgress -> map.isGestureInProgress = command.inProgress
       is CameraCommand.MoveBy -> map.moveBy(command.dx, command.dy)
       is CameraCommand.MoveByAnimated ->
         map.moveByAnimated(command.dx, command.dy, animation(command.durationMs))

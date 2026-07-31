@@ -34,6 +34,12 @@ final class MetalMapView: UIView {
   private var appForeground = true
   private var isShutDown = false
 
+  /// The recognizers with a gesture still open.
+  ///
+  /// Pinch, rotation, and shove recognize simultaneously, so the map hears one
+  /// gesture spanning all of them rather than a mark per recognizer.
+  private var openGestures = Set<ObjectIdentifier>()
+
   override class var layerClass: AnyClass {
     CAMetalLayer.self
   }
@@ -332,76 +338,126 @@ final class MetalMapView: UIView {
     }
   }
 
+  /// The deltas that follow belong to one live gesture, so the map hears about
+  /// the gesture rather than a stream of unrelated camera commands.
+  private func beginGesture(
+    _ recognizer: UIGestureRecognizer,
+    _ commands: Channels
+  ) {
+    if openGestures.isEmpty {
+      commands.push(.setGestureInProgress(true))
+    }
+    openGestures.insert(ObjectIdentifier(recognizer))
+  }
+
+  /// Every terminal recognizer state runs through here, including a cancelled
+  /// gesture, so each mark is paired with a clear.
+  private func endGesture(
+    _ recognizer: UIGestureRecognizer,
+    _ commands: Channels
+  ) {
+    guard openGestures.remove(ObjectIdentifier(recognizer)) != nil else {
+      return
+    }
+    if openGestures.isEmpty {
+      commands.push(.setGestureInProgress(false))
+    }
+  }
+
   @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
     enqueue { commands in
-      if recognizer.state == .began {
+      switch recognizer.state {
+      case .began:
         commands.push(.cancelTransitions)
+        self.beginGesture(recognizer, commands)
         recognizer.setTranslation(.zero, in: self)
         return false
+      case .changed:
+        let translation = recognizer.translation(in: self)
+        recognizer.setTranslation(.zero, in: self)
+        guard translation != .zero else { return false }
+        commands.push(.moveBy(
+          dx: Double(translation.x),
+          dy: Double(translation.y)
+        ))
+        return true
+      default:
+        self.endGesture(recognizer, commands)
+        return false
       }
-      guard recognizer.state == .changed else { return false }
-      let translation = recognizer.translation(in: self)
-      recognizer.setTranslation(.zero, in: self)
-      guard translation != .zero else { return false }
-      commands.push(.moveBy(
-        dx: Double(translation.x),
-        dy: Double(translation.y)
-      ))
-      return true
     }
   }
 
   @objc private func handlePinch(_ recognizer: UIPinchGestureRecognizer) {
     enqueue { commands in
-      if recognizer.state == .began {
+      switch recognizer.state {
+      case .began:
         commands.push(.cancelTransitions)
+        self.beginGesture(recognizer, commands)
         recognizer.scale = 1.0
         return false
+      case .changed:
+        let scale = Double(recognizer.scale)
+        recognizer.scale = 1.0
+        guard scale.isFinite, scale > 0 else { return false }
+        let location = recognizer.location(in: self)
+        commands.push(.scaleBy(
+          scale: scale,
+          anchor: self.screenPoint(location)
+        ))
+        return true
+      default:
+        self.endGesture(recognizer, commands)
+        return false
       }
-      guard recognizer.state == .changed else { return false }
-      let scale = Double(recognizer.scale)
-      recognizer.scale = 1.0
-      guard scale.isFinite, scale > 0 else { return false }
-      let location = recognizer.location(in: self)
-      commands.push(.scaleBy(scale: scale, anchor: screenPoint(location)))
-      return true
     }
   }
 
   @objc private func handleRotation(_ recognizer: UIRotationGestureRecognizer) {
     enqueue { commands in
-      if recognizer.state == .began {
+      switch recognizer.state {
+      case .began:
         commands.push(.cancelTransitions)
+        self.beginGesture(recognizer, commands)
         recognizer.rotation = 0
         return false
+      case .changed:
+        let deltaRadians = recognizer.rotation
+        recognizer.rotation = 0
+        guard deltaRadians != 0 else { return false }
+        let location = recognizer.location(in: self)
+        commands.push(.adjustBearing(
+          delta: -Double(deltaRadians * 180 / .pi),
+          anchor: self.screenPoint(location)
+        ))
+        return true
+      default:
+        self.endGesture(recognizer, commands)
+        return false
       }
-      guard recognizer.state == .changed else { return false }
-      let deltaRadians = recognizer.rotation
-      recognizer.rotation = 0
-      guard deltaRadians != 0 else { return false }
-      let location = recognizer.location(in: self)
-      commands.push(.adjustBearing(
-        delta: -Double(deltaRadians * 180 / .pi),
-        anchor: screenPoint(location)
-      ))
-      return true
     }
   }
 
   @objc private func handleShove(_ recognizer: UIPanGestureRecognizer) {
-    guard recognizer.numberOfTouches == 2 else { return }
     enqueue { commands in
-      if recognizer.state == .began {
+      switch recognizer.state {
+      case .began:
+        guard recognizer.numberOfTouches == 2 else { return false }
         commands.push(.cancelTransitions)
+        self.beginGesture(recognizer, commands)
         recognizer.setTranslation(.zero, in: self)
         return false
+      case .changed:
+        guard recognizer.numberOfTouches == 2 else { return false }
+        let translation = recognizer.translation(in: self)
+        recognizer.setTranslation(.zero, in: self)
+        guard translation.y != 0 else { return false }
+        commands.push(.adjustPitch(delta: -Double(translation.y) * 0.1))
+        return true
+      default:
+        self.endGesture(recognizer, commands)
+        return false
       }
-      guard recognizer.state == .changed else { return false }
-      let translation = recognizer.translation(in: self)
-      recognizer.setTranslation(.zero, in: self)
-      guard translation.y != 0 else { return false }
-      commands.push(.adjustPitch(delta: -Double(translation.y) * 0.1))
-      return true
     }
   }
 

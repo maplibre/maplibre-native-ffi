@@ -544,6 +544,42 @@ func (m *MapHandle) CancelTransitions() error {
 	return checkNative(func() int32 { return int32(C.mln_map_cancel_transitions(C.mln_map(ptr))) })
 }
 
+// SetGestureInProgress marks whether a host-driven gesture is in progress.
+//
+// A host that decodes its own pointer gestures sets this to true when a gesture
+// starts and back to false when it ends, so the camera commands issued in
+// between belong to one live gesture. The flag stays set until the host clears
+// it, so pair every true with a false.
+func (m *MapHandle) SetGestureInProgress(inProgress bool) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_gesture_in_progress(C.mln_map(ptr), C.bool(inProgress)))
+	})
+}
+
+// IsGestureInProgress reports whether a host-driven gesture is currently in
+// progress.
+func (m *MapHandle) IsGestureInProgress() (bool, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	var inProgress C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_is_gesture_in_progress(C.mln_map(ptr), &inProgress))
+	}); err != nil {
+		return false, err
+	}
+	return bool(inProgress), nil
+}
+
 // CameraForLatLngBounds computes a camera that fits geographic bounds. Passing
 // nil fitOptions uses native default fitting options.
 func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (CameraOptions, error) {

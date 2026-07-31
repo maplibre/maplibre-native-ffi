@@ -100,6 +100,12 @@ class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
         map.cancelTransitions()
+        assertFalse(map.isGestureInProgress)
+        map.isGestureInProgress = true
+        map.moveBy(8.0, -4.0)
+        assertTrue(map.isGestureInProgress)
+        map.isGestureInProgress = false
+        assertFalse(map.isGestureInProgress)
         map.jumpTo(
           CameraOptions().apply {
             center = LatLng(1.0, 1.0)

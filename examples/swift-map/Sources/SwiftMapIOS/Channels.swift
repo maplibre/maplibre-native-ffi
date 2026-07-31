@@ -9,6 +9,7 @@ import MaplibreNative
 /// one has to happen together on the thread that owns the map.
 enum CameraCommand {
   case cancelTransitions
+  case setGestureInProgress(Bool)
   case moveBy(dx: Double, dy: Double)
   case scaleBy(scale: Double, anchor: ScreenPoint)
   /// Adds `delta` degrees to the current bearing, pivoting on `anchor`.

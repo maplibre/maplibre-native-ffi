@@ -51,6 +51,11 @@ zero-duration default as `ease_to`.
 
 Absolute targets go through `jump_to`, `ease_to`, or `fly_to`.
 
+`mln_map_set_gesture_in_progress()` tells the map that the commands you issue
+belong to one live gesture. Set it when a pointer gesture starts and clear it
+when the gesture ends, including when it is cancelled.
+`mln_map_is_gesture_in_progress()` reads the flag back.
+
 ## Fit the camera to content
 
 The `camera_for_*` family computes a camera that fits a bounding box, a

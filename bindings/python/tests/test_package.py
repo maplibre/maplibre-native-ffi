@@ -1500,6 +1500,19 @@ def test_camera_snapshot_and_jump_round_trip_public_values() -> None:
             assert snapshot.padding == target.padding
 
 
+def test_gesture_in_progress_brackets_host_driven_camera_commands() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            assert map_handle.is_gesture_in_progress() is False
+
+            map_handle.set_gesture_in_progress(True)
+            map_handle.move_by(8.0, -4.0)
+            assert map_handle.is_gesture_in_progress() is True
+
+            map_handle.set_gesture_in_progress(False)
+            assert map_handle.is_gesture_in_progress() is False
+
+
 def test_free_camera_and_projection_mode_round_trip_public_values() -> None:
     with mln.RuntimeHandle() as runtime:
         with runtime.create_map() as map_handle:

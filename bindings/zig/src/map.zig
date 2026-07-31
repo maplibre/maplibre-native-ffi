@@ -1517,6 +1517,16 @@ pub const MapHandle = enum(c.mln_map) {
         try status.checkStatus(c.mln_map_cancel_transitions(try native(self)), diagnosticStore(self));
     }
 
+    pub fn setGestureInProgress(self: *MapHandle, in_progress: bool) status.Error!void {
+        try status.checkStatus(c.mln_map_set_gesture_in_progress(try native(self), in_progress), diagnosticStore(self));
+    }
+
+    pub fn isGestureInProgress(self: *MapHandle) status.Error!bool {
+        var in_progress = false;
+        try status.checkStatus(c.mln_map_is_gesture_in_progress(try native(self), &in_progress), diagnosticStore(self));
+        return in_progress;
+    }
+
     pub fn requestStillImage(self: *MapHandle) status.Error!void {
         try status.checkStatus(c.mln_map_request_still_image(try native(self)), diagnosticStore(self));
     }

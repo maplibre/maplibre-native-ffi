@@ -67,6 +67,25 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 	if err := m.CancelTransitions(); err != nil {
 		t.Fatalf("CancelTransitions(): %v", err)
 	}
+
+	if got, err := m.IsGestureInProgress(); err != nil || got {
+		t.Fatalf("IsGestureInProgress() = %v, %v; want false, nil", got, err)
+	}
+	if err := m.SetGestureInProgress(true); err != nil {
+		t.Fatalf("SetGestureInProgress(true): %v", err)
+	}
+	if err := m.MoveBy(ScreenPoint{X: 8, Y: -4}); err != nil {
+		t.Fatalf("MoveBy(): %v", err)
+	}
+	if got, err := m.IsGestureInProgress(); err != nil || !got {
+		t.Fatalf("IsGestureInProgress() = %v, %v; want true, nil", got, err)
+	}
+	if err := m.SetGestureInProgress(false); err != nil {
+		t.Fatalf("SetGestureInProgress(false): %v", err)
+	}
+	if got, err := m.IsGestureInProgress(); err != nil || got {
+		t.Fatalf("IsGestureInProgress() = %v, %v; want false, nil", got, err)
+	}
 }
 
 func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {

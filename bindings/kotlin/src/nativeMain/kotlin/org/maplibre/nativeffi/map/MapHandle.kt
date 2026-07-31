@@ -91,6 +91,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
+import org.maplibre.nativeffi.internal.c.mln_map_is_gesture_in_progress
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
@@ -123,6 +124,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_set_gesture_in_progress
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
@@ -1430,6 +1432,18 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
   public actual fun cancelTransitions() {
     Status.check(mln_map_cancel_transitions(state.requireLive().rawHandleValue))
   }
+
+  public actual var isGestureInProgress: Boolean
+    get() = memScoped {
+      val outInProgress = alloc<BooleanVar>()
+      Status.check(
+        mln_map_is_gesture_in_progress(state.requireLive().rawHandleValue, outInProgress.ptr)
+      )
+      outInProgress.value
+    }
+    set(inProgress) {
+      Status.check(mln_map_set_gesture_in_progress(state.requireLive().rawHandleValue, inProgress))
+    }
 
   public actual fun cameraForLatLngBounds(
     bounds: LatLngBounds,

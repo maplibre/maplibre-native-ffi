@@ -18,8 +18,12 @@ const (
 
 type inputController struct {
 	dragMode dragMode
-	lastX    float64
-	lastY    float64
+	// dragButton is the button that started the live drag. A drag belongs to
+	// one button, so a second button pressed during it neither restarts it nor
+	// ends it early.
+	dragButton uint8
+	lastX      float64
+	lastY      float64
 }
 
 func logControls() {
@@ -39,7 +43,7 @@ func (input *inputController) handleEvent(event *sdl.Event, commands chan camera
 	case sdl.EventMouseButtonDown:
 		return input.handleMouseButtonDown(event.MouseButton(), commands, v)
 	case sdl.EventMouseButtonUp:
-		return input.handleMouseButtonUp(event.MouseButton(), v)
+		return input.handleMouseButtonUp(event.MouseButton(), commands, v)
 	case sdl.EventMouseMotion:
 		return input.handleMouseMotion(event.MouseMotion(), commands, v)
 	case sdl.EventMouseWheel:
@@ -55,26 +59,46 @@ func (input *inputController) handleMouseButtonDown(event *sdl.MouseButtonEvent,
 	if event == nil {
 		return false
 	}
-	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
-	input.lastX = cursor.X
-	input.lastY = cursor.Y
+	// A drag already owns the pointer, so a second button joins it rather than
+	// starting a drag of its own. Its position leaves the live drag's baseline
+	// alone, so the next delta still measures from where the owning button last
+	// was.
+	if input.dragMode != dragNone {
+		return false
+	}
 	mode := dragModeForButton(event.Button)
 	if mode == dragNone {
 		return false
 	}
+	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
+	input.lastX = cursor.X
+	input.lastY = cursor.Y
 	input.dragMode = mode
-	return enqueueCameraCommand(commands, cameraCommand{kind: commandCancelTransitions})
+	input.dragButton = event.Button
+	// Queued ahead of the drag's own commands, so the transition stops before
+	// the first delta lands.
+	cancelQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandCancelTransitions})
+	// The deltas that follow belong to one live gesture, so the map hears about
+	// the gesture rather than a stream of unrelated camera commands.
+	gestureQueued := enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: true})
+	return cancelQueued || gestureQueued
 }
 
-func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, v viewport) bool {
+// handleMouseButtonUp ends the drag once, when the button that started it comes
+// up, so the gesture mark the drag set is always paired with a clear.
+func (input *inputController) handleMouseButtonUp(event *sdl.MouseButtonEvent, commands chan cameraCommand, v viewport) bool {
 	if event == nil || (event.Button != sdl.ButtonLeft && event.Button != sdl.ButtonRight) {
+		return false
+	}
+	if input.dragMode == dragNone || event.Button != input.dragButton {
 		return false
 	}
 	cursor := logicalPoint(float64(event.X), float64(event.Y), v)
 	input.dragMode = dragNone
+	input.dragButton = 0
 	input.lastX = cursor.X
 	input.lastY = cursor.Y
-	return false
+	return enqueueCameraCommand(commands, cameraCommand{kind: commandSetGestureInProgress, inProgress: false})
 }
 
 func (input *inputController) handleMouseMotion(event *sdl.MouseMotionEvent, commands chan cameraCommand, v viewport) bool {

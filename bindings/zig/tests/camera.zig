@@ -83,6 +83,23 @@ test "camera commands accept valid public descriptors" {
     try map.cancelTransitions();
 }
 
+test "gesture in progress brackets host-driven camera commands" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try testing.expect(!try map.isGestureInProgress());
+
+    try map.setGestureInProgress(true);
+    try testing.expect(try map.isGestureInProgress());
+    try map.moveBy(8, -4);
+    try testing.expect(try map.isGestureInProgress());
+
+    try map.setGestureInProgress(false);
+    try testing.expect(!try map.isGestureInProgress());
+}
+
 test "zero-duration ease reports one transition finish ahead of an immediate camera change" {
     var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
