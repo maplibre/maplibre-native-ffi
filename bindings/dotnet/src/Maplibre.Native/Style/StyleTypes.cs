@@ -246,4 +246,40 @@ public sealed record StyleImageOptions
     }
 }
 
+/// <summary>The style's global transition options.</summary>
+/// <remarks>
+/// <para>
+/// These control how the style animates paint property changes and whether symbol placement
+/// changes cross-fade. They are distinct from camera animation options and from the per-property
+/// transitions a style declares.
+/// </para>
+/// <para>
+/// Compares and hashes by property value; <c>with</c> returns an independent instance. Keep an
+/// instance unmodified while it is a key in a hash-based collection.
+/// </para>
+/// </remarks>
+public sealed record StyleTransitionOptions
+{
+    /// <summary>
+    /// Transition duration in milliseconds. Null falls back to the duration the style declares
+    /// for each transitioning property.
+    /// </summary>
+    public double? Duration { get; set; }
+
+    /// <summary>
+    /// Transition delay in milliseconds. Null falls back to the delay the style declares for each
+    /// transitioning property.
+    /// </summary>
+    public double? Delay { get; set; }
+
+    /// <summary>Whether symbol placement changes cross-fade.</summary>
+    /// <remarks>
+    /// Unlike duration and delay this value is always present, so clearing it makes symbol
+    /// placement changes apply to the next rendered frame. Hosts that move symbol-backed features
+    /// at pointer frequency clear it for the duration of the interaction so the rendered symbol
+    /// keeps up.
+    /// </remarks>
+    public bool EnablePlacementTransitions { get; set; } = true;
+}
+
 public delegate void CustomGeometrySourceCallback(CanonicalTileId tileId);

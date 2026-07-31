@@ -543,6 +543,8 @@
 --include-constant MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
 --include-constant MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
 --include-constant MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+--include-constant MLN_STYLE_TRANSITION_OPTION_DELAY
+--include-constant MLN_STYLE_TRANSITION_OPTION_DURATION
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MLT
 --include-constant MLN_STYLE_VECTOR_TILE_ENCODING_MVT
 --include-function mln_custom_geometry_source_options_default
@@ -574,6 +576,7 @@
 --include-function mln_map_get_style_light_property
 --include-function mln_map_get_style_source_info
 --include-function mln_map_get_style_source_type
+--include-function mln_map_get_style_transition_options
 --include-function mln_map_invalidate_custom_geometry_source_region
 --include-function mln_map_invalidate_custom_geometry_source_tile
 --include-function mln_map_list_style_layer_ids
@@ -597,6 +600,7 @@
 --include-function mln_map_set_style_image
 --include-function mln_map_set_style_light_json
 --include-function mln_map_set_style_light_property
+--include-function mln_map_set_style_transition_options
 --include-function mln_map_style_image_exists
 --include-function mln_map_style_layer_exists
 --include-function mln_map_style_source_exists
@@ -607,6 +611,7 @@
 --include-function mln_style_image_info_default
 --include-function mln_style_image_options_default
 --include-function mln_style_tile_source_options_default
+--include-function mln_style_transition_options_default
 --include-struct mln_canonical_tile_id
 --include-struct mln_custom_geometry_source_options
 --include-struct mln_geojson_source_options
@@ -615,6 +620,7 @@
 --include-struct mln_style_image_options
 --include-struct mln_style_source_info
 --include-struct mln_style_tile_source_options
+--include-struct mln_style_transition_options
 --include-typedef mln_custom_geometry_source_tile_callback
 
 # include/maplibre_native_c/surface.h

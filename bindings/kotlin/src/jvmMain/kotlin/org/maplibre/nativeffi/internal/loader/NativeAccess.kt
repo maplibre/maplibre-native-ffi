@@ -106,6 +106,7 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_style_image_options
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options
+import org.maplibre.nativeffi.internal.c.mln_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info
 import org.maplibre.nativeffi.internal.c.mln_tile_id
 import org.maplibre.nativeffi.internal.c.mln_unit_bezier
@@ -200,6 +201,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleImageTextFit
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
@@ -1203,6 +1205,25 @@ internal object NativeAccess {
           .invokeNative(map, stringView(arena, propertyName), outSnapshot) as Int
       )
       jsonSnapshot(NativeJsonSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
+    }
+
+  internal fun setStyleTransitionOptions(map: NativeMap, options: StyleTransitionOptions) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapAddressStatusFunction("mln_map_set_style_transition_options")
+          .invokeNative(map, styleTransitionOptions(arena, options)) as Int
+      )
+    }
+  }
+
+  internal fun styleTransitionOptions(map: NativeMap): StyleTransitionOptions =
+    Arena.ofConfined().use { arena ->
+      val outOptions = styleTransitionOptionsDefault(arena)
+      Status.check(
+        mapAddressStatusFunction("mln_map_get_style_transition_options")
+          .invokeNative(map, outOptions) as Int
+      )
+      styleTransitionOptions(outOptions)
     }
 
   internal fun setLayerProperty(
@@ -4286,6 +4307,64 @@ internal object NativeAccess {
     return segment
   }
 
+  private fun styleTransitionOptionsDefault(arena: Arena): MemorySegment {
+    val segment = arena.allocate(STYLE_TRANSITION_OPTIONS_SIZE)
+    segment.set(
+      ValueLayout.JAVA_INT,
+      STYLE_TRANSITION_OPTIONS_SIZE_OFFSET,
+      STYLE_TRANSITION_OPTIONS_SIZE.toInt(),
+    )
+    segment.set(
+      ValueLayout.JAVA_BOOLEAN,
+      STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
+      true,
+    )
+    return segment
+  }
+
+  private fun styleTransitionOptions(arena: Arena, value: StyleTransitionOptions): MemorySegment {
+    val segment = styleTransitionOptionsDefault(arena)
+    var fields = 0
+    segment.set(
+      ValueLayout.JAVA_BOOLEAN,
+      STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
+      value.enablePlacementTransitions,
+    )
+    value.durationMs?.let {
+      fields = fields or STYLE_TRANSITION_OPTION_DURATION
+      segment.set(ValueLayout.JAVA_DOUBLE, STYLE_TRANSITION_OPTIONS_DURATION_MS_OFFSET, it)
+    }
+    value.delayMs?.let {
+      fields = fields or STYLE_TRANSITION_OPTION_DELAY
+      segment.set(ValueLayout.JAVA_DOUBLE, STYLE_TRANSITION_OPTIONS_DELAY_MS_OFFSET, it)
+    }
+    segment.set(ValueLayout.JAVA_INT, STYLE_TRANSITION_OPTIONS_FIELDS_OFFSET, fields)
+    return segment
+  }
+
+  private fun styleTransitionOptions(segment: MemorySegment): StyleTransitionOptions {
+    val fields = segment.get(ValueLayout.JAVA_INT, STYLE_TRANSITION_OPTIONS_FIELDS_OFFSET)
+    return StyleTransitionOptions().apply {
+      durationMs =
+        if (fields and STYLE_TRANSITION_OPTION_DURATION != 0) {
+          segment.get(ValueLayout.JAVA_DOUBLE, STYLE_TRANSITION_OPTIONS_DURATION_MS_OFFSET)
+        } else {
+          null
+        }
+      delayMs =
+        if (fields and STYLE_TRANSITION_OPTION_DELAY != 0) {
+          segment.get(ValueLayout.JAVA_DOUBLE, STYLE_TRANSITION_OPTIONS_DELAY_MS_OFFSET)
+        } else {
+          null
+        }
+      enablePlacementTransitions =
+        segment.get(
+          ValueLayout.JAVA_BOOLEAN,
+          STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET,
+        )
+    }
+  }
+
   private fun styleImageInfoDefault(arena: Arena): MemorySegment {
     val segment = arena.allocate(STYLE_IMAGE_INFO_SIZE)
     segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_SIZE_OFFSET, STYLE_IMAGE_INFO_SIZE.toInt())
@@ -5822,6 +5901,21 @@ internal object NativeAccess {
     mln_style_image_options.`text_fit_width$offset`()
   private val STYLE_IMAGE_OPTIONS_TEXT_FIT_HEIGHT_OFFSET: Long =
     mln_style_image_options.`text_fit_height$offset`()
+
+  private const val STYLE_TRANSITION_OPTION_DURATION: Int = 1 shl 0
+  private const val STYLE_TRANSITION_OPTION_DELAY: Int = 1 shl 1
+
+  private val STYLE_TRANSITION_OPTIONS_SIZE: Long = mln_style_transition_options.sizeof()
+  private val STYLE_TRANSITION_OPTIONS_SIZE_OFFSET: Long =
+    mln_style_transition_options.`size$offset`()
+  private val STYLE_TRANSITION_OPTIONS_FIELDS_OFFSET: Long =
+    mln_style_transition_options.`fields$offset`()
+  private val STYLE_TRANSITION_OPTIONS_DURATION_MS_OFFSET: Long =
+    mln_style_transition_options.`duration_ms$offset`()
+  private val STYLE_TRANSITION_OPTIONS_DELAY_MS_OFFSET: Long =
+    mln_style_transition_options.`delay_ms$offset`()
+  private val STYLE_TRANSITION_OPTIONS_ENABLE_PLACEMENT_TRANSITIONS_OFFSET: Long =
+    mln_style_transition_options.`enable_placement_transitions$offset`()
 
   private val IMAGE_STRETCH_SIZE: Long = mln_image_stretch.sizeof()
   private val IMAGE_STRETCH_FROM_OFFSET: Long = mln_image_stretch.`from$offset`()

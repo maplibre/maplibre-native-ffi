@@ -86,6 +86,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
@@ -145,6 +146,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_transition_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
@@ -158,6 +160,7 @@ import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.c.mln_string_view
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_style_transition_options_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.lifecycle.NativeMap
@@ -196,6 +199,7 @@ import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.StyleLayerVisibility
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned native map handle. Close it on the map owner thread. */
@@ -1013,6 +1017,25 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
     )
     ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outValue.value))
+  }
+
+  public actual fun setStyleTransitionOptions(options: StyleTransitionOptions) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_transition_options(
+          state.requireLive().rawHandleValue,
+          StyleStructs.styleTransitionOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public actual fun styleTransitionOptions(): StyleTransitionOptions = memScoped {
+    val outOptions = mln_style_transition_options_default().getPointer(this)
+    Status.check(
+      mln_map_get_style_transition_options(state.requireLive().rawHandleValue, outOptions)
+    )
+    StyleStructs.styleTransitionOptions(outOptions.pointed)
   }
 
   public actual fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {

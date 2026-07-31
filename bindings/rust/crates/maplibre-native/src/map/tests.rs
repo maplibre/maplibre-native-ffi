@@ -12,6 +12,8 @@ use crate::{
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
+const STYLE_WITH_TRANSITION_JSON: &str =
+    r#"{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}"#;
 
 #[test]
 // Spec coverage: BND-105.
@@ -717,6 +719,58 @@ fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: Runt
         std::thread::sleep(Duration::from_millis(1));
     }
     panic!("timed out waiting for {event_type:?}");
+}
+
+#[test]
+// Spec coverage: BND-060, BND-061, BND-070, and BND-105.
+fn style_transition_options_round_trip_through_the_real_c_api() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+
+    // A map with no style yet reports nothing set.
+    assert_eq!(
+        map.style_transition_options().unwrap(),
+        StyleTransitionOptions::default()
+    );
+
+    // The style parser fills in its own 300ms duration for a style that
+    // declares no transition.
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    let parsed = map.style_transition_options().unwrap();
+    assert_eq!(parsed.duration_ms, Some(300.0));
+    assert_eq!(parsed.delay_ms, None);
+
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    let declared = map.style_transition_options().unwrap();
+    assert_eq!(declared.duration_ms, Some(750.0));
+    assert_eq!(declared.delay_ms, Some(100.0));
+    assert!(declared.enable_placement_transitions);
+
+    // A present zero stays distinguishable from an omitted field, and omitting
+    // a field clears what the style declared rather than merging into it.
+    let mut options = StyleTransitionOptions::default();
+    options.duration_ms = Some(0.0);
+    options.enable_placement_transitions = false;
+    map.set_style_transition_options(&options).unwrap();
+
+    let applied = map.style_transition_options().unwrap();
+    assert_eq!(applied, options);
+    assert_eq!(applied.duration_ms, Some(0.0));
+    assert_eq!(applied.delay_ms, None);
+    assert!(!applied.enable_placement_transitions);
+
+    // Loading a style replaces the override with what that style declares.
+    map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
+    assert_eq!(map.style_transition_options().unwrap(), declared);
+
+    let mut negative = StyleTransitionOptions::default();
+    negative.delay_ms = Some(-1.0);
+    let error = map.set_style_transition_options(&negative).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.diagnostic().contains("delay_ms"));
+
+    map.close().unwrap();
+    runtime.close().unwrap();
 }
 
 #[test]

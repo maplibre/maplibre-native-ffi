@@ -35,6 +35,8 @@ auto premultiplied_rgba8_image_default() noexcept
   -> mln_premultiplied_rgba8_image;
 auto style_image_options_default() noexcept -> mln_style_image_options;
 auto style_image_info_default() noexcept -> mln_style_image_info;
+auto style_transition_options_default() noexcept
+  -> mln_style_transition_options;
 auto create_map(
   mln_runtime runtime, const mln_map_options* options, mln_map* out_map
 ) -> mln_status;
@@ -225,6 +227,12 @@ auto map_set_style_light_property(
 ) -> mln_status;
 auto map_get_style_light_property(
   mln_map map, mln_string_view property_name, mln_json_snapshot* out_value
+) -> mln_status;
+auto map_set_style_transition_options(
+  mln_map map, const mln_style_transition_options* options
+) -> mln_status;
+auto map_get_style_transition_options(
+  mln_map map, mln_style_transition_options* out_options
 ) -> mln_status;
 auto map_set_layer_property(
   mln_map map, mln_string_view layer_id, mln_string_view property_name,

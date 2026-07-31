@@ -650,6 +650,78 @@ func allocCStretches(stretches []ImageStretch) unsafe.Pointer {
 	return allocation
 }
 
+// StyleTransitionOptions configures the style's global transitions.
+//
+// These control how the style animates paint property changes and whether symbol placement
+// changes cross-fade. They are distinct from camera animation options and from the per-property
+// transitions a style declares.
+type StyleTransitionOptions struct {
+	// DurationMS is the transition duration in milliseconds. An absent value falls back to the
+	// duration the style declares for each transitioning property.
+	DurationMS *float64
+	// DelayMS is the transition delay in milliseconds. An absent value falls back to the delay
+	// the style declares for each transitioning property.
+	DelayMS *float64
+	// EnablePlacementTransitions reports whether symbol placement changes cross-fade.
+	//
+	// Unlike duration and delay this value is always present, so clearing it makes symbol
+	// placement changes apply to the next rendered frame. Hosts that move symbol-backed
+	// features at pointer frequency clear it for the duration of the interaction so the
+	// rendered symbol keeps up.
+	EnablePlacementTransitions bool
+}
+
+// NewStyleTransitionOptions returns the C API's default transition options, which leave duration
+// and delay to the style and cross-fade symbol placement changes.
+func NewStyleTransitionOptions() StyleTransitionOptions {
+	return styleTransitionOptionsFromC(C.mln_style_transition_options_default())
+}
+
+// Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
+// compares pointer fields by identity.
+func (options StyleTransitionOptions) Equal(other StyleTransitionOptions) bool {
+	return equalPointer(options.DurationMS, other.DurationMS) &&
+		equalPointer(options.DelayMS, other.DelayMS) &&
+		options.EnablePlacementTransitions == other.EnablePlacementTransitions
+}
+
+// Clone returns an independent deep copy of this descriptor.
+func (options StyleTransitionOptions) Clone() StyleTransitionOptions {
+	cloned := options
+	cloned.DurationMS = clonePointer(options.DurationMS)
+	cloned.DelayMS = clonePointer(options.DelayMS)
+	return cloned
+}
+
+func newCStyleTransitionOptions(options StyleTransitionOptions) C.mln_style_transition_options {
+	raw := C.mln_style_transition_options_default()
+	raw.enable_placement_transitions = C.bool(options.EnablePlacementTransitions)
+	if options.DurationMS != nil {
+		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DURATION
+		raw.duration_ms = C.double(*options.DurationMS)
+	}
+	if options.DelayMS != nil {
+		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DELAY
+		raw.delay_ms = C.double(*options.DelayMS)
+	}
+	return raw
+}
+
+func styleTransitionOptionsFromC(raw C.mln_style_transition_options) StyleTransitionOptions {
+	options := StyleTransitionOptions{
+		EnablePlacementTransitions: bool(raw.enable_placement_transitions),
+	}
+	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DURATION != 0 {
+		duration := float64(raw.duration_ms)
+		options.DurationMS = &duration
+	}
+	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DELAY != 0 {
+		delay := float64(raw.delay_ms)
+		options.DelayMS = &delay
+	}
+	return options
+}
+
 // StyleImageInfo contains copied runtime style image metadata.
 type StyleImageInfo struct {
 	Width      uint32
@@ -1858,6 +1930,41 @@ func (m *MapHandle) StyleLightProperty(propertyName string) (JSONValue, error) {
 		return JSONValue{}, err
 	}
 	return cJSONSnapshotValue(snapshot)
+}
+
+// SetStyleTransitionOptions sets the style's global transition options.
+//
+// Absent duration and delay clear the style-wide override, so this call replaces the whole
+// transition configuration rather than merging into it. Loading a style replaces these options
+// with the ones that style declares, so apply an override after the style loads.
+func (m *MapHandle) SetStyleTransitionOptions(options StyleTransitionOptions) error {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	raw := newCStyleTransitionOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_style_transition_options(C.mln_map(ptr), &raw))
+	})
+}
+
+// StyleTransitionOptions returns the style's copied global transition options.
+func (m *MapHandle) StyleTransitionOptions() (StyleTransitionOptions, error) {
+	ptr, release, err := m.ptr()
+	if err != nil {
+		return StyleTransitionOptions{}, err
+	}
+	defer release()
+	defer m.state.KeepAlive()
+	raw := C.mln_style_transition_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_style_transition_options(C.mln_map(ptr), &raw))
+	}); err != nil {
+		return StyleTransitionOptions{}, err
+	}
+	return styleTransitionOptionsFromC(raw), nil
 }
 
 // SetLayerProperty sets one style layer property.

@@ -611,6 +611,63 @@ import Testing
   #expect(try !map.styleSourceExists("clustered-invalid"))
 }
 
+@Test func styleTransitionOptionsRoundTripThroughTheCAPI() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 1, height: 1)
+  )
+  defer { try? map.close() }
+
+  // A map with no style yet reports nothing set.
+  #expect(try map.styleTransitionOptions() == StyleTransitionOptions())
+
+  // The style parser fills in its own 300ms duration for a style that declares
+  // no transition.
+  try map.setStyleJSON("""
+  {"version":8,"sources":{},"layers":[]}
+  """)
+  let parsed = try map.styleTransitionOptions()
+  #expect(parsed.durationMilliseconds == 300)
+  #expect(parsed.delayMilliseconds == nil)
+
+  try map.setStyleJSON(transitionStyleJSON)
+  let declared = try map.styleTransitionOptions()
+  #expect(declared.durationMilliseconds == 750)
+  #expect(declared.delayMilliseconds == 100)
+  #expect(declared.enablePlacementTransitions)
+
+  // A present zero stays distinguishable from an absent field, and an absent
+  // field clears what the style declared rather than merging into it.
+  let options = StyleTransitionOptions(
+    durationMilliseconds: 0,
+    enablePlacementTransitions: false
+  )
+  try map.setStyleTransitionOptions(options)
+  #expect(try map.styleTransitionOptions() == options)
+
+  // Loading a style replaces the override with what that style declares.
+  try map.setStyleJSON(transitionStyleJSON)
+  #expect(try map.styleTransitionOptions() == declared)
+
+  do {
+    try map.setStyleTransitionOptions(
+      StyleTransitionOptions(delayMilliseconds: -1)
+    )
+    Issue.record("a negative delay should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
+private let transitionStyleJSON = """
+{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}
+"""
+
 private func clusterPropertiesValue() -> JSONValue {
   .object([
     JSONMember(

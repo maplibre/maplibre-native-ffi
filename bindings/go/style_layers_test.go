@@ -395,3 +395,100 @@ func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 		t.Fatalf("StyleLayerExists(empty) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
+func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	// A map with no style yet reports nothing set.
+	defaults, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if !defaults.Equal(NewStyleTransitionOptions()) {
+		t.Fatalf("StyleTransitionOptions() = %#v, want the C API defaults", defaults)
+	}
+
+	// The style parser fills in its own 300ms duration for a style that declares no transition.
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	parsed, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if parsed.DurationMS == nil || *parsed.DurationMS != 300 {
+		t.Fatalf("parsed DurationMS = %v, want 300", parsed.DurationMS)
+	}
+	if parsed.DelayMS != nil {
+		t.Fatalf("parsed DelayMS = %v, want absent", *parsed.DelayMS)
+	}
+
+	const transitionStyle = `{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}`
+	if err := m.SetStyleJSON(transitionStyle); err != nil {
+		t.Fatalf("SetStyleJSON(transition style): %v", err)
+	}
+	declared, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if declared.DurationMS == nil || *declared.DurationMS != 750 {
+		t.Fatalf("declared DurationMS = %v, want 750", declared.DurationMS)
+	}
+	if declared.DelayMS == nil || *declared.DelayMS != 100 {
+		t.Fatalf("declared DelayMS = %v, want 100", declared.DelayMS)
+	}
+	if !declared.EnablePlacementTransitions {
+		t.Fatal("declared EnablePlacementTransitions = false, want true")
+	}
+
+	// A present zero stays distinguishable from an absent field, and an absent field clears
+	// what the style declared rather than merging into it.
+	zero := 0.0
+	options := StyleTransitionOptions{DurationMS: &zero}
+	if err := m.SetStyleTransitionOptions(options); err != nil {
+		t.Fatalf("SetStyleTransitionOptions(): %v", err)
+	}
+	applied, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if !applied.Equal(options) {
+		t.Fatalf("StyleTransitionOptions() = %#v, want %#v", applied, options)
+	}
+
+	// Loading a style replaces the override with what that style declares.
+	if err := m.SetStyleJSON(transitionStyle); err != nil {
+		t.Fatalf("SetStyleJSON(transition style): %v", err)
+	}
+	reloaded, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if !reloaded.Equal(declared) {
+		t.Fatalf("StyleTransitionOptions() = %#v, want %#v", reloaded, declared)
+	}
+
+	negative := -1.0
+	err = m.SetStyleTransitionOptions(StyleTransitionOptions{DelayMS: &negative})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleTransitionOptions(negative delay) = %v, want ErrInvalidArgument", err)
+	}
+}

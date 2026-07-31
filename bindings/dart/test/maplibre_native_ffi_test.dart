@@ -675,6 +675,55 @@ void main() {
     }
   });
 
+  test('style transition options round-trip through the native C ABI', () {
+    const transitionStyleJson =
+        '{"version":8,"transition":{"duration":750,"delay":100},'
+        '"sources":{},"layers":[]}';
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    try {
+      // A map with no style yet reports nothing set.
+      expect(map.getStyleTransitionOptions(), const StyleTransitionOptions());
+
+      // The style parser fills in its own 300ms duration for a style that
+      // declares no transition.
+      map.setStyleJson(_emptyStyleJson);
+      final parsed = map.getStyleTransitionOptions();
+      expect(parsed.durationMs, 300);
+      expect(parsed.delayMs, isNull);
+
+      map.setStyleJson(transitionStyleJson);
+      final declared = map.getStyleTransitionOptions();
+      expect(declared.durationMs, 750);
+      expect(declared.delayMs, 100);
+      expect(declared.enablePlacementTransitions, isTrue);
+
+      // A present zero stays distinguishable from an absent field, and an
+      // absent field clears what the style declared rather than merging.
+      const options = StyleTransitionOptions(
+        durationMs: 0,
+        enablePlacementTransitions: false,
+      );
+      map.setStyleTransitionOptions(options);
+      expect(map.getStyleTransitionOptions(), options);
+      expect(map.getStyleTransitionOptions().hashCode, options.hashCode);
+
+      // Loading a style replaces the override with what that style declares.
+      map.setStyleJson(transitionStyleJson);
+      expect(map.getStyleTransitionOptions(), declared);
+
+      expect(
+        () => map.setStyleTransitionOptions(
+          const StyleTransitionOptions(delayMs: -1),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  });
+
   test('runtime and map handles use the native C ABI', () async {
     final cacheSizeRuntime = RuntimeHandle.create(
       options: const RuntimeOptions(cachePath: ':memory:'),

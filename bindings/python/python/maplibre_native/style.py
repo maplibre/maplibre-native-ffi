@@ -210,6 +210,40 @@ class StyleImageInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class StyleTransitionOptions:
+    """The style's global transition options.
+
+    These control how the style animates paint property changes and whether
+    symbol placement changes cross-fade. They are distinct from camera animation
+    options and from the per-property transitions a style declares.
+    """
+
+    duration_ms: float | None = None
+    """Transition duration in milliseconds. `None` falls back to the duration
+    the style declares for each transitioning property."""
+    delay_ms: float | None = None
+    """Transition delay in milliseconds. `None` falls back to the delay the
+    style declares for each transitioning property."""
+    enable_placement_transitions: bool = True
+    """Whether symbol placement changes cross-fade.
+
+    Unlike duration and delay this value is always present, so clearing it makes
+    symbol placement changes apply to the next rendered frame. Hosts that move
+    symbol-backed features at pointer frequency clear it for the duration of the
+    interaction so the rendered symbol keeps up.
+    """
+
+    @classmethod
+    def _from_native(cls, raw: dict[str, Any]) -> "StyleTransitionOptions":
+        """Build transition options from private native bridge values."""
+        return cls(
+            duration_ms=raw["duration_ms"],
+            delay_ms=raw["delay_ms"],
+            enable_placement_transitions=raw["enable_placement_transitions"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class StyleImage:
     """Copied runtime style image pixels with style-specific metadata."""
 
@@ -333,6 +367,7 @@ __all__ = [
     "StyleImageOptions",
     "StyleSourceInfo",
     "StyleSourceType",
+    "StyleTransitionOptions",
     "TileScheme",
     "TileSourceOptions",
     "VectorTileEncoding",

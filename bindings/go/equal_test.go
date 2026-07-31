@@ -416,6 +416,34 @@ func TestStyleImageOptionsEqualComparesFieldValues(t *testing.T) {
 	)
 }
 
+func TestStyleTransitionOptionsEqualComparesFieldValues(t *testing.T) {
+	assertValueSemantics(
+		t,
+		"StyleTransitionOptions",
+		func() StyleTransitionOptions {
+			return StyleTransitionOptions{
+				DurationMS:                 optionPtr(300.0),
+				DelayMS:                    optionPtr(0.0),
+				EnablePlacementTransitions: true,
+			}
+		},
+		StyleTransitionOptions.Equal,
+		[]func(*StyleTransitionOptions){
+			func(o *StyleTransitionOptions) { o.DurationMS = optionPtr(500.0) },
+			// A present zero stays distinguishable from an absent field.
+			func(o *StyleTransitionOptions) { o.DelayMS = nil },
+			func(o *StyleTransitionOptions) { o.EnablePlacementTransitions = false },
+		},
+	)
+
+	original := StyleTransitionOptions{DurationMS: optionPtr(300.0)}
+	cloned := original.Clone()
+	*cloned.DurationMS = 500
+	if *original.DurationMS != 300 {
+		t.Fatalf("original DurationMS = %v, want 300", *original.DurationMS)
+	}
+}
+
 func TestQueryOptionsEqualComparesLayerIDsElementByElement(t *testing.T) {
 	assertValueSemantics(
 		t,

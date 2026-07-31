@@ -34,6 +34,7 @@ import org.maplibre.nativeffi.style.GeoJsonSourceOptions
 import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleTransitionOptions
 import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
@@ -373,6 +374,26 @@ class OptionsValueSemanticsTest {
       },
       copyOf = { it.copy() },
       mutators = listOf({ pixelRatio = 3.0f }, { sdf = false }),
+    )
+  }
+
+  @Test
+  fun styleTransitionOptionsComparesByFieldValue() {
+    assertValueSemantics(
+      baseline = {
+        StyleTransitionOptions().apply {
+          durationMs = 300.0
+          delayMs = 0.0
+        }
+      },
+      copyOf = { it.copy() },
+      mutators =
+        listOf(
+          { durationMs = 500.0 },
+          // A present zero stays distinguishable from an absent field.
+          { delayMs = null },
+          { enablePlacementTransitions = false },
+        ),
     )
   }
 

@@ -130,3 +130,27 @@ and the repaint follows.
 `set_style_light_json` replaces the whole light object.
 `set_style_light_property` sets one of `anchor`, `color`, `intensity`, or
 `position`. Light steers fill-extrusion shading.
+
+## Transitions
+
+`set_style_transition_options` sets the style's global transition behavior:
+`duration`, `delay`, and whether symbol placement changes cross-fade. These are
+separate from camera animation options, which time camera moves, and from the
+per-property transitions a style declares.
+
+Duration and delay are optional. Omitting one clears the style-wide override,
+which leaves MapLibre Native on its own default: 300 ms for a continuous-mode
+map and zero for a still-mode one. Setting duration and delay together replaces
+the whole configuration rather than merging into what the style declared, so
+read the current options first when you mean to change one field.
+
+Loading a style replaces these options with the ones that style declares, so
+apply an override after the style loads. The style parser fills in a 300 ms
+duration for a style with no `transition` member, so a map that has loaded a
+style reports a duration whether or not the style names one.
+
+Placement transitions are always present and start enabled. Clearing them makes
+symbol placement changes apply to the next rendered frame instead of fading in.
+A host dragging a symbol-backed feature does that for the duration of the drag,
+because the cross-fade otherwise leaves the rendered symbol trailing the pointer.
+Restore it when the drag ends.

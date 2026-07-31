@@ -260,6 +260,46 @@ internal sealed unsafe class NativeStyleImage : IDisposable
 
 internal static class StyleStructs
 {
+    internal static mln_style_transition_options ToNative(StyleTransitionOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_style_transition_options_default();
+        native.enable_placement_transitions = (byte)(options.EnablePlacementTransitions ? 1 : 0);
+        if (options.Duration is { } duration)
+        {
+            native.fields |= (uint)
+                mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_DURATION;
+            native.duration_ms = duration;
+        }
+        if (options.Delay is { } delay)
+        {
+            native.fields |= (uint)
+                mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_DELAY;
+            native.delay_ms = delay;
+        }
+        return native;
+    }
+
+    internal static StyleTransitionOptions FromNative(mln_style_transition_options options) =>
+        new()
+        {
+            Duration =
+                (
+                    options.fields
+                    & (uint)mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_DURATION
+                ) != 0
+                    ? options.duration_ms
+                    : null,
+            Delay =
+                (
+                    options.fields
+                    & (uint)mln_style_transition_option_field.MLN_STYLE_TRANSITION_OPTION_DELAY
+                ) != 0
+                    ? options.delay_ms
+                    : null,
+            EnablePlacementTransitions = options.enable_placement_transitions != 0,
+        };
+
     internal static StyleImageInfo FromNative(mln_style_image_info info) =>
         new(
             info.width,

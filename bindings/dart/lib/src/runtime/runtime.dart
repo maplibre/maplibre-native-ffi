@@ -3056,6 +3056,34 @@ final class MapHandle {
     });
   }
 
+  /// Sets the style's global transition options.
+  ///
+  /// Absent duration and delay clear the style-wide override, so this call
+  /// replaces the whole transition configuration rather than merging into it.
+  /// Loading a style replaces these options with the ones that style declares,
+  /// so apply an override after the style loads.
+  void setStyleTransitionOptions(StyleTransitionOptions options) {
+    withNativeArena((arena) {
+      final nativeOptions = arena<raw.mln_style_transition_options>();
+      nativeOptions.ref = _styleTransitionOptionsToNative(options);
+      _check(
+        _c.raw.mln_map_set_style_transition_options(_handle.raw, nativeOptions),
+      );
+    });
+  }
+
+  /// Copies the style's global transition options.
+  StyleTransitionOptions getStyleTransitionOptions() {
+    return withNativeArena((arena) {
+      final outOptions = arena<raw.mln_style_transition_options>();
+      outOptions.ref = _c.raw.mln_style_transition_options_default();
+      _check(
+        _c.raw.mln_map_get_style_transition_options(_handle.raw, outOptions),
+      );
+      return _styleTransitionOptionsFromNative(outOptions.ref);
+    });
+  }
+
   /// Sets one layer property by style-spec property name.
   void setLayerProperty(String layerId, String propertyName, JsonValue value) {
     withNativeArena((arena) {

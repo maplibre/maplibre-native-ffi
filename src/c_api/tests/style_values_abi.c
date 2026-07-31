@@ -761,6 +761,66 @@ static void copy_entry_points_answer_a_null_buffer_as_a_size_probe(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// Bindings always emit a full struct header and reject non-finite durations
+// before the call, so only raw C callers reach these rejections.
+static void style_transition_options_reject_unsafe_raw_headers(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  mln_map map = mln_test_create_map(runtime);
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_set_style_transition_options(map, NULL)
+  );
+
+  mln_style_transition_options short_size =
+    mln_style_transition_options_default();
+  short_size.size = (uint32_t)(sizeof(mln_style_transition_options) - 1);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &short_size)
+  );
+
+  mln_style_transition_options unknown_field =
+    mln_style_transition_options_default();
+  unknown_field.fields = 1U << 20U;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &unknown_field)
+  );
+
+  mln_style_transition_options infinite_duration =
+    mln_style_transition_options_default();
+  infinite_duration.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  infinite_duration.duration_ms = INFINITY;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &infinite_duration)
+  );
+
+  mln_style_transition_options negative_delay =
+    mln_style_transition_options_default();
+  negative_delay.fields = MLN_STYLE_TRANSITION_OPTION_DELAY;
+  negative_delay.delay_ms = -1.0;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_transition_options(map, &negative_delay)
+  );
+
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT, mln_map_get_style_transition_options(map, NULL)
+  );
+
+  mln_style_transition_options short_out =
+    mln_style_transition_options_default();
+  short_out.size = (uint32_t)(sizeof(mln_style_transition_options) - 1);
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_get_style_transition_options(map, &short_out)
+  );
+
+  mln_test_destroy_map(map);
+  mln_test_destroy_runtime(runtime);
+}
+
 void run_style_values_abi_tests(void) {
   UnitySetTestFile(__FILE__);
   RUN_TEST(style_value_helpers_reject_unsafe_raw_descriptors);
@@ -772,4 +832,5 @@ void run_style_values_abi_tests(void) {
   RUN_TEST(layer_zoom_and_visibility_accessors_carry_raw_domains);
   RUN_TEST(style_image_stretch_descriptors_reject_unsafe_raw_values);
   RUN_TEST(copy_entry_points_answer_a_null_buffer_as_a_size_probe);
+  RUN_TEST(style_transition_options_reject_unsafe_raw_headers);
 }
