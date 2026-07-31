@@ -800,10 +800,15 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
     mln_map_set_style_transition_options(map, &unknown_field)
   );
 
+  // Each rejected duration carries a valid delay and vice versa, so a setter
+  // that committed one field before validating the other would leave the
+  // baseline half-overwritten whichever order it validated in.
   mln_style_transition_options infinite_duration =
     mln_style_transition_options_default();
-  infinite_duration.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
+  infinite_duration.fields =
+    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
   infinite_duration.duration_ms = INFINITY;
+  infinite_duration.delay_ms = 99.0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,
     mln_map_set_style_transition_options(map, &infinite_duration)
@@ -811,7 +816,9 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
 
   mln_style_transition_options negative_delay =
     mln_style_transition_options_default();
-  negative_delay.fields = MLN_STYLE_TRANSITION_OPTION_DELAY;
+  negative_delay.fields =
+    MLN_STYLE_TRANSITION_OPTION_DURATION | MLN_STYLE_TRANSITION_OPTION_DELAY;
+  negative_delay.duration_ms = 99.0;
   negative_delay.delay_ms = -1.0;
   TEST_ASSERT_EQUAL_INT(
     MLN_STATUS_INVALID_ARGUMENT,

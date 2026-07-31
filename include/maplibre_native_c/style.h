@@ -360,13 +360,15 @@ typedef struct mln_style_transition_options {
    * Transition duration in milliseconds. Must be finite and non-negative.
    * Values that would overflow MapLibre Native's internal duration are invalid.
    *
-   * When this field is omitted, paint property changes apply instantly.
-   * MapLibre Native's own 300 millisecond default still governs the symbol
-   * placement cross-fade that enable_placement_transitions gates, along with
-   * the pattern cross-fade across integer zoom levels.
+   * When this field is omitted, paint property changes apply instantly, and
+   * MapLibre Native's own 300 millisecond default governs the symbol placement
+   * cross-fade that enable_placement_transitions gates. A continuous-mode map
+   * applies that same default to the pattern cross-fade across integer zoom
+   * levels, while a still-mode map fades those patterns instantly instead.
    *
    * A still-mode map ignores this field and delay_ms for paint property
-   * transitions, applying every change instantly whatever they hold.
+   * transitions. A property carrying its own style-spec transition still
+   * animates there, because that one is not global.
    */
   double duration_ms;
   /**
@@ -1531,10 +1533,12 @@ MLN_API mln_status mln_map_set_style_transition_options(
  * Duration and delay report through their field-mask bits, because MapLibre
  * Native leaves either one unset until a style or a host sets it.
  *
- * MapLibre Native's style parser fills in a 300 millisecond duration for a
- * style that declares no transition, so a map that has loaded a style reports a
- * duration whether or not that style names one. A map that has loaded no style
- * yet reports both fields unset.
+ * A map that has loaded no style yet reports both fields unset. Once a style
+ * loads, what it declares decides: MapLibre Native's style parser fills in a
+ * 300 millisecond duration for a style carrying no "transition" member at all,
+ * but a style carrying one reports only the members that object names, so a
+ * style whose transition declares a delay alone reports no duration. Read the
+ * field-mask bits rather than assuming a loaded style sets either.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

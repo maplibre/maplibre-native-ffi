@@ -14,6 +14,8 @@ const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
 const STYLE_WITH_TRANSITION_JSON: &str =
     r#"{"version":8,"transition":{"duration":750,"delay":100},"sources":{},"layers":[]}"#;
+const STYLE_WITH_DELAY_ONLY_TRANSITION_JSON: &str =
+    r#"{"version":8,"transition":{"delay":100},"sources":{},"layers":[]}"#;
 
 #[test]
 // Spec coverage: BND-105.
@@ -734,11 +736,19 @@ fn style_transition_options_round_trip_through_the_real_c_api() {
     );
 
     // The style parser fills in its own 300ms duration for a style that
-    // declares no transition.
+    // carries no transition member at all.
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     let parsed = map.style_transition_options().unwrap();
     assert_eq!(parsed.duration_ms, Some(300.0));
     assert_eq!(parsed.delay_ms, None);
+
+    // A style that carries a transition member reports only what that member
+    // names, so a delay-only transition replaces that default with no duration.
+    map.set_style_json(STYLE_WITH_DELAY_ONLY_TRANSITION_JSON)
+        .unwrap();
+    let delay_only = map.style_transition_options().unwrap();
+    assert_eq!(delay_only.duration_ms, None);
+    assert_eq!(delay_only.delay_ms, Some(100.0));
 
     map.set_style_json(STYLE_WITH_TRANSITION_JSON).unwrap();
     let declared = map.style_transition_options().unwrap();
