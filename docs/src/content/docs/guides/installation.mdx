@@ -8,9 +8,10 @@ sidebar:
 import { Aside } from "@astrojs/starlight/components";
 
 <Aside type="caution">
-  Nothing here is released. CI rebuilds the native artifacts and force-moves the
-  snapshot tag on every push to `main`, and the C ABI stays unstable while
-  `mln_c_version()` returns `0`. Expect breakage between snapshots.
+  Nothing here is released. A daily job republishes the native artifacts and
+  force-moves the snapshot tag whenever their inputs changed on `main`, and the
+  C ABI stays unstable while `mln_c_version()` returns `0`. Expect breakage
+  between snapshots.
 </Aside>
 
 An integration needs the native library, which implements the C API. Unless you

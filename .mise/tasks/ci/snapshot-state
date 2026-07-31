@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+# [MISE] description="Hash snapshot component inputs and track what was published."
+# [MISE] shell="python3"
+
+"""Gate snapshot publishing on the inputs each component actually consumes.
+
+`hash` digests one component's inputs at a commit. `plan` compares every
+component's digest against the state recorded at its last publish and reports
+what to publish. `record` writes the digests of the components that published,
+and `read` prints the recorded state.
+
+The state is one `snapshots.json` on an orphan branch: one ref for every
+component, carrying history and the provenance of each publish.
+"""
+
+import argparse
+import base64
+import datetime
+import json
+import os
+import pathlib
+import sys
+import urllib.error
+import urllib.request
+
+
+ROOT = pathlib.Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT))
+
+from ci.snapshots import (  # noqa: E402
+    STATE_BRANCH,
+    STATE_PATH,
+    UncoveredPaths,
+    Component,
+    component_hash,
+    entries,
+    load,
+)
+
+
+def _token() -> str:
+    for name in ("GH_TOKEN", "GITHUB_TOKEN"):
+        token = os.environ.get(name)
+        if token:
+            return token
+    raise SystemExit("error: GH_TOKEN or GITHUB_TOKEN is required to reach GitHub")
+
+
+def _api(method: str, path: str, payload: dict | None = None) -> object | None:
+    """Call the repository's GitHub API, reporting a 404 as None."""
+    repository = os.environ.get("GITHUB_REPOSITORY")
+    if not repository:
+        raise SystemExit("error: GITHUB_REPOSITORY is required to reach GitHub")
+    base = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    request = urllib.request.Request(
+        f"{base}/repos/{repository}{path}",
+        method=method,
+        data=None if payload is None else json.dumps(payload).encode(),
+        headers={
+            "Accept": "application/vnd.github+json",
+            "Authorization": f"Bearer {_token()}",
+            "Content-Type": "application/json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request) as response:
+            return json.loads(response.read() or b"null")
+    except urllib.error.HTTPError as error:
+        if error.code == 404:
+            return None
+        detail = error.read().decode(errors="replace")
+        raise SystemExit(
+            f"error: {method} {path} failed with HTTP {error.code}: {detail}"
+        ) from error
+
+
+def read_state() -> tuple[dict, str | None]:
+    """The recorded state and the blob SHA it came from; empty when absent."""
+    content = _api("GET", f"/contents/{STATE_PATH}?ref={STATE_BRANCH}")
+    if content is None:
+        return {}, None
+    return json.loads(base64.b64decode(content["content"])), content["sha"]
+
+
+def write_state(state: dict, blob: str | None, message: str) -> None:
+    """Publish the state, creating its orphan branch on the first record."""
+    text = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    if _api("GET", f"/git/ref/heads/{STATE_BRANCH}") is None:
+        tree = _api(
+            "POST",
+            "/git/trees",
+            {
+                "tree": [
+                    {
+                        "path": STATE_PATH,
+                        "mode": "100644",
+                        "type": "blob",
+                        "content": text,
+                    }
+                ]
+            },
+        )
+        commit = _api(
+            "POST",
+            "/git/commits",
+            {"message": message, "tree": tree["sha"], "parents": []},
+        )
+        _api(
+            "POST",
+            "/git/refs",
+            {"ref": f"refs/heads/{STATE_BRANCH}", "sha": commit["sha"]},
+        )
+        return
+
+    # The blob SHA makes the write conditional, so a concurrent record fails
+    # rather than overwriting a component another run just published.
+    payload = {
+        "message": message,
+        "content": base64.b64encode(text.encode()).decode(),
+        "branch": STATE_BRANCH,
+    }
+    if blob is not None:
+        payload["sha"] = blob
+    _api("PUT", f"/contents/{STATE_PATH}", payload)
+
+
+def _run_url() -> str:
+    server = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
+    repository = os.environ.get("GITHUB_REPOSITORY", "")
+    return f"{server}/{repository}/actions/runs/{os.environ.get('GITHUB_RUN_ID', '')}"
+
+
+def _boolean(value: str) -> bool:
+    lowered = value.strip().lower()
+    if lowered in {"true", "1", "yes"}:
+        return True
+    if lowered in {"", "false", "0", "no"}:
+        return False
+    raise argparse.ArgumentTypeError(f"expected a boolean, got {value!r}")
+
+
+def _component(components: dict[str, Component], name: str) -> Component:
+    if name not in components:
+        known = ", ".join(sorted(components))
+        raise SystemExit(f"error: unknown component {name!r}; known: {known}")
+    return components[name]
+
+
+def _selection(components: dict[str, Component], requested: str) -> set[str]:
+    if requested.strip() in {"", "all"}:
+        return set(components)
+    names = {name.strip() for name in requested.split(",") if name.strip()}
+    for name in sorted(names):
+        _component(components, name)
+    return names
+
+
+def _emit_outputs(report: dict[str, dict]) -> None:
+    output = os.environ.get("GITHUB_OUTPUT")
+    if not output:
+        return
+    with open(output, "a", encoding="utf-8") as file:
+        for name, entry in sorted(report.items()):
+            file.write(f"publish_{name}={str(entry['publish']).lower()}\n")
+            file.write(f"hash_{name}={entry['hash']}\n")
+
+
+def command_hash(arguments: argparse.Namespace) -> int:
+    components = load(ROOT)
+    component = _component(components, arguments.component)
+    print(component_hash(component, entries(ROOT, arguments.ref)))
+    return 0
+
+
+def command_plan(arguments: argparse.Namespace) -> int:
+    components = load(ROOT)
+    selected = _selection(components, arguments.components)
+    found = entries(ROOT, arguments.ref)
+    state, _ = read_state()
+
+    report = {}
+    for name, component in components.items():
+        digest = component_hash(component, found)
+        recorded = state.get(name, {})
+        changed = recorded.get("inputHash") != digest
+        report[name] = {
+            "hash": digest,
+            "changed": changed,
+            "publish": name in selected and (changed or arguments.force),
+            "publishedAt": recorded.get("publishedAt"),
+        }
+
+    _emit_outputs(report)
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0
+
+
+def command_read(_: argparse.Namespace) -> int:
+    state, _blob = read_state()
+    print(json.dumps(state, indent=2, sort_keys=True))
+    return 0
+
+
+def command_record(arguments: argparse.Namespace) -> int:
+    components = load(ROOT)
+    updates = {}
+    for assignment in arguments.assignments:
+        name, separator, digest = assignment.partition("=")
+        if not separator or not digest:
+            raise SystemExit(
+                f"error: expected <component>=<hash>, got {assignment!r}"
+            )
+        _component(components, name)
+        updates[name] = digest
+
+    if not updates:
+        print("no components published; leaving the recorded state alone")
+        return 0
+
+    state, blob = read_state()
+    published_at = (
+        datetime.datetime.now(datetime.timezone.utc)
+        .isoformat(timespec="seconds")
+        .replace("+00:00", "Z")
+    )
+    for name, digest in updates.items():
+        state[name] = {
+            "inputHash": digest,
+            "sha": os.environ.get("SNAPSHOT_SHA", ""),
+            "publishedAt": published_at,
+            "runUrl": _run_url(),
+        }
+
+    write_state(state, blob, f"Record {', '.join(sorted(updates))} snapshot inputs")
+    print(json.dumps(state, indent=2, sort_keys=True))
+    return 0
+
+
+def parser() -> argparse.ArgumentParser:
+    root = argparse.ArgumentParser(description=__doc__)
+    commands = root.add_subparsers(dest="command", required=True)
+
+    hash_command = commands.add_parser("hash", help="digest one component's inputs")
+    hash_command.add_argument("component")
+    hash_command.add_argument("ref", nargs="?", default="HEAD")
+    hash_command.set_defaults(handler=command_hash)
+
+    plan_command = commands.add_parser("plan", help="report what to publish")
+    plan_command.add_argument("ref", nargs="?", default="HEAD")
+    plan_command.add_argument(
+        "--components",
+        default="all",
+        help="comma-separated component names, or 'all'",
+    )
+    plan_command.add_argument(
+        "--force",
+        type=_boolean,
+        default=False,
+        help="publish selected components even when their inputs are unchanged",
+    )
+    plan_command.set_defaults(handler=command_plan)
+
+    read_command = commands.add_parser("read", help="print the recorded state")
+    read_command.set_defaults(handler=command_read)
+
+    record_command = commands.add_parser("record", help="record published inputs")
+    record_command.add_argument("assignments", nargs="*", metavar="component=hash")
+    record_command.set_defaults(handler=command_record)
+
+    return root
+
+
+def main() -> int:
+    arguments = parser().parse_args()
+    try:
+        return arguments.handler(arguments)
+    except UncoveredPaths as uncovered:
+        print(f"error: {uncovered}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

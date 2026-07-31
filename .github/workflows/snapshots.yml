@@ -1,13 +1,20 @@
 name: Snapshots
 
+# Publishing runs on its own daily schedule rather than after every CI run, and
+# each component publishes only when the inputs it consumes changed since its
+# last publish. `ci/snapshots.toml` declares those input scopes.
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches:
-      - main
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      components:
+        description: "Comma list of components to publish, or 'all'"
+        default: all
+      force:
+        description: "Publish even when the inputs are unchanged"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -17,11 +24,83 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  plan:
+    name: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+    env:
+      # The repository's postinstall hook installs the Git hooks through `hk`,
+      # which the jobs that only need Python never acquire.
+      MISE_NO_HOOKS: "1"
+    outputs:
+      run_id: ${{ steps.source.outputs.run_id }}
+      sha: ${{ steps.source.outputs.sha }}
+      ci_run_url: ${{ steps.source.outputs.ci_run_url }}
+      publish_native: ${{ steps.plan.outputs.publish_native }}
+      publish_kotlin: ${{ steps.plan.outputs.publish_kotlin }}
+      publish_docs: ${{ steps.plan.outputs.publish_docs }}
+      hash_native: ${{ steps.plan.outputs.hash_native }}
+      hash_kotlin: ${{ steps.plan.outputs.hash_kotlin }}
+      hash_docs: ${{ steps.plan.outputs.hash_docs }}
+    steps:
+      # The artifacts every publish job downloads come from one CI run, so that
+      # run's commit is what this workflow publishes and hashes.
+      - name: Resolve the source CI run
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          run="$(gh run list \
+            --repo "$GITHUB_REPOSITORY" \
+            --workflow CI \
+            --branch main \
+            --status success \
+            --limit 1 \
+            --json databaseId,headSha,url)"
+
+          if [[ "$(jq 'length' <<<"$run")" -eq 0 ]]; then
+            echo "no successful CI run on main to publish from" >&2
+            exit 1
+          fi
+
+          {
+            echo "run_id=$(jq -r '.[0].databaseId' <<<"$run")"
+            echo "sha=$(jq -r '.[0].headSha' <<<"$run")"
+            echo "ci_run_url=$(jq -r '.[0].url' <<<"$run")"
+          } >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      # The gate reads Git history and the scope config, so it needs Python
+      # rather than the native toolchain the publish jobs use. `--no-deps` on
+      # the task keeps mise from preparing the submodule and package
+      # dependencies that only a build needs.
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: false
+          install_args: python
+      - name: Plan the publish
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          mise run --no-deps ci:snapshot-state plan
+          --components "${{ inputs.components || 'all' }}"
+          --force "${{ inputs.force || 'false' }}"
+
   docs-pages:
     name: Docs Pages
+    needs:
+      - plan
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ needs.plan.outputs.publish_docs == 'true' }}
     environment: sccache
     permissions:
       actions: read
@@ -29,7 +108,7 @@ jobs:
       pages: write
       id-token: write
     env:
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,7 +124,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           name: native-package-linux-x64-vulkan-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/docs-input
       - name: Install packaged native artifact
@@ -79,9 +158,11 @@ jobs:
 
   stage-kotlin:
     name: Kotlin Maven staging / ${{ matrix.partition }}
+    needs:
+      - plan
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ needs.plan.outputs.publish_kotlin == 'true' }}
     environment: sccache
     permissions:
       actions: read
@@ -99,7 +180,7 @@ jobs:
             target: macos-arm64-metal
             native_pattern: native-package-*
     env:
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -113,7 +194,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           pattern: ${{ matrix.native_pattern }}-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       # The Linux partition also publishes the linuxX64 KLIBs, which embed the
@@ -122,7 +203,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           pattern: native-package-linux-x64-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       - run: mise run //:kotlin:publish-snapshot stage ${{ matrix.partition }}
@@ -136,6 +217,7 @@ jobs:
   verify-kotlin:
     name: Kotlin Maven verification
     needs:
+      - plan
       - stage-kotlin
     runs-on: macos-26
     timeout-minutes: 60
@@ -144,7 +226,7 @@ jobs:
       actions: read
       contents: read
     env:
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -165,6 +247,7 @@ jobs:
   publish-kotlin-leaves:
     name: Kotlin Maven leaf snapshots / ${{ matrix.partition }}
     needs:
+      - plan
       - verify-kotlin
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 240
@@ -187,7 +270,7 @@ jobs:
             target: macos-arm64-metal
             native_pattern: native-package-*
     env:
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
       ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
       ORG_GRADLE_PROJECT_signAllPublications: "true"
@@ -206,7 +289,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           pattern: ${{ matrix.native_pattern }}-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       # The Linux partition also publishes the linuxX64 KLIBs, which embed the
@@ -215,7 +298,7 @@ jobs:
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           pattern: native-package-linux-x64-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       - run: mise run //:kotlin:publish-snapshot publish-leaves ${{ matrix.partition }}
@@ -223,6 +306,7 @@ jobs:
   publish-kotlin-roots:
     name: Kotlin Maven root snapshots
     needs:
+      - plan
       - publish-kotlin-leaves
     runs-on: macos-26
     timeout-minutes: 60
@@ -233,7 +317,7 @@ jobs:
       actions: read
       contents: read
     env:
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
       ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
       ORG_GRADLE_PROJECT_signAllPublications: "true"
@@ -252,7 +336,7 @@ jobs:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ needs.plan.outputs.run_id }}
           pattern: native-package-*-metal-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/maven-input
       - run: mise run //:kotlin:publish-snapshot publish-roots apple
@@ -260,60 +344,44 @@ jobs:
   publish:
     name: native package
     needs:
+      - plan
       - publish-kotlin-roots
+    # Ordered after the Kotlin uploads, but a Kotlin gate that skipped is not a
+    # reason to hold the native release back.
+    if: >-
+      ${{ !cancelled()
+      && needs.plan.outputs.publish_native == 'true'
+      && needs.publish-kotlin-roots.result != 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       actions: read
       contents: write
     env:
-      CI_RUN_URL: ${{ github.event.workflow_run.html_url }}
-      SNAPSHOT_SHA: ${{ github.event.workflow_run.head_sha }}
+      CI_RUN_URL: ${{ needs.plan.outputs.ci_run_url }}
+      MISE_NO_HOOKS: "1"
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
       SNAPSHOT_TAG: unstable-native-snapshot
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: false
+          install_args: python
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ github.event.workflow_run.id }}
-          pattern: native-package-*-${{ github.event.workflow_run.head_sha }}
+          run-id: ${{ needs.plan.outputs.run_id }}
+          pattern: native-package-*-${{ env.SNAPSHOT_SHA }}
           path: build/packages/native/release
           merge-multiple: true
       - name: Prepare release assets
-        run: |
-          python3 - build/packages/native/release <<'PY'
-          import hashlib
-          import os
-          import pathlib
-          import sys
-
-          release_dir = pathlib.Path(sys.argv[1])
-          tarballs = sorted(release_dir.glob("*.tar.gz"))
-          if not tarballs:
-              raise SystemExit(f"no native package tarballs found in {release_dir}")
-
-          server_url = os.environ.get("GITHUB_SERVER_URL", "https://github.com")
-          repository = os.environ["GITHUB_REPOSITORY"]
-          snapshot_sha = os.environ["SNAPSHOT_SHA"]
-          notes = "\n".join(
-              [
-                  "Unstable native package snapshot.",
-                  "",
-                  f"Commit: {server_url}/{repository}/commit/{snapshot_sha}",
-                  f"CI run: {os.environ['CI_RUN_URL']}",
-                  f"Snapshot run: {server_url}/{repository}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
-                  "",
-              ]
-          )
-          (release_dir / "RELEASE_NOTES.md").write_text(notes, encoding="utf-8")
-
-          checksums = []
-          for path in tarballs:
-              digest = hashlib.sha256(path.read_bytes()).hexdigest()
-              checksums.append(f"{digest}  {path.name}")
-          (release_dir / "SHA256SUMS").write_text(
-              "\n".join(checksums) + "\n", encoding="utf-8"
-          )
-          PY
+        run: >-
+          mise run --no-deps ci:prepare-native-package-snapshot
+          build/packages/native/release
       - name: Move snapshot tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -346,3 +414,78 @@ jobs:
           files: |
             build/packages/native/release/*.tar.gz
             build/packages/native/release/SHA256SUMS
+
+  record:
+    name: record
+    needs:
+      - plan
+      - deploy-docs
+      - publish-kotlin-roots
+      - publish
+    # Only components that published get their input hash recorded, so a failed
+    # or skipped component is retried by the next run.
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      MISE_NO_HOOKS: "1"
+      SNAPSHOT_SHA: ${{ needs.plan.outputs.sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.SNAPSHOT_SHA }}
+          persist-credentials: false
+      - uses: jdx/mise-action@9e7f7633ff6f6d6048a9418a68d48f288f50eb14 # v4.2.3
+        with:
+          cache: false
+          install_args: python
+      - name: Record published inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DOCS_RESULT: ${{ needs.deploy-docs.result }}
+          KOTLIN_RESULT: ${{ needs.publish-kotlin-roots.result }}
+          NATIVE_RESULT: ${{ needs.publish.result }}
+          DOCS_HASH: ${{ needs.plan.outputs.hash_docs }}
+          KOTLIN_HASH: ${{ needs.plan.outputs.hash_kotlin }}
+          NATIVE_HASH: ${{ needs.plan.outputs.hash_native }}
+        run: |
+          set -euo pipefail
+
+          published=()
+          if [[ "$NATIVE_RESULT" == success ]]; then
+            published+=("native=$NATIVE_HASH")
+          fi
+          if [[ "$KOTLIN_RESULT" == success ]]; then
+            published+=("kotlin=$KOTLIN_HASH")
+          fi
+          if [[ "$DOCS_RESULT" == success ]]; then
+            published+=("docs=$DOCS_HASH")
+          fi
+
+          mise run --no-deps ci:snapshot-state record ${published[@]+"${published[@]}"}
+
+  required:
+    name: snapshots-required
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # A skipped job is the gate doing its work, so only real failures are red.
+    if: ${{ always() }}
+    needs:
+      - plan
+      - docs-pages
+      - deploy-docs
+      - stage-kotlin
+      - verify-kotlin
+      - publish-kotlin-leaves
+      - publish-kotlin-roots
+      - publish
+      - record
+    steps:
+      - name: Fail if required jobs failed
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo '${{ toJSON(needs) }}'
+          exit 1
+      - run: "true"

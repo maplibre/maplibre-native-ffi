@@ -154,6 +154,19 @@ reusing the matrix's CMake install archives to build only the JNI bridge and
 final AARs, while macOS runners build the JVM, macOS, and iOS publications. Each
 consumes native build artifacts produced by the platform and backend CI matrix.
 
+A daily schedule drives publication rather than each push to `main`: the
+workflow picks the latest successful CI run on `main` and publishes from its
+artifacts. Each publishable component — the Kotlin modules, the native package
+release, and the docs site — carries an input scope in `ci/snapshots.toml`, and
+the workflow hashes that scope at the source commit. A component publishes when
+its hash differs from the one recorded at its last publish, so a change confined
+to another binding leaves the Kotlin modules alone. The recorded hashes live in
+`snapshots.json` on the orphan `snapshot-state` branch, alongside the commit,
+timestamp, and run URL of each publish, and only components that published
+successfully are recorded, so a failure is retried the next day. Run the
+workflow manually through `workflow_dispatch` to republish sooner, selecting
+components and forcing an unchanged component to publish.
+
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central
 Portal user token in the `MAVEN_CENTRAL_USERNAME` and `MAVEN_CENTRAL_PASSWORD`

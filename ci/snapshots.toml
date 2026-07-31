@@ -1,0 +1,104 @@
+# Input scopes for the components published by .github/workflows/snapshots.yml.
+# The workflow hashes each component's inputs at the commit it would publish and
+# skips the component when that hash matches the one recorded at its last
+# publish, so publishing follows input changes rather than commit frequency.
+#
+# Rules are gitignore-style and ordered, `!` marks a path as not an input, and
+# the last matching rule wins. A component's effective list is `shared`, then
+# the `paths` of everything it depends on, then its own `paths`.
+#
+# There is deliberately no catch-all: `ci:check-snapshot-scopes` fails when a
+# tracked path matches no rule, so a new top-level entry has to be classified
+# rather than inheriting a default. It also fails on a rule that matches nothing,
+# so stale patterns surface after a refactor.
+
+# Prepended to every component's rules. Every top-level entry appears here
+# exactly once, either as an input or `!`-excluded.
+shared = [
+  # Native build inputs.
+  "CMakeLists.txt",
+  "CMakePresets.json",
+  "cmake/**",
+  "include/**",
+  "src/**",
+  "third_party/**",
+  "patches/**",
+  "scripts/**",
+  "LICENSE",
+  # Toolchain and task definitions.
+  "mise.toml",
+  "mise.lock",
+  "mise.linux.toml",
+  "mise.macos.toml",
+  "mise.windows.toml",
+  ".miserc.toml",
+  ".mise/**",
+  ".config/**",
+  # CI definitions that shape the published artifacts.
+  ".github/workflows/**",
+  ".github/actions/**",
+  "ci/**",
+  # Binding sources and the build systems that package them.
+  "bindings/**",
+  "buildSrc/**",
+  "gradle/**",
+  "build.gradle.kts",
+  "settings.gradle.kts",
+  "gradle.properties",
+  "gradlew",
+  "gradlew.bat",
+  "Cargo.toml",
+  "Cargo.lock",
+  "Directory.Packages.props",
+  "Maplibre.Native.slnx",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "pyproject.toml",
+  "uv.lock",
+  ".npmrc",
+  # Checkout behaviour, and the submodule pin the native build compiles.
+  ".gitattributes",
+  ".gitmodules",
+
+  # Not inputs to any published artifact. Development tooling, editor and
+  # service configuration, prose, and the example apps.
+  "!examples/**",
+  "!docs/**",
+  "!*.md",
+  "!dprint.jsonc",
+  "!hk.pkl",
+  "!vite.config.ts",
+  "!.clang-tidy",
+  "!.clangd",
+  "!.gitignore",
+  "!.devcontainer/**",
+  "!.github/ISSUE_TEMPLATE/**",
+  "!.github/dependabot.yml",
+  "!.github/FUNDING.yml",
+  "!.coderabbit.yaml",
+  "!.idea/**",
+  "!.ona/**",
+  "!.vscode/**",
+  "!.zed/**",
+]
+
+[components.native]
+description = "Native CPack tarballs on the floating GitHub prerelease."
+paths = ["!bindings/**"]
+
+[components.kotlin]
+description = "Kotlin Multiplatform modules on Maven Central snapshots."
+depends = ["native"]
+paths = [
+  "bindings/kotlin/**",
+  "bindings/kotlin-runtime-*/**",
+  "bindings/rustls-platform-verifier-android/**",
+]
+
+[components.docs]
+# The site embeds an API reference generated from every binding and from the
+# native install, so it inherits the Kotlin scope and adds the rest back.
+description = "Docs site on GitHub Pages."
+depends = ["kotlin"]
+paths = ["bindings/**", "docs/**", "*.md"]

@@ -149,6 +149,14 @@ generators usually live with the language package graph they serve.
 `mise run check`, and `mise run fix`. [`dprint`](https://dprint.dev/) owns
 repository-wide formatting defaults.
 
+GitHub Actions runs those checks, configured from two files under `ci/`.
+`ci/workflow.toml` declares the suites each target runs, and
+`mise run ci:generate-workflow` renders them into `.github/workflows/ci.yml`.
+`ci/snapshots.toml` declares the input scope of each component the daily
+snapshot workflow publishes, so a component republishes only when the paths it
+consumes changed; `mise run ci:check-snapshot-scopes` keeps every tracked path
+classified.
+
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
 `docs/public/reference/` before each docs build.
