@@ -78,8 +78,12 @@ final class RuntimeLoopThread: Thread {
     defer { try? wake.close() }
     channels.publish(attachRef: attachRef, wake: wake)
 
+    // Reused across drains, so applying a batch allocates nothing.
+    var batch: [CameraCommand] = []
+
     while !channels.isShutdownRequested, channels.failureMessage == nil {
-      for command in channels.drainCommands() {
+      channels.drainCommands(into: &batch)
+      for command in batch {
         try state.apply(command)
       }
       // This thread has no display to pace it, so it takes its cadence from the

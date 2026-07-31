@@ -66,14 +66,20 @@ final class Channels: @unchecked Sendable {
     try? source?.signal()
   }
 
-  /// Runtime loop: takes every queued command so it can apply them without
-  /// holding the lock.
-  func drainCommands() -> [CameraCommand] {
+  /// Runtime loop: hands the pending commands over and takes `batch` in
+  /// exchange, so the two ping-pong and the locked section is the swap alone.
+  ///
+  /// Reading the array out and clearing it under the lock would not do: the
+  /// read leaves the buffer shared, so the clear has to allocate a fresh one
+  /// sized to the backlog, and it does that every drain.
+  func drainCommands(into batch: inout [CameraCommand]) {
+    // Clearing releases the elements of the batch just applied, so it happens
+    // before the lock is taken. Only the runtime loop holds `batch` here; the
+    // queue is still filling the other array.
+    batch.removeAll(keepingCapacity: true)
     condition.lock()
     defer { condition.unlock() }
-    let drained = commands
-    commands.removeAll(keepingCapacity: true)
-    return drained
+    swap(&commands, &batch)
   }
 
   // MARK: - Render request (runtime loop to render loop)
