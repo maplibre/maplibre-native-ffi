@@ -128,6 +128,7 @@ tasks.withType<Zip>().configureEach {
       into(licenseDirectory)
     }
     from(rustlsPlatformVerifierPackage.map { it.resolve("LICENSE-MIT") }) { into(licenseDirectory) }
+    from(rootProject.file("patches/rustls-platform-verifier/NOTICE")) { into(licenseDirectory) }
   }
 }
 

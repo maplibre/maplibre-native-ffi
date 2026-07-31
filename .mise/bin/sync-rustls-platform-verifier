@@ -10,6 +10,7 @@ upstream_commit="1099f161bfc5e3ac7f90aad88b1bf788e72906cb"
 patches=(
   "$repo_root/patches/rustls-platform-verifier/0001-namespace-android-verifier.patch"
   "$repo_root/patches/rustls-platform-verifier/0002-use-android-revocation-policy.patch"
+  "$repo_root/patches/rustls-platform-verifier/0003-add-modification-notices.patch"
 )
 
 mkdir -p "$dependency_parent"

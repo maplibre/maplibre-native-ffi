@@ -79,5 +79,26 @@ thread-safe, fast, and free of calls back into the API. Return "consumed" to
 suppress the platform logger. The callback and its state must stay valid until
 `mln_log_clear_callback()` replaces or clears it.
 
-On Android, call `mln_android_init` once at startup, or HTTPS requests cannot
-validate TLS against the platform trust store.
+## TLS on Android
+
+Call `mln_android_init` once at startup, or HTTPS requests cannot validate TLS
+against the platform trust store. The runtime reaches that store through a
+MapLibre-private build of
+[`rustls-platform-verifier`](https://github.com/rustls/rustls-platform-verifier),
+which the Kotlin binding packages for you and other hosts add as described in
+their binding's README.
+
+Certificate chains are validated by Android's own `X509TrustManager`, so the map
+honors the system roots plus any user- or enterprise-installed CA that the app's
+network security configuration trusts. That covers debugging proxies and tile
+servers behind a private CA.
+
+<Aside type="caution" title="Revocation checking on Android">
+  Chain validation on Android follows the platform's trust-manager policy, which
+  does not check certificate revocation. This matches what `HttpsURLConnection`
+  and OkHttp give an Android app, and it differs from the other platforms, where
+  the OS verifier applies its own revocation policy. The upstream verifier's
+  extra revocation pass rejects certificates that carry no OCSP responder, which
+  fails against issuers like Let's Encrypt that have retired OCSP. See
+  [`rustls-platform-verifier#221`](https://github.com/rustls/rustls-platform-verifier/issues/221).
+</Aside>

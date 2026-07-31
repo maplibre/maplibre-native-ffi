@@ -11,9 +11,12 @@ val verifierSourceFile =
 
 val verifyRustlsPlatformVerifierSource =
   tasks.register("verifyRustlsPlatformVerifierSource") {
-    inputs.file(verifierSourceFile).optional()
+    // Bind to a local so the action captures the file, not the enclosing script,
+    // which the configuration cache cannot serialize.
+    val sourceFile = verifierSourceFile
+    inputs.file(sourceFile).optional()
     doLast {
-      check(inputs.files.singleFile.isFile) {
+      check(sourceFile.isFile) {
         "Missing patched Rustls platform-verifier source; run `mise deps` from the repository root"
       }
     }
@@ -21,10 +24,10 @@ val verifyRustlsPlatformVerifierSource =
 
 android {
   namespace = "org.maplibre.nativeffi.internal.rustlsplatformverifier"
-  compileSdk = 36
+  compileSdk = libs.versions.android.compileSdk.get().toInt()
 
   defaultConfig {
-    minSdk = 24
+    minSdk = libs.versions.android.minSdk.get().toInt()
     buildConfigField("boolean", "TEST", "false")
     consumerProguardFiles("consumer-rules.pro")
   }
@@ -37,5 +40,20 @@ android {
 tasks.configureEach {
   if (name == "preBuild") {
     dependsOn(verifyRustlsPlatformVerifierSource)
+  }
+}
+
+// Hosts that consume this AAR directly receive the upstream licenses and the
+// statement of our modifications that Apache-2.0 section 4 requires.
+tasks.withType<Zip>().configureEach {
+  if (name == "bundleReleaseAar") {
+    val licenseDirectory = "META-INF/licenses/rustls-platform-verifier"
+    from(repositoryRoot.resolve("build/dependencies/rustls-platform-verifier/LICENSE-APACHE")) {
+      into(licenseDirectory)
+    }
+    from(repositoryRoot.resolve("build/dependencies/rustls-platform-verifier/LICENSE-MIT")) {
+      into(licenseDirectory)
+    }
+    from(rootProject.file("patches/rustls-platform-verifier/NOTICE")) { into(licenseDirectory) }
   }
 }

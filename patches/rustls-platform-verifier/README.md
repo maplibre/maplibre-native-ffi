@@ -13,7 +13,13 @@ these patches in order:
    [Element X Android](https://github.com/element-hq/element-x-android/commit/f62030ac5b6b4ef9a3247a4d168f91e8a1ebd467)
    for
    [`rustls-platform-verifier#221`](https://github.com/rustls/rustls-platform-verifier/issues/221).
+3. `0003-add-modification-notices.patch` marks the two substantively changed
+   source files as modified, which Apache-2.0 section 4(b) requires of anyone
+   redistributing them.
+
+`NOTICE` states the same modifications for recipients of the compiled artifacts.
+Gradle packages it beside the upstream licenses in the Android AARs.
 
 When updating upstream, change the pinned tag and commit together, then rebase
-both patches. The mise dependency acquisition fails if the tag resolves to a
-different commit or either patch no longer applies.
+all three patches and refresh `NOTICE`. The mise dependency acquisition fails if
+the tag resolves to a different commit or any patch no longer applies.
