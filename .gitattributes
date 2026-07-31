@@ -14,6 +14,7 @@ gradle/wrapper/**                                           linguist-vendored=tr
 /.github/workflows/ci.yml                                   linguist-generated=true
 /bindings/dart/lib/src/internal/c/maplibre_native_c.g.dart  linguist-generated=true
 /bindings/dotnet/src/Maplibre.Native/Generated/*.g.cs       linguist-generated=true
+/bindings/kotlin/src/jvmMain/generated/**/*.java            linguist-generated=true
 
 # Generated: dependency lockfiles.
 Cargo.lock                                                  linguist-generated=true

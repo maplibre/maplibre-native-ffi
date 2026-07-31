@@ -3,6 +3,16 @@
 "aqua:facebook/ktfmt" = "{{vars.ktfmt_version}}"
 "aqua:google/google-java-format" = "{{vars.google_java_format_version}}"
 
+[tasks.generate]
+description = "Regenerate the committed JVM FFM declarations with jextract."
+dir = "../.."
+run = "./gradlew :bindings:kotlin:generateJvmJextractBindings --rerun-tasks"
+
+[tasks.generate-check]
+description = "Check that the committed JVM FFM declarations match jextract output."
+dir = "../.."
+run = "./gradlew :bindings:kotlin:checkJvmJextractBindings"
+
 [tasks.api]
 description = "Generate Dokka HTML API reference for the Kotlin binding."
 dir = "../.."

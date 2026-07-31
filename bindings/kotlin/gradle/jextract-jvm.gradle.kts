@@ -117,6 +117,41 @@ abstract class GenerateJvmJextractBindingsTask : DefaultTask() {
         "public static final ValueLayout.OfLong C_LONG = JAVA_LONG;",
       )
     )
+    output
+      .walkTopDown()
+      .filter { it.isFile && it.extension == "java" }
+      .forEach { it.writeText(it.readText().trimEnd() + "\n") }
+  }
+}
+
+abstract class CheckJvmJextractBindingsTask : DefaultTask() {
+  @get:InputDirectory
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val checkedInDirectory: DirectoryProperty
+
+  @get:InputDirectory
+  @get:PathSensitive(PathSensitivity.RELATIVE)
+  abstract val generatedDirectory: DirectoryProperty
+
+  @TaskAction
+  fun check() {
+    fun sources(directory: File): Map<String, String> =
+      directory.walkTopDown().filter(File::isFile).associate {
+        it.relativeTo(directory).invariantSeparatorsPath to it.readText()
+      }
+
+    val checkedIn = sources(checkedInDirectory.get().asFile)
+    val generated = sources(generatedDirectory.get().asFile)
+    val differences =
+      (checkedIn.keys + generated.keys).sorted().filter { checkedIn[it] != generated[it] }
+    check(differences.isEmpty()) {
+      """
+      The committed JVM jextract bindings differ from a fresh generation:
+      ${differences.joinToString("\n") { "  $it" }}
+      Regenerate with 'mise run //bindings/kotlin:generate' and commit the result.
+      """
+        .trimIndent()
+    }
   }
 }
 
@@ -124,7 +159,9 @@ val hostPlatform = HostPlatform.current()
 val jextractDistribution = hostPlatform.jextractDistribution
 val checkedInCHeaders = rootProject.layout.projectDirectory.dir("include")
 
-val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
+val checkedInJextractSources = layout.projectDirectory.dir("src/jvmMain/generated")
+val generatedJextractCheckSources =
+  layout.buildDirectory.dir("generated-check/sources/jextract/jvmMain/java")
 val jextractArchive = layout.buildDirectory.file("jextract/openjdk-25-jextract.tar.gz")
 val jextractInstallDir = layout.buildDirectory.dir("jextract/tool")
 val jextractExecutableFile = jextractInstallDir.map { dir ->
@@ -152,17 +189,34 @@ val extractJextract =
 val generateJvmJextractBindings =
   tasks.register<GenerateJvmJextractBindingsTask>("generateJvmJextractBindings") {
     group = "build"
-    description = "Generates JVM FFM declarations for the MapLibre Native C ABI with jextract."
+    description = "Regenerates the committed JVM FFM declarations with jextract."
     dependsOn(extractJextract)
     includes = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
     cHeaders = checkedInCHeaders
     jextractExecutable = layout.file(provider { jextractExecutableFile.get() })
     jextractArchiveSha256 = jextractDistribution.sha256
-    outputDirectory = generatedJextractSources
+    outputDirectory = checkedInJextractSources
   }
 
+val generateJvmJextractBindingsForCheck =
+  tasks.register<GenerateJvmJextractBindingsTask>("generateJvmJextractBindingsForCheck") {
+    dependsOn(extractJextract)
+    includes = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
+    cHeaders = checkedInCHeaders
+    jextractExecutable = layout.file(provider { jextractExecutableFile.get() })
+    jextractArchiveSha256 = jextractDistribution.sha256
+    outputDirectory = generatedJextractCheckSources
+  }
+
+tasks.register<CheckJvmJextractBindingsTask>("checkJvmJextractBindings") {
+  group = "verification"
+  description = "Checks that the committed JVM FFM declarations match jextract output."
+  dependsOn(generateJvmJextractBindingsForCheck)
+  checkedInDirectory = checkedInJextractSources
+  generatedDirectory = generatedJextractCheckSources
+}
+
 tasks.named<JavaCompile>("compileJvmMainJava") {
-  dependsOn(generateJvmJextractBindings)
-  source(generatedJextractSources)
+  source(checkedInJextractSources)
   options.release = catalogVersionInt("java-release")
 }
