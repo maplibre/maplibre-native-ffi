@@ -844,8 +844,14 @@ static void style_transition_options_reject_unsafe_raw_headers(void) {
   // from the native duration type rather than from this API.
   mln_style_transition_options probe = mln_style_transition_options_default();
   probe.fields = MLN_STYLE_TRANSITION_OPTION_DURATION;
-  double accepted = 1.0;
-  double rejected = 2.0;
+  // Zero is the one duration this API always accepts, so the search starts from
+  // a bracket it proved rather than assumed.
+  double accepted = 0.0;
+  double rejected = 1.0;
+  probe.duration_ms = accepted;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_OK, mln_map_set_style_transition_options(map, &probe)
+  );
   // Double until one is rejected, so the bisection below starts from a bracket
   // it can close whatever duration type the platform uses. A non-finite bound
   // is rejected too, so this terminates.

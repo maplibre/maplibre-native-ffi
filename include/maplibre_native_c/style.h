@@ -368,8 +368,8 @@ typedef struct mln_style_transition_options {
    *
    * A still-mode map ignores this field and delay_ms for paint property
    * transitions, and renders each still image at a fixed time point, so a
-   * property change reaches its final value in the next still image whatever
-   * this holds.
+   * property that takes its transition from these reaches its final value in
+   * the next still image whatever they hold.
    */
   double duration_ms;
   /**

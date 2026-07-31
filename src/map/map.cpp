@@ -16,6 +16,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <type_traits>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -2054,10 +2055,22 @@ auto milliseconds_from_duration(mbgl::Duration duration) -> double {
 }
 
 // The bound is exclusive because mbgl::Duration::max() has no exact double
-// representation: converting it to milliseconds rounds to a value whose reverse
-// conversion lands one tick past the largest representable count, which wraps
-// to the most negative duration. Every double below that rounded maximum
-// converts back inside the range, so stopping short of it is enough.
+// representation. In nanoseconds it converts to 9223372036854.775391 ms, whose
+// reverse conversion computes 2^63 ticks: one past the largest representable
+// count, which makes the conversion to the tick type undefined and in practice
+// yields the most negative duration. The next double below it computes
+// 9223372036854773760 ticks, so stopping short of the rounded maximum keeps
+// every accepted value convertible.
+//
+// That margin follows from this representation rather than from anything
+// std::chrono guarantees, because duration_cast picks its own common
+// representation and ratio order. Pin the representation instead of assuming
+// the margin survives another one.
+static_assert(
+  std::is_same_v<mbgl::Duration, std::chrono::nanoseconds>,
+  "the accepted duration bound is derived from a nanosecond mbgl::Duration"
+);
+
 auto is_native_duration_ms(double milliseconds) -> bool {
   return std::isfinite(milliseconds) && milliseconds >= 0.0 &&
          milliseconds < max_native_duration_ms();
