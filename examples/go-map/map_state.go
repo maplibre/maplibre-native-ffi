@@ -129,7 +129,7 @@ func (state *runtimeMapState) Close() error {
 }
 
 func (state *runtimeMapState) applyCommands(commands *commandQueue) error {
-	state.batch = commands.drain(state.batch[:0])
+	state.batch = commands.drain(state.batch)
 	for _, command := range state.batch {
 		if err := state.applyCommand(command); err != nil {
 			return err

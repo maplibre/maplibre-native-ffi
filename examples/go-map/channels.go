@@ -57,14 +57,16 @@ func (queue *commandQueue) push(command cameraCommand) {
 	queue.mu.Unlock()
 }
 
-// drain is called on the runtime loop. It hands over everything queued so far
-// and keeps the backing array for the next batch.
+// drain is called on the runtime loop. It hands the pending slice over and
+// takes the caller's buffer in exchange, so the two ping-pong and the locked
+// section stays O(1): a render loop pushing during a drain waits on the swap,
+// not on the size of the backlog.
 func (queue *commandQueue) drain(out []cameraCommand) []cameraCommand {
 	queue.mu.Lock()
 	defer queue.mu.Unlock()
-	out = append(out, queue.pending...)
-	queue.pending = queue.pending[:0]
-	return out
+	pending := queue.pending
+	queue.pending = out[:0]
+	return pending
 }
 
 // sharedState is the small cross-thread state surface between the render and
