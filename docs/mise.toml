@@ -45,6 +45,14 @@ mkdir -p public/reference
 cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
 '''
 
+[tasks."api:python"]
+depends = ["//bindings/python:api"]
+run = '''
+rm -rf public/reference/python
+mkdir -p public/reference
+cp -a ../bindings/python/build/pdoc/. public/reference/python/
+'''
+
 [tasks."api:dotnet"]
 depends = ["//bindings/dotnet:api"]
 run = '''
@@ -68,6 +76,7 @@ run = [
   { task = "api:zig" },
   { task = "api:kotlin" },
   { task = "api:dart" },
+  { task = "api:python" },
   { task = "api:dotnet" },
   { task = "api:swift" },
 ]
