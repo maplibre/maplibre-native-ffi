@@ -7,6 +7,7 @@ package maplibre
 import "C"
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
@@ -903,7 +904,15 @@ func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr nativeR
 		return textureImageInfoFromC(rawInfo), err
 	}
 	runtime.KeepAlive(buffer)
-	return textureImageInfoFromC(rawInfo), nil
+	info := textureImageInfoFromC(rawInfo)
+	// An empty destination reaches native code as the null pointer and zero
+	// capacity that mean a size probe, which succeeds without copying. Report
+	// the buffer as too small unless the frame really carries no bytes.
+	if len(buffer) == 0 && info.ByteLength > 0 {
+		return info, newBindingError(ErrInvalidArgument,
+			fmt.Sprintf("buffer length 0 is smaller than the required %d bytes", info.ByteLength))
+	}
+	return info, nil
 }
 
 // AcquireMetalTextureFrame acquires the latest Metal session-owned texture

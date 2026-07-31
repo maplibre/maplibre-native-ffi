@@ -257,7 +257,11 @@ private constructor(private val map: MapHandle, handle: NativeRenderSession) : A
         )
       )
     }
-    RenderStructs.textureImageInfo(outInfo.pointed)
+    val info = RenderStructs.textureImageInfo(outInfo.pointed)
+    // An empty destination reaches native code as the null pointer and zero capacity that mean a
+    // size probe, which succeeds without copying, so recheck the capacity here.
+    buffer.ensureCapacity(info.byteLength.toULong())
+    info
   }
 
   public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {

@@ -533,6 +533,15 @@ public final class RenderSessionHandle {
           data: buffer.baseAddress,
           capacity: buffer.count
         )
+        // An empty destination reaches native code as the null pointer and
+        // zero capacity that mean a size probe, which succeeds without
+        // copying. Report the buffer as too small unless the frame really
+        // carries no bytes.
+        if buffer.isEmpty, rawInfo.byte_length > 0 {
+          throw MaplibreError.invalidArgument(
+            "buffer length 0 is smaller than the required \(rawInfo.byte_length) bytes"
+          )
+        }
         return TextureImageInfo(native: NativeTextureImageInfo(rawInfo))
       }
     }

@@ -257,7 +257,11 @@ private constructor(private val map: MapHandle, private val handleId: Long) : Au
         outInfo,
       )
     )
-    return textureImageInfo(outInfo)
+    val info = textureImageInfo(outInfo)
+    // An empty destination reaches native code as the null pointer and zero capacity that mean a
+    // size probe, which succeeds without copying, so recheck the capacity here.
+    buffer.ensureCapacity(info.byteLength)
+    return info
   }
 
   public actual fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {

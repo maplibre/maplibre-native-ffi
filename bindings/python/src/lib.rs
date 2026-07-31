@@ -3967,6 +3967,15 @@ impl RenderSessionHandle {
         // SAFETY: data points to the writable contiguous Python buffer borrowed
         // above for cells.len() u8 elements, or is null when the buffer is empty.
         let info = read_texture_image_raw(state.native(), data, cells.len())?;
+        // An empty destination reaches native code as the null pointer and zero
+        // capacity that mean a size probe, which succeeds without copying. Report
+        // the buffer as too small unless the frame really carries no bytes.
+        if cells.is_empty() && info.byte_length > 0 {
+            return Err(invalid_argument_error(format!(
+                "buffer length 0 is smaller than the required {} bytes",
+                info.byte_length
+            )));
+        }
         texture_image_info_to_py(py, info)
     }
 

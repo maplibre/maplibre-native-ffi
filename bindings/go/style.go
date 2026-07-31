@@ -7,6 +7,7 @@ package maplibre
 import "C"
 
 import (
+	"fmt"
 	"runtime"
 	"unsafe"
 
@@ -1098,6 +1099,13 @@ func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []by
 		return uint64(byteLength), bool(found), err
 	}
 	runtime.KeepAlive(buffer)
+	// An empty destination reaches native code as the null pointer and zero
+	// capacity that mean a size probe, which succeeds without copying. Report the
+	// buffer as too small unless the image really carries no bytes.
+	if len(buffer) == 0 && byteLength > 0 {
+		return uint64(byteLength), bool(found), newBindingError(ErrInvalidArgument,
+			fmt.Sprintf("buffer length 0 is smaller than the required %d bytes", uint64(byteLength)))
+	}
 	return uint64(byteLength), bool(found), nil
 }
 

@@ -2621,6 +2621,10 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
     assert!(undersized.iter().all(|byte| *byte == 0x7f));
 
+    // An empty destination is a caller error here, not the C size probe.
+    let empty_error = session.read_premultiplied_rgba8_into(&mut []).unwrap_err();
+    assert_eq!(empty_error.kind(), ErrorKind::InvalidArgument);
+
     let mut reusable = vec![0; info.byte_length];
     let copied_info = session
         .read_premultiplied_rgba8_into(&mut reusable)

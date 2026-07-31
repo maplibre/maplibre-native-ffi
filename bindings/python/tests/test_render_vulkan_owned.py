@@ -326,6 +326,10 @@ def test_cpu_readback_metadata_capacity_and_reusable_buffer(
     assert raised.value.status == mln.MaplibreStatus.INVALID_ARGUMENT
     assert set(undersized) == {0x7F}
 
+    # An empty destination is a caller error here, not the C size probe.
+    with pytest.raises(mln.InvalidArgumentError):
+        vulkan_owned_session.session.read_premultiplied_rgba8_into(bytearray())
+
     reusable = bytearray(info.byte_length)
     copied = vulkan_owned_session.session.read_premultiplied_rgba8_into(reusable)
     assert copied == info

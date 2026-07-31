@@ -177,6 +177,10 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
 		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
 	}
+	// An empty destination is a caller error here, not the C size probe.
+	if _, _, err := m.StyleImagePremultipliedRGBA8Into("marker", nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StyleImagePremultipliedRGBA8Into(empty buffer) error = %v, want ErrInvalidArgument", err)
+	}
 	removed, err := m.RemoveStyleImage("marker")
 	if err != nil {
 		t.Fatalf("RemoveStyleImage(marker): %v", err)

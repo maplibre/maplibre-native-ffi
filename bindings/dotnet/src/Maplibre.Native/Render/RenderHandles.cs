@@ -530,6 +530,18 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 )
             );
         }
+        // An empty destination reaches native code as the null pointer and zero capacity that
+        // mean a size probe, which succeeds without copying. Report the buffer as too small
+        // unless the frame really carries no bytes.
+        if (buffer.ByteLength == 0 && info.byte_length > 0)
+        {
+            throw new InvalidArgumentException(
+                MaplibreStatus.InvalidArgument,
+                null,
+                $"Buffer length 0 is smaller than the required {info.byte_length} bytes.",
+                null
+            );
+        }
         return RenderStructs.FromNative(info);
     }
 
