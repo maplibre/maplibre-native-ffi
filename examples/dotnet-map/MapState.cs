@@ -142,6 +142,9 @@ internal sealed class MapState : IDisposable
             case CancelTransitionsCommand:
                 Map.CancelTransitions();
                 break;
+            case SetGestureInProgressCommand gesture:
+                Map.SetGestureInProgress(gesture.InProgress);
+                break;
             case MoveByCommand { Animation: null } move:
                 Map.MoveBy(move.DeltaX, move.DeltaY);
                 break;

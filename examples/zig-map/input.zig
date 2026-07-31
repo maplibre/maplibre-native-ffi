@@ -39,7 +39,7 @@ pub const Controller = struct {
     ) Result {
         return switch (event.type) {
             c.SDL_EVENT_MOUSE_BUTTON_DOWN => self.handleMouseButtonDown(event.button, commands, current_viewport),
-            c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button),
+            c.SDL_EVENT_MOUSE_BUTTON_UP => self.handleMouseButtonUp(event.button, commands),
             c.SDL_EVENT_MOUSE_MOTION => self.handleMouseMotion(event.motion, commands, current_viewport),
             c.SDL_EVENT_MOUSE_WHEEL => handleMouseWheel(event.wheel, commands, current_viewport),
             c.SDL_EVENT_KEY_DOWN => handleKeyDown(event.key, commands, current_viewport),
@@ -63,18 +63,33 @@ pub const Controller = struct {
         // Queued ahead of the drag's own commands, so the transition stops
         // before the first delta lands.
         commands.push(.cancel_transitions);
+        // The deltas that follow belong to one live gesture, so the map hears
+        // about the gesture rather than a stream of unrelated camera commands.
+        commands.push(.{ .set_gesture_in_progress = .{ .in_progress = true } });
         self.drag_mode = mode;
         return .{ .handled = true };
     }
 
-    fn handleMouseButtonUp(self: *Controller, button: c.SDL_MouseButtonEvent) Result {
+    fn handleMouseButtonUp(
+        self: *Controller,
+        button: c.SDL_MouseButtonEvent,
+        commands: *channel.CommandQueue,
+    ) Result {
         if (button.button != c.SDL_BUTTON_LEFT and button.button != c.SDL_BUTTON_RIGHT) {
             return .{};
         }
-        self.drag_mode = .none;
+        self.endDrag(commands);
         self.last_x = button.x;
         self.last_y = button.y;
         return .{ .handled = true };
+    }
+
+    /// Every path that ends a drag runs through here, so the gesture mark the
+    /// drag set is always paired with a clear.
+    fn endDrag(self: *Controller, commands: *channel.CommandQueue) void {
+        if (self.drag_mode == .none) return;
+        self.drag_mode = .none;
+        commands.push(.{ .set_gesture_in_progress = .{ .in_progress = false } });
     }
 
     fn handleMouseMotion(

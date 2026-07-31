@@ -9,6 +9,7 @@ import MaplibreNative
 /// one has to happen together on the thread that owns the map.
 enum CameraCommand {
   case cancelTransitions
+  case setGestureInProgress(Bool)
   case moveBy(dx: Double, dy: Double)
   case moveByAnimated(dx: Double, dy: Double, animation: AnimationOptions)
   case scaleBy(scale: Double, anchor: ScreenPoint)

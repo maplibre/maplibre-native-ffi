@@ -85,6 +85,11 @@ pub fn applyCameraCommand(
             "cancel camera transitions failed",
             diagnostic_store,
         ),
+        .set_gesture_in_progress => |gesture| try expectCameraStatus(
+            map.setGestureInProgress(gesture.in_progress),
+            "set gesture in progress failed",
+            diagnostic_store,
+        ),
         .move_by => |move| try expectCameraStatus(
             map.moveBy(move.dx, move.dy),
             "camera pan failed",

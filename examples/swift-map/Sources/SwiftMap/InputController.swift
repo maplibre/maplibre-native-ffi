@@ -32,6 +32,9 @@ final class InputController {
     // Queued ahead of the drag's own commands, so the transition stops before
     // the first delta lands.
     commands.push(.cancelTransitions)
+    // The deltas that follow belong to one live gesture, so the map hears
+    // about the gesture rather than a stream of unrelated camera commands.
+    commands.push(.setGestureInProgress(true))
     return false
   }
 
@@ -39,12 +42,18 @@ final class InputController {
     lastLocation = event.locationInWindow
     dragMode = .rotate
     commands.push(.cancelTransitions)
+    commands.push(.setGestureInProgress(true))
     return false
   }
 
-  func mouseUp(_ event: NSEvent) -> Bool {
+  /// Every path that ends a drag runs through here, so the gesture mark the
+  /// drag set is always paired with a clear.
+  func mouseUp(_ event: NSEvent, commands: Channels) -> Bool {
     lastLocation = event.locationInWindow
-    dragMode = .none
+    if dragMode != .none {
+      dragMode = .none
+      commands.push(.setGestureInProgress(false))
+    }
     return false
   }
 

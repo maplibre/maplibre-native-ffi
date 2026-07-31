@@ -115,6 +115,7 @@ internal sealed unsafe class InputController : IDisposable
     {
         _ = handle;
         ctrlDown = (mods & KeyModifiers.Control) != 0;
+        var wasDragging = Dragging;
         if (button == MouseButton.Left)
         {
             leftDown =
@@ -140,7 +141,16 @@ internal sealed unsafe class InputController : IDisposable
             // delta lands.
             commands.Push(new CancelTransitionsCommand());
         }
+
+        // The deltas in between belong to one live gesture, so the map hears about the gesture
+        // rather than a stream of unrelated camera commands.
+        if (Dragging != wasDragging)
+        {
+            commands.Push(new SetGestureInProgressCommand(Dragging));
+        }
     }
+
+    private bool Dragging => leftDown || rightDown;
 
     private void OnScroll(WindowHandle* handle, double xOffset, double yOffset)
     {

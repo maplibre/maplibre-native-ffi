@@ -88,6 +88,11 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
           val change = event.changes.firstOrNull()
           val current = change?.takeIf { it.pressed }
           if (current == null) {
+            // Every path that ends the drag lands here, so the mark the drag set is always
+            // paired with a clear.
+            if (previous != null) {
+              renderer.setGestureInProgress(false)
+            }
             previous = null
             continue
           }
@@ -95,6 +100,9 @@ private fun Modifier.mapGestures(renderer: MapLibreSurfaceRenderer, scaleFactor:
           previous = current
           if (last == null) {
             renderer.cancelTransitions()
+            // The deltas that follow belong to one live gesture, so the map hears about the
+            // gesture rather than a stream of unrelated camera commands.
+            renderer.setGestureInProgress(true)
             continue
           }
 

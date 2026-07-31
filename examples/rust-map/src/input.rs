@@ -113,6 +113,7 @@ impl Controller {
         button: MouseButton,
         state: ElementState,
     ) -> bool {
+        let was_dragging = self.dragging();
         match button {
             MouseButton::Left => self.left_down = state == ElementState::Pressed,
             MouseButton::Right => self.right_down = state == ElementState::Pressed,
@@ -123,7 +124,21 @@ impl Controller {
             // before the first delta lands.
             push(commands, CameraCommand::CancelTransitions);
         }
+        // The deltas in between belong to one live gesture, so the map hears
+        // about the gesture rather than a stream of unrelated camera commands.
+        if self.dragging() != was_dragging {
+            push(
+                commands,
+                CameraCommand::SetGestureInProgress {
+                    in_progress: self.dragging(),
+                },
+            );
+        }
         false
+    }
+
+    fn dragging(&self) -> bool {
+        self.left_down || self.right_down
     }
 
     fn wheel(

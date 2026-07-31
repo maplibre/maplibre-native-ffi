@@ -14,6 +14,8 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 internal sealed interface CameraCommand {
   data object CancelTransitions : CameraCommand
 
+  data class SetGestureInProgress(val inProgress: Boolean) : CameraCommand
+
   data class MoveBy(val deltaX: Double, val deltaY: Double) : CameraCommand
 
   data class MoveByAnimated(val deltaX: Double, val deltaY: Double) : CameraCommand

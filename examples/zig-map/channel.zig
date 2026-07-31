@@ -17,6 +17,7 @@ const maplibre = @import("maplibre_native");
 /// one has to happen together on the thread that owns the map.
 pub const CameraCommand = union(enum) {
     cancel_transitions,
+    set_gesture_in_progress: struct { in_progress: bool },
     move_by: struct { dx: f64, dy: f64 },
     move_by_animated: struct { dx: f64, dy: f64, duration_ms: f64 },
     scale_by: struct { scale: f64, anchor: maplibre.ScreenPoint },

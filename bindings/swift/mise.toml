@@ -1,5 +1,9 @@
 [tools]
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
+# The Swift toolchain's libFoundationXML.so links libxml2.so.2, which SwiftPM
+# loads. Distros from Ubuntu 26.04 on ship only libxml2.so.16, so carry the
+# .so.2 ABI ourselves and put it on the loader path in the tasks below.
+"conda:libxml2" = { version = "{{vars.libxml2_version}}", os = ["linux/x64"] }
 
 [tasks.api]
 description = "Generate DocC HTML API reference for the Swift binding."
@@ -8,6 +12,11 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 rm -rf build/docc
 mkdir -p build
 swift package --scratch-path ".build/$usage_preset" \
@@ -25,6 +34,11 @@ depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 swift_args=(--scratch-path ".build/$usage_preset")
 swift_args+=(-Xlinker -rpath -Xlinker "$native_install_dir/lib")
 swift build --target MaplibreNative "${swift_args[@]}"
@@ -36,6 +50,11 @@ depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
 run = '''
 native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
 export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+# Linux only: supply the libxml2.so.2 the Swift toolchain links. macOS uses the
+# system toolchain, where mise installs no conda:libxml2 to point at.
+if libxml2_dir="$(mise where conda:libxml2 2>/dev/null)"; then
+  export LD_LIBRARY_PATH="$libxml2_dir/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+fi
 swift test \
   --scratch-path ".build/$usage_preset" \
   -Xlinker -rpath \

@@ -21,6 +21,9 @@ use maplibre_native::ScreenPoint;
 #[derive(Clone, Copy, Debug)]
 pub enum CameraCommand {
     CancelTransitions,
+    SetGestureInProgress {
+        in_progress: bool,
+    },
     MoveBy {
         dx: f64,
         dy: f64,
