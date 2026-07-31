@@ -503,17 +503,19 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * including how the next mln_render_session_render_update() waits for the map
  * to catch up to it. A scale_factor that differs from the session's current
  * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
- * ratio. The replacement's pixel format is a different matter: mbgl builds its
- * render pipeline states against it, so a texture whose format differs from the
- * one this session attached with is reported as MLN_STATUS_UNSUPPORTED, with
- * the session still rendering into the texture it has. Destroying the session
- * and attaching again is what changes the format.
+ * ratio. The replacement's pixel format and sample count are a different
+ * matter: mbgl builds its render pipeline states against both, so a texture
+ * differing in either from the one this session attached with is reported as
+ * MLN_STATUS_UNSUPPORTED, with the session still rendering into the texture it
+ * has. Destroying the session and attaching again is what changes them.
  *
+ * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
+ * touched and leaves the session rendering into the one it already had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
  *
- * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
- * failed, which cannot be unwound. Destroy the session with
- * mln_render_session_destroy() and attach again; every other status leaves the
- * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
@@ -523,9 +525,9 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when the session does not render into a caller-owned
- *   Metal texture, when descriptor->texture has a different pixel format from
- *   the session's, or when Metal borrowed texture sessions are not supported by
- *   this build.
+ *   Metal texture, when descriptor->texture has a different pixel format or
+ *   sample count from the session's, or when Metal borrowed texture sessions
+ *   are not supported by this build.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_metal_borrowed_texture_set_target(
@@ -546,11 +548,13 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  * with the session still rendering into the image it has, and destroying the
  * session and attaching again is what changes them.
  *
+ * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
+ * touched and leaves the session rendering into the one it already had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
  *
- * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
- * failed, which cannot be unwound. Destroy the session with
- * mln_render_session_destroy() and attach again; every other status leaves the
- * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
@@ -581,11 +585,13 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * change. The replacement belongs to that context or one in the same share
  * group, and the host context must be current on the calling thread.
  *
+ * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
+ * touched and leaves the session rendering into the one it already had.
+ * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
+ * already under way, which cannot be unwound; it can also come from a check
+ * made before anything was touched, and the two do not read differently here.
+ * Treat it as a session to destroy with mln_render_session_destroy().
  *
- * MLN_STATUS_NATIVE_ERROR means a replacement was already under way when it
- * failed, which cannot be unwound. Destroy the session with
- * mln_render_session_destroy() and attach again; every other status leaves the
- * session rendering into the target it already had.
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
