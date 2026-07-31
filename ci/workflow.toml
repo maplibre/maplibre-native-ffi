@@ -41,6 +41,12 @@ platforms = ["linux", "macos"]
 commands = [{ task = "//bindings/go:test" }]
 
 [[suites]]
+platforms = ["linux"]
+commands = [
+  { task = "//examples/go-map:check", include = ["linux-x64-egl", "linux-arm64-egl"] },
+]
+
+[[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 

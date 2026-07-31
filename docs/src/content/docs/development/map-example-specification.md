@@ -26,6 +26,7 @@ Implement a mobile example by reading Shared baseline and Mobile profile.
 | Example                | Profile | Binding    | Toolkit         | Platforms             | Backends              |
 | ---------------------- | ------- | ---------- | --------------- | --------------------- | --------------------- |
 | `examples/zig-map`     | Desktop | Zig        | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/go-map`      | Desktop | Go         | SDL3            | Linux                 | OpenGL                |
 | `examples/rust-map`    | Desktop | Rust       | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/lwjgl-map`   | Desktop | Kotlin/JVM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/android-map` | Mobile  | Kotlin     | Android view    | Android               | OpenGL/EGL            |
@@ -179,6 +180,7 @@ the only thread that makes it current.
 | Example       | Render loop thread                                 | Runtime loop thread |
 | ------------- | -------------------------------------------------- | ------------------- |
 | `zig-map`     | process main thread (SDL window, graphics context) | spawned thread      |
+| `go-map`      | process main thread (SDL window, graphics context) | pinned goroutine    |
 | `rust-map`    | winit event-loop thread                            | spawned thread      |
 | `lwjgl-map`   | GLFW main thread                                   | spawned thread      |
 | `dotnet-map`  | GLFW main thread                                   | dedicated `Thread`  |
