@@ -10,6 +10,7 @@ plugins {
   alias(libs.plugins.compose.multiplatform) apply false
   alias(libs.plugins.compose.compiler) apply false
   id("com.android.application") apply false
+  id("com.android.library") apply false
   id("com.android.kotlin.multiplatform.library") apply false
   id("com.vanniktech.maven.publish") apply false
   alias(libs.plugins.dokka) apply false
@@ -19,6 +20,8 @@ allprojects {
   repositories.mavenCentral()
 
   pluginManager.withPlugin("com.android.application") { repositories.android() }
+
+  pluginManager.withPlugin("com.android.library") { repositories.android() }
 
   pluginManager.withPlugin("com.android.kotlin.multiplatform.library") { repositories.android() }
 

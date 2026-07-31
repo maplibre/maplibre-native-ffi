@@ -8,8 +8,16 @@ members = [
   "examples/rust-map",
   "src/platform/rust",
 ]
+exclude = [
+  "build/dependencies/rustls-platform-verifier/android-release-support",
+  "build/dependencies/rustls-platform-verifier/rustls-platform-verifier",
+]
 
 [workspace.package]
 edition = "2024"
 license = "BSD-2-Clause"
 repository = "https://github.com/maplibre/maplibre-native-ffi"
+
+[patch.crates-io]
+rustls-platform-verifier = { path = "build/dependencies/rustls-platform-verifier/rustls-platform-verifier" }
+rustls-platform-verifier-android = { path = "build/dependencies/rustls-platform-verifier/android-release-support" }

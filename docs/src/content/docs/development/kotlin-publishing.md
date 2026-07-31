@@ -112,10 +112,18 @@ native library is compiled for one render backend. Runtime AARs include the
 native dependency notices and the Android NDK notice under `META-INF/licenses`.
 
 The Android target of `maplibre-native-ffi` directly includes the JVM helper
-from the exact `rustls-platform-verifier-android` package selected by
-Cargo.lock. It also includes the helper's consumer R8 rule and upstream
-licenses, which Gradle copies from the locked `rustls-platform-verifier`
-package. Consumers do not add a Rustls-specific Maven dependency.
+built from the pinned, patched `rustls-platform-verifier` checkout acquired by
+mise. The helper and Rust JNI descriptors use the
+`org.maplibre.nativeffi.internal.rustlsplatformverifier` package so an app may
+also consume the upstream helper without duplicate classes. The target includes
+the helper's consumer R8 rule and upstream licenses. Consumers of the Kotlin
+publication do not add a Rustls-specific Maven dependency.
+
+The Android target also publishes a consumer R8 rule for JavaCPP. JavaCPP reads
+the generated presets class reflectively and derives the JNI library name from a
+live stack trace, so both survive minification only when R8 leaves the presets
+package and the JavaCPP runtime package alone. Apps that minify get these rules
+from the publication and add none of their own.
 
 ### JVM
 

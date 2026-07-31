@@ -8,6 +8,8 @@ pluginManagement {
 
 rootProject.name = "maplibre-native-ffi"
 
+include(":bindings:rustls-platform-verifier-android")
+
 include(":bindings:kotlin")
 
 include(":bindings:kotlin-runtime-metal")

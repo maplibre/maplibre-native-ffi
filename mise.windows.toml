@@ -21,3 +21,7 @@ _.path = ["C:/Program Files/Git/bin"]
 # Dependency providers run through the platform shell rather than
 # `task_config.shell`, so name the Bash interpreter for the sync script here.
 run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-submodules'
+
+[deps.rustls-platform-verifier]
+auto = true
+run = '"C:/Program Files/Git/bin/bash.exe" .mise/bin/sync-rustls-platform-verifier'

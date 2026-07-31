@@ -1,0 +1,132 @@
+diff --git a/README.md b/README.md
+index bbe35ef..ac832a8 100644
+--- a/README.md
++++ b/README.md
+@@ -230,7 +230,7 @@ If your Android application makes use of Proguard for optimizations, its importa
+ out because it looks like dead code. Proguard is unable to see any JNI usage, so your rules must manually opt into keeping it. The following rule
+ can do this for you:
+ ```text
+--keep, includedescriptorclasses class org.rustls.platformverifier.** { *; }
++-keep, includedescriptorclasses class org.maplibre.nativeffi.internal.rustlsplatformverifier.** { *; }
+ ```
+ 
+ #### Crate initialization
+diff --git a/android/rustls-platform-verifier/build.gradle b/android/rustls-platform-verifier/build.gradle
+index 59a931c..1fbf6a6 100644
+--- a/android/rustls-platform-verifier/build.gradle
++++ b/android/rustls-platform-verifier/build.gradle
+@@ -35,7 +35,7 @@ android {
+         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+     }
+ 
+-    namespace "org.rustls.platformverifier"
++    namespace "org.maplibre.nativeffi.internal.rustlsplatformverifier"
+ 
+     buildTypes {
+         release {
+diff --git a/android/rustls-platform-verifier/proguard-rules.pro b/android/rustls-platform-verifier/proguard-rules.pro
+index 1bb20d5..e38be5b 100644
+--- a/android/rustls-platform-verifier/proguard-rules.pro
++++ b/android/rustls-platform-verifier/proguard-rules.pro
+@@ -12,7 +12,7 @@
+ 
+ # We need this function (and class) in all builds for Rust to call because its the JNI entrypoint
+ # for the verifier functionality.
+--keep class org.rustls.platformverifier.CertificateVerifier {
++-keep class org.maplibre.nativeffi.internal.rustlsplatformverifier.CertificateVerifier {
+     verifyCertificateChain(
+         android.content.Context,
+         java.lang.String,
+@@ -26,8 +26,8 @@
+ 
+ # We need these classes so Rust can load their class definitions at runtime
+ # and access their fields at runtime.
+--keep class org.rustls.platformverifier.StatusCode { *; }
+--keep class org.rustls.platformverifier.VerificationResult { *; }
++-keep class org.maplibre.nativeffi.internal.rustlsplatformverifier.StatusCode { *; }
++-keep class org.maplibre.nativeffi.internal.rustlsplatformverifier.VerificationResult { *; }
+ 
+ # Note: We don't explicitly tell Proguard to remove test-only methods. They are instead
+ # removed as dead code because `javac` removes all references to them when not building
+@@ -35,7 +35,7 @@
+ 
+ # This can be uncommented during development if needed to quickly check if
+ # a few test-only methods/fields are being removed by build time.
+-# -whyareyoukeeping class org.rustls.platformverifier.CertificateVerifier {
++# -whyareyoukeeping class org.maplibre.nativeffi.internal.rustlsplatformverifier.CertificateVerifier {
+ #   private java.security.KeyStore mockKeystore;
+ #    addMockRoot(byte[]);
+ #}
+diff --git a/android/rustls-platform-verifier/src/androidTest/java/org/rustls/platformverifier/CertificateVerifierTests.kt b/android/rustls-platform-verifier/src/androidTest/java/org/rustls/platformverifier/CertificateVerifierTests.kt
+index 238b636..829b60f 100644
+--- a/android/rustls-platform-verifier/src/androidTest/java/org/rustls/platformverifier/CertificateVerifierTests.kt
++++ b/android/rustls-platform-verifier/src/androidTest/java/org/rustls/platformverifier/CertificateVerifierTests.kt
+@@ -1,4 +1,4 @@
+-package org.rustls.platformverifier
++package org.maplibre.nativeffi.internal.rustlsplatformverifier
+ 
+ import android.content.Context
+ import androidx.test.ext.junit.runners.AndroidJUnit4
+diff --git a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt b/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt
+index febbcfd..c815bb7 100644
+--- a/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt
++++ b/android/rustls-platform-verifier/src/main/java/org/rustls/platformverifier/CertificateVerifier.kt
+@@ -1,4 +1,4 @@
+-package org.rustls.platformverifier
++package org.maplibre.nativeffi.internal.rustlsplatformverifier
+ 
+ import android.annotation.SuppressLint
+ import android.content.Context
+diff --git a/rustls-platform-verifier/src/tests/ffi.rs b/rustls-platform-verifier/src/tests/ffi.rs
+index 23fc54f..ce65cde 100644
+--- a/rustls-platform-verifier/src/tests/ffi.rs
++++ b/rustls-platform-verifier/src/tests/ffi.rs
+@@ -83,7 +83,7 @@ mod android {
+         .unwrap()
+     }
+ 
+-    #[export_name = "Java_org_rustls_platformverifier_CertificateVerifierTests_mockTests"]
++    #[export_name = "Java_org_maplibre_nativeffi_internal_rustlsplatformverifier_CertificateVerifierTests_mockTests"]
+     pub extern "C" fn rustls_platform_verifier_mock_test_suite(
+         mut env: JNIEnv,
+         _class: JClass,
+@@ -100,7 +100,7 @@ mod android {
+         .into_raw()
+     }
+ 
+-    #[export_name = "Java_org_rustls_platformverifier_CertificateVerifierTests_verifyMockRootUsage"]
++    #[export_name = "Java_org_maplibre_nativeffi_internal_rustlsplatformverifier_CertificateVerifierTests_verifyMockRootUsage"]
+     pub extern "C" fn rustls_platform_verifier_verify_mock_root_usage(
+         mut env: JNIEnv,
+         _class: JClass,
+@@ -117,7 +117,7 @@ mod android {
+         .into_raw()
+     }
+ 
+-    #[export_name = "Java_org_rustls_platformverifier_CertificateVerifierTests_realWorldTests"]
++    #[export_name = "Java_org_maplibre_nativeffi_internal_rustlsplatformverifier_CertificateVerifierTests_realWorldTests"]
+     pub extern "C" fn rustls_platform_verifier_real_world_test_suite(
+         mut env: JNIEnv,
+         _class: JClass,
+diff --git a/rustls-platform-verifier/src/verification/android.rs b/rustls-platform-verifier/src/verification/android.rs
+index 7f602e8..902b15f 100644
+--- a/rustls-platform-verifier/src/verification/android.rs
++++ b/rustls-platform-verifier/src/verification/android.rs
+@@ -17,7 +17,7 @@ use super::{log_server_cert, ALLOWED_EKUS};
+ use crate::android::{with_context, CachedClass};
+ 
+ static CERT_VERIFIER_CLASS: CachedClass =
+-    CachedClass::new("org/rustls/platformverifier/CertificateVerifier");
++    CachedClass::new("org/maplibre/nativeffi/internal/rustlsplatformverifier/CertificateVerifier");
+ 
+ // Find the `ByteArray (Uint8 [])` class.
+ static BYTE_ARRAY_CLASS: CachedClass = CachedClass::new("[B");
+@@ -169,7 +169,7 @@ impl Verifier {
+                 'J',
+                 "[[B",
+                 ')',
+-                "Lorg/rustls/platformverifier/VerificationResult;"
++                "Lorg/maplibre/nativeffi/internal/rustlsplatformverifier/VerificationResult;"
+             );
+ 
+             let result = env

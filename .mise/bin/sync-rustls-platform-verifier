@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git -C "$(dirname "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)"
+dependency_parent="$repo_root/build/dependencies"
+dependency_dir="$dependency_parent/rustls-platform-verifier"
+upstream_url="https://github.com/rustls/rustls-platform-verifier.git"
+upstream_tag="v/0.6.2"
+upstream_commit="1099f161bfc5e3ac7f90aad88b1bf788e72906cb"
+patches=(
+  "$repo_root/patches/rustls-platform-verifier/0001-namespace-android-verifier.patch"
+  "$repo_root/patches/rustls-platform-verifier/0002-use-android-revocation-policy.patch"
+  "$repo_root/patches/rustls-platform-verifier/0003-add-modification-notices.patch"
+)
+
+mkdir -p "$dependency_parent"
+staging_dir="$(mktemp -d "$dependency_parent/.rustls-platform-verifier.XXXXXX")"
+
+cleanup() {
+  if [[ -n "${staging_dir:-}" && -d "$staging_dir" ]]; then
+    rm -rf -- "$staging_dir"
+  fi
+}
+trap cleanup EXIT
+
+git -C "$staging_dir" init --quiet
+git -C "$staging_dir" remote add origin "$upstream_url"
+git -C "$staging_dir" fetch --quiet --depth 1 origin "refs/tags/$upstream_tag"
+git -C "$staging_dir" checkout --quiet --detach "$upstream_commit"
+
+actual_commit="$(git -C "$staging_dir" rev-parse HEAD)"
+if [[ "$actual_commit" != "$upstream_commit" ]]; then
+  echo "error: $upstream_tag resolved to $actual_commit, expected $upstream_commit" >&2
+  exit 1
+fi
+
+for patch in "${patches[@]}"; do
+  git -C "$staging_dir" apply --check "$patch"
+  git -C "$staging_dir" apply "$patch"
+done
+
+if [[ -e "$dependency_dir" ]]; then
+  previous_dir="$dependency_parent/.rustls-platform-verifier.previous.$$"
+  mv "$dependency_dir" "$previous_dir"
+  mv "$staging_dir" "$dependency_dir"
+  staging_dir=
+  rm -rf -- "$previous_dir"
+else
+  mv "$staging_dir" "$dependency_dir"
+  staging_dir=
+fi
