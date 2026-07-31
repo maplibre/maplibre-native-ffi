@@ -1094,8 +1094,11 @@ auto validate_style_image_options(const mln_style_image_options* options)
         mln::core::set_thread_error(message.c_str());
         return MLN_STATUS_INVALID_ARGUMENT;
       }
-      if (stretch.from > stretch.to) {
-        auto message = std::string{name} + " intervals must not run backwards";
+      // MapLibre divides by the summed interval width, so an axis whose
+      // intervals are all zero-width would divide by zero.
+      if (stretch.from >= stretch.to) {
+        auto message =
+          std::string{name} + " intervals must have a positive width";
         mln::core::set_thread_error(message.c_str());
         return MLN_STATUS_INVALID_ARGUMENT;
       }
