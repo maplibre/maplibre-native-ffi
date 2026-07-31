@@ -159,13 +159,15 @@ workflow picks the latest successful CI run on `main` and publishes from its
 artifacts. Each publishable component — the Kotlin modules, the native package
 release, and the docs site — carries an input scope in `ci/snapshots.toml`, and
 the workflow hashes that scope at the source commit. A component publishes when
-its hash differs from the one recorded at its last publish, so a change confined
-to another binding leaves the Kotlin modules alone. The recorded hashes live in
-`snapshots.json` on the orphan `snapshot-state` branch, alongside the commit,
-timestamp, and run URL of each publish, and only components that published
-successfully are recorded, so a failure is retried the next day. Dispatch the
-workflow manually to publish sooner: `all` applies the same gate immediately,
-and naming one component republishes it whether or not its inputs changed.
+its hash differs from the hash of the commit it last published from, so a change
+confined to another binding leaves the Kotlin modules alone. That commit is
+recorded as a floating `snapshot-state/<component>` tag, whose annotated message
+carries the timestamp and run URL of the publish, and only components that
+published successfully have their tag moved, so a failure is retried the next
+day. `git ls-remote --tags origin 'refs/tags/snapshot-state/*'` reports where
+every snapshot stands. Dispatch the workflow manually to publish sooner: `all`
+applies the same gate immediately, and naming one component republishes it
+whether or not its inputs changed.
 
 The Central Portal namespace covering `org.maplibre.nativeffi` must be
 registered with snapshot publishing enabled. The repository stores a Central

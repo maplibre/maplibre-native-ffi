@@ -45,9 +45,6 @@ jobs:
       publish_native: ${{ steps.plan.outputs.publish_native }}
       publish_kotlin: ${{ steps.plan.outputs.publish_kotlin }}
       publish_docs: ${{ steps.plan.outputs.publish_docs }}
-      hash_native: ${{ steps.plan.outputs.hash_native }}
-      hash_kotlin: ${{ steps.plan.outputs.hash_kotlin }}
-      hash_docs: ${{ steps.plan.outputs.hash_docs }}
     steps:
       # The artifacts every publish job downloads come from one CI run, so that
       # run's commit is what this workflow publishes and hashes.
@@ -76,9 +73,12 @@ jobs:
             echo "sha=$(jq -r '.[0].headSha' <<<"$run")"
             echo "ci_run_url=$(jq -r '.[0].url' <<<"$run")"
           } >> "$GITHUB_OUTPUT"
+      # The gate digests each component at this commit and at the one its state
+      # tag names, so it needs the history and tags behind both.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ steps.source.outputs.sha }}
+          fetch-depth: 0
           persist-credentials: false
       # The gate reads Git history and the scope config, so it needs Python
       # rather than the native toolchain the publish jobs use. `--no-deps` on
@@ -428,8 +428,8 @@ jobs:
       - deploy-docs
       - publish-kotlin-roots
       - publish
-    # Only components that published get their input hash recorded, so a failed
-    # or skipped component is retried by the next run.
+    # Only components that published get their state tag moved, so a failed or
+    # skipped component is retried by the next run.
     if: ${{ !cancelled() && needs.plan.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -447,27 +447,24 @@ jobs:
         with:
           cache: false
           install_args: python
-      - name: Record published inputs
+      - name: Record published components
         env:
           GH_TOKEN: ${{ github.token }}
           DOCS_RESULT: ${{ needs.deploy-docs.result }}
           KOTLIN_RESULT: ${{ needs.publish-kotlin-roots.result }}
           NATIVE_RESULT: ${{ needs.publish.result }}
-          DOCS_HASH: ${{ needs.plan.outputs.hash_docs }}
-          KOTLIN_HASH: ${{ needs.plan.outputs.hash_kotlin }}
-          NATIVE_HASH: ${{ needs.plan.outputs.hash_native }}
         run: |
           set -euo pipefail
 
           published=()
           if [[ "$NATIVE_RESULT" == success ]]; then
-            published+=("native=$NATIVE_HASH")
+            published+=(native)
           fi
           if [[ "$KOTLIN_RESULT" == success ]]; then
-            published+=("kotlin=$KOTLIN_HASH")
+            published+=(kotlin)
           fi
           if [[ "$DOCS_RESULT" == success ]]; then
-            published+=("docs=$DOCS_HASH")
+            published+=(docs)
           fi
 
           mise run --no-deps ci:snapshot-state record ${published[@]+"${published[@]}"}

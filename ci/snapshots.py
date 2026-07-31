@@ -25,10 +25,11 @@ from typing import NamedTuple
 
 CONFIG = pathlib.Path("ci/snapshots.toml")
 
-# The recorded state lives on its own orphan branch, so publishing history stays
-# out of the source history it gates.
-STATE_BRANCH = "snapshot-state"
-STATE_PATH = "snapshots.json"
+# Each component's last publish is recorded as a floating tag pointing at the
+# commit it published from. Their own namespace keeps them clear of the
+# `unstable-native-snapshot` release tag, which has to move before its assets
+# upload and so cannot mark a publish that succeeded.
+STATE_TAGS = "snapshot-state"
 
 # Uncovered paths are listed rather than counted, up to a length that still
 # reads as an error message.
@@ -168,13 +169,21 @@ def load(root: pathlib.Path) -> dict[str, Component]:
     return components
 
 
+def state_tag(component: str) -> str:
+    """The tag naming the commit a component last published from."""
+    return f"{STATE_TAGS}/{component}"
+
+
 def _git(root: pathlib.Path, *arguments: str) -> str:
-    return subprocess.run(
+    completed = subprocess.run(
         ("git", "-C", str(root), *arguments),
-        check=True,
         capture_output=True,
         text=True,
-    ).stdout
+    )
+    if completed.returncode != 0:
+        command = " ".join(arguments)
+        raise SystemExit(f"error: git {command} failed: {completed.stderr.strip()}")
+    return completed.stdout
 
 
 def tracked(root: pathlib.Path) -> list[str]:
