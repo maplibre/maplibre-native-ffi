@@ -528,6 +528,17 @@ static void style_image_stretch_descriptors_reject_unsafe_raw_values(void) {
     mln_map_set_style_image(map, image_id, &image, &options)
   );
 
+  // A zero-width interval would leave MapLibre dividing by a zero stretch sum.
+  const mln_image_stretch zero_width[] = {{.from = 1.0F, .to = 1.0F}};
+  options = mln_style_image_options_default();
+  options.fields = MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+  options.stretch_x = zero_width;
+  options.stretch_x_count = 1;
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_map_set_style_image(map, image_id, &image, &options)
+  );
+
   // Intervals that run out of order or overlap their predecessor are rejected.
   const mln_image_stretch unordered[] = {
     {.from = 2.0F, .to = 3.0F}, {.from = 0.0F, .to = 1.0F}
