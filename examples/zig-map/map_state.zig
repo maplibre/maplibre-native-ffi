@@ -59,14 +59,16 @@ pub const MapState = struct {
     }
 
     /// Applies every queued camera command on the map's owner thread.
-    pub fn applyCommands(self: *MapState, commands: *channel.CommandQueue) !void {
-        var batch: [64]channel.CameraCommand = undefined;
-        while (true) {
-            const count = commands.drain(&batch);
-            if (count == 0) return;
-            for (batch[0..count]) |command| {
-                try applyCameraCommand(&self.map, command, self.diagnostic_store);
-            }
+    ///
+    /// `batch` is owned by the runtime loop and reused across drains.
+    pub fn applyCommands(
+        self: *MapState,
+        commands: *channel.CommandQueue,
+        batch: *std.ArrayList(channel.CameraCommand),
+    ) !void {
+        commands.drainInto(batch);
+        for (batch.items) |command| {
+            try applyCameraCommand(&self.map, command, self.diagnostic_store);
         }
     }
 };

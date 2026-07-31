@@ -21,7 +21,7 @@ type runtimeLoopHandles struct {
 
 // runRuntimeLoop owns the runtime, map, pump, event queue, and every camera
 // mutation on one stable native thread for their whole lifetime.
-func runRuntimeLoop(v viewport, commands <-chan cameraCommand, published chan<- runtimeLoopHandles, shared *sharedState) {
+func runRuntimeLoop(v viewport, commands *commandQueue, published chan<- runtimeLoopHandles, shared *sharedState) {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
 	defer close(published)
@@ -71,6 +71,8 @@ type runtimeMapState struct {
 	runtime *maplibre.RuntimeHandle
 	mapRef  *maplibre.MapHandle
 	mapID   maplibre.MapID
+	// batch is reused across drains so applying commands allocates nothing.
+	batch []cameraCommand
 }
 
 func newRuntimeMapState(v viewport) (*runtimeMapState, error) {
@@ -126,17 +128,14 @@ func (state *runtimeMapState) Close() error {
 	return result
 }
 
-func (state *runtimeMapState) applyCommands(commands <-chan cameraCommand) error {
-	for {
-		select {
-		case command := <-commands:
-			if err := state.applyCommand(command); err != nil {
-				return err
-			}
-		default:
-			return nil
+func (state *runtimeMapState) applyCommands(commands *commandQueue) error {
+	state.batch = commands.drain(state.batch[:0])
+	for _, command := range state.batch {
+		if err := state.applyCommand(command); err != nil {
+			return err
 		}
 	}
+	return nil
 }
 
 func (state *runtimeMapState) applyCommand(command cameraCommand) error {

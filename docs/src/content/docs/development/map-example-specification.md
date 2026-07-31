@@ -165,6 +165,13 @@ loop**.
   the render loop carrying the map to attach against and the wake source that
   releases the runtime loop's parked pump. A shutdown signal and a first-failure
   record MAY accompany them.
+- The camera-command queue MUST NOT discard a queued command, and MUST NOT block
+  the render loop to avoid discarding one; it grows instead. Every command on it
+  is either a delta or a gesture bracket, and neither survives being dropped: a
+  dropped delta is motion the drag never gets back, and a dropped bracket leaves
+  every delta after it attributed to no gesture. Only a stalled runtime loop
+  grows the queue, and a runtime loop stalled long enough to matter has already
+  stopped the map.
 
 This split exists because `pump` drains the work it finds rather than a fixed
 slice, so a single call can take as long as a style parse. Keeping it off the

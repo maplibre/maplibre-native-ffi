@@ -36,6 +36,37 @@ const (
 	commandResetOrientation
 )
 
+// commandQueue holds the camera commands the render loop has decoded and the
+// runtime loop has not applied yet.
+//
+// The queue grows rather than dropping, which is why it is not a buffered
+// channel: a buffered channel is bounded, and sending on a full one either
+// blocks the render loop or discards a command. Its commands are deltas and a
+// gesture bracket, and neither survives being discarded: a dropped delta is
+// motion the drag never gets back, and a dropped bracket leaves every delta
+// after it attributed to no gesture. Only a stalled runtime loop grows it.
+type commandQueue struct {
+	mu      sync.Mutex
+	pending []cameraCommand
+}
+
+// push is called on the render loop.
+func (queue *commandQueue) push(command cameraCommand) {
+	queue.mu.Lock()
+	queue.pending = append(queue.pending, command)
+	queue.mu.Unlock()
+}
+
+// drain is called on the runtime loop. It hands over everything queued so far
+// and keeps the backing array for the next batch.
+func (queue *commandQueue) drain(out []cameraCommand) []cameraCommand {
+	queue.mu.Lock()
+	defer queue.mu.Unlock()
+	out = append(out, queue.pending...)
+	queue.pending = queue.pending[:0]
+	return out
+}
+
 // sharedState is the small cross-thread state surface between the render and
 // runtime loops. The camera queue and one-time map publication use channels;
 // this carries the render request, shutdown, and first failure.

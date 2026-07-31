@@ -41,13 +41,15 @@ internal sealed interface CameraCommand {
 }
 
 /**
- * Ring of pending camera commands, filled by the render loop and drained by the runtime loop.
+ * Pending camera commands, filled by the render loop and drained by the runtime loop.
  *
- * Overflow drops the oldest command, because a dropped pan beats blocking the render loop on the
- * runtime loop.
+ * The queue grows rather than dropping. Its commands are deltas and a gesture bracket, and neither
+ * survives being discarded: a dropped delta is motion the drag never gets back, and a dropped
+ * bracket leaves every delta after it attributed to no gesture. Growing does not block the render
+ * loop either, and only a stalled runtime loop grows it at all.
  */
 internal class CommandQueue {
-  private val items = ArrayDeque<CameraCommand>(CAPACITY)
+  private val items = ArrayDeque<CameraCommand>()
 
   /**
    * Released by [push] so a queued command reaches the runtime loop without waiting out its parking
@@ -57,12 +59,7 @@ internal class CommandQueue {
   @Volatile var onEnqueue: (() -> Unit)? = null
 
   fun push(command: CameraCommand) {
-    synchronized(items) {
-      if (items.size == CAPACITY) {
-        items.removeFirst()
-      }
-      items.addLast(command)
-    }
+    synchronized(items) { items.addLast(command) }
     onEnqueue?.invoke()
   }
 
@@ -74,10 +71,6 @@ internal class CommandQueue {
         ArrayList(items).also { items.clear() }
       }
     }
-
-  private companion object {
-    const val CAPACITY = 256
-  }
 }
 
 /**

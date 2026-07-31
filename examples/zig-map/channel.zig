@@ -29,39 +29,46 @@ pub const CameraCommand = union(enum) {
     reset_orientation: struct { duration_ms: f64 },
 };
 
-/// Ring of pending camera commands. Overflow drops the oldest, because a
-/// dropped pan beats blocking the render loop on the runtime loop.
+/// Pending camera commands, filled by the render loop and drained by the
+/// runtime loop.
+///
+/// The queue grows rather than dropping. Its commands are deltas and a gesture
+/// bracket, and neither survives being discarded: a dropped delta is motion the
+/// drag never gets back, and a dropped bracket leaves every delta after it
+/// attributed to no gesture. Growing does not block the render loop either, and
+/// only a stalled runtime loop grows it at all.
 pub const CommandQueue = struct {
-    pub const capacity = 256;
-
     lock: std.Io.Mutex = std.Io.Mutex.init,
-    items: [capacity]CameraCommand = undefined,
-    head: usize = 0,
-    len: usize = 0,
+    allocator: std.mem.Allocator,
+    items: std.ArrayList(CameraCommand) = .empty,
 
+    pub fn init(allocator: std.mem.Allocator) CommandQueue {
+        return .{ .allocator = allocator };
+    }
+
+    pub fn deinit(self: *CommandQueue) void {
+        self.items.deinit(self.allocator);
+    }
+
+    /// Render loop: queues one decoded camera change.
+    ///
+    /// A queue that cannot grow is a dead demo either way, so this reports an
+    /// allocation failure as a panic rather than threading an error through
+    /// every input handler.
     pub fn push(self: *CommandQueue, command: CameraCommand) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
-        if (self.len == capacity) {
-            self.head = (self.head + 1) % capacity;
-            self.len -= 1;
-        }
-        self.items[(self.head + self.len) % capacity] = command;
-        self.len += 1;
+        self.items.append(self.allocator, command) catch
+            @panic("camera command queue out of memory");
     }
 
-    /// Copies every queued command into `out` and returns the count, so the
-    /// runtime loop can apply them without holding the lock.
-    pub fn drain(self: *CommandQueue, out: []CameraCommand) usize {
+    /// Runtime loop: hands over everything queued so far and keeps the backing
+    /// storage for the next batch, so a drain allocates nothing.
+    pub fn drainInto(self: *CommandQueue, out: *std.ArrayList(CameraCommand)) void {
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
-        const count = @min(self.len, out.len);
-        for (0..count) |index| {
-            out[index] = self.items[(self.head + index) % capacity];
-        }
-        self.head = (self.head + count) % capacity;
-        self.len -= count;
-        return count;
+        out.clearRetainingCapacity();
+        std.mem.swap(std.ArrayList(CameraCommand), &self.items, out);
     }
 };
 
