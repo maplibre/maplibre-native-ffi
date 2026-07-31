@@ -1,31 +1,41 @@
 # Input scopes for the components published by .github/workflows/snapshots.yml.
 # The workflow hashes each component's inputs at the commit it would publish and
-# skips the component when that hash matches the one recorded at its last
-# publish, so publishing follows input changes rather than commit frequency.
+# skips the component when that hash matches the commit it last published from,
+# so publishing follows input changes rather than commit frequency.
 #
 # Rules are gitignore-style and ordered, `!` marks a path as not an input, and
 # the last matching rule wins. A component's effective list is `shared`, then
 # the `paths` of everything it depends on, then its own `paths`.
 #
+# `shared` carries only what every component answers the same way: the native
+# library and the toolchain that builds it are inputs everywhere, and everything
+# no published artifact consumes is excluded everywhere. Anything one component
+# consumes and another does not — binding sources, docs sources, and the
+# language ecosystem roots their builds run through — is claimed by the
+# components that consume it.
+#
 # There is deliberately no catch-all: `ci:check-snapshot-scopes` fails when a
-# tracked path matches no rule, so a new top-level entry has to be classified
-# rather than inheriting a default. It also fails on a rule that matches nothing,
-# so stale patterns surface after a refactor.
+# component's resolved list leaves a tracked path neither an input nor excluded,
+# so a new top-level entry has to be classified rather than inheriting a
+# default. It also fails on a rule that matches nothing, so stale patterns
+# surface after a refactor.
 
-# Prepended to every component's rules. Every top-level entry appears here
-# exactly once, either as an input or `!`-excluded.
 shared = [
-  # Native build inputs.
+  # The native library, and the sources and build that produce it. Every
+  # component ships it, embeds it, or documents it.
   "CMakeLists.txt",
   "CMakePresets.json",
   "cmake/**",
   "include/**",
   "src/**",
   "third_party/**",
+  ".gitmodules",
   "patches/**",
   "scripts/**",
+  "Cargo.toml",
+  "Cargo.lock",
   "LICENSE",
-  # Toolchain and task definitions.
+  # The toolchain and task definitions every job builds through.
   "mise.toml",
   "mise.lock",
   "mise.linux.toml",
@@ -34,38 +44,39 @@ shared = [
   ".miserc.toml",
   ".mise/**",
   ".config/**",
-  # CI definitions that shape the published artifacts.
+  # The CI definitions that shape every published artifact, and the checkout
+  # behaviour that decides the bytes they are built from.
   ".github/workflows/**",
   ".github/actions/**",
   "ci/**",
-  # Binding sources and the build systems that package them.
-  "bindings/**",
-  "buildSrc/**",
-  "gradle/**",
-  "build.gradle.kts",
-  "settings.gradle.kts",
-  "gradle.properties",
-  "gradlew",
-  "gradlew.bat",
-  "Cargo.toml",
-  "Cargo.lock",
-  "Directory.Packages.props",
-  "Maplibre.Native.slnx",
-  "package.json",
-  "pnpm-lock.yaml",
-  "pnpm-workspace.yaml",
-  "pyproject.toml",
-  "uv.lock",
-  ".npmrc",
-  # Checkout behaviour, and the submodule pin the native build compiles.
   ".gitattributes",
-  ".gitmodules",
 
-  # Not inputs to any published artifact. Development tooling, editor and
-  # service configuration, prose, and the example apps.
-  "!examples/**",
+  # Binding sources, docs sources, and the ecosystem roots their builds run
+  # through. Each is an input to the components that consume it and to no
+  # others, so the components claim them rather than `shared`.
+  "!bindings/**",
   "!docs/**",
   "!*.md",
+  "!buildSrc/**",
+  "!gradle/**",
+  "!build.gradle.kts",
+  "!settings.gradle.kts",
+  "!gradle.properties",
+  "!gradlew",
+  "!gradlew.bat",
+  "!package.json",
+  "!pnpm-lock.yaml",
+  "!pnpm-workspace.yaml",
+  "!.npmrc",
+  "!pyproject.toml",
+  "!uv.lock",
+  "!Directory.Packages.props",
+  "!Maplibre.Native.slnx",
+  "!.config/dotnet-tools.json",
+
+  # Not inputs to any published artifact. The example apps, development
+  # tooling, editor and service configuration.
+  "!examples/**",
   "!dprint.jsonc",
   "!hk.pkl",
   "!vite.config.ts",
@@ -83,9 +94,10 @@ shared = [
   "!.zed/**",
 ]
 
+# CPack packages the CMake install tree directly, so the native tarballs are
+# exactly what `shared` describes and this component claims nothing further.
 [components.native]
 description = "Native CPack tarballs on the floating GitHub prerelease."
-paths = ["!bindings/**"]
 
 [components.kotlin]
 description = "Kotlin Multiplatform modules on Maven Central snapshots."
@@ -94,11 +106,35 @@ paths = [
   "bindings/kotlin/**",
   "bindings/kotlin-runtime-*/**",
   "bindings/rustls-platform-verifier-android/**",
+  # Gradle compiles the binding, embeds the native artifacts, and assembles
+  # every publication.
+  "buildSrc/**",
+  "gradle/**",
+  "build.gradle.kts",
+  "settings.gradle.kts",
+  "gradle.properties",
+  "gradlew",
+  "gradlew.bat",
 ]
 
 [components.docs]
-# The site embeds an API reference generated from every binding and from the
-# native install, so it inherits the Kotlin scope and adds the rest back.
 description = "Docs site on GitHub Pages."
 depends = ["kotlin"]
-paths = ["bindings/**", "docs/**", "*.md"]
+# The site embeds an API reference generated from every binding, so it takes the
+# binding sources along with the ecosystem roots each doc tool builds through.
+# As the remaining bindings gain components of their own, `depends` should name
+# them and these entries should move to the component that owns them.
+paths = [
+  "bindings/**",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  ".npmrc",
+  "pyproject.toml",
+  "uv.lock",
+  "Directory.Packages.props",
+  "Maplibre.Native.slnx",
+  ".config/dotnet-tools.json",
+  "docs/**",
+  "*.md",
+]
