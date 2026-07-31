@@ -83,8 +83,19 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       context.reset();
     };
     if (has_native_context()) {
-      auto guard = mbgl::gfx::BackendScope{*this};
-      cleanup();
+      // Making the surface current can fail, and set_target lets a host install
+      // a surface that only turns out to be unusable later, so this is
+      // reachable. Release the GL objects only when the context is current, but
+      // release the context itself either way: skipping it would leak the HGLRC
+      // or EGLContext for a session the host has already destroyed.
+      try {
+        auto guard = mbgl::gfx::BackendScope{*this};
+        cleanup();
+      } catch (...) {
+        getThreadPool().runRenderJobs(true);
+        destroy_native_context();
+        throw;
+      }
     } else {
       cleanup();
     }
@@ -305,12 +316,11 @@ class OpenGLSurfaceSessionBackend final
     backend_.resize(mbgl::Size{physical_width, physical_height});
   }
 
-  auto set_opengl_target(
-    const mln_opengl_surface_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
-  ) -> mln_status override {
+  auto set_opengl_target(const mln_opengl_surface_descriptor& descriptor)
+    -> mln_status override {
     if (!mln::core::opengl_context_matches(
-          backend_.context_descriptor(), descriptor.context
+          backend_.context_descriptor(), descriptor.context,
+          mln::core::OpenGLContextMatch::ShareGroup
         )) {
       mln::core::set_thread_error(
         "OpenGL surface target must name the context this session attached with"
@@ -318,7 +328,6 @@ class OpenGLSurfaceSessionBackend final
       return MLN_STATUS_INVALID_ARGUMENT;
     }
     backend_.set_surface(descriptor);
-    out_outcome = mln::core::RetargetOutcome::RendererPreserved;
     return MLN_STATUS_OK;
   }
 
@@ -392,12 +401,8 @@ auto opengl_surface_set_target(
   }
   return surface_session_set_target(
     session, descriptor->extent,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
-      return target_session.surface.backend->set_opengl_target(
-        *descriptor, outcome
-      );
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.surface.backend->set_opengl_target(*descriptor);
     }
   );
 }

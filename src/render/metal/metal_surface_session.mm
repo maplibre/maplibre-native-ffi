@@ -263,10 +263,8 @@ class MetalSurfaceSessionBackend final
     backend_.setSize(mbgl::Size{physical_width, physical_height});
   }
 
-  auto set_metal_target(
-    const mln_metal_surface_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
-  ) -> mln_status override {
+  auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
+    -> mln_status override {
     if (!backend_.has_device(
           static_cast<MTL::Device*>(descriptor.context.device)
         )) {
@@ -286,7 +284,6 @@ class MetalSurfaceSessionBackend final
         )
       }
     );
-    out_outcome = mln::core::RetargetOutcome::RendererPreserved;
     return MLN_STATUS_OK;
   }
 
@@ -360,12 +357,8 @@ auto metal_surface_set_target(
   }
   return surface_session_set_target(
     session, descriptor->extent,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
-      return target_session.surface.backend->set_metal_target(
-        *descriptor, outcome
-      );
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.surface.backend->set_metal_target(*descriptor);
     }
   );
 }

@@ -61,8 +61,7 @@ class MetalTextureSessionBackend final
   }
 
   auto set_metal_borrowed_target(
-    const mln_metal_borrowed_texture_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
+    const mln_metal_borrowed_texture_descriptor& descriptor
   ) -> mln_status override {
     auto* texture = static_cast<MTL::Texture*>(descriptor.texture);
     if (!backend_.has_device(texture->device())) {
@@ -72,11 +71,16 @@ class MetalTextureSessionBackend final
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    const auto preserved = backend_.set_borrowed_texture(
+    if (!backend_.has_borrowed_pixel_format(texture->pixelFormat())) {
+      return mln::core::unsupported_retarget(
+        "Metal texture target must have the pixel format this session's render "
+        "pipeline states were built for; destroy the session and attach again "
+        "to change it"
+      );
+    }
+    backend_.set_borrowed_texture(
       texture, mbgl::Size{descriptor.physical_width, descriptor.physical_height}
     );
-    out_outcome = preserved ? mln::core::RetargetOutcome::RendererPreserved
-                            : mln::core::RetargetOutcome::RendererInvalidated;
     return MLN_STATUS_OK;
   }
 
@@ -316,11 +320,9 @@ auto metal_borrowed_texture_set_target(
   return render_session_set_target(
     session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
       return target_session.texture.backend->set_metal_borrowed_target(
-        *descriptor, outcome
+        *descriptor
       );
     }
   );

@@ -33,16 +33,19 @@ enum class TextureSessionFrameKind : uint8_t {
 };
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
-// Whether replacing a render target left the renderer's cached GPU state
-// usable.
+// A replacement target that the session's compiled GPU state cannot serve is
+// refused rather than accepted with a rebuild.
 //
-// A host target can be replaced by one the backend cannot serve from the same
-// resources: on Vulkan a surface whose swapchain reports a different color
-// format, or a borrowed image with a different format or layout, forces a new
-// render pass, and mbgl keys its pipeline cache on that. The backend says so,
-// and the session builds a new renderer rather than letting a stale key decide
-// which pipeline a draw gets.
-enum class RetargetOutcome : uint8_t { RendererPreserved, RendererInvalidated };
+// The state in question is not all owned by the renderer. mbgl's Vulkan
+// pipeline cache lives in the renderer's shader registry, but the Metal context
+// caches a clip-mask pipeline keyed only on the renderable's address, and both
+// backends compile shader variants against properties of the target. Retiring
+// the renderer would leave the context's share of that behind, so a target that
+// does not match what is already compiled is reported as unsupported and the
+// host destroys the session and attaches again, which rebuilds all of it.
+//
+// Backends check this before they touch anything, so a refusal leaves the
+// session rendering into the target it already had.
 
 // Reports a target replacement the backend does not implement. Every backend
 // serves exactly one descriptor kind, and the session checks that before
@@ -66,31 +69,25 @@ class SurfaceSessionBackend {
   // resource the renderer holds against it. The descriptor names the same
   // context as the one this session attached with; a backend rejects anything
   // else, because a context change is what destroy-and-attach is for.
-  virtual auto set_metal_target(
-    const mln_metal_surface_descriptor& descriptor, RetargetOutcome& out_outcome
-  ) -> mln_status {
+  virtual auto set_metal_target(const mln_metal_surface_descriptor& descriptor)
+    -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render through a Metal surface"
     );
   }
   virtual auto set_vulkan_target(
-    const mln_vulkan_surface_descriptor& descriptor,
-    RetargetOutcome& out_outcome
+    const mln_vulkan_surface_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render through a Vulkan surface"
     );
   }
   virtual auto set_opengl_target(
-    const mln_opengl_surface_descriptor& descriptor,
-    RetargetOutcome& out_outcome
+    const mln_opengl_surface_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render through an OpenGL surface"
     );
@@ -122,31 +119,25 @@ class TextureSessionBackend {
   // context as the one this session attached with; a backend rejects anything
   // else, because a context change is what destroy-and-attach is for.
   virtual auto set_metal_borrowed_target(
-    const mln_metal_borrowed_texture_descriptor& descriptor,
-    RetargetOutcome& out_outcome
+    const mln_metal_borrowed_texture_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render into a caller-owned Metal texture"
     );
   }
   virtual auto set_vulkan_borrowed_target(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor,
-    RetargetOutcome& out_outcome
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render into a caller-owned Vulkan image"
     );
   }
   virtual auto set_opengl_borrowed_target(
-    const mln_opengl_borrowed_texture_descriptor& descriptor,
-    RetargetOutcome& out_outcome
+    const mln_opengl_borrowed_texture_descriptor& descriptor
   ) -> mln_status {
     (void)descriptor;
-    (void)out_outcome;
     return unsupported_retarget(
       "session does not render into a caller-owned OpenGL texture"
     );
@@ -449,13 +440,23 @@ auto vulkan_context_matches(
   const mln_vulkan_context_descriptor& rhs
 ) -> bool;
 
-// Whether two OpenGL context descriptors name the same host context, which is
-// what lets a session keep its own context — and every object the renderer
-// holds in it — across a target replacement. The proc-address loader is left
-// out: it is a way to reach a context, not part of its identity.
+// How strictly two OpenGL context descriptors have to agree for a session to
+// keep its own context — and every object the renderer holds in it — across a
+// target replacement.
+//
+// A surface target carries its own drawable, so only the share group has to
+// match: WGL makes the session's context current against whichever HDC the
+// target names, and a recreated window brings a new one. A texture target
+// carries no drawable, so the session keeps making its context current against
+// the handles it attached with, and those have to be the same ones.
+enum class OpenGLContextMatch : uint8_t { ShareGroup, Exact };
+
+// Whether two OpenGL context descriptors name the same host context. The
+// proc-address loader is left out either way: it is a way to reach a context,
+// not part of its identity.
 auto opengl_context_matches(
   const mln_opengl_context_descriptor& lhs,
-  const mln_opengl_context_descriptor& rhs
+  const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
 ) -> bool;
 
 inline auto set_session_extent(
@@ -538,7 +539,7 @@ auto validate_render_session_retarget(
 
 // Hands a validated descriptor to the session's backend.
 using RenderTargetReplacer =
-  std::function<mln_status(mln_render_session_object&, RetargetOutcome&)>;
+  std::function<mln_status(mln_render_session_object&)>;
 
 // Shared body behind every set-target entry point.
 //

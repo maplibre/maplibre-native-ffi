@@ -242,19 +242,23 @@ auto vulkan_context_matches(
 
 auto opengl_context_matches(
   const mln_opengl_context_descriptor& lhs,
-  const mln_opengl_context_descriptor& rhs
+  const mln_opengl_context_descriptor& rhs, OpenGLContextMatch strictness
 ) -> bool {
   if (lhs.platform != rhs.platform) {
     return false;
   }
   switch (lhs.platform) {
     case MLN_OPENGL_CONTEXT_PLATFORM_WGL:
-      // The share group alone. A session's WGL context is made current against
-      // whichever HDC the target names, and a recreated window brings a new
-      // one, so an HDC is a surface here rather than a piece of context
-      // identity.
+      if (
+        strictness == OpenGLContextMatch::Exact &&
+        lhs.data.wgl.device_context != rhs.data.wgl.device_context
+      ) {
+        return false;
+      }
       return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
     case MLN_OPENGL_CONTEXT_PLATFORM_EGL:
+      // EGL names its drawable in the target rather than in the context, so
+      // both strictnesses ask for the same three handles.
       return lhs.data.egl.display == rhs.data.egl.display &&
              lhs.data.egl.config == rhs.data.egl.config &&
              lhs.data.egl.share_context == rhs.data.egl.share_context;
@@ -1186,10 +1190,9 @@ auto render_session_set_target(
     return status;
   }
 
-  auto outcome = RetargetOutcome::RendererPreserved;
   const auto replace_status = [&]() -> mln_status {
     try {
-      return replace(*live, outcome);
+      return replace(*live);
     } catch (...) {
       // The backend threw partway through swapping targets, so whatever the
       // renderer caches against may already be gone. Retire it before the
@@ -1213,12 +1216,10 @@ auto render_session_set_target(
   //
   // The same bargain a resize strikes: the renderer carries the tile pyramid,
   // glyph and image atlases, symbol placement, and feature state over to the
-  // new target. It starts over only when its shaders no longer match the pixel
-  // ratio, or when the backend had to rebuild something it caches against.
-  if (
-    extent.scale_factor != live->scale_factor ||
-    outcome == RetargetOutcome::RendererInvalidated
-  ) {
+  // new target. The pixel ratio is the one thing it cannot carry, being fixed
+  // when a renderer is built and baked into its shaders. Anything else the
+  // compiled state would not match was refused above rather than rebuilt here.
+  if (extent.scale_factor != live->scale_factor) {
     live->renderer.reset();
   }
   live->rendered_generation = 0;

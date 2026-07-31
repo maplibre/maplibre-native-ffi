@@ -128,8 +128,7 @@ class VulkanTextureSessionBackend final
   void resize(mbgl::Size size) override { backend_.resize(size); }
 
   auto set_vulkan_borrowed_target(
-    const mln_vulkan_borrowed_texture_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
   ) -> mln_status override {
     if (!mln::core::vulkan_context_matches(
           backend_.context_descriptor(), descriptor.context
@@ -140,9 +139,14 @@ class VulkanTextureSessionBackend final
       );
       return MLN_STATUS_INVALID_ARGUMENT;
     }
-    out_outcome = backend_.set_borrowed_target(descriptor)
-                    ? mln::core::RetargetOutcome::RendererPreserved
-                    : mln::core::RetargetOutcome::RendererInvalidated;
+    if (!backend_.matches_borrowed_target(descriptor)) {
+      return mln::core::unsupported_retarget(
+        "Vulkan image target must have the format and layouts this session's "
+        "render pass was built for; destroy the session and attach again to "
+        "change them"
+      );
+    }
+    backend_.set_borrowed_target(descriptor);
     return MLN_STATUS_OK;
   }
 
@@ -397,11 +401,9 @@ auto vulkan_borrowed_texture_set_target(
   return render_session_set_target(
     session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
       return target_session.texture.backend->set_vulkan_borrowed_target(
-        *descriptor, outcome
+        *descriptor
       );
     }
   );

@@ -214,9 +214,12 @@ MLN_API mln_status mln_metal_surface_set_target(
  * mln_render_session_destroy() instead and attaches again afterward. Metal and
  * OpenGL carry no such requirement; see mln_opengl_surface_set_target().
  *
- * A replacement surface whose swapchain reports a different color format needs
- * a new render pass, which mbgl keys its pipeline cache on, so the renderer is
- * rebuilt in that case. Matching formats keep it.
+ * The replacement must report the color format and the surface-transform
+ * support this session already compiled a render pass and shaders for.
+ * MLN_STATUS_UNSUPPORTED reports one that does not, with the session still
+ * rendering into the surface it has, and destroying the session and attaching
+ * again is what changes either. Both are read from the replacement before
+ * anything is torn down.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -227,8 +230,11 @@ MLN_API mln_status mln_metal_surface_set_target(
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
  * - MLN_STATUS_UNSUPPORTED when the session does not render through a Vulkan
- *   surface, or when Vulkan surface sessions are not supported by this build.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ *   surface, when the replacement's color format or surface-transform support
+ *   differs from the session's, or when Vulkan surface sessions are not
+ *   supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when a Vulkan query about the replacement fails, or
+ *   when an internal exception is converted to status.
  */
 MLN_API mln_status mln_vulkan_surface_set_target(
   mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
@@ -248,7 +254,7 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * turn out to be unusable. An HDC whose pixel format does not match the
  * session's context, or an EGLSurface from another display, is reported by the
  * next mln_render_session_render_update() as MLN_STATUS_NATIVE_ERROR rather
- * than by this function.
+ * than by this function. The session stays destroyable in that state.
  *
  * A lost OpenGL context is a different matter: nothing in it survives, and the
  * session is destroyed and attached again.

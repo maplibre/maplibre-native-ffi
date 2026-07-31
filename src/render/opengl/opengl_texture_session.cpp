@@ -449,11 +449,11 @@ class OpenGLTextureSessionBackend final
   }
 
   auto set_opengl_borrowed_target(
-    const mln_opengl_borrowed_texture_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
+    const mln_opengl_borrowed_texture_descriptor& descriptor
   ) -> mln_status override {
     if (!mln::core::opengl_context_matches(
-          backend_.context_descriptor(), descriptor.context
+          backend_.context_descriptor(), descriptor.context,
+          mln::core::OpenGLContextMatch::Exact
         )) {
       mln::core::set_thread_error(
         "OpenGL texture target must name the context this session attached with"
@@ -464,7 +464,6 @@ class OpenGLTextureSessionBackend final
       descriptor.texture,
       mbgl::Size{descriptor.physical_width, descriptor.physical_height}
     );
-    out_outcome = mln::core::RetargetOutcome::RendererPreserved;
     return MLN_STATUS_OK;
   }
 
@@ -647,11 +646,9 @@ auto opengl_borrowed_texture_set_target(
   return render_session_set_target(
     session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
     descriptor->physical_width, descriptor->physical_height,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
       return target_session.texture.backend->set_opengl_borrowed_target(
-        *descriptor, outcome
+        *descriptor
       );
     }
   );

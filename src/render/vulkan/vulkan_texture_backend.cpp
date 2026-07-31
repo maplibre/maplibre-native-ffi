@@ -85,28 +85,32 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_framebuffers();
   }
 
-  // Renders into a different caller-owned image from here on. Returns whether
-  // the render pass survived, which it does while the image keeps the format
-  // and layouts the pass was built around; mbgl keys its pipeline cache on that
-  // pass.
-  auto set_borrowed(
+  // Whether a replacement image can use the render pass this resource already
+  // has, which needs the format and both layouts the pass was built around.
+  // mbgl keys its pipeline cache on that pass, and the Metal and Vulkan
+  // contexts cache more against it besides, so a mismatch is refused rather
+  // than rebuilt.
+  [[nodiscard]] auto matches_borrowed(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor
+  ) const -> bool {
+    return colorFormat == static_cast<vk::Format>(descriptor.format) &&
+           initial_layout_ ==
+             static_cast<vk::ImageLayout>(descriptor.initial_layout) &&
+           final_layout_ ==
+             static_cast<vk::ImageLayout>(descriptor.final_layout);
+  }
+
+  // Renders into a different caller-owned image from here on. The caller has
+  // already established that it matches the live render pass, which is why that
+  // pass is kept.
+  void set_borrowed(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
     uint32_t height
-  ) -> bool {
+  ) {
     backend.getDevice()->waitIdle(backend.getDispatcher());
-    const auto compatible =
-      colorFormat == static_cast<vk::Format>(descriptor.format) &&
-      initial_layout_ ==
-        static_cast<vk::ImageLayout>(descriptor.initial_layout) &&
-      final_layout_ == static_cast<vk::ImageLayout>(descriptor.final_layout);
-
     swapchainFramebuffers.clear();
     swapchainImages.clear();
-    if (!compatible) {
-      renderPass.reset();
-    }
     init_borrowed(descriptor, width, height);
-    return compatible;
   }
 
   void init_borrowed(
@@ -395,19 +399,31 @@ auto VulkanTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
   return *this;
 }
 
-auto VulkanTextureBackend::set_borrowed_target(
+auto VulkanTextureBackend::matches_borrowed_target(
   const mln_vulkan_borrowed_texture_descriptor& descriptor
-) -> bool {
+) const -> bool {
+  // Nothing is built yet, so there is no render pass to be incompatible with.
+  if (!resource) {
+    return true;
+  }
+  return getResource<VulkanTextureRenderableResource>().matches_borrowed(
+    descriptor
+  );
+}
+
+void VulkanTextureBackend::set_borrowed_target(
+  const mln_vulkan_borrowed_texture_descriptor& descriptor
+) {
   borrowed_descriptor_ = descriptor;
   const auto new_size =
     mbgl::Size{descriptor.physical_width, descriptor.physical_height};
   // Nothing is built yet, so the lazy path already takes the new image.
   if (!resource) {
     setSize(new_size);
-    return true;
+    return;
   }
   size = new_size;
-  return getResource<VulkanTextureRenderableResource>().set_borrowed(
+  getResource<VulkanTextureRenderableResource>().set_borrowed(
     descriptor, new_size.width, new_size.height
   );
 }

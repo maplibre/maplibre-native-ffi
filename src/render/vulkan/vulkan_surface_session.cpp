@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
@@ -223,20 +224,48 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       init(size.width, size.height);
     }
 
-    // Presents through a different host surface from here on. Returns whether
-    // the render pass survived: initSwapchain() picks a color format from the
-    // new surface, and setColorFormat() drops the pass when that format
-    // differs, taking mbgl's pipeline cache with it.
+    // Whether a replacement surface can use the render pass and the shaders
+    // this session already compiled.
     //
-    // The answer comes from comparing the color format by value rather than
-    // comparing VkRenderPass handles across the rebuild. A destroyed handle is
-    // free to come back with the same value from the next create call, and
-    // mbgl's pipeline cache is a bare hash map over that value with no equality
-    // check behind it, so a recycled handle would hand the new pass every
-    // pipeline built for the old one. Color format is the only input to
-    // initRenderPass() that a replacement surface can change; the depth format
-    // follows from the physical device, which does not change here.
-    auto set_surface(VkSurfaceKHR surface_, mbgl::Size size) -> bool {
+    // Two properties of a surface reach into that compiled state. The color
+    // format decides the render pass, which mbgl keys its pipeline cache on,
+    // and mbgl compiles a distinct shader variant for surfaces that support a
+    // pre-rotation transform (USE_SURFACE_TRANSFORM). Both are read from the
+    // replacement before anything is torn down, so a mismatch is refused with
+    // the session still rendering into the surface it has.
+    [[nodiscard]] auto matches_surface(VkSurfaceKHR candidate) const -> bool {
+      const auto& physical_device = backend.getPhysicalDevice();
+      const auto& dispatcher = backend.getDispatcher();
+      const auto candidate_surface = vk::SurfaceKHR(candidate);
+
+      const auto candidate_capabilities =
+        physical_device.getSurfaceCapabilitiesKHR(
+          candidate_surface, dispatcher
+        );
+      const auto candidate_transform =
+        candidate_capabilities.supportedTransforms !=
+        vk::SurfaceTransformFlagBitsKHR::eIdentity;
+      if (candidate_transform != hasSurfaceTransformSupport()) {
+        return false;
+      }
+
+      // The same choice initSwapchain() makes, so the comparison is against the
+      // format the replacement would actually be given.
+      const auto formats =
+        physical_device.getSurfaceFormatsKHR(candidate_surface, dispatcher);
+      const auto found =
+        std::find_if(formats.begin(), formats.end(), [](const auto& format) {
+          return (format.format == vk::Format::eB8G8R8A8Unorm ||
+                  format.format == vk::Format::eR8G8B8A8Unorm) &&
+                 format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
+        });
+      return found != formats.end() && found->format == colorFormat;
+    }
+
+    // Presents through a different host surface from here on. The caller has
+    // already established that it matches, so the render pass survives: the
+    // color format is unchanged, and setColorFormat() leaves the pass alone.
+    void set_surface(VkSurfaceKHR surface_, mbgl::Size size) {
       backend.getDevice()->waitIdle(backend.getDispatcher());
       swapchainFramebuffers.clear();
       swapchainImageViews.clear();
@@ -255,9 +284,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       borrowed_surface = surface_;
       createPlatformSurface();
 
-      const auto previous_format = colorFormat;
       init(size.width, size.height);
-      return colorFormat == previous_format;
     }
 
    private:
@@ -301,12 +328,24 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     mbgl::vulkan::Renderable::setSize(size);
     if (resource) {
       getResource<VulkanSurfaceRenderableResource>().resize(size);
+      adopt_swapchain_extent();
     }
   }
 
-  // Returns whether the renderer's cached state survives, which on Vulkan comes
-  // down to whether the render pass did.
-  auto set_surface(const mln_vulkan_surface_descriptor& descriptor) -> bool {
+  // Whether a replacement surface can use what this session already compiled.
+  [[nodiscard]] auto matches_surface(
+    const mln_vulkan_surface_descriptor& descriptor
+  ) const -> bool {
+    // Nothing has been built yet, so there is nothing to be incompatible with.
+    if (!resource) {
+      return true;
+    }
+    return getResource<VulkanSurfaceRenderableResource>().matches_surface(
+      static_cast<VkSurfaceKHR>(descriptor.surface)
+    );
+  }
+
+  void set_surface(const mln_vulkan_surface_descriptor& descriptor) {
     const auto new_size = mbgl::Size{
       mln::core::physical_dimension(
         descriptor.extent.width, descriptor.extent.scale_factor
@@ -320,11 +359,12 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     // Nothing has been built yet, so the lazy path already takes the new
     // surface: the wrapper is created against descriptor_ on first use.
     if (!resource) {
-      return true;
+      return;
     }
-    return getResource<VulkanSurfaceRenderableResource>().set_surface(
+    getResource<VulkanSurfaceRenderableResource>().set_surface(
       static_cast<VkSurfaceKHR>(descriptor.surface), new_size
     );
+    adopt_swapchain_extent();
   }
 
   [[nodiscard]] auto context_descriptor() const
@@ -335,6 +375,23 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   void activate() override {}
   void deactivate() override {}
 
+ private:
+  // Takes the extent the swapchain actually got. A surface may report a fixed
+  // currentExtent, clamp what was asked for, or swap width and height for a
+  // pre-rotated display, and mbgl::Renderer reads its viewport and scissor from
+  // the renderable's size. mbgl::vulkan::RendererBackend::initSwapchain() does
+  // the same after building a swapchain of its own.
+  void adopt_swapchain_extent() {
+    const auto& renderable_resource =
+      getResource<VulkanSurfaceRenderableResource>();
+    if (!renderable_resource.hasSurfaceTransformSupport()) {
+      return;
+    }
+    const auto& extent = renderable_resource.getExtent();
+    mbgl::vulkan::Renderable::setSize({extent.width, extent.height});
+  }
+
+ public:
  protected:
   void initInstance() override {
     usingSharedContext = true;
@@ -421,10 +478,8 @@ class VulkanSurfaceSessionBackend final
     backend_.resize(mbgl::Size{physical_width, physical_height});
   }
 
-  auto set_vulkan_target(
-    const mln_vulkan_surface_descriptor& descriptor,
-    mln::core::RetargetOutcome& out_outcome
-  ) -> mln_status override {
+  auto set_vulkan_target(const mln_vulkan_surface_descriptor& descriptor)
+    -> mln_status override {
     if (!mln::core::vulkan_context_matches(
           backend_.context_descriptor(), descriptor.context
         )) {
@@ -438,9 +493,14 @@ class VulkanSurfaceSessionBackend final
     if (handles_status != MLN_STATUS_OK) {
       return handles_status;
     }
-    out_outcome = backend_.set_surface(descriptor)
-                    ? mln::core::RetargetOutcome::RendererPreserved
-                    : mln::core::RetargetOutcome::RendererInvalidated;
+    if (!backend_.matches_surface(descriptor)) {
+      return mln::core::unsupported_retarget(
+        "Vulkan surface target must report the color format and surface "
+        "transform support this session compiled its render pass and shaders "
+        "for; destroy the session and attach again to change them"
+      );
+    }
+    backend_.set_surface(descriptor);
     return MLN_STATUS_OK;
   }
 
@@ -516,12 +576,8 @@ auto vulkan_surface_set_target(
   }
   return surface_session_set_target(
     session, descriptor->extent,
-    [descriptor](
-      mln_render_session_object& target_session, RetargetOutcome& outcome
-    ) -> mln_status {
-      return target_session.surface.backend->set_vulkan_target(
-        *descriptor, outcome
-      );
+    [descriptor](mln_render_session_object& target_session) -> mln_status {
+      return target_session.surface.backend->set_vulkan_target(*descriptor);
     }
   );
 }
