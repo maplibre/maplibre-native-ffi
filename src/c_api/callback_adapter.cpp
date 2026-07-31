@@ -41,7 +41,8 @@ using AdapterQueuedResourceRequestView = mln_adapter_queued_resource_request;
 
 struct AdapterQueuedResourceRequest {
   AdapterQueuedResourceRequestView view{};
-  std::string url;
+  std::string requested_url;
+  std::string resolved_url;
   std::string prior_etag;
   std::vector<std::uint8_t> prior_data;
 };
@@ -89,7 +90,7 @@ auto request_matches_route(
 ) -> bool {
   return std::ranges::any_of(routes, [&request](const auto& route) -> bool {
     return matches_rule(route.kind, request.kind) &&
-           string_equals(route.url, request.url);
+           string_equals(route.requested_url, request.requested_url);
   });
 }
 
@@ -110,7 +111,12 @@ auto copy_request(
   const mln_resource_request& request, mln_resource_request_handle handle
 ) -> AdapterQueuedResourceRequestView* {
   auto copy = std::make_unique<AdapterQueuedResourceRequest>();
-  copy->url = request.url == nullptr ? std::string{} : std::string{request.url};
+  copy->requested_url = request.requested_url == nullptr
+                          ? std::string{}
+                          : std::string{request.requested_url};
+  copy->resolved_url = request.resolved_url == nullptr
+                         ? std::string{}
+                         : std::string{request.resolved_url};
   copy->prior_etag = request.prior_etag == nullptr
                        ? std::string{}
                        : std::string{request.prior_etag};
@@ -118,7 +124,8 @@ auto copy_request(
   copy->view = AdapterQueuedResourceRequestView{
     .owner = copy.get(),
     .handle = handle,
-    .url = copy->url.c_str(),
+    .requested_url = copy->requested_url.c_str(),
+    .resolved_url = copy->resolved_url.c_str(),
     .kind = request.kind,
     .loading_method = request.loading_method,
     .priority = request.priority,
@@ -346,8 +353,8 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
   mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
   if (
-    user_data == nullptr || request == nullptr || request->url == nullptr ||
-    handle == MLN_HANDLE_NULL
+    user_data == nullptr || request == nullptr ||
+    request->requested_url == nullptr || handle == MLN_HANDLE_NULL
   ) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }
@@ -357,7 +364,7 @@ extern "C" MLN_API auto mln_adapter_resource_provider_rules_callback(
   for (const auto& rule : std::span{table.rules, table.count}) {
     if (
       matches_rule(rule.kind, request->kind) &&
-      string_equals(rule.url, request->url)
+      string_equals(rule.requested_url, request->requested_url)
     ) {
       static_cast<void>(mln_resource_request_complete(handle, &rule.response));
       mln_resource_request_release(handle);
@@ -372,8 +379,8 @@ extern "C" MLN_API auto mln_adapter_queued_resource_provider_callback(
   mln_resource_request_handle handle
 ) noexcept -> std::uint32_t {
   if (
-    user_data == nullptr || request == nullptr || request->url == nullptr ||
-    handle == MLN_HANDLE_NULL
+    user_data == nullptr || request == nullptr ||
+    request->requested_url == nullptr || handle == MLN_HANDLE_NULL
   ) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }

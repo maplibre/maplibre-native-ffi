@@ -465,7 +465,10 @@ pub const ResourceByteRange = struct {
 };
 
 pub const ResourceRequest = struct {
-    url: []const u8,
+    /// URL entering the network layer, preserving configured scheme aliases.
+    requested_url: []const u8,
+    /// URL to fetch, after tile server normalization.
+    resolved_url: []const u8,
     kind: ResourceKind,
     loading_method: ResourceLoadingMethod,
     priority: ResourcePriority,
@@ -2001,15 +2004,18 @@ fn splitMix64(input: u64) u64 {
 }
 
 fn resourceRequestFromNative(allocator: std.mem.Allocator, request: *const c.mln_resource_request) std.mem.Allocator.Error!ResourceRequest {
-    const url = try allocator.dupe(u8, if (request.url == null) "" else std.mem.span(request.url));
-    errdefer allocator.free(url);
+    const requested_url = try allocator.dupe(u8, if (request.requested_url == null) "" else std.mem.span(request.requested_url));
+    errdefer allocator.free(requested_url);
+    const resolved_url = try allocator.dupe(u8, if (request.resolved_url == null) "" else std.mem.span(request.resolved_url));
+    errdefer allocator.free(resolved_url);
     const prior_etag = if (request.prior_etag == null) null else try allocator.dupe(u8, std.mem.span(request.prior_etag));
     errdefer if (prior_etag) |value| allocator.free(value);
     const prior_data = try allocator.dupe(u8, if (request.prior_data_size == 0) "" else request.prior_data[0..request.prior_data_size]);
     errdefer allocator.free(prior_data);
 
     return .{
-        .url = url,
+        .requested_url = requested_url,
+        .resolved_url = resolved_url,
         .kind = ResourceKind.fromRaw(request.kind),
         .loading_method = ResourceLoadingMethod.fromRaw(request.loading_method),
         .priority = ResourcePriority.fromRaw(request.priority),
@@ -2024,7 +2030,8 @@ fn resourceRequestFromNative(allocator: std.mem.Allocator, request: *const c.mln
 }
 
 fn resourceRequestDeinit(allocator: std.mem.Allocator, request: ResourceRequest) void {
-    allocator.free(request.url);
+    allocator.free(request.requested_url);
+    allocator.free(request.resolved_url);
     if (request.prior_etag) |prior_etag| allocator.free(prior_etag);
     allocator.free(request.prior_data);
 }

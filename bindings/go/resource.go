@@ -92,7 +92,11 @@ const (
 
 // ResourceRequest is a copied native resource request.
 type ResourceRequest struct {
-	URL                 string
+	// RequestedURL preserves configured URI-scheme aliases and is the
+	// request's logical, cache-facing identity.
+	RequestedURL string
+	// ResolvedURL is the URL to fetch, after tile server normalization.
+	ResolvedURL         string
 	Kind                ResourceKind
 	RawKind             uint32
 	LoadingMethod       ResourceLoadingMethod

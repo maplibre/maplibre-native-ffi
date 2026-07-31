@@ -69,7 +69,8 @@ public sealed record ResourceRequest
 
     public ResourceRequest(
         ResourceKind Kind,
-        string Url,
+        string RequestedUrl,
+        string ResolvedUrl,
         ResourceLoadingMethod LoadingMethod,
         ResourcePriority Priority,
         ResourceUsage Usage,
@@ -83,7 +84,8 @@ public sealed record ResourceRequest
     )
     {
         this.Kind = Kind;
-        this.Url = Url;
+        this.RequestedUrl = RequestedUrl;
+        this.ResolvedUrl = ResolvedUrl;
         this.LoadingMethod = LoadingMethod;
         this.Priority = Priority;
         this.Usage = Usage;
@@ -97,7 +99,12 @@ public sealed record ResourceRequest
     }
 
     public ResourceKind Kind { get; }
-    public string Url { get; }
+
+    /// <summary>URL entering the network layer, preserving configured scheme aliases.</summary>
+    public string RequestedUrl { get; }
+
+    /// <summary>URL to fetch, after tile server normalization.</summary>
+    public string ResolvedUrl { get; }
     public ResourceLoadingMethod LoadingMethod { get; }
     public ResourcePriority Priority { get; }
     public ResourceUsage Usage { get; }

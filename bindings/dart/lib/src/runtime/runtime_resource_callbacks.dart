@@ -40,7 +40,7 @@ final class _ResourceTransformState {
 final class _ResourceProviderRulesState {
   _ResourceProviderRulesState(List<ResourceProviderRule> rules) {
     for (final rule in rules) {
-      _checkNativeCString(rule.url);
+      _checkNativeCString(rule.requestedUrl);
       _checkResourceResponseNativeStrings(rule.response);
     }
     pointer = calloc<raw.mln_adapter_resource_provider_rules>();
@@ -52,7 +52,9 @@ final class _ResourceProviderRulesState {
       final rule = rules[index];
       pointer.ref.rules[index].kind =
           rule.kind?.rawValue ?? _resourceKindWildcard;
-      pointer.ref.rules[index].url = _nativeOwnedCString(rule.url);
+      pointer.ref.rules[index].requested_url = _nativeOwnedCString(
+        rule.requestedUrl,
+      );
       pointer.ref.rules[index].response = _resourceResponseToNative(
         rule.response,
         calloc,
@@ -65,7 +67,7 @@ final class _ResourceProviderRulesState {
   void close() {
     final rules = pointer.ref.rules;
     for (var index = 0; index < pointer.ref.count; index += 1) {
-      calloc.free(rules[index].url);
+      calloc.free(rules[index].requested_url);
       _freeNativeResourceResponse(rules[index].response, calloc);
     }
     if (rules != nullptr) {
@@ -78,7 +80,7 @@ final class _ResourceProviderRulesState {
 final class _ResourceProviderCallbackState extends RetainedCallbackState {
   _ResourceProviderCallbackState(ResourceProvider provider) {
     for (final route in provider.routes) {
-      _checkNativeCString(route.url);
+      _checkNativeCString(route.requestedUrl);
     }
     callback =
         NativeCallable<
@@ -106,7 +108,9 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
       final route = provider.routes[index];
       pointer.ref.routes[index].kind =
           route.kind?.rawValue ?? _resourceKindWildcard;
-      pointer.ref.routes[index].url = _nativeOwnedCString(route.url);
+      pointer.ref.routes[index].requested_url = _nativeOwnedCString(
+        route.requestedUrl,
+      );
     }
     pointer.ref.listener = callback.nativeFunction;
   }
@@ -130,7 +134,7 @@ final class _ResourceProviderCallbackState extends RetainedCallbackState {
   void closeResources() {
     final routes = pointer.ref.routes;
     for (var index = 0; index < pointer.ref.route_count; index += 1) {
-      calloc.free(routes[index].url);
+      calloc.free(routes[index].requested_url);
     }
     if (routes != nullptr) {
       calloc.free(routes);
@@ -205,7 +209,8 @@ ResourceRequest _copyResourceRequest(
           request.prior_data.asTypedList(request.prior_data_size),
         );
   return ResourceRequest(
-    url: request.url.cast<Utf8>().toDartString(),
+    requestedUrl: request.requested_url.cast<Utf8>().toDartString(),
+    resolvedUrl: request.resolved_url.cast<Utf8>().toDartString(),
     kind: ResourceKind.fromRawValue(request.kind),
     loadingMethod: ResourceLoadingMethod.fromRawValue(request.loading_method),
     priority: ResourcePriority.fromRawValue(request.priority),

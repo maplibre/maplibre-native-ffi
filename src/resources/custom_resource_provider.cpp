@@ -224,13 +224,16 @@ auto bytes_from_string(const std::string& value) -> const std::uint8_t* {
   return reinterpret_cast<const std::uint8_t*>(value.data());
 }
 
-auto make_request_view(const mbgl::Resource& resource) -> mln_resource_request {
+auto make_request_view(
+  const mbgl::Resource& resource, const std::string& resolved_url
+) -> mln_resource_request {
   const auto* prior_data = resource.priorData == nullptr
                              ? nullptr
                              : bytes_from_string(*resource.priorData);
   auto request = mln_resource_request{
     .size = sizeof(mln_resource_request),
-    .url = resource.url.c_str(),
+    .requested_url = resource.url.c_str(),
+    .resolved_url = resolved_url.c_str(),
     .kind = kind_to_abi(resource.kind),
     .loading_method = loading_method_to_abi(resource.loadingMethod),
     .priority = resource.priority == mbgl::Resource::Priority::Low
@@ -266,6 +269,7 @@ struct CustomProviderInvocation {
   // the object out from under the code that runs after the callback returns.
   std::shared_ptr<ResourceRequestObject> object;
   mbgl::Resource resource;
+  std::string resolved_url;
   mln_resource_provider_callback callback = nullptr;
   void* user_data = nullptr;
 };
@@ -284,7 +288,8 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       retire_request(invocation.handle);
       return true;
     }
-    const auto request = make_request_view(invocation.resource);
+    const auto request =
+      make_request_view(invocation.resource, invocation.resolved_url);
     const auto decision =
       invocation.callback(invocation.user_data, &request, invocation.handle);
     if (decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH) {
@@ -348,7 +353,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
 }  // namespace
 
 auto request_custom_resource(
-  const mbgl::Resource& resource,
+  const mbgl::Resource& resource, std::string resolved_url,
   mln_resource_provider_callback provider_callback, void* user_data,
   mbgl::FileSource::Callback file_source_callback
 ) -> std::unique_ptr<mbgl::AsyncRequest> {
@@ -369,6 +374,7 @@ auto request_custom_resource(
         .handle = handle,
         .object = object,
         .resource = resource,
+        .resolved_url = std::move(resolved_url),
         .callback = provider_callback,
         .user_data = user_data,
       }

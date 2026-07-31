@@ -78,13 +78,13 @@ typedef struct mln_adapter_resource_rewrite_rules {
 /**
  * One exact-URL resource provider rule.
  *
- * A matching request is completed with the rule's response without reaching the
- * host. The response and its buffers are borrowed and must outlive the rule
- * table.
+ * A rule matches mln_resource_request.requested_url. A matching request is
+ * completed with the rule's response without reaching the host. The response
+ * and its buffers are borrowed and must outlive the rule table.
  */
 typedef struct mln_adapter_resource_provider_rule {
   uint32_t kind;
-  const char* url;
+  const char* requested_url;
   mln_resource_response response;
 } mln_adapter_resource_provider_rule;
 
@@ -102,11 +102,12 @@ typedef struct mln_adapter_resource_provider_rules {
 /**
  * One route a queued provider claims.
  *
- * The url pointer is borrowed and must outlive the provider.
+ * A route matches mln_resource_request.requested_url. The requested_url pointer
+ * is borrowed and must outlive the provider.
  */
 typedef struct mln_adapter_queued_resource_provider_route {
   uint32_t kind;
-  const char* url;
+  const char* requested_url;
 } mln_adapter_queued_resource_provider_route;
 
 /**
@@ -142,7 +143,10 @@ typedef struct mln_adapter_queued_resource_provider {
 typedef struct mln_adapter_queued_resource_request {
   void* owner;
   mln_resource_request_handle handle;
-  const char* url;
+  /** Copy of mln_resource_request.requested_url. */
+  const char* requested_url;
+  /** Copy of mln_resource_request.resolved_url. */
+  const char* resolved_url;
   uint32_t kind;
   uint32_t loading_method;
   uint32_t priority;

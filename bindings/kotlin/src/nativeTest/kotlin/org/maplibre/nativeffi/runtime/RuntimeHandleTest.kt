@@ -246,7 +246,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
-          if (request.url == "custom://pass-through-style.json") {
+          if (request.requestedUrl == "custom://pass-through-style.json") {
             calls.addAndFetch(1)
             passThroughRequest.store(handle)
           }
@@ -342,6 +342,45 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
+  fun resourceProviderSeesSchemeAliasAndItsResolvedUrl() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val resolvedUrl = AtomicReference<String?>(null)
+    try {
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, handle ->
+          if (request.requestedUrl != "maplibre://maps/style") {
+            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+          }
+          resolvedUrl.store(request.resolvedUrl)
+          handle.complete(
+            ResourceResponse(ResourceResponseStatus.OK).apply {
+              bytes = STYLE_JSON.encodeToByteArray()
+            }
+          )
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+          },
+        )
+      try {
+        map.setStyleUrl("maplibre://maps/style")
+        waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_STYLE_LOADED)
+        assertEquals("https://demotiles.maplibre.org/style.json", resolvedUrl.load())
+      } finally {
+        map.close()
+      }
+    } finally {
+      runtime.close()
+    }
+  }
+
+  @Test
   fun resourceProviderCompletesStyleRequestInlineThroughPublicApi() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val calls = AtomicInt(0)
@@ -350,7 +389,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
           try {
-            if (request.url != "custom://style.json") {
+            if (request.requestedUrl != "custom://style.json") {
               return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
             }
             calls.addAndFetch(1)
@@ -407,7 +446,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
-          if (request.url != "custom://async-style.json") {
+          if (request.requestedUrl != "custom://async-style.json") {
             return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
           }
           handledRequest.store(handle)
@@ -453,7 +492,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
-          if (request.url != "custom://threaded-style.json") {
+          if (request.requestedUrl != "custom://threaded-style.json") {
             return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
           }
           handledRequest.store(handle)
@@ -531,7 +570,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
-          if (request.url != "custom://error-style.json") {
+          if (request.requestedUrl != "custom://error-style.json") {
             return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
           }
           handle.complete(
@@ -578,7 +617,7 @@ class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
-          if (request.url != "custom://cancelled-style.json") {
+          if (request.requestedUrl != "custom://cancelled-style.json") {
             return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
           }
           handledRequest.store(handle)

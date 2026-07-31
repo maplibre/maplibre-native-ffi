@@ -472,7 +472,10 @@ namespace Maplibre.Native.Internal.C
         public uint size;
 
         [NativeTypeName("const char *")]
-        public sbyte* url;
+        public sbyte* requested_url;
+
+        [NativeTypeName("const char *")]
+        public sbyte* resolved_url;
 
         [NativeTypeName("uint32_t")]
         public uint kind;

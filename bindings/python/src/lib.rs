@@ -6375,7 +6375,8 @@ fn resource_request_to_py(
     request: maplibre_core::ResourceRequest,
 ) -> PyResult<Py<PyAny>> {
     let dict = PyDict::new(py);
-    dict.set_item("url", request.url)?;
+    dict.set_item("requested_url", request.requested_url)?;
+    dict.set_item("resolved_url", request.resolved_url)?;
     dict.set_item("kind", request.raw_kind)?;
     dict.set_item("loading_method", request.raw_loading_method)?;
     dict.set_item("priority", request.raw_priority)?;

@@ -4752,7 +4752,8 @@ internal object NativeAccess {
 
   internal fun resourceRequest(request: MemorySegment): ResourceRequest =
     ResourceRequest(
-      copyCString(request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_URL_OFFSET)),
+      copyCString(request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_REQUESTED_URL_OFFSET)),
+      copyCString(request.get(ValueLayout.ADDRESS, RESOURCE_REQUEST_RESOLVED_URL_OFFSET)),
       ResourceKind.fromNative(request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_KIND_OFFSET)),
       ResourceLoadingMethod.fromNative(
         request.get(ValueLayout.JAVA_INT, RESOURCE_REQUEST_LOADING_METHOD_OFFSET)
@@ -5869,7 +5870,10 @@ internal object NativeAccess {
   private val RUNTIME_EVENT_MESSAGE_OFFSET: Long = mln_runtime_event.`message$offset`()
   private val RUNTIME_EVENT_MESSAGE_SIZE_OFFSET: Long = mln_runtime_event.`message_size$offset`()
 
-  private val RESOURCE_REQUEST_URL_OFFSET: Long = mln_resource_request.`url$offset`()
+  private val RESOURCE_REQUEST_REQUESTED_URL_OFFSET: Long =
+    mln_resource_request.`requested_url$offset`()
+  private val RESOURCE_REQUEST_RESOLVED_URL_OFFSET: Long =
+    mln_resource_request.`resolved_url$offset`()
   private val RESOURCE_REQUEST_KIND_OFFSET: Long = mln_resource_request.`kind$offset`()
   private val RESOURCE_REQUEST_LOADING_METHOD_OFFSET: Long =
     mln_resource_request.`loading_method$offset`()

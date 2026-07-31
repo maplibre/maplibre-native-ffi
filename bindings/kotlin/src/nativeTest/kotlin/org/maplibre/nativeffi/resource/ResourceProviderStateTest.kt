@@ -56,7 +56,8 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       memScoped {
         val request = alloc<mln_resource_request>()
-        request.url = "https://example.com/tile.pbf".cstr.getPointer(this)
+        request.requested_url = "maplibre://tiles/2/1/1.pbf".cstr.getPointer(this)
+        request.resolved_url = "https://example.com/tile.pbf".cstr.getPointer(this)
         request.kind = 900U
         request.loading_method = 901U
         request.priority = 902U
@@ -92,7 +93,8 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(903, copied?.usage?.nativeValue)
       assertEquals(ResourceStoragePolicy(904), copied?.storagePolicy)
       assertEquals(904, copied?.storagePolicy?.nativeValue)
-      assertEquals("https://example.com/tile.pbf", copied?.url)
+      assertEquals("maplibre://tiles/2/1/1.pbf", copied?.requestedUrl)
+      assertEquals("https://example.com/tile.pbf", copied?.resolvedUrl)
       assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
       assertEquals(123L, copied?.priorModifiedUnixMs)
       assertEquals(456L, copied?.priorExpiresUnixMs)
@@ -371,7 +373,8 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
     try {
       memScoped {
         val request = alloc<mln_resource_request>()
-        request.url = null
+        request.requested_url = null
+        request.resolved_url = null
         val fakeHandle = SyntheticHandles.resourceRequest()
         assertEquals(UInt.MAX_VALUE, state.invoke(request.ptr, fakeHandle.rawHandleValue))
       }
@@ -395,7 +398,8 @@ class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
           }
         )
       val request = alloc<mln_resource_request>()
-      request.url = null
+      request.requested_url = null
+      request.resolved_url = null
       val fakeHandle = SyntheticHandles.resourceRequest()
 
       assertEquals(

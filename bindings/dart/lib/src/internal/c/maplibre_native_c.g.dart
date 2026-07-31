@@ -6496,7 +6496,9 @@ final class mln_resource_request extends ffi.Struct {
   @ffi.Uint32()
   external int size;
 
-  external ffi.Pointer<ffi.Char> url;
+  external ffi.Pointer<ffi.Char> requested_url;
+
+  external ffi.Pointer<ffi.Char> resolved_url;
 
   @ffi.Uint32()
   external int kind;
@@ -8703,7 +8705,7 @@ final class mln_adapter_resource_provider_rule extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
-  external ffi.Pointer<ffi.Char> url;
+  external ffi.Pointer<ffi.Char> requested_url;
 
   external mln_resource_response response;
 }
@@ -8719,7 +8721,7 @@ final class mln_adapter_queued_resource_provider_route extends ffi.Struct {
   @ffi.Uint32()
   external int kind;
 
-  external ffi.Pointer<ffi.Char> url;
+  external ffi.Pointer<ffi.Char> requested_url;
 }
 
 typedef mln_adapter_queued_resource_request_listenerFunction =
@@ -8746,7 +8748,9 @@ final class mln_adapter_queued_resource_request extends ffi.Struct {
   @mln_resource_request_handle()
   external int handle;
 
-  external ffi.Pointer<ffi.Char> url;
+  external ffi.Pointer<ffi.Char> requested_url;
+
+  external ffi.Pointer<ffi.Char> resolved_url;
 
   @ffi.Uint32()
   external int kind;

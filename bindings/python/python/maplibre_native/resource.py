@@ -96,7 +96,12 @@ class ByteRange:
 class ResourceRequest:
     """Copied request passed to a resource provider callback."""
 
-    url: str
+    requested_url: str
+    """URL entering the network layer, preserving configured scheme aliases."""
+
+    resolved_url: str
+    """URL to fetch, after tile server normalization."""
+
     kind: ResourceKind
     loading_method: ResourceLoadingMethod
     priority: ResourcePriority
@@ -113,7 +118,8 @@ class ResourceRequest:
         """Build a copied request from private native values."""
         raw_range = raw["range"]
         return cls(
-            url=raw["url"],
+            requested_url=raw["requested_url"],
+            resolved_url=raw["resolved_url"],
             kind=ResourceKind(raw["kind"]),
             loading_method=ResourceLoadingMethod(raw["loading_method"]),
             priority=ResourcePriority(raw["priority"]),

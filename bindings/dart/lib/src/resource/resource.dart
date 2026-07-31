@@ -239,7 +239,8 @@ final class ResourceUrlRewriteRule {
 final class ResourceRequest {
   /// Creates a copied resource request.
   ResourceRequest({
-    required this.url,
+    required this.requestedUrl,
+    required this.resolvedUrl,
     required this.kind,
     required this.loadingMethod,
     required this.priority,
@@ -254,8 +255,11 @@ final class ResourceRequest {
            ? null
            : Uint8List.fromList(priorData).asUnmodifiableView();
 
-  /// Requested URL.
-  final String url;
+  /// URL entering the network layer, preserving configured scheme aliases.
+  final String requestedUrl;
+
+  /// URL to fetch, after tile server normalization.
+  final String resolvedUrl;
 
   /// Requested resource kind.
   final ResourceKind kind;
@@ -291,13 +295,13 @@ final class ResourceRequest {
 /// Exact URL route used by a queued Dart resource provider callback.
 final class ResourceProviderRoute {
   /// Creates an exact URL provider route.
-  const ResourceProviderRoute({this.kind, required this.url});
+  const ResourceProviderRoute({this.kind, required this.requestedUrl});
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Request URL to match exactly.
-  final String url;
+  /// Requested URL to match exactly.
+  final String requestedUrl;
 }
 
 /// Exact URL provider rule used by the runtime resource provider.
@@ -305,15 +309,15 @@ final class ResourceProviderRule {
   /// Creates an exact URL provider rule.
   const ResourceProviderRule({
     this.kind,
-    required this.url,
+    required this.requestedUrl,
     required this.response,
   });
 
   /// Optional resource kind filter. Null matches any kind.
   final ResourceKind? kind;
 
-  /// Request URL to match exactly.
-  final String url;
+  /// Requested URL to match exactly.
+  final String requestedUrl;
 
   /// Response to complete for matching requests.
   final ResourceResponse response;

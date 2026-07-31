@@ -660,8 +660,8 @@ static uint32_t lookup_probe_resource_provider(
   (void)handle;
   lookup_probe* probe = user_data;
   if (
-    request == NULL || request->url == NULL ||
-    strstr(request->url, "lookup-probe") == NULL
+    request == NULL || request->requested_url == NULL ||
+    strstr(request->requested_url, "lookup-probe") == NULL
   ) {
     return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
   }

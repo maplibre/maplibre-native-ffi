@@ -119,6 +119,44 @@ class RuntimeHandleTest {
     }
   }
 
+  // BND-155: a configured URI-scheme alias reaches the provider as the alias,
+  // alongside the URL the built-in network path would have fetched.
+  @Test
+  fun resourceProviderSeesSchemeAliasAndItsResolvedUrl() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val resolvedUrl = AtomicReference<String?>(null)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, handle ->
+          if (request.requestedUrl != "maplibre://maps/style") {
+            return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
+          }
+          resolvedUrl.set(request.resolvedUrl)
+          handle.complete(
+            ResourceResponse(ResourceResponseStatus.OK).apply {
+              bytes = STYLE_JSON.encodeToByteArray()
+            }
+          )
+          ResourceProviderDecision.HANDLE
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        map.setStyleUrl("maplibre://maps/style")
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED))
+        assertEquals("https://demotiles.maplibre.org/style.json", resolvedUrl.get())
+      } finally {
+        map.close()
+      }
+    }
+  }
+
   @Test
   fun resourceProviderCompletesStyleRequestThroughRuntime() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
@@ -127,7 +165,7 @@ class RuntimeHandleTest {
       runtime.setResourceProvider(
         ResourceProviderCallback { request, handle ->
           try {
-            if (request.url != "custom://jvm-style.json") {
+            if (request.requestedUrl != "custom://jvm-style.json") {
               return@ResourceProviderCallback ResourceProviderDecision.PASS_THROUGH
             }
             calls.incrementAndGet()
@@ -220,7 +258,7 @@ class RuntimeHandleTest {
       val closeError = AtomicReference<Throwable?>(null)
       runtime.setResourceProvider(
         ResourceProviderCallback { request, _ ->
-          if (request.url == "custom://close-during-provider.json") {
+          if (request.requestedUrl == "custom://close-during-provider.json") {
             closeError.set(assertFailsWith<InvalidStateException> { runtime.close() })
           }
           ResourceProviderDecision.PASS_THROUGH

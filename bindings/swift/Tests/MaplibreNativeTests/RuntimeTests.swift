@@ -171,6 +171,66 @@ private func loadProbeStyle(
   try runtime.clearResourceProvider()
 }
 
+private let providerStyleJSON = #"{"version":8,"sources":{},"layers":[]}"#
+
+private final class ResolvedURLCapture: @unchecked Sendable {
+  private let lock = NSLock()
+  private var url: String?
+
+  func store(_ url: String) {
+    lock.withLock { self.url = url }
+  }
+
+  var value: String? {
+    lock.withLock { url }
+  }
+}
+
+/// BND-155: the default tile server's `maplibre:` scheme alias reaches the
+/// provider as the alias, alongside the URL the built-in network path would
+/// have fetched.
+@Test func resourceProviderSeesSchemeAliasAndItsResolvedURL() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+
+  let resolved = ResolvedURLCapture()
+  try runtime.setResourceProvider { request, handle in
+    guard request.requestedUrl == "maplibre://maps/style" else {
+      return .passThrough
+    }
+    resolved.store(request.resolvedUrl)
+    try? handle.complete(ResourceResponse(
+      status: .ok,
+      bytes: Data(providerStyleJSON.utf8)
+    ))
+    return .handle
+  }
+
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 64, height: 64)
+  )
+  defer { try? map.close() }
+
+  try map.setStyleURL("maplibre://maps/style")
+  var loaded = false
+  for _ in 0 ..< 5000 where !loaded {
+    try runtime.pump()
+    while let event = try runtime.pollEvent() {
+      if event.type == .mapStyleLoaded {
+        loaded = true
+        break
+      }
+    }
+    if loaded { break }
+    Thread.sleep(forTimeInterval: 0.001)
+  }
+
+  #expect(loaded)
+  #expect(resolved.value == "https://demotiles.maplibre.org/style.json")
+}
+
 @Test func resourceTransformCallbackCopiesRequestWithoutReplacement() {
   let state = NativeResourceTransformState { request in
     #expect(request.kind == 3)
@@ -369,7 +429,8 @@ private func loadProbeStyle(
   let state =
     NativeResourceProviderState(handleFunctions: functions) { nativeRequest, nativeHandle in
       let request = ResourceRequest(native: nativeRequest)
-      #expect(request.url == "https://example.test/tile")
+      #expect(request.requestedUrl == "maplibre://tiles/2/1/1.pbf")
+      #expect(request.resolvedUrl == "https://example.test/tile")
       #expect(request.kind == .tile)
       #expect(request.loadingMethod == .networkOnly)
       #expect(request.priority == .low)
@@ -389,27 +450,30 @@ private func loadProbeStyle(
 
   let priorData: [UInt8] = [1, 2, 3]
   let decision = try NativeString
-    .withCString("https://example.test/tile") { url in
-      try NativeString.withCString("etag") { etag in
-        priorData.withUnsafeBufferPointer { priorData in
-          var request = mln_resource_request()
-          request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-          request.url = url
-          request.kind = 3
-          request.loading_method = 2
-          request.priority = 1
-          request.usage = 1
-          request.storage_policy = 1
-          request.has_range = true
-          request.range_start = 7
-          request.range_end = 11
-          request.prior_etag = etag
-          request.prior_data = priorData.baseAddress
-          request.prior_data_size = priorData.count
-          return state.invokeForTesting(
-            request: request,
-            rawHandle: SyntheticHandles.resourceRequest(0x4).raw
-          )
+    .withCString("maplibre://tiles/2/1/1.pbf") { requestedURL in
+      try NativeString.withCString("https://example.test/tile") { resolvedURL in
+        try NativeString.withCString("etag") { etag in
+          priorData.withUnsafeBufferPointer { priorData in
+            var request = mln_resource_request()
+            request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+            request.requested_url = requestedURL
+            request.resolved_url = resolvedURL
+            request.kind = 3
+            request.loading_method = 2
+            request.priority = 1
+            request.usage = 1
+            request.storage_policy = 1
+            request.has_range = true
+            request.range_start = 7
+            request.range_end = 11
+            request.prior_etag = etag
+            request.prior_data = priorData.baseAddress
+            request.prior_data_size = priorData.count
+            return state.invokeForTesting(
+              request: request,
+              rawHandle: SyntheticHandles.resourceRequest(0x4).raw
+            )
+          }
         }
       }
     }
@@ -437,7 +501,8 @@ private func loadProbeStyle(
     .withCString("https://example.test/tile") { url in
       var request = mln_resource_request()
       request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-      request.url = url
+      request.requested_url = url
+      request.resolved_url = url
       return state.invokeForTesting(
         request: request,
         rawHandle: SyntheticHandles.resourceRequest(0x7).raw
@@ -481,7 +546,8 @@ private func loadProbeStyle(
     .withCString("https://example.test/tile") { url in
       var request = mln_resource_request()
       request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-      request.url = url
+      request.requested_url = url
+      request.resolved_url = url
       return state.invokeForTesting(
         request: request,
         rawHandle: SyntheticHandles.resourceRequest(0x8).raw

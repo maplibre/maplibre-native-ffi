@@ -2235,7 +2235,7 @@ fn testStyleJsonProvider(
     maybe_handle: ?runtime_module.ResourceRequestHandle,
 ) runtime_module.ResourceProviderDecision {
     _ = context;
-    if (!std.mem.eql(u8, request.url, "custom://style.json")) return .pass_through;
+    if (!std.mem.eql(u8, request.requested_url, "custom://style.json")) return .pass_through;
     const handle = maybe_handle orelse return .pass_through;
     handle.complete(.{ .bytes = test_style_json }) catch {
         handle.release();

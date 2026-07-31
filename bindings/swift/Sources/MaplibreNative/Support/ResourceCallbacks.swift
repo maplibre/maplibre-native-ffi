@@ -7,7 +7,8 @@ struct NativeByteRange: Equatable {
 }
 
 struct NativeResourceRequest: Equatable {
-  let url: String
+  let requestedUrl: String
+  let resolvedUrl: String
   let kind: UInt32
   let loadingMethod: UInt32
   let priority: UInt32
@@ -20,13 +21,14 @@ struct NativeResourceRequest: Equatable {
   let priorData: [UInt8]
 
   init(_ raw: mln_resource_request) throws {
-    guard raw.url != nil else {
+    guard raw.requested_url != nil, raw.resolved_url != nil else {
       throw NativeStatusFailure(
         rawStatus: MLN_STATUS_INVALID_ARGUMENT.rawValue,
-        diagnostic: "resource request url is null"
+        diagnostic: "resource request requested_url or resolved_url is null"
       )
     }
-    url = NativeString.copyCString(raw.url)
+    requestedUrl = NativeString.copyCString(raw.requested_url)
+    resolvedUrl = NativeString.copyCString(raw.resolved_url)
     kind = raw.kind
     loadingMethod = raw.loading_method
     priority = raw.priority

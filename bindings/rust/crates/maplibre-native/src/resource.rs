@@ -332,7 +332,8 @@ mod tests {
     fn request() -> sys::mln_resource_request {
         sys::mln_resource_request {
             size: std::mem::size_of::<sys::mln_resource_request>() as u32,
-            url: c"https://example.test/tile.pbf".as_ptr(),
+            requested_url: c"maplibre://tiles/2/1/1.pbf".as_ptr(),
+            resolved_url: c"https://example.test/tile.pbf".as_ptr(),
             kind: sys::MLN_RESOURCE_KIND_TILE,
             loading_method: sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY,
             priority: sys::MLN_RESOURCE_PRIORITY_LOW,
@@ -374,7 +375,8 @@ mod tests {
         reset_fake_handle_state();
         let state = ResourceProviderState {
             callback: Box::new(|request, handle| {
-                assert_eq!(request.url, "https://example.test/tile.pbf");
+                assert_eq!(request.requested_url, "maplibre://tiles/2/1/1.pbf");
+                assert_eq!(request.resolved_url, "https://example.test/tile.pbf");
                 assert_eq!(request.kind, ResourceKind::Tile);
                 assert_eq!(request.raw_kind, sys::MLN_RESOURCE_KIND_TILE);
                 assert_eq!(request.loading_method, ResourceLoadingMethod::NetworkOnly);

@@ -30,7 +30,8 @@ internal object ResourceStructs {
     val rawUsage = value.usage
     val rawStoragePolicy = value.storage_policy
     return ResourceRequest(
-      MemoryUtil.copyCString(value.url),
+      MemoryUtil.copyCString(value.requested_url),
+      MemoryUtil.copyCString(value.resolved_url),
       ResourceKind.fromNative(rawKind),
       ResourceLoadingMethod.fromNative(rawLoadingMethod),
       ResourcePriority.fromNative(rawPriority),
