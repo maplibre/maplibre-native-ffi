@@ -107,14 +107,6 @@ function(mln_add_c_api_test)
     target_compile_options(mln_c_api_tests PRIVATE /we4505)
   endif()
 
-  # Tile fixtures the suite feeds through a resource provider come from the
-  # MapLibre Native submodule rather than being duplicated here, so a submodule
-  # bump that moves one surfaces as a test failure instead of silent drift.
-  target_compile_definitions(
-    mln_c_api_tests
-    PRIVATE
-      "MLN_TEST_FIXTURE_DIR=\"${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures\"")
-
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
     target_compile_definitions(mln_c_api_tests PRIVATE MLN_TEST_BACKEND_METAL=1)
   elseif(MLN_FFI_RENDER_BACKEND STREQUAL "opengl")
@@ -167,11 +159,18 @@ function(mln_add_c_api_test)
       TEST c-api
       PROPERTY ENVIRONMENT_MODIFICATION ${runtime_environment})
   endif()
+  # Tile fixtures the suite feeds through a resource provider come from the
+  # MapLibre Native submodule rather than being duplicated here, so a submodule
+  # bump that moves one surfaces as a test failure instead of silent drift. The
+  # directory arrives at run time, which keeps the checkout path out of the
+  # compiled objects: an object carrying it would send a second checkout reading
+  # fixtures out of the tree that happened to compile it first.
+  set(test_environment
+      "MLN_TEST_FIXTURE_DIR=${PROJECT_SOURCE_DIR}/third_party/maplibre-native/test/fixtures")
   get_target_property(vulkan_icd_file mln_ffi_render_dependencies
                       MLN_FFI_VULKAN_ICD_FILE)
   if(vulkan_icd_file)
-    set_property(
-      TEST c-api
-      PROPERTY ENVIRONMENT "VK_ICD_FILENAMES=${vulkan_icd_file}")
+    list(APPEND test_environment "VK_ICD_FILENAMES=${vulkan_icd_file}")
   endif()
+  set_property(TEST c-api PROPERTY ENVIRONMENT ${test_environment})
 endfunction()

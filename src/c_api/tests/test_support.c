@@ -166,9 +166,15 @@ uint8_t* mln_test_read_fixture(const char* relative_path, size_t* out_size) {
   if (out_size != NULL) {
     *out_size = 0;
   }
+  const char* fixture_dir = getenv("MLN_TEST_FIXTURE_DIR");
+  TEST_ASSERT_TRUE_MESSAGE(
+    fixture_dir != NULL && fixture_dir[0] != '\0',
+    "MLN_TEST_FIXTURE_DIR is unset; run the suite through ctest"
+  );
+
   char path[1024];
   const int written =
-    snprintf(path, sizeof(path), "%s/%s", MLN_TEST_FIXTURE_DIR, relative_path);
+    snprintf(path, sizeof(path), "%s/%s", fixture_dir, relative_path);
   if (written < 0 || (size_t)written >= sizeof(path)) {
     return NULL;
   }
