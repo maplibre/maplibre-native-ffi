@@ -68,16 +68,19 @@ internal class CommandQueue {
 
   /**
    * Runtime loop: hands the pending deque over and takes [out] in exchange, so the two ping-pong
-   * and the locked section stays O(1). A render loop pushing during a drain waits on the swap, not
-   * on the size of the backlog.
+   * and the locked section is the swap alone. A render loop pushing during a drain waits on that,
+   * not on the size of the backlog or of the batch just applied.
    */
-  fun drain(out: ArrayDeque<CameraCommand>): ArrayDeque<CameraCommand> =
-    synchronized(lock) {
+  fun drain(out: ArrayDeque<CameraCommand>): ArrayDeque<CameraCommand> {
+    // Clearing nulls every slot of the batch just applied, so it happens before the lock is taken.
+    // Only the runtime loop holds [out] at this point; the queue is still filling the other deque.
+    out.clear()
+    return synchronized(lock) {
       val drained = pending
-      out.clear()
       pending = out
       drained
     }
+  }
 }
 
 /**

@@ -62,12 +62,16 @@ pub const CommandQueue = struct {
             @panic("camera command queue out of memory");
     }
 
-    /// Runtime loop: hands over everything queued so far and keeps the backing
-    /// storage for the next batch, so a drain allocates nothing.
+    /// Runtime loop: hands over everything queued so far and takes `out` in
+    /// exchange, so the two ping-pong, a drain allocates nothing, and the
+    /// locked section is the swap alone.
     pub fn drainInto(self: *CommandQueue, out: *std.ArrayList(CameraCommand)) void {
+        // Clearing memsets the batch just applied, so it happens before the
+        // lock is taken. Only the runtime loop holds `out` here; the queue is
+        // still filling the other list.
+        out.clearRetainingCapacity();
         std.Io.Threaded.mutexLock(&self.lock);
         defer std.Io.Threaded.mutexUnlock(&self.lock);
-        out.clearRetainingCapacity();
         std.mem.swap(std.ArrayList(CameraCommand), &self.items, out);
     }
 };
