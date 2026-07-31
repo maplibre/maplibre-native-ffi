@@ -70,11 +70,13 @@ across that, so the map keeps its tiles and atlases every time the window
 changes size. A scale factor change is the exception, starting a new renderer
 for the new pixel ratio.
 
-Hand over a replacement with the same format and layouts the session attached
-with. Pipelines are built against those and cached without them in the key, so
-one that differs comes back as `MLN_STATUS_UNSUPPORTED` with the session still
-rendering into the texture it has. Destroying and re-attaching is what changes
-them, and what a new graphics context needs.
+Hand over a replacement that matches what the session attached with. What has to
+match is per backend, because each builds its pipelines against something
+different: a Metal texture's pixel format, a Vulkan image's format and layouts.
+The [C API reference](/maplibre-native-ffi/reference/c/) states it per function.
+A target that differs comes back as `MLN_STATUS_UNSUPPORTED`, with the session
+still rendering into the texture it has. Destroying and re-attaching is what
+changes it, and what a new graphics context needs.
 
 How much synchronization you owe depends on the backend. An OpenGL session
 finishes its render before `render_update()` returns, so you can sample the

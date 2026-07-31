@@ -276,7 +276,8 @@ auto MetalTextureBackend::has_borrowed_pixel_format(
   // memory.
   //
   // mbgl reads the color format off the renderable when it builds a render
-  // pipeline state, but keys its cache on the shader and color mode alone, so a
+  // pipeline state, then caches that state per shader program under a key of
+  // color mode and vertex layout, with the format itself absent from it. A
   // replacement in another format would be drawn with a pipeline built for the
   // old one. Sample count needs no comparison here: attach admits only
   // single-sample textures, so both sides are always one.
