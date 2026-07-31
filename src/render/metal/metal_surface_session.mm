@@ -57,6 +57,24 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
       depthStencilDirty = true;
     }
 
+    // Presents through a different layer from here on. Every layer this session
+    // takes is configured for the same device and pixel format, so the render
+    // pipeline states mbgl caches against that format stay usable and the
+    // renderer keeps its resources.
+    void set_layer(CA::MetalLayer* layer_, mbgl::Size size_) {
+      // Release what is still bound to the outgoing layer. A drawable outlives
+      // its layer badly, and bind() acquires one from the new layer anyway.
+      commandBuffer.reset();
+      renderPassDescriptor.reset();
+      drawable.reset();
+
+      layer = NS::RetainPtr(layer_);
+      layer->setDevice(backend.getDevice().get());
+      layer->setPixelFormat(MTL::PixelFormatRGBA8Unorm);
+      layer->setFramebufferOnly(false);
+      setSize(size_);
+    }
+
     void bind() override {
       if (drawable && commandBuffer && renderPassDescriptor) {
         return;
@@ -213,6 +231,17 @@ class MetalSurfaceBackend final : public mbgl::mtl::RendererBackend,
     getResource<MetalSurfaceRenderableResource>().setSize(size_);
   }
 
+  void set_layer(CA::MetalLayer* layer_, mbgl::Size size_) {
+    size = size_;
+    getResource<MetalSurfaceRenderableResource>().set_layer(layer_, size_);
+  }
+
+  // A null device in a descriptor names no device at all, which every session
+  // satisfies; the session keeps the one it attached with either way.
+  [[nodiscard]] auto has_device(MTL::Device* other) const -> bool {
+    return other == nullptr || other == device.get();
+  }
+
   void activate() override {}
   void deactivate() override {}
   void updateAssumedState() override {}
@@ -232,6 +261,33 @@ class MetalSurfaceSessionBackend final
 
   void resize(uint32_t physical_width, uint32_t physical_height) override {
     backend_.setSize(mbgl::Size{physical_width, physical_height});
+  }
+
+  auto set_metal_target(
+    const mln_metal_surface_descriptor& descriptor,
+    mln::core::RetargetOutcome& out_outcome
+  ) -> mln_status override {
+    if (!backend_.has_device(
+          static_cast<MTL::Device*>(descriptor.context.device)
+        )) {
+      mln::core::set_thread_error(
+        "Metal surface target must name the device this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    backend_.set_layer(
+      static_cast<CA::MetalLayer*>(descriptor.layer),
+      mbgl::Size{
+        mln::core::physical_dimension(
+          descriptor.extent.width, descriptor.extent.scale_factor
+        ),
+        mln::core::physical_dimension(
+          descriptor.extent.height, descriptor.extent.scale_factor
+        )
+      }
+    );
+    out_outcome = mln::core::RetargetOutcome::RendererPreserved;
+    return MLN_STATUS_OK;
   }
 
  private:
@@ -284,6 +340,23 @@ auto metal_surface_attach(
       .null_session = "surface session must not be null",
       .null_output = "out_session must not be null",
       .non_null_output = "out_session must point to a null handle"
+    }
+  );
+}
+
+auto metal_surface_set_target(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return surface_session_set_target(
+    session, descriptor->extent,
+    [descriptor](
+      mln_render_session_object& live, RetargetOutcome& outcome
+    ) -> mln_status {
+      return live.surface.backend->set_metal_target(*descriptor, outcome);
     }
   );
 }

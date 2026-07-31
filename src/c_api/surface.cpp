@@ -45,3 +45,27 @@ auto mln_opengl_surface_attach(
     return mln::core::opengl_surface_attach(map, descriptor, out_session);
   });
 }
+
+auto mln_metal_surface_set_target(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::metal_surface_set_target(session, descriptor);
+  });
+}
+
+auto mln_vulkan_surface_set_target(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::vulkan_surface_set_target(session, descriptor);
+  });
+}
+
+auto mln_opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_surface_set_target(session, descriptor);
+  });
+}

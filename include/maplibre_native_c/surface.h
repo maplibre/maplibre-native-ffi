@@ -161,6 +161,101 @@ MLN_API mln_status mln_opengl_surface_attach(
   mln_render_session* out_session
 ) MLN_NOEXCEPT;
 
+/**
+ * Presents an attached Metal surface session through a new surface.
+ *
+ * A host surface can be destroyed and recreated while the map goes on living,
+ * which is what Android rotation, a Flutter SurfaceProducer lifecycle change,
+ * and a window resize that reallocates all look like from here. This replaces
+ * the presentation surface in place, so the session keeps its renderer along
+ * with the tile pyramid, glyph and image atlases, symbol placement, and feature
+ * state set through mln_render_session_set_feature_state().
+ *
+ * descriptor->context must name the graphics context or device the session
+ * attached with; a null Metal device names none and is accepted. A target on a
+ * different context is a different session: destroy this one with
+ * mln_render_session_destroy() and attach again, accepting a cold renderer.
+ * That is also the path to take when a graphics context is genuinely lost.
+ *
+ * The new extent applies exactly as mln_render_session_resize() applies one,
+ * including how the next mln_render_session_render_update() waits for the map
+ * to catch up to it. A scale_factor that differs from the session's current
+ * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
+ * ratio; the surface is replaced either way.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names a device other than the
+ *   session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render through a Metal
+ *   surface, or when Metal surface sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_metal_surface_set_target(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Presents an attached Vulkan surface session through a new surface.
+ *
+ * See mln_metal_surface_set_target() for what replacing a surface preserves and
+ * when a host reaches for it. descriptor->context must name the same instance,
+ * physical device, device, and graphics queue the session attached with, and
+ * the new descriptor->surface must be presentable from that queue family.
+ *
+ * A replacement surface whose swapchain reports a different color format needs
+ * a new render pass, which mbgl keys its pipeline cache on, so the renderer is
+ * rebuilt in that case. Matching formats keep it.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, descriptor->context names handles other than the
+ *   session's, or the surface is not usable by this session.
+ * - MLN_STATUS_INVALID_STATE when the session is detached.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render through a Vulkan
+ *   surface, or when Vulkan surface sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_vulkan_surface_set_target(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+) MLN_NOEXCEPT;
+
+/**
+ * Presents an attached OpenGL surface session through a new surface.
+ *
+ * See mln_metal_surface_set_target() for what replacing a surface preserves and
+ * when a host reaches for it. descriptor->context must name the context
+ * provider data the session attached with, so the session's own context — and
+ * every object the renderer holds in it — stays current across the change. The
+ * new surface is made current on the next render, which lets a host replace a
+ * surface it has already destroyed.
+ *
+ * A lost OpenGL context is a different matter: nothing in it survives, and the
+ * session is destroyed and attached again.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, descriptor is
+ *   null or invalid, or descriptor->context names context provider data other
+ *   than the session's.
+ * - MLN_STATUS_INVALID_STATE when the session is detached.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when the session does not render through an OpenGL
+ *   surface, or when OpenGL surface sessions are not supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) MLN_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

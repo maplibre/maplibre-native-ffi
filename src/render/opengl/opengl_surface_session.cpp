@@ -98,6 +98,28 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void resize(mbgl::Size size_) { size = size_; }
 
+  // Presents through a different host surface from here on. Nothing is touched
+  // now: the session's own context stays as it is, holding every object the
+  // renderer built in it, and activate() makes the new surface current on the
+  // next render. That deliberately never reaches for the outgoing surface,
+  // which a host may already have destroyed — the case this exists for.
+  void set_surface(const mln_opengl_surface_descriptor& descriptor) {
+    descriptor_ = descriptor;
+    size = mbgl::Size{
+      mln::core::physical_dimension(
+        descriptor.extent.width, descriptor.extent.scale_factor
+      ),
+      mln::core::physical_dimension(
+        descriptor.extent.height, descriptor.extent.scale_factor
+      )
+    };
+  }
+
+  [[nodiscard]] auto context_descriptor() const
+    -> const mln_opengl_context_descriptor& {
+    return descriptor_.context;
+  }
+
   void updateAssumedState() override {
     assumeFramebufferBinding(0);
     setViewport(0, 0, size);
@@ -279,6 +301,23 @@ class OpenGLSurfaceSessionBackend final
     backend_.resize(mbgl::Size{physical_width, physical_height});
   }
 
+  auto set_opengl_target(
+    const mln_opengl_surface_descriptor& descriptor,
+    mln::core::RetargetOutcome& out_outcome
+  ) -> mln_status override {
+    if (!mln::core::opengl_context_matches(
+          backend_.context_descriptor(), descriptor.context
+        )) {
+      mln::core::set_thread_error(
+        "OpenGL surface target must name the context this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    backend_.set_surface(descriptor);
+    out_outcome = mln::core::RetargetOutcome::RendererPreserved;
+    return MLN_STATUS_OK;
+  }
+
  private:
   OpenGLSurfaceBackend backend_;
 };
@@ -328,6 +367,24 @@ auto opengl_surface_attach(
       .null_session = "surface session must not be null",
       .null_output = "out_session must not be null",
       .non_null_output = "out_session must point to a null handle"
+    }
+  );
+}
+
+auto opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    validate_opengl_surface_descriptor(descriptor, true);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return surface_session_set_target(
+    session, descriptor->extent,
+    [descriptor](
+      mln_render_session_object& live, RetargetOutcome& outcome
+    ) -> mln_status {
+      return live.surface.backend->set_opengl_target(*descriptor, outcome);
     }
   );
 }

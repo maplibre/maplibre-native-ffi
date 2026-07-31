@@ -226,9 +226,9 @@ current on another thread. Attaching where the host context is already current
 avoids both failure modes. Vulkan and Metal have no thread-current context and
 are unaffected.
 
-Reattaching, which the borrowed-texture mode requires on resize, is entirely
-local to the render loop thread: close the session, rebuild the mode-specific
-resources, attach again.
+Reattaching, which a graphics context change requires, is entirely local to the
+render loop thread: close the session, rebuild the mode-specific resources,
+attach again.
 
 ##### Thread identity on Apple platforms and managed runtimes
 
@@ -523,8 +523,9 @@ map-specific setup.
 
 Expose `resize(viewport)` for the active render target. Resize API-level
 resources separately when the graphics context requires it. When the active
-render target reports `needsReattachOnResize`, destroy it and attach a
-replacement for the same graphics context, map, and mode.
+render target reports `needsSetTargetOnResize`, rebuild the mode-specific
+resources for the new viewport and hand them to the live session with
+`set_target`.
 
 ### Render-target modes
 
@@ -567,9 +568,9 @@ table:
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
-- On resize, recreate the host texture and re-attach the session (see
-  [Resize mechanics](#resize-mechanics); `needsReattachOnResize` is `true` for
-  this mode).
+- On resize, recreate the host texture and hand it to the live session with
+  `set_target` (see [Resize mechanics](#resize-mechanics);
+  `needsSetTargetOnResize` is `true` for this mode).
 
 #### `native-surface`
 
@@ -598,14 +599,18 @@ that pass.
 
 - Recompute viewport on host size or scale changes; skip rendering if extent is
   empty.
-- `needsReattachOnResize()` is a render-target method. It returns `true` for
+- `needsSetTargetOnResize()` is a render-target method. It returns `true` for
   `borrowed-texture` because the host-owned exportable texture is fixed to the
-  viewport size: resize destroys the render target, recreates the texture, and
-  attaches again. It returns `false` for `owned-texture` and `native-surface`,
-  where resize updates graphics-context resources, compositor resources for
-  texture modes, and session extent in place.
-- When it returns `true`, use the [reattach](#reattach); otherwise resize the
-  graphics context and active render target in place.
+  viewport size: resize recreates the texture and hands it to the live session
+  through `set_target`. It returns `false` for `owned-texture` and
+  `native-surface`, where resize updates graphics-context resources, compositor
+  resources for texture modes, and session extent in place.
+- When it returns `true`, recreate the texture and call `set_target`; otherwise
+  resize the graphics context and active render target in place. Either way the
+  session and its renderer stay live, so the map keeps its tiles and atlases
+  across the change.
+- Reserve [reattach](#reattach) for a target the live session cannot take: a new
+  graphics context or device, or a context that was lost.
 - Set the render request after any resize.
 - The render loop owns the session, so an in-place resize is a local call. The
   map applies the new logical size on the runtime loop's next `pump`, so

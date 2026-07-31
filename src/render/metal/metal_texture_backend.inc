@@ -31,6 +31,12 @@ class MetalTextureBackend final : public mbgl::mtl::RendererBackend,
 
   auto metal_texture() -> MTL::Texture*;
 
+  [[nodiscard]] auto has_device(const MTL::Device* other) const -> bool;
+  // Renders into a different caller-owned texture from here on. Returns whether
+  // the renderer's cached state survives, which turns on the pixel format mbgl
+  // builds its render pipeline states against.
+  auto set_borrowed_texture(MTL::Texture* texture, mbgl::Size new_size) -> bool;
+
  private:
   MTL::Texture* borrowed_texture_ = nullptr;
 };

@@ -60,6 +60,26 @@ class MetalTextureSessionBackend final
     return backend_;
   }
 
+  auto set_metal_borrowed_target(
+    const mln_metal_borrowed_texture_descriptor& descriptor,
+    mln::core::RetargetOutcome& out_outcome
+  ) -> mln_status override {
+    auto* texture = static_cast<MTL::Texture*>(descriptor.texture);
+    if (!backend_.has_device(texture->device())) {
+      mln::core::set_thread_error(
+        "Metal texture target must belong to the device this session attached "
+        "with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    const auto preserved = backend_.set_borrowed_texture(
+      texture, mbgl::Size{descriptor.physical_width, descriptor.physical_height}
+    );
+    out_outcome = preserved ? mln::core::RetargetOutcome::RendererPreserved
+                            : mln::core::RetargetOutcome::RendererInvalidated;
+    return MLN_STATUS_OK;
+  }
+
   auto after_render(mln_render_session_object& texture, bool& out_rendered)
     -> mln_status override {
     auto* rendered_texture = backend_.metal_texture();
@@ -275,6 +295,28 @@ auto metal_owned_texture_release_frame(
   live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
   live->texture.acquired_native_texture = nullptr;
   return MLN_STATUS_OK;
+}
+
+auto metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    validate_metal_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return render_session_set_target(
+    session, RetargetTargetKind::BorrowedTexture, descriptor->extent,
+    descriptor->physical_width, descriptor->physical_height,
+    [descriptor](
+      mln_render_session_object& live, RetargetOutcome& outcome
+    ) -> mln_status {
+      return live.texture.backend->set_metal_borrowed_target(
+        *descriptor, outcome
+      );
+    }
+  );
 }
 
 }  // namespace mln::core

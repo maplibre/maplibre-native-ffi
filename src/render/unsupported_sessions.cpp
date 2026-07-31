@@ -179,6 +179,31 @@ auto metal_owned_texture_release_frame(
   return MLN_STATUS_UNSUPPORTED;
 }
 
+auto metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status = validate_metal_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("Metal texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto metal_surface_set_target(
+  mln_render_session session, const mln_metal_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status = validate_metal_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("Metal surface sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
 #endif
 
 #if !defined(MLN_RENDER_BACKEND_VULKAN)
@@ -282,6 +307,32 @@ auto vulkan_owned_texture_release_frame(
     return status;
   }
   set_thread_error("Vulkan texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto vulkan_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    validate_vulkan_borrowed_texture_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("Vulkan texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto vulkan_surface_set_target(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("Vulkan surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
 
@@ -389,6 +440,33 @@ auto opengl_owned_texture_release_frame(
     return status;
   }
   set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto opengl_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_opengl_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    validate_opengl_borrowed_texture_descriptor(descriptor, false);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto opengl_surface_set_target(
+  mln_render_session session, const mln_opengl_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status =
+    validate_opengl_surface_descriptor(descriptor, false);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  static_cast<void>(session);
+  set_thread_error("OpenGL surface sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
 

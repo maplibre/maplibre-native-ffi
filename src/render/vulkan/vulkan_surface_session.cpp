@@ -200,18 +200,55 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
     void bind() override {}
 
+    // Rebuilds the swapchain and everything sized with it, and deliberately
+    // keeps the render pass. mbgl keys its Vulkan pipeline cache on the render
+    // pass handle, and that cache lives in the renderer's shader registry, so
+    // destroying the pass here would strand every cached pipeline behind a dead
+    // key — and hand a recycled handle a cache hit on a pipeline built for the
+    // pass that used to own it. Attachment formats and layouts do not change
+    // across a resize, so the pass stays correct as it is. This mirrors
+    // mbgl::vulkan::SurfaceRenderableResource::recreateSwapchain(), which
+    // preserves it for the same reason; initRenderPass() is a no-op while it
+    // lives.
     void resize(mbgl::Size size) {
       if (!renderPass) {
         return;
       }
       backend.getDevice()->waitIdle(backend.getDispatcher());
       swapchainFramebuffers.clear();
-      renderPass.reset();
       swapchainImageViews.clear();
       swapchainImages.clear();
       acquireSemaphores.clear();
       presentSemaphores.clear();
       init(size.width, size.height);
+    }
+
+    // Presents through a different host surface from here on. Returns whether
+    // the render pass survived: initSwapchain() picks a color format from the
+    // new surface, and setColorFormat() drops the pass when that format
+    // differs, taking mbgl's pipeline cache with it.
+    auto set_surface(VkSurfaceKHR surface_, mbgl::Size size) -> bool {
+      backend.getDevice()->waitIdle(backend.getDispatcher());
+      swapchainFramebuffers.clear();
+      swapchainImageViews.clear();
+      swapchainImages.clear();
+      acquireSemaphores.clear();
+      presentSemaphores.clear();
+      readTexture.reset();
+      // Before the surface it was created from goes away, and not as an
+      // oldSwapchain for the new one: a swapchain may only be recycled into
+      // another on the same surface.
+      swapchain.reset();
+
+      // The outgoing VkSurfaceKHR belongs to the host, so let go of the wrapper
+      // without running the Vulkan deleter over it.
+      static_cast<void>(surface.release());
+      borrowed_surface = surface_;
+      createPlatformSurface();
+
+      const VkRenderPass previous_pass = renderPass.get();
+      init(size.width, size.height);
+      return renderPass.get() == previous_pass;
     }
 
    private:
@@ -256,6 +293,34 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     if (resource) {
       getResource<VulkanSurfaceRenderableResource>().resize(size);
     }
+  }
+
+  // Returns whether the renderer's cached state survives, which on Vulkan comes
+  // down to whether the render pass did.
+  auto set_surface(const mln_vulkan_surface_descriptor& descriptor) -> bool {
+    const auto new_size = mbgl::Size{
+      mln::core::physical_dimension(
+        descriptor.extent.width, descriptor.extent.scale_factor
+      ),
+      mln::core::physical_dimension(
+        descriptor.extent.height, descriptor.extent.scale_factor
+      )
+    };
+    descriptor_.surface = descriptor.surface;
+    mbgl::vulkan::Renderable::setSize(new_size);
+    // Nothing has been built yet, so the lazy path already takes the new
+    // surface: the wrapper is created against descriptor_ on first use.
+    if (!resource) {
+      return true;
+    }
+    return getResource<VulkanSurfaceRenderableResource>().set_surface(
+      static_cast<VkSurfaceKHR>(descriptor.surface), new_size
+    );
+  }
+
+  [[nodiscard]] auto context_descriptor() const
+    -> const mln_vulkan_context_descriptor& {
+    return descriptor_.context;
   }
 
   void activate() override {}
@@ -347,6 +412,29 @@ class VulkanSurfaceSessionBackend final
     backend_.resize(mbgl::Size{physical_width, physical_height});
   }
 
+  auto set_vulkan_target(
+    const mln_vulkan_surface_descriptor& descriptor,
+    mln::core::RetargetOutcome& out_outcome
+  ) -> mln_status override {
+    if (!mln::core::vulkan_context_matches(
+          backend_.context_descriptor(), descriptor.context
+        )) {
+      mln::core::set_thread_error(
+        "Vulkan surface target must name the instance, physical device, "
+        "device, and graphics queue this session attached with"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    const auto handles_status = validate_vulkan_handles(descriptor);
+    if (handles_status != MLN_STATUS_OK) {
+      return handles_status;
+    }
+    out_outcome = backend_.set_surface(descriptor)
+                    ? mln::core::RetargetOutcome::RendererPreserved
+                    : mln::core::RetargetOutcome::RendererInvalidated;
+    return MLN_STATUS_OK;
+  }
+
  private:
   VulkanSurfaceBackend backend_;
 };
@@ -399,6 +487,23 @@ auto vulkan_surface_attach(
       .null_session = "surface session must not be null",
       .null_output = "out_session must not be null",
       .non_null_output = "out_session must point to a null handle"
+    }
+  );
+}
+
+auto vulkan_surface_set_target(
+  mln_render_session session, const mln_vulkan_surface_descriptor* descriptor
+) -> mln_status {
+  const auto descriptor_status = validate_vulkan_surface_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  return surface_session_set_target(
+    session, descriptor->extent,
+    [descriptor](
+      mln_render_session_object& live, RetargetOutcome& outcome
+    ) -> mln_status {
+      return live.surface.backend->set_vulkan_target(*descriptor, outcome);
     }
   );
 }

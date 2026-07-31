@@ -78,6 +78,18 @@ auto opengl_borrowed_texture_attach(
   mln_map map, const mln_opengl_borrowed_texture_descriptor* descriptor,
   mln_render_session* out_session
 ) -> mln_status;
+auto metal_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_metal_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto vulkan_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_vulkan_borrowed_texture_descriptor* descriptor
+) -> mln_status;
+auto opengl_borrowed_texture_set_target(
+  mln_render_session session,
+  const mln_opengl_borrowed_texture_descriptor* descriptor
+) -> mln_status;
 auto texture_read_premultiplied_rgba8(
   mln_render_session texture, uint8_t* out_data, size_t out_data_capacity,
   mln_texture_image_info* out_info

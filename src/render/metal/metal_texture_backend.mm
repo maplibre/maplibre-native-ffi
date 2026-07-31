@@ -262,4 +262,27 @@ auto MetalTextureBackend::metal_texture() -> MTL::Texture* {
   return getResource<MetalTextureRenderableResource>().metal_texture();
 }
 
+auto MetalTextureBackend::has_device(const MTL::Device* other) const -> bool {
+  return other == device.get();
+}
+
+auto MetalTextureBackend::set_borrowed_texture(
+  MTL::Texture* texture, mbgl::Size new_size
+) -> bool {
+  const auto previous_format = borrowed_texture_ != nullptr
+                                 ? borrowed_texture_->pixelFormat()
+                                 : texture->pixelFormat();
+  borrowed_texture_ = texture;
+  size = new_size;
+  // Drop the renderable rather than patch it: its depth and stencil textures
+  // are sized with the color attachment, and any command buffer in hand was
+  // opened against the texture being replaced. bind() builds a matching set
+  // from the new one on the next frame.
+  {
+    auto guard = mbgl::gfx::BackendScope{*this};
+    resource.reset();
+  }
+  return texture->pixelFormat() == previous_format;
+}
+
 }  // namespace mln::core

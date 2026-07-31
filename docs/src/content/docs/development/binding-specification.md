@@ -634,11 +634,21 @@ window.
 The public handle exposes:
 
 - `resize` for session kinds that support resize;
+- `set_target` for session kinds whose target the host owns, which is surface
+  sessions and caller-owned texture sessions;
 - `render_update` for the latest available map render update, reporting whether
   an update was rendered;
 - `detach`, which keeps the public handle live after backend resources detach;
 - `close` or `destroy`, using the owned-handle release operation, on the thread
   that attached the session.
+
+`set_target` takes the same public descriptor type its attach function takes, so
+a host builds a replacement target the way it built the first one. It is exposed
+per backend and target kind, matching the C API's `mln_*_surface_set_target()`
+and `mln_*_borrowed_texture_set_target()` functions, and it is bound to the
+thread that attached the session like every other session operation. Bindings do
+not compare the descriptor's graphics context against the session's; the C API
+rejects a mismatch.
 
 ### Texture frames
 
@@ -849,6 +859,8 @@ When the binding routes provider requests through
 | BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
 | BND-164 | `render_update` reports no-update-available as a false result without closing the session.                                                                |
 | BND-165 | Resize updates extent through the public render session API.                                                                                              |
+| BND-175 | `set_target` replaces a host-owned render target through the public render session API and updates the session's extent.                                  |
+| BND-176 | `set_target` on a session whose target the session owns reports unsupported, and on a session of another backend reports unsupported.                     |
 | BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
 | BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
 | BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |

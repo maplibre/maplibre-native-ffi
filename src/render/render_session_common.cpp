@@ -230,6 +230,40 @@ auto validate_opengl_context(
   return MLN_STATUS_INVALID_ARGUMENT;
 }
 
+auto vulkan_context_matches(
+  const mln_vulkan_context_descriptor& lhs,
+  const mln_vulkan_context_descriptor& rhs
+) -> bool {
+  return lhs.instance == rhs.instance &&
+         lhs.physical_device == rhs.physical_device &&
+         lhs.device == rhs.device && lhs.graphics_queue == rhs.graphics_queue &&
+         lhs.graphics_queue_family_index == rhs.graphics_queue_family_index;
+}
+
+auto opengl_context_matches(
+  const mln_opengl_context_descriptor& lhs,
+  const mln_opengl_context_descriptor& rhs
+) -> bool {
+  if (lhs.platform != rhs.platform) {
+    return false;
+  }
+  switch (lhs.platform) {
+    case MLN_OPENGL_CONTEXT_PLATFORM_WGL:
+      // The share group alone. A session's WGL context is made current against
+      // whichever HDC the target names, and a recreated window brings a new
+      // one, so an HDC is a surface here rather than a piece of context
+      // identity.
+      return lhs.data.wgl.share_context == rhs.data.wgl.share_context;
+    case MLN_OPENGL_CONTEXT_PLATFORM_EGL:
+      return lhs.data.egl.display == rhs.data.egl.display &&
+             lhs.data.egl.config == rhs.data.egl.config &&
+             lhs.data.egl.share_context == rhs.data.egl.share_context;
+    case MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED:
+      break;
+  }
+  return false;
+}
+
 }  // namespace mln::core
 
 namespace mln::core {
@@ -1063,9 +1097,7 @@ auto render_session_resize(
   if (live->kind == RenderSessionKind::Surface) {
     live->surface.backend->resize(physical_width, physical_height);
   } else {
-    live->texture.backend->headless_backend().setSize(
-      mbgl::Size{physical_width, physical_height}
-    );
+    live->texture.backend->resize(mbgl::Size{physical_width, physical_height});
     live->texture.rendered_native_texture = nullptr;
     live->texture.acquired_native_texture = nullptr;
     live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
@@ -1075,7 +1107,19 @@ auto render_session_resize(
     return size_status;
   }
   warn_on_scale_factor_mismatch(live->map, scale_factor);
-  live->renderer.reset();
+  // Keep the renderer. mbgl::Renderer reads the backend renderable's size at
+  // the top of every frame, so a resized target is all it needs, and holding on
+  // to it carries the tile pyramid, glyph and image atlases, symbol placement,
+  // and feature state across the resize instead of rebuilding them cold.
+  //
+  // The backends hold up the other half of this bargain: a resize preserves
+  // whatever the renderer keys cached GPU state against, which on Vulkan means
+  // the render pass. Pixel ratio is the exception, fixed when a Renderer is
+  // constructed and baked into its shaders, so a scale factor change is the one
+  // resize that still starts over.
+  if (scale_factor != live->scale_factor) {
+    live->renderer.reset();
+  }
   live->rendered_generation = 0;
   live->width = width;
   live->height = height;
@@ -1084,6 +1128,104 @@ auto render_session_resize(
   live->scale_factor = scale_factor;
   ++live->generation;
   return MLN_STATUS_OK;
+}
+
+auto unsupported_retarget(const char* message) -> mln_status {
+  set_thread_error(message);
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto render_session_set_target(
+  mln_render_session session, RetargetTargetKind kind,
+  const mln_render_target_extent& extent, uint32_t physical_width,
+  uint32_t physical_height, const RenderTargetReplacer& replace
+) -> mln_status {
+  mln_render_session_object* live = nullptr;
+  const auto status = validate_live_attached_render_session(session, live);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  if (kind == RetargetTargetKind::Surface) {
+    if (live->kind != RenderSessionKind::Surface) {
+      return unsupported_retarget(
+        "session does not render through a native surface"
+      );
+    }
+  } else {
+    if (live->kind != RenderSessionKind::Texture) {
+      return unsupported_retarget(
+        "session does not render into a caller-owned texture"
+      );
+    }
+    if (live->texture.acquired) {
+      set_thread_error(
+        "cannot replace the render target while a texture frame is acquired"
+      );
+      return MLN_STATUS_INVALID_STATE;
+    }
+    if (live->texture.mode != TextureSessionMode::Borrowed) {
+      return unsupported_retarget(
+        "a session-owned texture is sized and replaced by its session; resize "
+        "it instead"
+      );
+    }
+  }
+
+  auto outcome = RetargetOutcome::RendererPreserved;
+  const auto replace_status = replace(*live, outcome);
+  if (replace_status != MLN_STATUS_OK) {
+    return replace_status;
+  }
+
+  const auto size_status =
+    map_post_set_size(live->map, extent.width, extent.height);
+  if (size_status != MLN_STATUS_OK) {
+    return size_status;
+  }
+  warn_on_scale_factor_mismatch(live->map, extent.scale_factor);
+
+  // The same bargain a resize strikes: the renderer carries the tile pyramid,
+  // glyph and image atlases, symbol placement, and feature state over to the
+  // new target. It starts over only when its shaders no longer match the pixel
+  // ratio, or when the backend had to rebuild something it caches against.
+  if (
+    extent.scale_factor != live->scale_factor ||
+    outcome == RetargetOutcome::RendererInvalidated
+  ) {
+    live->renderer.reset();
+  }
+  live->rendered_generation = 0;
+  live->width = extent.width;
+  live->height = extent.height;
+  live->physical_width = physical_width;
+  live->physical_height = physical_height;
+  live->scale_factor = extent.scale_factor;
+  if (live->kind == RenderSessionKind::Texture) {
+    live->texture.rendered_native_texture = nullptr;
+    live->texture.acquired_native_texture = nullptr;
+    live->texture.acquired_frame_kind = TextureSessionFrameKind::None;
+  }
+  ++live->generation;
+  return MLN_STATUS_OK;
+}
+
+auto surface_session_set_target(
+  mln_render_session session, const mln_render_target_extent& extent,
+  const RenderTargetReplacer& replace
+) -> mln_status {
+  const auto physical_status = validate_physical_size(
+    extent.width, extent.height, extent.scale_factor,
+    "scaled surface dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  return render_session_set_target(
+    session, RetargetTargetKind::Surface, extent,
+    physical_dimension(extent.width, extent.scale_factor),
+    physical_dimension(extent.height, extent.scale_factor), replace
+  );
 }
 
 auto render_session_render_update(

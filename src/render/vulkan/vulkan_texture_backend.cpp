@@ -64,6 +64,51 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     create_framebuffers();
   }
 
+  // Rebuilds everything sized with the texture and deliberately keeps the
+  // render pass. mbgl keys its Vulkan pipeline cache on the render pass handle,
+  // and that cache lives in the renderer's shader registry, so destroying the
+  // pass here would strand every cached pipeline behind a dead key — and hand a
+  // recycled handle a cache hit on a pipeline built for the pass that used to
+  // own it. Attachment formats and layouts are the same at every size, so the
+  // pass stays correct as it is.
+  void resize_sampled(vk::Extent2D sampled_extent) {
+    backend.getDevice()->waitIdle(backend.getDispatcher());
+    swapchainFramebuffers.clear();
+    swapchainImageViews.clear();
+    swapchainImages.clear();
+    colorAllocations.clear();
+    readTexture.reset();
+
+    init_sampled_color(sampled_extent);
+    create_color_image_views();
+    initDepthStencil();
+    create_framebuffers();
+  }
+
+  // Renders into a different caller-owned image from here on. Returns whether
+  // the render pass survived, which it does while the image keeps the format
+  // and layouts the pass was built around; mbgl keys its pipeline cache on that
+  // pass.
+  auto set_borrowed(
+    const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
+    uint32_t height
+  ) -> bool {
+    backend.getDevice()->waitIdle(backend.getDispatcher());
+    const auto compatible =
+      colorFormat == static_cast<vk::Format>(descriptor.format) &&
+      initial_layout_ ==
+        static_cast<vk::ImageLayout>(descriptor.initial_layout) &&
+      final_layout_ == static_cast<vk::ImageLayout>(descriptor.final_layout);
+
+    swapchainFramebuffers.clear();
+    swapchainImages.clear();
+    if (!compatible) {
+      renderPass.reset();
+    }
+    init_borrowed(descriptor, width, height);
+    return compatible;
+  }
+
   void init_borrowed(
     const mln_vulkan_borrowed_texture_descriptor& descriptor, uint32_t width,
     uint32_t height
@@ -179,9 +224,19 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
     }
   }
 
+  // Idempotent, like mbgl::vulkan::SurfaceRenderableResource::initRenderPass():
+  // a live pass is left alone so the pipelines mbgl cached against it stay
+  // reachable. Whoever changes an attachment format or layout drops the pass
+  // first, which is the signal that those pipelines go too.
   void create_render_pass(
     vk::ImageLayout initial_layout, vk::ImageLayout final_layout
   ) {
+    initial_layout_ = initial_layout;
+    final_layout_ = final_layout;
+    if (renderPass) {
+      return;
+    }
+
     const auto& device = backend.getDevice();
     const auto& dispatcher = backend.getDispatcher();
 
@@ -288,6 +343,10 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   bool usesBorrowedImage = false;
   vk::Image borrowedImage;
   vk::ImageView borrowedImageView;
+  // What the live render pass was built around, so a replacement target can be
+  // measured against it.
+  vk::ImageLayout initial_layout_ = vk::ImageLayout::eUndefined;
+  vk::ImageLayout final_layout_ = vk::ImageLayout::eUndefined;
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
@@ -334,6 +393,37 @@ auto VulkanTextureBackend::getDefaultRenderable() -> mbgl::gfx::Renderable& {
     resource = std::make_unique<VulkanTextureRenderableResource>(*this);
   }
   return *this;
+}
+
+auto VulkanTextureBackend::set_borrowed_target(
+  const mln_vulkan_borrowed_texture_descriptor& descriptor
+) -> bool {
+  borrowed_descriptor_ = descriptor;
+  const auto new_size =
+    mbgl::Size{descriptor.physical_width, descriptor.physical_height};
+  // Nothing is built yet, so the lazy path already takes the new image.
+  if (!resource) {
+    setSize(new_size);
+    return true;
+  }
+  size = new_size;
+  return getResource<VulkanTextureRenderableResource>().set_borrowed(
+    descriptor, new_size.width, new_size.height
+  );
+}
+
+void VulkanTextureBackend::resize(mbgl::Size new_size) {
+  // Nothing is built yet, so the lazy path already produces the new size. A
+  // borrowed texture is sized by its owner and never reaches here; the session
+  // rejects resizing one.
+  if (!resource || uses_borrowed_texture_) {
+    setSize(new_size);
+    return;
+  }
+  size = new_size;
+  getResource<VulkanTextureRenderableResource>().resize_sampled(
+    vk::Extent2D{new_size.width, new_size.height}
+  );
 }
 
 auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
