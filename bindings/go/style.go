@@ -662,19 +662,17 @@ type StyleTransitionOptions struct {
 	// DelayMS is the transition delay in milliseconds. An absent value falls back to the delay
 	// the style declares for each transitioning property.
 	DelayMS *float64
-	// EnablePlacementTransitions reports whether symbol placement changes cross-fade.
+	// DisablePlacementTransitions turns off the symbol placement cross-fade, making placement
+	// changes apply to the next rendered frame. Hosts that move symbol-backed features at
+	// pointer frequency set it for the duration of the interaction so the rendered symbol
+	// keeps up.
 	//
-	// Unlike duration and delay this value is always present, so clearing it makes symbol
-	// placement changes apply to the next rendered frame. Hosts that move symbol-backed
-	// features at pointer frequency clear it for the duration of the interaction so the
-	// rendered symbol keeps up.
-	EnablePlacementTransitions bool
-}
-
-// NewStyleTransitionOptions returns the C API's default transition options, which leave duration
-// and delay to the style and cross-fade symbol placement changes.
-func NewStyleTransitionOptions() StyleTransitionOptions {
-	return styleTransitionOptionsFromC(C.mln_style_transition_options_default())
+	// The C API carries this the other way round, as an always-present enable flag that
+	// defaults to on. This field states the departure from that default instead, so the zero
+	// value of this struct means the same thing the C default does. A Go composite literal
+	// cannot default a field to true, and silently disabling the cross-fade for a caller who
+	// set only a duration would be worse than differing in polarity from the other bindings.
+	DisablePlacementTransitions bool
 }
 
 // Equal reports whether two descriptors hold the same field values. Use this instead of ==, which
@@ -682,7 +680,7 @@ func NewStyleTransitionOptions() StyleTransitionOptions {
 func (options StyleTransitionOptions) Equal(other StyleTransitionOptions) bool {
 	return equalPointer(options.DurationMS, other.DurationMS) &&
 		equalPointer(options.DelayMS, other.DelayMS) &&
-		options.EnablePlacementTransitions == other.EnablePlacementTransitions
+		options.DisablePlacementTransitions == other.DisablePlacementTransitions
 }
 
 // Clone returns an independent deep copy of this descriptor.
@@ -695,7 +693,7 @@ func (options StyleTransitionOptions) Clone() StyleTransitionOptions {
 
 func newCStyleTransitionOptions(options StyleTransitionOptions) C.mln_style_transition_options {
 	raw := C.mln_style_transition_options_default()
-	raw.enable_placement_transitions = C.bool(options.EnablePlacementTransitions)
+	raw.enable_placement_transitions = C.bool(!options.DisablePlacementTransitions)
 	if options.DurationMS != nil {
 		raw.fields |= C.MLN_STYLE_TRANSITION_OPTION_DURATION
 		raw.duration_ms = C.double(*options.DurationMS)
@@ -709,7 +707,7 @@ func newCStyleTransitionOptions(options StyleTransitionOptions) C.mln_style_tran
 
 func styleTransitionOptionsFromC(raw C.mln_style_transition_options) StyleTransitionOptions {
 	options := StyleTransitionOptions{
-		EnablePlacementTransitions: bool(raw.enable_placement_transitions),
+		DisablePlacementTransitions: !bool(raw.enable_placement_transitions),
 	}
 	if raw.fields&C.MLN_STYLE_TRANSITION_OPTION_DURATION != 0 {
 		duration := float64(raw.duration_ms)

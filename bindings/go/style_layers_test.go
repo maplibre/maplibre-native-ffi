@@ -422,7 +422,8 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("StyleTransitionOptions(): %v", err)
 	}
-	if !defaults.Equal(NewStyleTransitionOptions()) {
+	// The zero value means what the C default means, so a bare literal compares equal.
+	if !defaults.Equal(StyleTransitionOptions{}) {
 		t.Fatalf("StyleTransitionOptions() = %#v, want the C API defaults", defaults)
 	}
 
@@ -455,14 +456,14 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	if declared.DelayMS == nil || *declared.DelayMS != 100 {
 		t.Fatalf("declared DelayMS = %v, want 100", declared.DelayMS)
 	}
-	if !declared.EnablePlacementTransitions {
-		t.Fatal("declared EnablePlacementTransitions = false, want true")
+	if declared.DisablePlacementTransitions {
+		t.Fatal("declared DisablePlacementTransitions = true, want false")
 	}
 
 	// A present zero stays distinguishable from an absent field, and an absent field clears
 	// what the style declared rather than merging into it.
 	zero := 0.0
-	options := StyleTransitionOptions{DurationMS: &zero}
+	options := StyleTransitionOptions{DurationMS: &zero, DisablePlacementTransitions: true}
 	if err := m.SetStyleTransitionOptions(options); err != nil {
 		t.Fatalf("SetStyleTransitionOptions(): %v", err)
 	}
@@ -472,6 +473,20 @@ func TestStyleTransitionOptionsRoundTrip(t *testing.T) {
 	}
 	if !applied.Equal(options) {
 		t.Fatalf("StyleTransitionOptions() = %#v, want %#v", applied, options)
+	}
+
+	// A literal that sets only a duration must leave the cross-fade alone. Go cannot default a
+	// struct field to true, so an enable-shaped field would have disabled it here.
+	durationOnly := 250.0
+	if err := m.SetStyleTransitionOptions(StyleTransitionOptions{DurationMS: &durationOnly}); err != nil {
+		t.Fatalf("SetStyleTransitionOptions(): %v", err)
+	}
+	kept, err := m.StyleTransitionOptions()
+	if err != nil {
+		t.Fatalf("StyleTransitionOptions(): %v", err)
+	}
+	if kept.DisablePlacementTransitions {
+		t.Fatal("a duration-only literal disabled the placement cross-fade")
 	}
 
 	// Loading a style replaces the override with what that style declares.
