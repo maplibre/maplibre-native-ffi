@@ -15,13 +15,8 @@ dependencies {
   implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
 }
 
-val buildJvmRelease =
-  providers
-    .gradleProperty("maplibreBuildJvmRelease")
-    .orElse(libs.versions.java.release)
-    .get()
-    .toInt()
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(libs.versions.java.release.get())) } }
 
-kotlin { compilerOptions { jvmTarget.set(JvmTarget.fromTarget(buildJvmRelease.toString())) } }
-
-tasks.withType<JavaCompile>().configureEach { options.release = buildJvmRelease }
+tasks.withType<JavaCompile>().configureEach {
+  options.release = libs.versions.java.release.get().toInt()
+}
