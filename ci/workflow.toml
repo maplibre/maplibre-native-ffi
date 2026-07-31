@@ -41,8 +41,19 @@ platforms = ["linux", "macos"]
 commands = [{ task = "//bindings/go:test" }]
 
 [[suites]]
+platforms = ["linux"]
+commands = [
+  { task = "//examples/go-map:check", include = ["linux-x64-egl", "linux-arm64-egl"] },
+]
+
+[[suites]]
 platforms = ["linux", "macos", "windows"]
 commands = [{ task = "//bindings/python:test" }]
 
-# TODO(#412): Re-enable Dart CI after thread-affine ownership is safe across
-# isolate migration; affected test processes can otherwise wedge until timeout.
+# TODO(#412): Re-enable //bindings/dart:test after thread-affine ownership is
+# safe across isolate migration; affected test processes can otherwise wedge
+# until timeout. Keep analyze/build in CI so the binding still appears in the
+# generated support matrix as build-only.
+[[suites]]
+platforms = ["linux", "macos", "windows"]
+commands = [{ task = "//bindings/dart:build" }]

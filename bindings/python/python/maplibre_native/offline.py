@@ -54,6 +54,7 @@ class OfflineOperationKind(UnknownIntEnum):
     REGION_SET_DOWNLOAD_STATE = 9
     REGION_INVALIDATE = 10
     REGION_DELETE = 11
+    SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12
 
 
 class OfflineOperationResultKind(UnknownIntEnum):

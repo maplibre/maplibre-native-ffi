@@ -271,6 +271,201 @@ pub const MapHandle = enum(c.mln_map) {
         return try copyJsonSnapshot(allocator, snapshot, diagnosticStore(self));
     }
 
+    /// Sets one layer's source-layer ID. Layer types that take no source, such as background, are
+    /// rejected.
+    pub fn setLayerSourceLayer(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        source_layer: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_layer_source_layer(
+                try native(self),
+                try temp.stringView(layer_id),
+                try temp.stringView(source_layer),
+            ),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Copies one layer's source-layer ID. The value is empty when the layer carries none.
+    pub fn copyLayerSourceLayer(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!values.OwnedString {
+        return self.copyLayerText(allocator, layer_id, c.mln_map_copy_layer_source_layer);
+    }
+
+    /// Sets one layer's source ID. Layer types that take no source, such as background, are
+    /// rejected. The named source need not exist yet.
+    pub fn setLayerSourceId(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        source_id: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_layer_source_id(
+                try native(self),
+                try temp.stringView(layer_id),
+                try temp.stringView(source_id),
+            ),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Copies one layer's source ID. The value is empty when the layer carries none.
+    pub fn copyLayerSourceId(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!values.OwnedString {
+        return self.copyLayerText(allocator, layer_id, c.mln_map_copy_layer_source_id);
+    }
+
+    /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
+    /// the C API answers with OK.
+    fn copyLayerText(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        copy: *const fn (c.mln_map, c.mln_string_view, ?[*]u8, usize, *usize) callconv(.c) c.mln_status,
+    ) status.Error!values.OwnedString {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const layer_view = try temp.stringView(layer_id);
+
+        var required: usize = 0;
+        try status.checkStatus(
+            copy(try native(self), layer_view, null, 0, &required),
+            diagnosticStore(self),
+        );
+        if (required == 0) {
+            return .{ .allocator = allocator, .value = try allocator.dupe(u8, "") };
+        }
+
+        const buffer = try allocator.alloc(u8, required);
+        errdefer allocator.free(buffer);
+        var copied: usize = 0;
+        try status.checkStatus(
+            copy(try native(self), layer_view, buffer.ptr, buffer.len, &copied),
+            diagnosticStore(self),
+        );
+        if (copied != buffer.len) {
+            const exact = try allocator.dupe(u8, buffer[0..copied]);
+            allocator.free(buffer);
+            return .{ .allocator = allocator, .value = exact };
+        }
+        return .{ .allocator = allocator, .value = buffer };
+    }
+
+    /// Sets the lowest zoom at which one layer draws. Pass -inf for no lower bound.
+    pub fn setLayerMinZoom(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        min_zoom: f64,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_layer_min_zoom(try native(self), try temp.stringView(layer_id), min_zoom),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Reads the lowest zoom at which one layer draws. A layer with no lower bound reports -inf.
+    pub fn getLayerMinZoom(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!f64 {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var min_zoom: f64 = 0;
+        try status.checkStatus(
+            c.mln_map_get_layer_min_zoom(try native(self), try temp.stringView(layer_id), &min_zoom),
+            diagnosticStore(self),
+        );
+        return min_zoom;
+    }
+
+    /// Sets the highest zoom at which one layer draws. Pass inf for no upper bound.
+    pub fn setLayerMaxZoom(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        max_zoom: f64,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_layer_max_zoom(try native(self), try temp.stringView(layer_id), max_zoom),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Reads the highest zoom at which one layer draws. A layer with no upper bound reports inf.
+    pub fn getLayerMaxZoom(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!f64 {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var max_zoom: f64 = 0;
+        try status.checkStatus(
+            c.mln_map_get_layer_max_zoom(try native(self), try temp.stringView(layer_id), &max_zoom),
+            diagnosticStore(self),
+        );
+        return max_zoom;
+    }
+
+    /// Sets whether one layer draws.
+    pub fn setLayerVisibility(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        visibility: values.StyleLayerVisibility,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_layer_visibility(
+                try native(self),
+                try temp.stringView(layer_id),
+                visibility.toRaw(),
+            ),
+            diagnosticStore(self),
+        );
+    }
+
+    /// Reads whether one layer draws.
+    pub fn getLayerVisibility(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!values.StyleLayerVisibility {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var visibility: u32 = 0;
+        try status.checkStatus(
+            c.mln_map_get_layer_visibility(
+                try native(self),
+                try temp.stringView(layer_id),
+                &visibility,
+            ),
+            diagnosticStore(self),
+        );
+        return values.StyleLayerVisibility.fromRaw(visibility);
+    }
+
     pub fn listStyleSourceIds(self: *MapHandle, allocator: std.mem.Allocator) status.Error!values.StringList {
         var list: c.mln_style_id_list = 0;
         try status.checkStatus(c.mln_map_list_style_source_ids(try native(self), &list), diagnosticStore(self));
@@ -653,11 +848,89 @@ pub const MapHandle = enum(c.mln_map) {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         var raw_image = values.premultipliedRgba8ImageToNative(image);
-        var raw_options = if (options) |value| values.styleImageOptionsToNative(value) else undefined;
+        // Native borrows the stretch arrays for the call, so they live in this scope.
+        const stretch_x_count = if (options) |value|
+            if (value.stretch_x) |stretches| stretches.len else 0
+        else
+            0;
+        const stretch_y_count = if (options) |value|
+            if (value.stretch_y) |stretches| stretches.len else 0
+        else
+            0;
+        const stretch_x = try allocator.alloc(c.mln_image_stretch, stretch_x_count);
+        defer allocator.free(stretch_x);
+        const stretch_y = try allocator.alloc(c.mln_image_stretch, stretch_y_count);
+        defer allocator.free(stretch_y);
+        var raw_options = if (options) |value|
+            values.styleImageOptionsToNative(value, stretch_x, stretch_y)
+        else
+            undefined;
         try status.checkStatus(
             c.mln_map_set_style_image(try native(self), try temp.stringView(image_id), &raw_image, if (options != null) &raw_options else null),
             diagnosticStore(self),
         );
+    }
+
+    /// Copies one runtime style image's stretchable intervals, or null when no image carries
+    /// `image_id`. Probes the required counts, then copies.
+    pub fn copyStyleImageStretches(
+        self: *MapHandle,
+        allocator: std.mem.Allocator,
+        image_id: []const u8,
+    ) status.Error!?values.OwnedImageStretches {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const image_view = try temp.stringView(image_id);
+
+        var x_count: usize = 0;
+        var y_count: usize = 0;
+        var found = false;
+        try status.checkStatus(
+            c.mln_map_copy_style_image_stretches(
+                try native(self),
+                image_view,
+                null,
+                0,
+                &x_count,
+                null,
+                0,
+                &y_count,
+                &found,
+            ),
+            diagnosticStore(self),
+        );
+        if (!found) return null;
+
+        const raw_x = try allocator.alloc(c.mln_image_stretch, x_count);
+        defer allocator.free(raw_x);
+        const raw_y = try allocator.alloc(c.mln_image_stretch, y_count);
+        defer allocator.free(raw_y);
+        try status.checkStatus(
+            c.mln_map_copy_style_image_stretches(
+                try native(self),
+                image_view,
+                if (raw_x.len == 0) null else raw_x.ptr,
+                raw_x.len,
+                &x_count,
+                if (raw_y.len == 0) null else raw_y.ptr,
+                raw_y.len,
+                &y_count,
+                &found,
+            ),
+            diagnosticStore(self),
+        );
+
+        const stretch_x = try allocator.alloc(values.ImageStretch, x_count);
+        errdefer allocator.free(stretch_x);
+        const stretch_y = try allocator.alloc(values.ImageStretch, y_count);
+        errdefer allocator.free(stretch_y);
+        for (raw_x, 0..) |stretch, index| {
+            stretch_x[index] = .{ .from = stretch.from, .to = stretch.to };
+        }
+        for (raw_y, 0..) |stretch, index| {
+            stretch_y[index] = .{ .from = stretch.from, .to = stretch.to };
+        }
+        return .{ .allocator = allocator, .stretch_x = stretch_x, .stretch_y = stretch_y };
     }
 
     pub fn removeStyleImage(self: *MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!bool {
@@ -1519,6 +1792,10 @@ fn styleGeoJsonSourceOptionsToNative(
     if (options.cluster) |cluster| {
         raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
         raw.cluster = cluster;
+    }
+    if (options.synchronous_update) |synchronous_update| {
+        raw.fields |= c.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
+        raw.synchronous_update = synchronous_update;
     }
     return raw;
 }

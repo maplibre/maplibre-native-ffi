@@ -25,6 +25,106 @@ func waitForRuntimeEvent(t *testing.T, runtime *RuntimeHandle, eventType Runtime
 	return nil
 }
 
+func TestNinePatchStyleImageRoundTripsStretchContentAndTextFit(t *testing.T) {
+	lockOSThreadForTest(t)
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(): %v", err)
+	}
+
+	image := PremultipliedRGBA8Image{Width: 2, Height: 2, Stride: 8, Pixels: make([]byte, 16)}
+	textFit := StyleImageTextFitProportional
+	options := StyleImageOptions{
+		StretchX:      []ImageStretch{{From: 0, To: 1}},
+		StretchY:      []ImageStretch{{From: 0, To: 1}, {From: 1, To: 2}},
+		Content:       &ImageContent{Left: 0.5, Top: 0.5, Right: 1.5, Bottom: 1.5},
+		TextFitHeight: &textFit,
+	}
+	if err := m.SetStyleImage("patch", image, options); err != nil {
+		t.Fatalf("SetStyleImage(): %v", err)
+	}
+
+	info, found, err := m.StyleImageInfo("patch")
+	if err != nil || !found {
+		t.Fatalf("StyleImageInfo(patch) = (%+v, %v, %v)", info, found, err)
+	}
+	if info.StretchXCount != 1 || info.StretchYCount != 2 {
+		t.Fatalf("stretch counts = (%d, %d), want (1, 2)", info.StretchXCount, info.StretchYCount)
+	}
+	if info.Content == nil || info.Content.Right != 1.5 {
+		t.Fatalf("Content = %+v, want right 1.5", info.Content)
+	}
+	// An absent text fit stays distinguishable from a present default.
+	if info.TextFitWidth != nil {
+		t.Fatalf("TextFitWidth = %v, want nil", info.TextFitWidth)
+	}
+	if info.TextFitHeight == nil || *info.TextFitHeight != StyleImageTextFitProportional {
+		t.Fatalf("TextFitHeight = %v, want proportional", info.TextFitHeight)
+	}
+
+	stretchX, stretchY, found, err := m.StyleImageStretches("patch")
+	if err != nil || !found {
+		t.Fatalf("StyleImageStretches(patch) = (%v, %v, %v, %v)", stretchX, stretchY, found, err)
+	}
+	if len(stretchX) != 1 || stretchX[0] != (ImageStretch{From: 0, To: 1}) {
+		t.Fatalf("stretchX = %v, want [{0 1}]", stretchX)
+	}
+	if len(stretchY) != 2 || stretchY[1] != (ImageStretch{From: 1, To: 2}) {
+		t.Fatalf("stretchY = %v, want [{0 1} {1 2}]", stretchY)
+	}
+
+	if _, _, found, err = m.StyleImageStretches("missing"); err != nil || found {
+		t.Fatalf("StyleImageStretches(missing) = (%v, %v), want (false, nil)", found, err)
+	}
+
+	// A backwards interval is rejected by C.
+	bad := StyleImageOptions{StretchX: []ImageStretch{{From: 2, To: 1}}}
+	if err := m.SetStyleImage("bad", image, bad); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleImage(backwards) error = %v; want ErrInvalidArgument", err)
+	}
+}
+
+func TestStyleImageOptionsCloneKeepsStretchPresence(t *testing.T) {
+	options := StyleImageOptions{StretchX: []ImageStretch{}, StretchY: nil}
+	cloned := options.Clone()
+
+	// A present empty slice and an absent one stay distinguishable across a clone.
+	if cloned.StretchX == nil {
+		t.Fatalf("cloned StretchX = nil, want a present empty slice")
+	}
+	if cloned.StretchY != nil {
+		t.Fatalf("cloned StretchY = %v, want nil", cloned.StretchY)
+	}
+	if !options.Equal(cloned) {
+		t.Fatalf("clone %+v is not equal to its source %+v", cloned, options)
+	}
+
+	source := StyleImageOptions{StretchX: []ImageStretch{{From: 0, To: 1}}}
+	independent := source.Clone()
+	source.StretchX[0] = ImageStretch{From: 5, To: 6}
+	if independent.StretchX[0] != (ImageStretch{From: 0, To: 1}) {
+		t.Fatalf("clone StretchX = %v, want the values at clone time", independent.StretchX)
+	}
+}
+
 func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	lockOSThreadForTest(t)
 
@@ -76,6 +176,10 @@ func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
 	}
 	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
 		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
+	}
+	// An empty destination is a caller error here, not the C size probe.
+	if _, _, err := m.StyleImagePremultipliedRGBA8Into("marker", nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StyleImagePremultipliedRGBA8Into(empty buffer) error = %v, want ErrInvalidArgument", err)
 	}
 	removed, err := m.RemoveStyleImage("marker")
 	if err != nil {

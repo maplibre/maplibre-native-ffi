@@ -183,6 +183,12 @@ internal sealed unsafe class NativeGeoJsonSourceOptions : IDisposable
                     mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
                 native.cluster = cluster ? (byte)1 : (byte)0;
             }
+            if (options.SynchronousUpdate is { } synchronousUpdate)
+            {
+                native.fields |= (uint)
+                    mln_geojson_source_option_field.MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
+                native.synchronous_update = synchronousUpdate ? (byte)1 : (byte)0;
+            }
 
             return new NativeGeoJsonSourceOptions(native, clusterProperties);
         }
@@ -254,23 +260,6 @@ internal sealed unsafe class NativeStyleImage : IDisposable
 
 internal static class StyleStructs
 {
-    internal static mln_style_image_options ToNative(StyleImageOptions options)
-    {
-        ArgumentNullException.ThrowIfNull(options);
-        var native = NativeMethods.mln_style_image_options_default();
-        if (options.PixelRatio is { } pixelRatio)
-        {
-            native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-            native.pixel_ratio = pixelRatio;
-        }
-        if (options.Sdf is { } sdf)
-        {
-            native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF;
-            native.sdf = sdf ? (byte)1 : (byte)0;
-        }
-        return native;
-    }
-
     internal static StyleImageInfo FromNative(mln_style_image_info info) =>
         new(
             info.width,
@@ -278,7 +267,19 @@ internal static class StyleStructs
             info.stride,
             info.byte_length,
             info.pixel_ratio,
-            info.sdf != 0
+            info.sdf != 0,
+            info.stretch_x_count,
+            info.stretch_y_count,
+            info.has_content != 0
+                ? new ImageContent(
+                    info.content.left,
+                    info.content.top,
+                    info.content.right,
+                    info.content.bottom
+                )
+                : null,
+            info.has_text_fit_width != 0 ? (StyleImageTextFit)info.text_fit_width : null,
+            info.has_text_fit_height != 0 ? (StyleImageTextFit)info.text_fit_height : null
         );
 
     internal static mln_canonical_tile_id ToNative(CanonicalTileId tileId) =>
@@ -288,6 +289,130 @@ internal static class StyleStructs
             x = tileId.X,
             y = tileId.Y,
         };
+}
+
+/// <summary>
+/// Holds native style image options plus the stretch storage the C API borrows for the call.
+/// </summary>
+internal sealed unsafe class NativeStyleImageOptions : IDisposable
+{
+    private readonly mln_image_stretch* stretchX;
+    private readonly mln_image_stretch* stretchY;
+
+    private NativeStyleImageOptions(
+        mln_style_image_options value,
+        mln_image_stretch* stretchX,
+        mln_image_stretch* stretchY
+    )
+    {
+        Value = value;
+        this.stretchX = stretchX;
+        this.stretchY = stretchY;
+    }
+
+    internal mln_style_image_options Value;
+
+    internal static NativeStyleImageOptions From(StyleImageOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        mln_image_stretch* stretchX = null;
+        mln_image_stretch* stretchY = null;
+        try
+        {
+            var native = NativeMethods.mln_style_image_options_default();
+            if (options.PixelRatio is { } pixelRatio)
+            {
+                native.fields |= (uint)
+                    mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+                native.pixel_ratio = pixelRatio;
+            }
+            if (options.Sdf is { } sdf)
+            {
+                native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF;
+                native.sdf = sdf ? (byte)1 : (byte)0;
+            }
+            if (options.StretchX is { } valuesX)
+            {
+                native.fields |= (uint)
+                    mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+                stretchX = Allocate(valuesX);
+                native.stretch_x = stretchX;
+                native.stretch_x_count = (nuint)valuesX.Count;
+            }
+            if (options.StretchY is { } valuesY)
+            {
+                native.fields |= (uint)
+                    mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+                stretchY = Allocate(valuesY);
+                native.stretch_y = stretchY;
+                native.stretch_y_count = (nuint)valuesY.Count;
+            }
+            if (options.Content is { } content)
+            {
+                native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_CONTENT;
+                native.content = new mln_image_content
+                {
+                    left = content.Left,
+                    top = content.Top,
+                    right = content.Right,
+                    bottom = content.Bottom,
+                };
+            }
+            if (options.TextFitWidth is { } textFitWidth)
+            {
+                native.fields |= (uint)
+                    mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+                native.text_fit_width = (uint)textFitWidth;
+            }
+            if (options.TextFitHeight is { } textFitHeight)
+            {
+                native.fields |= (uint)
+                    mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+                native.text_fit_height = (uint)textFitHeight;
+            }
+            return new NativeStyleImageOptions(native, stretchX, stretchY);
+        }
+        catch
+        {
+            if (stretchX is not null)
+            {
+                NativeMemory.Free(stretchX);
+            }
+            if (stretchY is not null)
+            {
+                NativeMemory.Free(stretchY);
+            }
+            throw;
+        }
+    }
+
+    private static mln_image_stretch* Allocate(IReadOnlyList<ImageStretch> stretches)
+    {
+        if (stretches.Count == 0)
+        {
+            return null;
+        }
+        var array = (mln_image_stretch*)
+            NativeMemory.Alloc((nuint)stretches.Count, (nuint)sizeof(mln_image_stretch));
+        for (var index = 0; index < stretches.Count; index += 1)
+        {
+            array[index].from = stretches[index].From;
+            array[index].to = stretches[index].To;
+        }
+        return array;
+    }
+
+    public void Dispose()
+    {
+        if (stretchX is not null)
+        {
+            NativeMemory.Free(stretchX);
+        }
+        if (stretchY is not null)
+        {
+            NativeMemory.Free(stretchY);
+        }
+    }
 }
 
 internal sealed unsafe class NativeStringViewArray : IDisposable

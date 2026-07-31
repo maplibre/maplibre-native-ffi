@@ -48,6 +48,8 @@ import org.maplibre.nativeffi.internal.c.mln_geojson
 import org.maplibre.nativeffi.internal.c.mln_geojson_source_options
 import org.maplibre.nativeffi.internal.c.mln_geometry
 import org.maplibre.nativeffi.internal.c.mln_geometry_collection
+import org.maplibre.nativeffi.internal.c.mln_image_content
+import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_json_member
 import org.maplibre.nativeffi.internal.c.mln_json_value
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
@@ -189,12 +191,15 @@ import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageContent
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleImageTextFit
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Ensures the native library is loaded before JVM FFM downcalls run. */
@@ -387,6 +392,16 @@ internal object NativeAccess {
       val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
       Status.check(
         runtimeAmbientCacheOperationStartFunction().invokeNative(runtime, operation, outOperationId)
+          as Int
+      )
+      outOperationId.get(ValueLayout.JAVA_LONG, 0)
+    }
+
+  internal fun startSetMaximumAmbientCacheSize(runtime: NativeRuntime, size: Long): Long =
+    Arena.ofConfined().use { arena ->
+      val outOperationId = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        runtimeSetMaximumAmbientCacheSizeStartFunction().invokeNative(runtime, size, outOperationId)
           as Int
       )
       outOperationId.get(ValueLayout.JAVA_LONG, 0)
@@ -1252,6 +1267,181 @@ internal object NativeAccess {
           .invokeNative(map, stringView(arena, layerId), outSnapshot) as Int
       )
       jsonSnapshot(NativeJsonSnapshot(outSnapshot.get(ValueLayout.JAVA_LONG, 0)))
+    }
+
+  private fun stretchArray(arena: Arena, stretches: List<ImageStretch>): MemorySegment {
+    if (stretches.isEmpty()) return MemorySegment.NULL
+    val array = arena.allocate(IMAGE_STRETCH_SIZE * stretches.size)
+    stretches.forEachIndexed { index, stretch ->
+      val element = array.asSlice(IMAGE_STRETCH_SIZE * index, IMAGE_STRETCH_SIZE)
+      element.set(ValueLayout.JAVA_FLOAT, IMAGE_STRETCH_FROM_OFFSET, stretch.from)
+      element.set(ValueLayout.JAVA_FLOAT, IMAGE_STRETCH_TO_OFFSET, stretch.to)
+    }
+    return array
+  }
+
+  /**
+   * Probes the required interval counts, then copies. Null arrays with zero capacity are a size
+   * probe the C API answers with OK.
+   */
+  internal fun styleImageStretches(
+    map: NativeMap,
+    imageId: String,
+  ): Pair<List<ImageStretch>, List<ImageStretch>>? =
+    Arena.ofConfined().use { arena ->
+      val function = downcall("mln_map_copy_style_image_stretches")
+      val outXCount = arena.allocate(ValueLayout.JAVA_LONG)
+      val outYCount = arena.allocate(ValueLayout.JAVA_LONG)
+      val outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN)
+      Status.check(
+        function.invokeNative(
+          map,
+          stringView(arena, imageId),
+          MemorySegment.NULL,
+          0L,
+          outXCount,
+          MemorySegment.NULL,
+          0L,
+          outYCount,
+          outFound,
+        ) as Int
+      )
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return@use null
+      }
+
+      val xCount = outXCount.get(ValueLayout.JAVA_LONG, 0)
+      val yCount = outYCount.get(ValueLayout.JAVA_LONG, 0)
+      val rawX =
+        if (xCount == 0L) MemorySegment.NULL else arena.allocate(IMAGE_STRETCH_SIZE * xCount)
+      val rawY =
+        if (yCount == 0L) MemorySegment.NULL else arena.allocate(IMAGE_STRETCH_SIZE * yCount)
+      Status.check(
+        function.invokeNative(
+          map,
+          stringView(arena, imageId),
+          rawX,
+          xCount,
+          outXCount,
+          rawY,
+          yCount,
+          outYCount,
+          outFound,
+        ) as Int
+      )
+      readStretches(rawX, xCount) to readStretches(rawY, yCount)
+    }
+
+  private fun readStretches(array: MemorySegment, count: Long): List<ImageStretch> =
+    List(count.toInt()) { index ->
+      val element = array.asSlice(IMAGE_STRETCH_SIZE * index, IMAGE_STRETCH_SIZE)
+      ImageStretch(
+        element.get(ValueLayout.JAVA_FLOAT, IMAGE_STRETCH_FROM_OFFSET),
+        element.get(ValueLayout.JAVA_FLOAT, IMAGE_STRETCH_TO_OFFSET),
+      )
+    }
+
+  internal fun setLayerSourceLayer(map: NativeMap, layerId: String, sourceLayer: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_set_layer_source_layer")
+          .invokeNative(map, stringView(arena, layerId), stringView(arena, sourceLayer)) as Int
+      )
+    }
+  }
+
+  internal fun layerSourceLayer(map: NativeMap, layerId: String): String =
+    copyLayerText(map, layerId, "mln_map_copy_layer_source_layer")
+
+  internal fun setLayerSourceId(map: NativeMap, layerId: String, sourceId: String) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapTwoStringViewsStatusFunction("mln_map_set_layer_source_id")
+          .invokeNative(map, stringView(arena, layerId), stringView(arena, sourceId)) as Int
+      )
+    }
+  }
+
+  internal fun layerSourceId(map: NativeMap, layerId: String): String =
+    copyLayerText(map, layerId, "mln_map_copy_layer_source_id")
+
+  /**
+   * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
+   * API answers with OK.
+   */
+  private fun copyLayerText(map: NativeMap, layerId: String, name: String): String =
+    Arena.ofConfined().use { arena ->
+      val function = mapStringViewAddressLongAddressStatusFunction(name)
+      val outSize = arena.allocate(ValueLayout.JAVA_LONG)
+      Status.check(
+        function.invokeNative(map, stringView(arena, layerId), MemorySegment.NULL, 0L, outSize)
+          as Int
+      )
+      val required = outSize.get(ValueLayout.JAVA_LONG, 0)
+      if (required == 0L) {
+        ""
+      } else {
+        val buffer = arena.allocate(required)
+        val outCopied = arena.allocate(ValueLayout.JAVA_LONG)
+        Status.check(
+          function.invokeNative(map, stringView(arena, layerId), buffer, required, outCopied) as Int
+        )
+        val copied = outCopied.get(ValueLayout.JAVA_LONG, 0)
+        buffer.asSlice(0, copied).toArray(ValueLayout.JAVA_BYTE).decodeToString()
+      }
+    }
+
+  internal fun setLayerMinZoom(map: NativeMap, layerId: String, minZoom: Double) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewDoubleStatusFunction("mln_map_set_layer_min_zoom")
+          .invokeNative(map, stringView(arena, layerId), minZoom) as Int
+      )
+    }
+  }
+
+  internal fun layerMinZoom(map: NativeMap, layerId: String): Double =
+    layerZoom(map, layerId, "mln_map_get_layer_min_zoom")
+
+  internal fun setLayerMaxZoom(map: NativeMap, layerId: String, maxZoom: Double) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewDoubleStatusFunction("mln_map_set_layer_max_zoom")
+          .invokeNative(map, stringView(arena, layerId), maxZoom) as Int
+      )
+    }
+  }
+
+  internal fun layerMaxZoom(map: NativeMap, layerId: String): Double =
+    layerZoom(map, layerId, "mln_map_get_layer_max_zoom")
+
+  private fun layerZoom(map: NativeMap, layerId: String, name: String): Double =
+    Arena.ofConfined().use { arena ->
+      val outZoom = arena.allocate(ValueLayout.JAVA_DOUBLE)
+      Status.check(
+        mapStringViewAddressStatusFunction(name)
+          .invokeNative(map, stringView(arena, layerId), outZoom) as Int
+      )
+      outZoom.get(ValueLayout.JAVA_DOUBLE, 0)
+    }
+
+  internal fun setLayerVisibility(map: NativeMap, layerId: String, visibility: Int) {
+    Arena.ofConfined().use { arena ->
+      Status.check(
+        mapStringViewIntStatusFunction("mln_map_set_layer_visibility")
+          .invokeNative(map, stringView(arena, layerId), visibility) as Int
+      )
+    }
+  }
+
+  internal fun layerVisibility(map: NativeMap, layerId: String): Int =
+    Arena.ofConfined().use { arena ->
+      val outVisibility = arena.allocate(ValueLayout.JAVA_INT)
+      Status.check(
+        mapStringViewAddressStatusFunction("mln_map_get_layer_visibility")
+          .invokeNative(map, stringView(arena, layerId), outVisibility) as Int
+      )
+      outVisibility.get(ValueLayout.JAVA_INT, 0)
     }
 
   internal fun requestRepaint(map: NativeMap) {
@@ -2728,6 +2918,9 @@ internal object NativeAccess {
   private fun runtimeAmbientCacheOperationStartFunction(): MethodHandle =
     downcall("mln_runtime_run_ambient_cache_operation_start")
 
+  private fun runtimeSetMaximumAmbientCacheSizeStartFunction(): MethodHandle =
+    downcall("mln_runtime_set_maximum_ambient_cache_size_start")
+
   private fun runtimeOfflineRegionCreateStartFunction(): MethodHandle =
     downcall("mln_runtime_offline_region_create_start")
 
@@ -2882,6 +3075,8 @@ internal object NativeAccess {
     downcall(name)
 
   private fun mapStringViewAddressLongStatusFunction(name: String): MethodHandle = downcall(name)
+
+  private fun mapStringViewIntStatusFunction(name: String): MethodHandle = downcall(name)
 
   private fun mapStringViewAddressLongStringViewStatusFunction(name: String): MethodHandle =
     downcall(name)
@@ -3045,10 +3240,6 @@ internal object NativeAccess {
     var flags = mln_runtime_options.flags(nativeOptions)
     mln_runtime_options.asset_path(nativeOptions, optionalCString(arena, options.assetPath))
     mln_runtime_options.cache_path(nativeOptions, optionalCString(arena, options.cachePath))
-    options.maximumCacheSize?.let { maximumCacheSize ->
-      flags = flags or MapLibreNativeC.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE()
-      mln_runtime_options.maximum_cache_size(nativeOptions, maximumCacheSize)
-    }
     mln_runtime_options.flags(nativeOptions, flags)
     return nativeOptions
   }
@@ -3189,6 +3380,10 @@ internal object NativeAccess {
     value.cluster?.let {
       fields = fields or GEOJSON_SOURCE_OPTION_CLUSTER
       segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET, it)
+    }
+    value.synchronousUpdate?.let {
+      fields = fields or GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
+      segment.set(ValueLayout.JAVA_BOOLEAN, GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET, it)
     }
     segment.set(ValueLayout.JAVA_INT, GEOJSON_SOURCE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
@@ -4028,6 +4223,48 @@ internal object NativeAccess {
       fields = fields or STYLE_IMAGE_OPTION_SDF
       segment.set(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_OPTIONS_SDF_OFFSET, it)
     }
+    value?.stretchX?.let {
+      fields = fields or STYLE_IMAGE_OPTION_STRETCH_X
+      segment.set(
+        ValueLayout.ADDRESS,
+        STYLE_IMAGE_OPTIONS_STRETCH_X_OFFSET,
+        stretchArray(arena, it),
+      )
+      segment.set(
+        ValueLayout.JAVA_LONG,
+        STYLE_IMAGE_OPTIONS_STRETCH_X_COUNT_OFFSET,
+        it.size.toLong(),
+      )
+    }
+    value?.stretchY?.let {
+      fields = fields or STYLE_IMAGE_OPTION_STRETCH_Y
+      segment.set(
+        ValueLayout.ADDRESS,
+        STYLE_IMAGE_OPTIONS_STRETCH_Y_OFFSET,
+        stretchArray(arena, it),
+      )
+      segment.set(
+        ValueLayout.JAVA_LONG,
+        STYLE_IMAGE_OPTIONS_STRETCH_Y_COUNT_OFFSET,
+        it.size.toLong(),
+      )
+    }
+    value?.content?.let {
+      fields = fields or STYLE_IMAGE_OPTION_CONTENT
+      val content = segment.asSlice(STYLE_IMAGE_OPTIONS_CONTENT_OFFSET, mln_image_content.sizeof())
+      content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_LEFT_OFFSET, it.left)
+      content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_TOP_OFFSET, it.top)
+      content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_RIGHT_OFFSET, it.right)
+      content.set(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_BOTTOM_OFFSET, it.bottom)
+    }
+    value?.textFitWidth?.let {
+      fields = fields or STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+      segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_TEXT_FIT_WIDTH_OFFSET, it.nativeValue)
+    }
+    value?.textFitHeight?.let {
+      fields = fields or STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
+      segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_TEXT_FIT_HEIGHT_OFFSET, it.nativeValue)
+    }
     segment.set(ValueLayout.JAVA_INT, STYLE_IMAGE_OPTIONS_FIELDS_OFFSET, fields)
     return segment
   }
@@ -4047,6 +4284,27 @@ internal object NativeAccess {
       segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_BYTE_LENGTH_OFFSET),
       segment.get(ValueLayout.JAVA_FLOAT, STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET),
       segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_SDF_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_X_COUNT_OFFSET),
+      segment.get(ValueLayout.JAVA_LONG, STYLE_IMAGE_INFO_STRETCH_Y_COUNT_OFFSET),
+      if (segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_HAS_CONTENT_OFFSET)) {
+        val content = segment.asSlice(STYLE_IMAGE_INFO_CONTENT_OFFSET, mln_image_content.sizeof())
+        ImageContent(
+          content.get(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_LEFT_OFFSET),
+          content.get(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_TOP_OFFSET),
+          content.get(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_RIGHT_OFFSET),
+          content.get(ValueLayout.JAVA_FLOAT, IMAGE_CONTENT_BOTTOM_OFFSET),
+        )
+      } else null,
+      if (segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_HAS_TEXT_FIT_WIDTH_OFFSET)) {
+        StyleImageTextFit.fromNative(
+          segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_TEXT_FIT_WIDTH_OFFSET)
+        )
+      } else null,
+      if (segment.get(ValueLayout.JAVA_BOOLEAN, STYLE_IMAGE_INFO_HAS_TEXT_FIT_HEIGHT_OFFSET)) {
+        StyleImageTextFit.fromNative(
+          segment.get(ValueLayout.JAVA_INT, STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT_OFFSET)
+        )
+      } else null,
     )
 
   private fun debugOptions(mask: Int): Set<DebugOption> =
@@ -5435,6 +5693,7 @@ internal object NativeAccess {
   private const val GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS: Int = 1 shl 8
   private const val GEOJSON_SOURCE_OPTION_LINE_METRICS: Int = 1 shl 9
   private const val GEOJSON_SOURCE_OPTION_CLUSTER: Int = 1 shl 10
+  private const val GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE: Int = 1 shl 11
 
   private val GEOJSON_SOURCE_OPTIONS_SIZE: Long = mln_geojson_source_options.sizeof()
   private val GEOJSON_SOURCE_OPTIONS_SIZE_OFFSET: Long = mln_geojson_source_options.`size$offset`()
@@ -5462,6 +5721,8 @@ internal object NativeAccess {
     mln_geojson_source_options.`line_metrics$offset`()
   private val GEOJSON_SOURCE_OPTIONS_CLUSTER_OFFSET: Long =
     mln_geojson_source_options.`cluster$offset`()
+  private val GEOJSON_SOURCE_OPTIONS_SYNCHRONOUS_UPDATE_OFFSET: Long =
+    mln_geojson_source_options.`synchronous_update$offset`()
 
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM: Int = 1 shl 0
   private const val CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM: Int = 1 shl 1
@@ -5517,6 +5778,11 @@ internal object NativeAccess {
 
   private const val STYLE_IMAGE_OPTION_PIXEL_RATIO: Int = 1 shl 0
   private const val STYLE_IMAGE_OPTION_SDF: Int = 1 shl 1
+  private const val STYLE_IMAGE_OPTION_STRETCH_X: Int = 1 shl 2
+  private const val STYLE_IMAGE_OPTION_STRETCH_Y: Int = 1 shl 3
+  private const val STYLE_IMAGE_OPTION_CONTENT: Int = 1 shl 4
+  private const val STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH: Int = 1 shl 5
+  private const val STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT: Int = 1 shl 6
 
   private const val DEFAULT_PIXEL_RATIO: Float = 1.0f
 
@@ -5526,6 +5792,27 @@ internal object NativeAccess {
   private val STYLE_IMAGE_OPTIONS_PIXEL_RATIO_OFFSET: Long =
     mln_style_image_options.`pixel_ratio$offset`()
   private val STYLE_IMAGE_OPTIONS_SDF_OFFSET: Long = mln_style_image_options.`sdf$offset`()
+  private val STYLE_IMAGE_OPTIONS_STRETCH_X_OFFSET: Long =
+    mln_style_image_options.`stretch_x$offset`()
+  private val STYLE_IMAGE_OPTIONS_STRETCH_X_COUNT_OFFSET: Long =
+    mln_style_image_options.`stretch_x_count$offset`()
+  private val STYLE_IMAGE_OPTIONS_STRETCH_Y_OFFSET: Long =
+    mln_style_image_options.`stretch_y$offset`()
+  private val STYLE_IMAGE_OPTIONS_STRETCH_Y_COUNT_OFFSET: Long =
+    mln_style_image_options.`stretch_y_count$offset`()
+  private val STYLE_IMAGE_OPTIONS_CONTENT_OFFSET: Long = mln_style_image_options.`content$offset`()
+  private val STYLE_IMAGE_OPTIONS_TEXT_FIT_WIDTH_OFFSET: Long =
+    mln_style_image_options.`text_fit_width$offset`()
+  private val STYLE_IMAGE_OPTIONS_TEXT_FIT_HEIGHT_OFFSET: Long =
+    mln_style_image_options.`text_fit_height$offset`()
+
+  private val IMAGE_STRETCH_SIZE: Long = mln_image_stretch.sizeof()
+  private val IMAGE_STRETCH_FROM_OFFSET: Long = mln_image_stretch.`from$offset`()
+  private val IMAGE_STRETCH_TO_OFFSET: Long = mln_image_stretch.`to$offset`()
+  private val IMAGE_CONTENT_LEFT_OFFSET: Long = mln_image_content.`left$offset`()
+  private val IMAGE_CONTENT_TOP_OFFSET: Long = mln_image_content.`top$offset`()
+  private val IMAGE_CONTENT_RIGHT_OFFSET: Long = mln_image_content.`right$offset`()
+  private val IMAGE_CONTENT_BOTTOM_OFFSET: Long = mln_image_content.`bottom$offset`()
 
   private val STYLE_IMAGE_INFO_SIZE: Long = mln_style_image_info.sizeof()
   private val STYLE_IMAGE_INFO_SIZE_OFFSET: Long = mln_style_image_info.`size$offset`()
@@ -5537,6 +5824,21 @@ internal object NativeAccess {
   private val STYLE_IMAGE_INFO_PIXEL_RATIO_OFFSET: Long =
     mln_style_image_info.`pixel_ratio$offset`()
   private val STYLE_IMAGE_INFO_SDF_OFFSET: Long = mln_style_image_info.`sdf$offset`()
+  private val STYLE_IMAGE_INFO_STRETCH_X_COUNT_OFFSET: Long =
+    mln_style_image_info.`stretch_x_count$offset`()
+  private val STYLE_IMAGE_INFO_STRETCH_Y_COUNT_OFFSET: Long =
+    mln_style_image_info.`stretch_y_count$offset`()
+  private val STYLE_IMAGE_INFO_CONTENT_OFFSET: Long = mln_style_image_info.`content$offset`()
+  private val STYLE_IMAGE_INFO_TEXT_FIT_WIDTH_OFFSET: Long =
+    mln_style_image_info.`text_fit_width$offset`()
+  private val STYLE_IMAGE_INFO_TEXT_FIT_HEIGHT_OFFSET: Long =
+    mln_style_image_info.`text_fit_height$offset`()
+  private val STYLE_IMAGE_INFO_HAS_CONTENT_OFFSET: Long =
+    mln_style_image_info.`has_content$offset`()
+  private val STYLE_IMAGE_INFO_HAS_TEXT_FIT_WIDTH_OFFSET: Long =
+    mln_style_image_info.`has_text_fit_width$offset`()
+  private val STYLE_IMAGE_INFO_HAS_TEXT_FIT_HEIGHT_OFFSET: Long =
+    mln_style_image_info.`has_text_fit_height$offset`()
 
   private val RUNTIME_EVENT_SIZE: Long = mln_runtime_event.sizeof()
   private val RUNTIME_EVENT_SIZE_OFFSET: Long = mln_runtime_event.`size$offset`()

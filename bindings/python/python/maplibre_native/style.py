@@ -71,6 +71,10 @@ class GeoJsonSourceOptions:
     cluster_min_points: int | None = None
     line_metrics: bool | None = None
     cluster: bool | None = None
+    synchronous_update: bool | None = None
+    """Applies data updates synchronously, so data set through
+    `set_geojson_source_data` reaches the next rendered frame instead of being
+    tiled on a worker and shown in a later one."""
 
     def __post_init__(self) -> None:
         for name in ("tile_size", "buffer", "cluster_radius", "cluster_min_points"):
@@ -95,6 +99,13 @@ class StyleSourceType(UnknownIntEnum):
     CUSTOM_VECTOR = 8
 
 
+class StyleLayerVisibility(UnknownIntEnum):
+    """Whether a style layer draws."""
+
+    VISIBLE = 0
+    NONE = 1
+
+
 @dataclass(frozen=True, slots=True)
 class StyleSourceInfo:
     """Copied fixed metadata for one style source."""
@@ -114,11 +125,45 @@ class StyleSourceInfo:
 
 
 @dataclass(frozen=True, slots=True)
+class ImageStretch:
+    """One stretchable interval along an image axis, in image pixels."""
+
+    from_: float
+    to: float
+
+
+@dataclass(frozen=True, slots=True)
+class ImageContent:
+    """Content-box insets in image pixels, from the image's top-left."""
+
+    left: float
+    top: float
+    right: float
+    bottom: float
+
+
+class StyleImageTextFit(UnknownIntEnum):
+    """How a stretchable image fits text along one axis."""
+
+    STRETCH_OR_SHRINK = 0
+    STRETCH_ONLY = 1
+    PROPORTIONAL = 2
+
+
+@dataclass(frozen=True, slots=True)
 class StyleImageOptions:
     """Options for adding or replacing a runtime style image."""
 
     pixel_ratio: float | None = None
     sdf: bool | None = None
+    stretch_x: tuple[ImageStretch, ...] | None = None
+    """Horizontally stretchable intervals. A present empty tuple stays
+    distinguishable from an absent one."""
+    stretch_y: tuple[ImageStretch, ...] | None = None
+    content: ImageContent | None = None
+    """Content box used when `icon-text-fit` applies."""
+    text_fit_width: StyleImageTextFit | None = None
+    text_fit_height: StyleImageTextFit | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,10 +176,20 @@ class StyleImageInfo:
     byte_length: int
     pixel_ratio: float
     sdf: bool
+    stretch_x_count: int = 0
+    stretch_y_count: int = 0
+    """Interval counts for the stretchable axes. Read the intervals themselves
+    with `get_style_image_stretches`."""
+    content: ImageContent | None = None
+    text_fit_width: StyleImageTextFit | None = None
+    text_fit_height: StyleImageTextFit | None = None
 
     @classmethod
     def _from_native(cls, raw: dict[str, Any]) -> "StyleImageInfo":
         """Build style image metadata from private native bridge values."""
+        content = raw["content"]
+        text_fit_width = raw["text_fit_width"]
+        text_fit_height = raw["text_fit_height"]
         return cls(
             width=raw["width"],
             height=raw["height"],
@@ -142,6 +197,15 @@ class StyleImageInfo:
             byte_length=raw["byte_length"],
             pixel_ratio=raw["pixel_ratio"],
             sdf=raw["sdf"],
+            stretch_x_count=raw["stretch_x_count"],
+            stretch_y_count=raw["stretch_y_count"],
+            content=None if content is None else ImageContent(*content),
+            text_fit_width=(
+                None if text_fit_width is None else StyleImageTextFit(text_fit_width)
+            ),
+            text_fit_height=(
+                None if text_fit_height is None else StyleImageTextFit(text_fit_height)
+            ),
         )
 
 

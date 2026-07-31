@@ -14,7 +14,6 @@ import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
-import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
@@ -43,6 +42,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_pump
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_maximum_ambient_cache_size_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_wake_source_acquire
@@ -108,6 +108,24 @@ internal constructor(
       OfflineOperationResultKind.NONE,
     )
   }
+
+  public actual fun startSetMaximumAmbientCacheSize(size: Long): OfflineOperationHandle<Unit> =
+    memScoped {
+      Status.requireArgument(size >= 0) { "size must be non-negative" }
+      val outOperationId = alloc<ULongVar>()
+      Status.check(
+        mln_runtime_set_maximum_ambient_cache_size_start(
+          state.requireLive().rawHandleValue,
+          size.toULong(),
+          outOperationId.ptr,
+        )
+      )
+      offlineOperation(
+        outOperationId.value,
+        OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE,
+        OfflineOperationResultKind.NONE,
+      )
+    }
 
   public actual fun startCreateOfflineRegion(
     definition: OfflineRegionDefinition,
@@ -655,11 +673,6 @@ internal constructor(
       mln_runtime_options_default().place(nativeOptions.ptr)
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
       options.cachePath?.let { nativeOptions.cache_path = MemoryUtil.cString(this, it) }
-      options.maximumCacheSize?.let {
-        Status.requireArgument(it >= 0) { "maximumCacheSize must be non-negative" }
-        nativeOptions.flags = nativeOptions.flags or MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
-        nativeOptions.maximum_cache_size = it.toULong()
-      }
 
       val outRuntime = alloc<ULongVar>()
       outRuntime.value = 0uL

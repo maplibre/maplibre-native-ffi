@@ -250,6 +250,17 @@ static void ambient_cache_operations_validate_raw_operation_values(void) {
   mln_test_destroy_runtime(runtime);
 }
 
+// This verifies the null C output pointer that binding APIs hide, which is the
+// only argument shape this entry point can reject before scheduling.
+static void set_maximum_ambient_cache_size_rejects_raw_null_output(void) {
+  mln_runtime runtime = mln_test_create_runtime();
+  TEST_ASSERT_EQUAL_INT(
+    MLN_STATUS_INVALID_ARGUMENT,
+    mln_runtime_set_maximum_ambient_cache_size_start(runtime, 1024, NULL)
+  );
+  mln_test_destroy_runtime(runtime);
+}
+
 // This verifies raw union discriminants, required nested pointers, and
 // failure-time output initialization.
 static void offline_regions_reject_raw_invalid_descriptors(void) {
@@ -1117,6 +1128,7 @@ void run_resources_abi_tests(void) {
   RUN_TEST(custom_provider_request_handles_reject_raw_null_handles);
   RUN_TEST(network_status_get_rejects_raw_null_output);
   RUN_TEST(ambient_cache_operations_validate_raw_operation_values);
+  RUN_TEST(set_maximum_ambient_cache_size_rejects_raw_null_output);
   RUN_TEST(offline_regions_reject_raw_invalid_descriptors);
   RUN_TEST(offline_database_merge_rejects_raw_null_path);
   RUN_TEST(offline_take_rejects_mismatched_result_kind);

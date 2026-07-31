@@ -564,17 +564,133 @@ void main() {
     },
   );
 
+  test('nine-patch style images round-trip through the native C ABI', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    try {
+      map.setStyleJson('{"version":8,"sources":{},"layers":[]}');
+      final image = PremultipliedRgba8Image(
+        width: 2,
+        height: 2,
+        stride: 8,
+        bytes: Uint8List(16),
+      );
+      map.setStyleImage(
+        'patch',
+        image,
+        options: StyleImageOptions(
+          stretchX: const [ImageStretch(0, 1)],
+          stretchY: const [ImageStretch(0, 1), ImageStretch(1, 2)],
+          content: const ImageContent(
+            left: 0.5,
+            top: 0.5,
+            right: 1.5,
+            bottom: 1.5,
+          ),
+          textFitHeight: StyleImageTextFit.proportional,
+        ),
+      );
+
+      final info = map.getStyleImageInfo('patch');
+      expect(info, isNotNull);
+      expect(info!.stretchXCount, 1);
+      expect(info.stretchYCount, 2);
+      expect(info.content?.right, 1.5);
+      // An absent text fit stays distinguishable from a present default.
+      expect(info.textFitWidth, isNull);
+      expect(info.textFitHeight, StyleImageTextFit.proportional);
+
+      final stretches = map.getStyleImageStretches('patch');
+      expect(stretches, isNotNull);
+      expect(stretches!.stretchX, [const ImageStretch(0, 1)]);
+      expect(stretches.stretchY, [
+        const ImageStretch(0, 1),
+        const ImageStretch(1, 2),
+      ]);
+      expect(map.getStyleImageStretches('missing'), isNull);
+
+      // A backwards interval is rejected by C.
+      expect(
+        () => map.setStyleImage(
+          'bad',
+          image,
+          options: StyleImageOptions(stretchX: const [ImageStretch(2, 1)]),
+        ),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+
+      // Options snapshot the caller's lists, so later mutation cannot reach them.
+      final callerStretches = [const ImageStretch(0, 1)];
+      final snapshotted = StyleImageOptions(stretchX: callerStretches);
+      callerStretches.add(const ImageStretch(1, 2));
+      expect(snapshotted.stretchX, [const ImageStretch(0, 1)]);
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  });
+
+  test('layer base accessors round-trip through the native C ABI', () {
+    final runtime = RuntimeHandle.create();
+    final map = runtime.createMap();
+    try {
+      map.setStyleJson(
+        '{"version":8,"sources":{"geo":{"type":"geojson","data":'
+        '{"type":"FeatureCollection","features":[]}}},"layers":['
+        '{"id":"bg","type":"background"},'
+        '{"id":"fill","type":"fill","source":"geo"}]}',
+      );
+
+      expect(map.getLayerSourceLayer('fill'), '');
+      map.setLayerSourceLayer('fill', 'roads');
+      expect(map.getLayerSourceLayer('fill'), 'roads');
+      expect(map.getLayerSourceId('fill'), 'geo');
+
+      // A layer type that takes no source is rejected, not silently ignored.
+      expect(
+        () => map.setLayerSourceLayer('bg', 'roads'),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+      expect(map.getLayerSourceId('bg'), '');
+
+      // An unset zoom range crosses the boundary as infinities.
+      expect(map.getLayerMinZoom('fill'), double.negativeInfinity);
+      expect(map.getLayerMaxZoom('fill'), double.infinity);
+      map.setLayerMinZoom('fill', 4);
+      map.setLayerMaxZoom('fill', 12.5);
+      expect(map.getLayerMinZoom('fill'), 4);
+      expect(map.getLayerMaxZoom('fill'), 12.5);
+
+      expect(map.getLayerVisibility('fill'), StyleLayerVisibility.visible);
+      map.setLayerVisibility('fill', StyleLayerVisibility.none);
+      expect(map.getLayerVisibility('fill'), StyleLayerVisibility.none);
+
+      expect(
+        () => map.getLayerMinZoom('missing'),
+        throwsA(isA<InvalidArgumentException>()),
+      );
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  });
+
   test('runtime and map handles use the native C ABI', () async {
+    final cacheSizeRuntime = RuntimeHandle.create(
+      options: const RuntimeOptions(cachePath: ':memory:'),
+    );
+    // An out-of-domain unsigned value is rejected before crossing into C.
     expect(
-      () => RuntimeHandle.create(
-        options: RuntimeOptions(maximumCacheSize: BigInt.from(-1)),
-      ),
+      () => cacheSizeRuntime.setMaximumAmbientCacheSize(BigInt.from(-1)),
       throwsA(isA<InvalidArgumentException>()),
     );
-    final defaultedRuntime = RuntimeHandle.create(
-      options: RuntimeOptions(maximumCacheSize: BigInt.zero),
+    final cacheSizeOperation = cacheSizeRuntime.setMaximumAmbientCacheSize(
+      BigInt.zero,
     );
-    defaultedRuntime.close();
+    expect(cacheSizeOperation.isDiscarded, isFalse);
+    cacheSizeOperation.discard();
+    expect(cacheSizeOperation.isDiscarded, isTrue);
+    cacheSizeRuntime.close();
 
     final runtime = RuntimeHandle.create();
     expect(runtime.isClosed, isFalse);
@@ -764,7 +880,7 @@ void main() {
         stride: 4,
         bytes: Uint8List.fromList([255, 0, 0, 255]),
       ),
-      options: const StyleImageOptions(pixelRatio: 2, sdf: true),
+      options: StyleImageOptions(pixelRatio: 2, sdf: true),
     );
     expect(map.styleImageExists('dart-image'), isTrue);
     final styleImageInfo = map.getStyleImageInfo('dart-image');

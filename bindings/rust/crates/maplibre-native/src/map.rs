@@ -41,9 +41,9 @@ use crate::{GeoJson, JsonValue, PremultipliedRgba8Image};
 
 mod style;
 pub use style::{
-    GeoJsonSourceOptions, LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType,
-    StyleImage, StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions,
-    VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind,
+    RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions,
+    StyleImageTextFit, StyleLayerVisibility, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 #[derive(Debug)]

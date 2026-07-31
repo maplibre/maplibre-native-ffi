@@ -50,6 +50,14 @@ if ! diff -u lib/src/internal/c/maplibre_native_c.g.dart .dart_tool/maplibre_nat
 fi
 """
 
+[tasks.api]
+description = "Generate Dart API reference HTML with dart doc."
+run = '''
+rm -rf .dart_tool/api-docs
+mkdir -p .dart_tool
+dart doc -o .dart_tool/api-docs
+'''
+
 [tasks.format]
 run = "dart format lib test tool"
 

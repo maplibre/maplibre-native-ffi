@@ -230,6 +230,28 @@ public sealed unsafe class RuntimeHandle : IDisposable
         );
     }
 
+    /// <summary>Starts a change to this runtime's maximum ambient cache size.</summary>
+    /// <remarks>
+    /// MapLibre evicts ambient resources to fit the new budget, so lowering it discards cached
+    /// resources. Offline regions are unaffected.
+    /// </remarks>
+    public OfflineOperationHandle StartSetMaximumAmbientCacheSize(ulong size)
+    {
+        ulong operationId = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_runtime_set_maximum_ambient_cache_size_start(
+                Handle,
+                size,
+                &operationId
+            )
+        );
+        return OfflineOperation(
+            operationId,
+            OfflineOperationKind.SetMaximumAmbientCacheSize,
+            OfflineOperationResultKind.None
+        );
+    }
+
     /// <summary>Starts an offline region creation operation.</summary>
     public OfflineOperationHandle StartCreateOfflineRegion(
         OfflineRegionDefinition definition,

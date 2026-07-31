@@ -16,9 +16,6 @@ public sealed record RuntimeOptions
     /// <summary>Cache database path.</summary>
     public string? CachePath { get; set; }
 
-    /// <summary>Maximum ambient cache size in bytes.</summary>
-    public ulong? MaximumCacheSize { get; set; }
-
     internal unsafe NativeRuntimeOptions ToNative()
     {
         return new NativeRuntimeOptions(this);
@@ -43,11 +40,6 @@ internal sealed unsafe class NativeRuntimeOptions : IDisposable
         Value = NativeMethods.mln_runtime_options_default();
         Value.asset_path = assetPath.Pointer;
         Value.cache_path = cachePath.Pointer;
-        if (options.MaximumCacheSize is { } maximumCacheSize)
-        {
-            Value.flags |= (uint)mln_runtime_option_flag.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
-            Value.maximum_cache_size = maximumCacheSize;
-        }
     }
 
     internal mln_runtime_options Value;

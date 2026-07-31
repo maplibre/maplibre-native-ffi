@@ -44,9 +44,10 @@ pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
 pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
-    GeoJsonSourceOptions, LocationIndicatorImageKind, MapAttachRef, MapHandle, RasterDemEncoding,
-    SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions, TileScheme,
-    TileSourceOptions, VectorTileEncoding,
+    GeoJsonSourceOptions, ImageContent, ImageStretch, LocationIndicatorImageKind, MapAttachRef,
+    MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage, StyleImageInfo,
+    StyleImageOptions, StyleImageTextFit, StyleLayerVisibility, TileScheme, TileSourceOptions,
+    VectorTileEncoding,
 };
 pub use maplibre_core::{
     AmbientCacheOperation, CameraChangeMode, ConstrainMode, Error, ErrorKind, LogEvent,

@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.map
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CValue
 import kotlinx.cinterop.DoubleVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
@@ -33,6 +34,7 @@ import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_image_stretch
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
@@ -55,7 +57,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_camera_for_geometry
 import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_id
+import org.maplibre.nativeffi.internal.c.mln_map_copy_layer_source_layer
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_stretches
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
@@ -68,7 +73,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_max_zoom
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_min_zoom
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_visibility
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_get_size
@@ -119,7 +127,12 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_max_zoom
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_min_zoom
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_source_id
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_source_layer
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_visibility
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_accuracy_radius
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_bearing
 import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_image_name
@@ -140,6 +153,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
 import org.maplibre.nativeffi.internal.c.mln_screen_point
+import org.maplibre.nativeffi.internal.c.mln_string_view
 import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
@@ -172,12 +186,14 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
 import org.maplibre.nativeffi.style.StyleImageInfo
 import org.maplibre.nativeffi.style.StyleImageOptions
+import org.maplibre.nativeffi.style.StyleLayerVisibility
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned native map handle. Close it on the map owner thread. */
@@ -583,6 +599,51 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
     )
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
+  }
+
+  public actual fun styleImageStretches(
+    imageId: String
+  ): Pair<List<ImageStretch>, List<ImageStretch>>? = memScoped {
+    val handle = state.requireLive().rawHandleValue
+    val outXCount = alloc<ULongVar>()
+    val outYCount = alloc<ULongVar>()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_copy_style_image_stretches(
+        handle,
+        CoreStructs.stringView(imageId, this),
+        null,
+        0UL,
+        outXCount.ptr,
+        null,
+        0UL,
+        outYCount.ptr,
+        outFound.ptr,
+      )
+    )
+    if (!outFound.value) return@memScoped null
+
+    val xCount = checkedInt(outXCount.value, "style image stretch x count")
+    val yCount = checkedInt(outYCount.value, "style image stretch y count")
+    val rawX = if (xCount == 0) null else allocArray<mln_image_stretch>(xCount)
+    val rawY = if (yCount == 0) null else allocArray<mln_image_stretch>(yCount)
+    Status.check(
+      mln_map_copy_style_image_stretches(
+        handle,
+        CoreStructs.stringView(imageId, this),
+        rawX,
+        xCount.toULong(),
+        outXCount.ptr,
+        rawY,
+        yCount.toULong(),
+        outYCount.ptr,
+        outFound.ptr,
+      )
+    )
+    val toList = { array: CPointer<mln_image_stretch>?, count: Int ->
+      List(count) { index -> ImageStretch(array!![index].from, array[index].to) }
+    }
+    toList(rawX, xCount) to toList(rawY, yCount)
   }
 
   public actual fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = memScoped {
@@ -1014,6 +1075,134 @@ private constructor(private val runtime: RuntimeHandle, handle: NativeMap) : Aut
       )
     )
     ValueStructs.readJsonSnapshot(jsonSnapshotHandle(outFilter.value))
+  }
+
+  public actual fun setLayerSourceLayer(layerId: String, sourceLayer: String) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_source_layer(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceLayer, this),
+        )
+      )
+    }
+  }
+
+  public actual fun layerSourceLayer(layerId: String): String =
+    copyLayerText(layerId) { handle, layerView, text, capacity, outSize ->
+      mln_map_copy_layer_source_layer(handle, layerView, text, capacity, outSize)
+    }
+
+  public actual fun setLayerSourceId(layerId: String, sourceId: String) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_source_id(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceId, this),
+        )
+      )
+    }
+  }
+
+  public actual fun layerSourceId(layerId: String): String =
+    copyLayerText(layerId) { handle, layerView, text, capacity, outSize ->
+      mln_map_copy_layer_source_id(handle, layerView, text, capacity, outSize)
+    }
+
+  /**
+   * Probes the required length, then copies. A null buffer with zero capacity is a size probe the C
+   * API answers with OK.
+   */
+  private fun copyLayerText(
+    layerId: String,
+    copy: (ULong, CValue<mln_string_view>, CPointer<ByteVar>?, ULong, CPointer<ULongVar>) -> Int,
+  ): String = memScoped {
+    val handle = state.requireLive().rawHandleValue
+    val outSize = alloc<ULongVar>()
+    Status.check(copy(handle, CoreStructs.stringView(layerId, this), null, 0UL, outSize.ptr))
+    val required = checkedInt(outSize.value, "layer text size")
+    if (required == 0) return@memScoped ""
+
+    val buffer = allocArray<ByteVar>(required)
+    val outCopied = alloc<ULongVar>()
+    Status.check(
+      copy(handle, CoreStructs.stringView(layerId, this), buffer, required.toULong(), outCopied.ptr)
+    )
+    buffer.readBytes(checkedInt(outCopied.value, "layer copied text size")).decodeToString()
+  }
+
+  public actual fun setLayerMinZoom(layerId: String, minZoom: Double) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_min_zoom(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          minZoom,
+        )
+      )
+    }
+  }
+
+  public actual fun layerMinZoom(layerId: String): Double = memScoped {
+    val outZoom = alloc<DoubleVar>()
+    Status.check(
+      mln_map_get_layer_min_zoom(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        outZoom.ptr,
+      )
+    )
+    outZoom.value
+  }
+
+  public actual fun setLayerMaxZoom(layerId: String, maxZoom: Double) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_max_zoom(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          maxZoom,
+        )
+      )
+    }
+  }
+
+  public actual fun layerMaxZoom(layerId: String): Double = memScoped {
+    val outZoom = alloc<DoubleVar>()
+    Status.check(
+      mln_map_get_layer_max_zoom(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        outZoom.ptr,
+      )
+    )
+    outZoom.value
+  }
+
+  public actual fun setLayerVisibility(layerId: String, visibility: StyleLayerVisibility) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_visibility(
+          state.requireLive().rawHandleValue,
+          CoreStructs.stringView(layerId, this),
+          visibility.nativeValue.toUInt(),
+        )
+      )
+    }
+  }
+
+  public actual fun layerVisibility(layerId: String): StyleLayerVisibility = memScoped {
+    val outVisibility = alloc<UIntVar>()
+    Status.check(
+      mln_map_get_layer_visibility(
+        state.requireLive().rawHandleValue,
+        CoreStructs.stringView(layerId, this),
+        outVisibility.ptr,
+      )
+    )
+    StyleLayerVisibility.fromNative(outVisibility.value)
   }
 
   public actual fun requestRepaint() {

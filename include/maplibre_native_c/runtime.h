@@ -24,10 +24,6 @@ typedef enum mln_network_status : uint32_t {
   MLN_NETWORK_STATUS_OFFLINE = 2,
 } mln_network_status;
 
-typedef enum mln_runtime_option_flag : uint32_t {
-  MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE = 1U << 0U,
-} mln_runtime_option_flag;
-
 typedef enum mln_ambient_cache_operation : uint32_t {
   MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE = 1,
   MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE = 2,
@@ -63,6 +59,7 @@ typedef enum mln_offline_operation_kind : uint32_t {
   MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
   MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
   MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
+  MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE = 12,
 } mln_offline_operation_kind;
 
 /** Offline database operation result kinds reported by completion events. */
@@ -285,6 +282,7 @@ MLN_API mln_status mln_network_status_set(uint32_t status) MLN_NOEXCEPT;
 
 typedef struct mln_runtime_options {
   uint32_t size;
+  /** No flags are currently defined. Must be zero. */
   uint32_t flags;
   /** Filesystem root for asset:// URLs. Copied during runtime creation. */
   const char* asset_path;
@@ -296,8 +294,6 @@ typedef struct mln_runtime_options {
    * sources that support running without one.
    */
   const char* cache_path;
-  /** Maximum ambient cache size in bytes when the matching flag is set. */
-  uint64_t maximum_cache_size;
 } mln_runtime_options;
 
 /** Rendering statistics reported in MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME. */
@@ -793,6 +789,30 @@ mln_runtime_clear_resource_transform(mln_runtime runtime) MLN_NOEXCEPT;
 MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
   mln_runtime runtime, uint32_t operation,
   mln_offline_operation_id* out_operation_id
+) MLN_NOEXCEPT;
+
+/**
+ * Starts a change to this runtime's maximum ambient cache size.
+ *
+ * size is the ambient cache budget in bytes. MapLibre evicts ambient resources
+ * to fit the new budget, so lowering it discards cached resources. Offline
+ * regions are not ambient and are unaffected.
+ *
+ * When runtime options omit cache_path, this operates on MapLibre's default
+ * in-memory database and its effects are not durable beyond the native database
+ * lifetime. Completion is reported through
+ * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
+ *
+ * Returns:
+ * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
+ *   out_operation_id is null.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_set_maximum_ambient_cache_size_start(
+  mln_runtime runtime, uint64_t size, mln_offline_operation_id* out_operation_id
 ) MLN_NOEXCEPT;
 
 /**

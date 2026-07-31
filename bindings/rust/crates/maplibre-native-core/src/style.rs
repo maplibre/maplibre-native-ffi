@@ -3,7 +3,9 @@ use std::ptr;
 
 use maplibre_native_sys as sys;
 
-use crate::enums::{RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding};
+use crate::enums::{
+    RasterDemEncoding, SourceType, StyleImageTextFit, TileScheme, VectorTileEncoding,
+};
 use crate::json::{JsonValue, NativeJsonValue, json_value_try_to_native};
 use crate::string::{StringView, string_view};
 use crate::values::{
@@ -114,6 +116,10 @@ pub struct GeoJsonSourceOptions {
     pub cluster_min_points: Option<u32>,
     pub line_metrics: Option<bool>,
     pub cluster: Option<bool>,
+    /// Applies data updates synchronously, so data set through
+    /// `set_geojson_source_data` reaches the next rendered frame instead of
+    /// being tiled on a worker and shown in a later one.
+    pub synchronous_update: Option<bool>,
 }
 
 impl GeoJsonSourceOptions {
@@ -183,6 +189,10 @@ impl NativeGeoJsonSourceOptions {
         if let Some(value) = options.cluster {
             raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER;
             raw.cluster = value;
+        }
+        if let Some(value) = options.synchronous_update {
+            raw.fields |= sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE;
+            raw.synchronous_update = value;
         }
         Ok(Self {
             raw,
@@ -376,32 +386,117 @@ pub fn style_image_from_copied_premultiplied_rgba8(
 pub struct StyleImageOptions {
     pub pixel_ratio: Option<f32>,
     pub sdf: Option<bool>,
+    /// Horizontally stretchable intervals, in image pixels.
+    pub stretch_x: Option<Vec<ImageStretch>>,
+    /// Vertically stretchable intervals, in image pixels.
+    pub stretch_y: Option<Vec<ImageStretch>>,
+    /// Content box used when `icon-text-fit` applies.
+    pub content: Option<ImageContent>,
+    pub text_fit_width: Option<StyleImageTextFit>,
+    pub text_fit_height: Option<StyleImageTextFit>,
 }
 
-impl StyleImageOptions {
-    fn to_native(&self) -> sys::mln_style_image_options {
-        let mut fields = 0;
-        let mut pixel_ratio = 1.0;
-        let mut sdf = false;
-        if let Some(value) = self.pixel_ratio {
-            fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-            pixel_ratio = value;
-        }
-        if let Some(value) = self.sdf {
-            fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
-            sdf = value;
-        }
-        sys::mln_style_image_options {
-            size: std::mem::size_of::<sys::mln_style_image_options>() as u32,
-            fields,
-            pixel_ratio,
-            sdf,
-        }
+/// One stretchable interval along an image axis, in image pixels.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageStretch {
+    pub from: f32,
+    pub to: f32,
+}
+
+impl ImageStretch {
+    pub fn new(from: f32, to: f32) -> Self {
+        Self { from, to }
     }
 }
 
-pub fn style_image_options_to_native(options: &StyleImageOptions) -> sys::mln_style_image_options {
-    options.to_native()
+/// Content-box insets in image pixels, measured from the image's top-left.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImageContent {
+    pub left: f32,
+    pub top: f32,
+    pub right: f32,
+    pub bottom: f32,
+}
+
+/// Native style image options holding the stretch arrays the C API borrows.
+pub struct NativeStyleImageOptions {
+    raw: sys::mln_style_image_options,
+    _stretch_x: Vec<sys::mln_image_stretch>,
+    _stretch_y: Vec<sys::mln_image_stretch>,
+}
+
+impl NativeStyleImageOptions {
+    fn new(options: &StyleImageOptions) -> Self {
+        // SAFETY: This C helper returns a plain value with no preconditions.
+        let mut raw = unsafe { sys::mln_style_image_options_default() };
+        if let Some(value) = options.pixel_ratio {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            raw.pixel_ratio = value;
+        }
+        if let Some(value) = options.sdf {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            raw.sdf = value;
+        }
+        let stretch_x = to_native_stretches(options.stretch_x.as_deref());
+        if options.stretch_x.is_some() {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+            raw.stretch_x = stretch_x.as_ptr();
+            raw.stretch_x_count = stretch_x.len();
+        }
+        let stretch_y = to_native_stretches(options.stretch_y.as_deref());
+        if options.stretch_y.is_some() {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+            raw.stretch_y = stretch_y.as_ptr();
+            raw.stretch_y_count = stretch_y.len();
+        }
+        if let Some(value) = options.content {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_CONTENT;
+            raw.content = sys::mln_image_content {
+                left: value.left,
+                top: value.top,
+                right: value.right,
+                bottom: value.bottom,
+            };
+        }
+        if let Some(value) = options.text_fit_width {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+            raw.text_fit_width = value.raw_value();
+        }
+        if let Some(value) = options.text_fit_height {
+            raw.fields |= sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+            raw.text_fit_height = value.raw_value();
+        }
+        Self {
+            raw,
+            _stretch_x: stretch_x,
+            _stretch_y: stretch_y,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const sys::mln_style_image_options {
+        ptr::from_ref(&self.raw)
+    }
+}
+
+impl AsRef<sys::mln_style_image_options> for NativeStyleImageOptions {
+    fn as_ref(&self) -> &sys::mln_style_image_options {
+        &self.raw
+    }
+}
+
+fn to_native_stretches(stretches: Option<&[ImageStretch]>) -> Vec<sys::mln_image_stretch> {
+    stretches
+        .unwrap_or_default()
+        .iter()
+        .map(|stretch| sys::mln_image_stretch {
+            from: stretch.from,
+            to: stretch.to,
+        })
+        .collect()
+}
+
+pub fn style_image_options_to_native(options: &StyleImageOptions) -> NativeStyleImageOptions {
+    NativeStyleImageOptions::new(options)
 }
 
 pub fn empty_style_image_info() -> sys::mln_style_image_info {
@@ -411,8 +506,21 @@ pub fn empty_style_image_info() -> sys::mln_style_image_info {
         height: 0,
         stride: 0,
         byte_length: 0,
+        stretch_x_count: 0,
+        stretch_y_count: 0,
+        content: sys::mln_image_content {
+            left: 0.0,
+            top: 0.0,
+            right: 0.0,
+            bottom: 0.0,
+        },
+        text_fit_width: sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+        text_fit_height: sys::MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
         pixel_ratio: 1.0,
         sdf: false,
+        has_content: false,
+        has_text_fit_width: false,
+        has_text_fit_height: false,
     }
 }
 
@@ -440,11 +548,11 @@ impl GeoJsonSourceOptionsNativeExt for GeoJsonSourceOptions {
 
 #[doc(hidden)]
 pub trait StyleImageOptionsNativeExt {
-    fn to_native(&self) -> sys::mln_style_image_options;
+    fn to_native(&self) -> NativeStyleImageOptions;
 }
 
 impl StyleImageOptionsNativeExt for StyleImageOptions {
-    fn to_native(&self) -> sys::mln_style_image_options {
+    fn to_native(&self) -> NativeStyleImageOptions {
         style_image_options_to_native(self)
     }
 }
@@ -561,6 +669,7 @@ mod tests {
             cluster_min_points: Some(3),
             line_metrics: Some(false),
             cluster: Some(true),
+            synchronous_update: Some(true),
         };
 
         let native = geojson_source_options_to_native(&options).unwrap();
@@ -579,6 +688,7 @@ mod tests {
                 | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER_MIN_POINTS
                 | sys::MLN_GEOJSON_SOURCE_OPTION_LINE_METRICS
                 | sys::MLN_GEOJSON_SOURCE_OPTION_CLUSTER
+                | sys::MLN_GEOJSON_SOURCE_OPTION_SYNCHRONOUS_UPDATE
         );
         // A present zero stays distinguishable from an absent field.
         assert_eq!(raw.min_zoom, 0.0);
@@ -591,6 +701,7 @@ mod tests {
         assert_eq!(raw.cluster_min_points, 3);
         assert!(!raw.line_metrics);
         assert!(raw.cluster);
+        assert!(raw.synchronous_update);
         // SAFETY: native keeps the cluster properties descriptor graph alive for
         // this scope.
         let copied = unsafe { crate::json::json_value_from_native(&*raw.cluster_properties) }
@@ -695,6 +806,11 @@ mod tests {
             byte_length: 8,
             pixel_ratio: 2.0,
             sdf: true,
+            stretch_x_count: 0,
+            stretch_y_count: 0,
+            content: None,
+            text_fit_width: None,
+            text_fit_height: None,
         };
         let image = style_image_from_copied_premultiplied_rgba8(info, vec![1, 2, 3, 4], 3).unwrap();
 
@@ -718,7 +834,8 @@ mod tests {
         assert_eq!(empty_info.pixel_ratio, 1.0);
         assert!(!empty_info.sdf);
 
-        let default_raw = style_image_options_to_native(&StyleImageOptions::default());
+        let default_native = style_image_options_to_native(&StyleImageOptions::default());
+        let default_raw = default_native.as_ref();
         assert_eq!(
             default_raw.size,
             std::mem::size_of::<sys::mln_style_image_options>() as u32
@@ -726,16 +843,45 @@ mod tests {
         assert_eq!(default_raw.fields, 0);
         assert_eq!(default_raw.pixel_ratio, 1.0);
         assert!(!default_raw.sdf);
+        assert!(default_raw.stretch_x.is_null());
+        assert_eq!(default_raw.stretch_x_count, 0);
 
-        let raw = style_image_options_to_native(&StyleImageOptions {
+        let native = style_image_options_to_native(&StyleImageOptions {
             pixel_ratio: Some(2.0),
             sdf: Some(true),
+            stretch_x: Some(vec![ImageStretch::new(0.0, 1.0)]),
+            stretch_y: Some(Vec::new()),
+            content: Some(ImageContent {
+                left: 0.5,
+                top: 0.5,
+                right: 1.5,
+                bottom: 1.5,
+            }),
+            text_fit_width: Some(StyleImageTextFit::StretchOnly),
+            text_fit_height: Some(StyleImageTextFit::Proportional),
         });
+        let raw = native.as_ref();
         assert_eq!(
             raw.fields,
-            sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO | sys::MLN_STYLE_IMAGE_OPTION_SDF
+            sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
+                | sys::MLN_STYLE_IMAGE_OPTION_SDF
+                | sys::MLN_STYLE_IMAGE_OPTION_STRETCH_X
+                | sys::MLN_STYLE_IMAGE_OPTION_STRETCH_Y
+                | sys::MLN_STYLE_IMAGE_OPTION_CONTENT
+                | sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH
+                | sys::MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT
         );
         assert_eq!(raw.pixel_ratio, 2.0);
         assert!(raw.sdf);
+        // A present empty array stays distinguishable from an absent one.
+        assert_eq!(raw.stretch_x_count, 1);
+        assert_eq!(raw.stretch_y_count, 0);
+        // SAFETY: native owns the stretch storage raw points at for this scope.
+        assert_eq!(unsafe { (*raw.stretch_x).to }, 1.0);
+        assert_eq!(raw.content.right, 1.5);
+        assert_eq!(
+            raw.text_fit_height,
+            sys::MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL
+        );
     }
 }

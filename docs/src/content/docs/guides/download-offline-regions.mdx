@@ -88,3 +88,9 @@ Cache maintenance runs through `ambient_cache_operation_start`. `INVALIDATE` and
   `RESET_DATABASE` deletes and recreates the whole shared database, so your
   downloaded regions go with it.
 </Aside>
+
+`set_maximum_ambient_cache_size_start` sets the ambient cache budget in bytes.
+MapLibre evicts ambient resources to fit the new budget, so lowering it discards
+cached resources; offline regions are not ambient and stay put. It is an offline
+operation like the ones above, so it reports through the same completion event,
+and it can run any time after the runtime exists.

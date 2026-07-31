@@ -7,13 +7,13 @@ package maplibre
 import "C"
 
 import (
+	"fmt"
 	"math"
 	"runtime"
 	"sync"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
-	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
 
 // RenderBackendMask preserves the render backend bits reported by the native
@@ -851,20 +851,20 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureIma
 	var buffer []byte
 	var info TextureImageInfo
 	err = session.withNoAcquiredFrame(func() error {
+		// A null buffer with zero capacity is a size probe that reports the
+		// required byte length.
 		rawInfo := C.mln_texture_image_info_default()
-		failure := internalstatus.CheckCall(func() int32 {
+		if probeErr := checkNative(func() int32 {
 			return int32(C.mln_texture_read_premultiplied_rgba8(C.mln_render_session(ptr), nil, 0, &rawInfo))
-		}, threadLastErrorMessage)
+		}); probeErr != nil {
+			info = textureImageInfoFromC(rawInfo)
+			return probeErr
+		}
 		info = textureImageInfoFromC(rawInfo)
-		if failure == nil {
-			return nil
-		}
-		if failure.Status != int32(C.MLN_STATUS_INVALID_ARGUMENT) || info.ByteLength == 0 {
-			return newStatusError(failure)
-		}
 		buffer = make([]byte, info.ByteLength)
-		info, err = session.readPremultipliedRGBA8IntoLocked(ptr, buffer)
-		return err
+		var readErr error
+		info, readErr = session.readPremultipliedRGBA8IntoLocked(ptr, buffer)
+		return readErr
 	})
 	if err != nil {
 		return nil, info, err
@@ -904,7 +904,15 @@ func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr nativeR
 		return textureImageInfoFromC(rawInfo), err
 	}
 	runtime.KeepAlive(buffer)
-	return textureImageInfoFromC(rawInfo), nil
+	info := textureImageInfoFromC(rawInfo)
+	// An empty destination reaches native code as the null pointer and zero
+	// capacity that mean a size probe, which succeeds without copying. Report
+	// the buffer as too small unless the frame really carries no bytes.
+	if len(buffer) == 0 && info.ByteLength > 0 {
+		return info, newBindingError(ErrInvalidArgument,
+			fmt.Sprintf("buffer length 0 is smaller than the required %d bytes", info.ByteLength))
+	}
+	return info, nil
 }
 
 // AcquireMetalTextureFrame acquires the latest Metal session-owned texture

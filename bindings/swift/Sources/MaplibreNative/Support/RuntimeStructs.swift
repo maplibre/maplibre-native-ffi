@@ -3,16 +3,13 @@ internal import CMaplibreNativeC
 struct NativeRuntimeOptionsInput: Equatable {
   var assetPath: String?
   var cachePath: String?
-  var maximumCacheSize: UInt64?
 
   init(
     assetPath: String? = nil,
-    cachePath: String? = nil,
-    maximumCacheSize: UInt64? = nil
+    cachePath: String? = nil
   ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
-    self.maximumCacheSize = maximumCacheSize
   }
 
   func withNativeOptions<Result>(
@@ -23,10 +20,6 @@ struct NativeRuntimeOptionsInput: Equatable {
         var options = mln_runtime_options_default()
         options.asset_path = assetPath
         options.cache_path = cachePath
-        if let maximumCacheSize {
-          options.flags |= MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE.rawValue
-          options.maximum_cache_size = maximumCacheSize
-        }
         return try withUnsafePointer(to: &options, body)
       }
     }

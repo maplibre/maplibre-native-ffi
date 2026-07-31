@@ -31,6 +31,7 @@ import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 import org.maplibre.nativeffi.style.GeoJsonSourceOptions
+import org.maplibre.nativeffi.style.ImageStretch
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileScheme
@@ -270,16 +271,10 @@ class OptionsValueSemanticsTest {
         RuntimeOptions().apply {
           assetPath = "assets"
           cachePath = "cache"
-          maximumCacheSize = 1024L
         }
       },
       copyOf = { it.copy() },
-      mutators =
-        listOf(
-          { assetPath = "other-assets" },
-          { cachePath = "other-cache" },
-          { maximumCacheSize = 2048L },
-        ),
+      mutators = listOf({ assetPath = "other-assets" }, { cachePath = "other-cache" }),
     )
   }
 
@@ -329,6 +324,7 @@ class OptionsValueSemanticsTest {
           clusterMinPoints = 3
           lineMetrics = true
           cluster = true
+          synchronousUpdate = true
         }
       },
       copyOf = { it.copy() },
@@ -345,6 +341,7 @@ class OptionsValueSemanticsTest {
           { clusterMinPoints = 2 },
           { lineMetrics = false },
           { cluster = false },
+          { synchronousUpdate = false },
         ),
     )
   }
@@ -444,5 +441,24 @@ class OptionsValueSemanticsTest {
     sourceLayerIds.add("b")
 
     assertEquals(listOf("a"), sourceOptions.sourceLayerIds)
+  }
+
+  @Test
+  fun styleImageOptionsSnapshotCallerOwnedStretches() {
+    // BND-069: neither the descriptor nor its copy observes later mutation of the caller's list.
+    val stretchX = mutableListOf(ImageStretch(0.0f, 1.0f))
+    val options =
+      StyleImageOptions().apply {
+        this.stretchX = stretchX
+        stretchY = emptyList()
+      }
+    val copy = options.copy()
+
+    stretchX.add(ImageStretch(1.0f, 2.0f))
+
+    assertEquals(listOf(ImageStretch(0.0f, 1.0f)), options.stretchX)
+    assertEquals(listOf(ImageStretch(0.0f, 1.0f)), copy.stretchX)
+    // A present empty list stays distinguishable from an absent one.
+    assertEquals(emptyList(), copy.stretchY)
   }
 }

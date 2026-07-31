@@ -40,9 +40,9 @@ it, so pass a filesystem path if you want them.
 
 `asset_path` sets the filesystem root that `asset://` URLs resolve against.
 
-`maximum_cache_size` caps the ambient cache in bytes. Runtime creation reads
-that field only when `flags` includes
-`MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE`.
+The ambient cache has no size cap at creation time. Call
+`set_maximum_ambient_cache_size_start` once the runtime exists to set one; see
+[Download offline regions](/maplibre-native-ffi/guides/download-offline-regions/).
 
 ## Create a map
 

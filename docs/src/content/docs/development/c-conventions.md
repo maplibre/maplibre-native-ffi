@@ -53,6 +53,18 @@ function that accepts or returns the struct. A backend-native handle is an
 address the host already owns, so it stays a `void*` and never becomes a
 MapLibre handle id.
 
+A copy-out entry point takes a caller buffer, its capacity, and an out-parameter
+for the required length. It writes the required length before it checks the
+capacity, so a caller learns the size from a call that could not fit the data.
+
+A null buffer with a capacity of zero is a size probe: the entry point reports
+the required length and returns `MLN_STATUS_OK`. This keeps the sizing call
+distinct from the `MLN_STATUS_INVALID_ARGUMENT` these functions also use for a
+missing object, which a caller otherwise cannot tell apart. A non-null buffer
+whose capacity is too small still reports the required length and returns
+`MLN_STATUS_INVALID_ARGUMENT`. Entry points whose output length is a documented
+constant need no probe.
+
 ## Handles
 
 Every MapLibre handle type is `typedef uint64_t`, an opaque id. Each id packs

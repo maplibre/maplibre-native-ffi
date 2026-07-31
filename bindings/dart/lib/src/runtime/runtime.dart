@@ -76,16 +76,13 @@ final class ResourceProvider {
 /// Runtime creation options.
 final class RuntimeOptions {
   /// Creates runtime options.
-  const RuntimeOptions({this.assetPath, this.cachePath, this.maximumCacheSize});
+  const RuntimeOptions({this.assetPath, this.cachePath});
 
   /// Filesystem root for `asset://` URLs.
   final String? assetPath;
 
   /// Cache database path.
   final String? cachePath;
-
-  /// Maximum ambient cache size in bytes.
-  final BigInt? maximumCacheSize;
 }
 
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
@@ -289,6 +286,29 @@ final class RuntimeHandle {
         this,
         outOperationId.value,
         _OfflineOperationKind.ambientCache,
+        _OfflineOperationResultKind.none,
+      );
+    });
+  }
+
+  /// Starts a change to this runtime's maximum ambient cache size.
+  ///
+  /// MapLibre evicts ambient resources to fit the new budget, so lowering it
+  /// discards cached resources. Offline regions are unaffected.
+  OfflineOperationHandle setMaximumAmbientCacheSize(BigInt size) {
+    return withNativeArena((arena) {
+      final outOperationId = arena<Uint64>();
+      _check(
+        _c.raw.mln_runtime_set_maximum_ambient_cache_size_start(
+          _handle.raw,
+          uint64ToNative(size, 'maximum ambient cache size'),
+          outOperationId,
+        ),
+      );
+      return OfflineOperationHandle._(
+        this,
+        outOperationId.value,
+        _OfflineOperationKind.setMaximumAmbientCacheSize,
         _OfflineOperationResultKind.none,
       );
     });
@@ -1014,6 +1034,10 @@ final class OfflineOperationKind {
     'regionInvalidate',
   );
   static const regionDelete = OfflineOperationKind._(11, 'regionDelete');
+  static const setMaximumAmbientCacheSize = OfflineOperationKind._(
+    12,
+    'setMaximumAmbientCacheSize',
+  );
 
   factory OfflineOperationKind.fromRawValue(int rawValue) => switch (rawValue) {
     1 => ambientCache,
@@ -1027,6 +1051,7 @@ final class OfflineOperationKind {
     9 => regionSetDownloadState,
     10 => regionInvalidate,
     11 => regionDelete,
+    12 => setMaximumAmbientCacheSize,
     _ => OfflineOperationKind._(rawValue, 'unknown($rawValue)'),
   };
 
@@ -2158,14 +2183,15 @@ final class MapHandle {
   void setStyleImage(
     String imageId,
     PremultipliedRgba8Image image, {
-    StyleImageOptions options = const StyleImageOptions(),
+    StyleImageOptions? options,
   }) {
+    final resolvedOptions = options ?? StyleImageOptions();
     withNativeArena((arena) {
       final nativeId = nativeStringView(imageId, arena);
       final nativeImage = arena<raw.mln_premultiplied_rgba8_image>();
       nativeImage.ref = _premultipliedRgba8ImageToNative(image, arena);
       final nativeOptions = arena<raw.mln_style_image_options>();
-      nativeOptions.ref = _styleImageOptionsToNative(options);
+      nativeOptions.ref = _styleImageOptionsToNative(resolvedOptions, arena);
       _check(
         _c.raw.mln_map_set_style_image(
           _handle.raw,
@@ -2174,6 +2200,64 @@ final class MapHandle {
           nativeOptions,
         ),
       );
+    });
+  }
+
+  /// Copies one runtime style image's stretchable intervals, or null when no
+  /// image carries [imageId]. The record holds horizontal intervals first.
+  ({List<ImageStretch> stretchX, List<ImageStretch> stretchY})?
+  getStyleImageStretches(String imageId) {
+    return withNativeArena((arena) {
+      final nativeId = nativeStringView(imageId, arena);
+      final outXCount = arena<Size>();
+      final outYCount = arena<Size>();
+      final outFound = arena<Bool>();
+      _check(
+        _c.raw.mln_map_copy_style_image_stretches(
+          _handle.raw,
+          nativeId.value,
+          nullptr,
+          0,
+          outXCount,
+          nullptr,
+          0,
+          outYCount,
+          outFound,
+        ),
+      );
+      if (!outFound.value) {
+        return null;
+      }
+
+      final xCount = outXCount.value;
+      final yCount = outYCount.value;
+      final rawX = xCount == 0
+          ? nullptr.cast<raw.mln_image_stretch>()
+          : arena<raw.mln_image_stretch>(xCount);
+      final rawY = yCount == 0
+          ? nullptr.cast<raw.mln_image_stretch>()
+          : arena<raw.mln_image_stretch>(yCount);
+      _check(
+        _c.raw.mln_map_copy_style_image_stretches(
+          _handle.raw,
+          nativeId.value,
+          rawX,
+          xCount,
+          outXCount,
+          rawY,
+          yCount,
+          outYCount,
+          outFound,
+        ),
+      );
+      List<ImageStretch> read(
+        Pointer<raw.mln_image_stretch> array,
+        int count,
+      ) => List<ImageStretch>.generate(
+        count,
+        (index) => ImageStretch(array[index].from, array[index].to),
+      );
+      return (stretchX: read(rawX, xCount), stretchY: read(rawY, yCount));
     });
   }
 
@@ -3020,6 +3104,157 @@ final class MapHandle {
         ),
       );
       return _copyJsonSnapshot(NativeJsonSnapshot(outFilter.value));
+    });
+  }
+
+  /// Sets one layer's source-layer ID.
+  ///
+  /// Layer types that take no source, such as background, are rejected.
+  void setLayerSourceLayer(String layerId, String sourceLayer) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeSourceLayer = nativeStringView(sourceLayer, arena);
+      _check(
+        _c.raw.mln_map_set_layer_source_layer(
+          _handle.raw,
+          nativeLayerId.value,
+          nativeSourceLayer.value,
+        ),
+      );
+    });
+  }
+
+  /// Copies one layer's source-layer ID, empty when the layer carries none.
+  String getLayerSourceLayer(String layerId) {
+    return _copyLayerText(
+      _handle,
+      layerId,
+      _c.raw.mln_map_copy_layer_source_layer,
+    );
+  }
+
+  /// Sets one layer's source ID.
+  ///
+  /// Layer types that take no source, such as background, are rejected. The
+  /// named source need not exist yet.
+  void setLayerSourceId(String layerId, String sourceId) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final nativeSourceId = nativeStringView(sourceId, arena);
+      _check(
+        _c.raw.mln_map_set_layer_source_id(
+          _handle.raw,
+          nativeLayerId.value,
+          nativeSourceId.value,
+        ),
+      );
+    });
+  }
+
+  /// Copies one layer's source ID, empty when the layer carries none.
+  String getLayerSourceId(String layerId) {
+    return _copyLayerText(
+      _handle,
+      layerId,
+      _c.raw.mln_map_copy_layer_source_id,
+    );
+  }
+
+  /// Sets the lowest zoom at which one layer draws.
+  ///
+  /// Pass `double.negativeInfinity` for no lower bound.
+  void setLayerMinZoom(String layerId, double minZoom) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.raw.mln_map_set_layer_min_zoom(
+          _handle.raw,
+          nativeLayerId.value,
+          minZoom,
+        ),
+      );
+    });
+  }
+
+  /// Reads the lowest zoom at which one layer draws.
+  ///
+  /// A layer with no lower bound reports `double.negativeInfinity`.
+  double getLayerMinZoom(String layerId) {
+    return withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final outZoom = arena<Double>();
+      _check(
+        _c.raw.mln_map_get_layer_min_zoom(
+          _handle.raw,
+          nativeLayerId.value,
+          outZoom,
+        ),
+      );
+      return outZoom.value;
+    });
+  }
+
+  /// Sets the highest zoom at which one layer draws.
+  ///
+  /// Pass `double.infinity` for no upper bound.
+  void setLayerMaxZoom(String layerId, double maxZoom) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.raw.mln_map_set_layer_max_zoom(
+          _handle.raw,
+          nativeLayerId.value,
+          maxZoom,
+        ),
+      );
+    });
+  }
+
+  /// Reads the highest zoom at which one layer draws.
+  ///
+  /// A layer with no upper bound reports `double.infinity`.
+  double getLayerMaxZoom(String layerId) {
+    return withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final outZoom = arena<Double>();
+      _check(
+        _c.raw.mln_map_get_layer_max_zoom(
+          _handle.raw,
+          nativeLayerId.value,
+          outZoom,
+        ),
+      );
+      return outZoom.value;
+    });
+  }
+
+  /// Sets whether one layer draws.
+  void setLayerVisibility(String layerId, StyleLayerVisibility visibility) {
+    withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      _check(
+        _c.raw.mln_map_set_layer_visibility(
+          _handle.raw,
+          nativeLayerId.value,
+          visibility.rawValue,
+        ),
+      );
+    });
+  }
+
+  /// Reads whether one layer draws.
+  StyleLayerVisibility getLayerVisibility(String layerId) {
+    return withNativeArena((arena) {
+      final nativeLayerId = nativeStringView(layerId, arena);
+      final outVisibility = arena<Uint32>();
+      _check(
+        _c.raw.mln_map_get_layer_visibility(
+          _handle.raw,
+          nativeLayerId.value,
+          outVisibility,
+        ),
+      );
+      return StyleLayerVisibility.fromRawValue(outVisibility.value);
     });
   }
 

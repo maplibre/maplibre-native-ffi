@@ -143,8 +143,6 @@ struct RuntimeObject {
   bool has_cache_path = false;
   std::string cache_path;
   std::shared_ptr<mbgl::DatabaseFileSource> database_source;
-  bool has_maximum_cache_size = false;
-  std::uint64_t maximum_cache_size = 0;
   std::shared_ptr<mln::core::ResourceProviderState> resource_provider_state;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
   std::shared_ptr<mln::core::OfflineOperationEventState>
@@ -203,6 +201,10 @@ auto invoke_resource_transform(
 ) noexcept -> mln_status;
 auto run_ambient_cache_operation_start(
   mln_runtime runtime, uint32_t operation,
+  mln_offline_operation_id* out_operation_id
+) -> mln_status;
+auto set_maximum_ambient_cache_size_start(
+  mln_runtime runtime, std::uint64_t size,
   mln_offline_operation_id* out_operation_id
 ) -> mln_status;
 auto offline_operation_discard(
@@ -313,13 +315,6 @@ auto resource_options_for_runtime(mln_runtime runtime) -> mbgl::ResourceOptions;
 auto acquire_resource_provider_for_platform_context(
   void* platform_context
 ) noexcept -> std::optional<ResourceProviderLease>;
-
-// Copies the maximum ambient cache size configured on the runtime named by a
-// MapLibre platform context, under the same registry lock. Returns nullopt when
-// the platform context names no live runtime or the runtime carries no maximum.
-auto find_maximum_cache_size_for_platform_context(
-  void* platform_context
-) noexcept -> std::optional<std::uint64_t>;
 
 // Reports whether a resource transform is registered. MapLibre-owned threads
 // observe a value instead of a runtime pointer teardown may retire, and the

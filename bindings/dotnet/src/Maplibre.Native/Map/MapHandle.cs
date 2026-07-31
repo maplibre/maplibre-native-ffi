@@ -1019,13 +1019,14 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
         using var nativeImage = NativeStyleImage.From(image);
         var imageValue = nativeImage.Value;
-        var nativeOptions = options is null ? default : StyleStructs.ToNative(options);
+        using var nativeOptions = options is null ? null : NativeStyleImageOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(
             NativeMethods.mln_map_set_style_image(
                 Handle,
                 nativeImageId.Value,
                 &imageValue,
-                options is null ? null : &nativeOptions
+                nativeOptions is null ? null : &optionsValue
             )
         );
     }
@@ -1063,6 +1064,63 @@ public sealed unsafe class MapHandle : IDisposable
         );
         return found ? StyleStructs.FromNative(info) : null;
     }
+
+    /// <summary>Copies a style image's stretchable intervals when it exists.</summary>
+    /// <remarks>Probes the required counts, then copies.</remarks>
+    public (
+        IReadOnlyList<ImageStretch> StretchX,
+        IReadOnlyList<ImageStretch> StretchY
+    )? StyleImageStretches(string imageId)
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        nuint xCount = 0;
+        nuint yCount = 0;
+        bool found = false;
+        NativeStatus.Check(
+            NativeMethods.mln_map_copy_style_image_stretches(
+                Handle,
+                nativeImageId.Value,
+                null,
+                0,
+                &xCount,
+                null,
+                0,
+                &yCount,
+                &found
+            )
+        );
+        if (!found)
+        {
+            return null;
+        }
+
+        var rawX = new mln_image_stretch[checked((int)xCount)];
+        var rawY = new mln_image_stretch[checked((int)yCount)];
+        fixed (mln_image_stretch* pointerX = rawX)
+        fixed (mln_image_stretch* pointerY = rawY)
+        {
+            NativeStatus.Check(
+                NativeMethods.mln_map_copy_style_image_stretches(
+                    Handle,
+                    nativeImageId.Value,
+                    rawX.Length == 0 ? null : pointerX,
+                    (nuint)rawX.Length,
+                    &xCount,
+                    rawY.Length == 0 ? null : pointerY,
+                    (nuint)rawY.Length,
+                    &yCount,
+                    &found
+                )
+            );
+        }
+        return (ToStretches(rawX), ToStretches(rawY));
+    }
+
+    private static IReadOnlyList<ImageStretch> ToStretches(mln_image_stretch[] raw) =>
+        Array.ConvertAll(raw, stretch => new ImageStretch(stretch.from, stretch.to));
+
+    private static IReadOnlyList<ImageStretch>? NullIfEmpty(IReadOnlyList<ImageStretch>? values) =>
+        values is null || values.Count == 0 ? null : values;
 
     /// <summary>Copies a style image as premultiplied RGBA8 pixels when it exists.</summary>
     public StyleImage? CopyStyleImagePremultipliedRgba8(string imageId)
@@ -1108,12 +1166,24 @@ public sealed unsafe class MapHandle : IDisposable
             Array.Resize(ref bytes, checked((int)byteLength));
         }
 
+        // Native storage keeps no empty-versus-absent distinction for stretches, so an image
+        // without intervals reports them as absent.
+        var stretches = StyleImageStretches(imageId);
         return new StyleImage(
             new PremultipliedRgba8Image(
                 bytes,
                 new TextureImageInfo(info.Width, info.Height, info.Stride, (ulong)byteLength)
             ),
-            new StyleImageOptions { PixelRatio = info.PixelRatio, Sdf = info.Sdf }
+            new StyleImageOptions
+            {
+                PixelRatio = info.PixelRatio,
+                Sdf = info.Sdf,
+                StretchX = NullIfEmpty(stretches?.StretchX),
+                StretchY = NullIfEmpty(stretches?.StretchY),
+                Content = info.Content,
+                TextFitWidth = info.TextFitWidth,
+                TextFitHeight = info.TextFitHeight,
+            }
         );
     }
 
@@ -1529,6 +1599,170 @@ public sealed unsafe class MapHandle : IDisposable
         );
         var value = ValueStructs.ReadJsonSnapshot(snapshot);
         return value is JsonValue.Null ? null : value;
+    }
+
+    /// <summary>Sets one layer's source-layer ID.</summary>
+    /// <remarks>
+    /// Layer types that take no source, such as background, are rejected.
+    /// </remarks>
+    public void SetLayerSourceLayer(string layerId, string sourceLayer)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeSourceLayer = NativeStringView.From(sourceLayer, nameof(sourceLayer));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_layer_source_layer(
+                Handle,
+                nativeLayerId.Value,
+                nativeSourceLayer.Value
+            )
+        );
+    }
+
+    /// <summary>Gets one layer's source-layer ID, empty when it carries none.</summary>
+    public string GetLayerSourceLayer(string layerId) => CopyLayerText(layerId, sourceLayer: true);
+
+    /// <summary>Sets one layer's source ID.</summary>
+    /// <remarks>
+    /// Layer types that take no source, such as background, are rejected. The named source need
+    /// not exist yet.
+    /// </remarks>
+    public void SetLayerSourceId(string layerId, string sourceId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_layer_source_id(
+                Handle,
+                nativeLayerId.Value,
+                nativeSourceId.Value
+            )
+        );
+    }
+
+    /// <summary>Gets one layer's source ID, empty when it carries none.</summary>
+    public string GetLayerSourceId(string layerId) => CopyLayerText(layerId, sourceLayer: false);
+
+    /// <summary>
+    /// Probes the required length, then copies. A null buffer with zero capacity is a size probe
+    /// the C API answers with OK.
+    /// </summary>
+    private string CopyLayerText(string layerId, bool sourceLayer)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        nuint required = 0;
+        NativeStatus.Check(
+            sourceLayer
+                ? NativeMethods.mln_map_copy_layer_source_layer(
+                    Handle,
+                    nativeLayerId.Value,
+                    null,
+                    0,
+                    &required
+                )
+                : NativeMethods.mln_map_copy_layer_source_id(
+                    Handle,
+                    nativeLayerId.Value,
+                    null,
+                    0,
+                    &required
+                )
+        );
+        if (required == 0)
+        {
+            return string.Empty;
+        }
+
+        var buffer = new byte[checked((int)required)];
+        nuint copied = 0;
+        fixed (byte* bufferPointer = buffer)
+        {
+            NativeStatus.Check(
+                sourceLayer
+                    ? NativeMethods.mln_map_copy_layer_source_layer(
+                        Handle,
+                        nativeLayerId.Value,
+                        (sbyte*)bufferPointer,
+                        required,
+                        &copied
+                    )
+                    : NativeMethods.mln_map_copy_layer_source_id(
+                        Handle,
+                        nativeLayerId.Value,
+                        (sbyte*)bufferPointer,
+                        required,
+                        &copied
+                    )
+            );
+            return RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, copied) ?? string.Empty;
+        }
+    }
+
+    /// <summary>Sets the lowest zoom at which one layer draws.</summary>
+    /// <remarks>Pass <c>double.NegativeInfinity</c> for no lower bound.</remarks>
+    public void SetLayerMinZoom(string layerId, double minZoom)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_layer_min_zoom(Handle, nativeLayerId.Value, minZoom)
+        );
+    }
+
+    /// <summary>Gets the lowest zoom at which one layer draws.</summary>
+    /// <remarks>A layer with no lower bound reports <c>double.NegativeInfinity</c>.</remarks>
+    public double GetLayerMinZoom(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        double minZoom = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_get_layer_min_zoom(Handle, nativeLayerId.Value, &minZoom)
+        );
+        return minZoom;
+    }
+
+    /// <summary>Sets the highest zoom at which one layer draws.</summary>
+    /// <remarks>Pass <c>double.PositiveInfinity</c> for no upper bound.</remarks>
+    public void SetLayerMaxZoom(string layerId, double maxZoom)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_layer_max_zoom(Handle, nativeLayerId.Value, maxZoom)
+        );
+    }
+
+    /// <summary>Gets the highest zoom at which one layer draws.</summary>
+    /// <remarks>A layer with no upper bound reports <c>double.PositiveInfinity</c>.</remarks>
+    public double GetLayerMaxZoom(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        double maxZoom = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_get_layer_max_zoom(Handle, nativeLayerId.Value, &maxZoom)
+        );
+        return maxZoom;
+    }
+
+    /// <summary>Sets whether one layer draws.</summary>
+    public void SetLayerVisibility(string layerId, StyleLayerVisibility visibility)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(
+            NativeMethods.mln_map_set_layer_visibility(
+                Handle,
+                nativeLayerId.Value,
+                (uint)visibility
+            )
+        );
+    }
+
+    /// <summary>Gets whether one layer draws.</summary>
+    public StyleLayerVisibility GetLayerVisibility(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        uint visibility = 0;
+        NativeStatus.Check(
+            NativeMethods.mln_map_get_layer_visibility(Handle, nativeLayerId.Value, &visibility)
+        );
+        return (StyleLayerVisibility)visibility;
     }
 
     /// <summary>Destroys the map on its owner thread.</summary>

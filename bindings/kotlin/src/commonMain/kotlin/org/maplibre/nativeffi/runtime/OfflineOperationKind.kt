@@ -23,6 +23,7 @@ public value class OfflineOperationKind(public val nativeValue: Int) {
     public val REGION_SET_DOWNLOAD_STATE: OfflineOperationKind = OfflineOperationKind(9)
     public val REGION_INVALIDATE: OfflineOperationKind = OfflineOperationKind(10)
     public val REGION_DELETE: OfflineOperationKind = OfflineOperationKind(11)
+    public val SET_MAXIMUM_AMBIENT_CACHE_SIZE: OfflineOperationKind = OfflineOperationKind(12)
 
     internal fun fromNative(nativeValue: UInt): OfflineOperationKind =
       fromNative(nativeValue.toInt())

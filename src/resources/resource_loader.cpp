@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <exception>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -24,9 +23,6 @@
 #include <mbgl/storage/response.hpp>
 #include <mbgl/util/async_request.hpp>
 #include <mbgl/util/client_options.hpp>
-#include <mbgl/util/event.hpp>
-#include <mbgl/util/logging.hpp>
-#include <mbgl/util/string.hpp>
 #include <mbgl/util/tile_server_options.hpp>
 
 #include "diagnostics/diagnostics.hpp"
@@ -453,23 +449,6 @@ auto make_database_file_source(
     auto source = std::make_unique<mbgl::DatabaseFileSource>(
       resource_options, client_options
     );
-    const auto maximum_cache_size =
-      find_maximum_cache_size_for_platform_context(
-        resource_options.platformContext()
-      );
-    if (maximum_cache_size.has_value()) {
-      source->setMaximumAmbientCacheSize(
-        *maximum_cache_size, [](std::exception_ptr exception) -> void {
-          if (exception != nullptr) {
-            mbgl::Log::Error(
-              mbgl::Event::Database,
-              "Failed to apply maximum ambient cache size: " +
-                mbgl::util::toString(exception)
-            );
-          }
-        }
-      );
-    }
     return source;
   } catch (const std::exception& exception) {
     set_thread_error(exception);

@@ -182,6 +182,32 @@ pub const StyleRasterDemEncoding = enum {
     terrarium,
 };
 
+/// Whether a style layer draws.
+///
+/// This is an open domain: MapLibre Native may report a value with no named field here, so a
+/// `switch` over this type needs an `else` branch.
+pub const StyleLayerVisibility = union(enum) {
+    visible,
+    none,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) StyleLayerVisibility {
+        return switch (raw) {
+            c.MLN_STYLE_LAYER_VISIBILITY_VISIBLE => .visible,
+            c.MLN_STYLE_LAYER_VISIBILITY_NONE => .none,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: StyleLayerVisibility) u32 {
+        return switch (self) {
+            .visible => c.MLN_STYLE_LAYER_VISIBILITY_VISIBLE,
+            .none => c.MLN_STYLE_LAYER_VISIBILITY_NONE,
+            .unknown => |raw| raw,
+        };
+    }
+};
+
 pub const StyleTileSourceOptions = struct {
     min_zoom: ?f64 = null,
     max_zoom: ?f64 = null,
@@ -209,6 +235,9 @@ pub const StyleGeoJsonSourceOptions = struct {
     cluster_min_points: ?u32 = null,
     line_metrics: ?bool = null,
     cluster: ?bool = null,
+    /// Applies data updates synchronously, so data set through setGeoJsonSourceData reaches the
+    /// next rendered frame instead of being tiled on a worker and shown in a later one.
+    synchronous_update: ?bool = null,
 
     /// Copies this descriptor and recursively owns all nested cluster-property storage.
     pub fn copy(self: StyleGeoJsonSourceOptions, allocator: std.mem.Allocator) std.mem.Allocator.Error!OwnedStyleGeoJsonSourceOptions {
@@ -235,9 +264,60 @@ pub const PremultipliedRgba8Image = struct {
     pixels: []const u8,
 };
 
+/// One stretchable interval along an image axis, in image pixels.
+pub const ImageStretch = struct {
+    from: f32,
+    to: f32,
+};
+
+/// Content-box insets in image pixels, measured from the image's top-left.
+pub const ImageContent = struct {
+    left: f32,
+    top: f32,
+    right: f32,
+    bottom: f32,
+};
+
+/// How a stretchable image fits text along one axis.
+///
+/// This is an open domain: MapLibre Native may report a value with no named field here, so a
+/// `switch` over this type needs an `else` branch.
+pub const StyleImageTextFit = union(enum) {
+    stretch_or_shrink,
+    stretch_only,
+    proportional,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) StyleImageTextFit {
+        return switch (raw) {
+            c.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK => .stretch_or_shrink,
+            c.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY => .stretch_only,
+            c.MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL => .proportional,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: StyleImageTextFit) u32 {
+        return switch (self) {
+            .stretch_or_shrink => c.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_OR_SHRINK,
+            .stretch_only => c.MLN_STYLE_IMAGE_TEXT_FIT_STRETCH_ONLY,
+            .proportional => c.MLN_STYLE_IMAGE_TEXT_FIT_PROPORTIONAL,
+            .unknown => |raw| raw,
+        };
+    }
+};
+
 pub const StyleImageOptions = struct {
     pixel_ratio: ?f32 = null,
     sdf: ?bool = null,
+    /// Stretchable intervals along each axis. A present empty slice stays distinguishable from
+    /// an absent one. Borrowed for the call.
+    stretch_x: ?[]const ImageStretch = null,
+    stretch_y: ?[]const ImageStretch = null,
+    /// Content box used when icon-text-fit applies.
+    content: ?ImageContent = null,
+    text_fit_width: ?StyleImageTextFit = null,
+    text_fit_height: ?StyleImageTextFit = null,
 };
 
 pub const StyleImageInfo = struct {
@@ -247,6 +327,28 @@ pub const StyleImageInfo = struct {
     byte_length: usize,
     pixel_ratio: f32,
     sdf: bool,
+    /// Interval counts for the stretchable axes. Read the intervals themselves with
+    /// copyStyleImageStretches.
+    stretch_x_count: usize = 0,
+    stretch_y_count: usize = 0,
+    /// Content box, absent when the image carries none.
+    content: ?ImageContent = null,
+    text_fit_width: ?StyleImageTextFit = null,
+    text_fit_height: ?StyleImageTextFit = null,
+};
+
+/// Owned stretchable intervals copied out of a runtime style image.
+pub const OwnedImageStretches = struct {
+    allocator: std.mem.Allocator,
+    stretch_x: []ImageStretch,
+    stretch_y: []ImageStretch,
+
+    pub fn deinit(self: *OwnedImageStretches) void {
+        self.allocator.free(self.stretch_x);
+        self.allocator.free(self.stretch_y);
+        self.stretch_x = &.{};
+        self.stretch_y = &.{};
+    }
 };
 
 pub const OwnedStyleImage = struct {
@@ -1072,7 +1174,13 @@ pub fn premultipliedRgba8ImageToNative(value: PremultipliedRgba8Image) c.mln_pre
     return raw;
 }
 
-pub fn styleImageOptionsToNative(value: StyleImageOptions) c.mln_style_image_options {
+/// Materializes native image options. The stretch slices are borrowed, so `value` and the
+/// scratch buffers it points at must outlive the native call.
+pub fn styleImageOptionsToNative(
+    value: StyleImageOptions,
+    stretch_x: []c.mln_image_stretch,
+    stretch_y: []c.mln_image_stretch,
+) c.mln_style_image_options {
     var raw = c.mln_style_image_options_default();
     if (value.pixel_ratio) |pixel_ratio| {
         raw.fields |= c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
@@ -1081,6 +1189,39 @@ pub fn styleImageOptionsToNative(value: StyleImageOptions) c.mln_style_image_opt
     if (value.sdf) |sdf| {
         raw.fields |= c.MLN_STYLE_IMAGE_OPTION_SDF;
         raw.sdf = sdf;
+    }
+    if (value.stretch_x) |stretches| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_STRETCH_X;
+        for (stretches, 0..) |stretch, index| {
+            stretch_x[index] = .{ .from = stretch.from, .to = stretch.to };
+        }
+        raw.stretch_x = if (stretches.len == 0) null else stretch_x.ptr;
+        raw.stretch_x_count = stretches.len;
+    }
+    if (value.stretch_y) |stretches| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_STRETCH_Y;
+        for (stretches, 0..) |stretch, index| {
+            stretch_y[index] = .{ .from = stretch.from, .to = stretch.to };
+        }
+        raw.stretch_y = if (stretches.len == 0) null else stretch_y.ptr;
+        raw.stretch_y_count = stretches.len;
+    }
+    if (value.content) |content| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_CONTENT;
+        raw.content = .{
+            .left = content.left,
+            .top = content.top,
+            .right = content.right,
+            .bottom = content.bottom,
+        };
+    }
+    if (value.text_fit_width) |fit| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_WIDTH;
+        raw.text_fit_width = fit.toRaw();
+    }
+    if (value.text_fit_height) |fit| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_TEXT_FIT_HEIGHT;
+        raw.text_fit_height = fit.toRaw();
     }
     return raw;
 }
@@ -1093,6 +1234,22 @@ pub fn styleImageInfoFromNative(raw: c.mln_style_image_info) StyleImageInfo {
         .byte_length = raw.byte_length,
         .pixel_ratio = raw.pixel_ratio,
         .sdf = raw.sdf,
+        .stretch_x_count = raw.stretch_x_count,
+        .stretch_y_count = raw.stretch_y_count,
+        .content = if (raw.has_content) .{
+            .left = raw.content.left,
+            .top = raw.content.top,
+            .right = raw.content.right,
+            .bottom = raw.content.bottom,
+        } else null,
+        .text_fit_width = if (raw.has_text_fit_width)
+            StyleImageTextFit.fromRaw(raw.text_fit_width)
+        else
+            null,
+        .text_fit_height = if (raw.has_text_fit_height)
+            StyleImageTextFit.fromRaw(raw.text_fit_height)
+        else
+            null,
     };
 }
 

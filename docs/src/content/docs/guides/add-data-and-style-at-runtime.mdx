@@ -41,8 +41,13 @@ data arrives as geometry and feature descriptors.
 
 Both adders take `mln_geojson_source_options`, or null for the defaults. Those
 options cover tiling zoom range, simplification tolerance, tile size and buffer,
-and clustering, and they are fixed for the life of the source, so the setters
-keep whatever the source was added with.
+clustering, and whether data updates apply synchronously, and they are fixed for
+the life of the source, so the setters keep whatever the source was added with.
+
+Set `synchronous_update` when a data swap needs to reach the next rendered
+frame. MapLibre Native otherwise tiles updated data on a worker and shows it in
+a later frame; the synchronous path runs that work inline on the thread driving
+the update instead.
 
 Vector, raster, and raster-DEM sources use `add_*_source_url` for TileJSON or
 `add_*_source_tiles` for explicit tile URL templates, with tile options for zoom
@@ -85,6 +90,17 @@ taking a style-spec value. Expressions are arrays, such as
 filter, and passing an absent value clears it. Getters return the current value,
 or report absent for a property nobody set.
 
+The properties every layer shares get typed entry points instead:
+`set_layer_source_layer`, `set_layer_source_id`, `set_layer_min_zoom`,
+`set_layer_max_zoom`, and `set_layer_visibility`, each with a matching getter.
+Prefer these over `set_layer_property` for those five. They read back, which
+`get_layer_property` cannot do for them, and the two source setters reject a
+layer type that takes no source rather than accepting the call and doing nothing.
+
+An unset zoom bound reads back as an infinity, and the copy-out getters for
+source-layer and source id answer a null buffer with zero capacity as a size
+probe, so you can size a buffer before copying.
+
 ## Images
 
 `set_style_image` registers a bitmap that the style can reference from
@@ -92,6 +108,18 @@ or report absent for a property nobody set.
 image. Pixels are premultiplied RGBA8 with an explicit stride. Options carry
 `pixel_ratio`, which you match to the map's scale factor for crisp icons, and
 `sdf` for signed-distance-field icons that `icon-color` tints.
+
+For a nine-patch sprite, set `stretch_x` and `stretch_y` to the intervals that
+may scale, in image pixels. Pixels outside those intervals keep their size, so a
+rounded button border stays crisp while its middle stretches. The intervals along
+one axis run in increasing order without overlapping, and `set_style_image`
+rejects any that break that shape. `content` sets the
+box a symbol's label sits inside, and `text_fit_width` and `text_fit_height`
+choose how the image resizes around that label for `icon-text-fit`.
+
+Read those back with `get_style_image_info`, which reports the interval counts,
+the content box, and the text fit, and with `copy_style_image_stretches` for the
+intervals themselves. Passing null arrays with zero capacity probes the counts.
 
 When a style references an image nobody supplied, the runtime emits
 `MAP_STYLE_IMAGE_MISSING` with the ID. Handle that event by adding the image,

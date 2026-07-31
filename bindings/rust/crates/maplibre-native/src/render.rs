@@ -1352,16 +1352,10 @@ impl RenderSessionHandle {
         let mut info = unsafe { sys::mln_texture_image_info_default() };
         // SAFETY: session is live. Passing a null buffer with zero capacity is
         // the documented metadata probe path; out_info points to initialized storage.
-        let status = unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, std::ptr::null_mut(), 0, &mut info)
-        };
-        if status == sys::MLN_STATUS_OK
-            || (status == sys::MLN_STATUS_INVALID_ARGUMENT && info.byte_length > 0)
-        {
-            Ok(maplibre_core::values::texture_image_info_from_native(&info))
-        } else {
-            Err(crate::Error::from_status(status))
-        }
+        })?;
+        Ok(maplibre_core::values::texture_image_info_from_native(&info))
     }
 
     /// Reads the most recently rendered texture frame as premultiplied RGBA8.
@@ -1381,6 +1375,15 @@ impl RenderSessionHandle {
         maplibre_core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
         })?;
+        // An empty destination reaches native code as the null pointer and zero
+        // capacity that mean a size probe, which succeeds without copying. Report
+        // the buffer as too small unless the frame really carries no bytes.
+        if data.is_empty() && info.byte_length > 0 {
+            return Err(crate::Error::invalid_argument(format!(
+                "buffer length 0 is smaller than the required {} bytes",
+                info.byte_length
+            )));
+        }
         Ok(maplibre_core::values::texture_image_info_from_native(&info))
     }
 

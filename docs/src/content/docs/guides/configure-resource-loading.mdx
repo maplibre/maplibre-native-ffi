@@ -17,8 +17,9 @@ cache.
 Runtime options set these at creation, covered in
 [Create and Run a Map](/maplibre-native-ffi/guides/create-and-run-a-map/).
 `cache_path` points at the ambient cache database and `asset_path` at the root
-that `asset://` URLs resolve against. `maximum_cache_size` caps the cache in
-bytes when `flags` includes `MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE`.
+that `asset://` URLs resolve against. To cap the ambient cache in bytes, call
+`set_maximum_ambient_cache_size_start`, covered in
+[Download offline regions](/maplibre-native-ffi/guides/download-offline-regions/).
 
 ## Rewriting URLs
 

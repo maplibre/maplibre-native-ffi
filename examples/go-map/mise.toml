@@ -1,0 +1,54 @@
+[tools]
+"core:go" = "{{vars.go_version}}"
+"aqua:mvdan/gofumpt" = "{{vars.gofumpt_version}}"
+"conda:sdl3" = { version = "3.2", os = ["linux"] }
+
+[tasks.build]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where conda:sdl3@3.2)"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export CGO_LDFLAGS="-Wl,-rpath,$native_install_dir/lib -Wl,-rpath,$sdl_prefix/lib ${CGO_LDFLAGS:-}"
+go build -o "$MISE_MONOREPO_ROOT/build/$usage_preset/go-map" .
+'''
+
+[tasks.check]
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = ":build", args = ["{{usage.preset}}"] }]
+run = '''
+unformatted="$(gofumpt -l .)"
+if [[ -n "$unformatted" ]]; then
+  printf '%s\n' "$unformatted" >&2
+  exit 1
+fi
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+sdl_prefix="$(mise where conda:sdl3@3.2)"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+go vet ./...
+'''
+
+[tasks.run]
+depends = [{ task = ":build", args = ["linux-{{ arch() }}-egl"] }]
+usage = '''
+arg "<render-target>" {
+  choices "owned-texture" "borrowed-texture" "native-surface"
+}
+'''
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/linux-{{ arch() }}-egl/install"
+sdl_prefix="$(mise where conda:sdl3@3.2)"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig:$sdl_prefix/lib/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+export LD_LIBRARY_PATH="$native_install_dir/lib:$sdl_prefix/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+go run . "{{ usage.render_target }}"
+'''
+
+[tasks."run:owned-texture"]
+run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
+
+[tasks."run:native-surface"]
+run = [{ task = "run", args = ["native-surface"] }]

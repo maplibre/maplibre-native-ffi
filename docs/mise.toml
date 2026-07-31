@@ -29,11 +29,65 @@ mkdir -p ../../docs/public/reference
 zig build docs -Dinclude-dir=../../include --prefix ../../docs/public/reference/zig
 '''
 
+[tasks."api:kotlin"]
+depends = ["//bindings/kotlin:api"]
+run = '''
+rm -rf public/reference/kotlin
+mkdir -p public/reference
+cp -a ../bindings/kotlin/build/dokka/html/. public/reference/kotlin/
+'''
+
+[tasks."api:dart"]
+depends = ["//bindings/dart:api"]
+run = '''
+rm -rf public/reference/dart
+mkdir -p public/reference
+cp -a ../bindings/dart/.dart_tool/api-docs/. public/reference/dart/
+'''
+
+[tasks."api:python"]
+depends = ["//bindings/python:api"]
+run = '''
+rm -rf public/reference/python
+mkdir -p public/reference
+cp -a ../bindings/python/build/pdoc/. public/reference/python/
+'''
+
+[tasks."api:dotnet"]
+depends = ["//bindings/dotnet:api"]
+run = '''
+rm -rf public/reference/dotnet
+mkdir -p public/reference
+cp -a ../bindings/dotnet/build/docfx/. public/reference/dotnet/
+'''
+
+[tasks."api:go"]
+depends = ["//bindings/go:api"]
+run = '''
+rm -rf public/reference/go
+mkdir -p public/reference
+cp -a ../bindings/go/build/doc2go/. public/reference/go/
+'''
+
+[tasks."api:swift"]
+depends = ["//bindings/swift:api"]
+run = '''
+rm -rf public/reference/swift
+mkdir -p public/reference
+cp -a ../bindings/swift/build/docc/. public/reference/swift/
+'''
+
 [tasks.api]
 run = [
   { task = "api:c" },
   { task = "api:rust" },
   { task = "api:zig" },
+  { task = "api:kotlin" },
+  { task = "api:dart" },
+  { task = "api:python" },
+  { task = "api:dotnet" },
+  { task = "api:go" },
+  { task = "api:swift" },
 ]
 
 [tasks.install]

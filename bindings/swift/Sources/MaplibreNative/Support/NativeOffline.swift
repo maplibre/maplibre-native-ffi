@@ -15,6 +15,19 @@ enum NativeOffline {
     }.value
   }
 
+  static func setMaximumAmbientCacheSizeStart(
+    _ runtime: NativeRuntimeHandle,
+    size: UInt64
+  ) throws -> UInt64 {
+    try NativeMemory.withTemporary(UInt64(0)) { operationId in
+      try checkStatus(mln_runtime_set_maximum_ambient_cache_size_start(
+        runtime.raw,
+        size,
+        operationId
+      ))
+    }.value
+  }
+
   static func regionCreateStart(
     _ runtime: NativeRuntimeHandle,
     definition: UnsafePointer<mln_offline_region_definition>,

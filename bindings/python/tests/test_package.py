@@ -298,13 +298,11 @@ def test_runtime_abi_mismatch_reports_public_error_before_handle_storage(
     def create_mismatched_runtime(
         asset_path: str | None,
         cache_path: str | None,
-        maximum_cache_size: int | None,
     ) -> object:
         return _native.create_runtime_with_abi_version_for_test(
             actual_abi_version,
             asset_path,
             cache_path,
-            maximum_cache_size,
         )
 
     monkeypatch.setattr(_native, "create_runtime", create_mismatched_runtime)
@@ -1331,6 +1329,92 @@ def test_builtin_style_layers_and_location_indicator_public_api() -> None:
             assert map_handle.remove_style_layer("hillshade") is True
             assert map_handle.remove_style_layer("relief") is True
             assert map_handle.remove_style_layer("location") is True
+
+
+def test_nine_patch_style_image_round_trips_public_api() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json(_EMPTY_STYLE_JSON)
+            image = render.PremultipliedRgba8Image(
+                render.TextureImageInfo(width=2, height=2, stride=8, byte_length=16),
+                bytes(16),
+            )
+            options = style.StyleImageOptions(
+                stretch_x=(style.ImageStretch(0.0, 1.0),),
+                stretch_y=(style.ImageStretch(0.0, 1.0), style.ImageStretch(1.0, 2.0)),
+                content=style.ImageContent(0.5, 0.5, 1.5, 1.5),
+                text_fit_height=style.StyleImageTextFit.PROPORTIONAL,
+            )
+            map_handle.set_style_image("patch", image, options)
+
+            info = map_handle.get_style_image_info("patch")
+            assert info is not None
+            assert info.stretch_x_count == 1
+            assert info.stretch_y_count == 2
+            assert info.content == style.ImageContent(0.5, 0.5, 1.5, 1.5)
+            # An absent text fit stays distinguishable from a present default.
+            assert info.text_fit_width is None
+            assert info.text_fit_height is style.StyleImageTextFit.PROPORTIONAL
+
+            stretches = map_handle.get_style_image_stretches("patch")
+            assert stretches is not None
+            stretch_x, stretch_y = stretches
+            assert stretch_x == (style.ImageStretch(0.0, 1.0),)
+            assert stretch_y == (
+                style.ImageStretch(0.0, 1.0),
+                style.ImageStretch(1.0, 2.0),
+            )
+            assert map_handle.get_style_image_stretches("missing") is None
+
+            # A backwards interval is rejected by C.
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.set_style_image(
+                    "bad",
+                    image,
+                    style.StyleImageOptions(stretch_x=(style.ImageStretch(2.0, 1.0),)),
+                )
+
+
+def test_layer_base_accessors_round_trip_public_api() -> None:
+    with mln.RuntimeHandle() as runtime:
+        with runtime.create_map() as map_handle:
+            map_handle.set_style_json(
+                '{"version":8,"sources":{"geo":{"type":"geojson","data":'
+                '{"type":"FeatureCollection","features":[]}}},"layers":['
+                '{"id":"bg","type":"background"},'
+                '{"id":"fill","type":"fill","source":"geo"}]}'
+            )
+
+            assert map_handle.get_layer_source_layer("fill") == ""
+            map_handle.set_layer_source_layer("fill", "roads")
+            assert map_handle.get_layer_source_layer("fill") == "roads"
+            assert map_handle.get_layer_source_id("fill") == "geo"
+
+            # A layer type that takes no source is rejected, not silently ignored.
+            with pytest.raises(mln.InvalidArgumentError, match="source-layer"):
+                map_handle.set_layer_source_layer("bg", "roads")
+            assert map_handle.get_layer_source_id("bg") == ""
+
+            # An unset zoom range crosses the boundary as infinities.
+            assert map_handle.get_layer_min_zoom("fill") == -math.inf
+            assert map_handle.get_layer_max_zoom("fill") == math.inf
+            map_handle.set_layer_min_zoom("fill", 4.0)
+            map_handle.set_layer_max_zoom("fill", 12.5)
+            assert map_handle.get_layer_min_zoom("fill") == 4.0
+            assert map_handle.get_layer_max_zoom("fill") == 12.5
+
+            assert (
+                map_handle.get_layer_visibility("fill")
+                is style.StyleLayerVisibility.VISIBLE
+            )
+            map_handle.set_layer_visibility("fill", style.StyleLayerVisibility.NONE)
+            assert (
+                map_handle.get_layer_visibility("fill")
+                is style.StyleLayerVisibility.NONE
+            )
+
+            with pytest.raises(mln.InvalidArgumentError):
+                map_handle.get_layer_min_zoom("missing")
 
 
 def test_style_layer_metadata_move_and_removal_public_api() -> None:
@@ -2469,6 +2553,36 @@ def test_ambient_cache_operation_starts_and_discards_through_public_api(
         operation.close()
         assert operation.closed
         operation.close()
+
+
+def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
+    tmp_path: Path,
+) -> None:
+    with mln.RuntimeHandle(mln.RuntimeOptions(cache_path=str(tmp_path))) as runtime:
+        operation = runtime.set_maximum_ambient_cache_size(8 << 20)
+
+        assert isinstance(operation, offline.OfflineOperationHandle)
+        assert not operation.closed
+
+        event = _wait_for_offline_operation(runtime, operation)
+        completed = event.payload
+        assert isinstance(completed, offline.OfflineOperationCompleted)
+        # The completion reports a named kind rather than an unknown value.
+        assert (
+            completed.operation_kind
+            == offline.OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE
+        )
+        assert not completed.operation_kind.is_unknown
+
+        operation.close()
+        assert operation.closed
+
+        # An out-of-range size stays on the binding's documented error family
+        # instead of leaking the extension module's OverflowError.
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_maximum_ambient_cache_size(-1)
+        with pytest.raises(mln.InvalidArgumentError):
+            runtime.set_maximum_ambient_cache_size(2**64)
 
 
 def test_offline_values_wrap_runtime_event_payload_shape() -> None:

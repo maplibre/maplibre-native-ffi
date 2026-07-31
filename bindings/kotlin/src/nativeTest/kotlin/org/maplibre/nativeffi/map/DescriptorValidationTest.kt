@@ -46,7 +46,6 @@ class DescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
       }
     }
     assertFailsWith<InvalidArgumentException> { TileOptions().prefetchZoomDelta = -1 }
-    assertFailsWith<InvalidArgumentException> { RuntimeOptions().maximumCacheSize = -1L }
     assertFailsWith<InvalidArgumentException> { NativeBuffer.allocate(-1) }
     val nullPointer = NativePointer.NULL
     assertFailsWith<InvalidArgumentException> { RenderTargetExtent(-1, 1, 1.0) }

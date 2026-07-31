@@ -83,5 +83,11 @@ let package = Package(
   name: "maplibre-native-swift",
   platforms: [.macOS("14.3"), .iOS("14.3")],
   products: products,
+  dependencies: [
+    .package(
+      url: "https://github.com/swiftlang/swift-docc-plugin",
+      from: "1.4.3"
+    ),
+  ],
   targets: targets
 )

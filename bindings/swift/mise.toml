@@ -1,6 +1,24 @@
 [tools]
 "core:swift" = { version = "{{vars.swift_version}}", os = ["linux/x64"] }
 
+[tasks.api]
+description = "Generate DocC HTML API reference for the Swift binding."
+usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
+depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]
+run = '''
+native_install_dir="$MISE_MONOREPO_ROOT/build/$usage_preset/install"
+export PKG_CONFIG_PATH="$native_install_dir/share/pkgconfig${PKG_CONFIG_PATH:+:${PKG_CONFIG_PATH}}"
+rm -rf build/docc
+mkdir -p build
+swift package --scratch-path ".build/$usage_preset" \
+  --allow-writing-to-directory build/docc \
+  generate-documentation \
+  --target MaplibreNative \
+  --output-path build/docc \
+  --transform-for-static-hosting \
+  --hosting-base-path maplibre-native-ffi/reference/swift
+'''
+
 [tasks.build]
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
 depends = [{ task = "//:build", args = ["{{usage.preset}}"] }]

@@ -13,6 +13,119 @@ use crate::{
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
 
+#[test]
+// Spec coverage: BND-105.
+fn nine_patch_style_image_round_trips_stretch_content_and_text_fit() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+    let image =
+        PremultipliedRgba8Image::new(crate::TextureImageInfo::new(2, 2, 8, 16), vec![0u8; 16]);
+    let mut options = StyleImageOptions::default();
+    options.stretch_x = Some(vec![ImageStretch::new(0.0, 1.0)]);
+    options.stretch_y = Some(vec![
+        ImageStretch::new(0.0, 1.0),
+        ImageStretch::new(1.0, 2.0),
+    ]);
+    options.content = Some(ImageContent {
+        left: 0.5,
+        top: 0.5,
+        right: 1.5,
+        bottom: 1.5,
+    });
+    options.text_fit_height = Some(StyleImageTextFit::Proportional);
+    map.set_style_image("patch", &image, Some(&options))
+        .unwrap();
+
+    let info = map.style_image_info("patch").unwrap().unwrap();
+    assert_eq!(info.stretch_x_count, 1);
+    assert_eq!(info.stretch_y_count, 2);
+    assert_eq!(
+        info.content,
+        Some(ImageContent {
+            left: 0.5,
+            top: 0.5,
+            right: 1.5,
+            bottom: 1.5,
+        })
+    );
+    // An absent text fit stays distinguishable from a present default.
+    assert_eq!(info.text_fit_width, None);
+    assert_eq!(info.text_fit_height, Some(StyleImageTextFit::Proportional));
+
+    let (stretch_x, stretch_y) = map.style_image_stretches("patch").unwrap().unwrap();
+    assert_eq!(stretch_x, vec![ImageStretch::new(0.0, 1.0)]);
+    assert_eq!(
+        stretch_y,
+        vec![ImageStretch::new(0.0, 1.0), ImageStretch::new(1.0, 2.0)]
+    );
+    assert!(map.style_image_stretches("missing").unwrap().is_none());
+
+    // A backwards interval is rejected by C.
+    let mut bad = StyleImageOptions::default();
+    bad.stretch_x = Some(vec![ImageStretch::new(2.0, 1.0)]);
+    let error = map.set_style_image("bad", &image, Some(&bad)).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+// Spec coverage: BND-105.
+fn layer_base_accessors_round_trip_through_real_c_abi() {
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
+
+    // A layer with a source round-trips source-layer and source id.
+    assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "");
+    map.set_layer_source_layer("geo-fill", "roads").unwrap();
+    assert_eq!(map.layer_source_layer("geo-fill").unwrap(), "roads");
+    assert_eq!(map.layer_source_id("geo-fill").unwrap(), "geo");
+
+    // A layer type that takes no source is rejected rather than silently
+    // ignored, and reads back as empty.
+    let error = map
+        .set_layer_source_layer("background", "roads")
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    assert!(error.diagnostic().contains("source-layer"));
+    assert_eq!(map.layer_source_id("background").unwrap(), "");
+
+    // An unset zoom range crosses the boundary as infinities.
+    assert_eq!(map.layer_min_zoom("geo-fill").unwrap(), f64::NEG_INFINITY);
+    assert_eq!(map.layer_max_zoom("geo-fill").unwrap(), f64::INFINITY);
+    map.set_layer_min_zoom("geo-fill", 4.0).unwrap();
+    map.set_layer_max_zoom("geo-fill", 12.5).unwrap();
+    assert_eq!(map.layer_min_zoom("geo-fill").unwrap(), 4.0);
+    assert_eq!(map.layer_max_zoom("geo-fill").unwrap(), 12.5);
+
+    assert_eq!(
+        map.layer_visibility("geo-fill").unwrap(),
+        StyleLayerVisibility::Visible
+    );
+    map.set_layer_visibility("geo-fill", StyleLayerVisibility::None)
+        .unwrap();
+    assert_eq!(
+        map.layer_visibility("geo-fill").unwrap(),
+        StyleLayerVisibility::None
+    );
+
+    // An unknown raw visibility passes through to C, which rejects it.
+    let error = map
+        .set_layer_visibility("geo-fill", StyleLayerVisibility::Unknown(900))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    let error = map.layer_min_zoom("missing").unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
 fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
     let JsonValue::Object(members) = value else {
         return None;

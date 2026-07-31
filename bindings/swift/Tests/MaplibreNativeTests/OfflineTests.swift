@@ -118,6 +118,32 @@ import Testing
   }
 }
 
+@Test func setMaximumAmbientCacheSizeReportsCompletion() throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+
+  let operationId = try runtime.setMaximumAmbientCacheSizeStart(8 << 20)
+  #expect(operationId != 0)
+
+  for _ in 0 ..< 5000 {
+    try runtime.pump()
+    while let event = try runtime.pollEvent() {
+      guard case let .offlineOperationCompleted(completed) = event.payload,
+            completed.operationId == operationId
+      else { continue }
+      // MLN_OFFLINE_OPERATION_SET_MAXIMUM_AMBIENT_CACHE_SIZE; the public API
+      // carries operation kinds as raw C values.
+      #expect(completed.operationKind == 12)
+      #expect(completed.resultStatus == 0)
+      try runtime.discardOfflineOperation(operationId)
+      return
+    }
+    Thread.sleep(forTimeInterval: 0.001)
+  }
+  Issue.record("timed out waiting for the cache size operation to complete")
+}
+
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {
   let runtime =
     try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))

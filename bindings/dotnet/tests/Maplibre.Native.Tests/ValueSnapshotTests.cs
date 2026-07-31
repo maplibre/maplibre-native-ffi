@@ -1,6 +1,7 @@
 using Maplibre.Native.Geo;
 using Maplibre.Native.Json;
 using Maplibre.Native.Query;
+using Maplibre.Native.Style;
 using Xunit;
 
 namespace Maplibre.Native.Tests;
@@ -140,6 +141,23 @@ public sealed class ValueSnapshotTests
 
         Assert.Single(line.Coordinates);
         Assert.Equal(new LatLng(0, 0), line.Coordinates[0]);
+    }
+
+    [BindingSpecTest("BND-069")]
+    [Fact]
+    public void StyleImageOptionsSnapshotAssignedStretchLists()
+    {
+        var stretches = new List<ImageStretch> { new(0, 1) };
+        var options = new StyleImageOptions { StretchX = stretches, StretchY = [] };
+        var expectedHash = options.GetHashCode();
+
+        stretches.Add(new ImageStretch(1, 2));
+
+        Assert.Single(options.StretchX!);
+        Assert.Equal(expectedHash, options.GetHashCode());
+        // A present empty list stays distinguishable from an absent one.
+        Assert.NotNull(options.StretchY);
+        Assert.Empty(options.StretchY);
     }
 
     [BindingSpecTest("BND-069")]

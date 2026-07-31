@@ -48,7 +48,9 @@ from .style import (
     LocationIndicatorImageKind,
     StyleImage,
     StyleImageInfo,
+    ImageStretch,
     StyleImageOptions,
+    StyleLayerVisibility,
     StyleSourceInfo,
     StyleSourceType,
     TileSourceOptions,
@@ -383,9 +385,11 @@ def _geojson_source_parts(
     int | None,
     bool | None,
     bool | None,
+    bool | None,
 ]:
     if options is None:
         return (
+            None,
             None,
             None,
             None,
@@ -410,6 +414,7 @@ def _geojson_source_parts(
         options.cluster_min_points,
         options.line_metrics,
         options.cluster,
+        options.synchronous_update,
     )
 
 
@@ -938,6 +943,67 @@ class MapHandle(NativeHandleMixin):
         """Return one layer filter as a style-spec JSON value."""
         return self._native.get_layer_filter(layer_id)
 
+    def set_layer_source_layer(self, layer_id: str, source_layer: str) -> None:
+        """Set one layer's source-layer ID.
+
+        Layer types that take no source, such as background, are rejected.
+        """
+        self._native.set_layer_source_layer(layer_id, source_layer)
+
+    def get_layer_source_layer(self, layer_id: str) -> str:
+        """Return one layer's source-layer ID, empty when it carries none."""
+        return self._native.copy_layer_source_layer(layer_id)
+
+    def set_layer_source_id(self, layer_id: str, source_id: str) -> None:
+        """Set one layer's source ID.
+
+        Layer types that take no source, such as background, are rejected. The
+        named source need not exist yet.
+        """
+        self._native.set_layer_source_id(layer_id, source_id)
+
+    def get_layer_source_id(self, layer_id: str) -> str:
+        """Return one layer's source ID, empty when it carries none."""
+        return self._native.copy_layer_source_id(layer_id)
+
+    def set_layer_min_zoom(self, layer_id: str, min_zoom: float) -> None:
+        """Set the lowest zoom at which one layer draws.
+
+        Pass ``-math.inf`` for no lower bound.
+        """
+        self._native.set_layer_min_zoom(layer_id, min_zoom)
+
+    def get_layer_min_zoom(self, layer_id: str) -> float:
+        """Return the lowest zoom at which one layer draws.
+
+        A layer with no lower bound reports ``-math.inf``.
+        """
+        return self._native.get_layer_min_zoom(layer_id)
+
+    def set_layer_max_zoom(self, layer_id: str, max_zoom: float) -> None:
+        """Set the highest zoom at which one layer draws.
+
+        Pass ``math.inf`` for no upper bound.
+        """
+        self._native.set_layer_max_zoom(layer_id, max_zoom)
+
+    def get_layer_max_zoom(self, layer_id: str) -> float:
+        """Return the highest zoom at which one layer draws.
+
+        A layer with no upper bound reports ``math.inf``.
+        """
+        return self._native.get_layer_max_zoom(layer_id)
+
+    def set_layer_visibility(
+        self, layer_id: str, visibility: StyleLayerVisibility
+    ) -> None:
+        """Set whether one layer draws."""
+        self._native.set_layer_visibility(layer_id, int(visibility))
+
+    def get_layer_visibility(self, layer_id: str) -> StyleLayerVisibility:
+        """Return whether one layer draws."""
+        return StyleLayerVisibility(self._native.get_layer_visibility(layer_id))
+
     def set_style_image(
         self,
         image_id: str,
@@ -960,6 +1026,37 @@ class MapHandle(NativeHandleMixin):
             image.data,
             options.pixel_ratio,
             options.sdf,
+            None
+            if options.stretch_x is None
+            else [(s.from_, s.to) for s in options.stretch_x],
+            None
+            if options.stretch_y is None
+            else [(s.from_, s.to) for s in options.stretch_y],
+            None
+            if options.content is None
+            else (
+                options.content.left,
+                options.content.top,
+                options.content.right,
+                options.content.bottom,
+            ),
+            None if options.text_fit_width is None else int(options.text_fit_width),
+            None if options.text_fit_height is None else int(options.text_fit_height),
+        )
+
+    def get_style_image_stretches(
+        self, image_id: str
+    ) -> tuple[tuple[ImageStretch, ...], tuple[ImageStretch, ...]] | None:
+        """Return one style image's stretchable intervals, or None when missing."""
+        from .style import ImageStretch
+
+        copied = self._native.copy_style_image_stretches(image_id)
+        if copied is None:
+            return None
+        stretch_x, stretch_y = copied
+        return (
+            tuple(ImageStretch(from_, to) for from_, to in stretch_x),
+            tuple(ImageStretch(from_, to) for from_, to in stretch_y),
         )
 
     def remove_style_image(self, image_id: str) -> bool:
