@@ -2563,6 +2563,17 @@ def test_set_maximum_ambient_cache_size_starts_and_discards_through_public_api(
 
         assert isinstance(operation, offline.OfflineOperationHandle)
         assert not operation.closed
+
+        event = _wait_for_offline_operation(runtime, operation)
+        completed = event.payload
+        assert isinstance(completed, offline.OfflineOperationCompleted)
+        # The completion reports a named kind rather than an unknown value.
+        assert (
+            completed.operation_kind
+            == offline.OfflineOperationKind.SET_MAXIMUM_AMBIENT_CACHE_SIZE
+        )
+        assert not completed.operation_kind.is_unknown
+
         operation.close()
         assert operation.closed
 

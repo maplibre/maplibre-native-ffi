@@ -3,8 +3,9 @@ package org.maplibre.nativeffi.style
 /**
  * Mutable descriptor for runtime style image options.
  *
- * Compares and hashes by field value; [copy] returns an independent instance. Keep an instance
- * unmodified while it is a key in a hash-based collection.
+ * Compares and hashes by field value; [copy] returns an independent instance. Assigning [stretchX]
+ * or [stretchY] snapshots the caller's list, so later caller mutation does not change this
+ * descriptor. Keep an instance unmodified while it is a key in a hash-based collection.
  */
 public class StyleImageOptions {
   public var pixelRatio: Float? = null
@@ -16,9 +17,15 @@ public class StyleImageOptions {
    * one.
    */
   public var stretchX: List<ImageStretch>? = null
+    set(value) {
+      field = value?.toList()
+    }
 
   /** Vertically stretchable intervals. */
   public var stretchY: List<ImageStretch>? = null
+    set(value) {
+      field = value?.toList()
+    }
 
   /** Content box used when `icon-text-fit` applies. */
   public var content: ImageContent? = null
@@ -33,8 +40,8 @@ public class StyleImageOptions {
       .also {
         it.pixelRatio = pixelRatio
         it.sdf = sdf
-        it.stretchX = stretchX?.toList()
-        it.stretchY = stretchY?.toList()
+        it.stretchX = stretchX
+        it.stretchY = stretchY
         it.content = content
         it.textFitWidth = textFitWidth
         it.textFitHeight = textFitHeight
