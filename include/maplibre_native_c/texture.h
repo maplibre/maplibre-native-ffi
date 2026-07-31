@@ -509,8 +509,8 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
  * MLN_STATUS_UNSUPPORTED, with the session still rendering into the texture it
  * has. Destroying the session and attaching again is what changes them.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.
@@ -548,8 +548,8 @@ MLN_API mln_status mln_metal_borrowed_texture_set_target(
  * with the session still rendering into the image it has, and destroying the
  * session and attaching again is what changes them.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.
@@ -585,8 +585,8 @@ MLN_API mln_status mln_vulkan_borrowed_texture_set_target(
  * change. The replacement belongs to that context or one in the same share
  * group, and the host context must be current on the calling thread.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.

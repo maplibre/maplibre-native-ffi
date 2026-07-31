@@ -183,8 +183,8 @@ MLN_API mln_status mln_opengl_surface_attach(
  * value rebuilds the renderer, whose shaders are compiled for a fixed pixel
  * ratio; the surface is replaced either way.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.
@@ -228,8 +228,8 @@ MLN_API mln_status mln_metal_surface_set_target(
  * again is what changes either. Both are read from the replacement before
  * anything is torn down.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.
@@ -273,8 +273,8 @@ MLN_API mln_status mln_vulkan_surface_set_target(
  * A lost OpenGL context is a different matter: nothing in it survives, and the
  * session is destroyed and attached again.
  *
- * Every status but MLN_STATUS_NATIVE_ERROR is reported before the target is
- * touched and leaves the session rendering into the one it already had.
+ * Every failure status but MLN_STATUS_NATIVE_ERROR is reported before the
+ * target is touched and leaves the session rendering into the one it had.
  * MLN_STATUS_NATIVE_ERROR is the only one that can mean a replacement was
  * already under way, which cannot be unwound; it can also come from a check
  * made before anything was touched, and the two do not read differently here.
