@@ -111,16 +111,15 @@ swiftformat = { version = "{{vars.swiftformat_version}}", backend = "github:nick
 MLN_FFI_ANDROID_CMAKE_VERSION = "4.1.2"
 MLN_FFI_ANDROID_NDK_VERSION = "28.2.13676358"
 
-# Public sccache reads via the R2 custom domain (no credentials). CI pushes
-# override these with write credentials in .github/actions/setup-ci-deps.
-SCCACHE_BUCKET = "maplibre-native-ffi-sccache"
-SCCACHE_ENDPOINT = { default = "https://sccache.sargunv.dev" }
-SCCACHE_REGION = "auto"
-SCCACHE_S3_USE_SSL = "true"
-SCCACHE_S3_NO_CREDENTIALS = { default = "1" }
+# sccache keeps compiled objects in its own disk cache, which every checkout on
+# the machine shares; .mise/bin/with-sccache-basedirs lines the cache keys up
+# across Git worktrees. The R2 backend belongs to CI, which configures it in
+# .github/actions/setup-ci-deps: those keys carry the toolchain paths of the
+# runner that produced them, so a contributor machine reads its own disk cache
+# instead. CI wraps rustc there as well, where it turns incremental compilation
+# off to suit sccache; cargo runs unwrapped here so the dev profile keeps it.
 CMAKE_C_COMPILER_LAUNCHER = "sccache"
 CMAKE_CXX_COMPILER_LAUNCHER = "sccache"
-RUSTC_WRAPPER = "sccache"
 
 [deps.uv]
 auto = true
@@ -159,7 +158,7 @@ postinstall = [
 [tasks.configure]
 description = "Configure a native CMake preset."
 usage = 'arg "[preset]" default="{{vars.host_native_preset}}"'
-run = 'cmake --preset "$usage_preset"'
+run = '.mise/bin/with-sccache-basedirs cmake --preset "$usage_preset"'
 
 [tasks.build]
 description = "Configure, build, and install a native CMake preset."
@@ -183,7 +182,7 @@ sources = [
   "third_party/**/*",
 ]
 outputs = { auto = true }
-run = 'cmake --workflow --preset "$usage_preset"'
+run = '.mise/bin/with-sccache-basedirs cmake --workflow --preset "$usage_preset"'
 
 [tasks.clean]
 description = "Remove one native preset build tree."
